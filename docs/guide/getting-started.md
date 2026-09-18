@@ -2,7 +2,7 @@
 
 このページでやること:
 
-1. dek を PATH に載せる
+1. dek を入れる
 2. プロジェクトと最初のデッキを作る
 3. 台本を書いて、骨格のままブラウザで送る
 4. 会場用の単一 HTML を書き出す
@@ -13,32 +13,38 @@ HTML はまだ書かない。声も動画も出さない。成功条件は、同
 
 [Bun](https://bun.sh) 1.3 以上。
 
-dek はまだ npm に載せていない。リポジトリから入れる。
+dek は npm に載せていない。GitHub から実行する。
 
 ```bash
-git clone https://github.com/hajimism/dek.git
-cd dek
-bun install
-bun link
+bunx github:hajimism/dek
 ```
 
-`command -v dek` で衝突を確認する。*dek* は *deck* の異綴りで、Kong の decK が `deck` を使っているため一文字落としている。
+トーク用プロジェクトに固定するなら、そのディレクトリで:
+
+```bash
+bun add github:hajimism/dek
+```
+
+固定したあとは `bunx dek` で足りる。`bunx` は PATH に `dek` を置かない。*dek* は *deck* の異綴りで、Kong の decK が `deck` を使っているため一文字落としている。
 
 ## プロジェクトを作る
 
 dek のリポジトリの外で、トーク用のプロジェクトを作る。
 
 ```bash
-dek init my-talks --deck 2026-04-vite
-cd my-talks/decks/2026-04-vite
+bunx github:hajimism/dek init my-talks --deck 2026-04-vite
+cd my-talks
+bun add github:hajimism/dek
+cd decks/2026-04-vite
 ```
 
-プロジェクトを作るのは最初の一度だけ。最初のデッキも一緒にできる。
+プロジェクトを作るのは最初の一度だけ。最初のデッキも一緒にできる。`bun add` は CLI をプロジェクトに固定するだけで、デッキの HTML は `node_modules` を見ない。
 
 ## 何ができたか
 
 ```
 my-talks/
+├── package.json
 ├── dek.toml
 ├── theme.css
 ├── AGENTS.md
@@ -94,7 +100,7 @@ duration: 20m
 デッキの中で:
 
 ```bash
-dek
+bunx dek
 ```
 
 見出しから骨格スライドが生える。保存のたびに描画と lint が走る。ブラウザで送り、ビートが進むことを確認する。
@@ -104,7 +110,7 @@ dek
 ## 会場 HTML を書き出す
 
 ```bash
-dek build
+bunx dek build
 ```
 
 `my-talks/dist/2026-04-vite.html` ができる。この 1 ファイルをブラウザで開けば発表できる。

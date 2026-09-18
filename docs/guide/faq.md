@@ -1,5 +1,15 @@
 # FAQ
 
+## どう入れるか
+
+npm には載せていない。GitHub から実行する。
+
+```bash
+bunx github:hajimism/dek
+```
+
+トーク用プロジェクトに固定するなら `bun add github:hajimism/dek`。固定したあとは `bunx dek`。手順は [はじめる](./getting-started) を見る。
+
 ## Slidev を使うべきとき
 
 ライブコーディング、スライド内の Vue コンポーネント、テーマの npm ギャラリー、埋め込みエディタが必要なら Slidev を使う。dek は喋りが主役のトーク向けで、素の HTML/CSS で完結することを強みとして維持する。比較は [なぜ dek か](./why#他のツールとの違い) を見る。

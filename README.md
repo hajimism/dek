@@ -6,7 +6,7 @@
 
 **ドキュメント:** [hajimism.github.io/dek](https://hajimism.github.io/dek/)
 
-> *dek* は *deck* の異綴りです。`deck` は Kong の decK が使っているため一文字落としています。導入前に `command -v dek` で `PATH` の衝突だけ確認してください。
+> *dek* は *deck* の異綴りです。`deck` は Kong の decK が使っているため一文字落としています。
 
 ## Why
 
@@ -22,33 +22,36 @@
 
 ## Quick Start
 
-まだ npm には載せていません。リポジトリから入れます。
+[Bun](https://bun.sh) 1.3 以上。npm には載せていません。GitHub から実行します。
 
 ```bash
-git clone https://github.com/hajimism/dek.git
-cd dek
-bun install
-bun link
+bunx github:hajimism/dek init my-talks --deck 2026-04-vite
+cd my-talks
+bun add github:hajimism/dek
+cd decks/2026-04-vite
 ```
 
-プロジェクトを作るのは最初の一度だけです。最初のデッキも一緒に作れます。
-
-```bash
-dek init my-talks --deck 2026-04-vite
-cd my-talks/decks/2026-04-vite
-```
-
-あとは 3 手です。ライブ専用ならここで終わります。
+プロジェクトを作るのは最初の一度だけです。`bun add` したあとは `bunx dek` で足ります。あとは 3 手です。ライブ専用ならここで終わります。
 
 ```bash
 $EDITOR script.md   # ① 喋ることを書く（ここに一番時間をかける）
-dek                 # ② 開発サーバ。見出しからスライドが生え、保存のたびに描画と lint が走る
-dek build           # ③ ../../dist/2026-04-vite.html — この 1 ファイルで発表できる
+bunx dek            # ② 開発サーバ。見出しからスライドが生え、保存のたびに描画と lint が走る
+bunx dek build      # ③ ../../dist/2026-04-vite.html — この 1 ファイルで発表できる
 ```
 
 `script.md` を書いて `dek` を叩けば、骨格スライドが生えて同梱テーマのまま喋れます。HTML を一行も書く必要はありません。
 
 続きは [はじめる](https://hajimism.github.io/dek/guide/getting-started.html)。コマンド一覧は [CLI](https://hajimism.github.io/dek/reference/cli.html)。
+
+## Sample
+
+`sample/` が、dek 自身を題材にした約 8 分のデッキです。`script.md` を開くと、順序と喋りと尺が全部そこにあります。
+
+```bash
+cd sample/decks/why-dek
+bunx github:hajimism/dek
+bunx github:hajimism/dek build   # ../../dist/why-dek.html
+```
 
 ## 開発
 

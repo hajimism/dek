@@ -1,5 +1,7 @@
 # CLI
 
+導入は `bunx github:hajimism/dek` と `bun add github:hajimism/dek`。[はじめる](/guide/getting-started) を見る。以降の例はコマンド名を `dek` と書く。実体は `bunx dek`、まだ固定していなければ `bunx github:hajimism/dek`。
+
 結果を出すコマンドは `--json` を受け付ける。`dek` と `dek rehearse` は起動したままなので JSON にしない。人間向けはテキスト、機械向けは JSON か SARIF。診断は `dek lint --format sarif`。
 
 `init` と `sync` は既存ファイルを上書きしない。足りないものを骨格として作り、余ったものを警告するだけ。リネームもしない。

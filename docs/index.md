@@ -26,11 +26,13 @@ features:
 ---
 
 ```bash
-dek init my-talks --deck 2026-04-vite
-cd my-talks/decks/2026-04-vite
+bunx github:hajimism/dek init my-talks --deck 2026-04-vite
+cd my-talks
+bun add github:hajimism/dek
+cd decks/2026-04-vite
 $EDITOR script.md
-dek
-dek build
+bunx dek
+bunx dek build
 ```
 
 HTML はまだ書かない。[はじめる](/guide/getting-started) で骨格のまま喋れるところまで行く。
