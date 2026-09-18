@@ -1,0 +1,47 @@
+{
+  "name": "dek",
+  "version": "0.0.0",
+  "description": "Talk-script-first HTML slides.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "dek": "src/cli.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hajimism/dek.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hajimism/dek/issues"
+  },
+  "homepage": "https://hajimism.github.io/dek/",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "keywords": [
+    "slides",
+    "cli",
+    "html",
+    "talk-script"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --write .",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2",
+    "vitepress": "^1.6.4"
+  }
+}
