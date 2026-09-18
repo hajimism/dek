@@ -1,0 +1,4 @@
+[test]
+root = "./tests"
+# Async tests in a file overlap while awaiting I/O. Sync tests and test.serial stay sequential.
+concurrentTestGlob = "**/*.test.ts"
