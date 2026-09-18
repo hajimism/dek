@@ -1,0 +1,58 @@
+import { describe, expect, test } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { DekError } from "../../src/core/error.ts";
+import {
+  readDevServerLock,
+  removeDevServerLock,
+  writeDevServerLock,
+} from "../../src/server/lock.ts";
+import { withTempDir } from "../helpers/fs.ts";
+
+describe("writeDevServerLock", () => {
+  test("refuses to overwrite a lock whose pid is still alive", async () => {
+    await withTempDir(async (root) => {
+      await mkdir(join(root, ".dek"), { recursive: true });
+      await writeFile(
+        join(root, ".dek", "server.json"),
+        `${JSON.stringify({ url: "http://127.0.0.1:5173/", pid: process.pid })}\n`,
+      );
+
+      expect(() => writeDevServerLock(root, "http://127.0.0.1:9999/")).toThrow(DekError);
+      try {
+        writeDevServerLock(root, "http://127.0.0.1:9999/");
+      } catch (error) {
+        expect(error).toBeInstanceOf(DekError);
+        expect((error as DekError).message).toContain("http://127.0.0.1:5173/");
+        expect((error as DekError).hint).toContain("http://127.0.0.1:5173/");
+      }
+
+      expect(readDevServerLock(root)?.url).toBe("http://127.0.0.1:5173/");
+    });
+  });
+
+  test("replaces a lock whose pid is dead", async () => {
+    await withTempDir(async (root) => {
+      await mkdir(join(root, ".dek"), { recursive: true });
+      await writeFile(
+        join(root, ".dek", "server.json"),
+        `${JSON.stringify({ url: "http://127.0.0.1:5173/", pid: 2_147_483_647 })}\n`,
+      );
+
+      writeDevServerLock(root, "http://127.0.0.1:9999/");
+      expect(readDevServerLock(root)).toEqual({
+        url: "http://127.0.0.1:9999/",
+        pid: process.pid,
+      });
+      removeDevServerLock(root);
+    });
+  });
+
+  test("refuses a second lock in the same process", async () => {
+    await withTempDir(async (root) => {
+      writeDevServerLock(root, "http://127.0.0.1:1/");
+      expect(() => writeDevServerLock(root, "http://127.0.0.1:2/")).toThrow(DekError);
+      removeDevServerLock(root);
+    });
+  });
+});
