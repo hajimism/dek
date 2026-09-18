@@ -11,4 +11,10 @@ describe("playerChromeCss", () => {
   test("sets transform-origin so scale fits from the top", () => {
     expect(playerChromeCss()).toContain("transform-origin");
   });
+
+  test("hides inactive slides without forcing display on the current one", () => {
+    const css = playerChromeCss({ presenter: false });
+    expect(css).toContain("#deck > .slide:not(.is-current) { display: none; }");
+    expect(css).not.toContain("#deck > .slide.is-current { display: block; }");
+  });
 });
