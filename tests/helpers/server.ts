@@ -5,9 +5,11 @@ export async function withDevServer<T>(
   options: {
     cwd: string;
     port?: number;
+    visual?: boolean;
     visualRunner?: PlaywrightRunner;
     remote?: boolean;
     password?: string;
+    deck?: string;
   },
   fn: (server: DevServer) => Promise<T>,
 ): Promise<T> {

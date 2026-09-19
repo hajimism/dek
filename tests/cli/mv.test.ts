@@ -155,4 +155,26 @@ hello
       },
     );
   });
+
+  test("accepts a positional deck name from the project root", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: twoSectionScript,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const result = await runDek(["mv", "demo", "architecture", "--before", "intro", "--json"], {
+          cwd: root,
+        });
+        expect(result.exitCode).toBe(0);
+        const script = await readFile(join(root, "decks", "demo", "script.md"), "utf8");
+        expect(script.indexOf("## architecture")).toBeLessThan(script.indexOf("## intro"));
+      },
+    );
+  });
 });

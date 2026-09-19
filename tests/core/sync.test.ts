@@ -51,8 +51,8 @@ more
         expect(await readFile(join(deckDir, "slides", "intro.html"), "utf8")).toBe(customIntro);
 
         const extra = await readFile(join(deckDir, "slides", "extra.html"), "utf8");
-        expect(extra).toContain("<!DOCTYPE html>");
-        expect(extra).toContain('<link rel="stylesheet" href="../theme.css">');
+        expect(extra).not.toContain("<!DOCTYPE html>");
+        expect(extra.trimStart().startsWith('<section class="slide"')).toBe(true);
         expect(extractSlide(extra)).toContain('data-layout="title"');
         expect(extractSlide(extra)).toContain('<h2 class="slide-title">extra</h2>');
       },
@@ -68,6 +68,8 @@ more
         const deckDir = join(root, "decks", "demo");
         syncDeck(deckDir);
         const html = await readFile(join(deckDir, "slides", "intro.html"), "utf8");
+        expect(html).not.toContain("<!DOCTYPE html>");
+        expect(html.trimStart().startsWith('<section class="slide"')).toBe(true);
         expect(extractSlide(html)).toBe(
           '<section class="slide" data-layout="title"><h2 class="slide-title">intro</h2></section>',
         );

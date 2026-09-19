@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
@@ -54,17 +55,17 @@ describe("resolveTimelineAudio", () => {
 describe("loadCachedTimeline", () => {
   test("returns undefined when the cache file is missing", async () => {
     await withTempDir(async (dir) => {
-      expect(loadCachedTimeline(dir, "demo")).toBeUndefined();
+      expect(loadCachedTimeline(dir)).toBeUndefined();
     });
   });
 
   test("throws for JSON that is not a Timeline", async () => {
     await withTempDir(async (dir) => {
-      await mkdir(join(dir, ".dek", "voice", "demo"), { recursive: true });
-      await writeFile(join(dir, ".dek", "voice", "demo", "timeline.json"), '{"ok":true}\n');
-      expect(() => loadCachedTimeline(dir, "demo")).toThrow(DekError);
+      await mkdir(join(dir, ".cache", "voice"), { recursive: true });
+      await writeFile(join(dir, ".cache", "voice", "timeline.json"), '{"ok":true}\n');
+      expect(() => loadCachedTimeline(dir)).toThrow(DekError);
       try {
-        loadCachedTimeline(dir, "demo");
+        loadCachedTimeline(dir);
       } catch (error) {
         expect(error).toBeInstanceOf(DekError);
         expect((error as DekError).message).toContain("invalid");
@@ -105,7 +106,7 @@ describe("synthDeck timeline audio", () => {
         };
         expect(pinned.audio).toBe("audio.wav");
         expect(resolveTimelineAudio(pinned, restored.timelinePath)).toBe(
-          voiceCacheFile(root, "demo", "audio.wav"),
+          voiceCacheFile(deckDir, "audio.wav"),
         );
       });
     } finally {
@@ -116,5 +117,20 @@ describe("synthDeck timeline audio", () => {
       }
       await fake.close();
     }
+  });
+
+  test("rejects a pin timeline that is not a Timeline", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, "voice", "pin"), { recursive: true });
+      await writeFile(join(deckDir, "voice", "pin", "timeline.json"), `${JSON.stringify({ not: "a timeline" })}\n`);
+      await writeFile(join(deckDir, "voice", "pin", "master.wav"), silentWav(50));
+      const { synthDeck } = await import("../../src/voice/synth.ts");
+      await expect(synthDeck(deckDir)).rejects.toMatchObject({
+        name: "DekError",
+        message: "invalid timeline.json",
+      });
+      expect(existsSync(voiceCacheFile(deckDir, "timeline.json"))).toBe(false);
+    });
   });
 });

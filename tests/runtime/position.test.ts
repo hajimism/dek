@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  clampPosition,
   formatHash,
   hashChangeTarget,
   parseHash,
@@ -50,6 +51,21 @@ describe("parsePosition", () => {
       parsePosition(JSON.stringify({ slideIndex: Number.POSITIVE_INFINITY, beatIndex: 0 })),
     ).toBeUndefined();
     expect(parsePosition(JSON.stringify({ slideIndex: -1, beatIndex: 0 }))).toBeUndefined();
+    expect(parsePosition(JSON.stringify({ slideIndex: 1.5, beatIndex: 0 }))).toBeUndefined();
+    expect(parsePosition(JSON.stringify({ slideIndex: 0, beatIndex: 1.2 }))).toBeUndefined();
+  });
+});
+
+describe("clampPosition", () => {
+  test("drops a slide that is out of range", () => {
+    expect(clampPosition({ slideIndex: 9, beatIndex: 0 }, [{ beats: 1 }])).toBeUndefined();
+  });
+
+  test("clamps beatIndex to the last beat", () => {
+    expect(clampPosition({ slideIndex: 0, beatIndex: 5 }, [{ beats: 2 }])).toEqual({
+      slideIndex: 0,
+      beatIndex: 1,
+    });
   });
 });
 

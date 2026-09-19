@@ -24,6 +24,19 @@ describe("playerScript", () => {
     expect(script).toContain("dek-budget");
   });
 
+  test("toggles and resizes the left thumbnail rail", () => {
+    expect(script).toContain("dek-rail");
+    expect(script).toContain("dek-thumb-stage");
+    expect(script).toContain("is-rail-hidden");
+    expect(script).toContain("dek-rail-resize");
+  });
+
+  test("toggles presenter chrome without leaving the page", () => {
+    expect(script).toContain("replaceState");
+    expect(script).toContain("dek-next-stage");
+    expect(script).toContain("is-presenter");
+  });
+
   test("scopes live websocket URLs to the current deck path", () => {
     expect(script).toContain("/decks/");
     expect(script).toContain("token");

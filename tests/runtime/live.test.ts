@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   applyLiveEvent,
+  hydrateLiveEvent,
   type LiveHost,
   type LiveSlide,
   liveSlidePath,
@@ -50,6 +51,36 @@ function fakeHost(doc: FakeDoc): LiveHost {
     },
   };
 }
+
+describe("hydrateLiveEvent", () => {
+  test("does not apply a 404 body as slide HTML", async () => {
+    const hydrated = await hydrateLiveEvent(
+      { type: "reload-slide", slug: "intro" },
+      "/",
+      async () => new Response("Not found", { status: 404 }),
+    );
+    expect(hydrated).toBeUndefined();
+  });
+
+  test("does not apply a 500 body as theme CSS", async () => {
+    const hydrated = await hydrateLiveEvent(
+      { type: "reload-theme" },
+      "/",
+      async () => new Response("Internal Server Error", { status: 500 }),
+    );
+    expect(hydrated).toBeUndefined();
+  });
+
+  test("keeps the fragment when fetch succeeds", async () => {
+    const html = `<section class="slide" data-slug="intro">ok</section>`;
+    const hydrated = await hydrateLiveEvent(
+      { type: "reload-slide", slug: "intro" },
+      "/",
+      async () => new Response(html, { status: 200 }),
+    );
+    expect(hydrated).toEqual({ type: "reload-slide", slug: "intro", html });
+  });
+});
 
 describe("applyLiveEvent", () => {
   test("replaces a slide fragment and keeps its slug", () => {

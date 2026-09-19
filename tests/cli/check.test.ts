@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
+import { checkCommand } from "../../src/cli/check.ts";
+import type { VisualRequest } from "../../src/core/playwright.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -120,6 +122,36 @@ more
     );
   });
 
+  test("runs playwright once for visual and shot", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        let calls = 0;
+        const result = await checkCommand({
+          cwd: join(root, "decks", "demo"),
+          slug: "intro",
+          shot: true,
+          runner: async (request: VisualRequest) => {
+            calls += 1;
+            for (const page of request.pages) {
+              if (page.screenshotPath) {
+                await Bun.write(page.screenshotPath, "");
+              }
+            }
+            return {
+              overflows: [{ slug: "intro", step: "1", box: "h2" }],
+              contrasts: [],
+              screenshotPath: request.pages.find((page) => page.screenshotPath)?.screenshotPath,
+            };
+          },
+        });
+        expect(calls).toBe(1);
+        expect(result.shot).toContain(".cache/shots/intro");
+        expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
+      },
+    );
+  });
+
   test("writes a screenshot path with --shot", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
@@ -131,7 +163,7 @@ more
         });
         expect(result.exitCode).toBe(0);
         const json = jsonStdout<CheckOk>(result);
-        expect(json.shot).toContain(".dek/shots/demo/intro");
+        expect(json.shot).toContain(".cache/shots/intro");
         expect(await Bun.file(json.shot ?? "").exists()).toBe(true);
       },
     );
@@ -152,7 +184,7 @@ more
         expect(result.exitCode).toBe(1);
         expect(result.stdout.startsWith("{")).toBe(false);
         expect(result.stdout).toContain("DEK030");
-        expect(result.stdout).toContain(".dek/shots");
+        expect(result.stdout).toContain(".cache/shots");
       },
     );
   });

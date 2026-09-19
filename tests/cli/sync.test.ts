@@ -59,7 +59,8 @@ more
         expect(await readFile(join(deckDir, "slides", "intro.html"), "utf8")).toBe(customIntro);
 
         const extra = await readFile(join(deckDir, "slides", "extra.html"), "utf8");
-        expect(extra).toContain("<!DOCTYPE html>");
+        expect(extra).not.toContain("<!DOCTYPE html>");
+        expect(extra.trimStart().startsWith('<section class="slide"')).toBe(true);
         expect(extractSlide(extra)).toContain('data-layout="title"');
         expect(existsSync(join(root, ".dek", "schema.json"))).toBe(true);
       },

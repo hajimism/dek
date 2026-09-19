@@ -48,7 +48,7 @@ describe("dek shot", () => {
         expect(json.ok).toBe(true);
         expect(json.shots).toHaveLength(1);
         expect(json.shots[0]?.slug).toBe("intro");
-        expect(json.shots[0]?.path).toContain(".dek/shots/demo/intro");
+        expect(json.shots[0]?.path).toContain(".cache/shots/intro");
         expect(await Bun.file(json.shots[0]?.path ?? "").exists()).toBe(true);
       },
     );
@@ -129,6 +129,29 @@ second
         expect(json.shots[0]?.slug).toBe("architecture");
         expect(json.shots[0]?.step).toBe("script-parent");
         expect(json.shots[0]?.path).toContain("architecture");
+      },
+    );
+  });
+
+  test("shots a positional deck from the project root", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "alpha", slides: { intro: introHtml } },
+          { name: "beta", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        await chmod(fakePlaywright, 0o755);
+        const result = await runDek(["shot", "beta", "--json"], {
+          cwd: root,
+          env: { DEK_PLAYWRIGHT: fakePlaywright },
+        });
+        expect(result.exitCode).toBe(0);
+        const json = jsonStdout<ShotOk>(result);
+        expect(json.shots).toHaveLength(1);
+        expect(json.shots[0]?.slug).toBe("intro");
+        expect(json.shots[0]?.path).toContain(`${join("decks", "beta")}`);
       },
     );
   });

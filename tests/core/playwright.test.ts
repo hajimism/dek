@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { chmod } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
+import { resolvePackageFromAncestors } from "../../src/core/optional.ts";
 import {
   defaultPlaywrightRunner,
   parseVisualResponse,
   playwrightResolved,
+  resolvePlaywrightModule,
 } from "../../src/core/playwright.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -92,6 +94,22 @@ describe("defaultPlaywrightRunner", () => {
     });
   });
 
+  test.serial("returns JSON when the worker is slower than timeoutMs", async () => {
+    const slow = join(import.meta.dir, "..", "helpers", "fake-playwright-slow.ts");
+    const previous = process.env.DEK_PLAYWRIGHT;
+    process.env.DEK_PLAYWRIGHT = slow;
+    try {
+      const response = await defaultPlaywrightRunner(request, { timeoutMs: 30 });
+      expect(response).toEqual({ overflows: [], contrasts: [] });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.DEK_PLAYWRIGHT;
+      } else {
+        process.env.DEK_PLAYWRIGHT = previous;
+      }
+    }
+  });
+
   test.serial("throws when an installed worker exits non-zero", async () => {
     const fail = join(import.meta.dir, "..", "helpers", "fake-playwright-fail.ts");
     const previous = process.env.DEK_PLAYWRIGHT;
@@ -123,6 +141,38 @@ describe("defaultPlaywrightRunner", () => {
         process.env.DEK_PLAYWRIGHT = previous;
       }
     }
+  });
+});
+
+describe("resolvePlaywrightModule", () => {
+  test("finds playwright in an ancestor node_modules from a nested cwd", async () => {
+    await withTempDir(async (dir) => {
+      const pkg = join(dir, "node_modules", "playwright");
+      await mkdir(pkg, { recursive: true });
+      await writeFile(
+        join(pkg, "package.json"),
+        `${JSON.stringify({ name: "playwright", main: "index.js" })}\n`,
+      );
+      await writeFile(join(pkg, "index.js"), "module.exports = {}\n");
+      const nested = join(dir, "decks", "why-dek");
+      await mkdir(nested, { recursive: true });
+      const previous = process.env.DEK_PLAYWRIGHT;
+      const cwd = process.cwd();
+      delete process.env.DEK_PLAYWRIGHT;
+      try {
+        process.chdir(nested);
+        expect(resolvePackageFromAncestors("playwright", nested)).toBe(join(pkg, "index.js"));
+        expect(resolvePlaywrightModule()).toContain("playwright");
+        expect(playwrightResolved()).toBe(true);
+      } finally {
+        process.chdir(cwd);
+        if (previous === undefined) {
+          delete process.env.DEK_PLAYWRIGHT;
+        } else {
+          process.env.DEK_PLAYWRIGHT = previous;
+        }
+      }
+    });
   });
 });
 

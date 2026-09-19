@@ -21,6 +21,7 @@ describe("parseScript", () => {
     expect(deck.date).toBe("2026-04-18");
     expect(deck.duration).toBe("20m");
     expect(deck.ratio).toBe("16:9");
+    expect(deck.lang).toBe("ja");
     expect(deck.sections).toHaveLength(3);
 
     const intro = deck.sections[0];
@@ -49,6 +50,19 @@ describe("parseScript", () => {
     expect(architecture?.beats[0]?.line).toBe(headingLine(source, "### script.md が親"));
     expect(architecture?.beats[1]?.title).toBe("スライドがぶら下がる");
     expect(architecture?.beats[2]?.title).toBe("逆だと喋れない");
+  });
+
+  test("reads lang from frontmatter", () => {
+    const source = `---
+title: Talk
+lang: en
+---
+
+## intro
+
+hello
+`;
+    expect(parseScript(source).lang).toBe("en");
   });
 
   test("lets a qualifying heading keep a distinct {#id}", () => {

@@ -25,6 +25,7 @@ describe("dek help", () => {
     expect(help.stdout).toContain("Slide");
     expect(help.stdout).toContain("CI");
     expect(help.stdout).toContain("dek help --agent");
+    expect(help.stdout).toContain("--root-dist");
     expect(help.stdout).toContain(
       "Commands that print a result accept --json. dek and dek rehearse stay running.",
     );
@@ -43,6 +44,7 @@ describe("dek help", () => {
     expect(result.stdout).toContain("sarif");
     expect(result.stdout).toContain("pdf");
     expect(result.stdout).toContain("--remote");
+    expect(result.stdout).toContain("--root-dist");
     expect(result.stdout).toContain("pin");
     expect(result.stdout).toContain(
       "Result commands accept --json. dek / rehearse do not (long-running).",

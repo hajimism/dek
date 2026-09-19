@@ -58,6 +58,7 @@ describe("shotDeck", () => {
         });
         expect(calls).toBe(1);
         expect(shots.map((shot) => shot.slug)).toEqual(["intro", "architecture"]);
+        expect(shots[0]?.path).toBe(join(root, "decks", "demo", ".cache", "shots", "intro.png"));
       },
     );
   });
@@ -81,6 +82,51 @@ describe("shotDeck", () => {
         await expect(shotDeck(resolved.deck.dir, { runner })).rejects.toThrow(DekError);
         const shots = await shotDeck(resolved, { runner });
         expect(shots.map((shot) => shot.slug)).toEqual(["intro"]);
+      },
+    );
+  });
+
+  test("rejects a numeric step that does not exist on a title slide", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await expect(
+          shotDeck(join(root, "decks", "demo"), {
+            slug: "intro",
+            step: "2",
+            runner: async () => ({ overflows: [], contrasts: [] }),
+          }),
+        ).rejects.toMatchObject({
+          name: "DekError",
+          message: 'step "2" not found in "intro"',
+        });
+      },
+    );
+  });
+
+  test("accepts step 1 on a title slide with no beats", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const shots = await shotDeck(join(root, "decks", "demo"), {
+          slug: "intro",
+          step: "1",
+          runner: async (request) => {
+            expect(request.pages).toHaveLength(1);
+            const path = request.pages[0]?.screenshotPath;
+            if (path) {
+              await Bun.write(path, "");
+            }
+            return { overflows: [], contrasts: [] };
+          },
+        });
+        expect(shots).toEqual([
+          {
+            slug: "intro",
+            step: "1",
+            path: join(root, "decks", "demo", ".cache", "shots", "intro-1.png"),
+          },
+        ]);
       },
     );
   });

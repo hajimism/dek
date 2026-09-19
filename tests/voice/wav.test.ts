@@ -21,4 +21,20 @@ describe("concatWavs", () => {
     const out = concatWavs([tone(1000), tone(400)], [700, 700], 200);
     expect(wavDurationMs(out)).toBe(3000);
   });
+
+  test("throws when sample rates differ", () => {
+    const a = encodeWav({
+      sampleRate: 24000,
+      channels: 1,
+      bitsPerSample: 16,
+      pcm: silencePcm(50, { sampleRate: 24000, channels: 1, bitsPerSample: 16 }),
+    });
+    const b = encodeWav({
+      sampleRate: 48000,
+      channels: 1,
+      bitsPerSample: 16,
+      pcm: silencePcm(50, { sampleRate: 48000, channels: 1, bitsPerSample: 16 }),
+    });
+    expect(() => concatWavs([a, b], [0, 0])).toThrow();
+  });
 });

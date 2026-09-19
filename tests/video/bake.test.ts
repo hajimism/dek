@@ -108,11 +108,11 @@ describe("bakeVideo", () => {
           join(deckDir, "voice", "voice.toml"),
           `engine = "voicevox"\nspeaker = "ずんだもん/ノーマル"\nspeed = 1\n`,
         );
-        const cacheDir = join(root, ".dek", "voice", "demo");
+        const cacheDir = join(deckDir, ".cache", "voice");
         mkdirSync(cacheDir, { recursive: true });
-        await writeFile(voiceCacheFile(root, "demo", "audio.wav"), silentWav(200));
+        await writeFile(voiceCacheFile(deckDir, "audio.wav"), silentWav(200));
         await writeFile(
-          voiceCacheFile(root, "demo", "timeline.json"),
+          voiceCacheFile(deckDir, "timeline.json"),
           `${JSON.stringify({
             audio: "audio.wav",
             durationMs: 200,
@@ -133,7 +133,7 @@ describe("bakeVideo", () => {
         await expect(bakeVideo(resolved.deck.dir, { runner })).rejects.toThrow(DekError);
         try {
           const result = await bakeVideo(resolved, { runner });
-          expect(result.out).toBe(join(root, "dist", "demo.mp4"));
+          expect(result.out).toBe(join(root, "decks", "demo", "dist", "demo.mp4"));
         } catch (error) {
           expect(error).toBeInstanceOf(DekError);
           expect((error as DekError).message).toBe("ffmpeg not found");

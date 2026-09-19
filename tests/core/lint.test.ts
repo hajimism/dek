@@ -40,6 +40,31 @@ describe("lintDeck", () => {
     );
   });
 
+  test("DEK006: data-slug does not match the section id", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(
+                `<section class="slide" data-slug="other" data-layout="title"><h2 class="slide-title">intro</h2></section>`,
+              ),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        expect(diagnostics.some((d) => d.id === "DEK006")).toBe(true);
+        const dek006 = diagnostics.find((d) => d.id === "DEK006");
+        expect(dek006?.path).toContain("slides/intro.html");
+        expect(dek006?.message).toContain("other");
+        expect(dek006?.slug).toBe("intro");
+      },
+    );
+  });
+
   test("DEK001: script.md has a section with no HTML", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const diagnostics = lintDeck(join(root, "decks", "demo"));
@@ -715,9 +740,9 @@ hello
         ],
       },
       async (root) => {
-        await mkdir(join(root, ".dek", "voice", "demo"), { recursive: true });
+        await mkdir(join(root, "decks", "demo", ".cache", "voice"), { recursive: true });
         await writeFile(
-          join(root, ".dek", "voice", "demo", "timeline.json"),
+          join(root, "decks", "demo", ".cache", "voice", "timeline.json"),
           JSON.stringify({
             audio: "",
             durationMs: 1000,
@@ -757,9 +782,9 @@ hello
         ],
       },
       async (root) => {
-        await mkdir(join(root, ".dek", "voice", "demo"), { recursive: true });
+        await mkdir(join(root, "decks", "demo", ".cache", "voice"), { recursive: true });
         await writeFile(
-          join(root, ".dek", "voice", "demo", "timeline.json"),
+          join(root, "decks", "demo", ".cache", "voice", "timeline.json"),
           JSON.stringify({
             audio: "",
             durationMs: 600_000,
@@ -856,9 +881,9 @@ hello dek
           join(dir, "voice.toml"),
           `engine = "voicevox"\nspeaker = "ずんだもん/ノーマル"\n`,
         );
-        await mkdir(join(root, ".dek", "voice", "demo"), { recursive: true });
+        await mkdir(join(root, "decks", "demo", ".cache", "voice"), { recursive: true });
         await writeFile(
-          join(root, ".dek", "voice", "demo", "timeline.json"),
+          join(root, "decks", "demo", ".cache", "voice", "timeline.json"),
           JSON.stringify({
             audio: "",
             durationMs: 1000,

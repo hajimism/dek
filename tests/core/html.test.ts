@@ -2,11 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadConfig } from "../../src/core/config.ts";
-import { renderDeckDocument, renderDeckHtml } from "../../src/core/document.ts";
+import { renderDeckDocument, renderDeckHtml, renderRailHtml } from "../../src/core/document.ts";
 import {
   applyShownClasses,
   extractSlideSection,
   injectSlug,
+  loadSlideSources,
   renderIndexHtml,
   renderSlideHtml,
 } from "../../src/core/html.ts";
@@ -41,6 +42,18 @@ async function renderPage(
 }
 
 describe("extractSlideSection", () => {
+  const fragment = `<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+</section>`;
+
+  test("returns a file that is only a slide section", () => {
+    expect(extractSlideSection(fragment)).toBe(fragment);
+  });
+
+  test("returns the same section from a full document", () => {
+    expect(extractSlideSection(slideDocument(fragment))).toBe(fragment);
+  });
+
   test("accepts an unquoted class attribute", () => {
     const html = `<body><section class=slide data-layout="title"><h2>intro</h2></section></body>`;
     expect(extractSlideSection(html)).toContain("intro");
@@ -116,6 +129,20 @@ describe("applyShownClasses", () => {
   });
 });
 
+describe("renderRailHtml", () => {
+  test("lists each slide as a hash link", () => {
+    const html = renderRailHtml([
+      { slug: "intro", title: "intro" },
+      { slug: "architecture", title: "architecture" },
+    ]);
+    expect(html).toContain('id="dek-rail"');
+    expect(html).toContain('href="#intro"');
+    expect(html).toContain('href="#architecture"');
+    expect(html).toContain('data-slide-index="0"');
+    expect(html).toContain('data-slide-index="1"');
+  });
+});
+
 describe("renderDeckDocument", () => {
   test("embeds the supplied player script", async () => {
     await withTempProject(
@@ -132,9 +159,92 @@ describe("renderDeckDocument", () => {
       },
     );
   });
+
+  test("uses lang from frontmatter on the document shell", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+lang: en
+---
+
+## intro
+
+hello
+`,
+            slides: { intro: introHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const { project, deck } = resolveDeck(join(root, "decks", "demo"));
+        const html = await renderDeckDocument(deck, {
+          mode: "player",
+          inlineAssets: false,
+          config: loadConfig(project.configPath),
+          playerScript: "",
+        });
+        expect(html).toContain('<html lang="en">');
+        expect(html).not.toContain('<html lang="ja">');
+      },
+    );
+  });
+
+  test("defaults the document shell to ja", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const { project, deck } = resolveDeck(join(root, "decks", "demo"));
+        const html = await renderDeckDocument(deck, {
+          mode: "player",
+          inlineAssets: false,
+          config: loadConfig(project.configPath),
+          playerScript: "",
+        });
+        expect(html).toContain('<html lang="ja">');
+      },
+    );
+  });
 });
 
 describe("renderDeckHtml", () => {
+  test("lists slides in a left rail in player mode", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## architecture
+
+body
+`,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const html = await renderPage(join(root, "decks", "demo"));
+        expect(html).toContain('id="dek-rail"');
+        expect(html).toContain('id="dek-rail-resize"');
+        expect(html).toContain('href="#intro"');
+        expect(html).toContain('href="#architecture"');
+        expect(html).not.toContain('class="is-presenter"');
+        expect(html).toContain("body.is-presenter #dek-rail");
+      },
+    );
+  });
+
   test("shows the next slide title and beat indexes in presenter mode", async () => {
     await withTempProject(
       {
@@ -161,9 +271,19 @@ body
       },
       async (root) => {
         const html = await renderPage(join(root, "decks", "demo"), { mode: "presenter" });
+        expect(html).toContain('class="is-presenter"');
+        expect(html).toContain('id="dek-shell"');
+        expect(html).toContain('id="dek-current-stage"');
+        expect(html).toContain('id="dek-next-stage"');
+        expect(html).toContain('id="dek-progress"');
+        expect(html).toContain('id="dek-page"');
         expect(html).toContain('id="dek-next"');
         expect(html).toMatch(/id="dek-next"[^>]*>[\s\S]*architecture/);
         expect(html).toContain('data-beat-index="0"');
+        expect(html).not.toMatch(/id="dek-presenter" hidden/);
+        expect(html).toContain('id="dek-rail"');
+        expect(html).toContain('href="#intro"');
+        expect(html).toContain("body.is-presenter #dek-rail");
       },
     );
   });
@@ -227,6 +347,8 @@ hello
         const html = await renderPage(join(root, "decks", "demo"), { mode: "video" });
         expect(html).toContain('data-mode="video"');
         expect(html).not.toContain('id="dek-presenter"');
+        expect(html).not.toContain('id="dek-rail"');
+        expect(html).not.toContain('id="dek-rail-resize"');
       },
     );
   });
@@ -237,6 +359,7 @@ describe("renderIndexHtml", () => {
     const html = renderIndexHtml([{ name: "demo", title: "Demo" }]);
     expect(html).toContain('href="/decks/demo/"');
     expect(html).toContain("demo");
+    expect(html).toContain('<html lang="ja">');
   });
 
   test("lists failed decks", () => {
@@ -292,6 +415,73 @@ second
         expect(html).not.toMatch(
           /data-step="slides-hang"[^>]*is-shown|is-shown[^>]*data-step="slides-hang"/,
         );
+        expect(html).toContain('<html lang="ja">');
+      },
+    );
+  });
+
+  test("reuses loaded theme css across beats after theme.css is removed", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: `.slide { background: navy; }`,
+            script: `---
+title: Demo
+---
+
+## architecture
+
+### one
+
+a
+
+### two
+
+b
+`,
+            slides: { architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const { unlink } = await import("node:fs/promises");
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
+        const sources = loadSlideSources(deck);
+        const first = renderSlideHtml(deck, "architecture", 0, sources);
+        await unlink(join(deck.dir, "theme.css"));
+        const second = renderSlideHtml(deck, "architecture", 1, sources);
+        expect(first).toContain("navy");
+        expect(second).toContain("navy");
+      },
+    );
+  });
+
+  test("uses lang from frontmatter on the slide shell", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+lang: en
+---
+
+## intro
+
+hello
+`,
+            slides: { intro: introHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
+        const html = renderSlideHtml(deck, "intro", 0);
+        expect(html).toContain('<html lang="en">');
+        expect(html).not.toContain('<html lang="ja">');
       },
     );
   });

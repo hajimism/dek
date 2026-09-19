@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   inferDeckName,
+  peelDeckArg,
   requireDeckFromCwd,
   requireSection,
   resolveDecks,
@@ -60,8 +61,8 @@ describe("requireDeckFromCwd", () => {
         requireDeckFromCwd(root);
       } catch (error) {
         expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toBe("not inside a deck directory; use --deck <name>");
-        expect((error as DekError).hint).toBe("use --deck <name>");
+        expect((error as DekError).message).toBe("not inside a deck directory; pass a deck name");
+        expect((error as DekError).hint).toBe("pass a deck name or --deck <name>");
       }
     });
   });
@@ -113,6 +114,78 @@ describe("resolveDecks", () => {
       const result = resolveDecks(root);
       expect(result.deck).toBeUndefined();
       expect(result.decks.map((deck) => deck.name)).toEqual(["alpha", "beta"]);
+    });
+  });
+});
+
+describe("peelDeckArg", () => {
+  test("takes a positional deck for lint from the project root", async () => {
+    await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
+      expect(peelDeckArg(root, { command: "lint", args: ["beta"] })).toEqual({
+        deck: "beta",
+        rest: [],
+      });
+    });
+  });
+
+  test("keeps --deck and leaves remaining args alone", async () => {
+    await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
+      expect(peelDeckArg(root, { command: "show", deck: "beta", args: ["intro"] })).toEqual({
+        deck: "beta",
+        rest: ["intro"],
+      });
+    });
+  });
+
+  test("peels a known deck before a slug from the project root", async () => {
+    await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
+      expect(peelDeckArg(root, { command: "show", args: ["beta", "intro"] })).toEqual({
+        deck: "beta",
+        rest: ["intro"],
+      });
+      expect(peelDeckArg(root, { command: "shot", args: ["beta"] })).toEqual({
+        deck: "beta",
+        rest: [],
+      });
+    });
+  });
+
+  test("does not steal a slug when cwd is already a deck", async () => {
+    await withTempProject({ decks: [{ name: "intro" }, { name: "demo" }] }, async (root) => {
+      expect(
+        peelDeckArg(join(root, "decks", "demo"), { command: "shot", args: ["intro"] }),
+      ).toEqual({ rest: ["intro"] });
+    });
+  });
+
+  test("does not treat voice subcommands as deck names", async () => {
+    await withTempProject({ decks: [{ name: "demo" }, { name: "speakers" }] }, async (root) => {
+      expect(peelDeckArg(root, { command: "voice", args: ["speakers"] })).toEqual({
+        rest: ["speakers"],
+      });
+      expect(peelDeckArg(root, { command: "voice", args: ["demo", "say", "hello"] })).toEqual({
+        deck: "demo",
+        rest: ["say", "hello"],
+      });
+    });
+  });
+
+  test("peels mv only when a deck plus two slugs are present", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      expect(peelDeckArg(root, { command: "mv", args: ["demo", "old", "new"] })).toEqual({
+        deck: "demo",
+        rest: ["old", "new"],
+      });
+      expect(
+        peelDeckArg(root, {
+          command: "mv",
+          args: ["demo", "architecture"],
+          before: "intro",
+        }),
+      ).toEqual({ deck: "demo", rest: ["architecture"] });
+      expect(peelDeckArg(root, { command: "mv", args: ["architecture", "intro"] })).toEqual({
+        rest: ["architecture", "intro"],
+      });
     });
   });
 });

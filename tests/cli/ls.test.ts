@@ -290,9 +290,9 @@ body
         ],
       },
       async (root) => {
-        await mkdir(join(root, ".dek", "voice", "demo"), { recursive: true });
+        await mkdir(join(root, "decks", "demo", ".cache", "voice"), { recursive: true });
         await writeFile(
-          join(root, ".dek", "voice", "demo", "timeline.json"),
+          join(root, "decks", "demo", ".cache", "voice", "timeline.json"),
           JSON.stringify({
             audio: "",
             durationMs: 8000,

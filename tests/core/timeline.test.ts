@@ -26,6 +26,7 @@ describe("splitSentences", () => {
   test("splits English and fullwidth periods", () => {
     expect(splitSentences("Hello. Next.")).toEqual(["Hello.", "Next."]);
     expect(splitSentences("終わり．つぎ．")).toEqual(["終わり．", "つぎ．"]);
+    expect(splitSentences("Dr. Smith spoke.")).toEqual(["Dr. Smith spoke."]);
   });
 
   test("does not split file extensions or decimals", () => {

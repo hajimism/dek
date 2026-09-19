@@ -144,6 +144,32 @@ describe("defaultVideoRunner", () => {
     });
   });
 
+  test.serial("returns frames when the worker is slower than timeoutMs", async () => {
+    await withTempDir(async (dir) => {
+      const previous = process.env.DEK_VIDEO;
+      process.env.DEK_VIDEO = join(import.meta.dir, "../helpers/fake-video-slow.ts");
+      try {
+        const captured = await defaultVideoRunner(
+          {
+            html: "<html></html>",
+            timeline,
+            fps: 30,
+            viewport: { width: 1, height: 1 },
+            outDir: dir,
+          },
+          { timeoutMs: 30 },
+        );
+        expect(captured.frames.length).toBeGreaterThan(0);
+      } finally {
+        if (previous === undefined) {
+          delete process.env.DEK_VIDEO;
+        } else {
+          process.env.DEK_VIDEO = previous;
+        }
+      }
+    });
+  });
+
   test.serial("throws when the worker exits non-zero", async () => {
     await withTempDir(async (dir) => {
       const previous = process.env.DEK_VIDEO;
@@ -200,6 +226,39 @@ describe("muxVideo", () => {
         (name) => name.startsWith("dek-mux-") && !before.has(name),
       );
       expect(leftover).toEqual([]);
+    });
+  });
+
+  test.serial("resolves when ffmpeg writes a megabyte of stderr", async () => {
+    await withTempDir(async (dir) => {
+      const a = join(dir, "a.png");
+      writeFileSync(a, PNG);
+      const wav = join(dir, "audio.wav");
+      writeFileSync(wav, silentWav(200));
+      const out = join(dir, "out.mp4");
+      const previous = process.env.DEK_FFMPEG;
+      process.env.DEK_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
+      try {
+        const started = Date.now();
+        await Promise.race([
+          muxVideo({
+            frames: [{ path: a, durationMs: 100 }],
+            audioPath: wav,
+            outPath: out,
+          }),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("hung")), 2000);
+          }),
+        ]);
+        expect(Date.now() - started).toBeLessThan(2000);
+        expect(await Bun.file(out).exists()).toBe(true);
+      } finally {
+        if (previous === undefined) {
+          delete process.env.DEK_FFMPEG;
+        } else {
+          process.env.DEK_FFMPEG = previous;
+        }
+      }
     });
   });
 

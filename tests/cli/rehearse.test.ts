@@ -36,7 +36,7 @@ describe("voice timeline route", () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const dir = join(root, ".dek", "voice", "demo");
+        const dir = join(root, "decks", "demo", ".cache", "voice");
         await mkdir(dir, { recursive: true });
         await writeFile(
           join(dir, "timeline.json"),

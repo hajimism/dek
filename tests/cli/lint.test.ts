@@ -124,7 +124,8 @@ more
         expect(json.diagnostics.some((d) => d.id === "DEK001")).toBe(false);
 
         const intro = await Bun.file(join(deckDir, "slides", "intro.html")).text();
-        expect(intro).toContain("<!DOCTYPE html>");
+        expect(intro).not.toContain("<!DOCTYPE html>");
+        expect(intro.trimStart().startsWith('<section class="slide"')).toBe(true);
         expect(intro).toContain("intro");
 
         const extra = await Bun.file(join(deckDir, "slides", "extra.html")).text();
@@ -282,6 +283,33 @@ more
           true,
         );
         expect(json.diagnostics.some((d) => d.path?.includes("alpha"))).toBe(false);
+      },
+    );
+  });
+
+  test("scopes lint with a positional deck name", async () => {
+    await withTempProject(
+      {
+        decks: [{ name: "alpha", slides: { intro: introHtml } }, { name: "beta" }],
+      },
+      async (root) => {
+        const result = await runDek(["lint", "alpha", "--json"], { cwd: root });
+        expect(result.exitCode).toBe(0);
+        const json = jsonStdout<LintOk>(result);
+        expect(json.ok).toBe(true);
+        expect(json.diagnostics).toEqual([]);
+      },
+    );
+  });
+
+  test("fails when the positional deck name is missing", async () => {
+    await withTempProject(
+      { decks: [{ name: "alpha", slides: { intro: introHtml } }] },
+      async (root) => {
+        const result = await runDek(["lint", "nope", "--json"], { cwd: root });
+        expect(result.exitCode).toBe(1);
+        const json = jsonStdout<{ ok: false; error: { message?: string } }>(result);
+        expect(json.error.message).toContain('deck "nope" not found');
       },
     );
   });

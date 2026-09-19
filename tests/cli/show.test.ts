@@ -38,6 +38,23 @@ describe("dek show", () => {
     );
   });
 
+  test("accepts a positional deck name from the project root", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "alpha", slides: { intro: introHtml } },
+          { name: "beta", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const result = await runDek(["show", "beta", "intro", "--json"], { cwd: root });
+        expect(result.exitCode).toBe(0);
+        const json = jsonStdout<ShowOk>(result);
+        expect(json.slug).toBe("intro");
+      },
+    );
+  });
+
   test("returns html null when the slide file is missing", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await runDek(["show", "intro", "--json"], {

@@ -47,7 +47,7 @@ describe("dek voice", () => {
       expect(firstJson.synthesized).toBe(1);
       expect(firstJson.cached).toBe(0);
       const timeline = JSON.parse(
-        await Bun.file(join(_root, ".dek", "voice", "demo", "timeline.json")).text(),
+        await Bun.file(join(deckDir, ".cache", "voice", "timeline.json")).text(),
       ) as { audio: string };
       expect(timeline.audio).toBe("audio.wav");
 

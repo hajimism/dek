@@ -36,7 +36,7 @@ describe("dek pdf", () => {
         expect(result.exitCode).toBe(0);
         const json = jsonStdout<PdfOk>(result);
         expect(json.ok).toBe(true);
-        expect(json.out).toBe(join(root, "dist", "demo.pdf"));
+        expect(json.out).toBe(join(root, "decks", "demo", "dist", "demo.pdf"));
         expect(await Bun.file(json.out).exists()).toBe(true);
       },
     );
@@ -74,9 +74,29 @@ describe("dek pdf", () => {
         expect(result.exitCode).toBe(0);
         const json = jsonStdout<{ ok: true; outs: string[] }>(result);
         expect(json.outs).toEqual([
-          join(root, "dist", "alpha.pdf"),
-          join(root, "dist", "beta.pdf"),
+          join(root, "decks", "alpha", "dist", "alpha.pdf"),
+          join(root, "decks", "beta", "dist", "beta.pdf"),
         ]);
+      },
+    );
+  });
+
+  test("writes project dist/<deck>.pdf with --root-dist", async () => {
+    await withTempProject(
+      {
+        decks: [{ name: "demo", slides: { intro: introHtml } }],
+      },
+      async (root) => {
+        await chmod(fakePlaywright, 0o755);
+        const result = await runDek(["pdf", "--json", "--root-dist"], {
+          cwd: join(root, "decks", "demo"),
+          env: { DEK_PLAYWRIGHT: fakePlaywright },
+        });
+        expect(result.exitCode).toBe(0);
+        const json = jsonStdout<PdfOk>(result);
+        expect(json.ok).toBe(true);
+        expect(json.out).toBe(join(root, "dist", "demo.pdf"));
+        expect(await Bun.file(json.out).exists()).toBe(true);
       },
     );
   });

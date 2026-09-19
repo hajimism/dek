@@ -52,7 +52,7 @@ more
         await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
 
         const result = await build(deckDir);
-        expect(result.outPath).toBe(join(root, "dist", "demo.html"));
+        expect(result.outPath).toBe(join(root, "decks", "demo", "dist", "demo.html"));
         expect(existsSync(result.outPath)).toBe(true);
 
         const html = await readFile(result.outPath, "utf8");

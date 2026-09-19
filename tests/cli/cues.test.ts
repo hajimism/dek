@@ -95,4 +95,31 @@ hello
       },
     );
   });
+
+  test("accepts a positional deck name from the project root", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+`,
+          },
+        ],
+      },
+      async (root) => {
+        const result = await runDek(["cues", "demo", "--json"], { cwd: root });
+        expect(result.exitCode).toBe(0);
+        const json = jsonStdout<CuesOk>(result);
+        expect(json.name).toBe("demo");
+        expect(json.cues[0]?.paragraphs).toEqual(["hello"]);
+      },
+    );
+  });
 });

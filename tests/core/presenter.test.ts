@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { type PresenterSlide, presenterState } from "../../src/core/presenter.ts";
+import {
+  nextPresenterTitle,
+  type PresenterSlide,
+  presenterState,
+} from "../../src/core/presenter.ts";
 
 const slides: PresenterSlide[] = [
   {
@@ -33,5 +37,30 @@ describe("presenterState", () => {
     expect(state.script).toContain("body text");
     expect(state.currentBeat).toEqual({ id: "hook", title: "script.md が親" });
     expect(state.currentBeatIndex).toBe(0);
+  });
+});
+
+describe("nextPresenterTitle", () => {
+  test("uses the next slide title when the current slide is on its last beat", () => {
+    const state = presenterState(slides, { slideIndex: 0, beatIndex: 0 });
+    expect(nextPresenterTitle(state)).toBe("architecture");
+  });
+
+  test("keeps the current title while more beats remain", () => {
+    const multi: PresenterSlide[] = [
+      {
+        slug: "intro",
+        title: "intro",
+        script: "hello",
+        beats: [{ title: "a" }, { title: "b" }],
+      },
+    ];
+    const state = presenterState(multi, { slideIndex: 0, beatIndex: 0 });
+    expect(nextPresenterTitle(state)).toBe("intro");
+  });
+
+  test("is empty on the last beat of the last slide", () => {
+    const state = presenterState(slides, { slideIndex: 1, beatIndex: 0 });
+    expect(nextPresenterTitle(state)).toBe("");
   });
 });
