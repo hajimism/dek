@@ -1,19 +1,24 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <link rel="stylesheet" href="../theme.css">
-</head>
-<body>
-  <section class="slide" data-layout="two-col">
-    <div class="col">
-      <p class="node node-parent" data-step="script-parent" data-morph="script">script.md</p>
-    </div>
-    <div class="col" data-step="slides-hang">
-      <p class="node">intro.html</p>
-      <p class="node">problem.html</p>
-      <p class="node">order.html</p>
-    </div>
-  </section>
-</body>
-</html>
+<section class="slide" data-layout="tree">
+  <p class="kicker">今日いちばん覚えて帰ってほしいこと</p>
+  <h2 class="slide-title">台本が親で、スライドは従う。</h2>
+  <p class="node node-parent" data-step="script-parent" data-morph="script">
+    <img class="icon" src="assets/icon-script.svg" alt="">
+    script.md
+    <span class="note">順序も、喋りも、尺も</span>
+  </p>
+  <div class="col stack" data-step="slides-hang">
+    <p class="node">
+      <img class="icon" src="assets/icon-slide.svg" alt="">
+      intro.html
+    </p>
+    <p class="node">
+      <img class="icon" src="assets/icon-slide.svg" alt="">
+      problem.html
+    </p>
+    <p class="node">
+      <img class="icon" src="assets/icon-slide.svg" alt="">
+      order.html
+    </p>
+  </div>
+  <p class="meta"><span>dek sample</span><span>2026.09.18</span></p>
+</section>

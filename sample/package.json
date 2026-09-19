@@ -1,0 +1,25 @@
+{
+  "name": "dek-sample",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "playwright install chromium",
+    "dev": "dek",
+    "build": "dek build",
+    "lint": "dek lint",
+    "lint:visual": "dek lint --visual",
+    "shot": "dek shot",
+    "pdf": "dek pdf",
+    "cues": "dek cues",
+    "voice": "dek voice",
+    "rehearse": "dek rehearse",
+    "video": "dek video"
+  },
+  "dependencies": {
+    "dek": "file:.."
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0",
+    "rumdl": "^0.2.73"
+  }
+}

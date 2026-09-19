@@ -5,7 +5,7 @@ Talk-script-first HTML slides.
 ## Principles
 
 - `script.md` is the source of truth for order, script, and timing.
-- Each slide is a self-contained HTML document.
+- Each slide is a `<section class="slide">` fragment.
 - Conventions are enforced by lint; a deck is done when lint passes.
 
 ## Conventions
@@ -18,38 +18,69 @@ Talk-script-first HTML slides.
 
 ## Theme classes
 
+- `claim`
 - `col`
+- `exhibit`
 - `figure`
 - `figure-small`
+- `flow`
+- `icon`
 - `is-current`
 - `is-shown`
+- `kicker`
+- `lede`
+- `mark`
+- `meta`
 - `node`
 - `node-parent`
+- `note`
+- `num`
 - `slide`
 - `slide-title`
+- `stack`
+- `stat`
 
 ## Theme tokens
 
 - `--accent`
 - `--bg`
+- `--brand`
+- `--brand-soft`
+- `--canvas`
 - `--fg`
 - `--font-body`
 - `--font-title`
 - `--gap`
+- `--hairline`
+- `--icon`
+- `--icon-lg`
+- `--line`
 - `--muted`
 - `--pad`
+- `--pad-x`
+- `--pad-y`
 - `--radius`
+- `--rail`
 - `--size-body`
 - `--size-caption`
+- `--size-stat`
 - `--size-title`
 - `--step-transition`
+- `--surface`
+- `--surface-strong`
+- `--tracking`
 
 ## Layouts
 
+- `close`
 - `default`
 - `full-bleed`
+- `pipeline`
+- `process`
 - `quote`
+- `split`
 - `title`
+- `tree`
 - `two-col`
 
 For commands, run `dek help --agent`.

@@ -1,0 +1,50 @@
+[AI]
+kana = "エーアイ"
+
+[DSL]
+kana = "ディーエスエル"
+
+[Google]
+kana = "グーグル"
+
+[HTML]
+kana = "エイチティーエムエル"
+
+[LAN]
+kana = "ラン"
+
+[LLM]
+kana = "エルエルエム"
+
+[PowerPoint]
+kana = "パワーポイント"
+
+[Slides]
+kana = "スライズ"
+
+[Slidev]
+kana = "スライデヴ"
+
+[USB]
+kana = "ユーエスビー"
+
+[build]
+kana = "ビルド"
+
+[data-morph]
+kana = "データモーフ"
+
+[dek]
+kana = "デック"
+
+[lint]
+kana = "リント"
+
+["script.md"]
+kana = "スクリプトエムディー"
+
+["slides.md"]
+kana = "スライドエムディー"
+
+["theme.css"]
+kana = "テーマシーエスエス"

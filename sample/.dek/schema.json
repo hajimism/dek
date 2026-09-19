@@ -24,11 +24,17 @@
         "16:9",
         "4:3"
       ]
+    },
+    "lang": {
+      "default": "ja",
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
     }
   },
   "required": [
     "title",
-    "ratio"
+    "ratio",
+    "lang"
   ],
   "additionalProperties": false
 }
