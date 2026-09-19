@@ -1,6 +1,7 @@
 node_modules/
 coverage/
 dist/
+.cache/
 bin/
 *.log
 .DS_Store
