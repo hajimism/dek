@@ -35,8 +35,8 @@ export function parsePosition(payload: string): Position | undefined {
     if (
       typeof parsed.slideIndex === "number" &&
       typeof parsed.beatIndex === "number" &&
-      Number.isFinite(parsed.slideIndex) &&
-      Number.isFinite(parsed.beatIndex) &&
+      Number.isInteger(parsed.slideIndex) &&
+      Number.isInteger(parsed.beatIndex) &&
       parsed.slideIndex >= 0 &&
       parsed.beatIndex >= 0
     ) {
@@ -46,6 +46,21 @@ export function parsePosition(payload: string): Position | undefined {
     return undefined;
   }
   return undefined;
+}
+
+export function clampPosition(
+  pos: Position,
+  slides: Array<{ beats: number }>,
+): Position | undefined {
+  const slide = slides[pos.slideIndex];
+  if (!slide) {
+    return undefined;
+  }
+  const lastBeat = Math.max(0, slide.beats - 1);
+  return {
+    slideIndex: pos.slideIndex,
+    beatIndex: Math.min(pos.beatIndex, lastBeat),
+  };
 }
 
 export function positionsEqual(a: Position, b: Position): boolean {

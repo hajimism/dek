@@ -32,3 +32,22 @@ export function createGuardedGo<T>(
     }
   };
 }
+
+export function applyIncomingPosition<T>(
+  go: (next: T) => Promise<void>,
+  next: T,
+  options: {
+    equal: (a: T, b: T) => boolean;
+    current: () => T;
+    seek?: (next: T) => void;
+  },
+): void {
+  if (options.equal(options.current(), next)) {
+    return;
+  }
+  if (options.seek) {
+    options.seek(next);
+    return;
+  }
+  void go(next);
+}

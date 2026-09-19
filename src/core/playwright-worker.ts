@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
-import { createRequire } from "node:module";
-import type { VisualRequest, VisualResponse } from "./playwright.ts";
+import { importPlaywright, type VisualRequest, type VisualResponse } from "./playwright.ts";
 import { type Box, contrastRatio, overflowsSlide, parseCssRgb } from "./visual.ts";
 
+let playwright: Awaited<ReturnType<typeof importPlaywright>>;
 try {
-  createRequire(import.meta.url).resolve("playwright");
+  playwright = await importPlaywright();
 } catch {
   process.exit(2);
 }
@@ -18,7 +18,6 @@ try {
 }
 
 try {
-  const playwright = await import("playwright");
   const browser = await playwright.chromium.launch({ headless: true });
   try {
     const response: VisualResponse = { overflows: [], contrasts: [] };

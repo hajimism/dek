@@ -7,7 +7,8 @@ export function helpText(): string {
   return `dek — talk-script-first HTML slides
 
 Dev
-  dek                 start the dev server
+  dek [deck] [--visual]
+                      start the dev server; --visual lints overflow/contrast on save
   dek --remote        share on LAN; presenter notes are password-protected
   dek rehearse [slug] auto-advance from a Timeline (no video)
 
@@ -36,13 +37,16 @@ CI
   dek voice say TEXT  speak one sentence
   dek voice dict add  add a reading
   dek voice pin       pin TTS master.wav + timeline.json
-  dek build           write a single HTML file
-  dek video [slug]    bake dist/<deck>.mp4 (or one slide under .dek/video/)
-  dek pdf             write a PDF
+  dek build [--root-dist]
+                      write a single HTML file
+  dek video [slug] [--root-dist]
+                      bake dist/<deck>.mp4 (or one slide under .cache/video/)
+  dek pdf [--root-dist]
+                      write a PDF
   dek help            show this help
 
 Commands that print a result accept --json. dek and dek rehearse stay running.
-Use --deck <name> to target a deck from the project root.
+Pass a deck name or --deck <name> to target a deck from the project root.
 dek help --agent      compact command reference for agents
 `;
 }
@@ -50,9 +54,9 @@ dek help --agent      compact command reference for agents
 export function agentHelpText(): string {
   return `dek — agent interface
 Result commands accept --json. dek / rehearse do not (long-running). Diagnostics: dek lint --format sarif.
-Scope: project root = all decks; deck dir = that deck; --deck NAME.
+Scope: project root = all decks; deck dir = that deck; NAME or --deck NAME.
 
-dek                 start the dev server
+dek [deck] [--visual]
 dek --remote [--password PWD]
 dek rehearse [slug]
 dek init [dir] [--deck NAME]
@@ -68,9 +72,9 @@ dek check <slug> [--shot] [--voice]
 dek shot [slug] [--step <id|n>]
 dek goto <slug>     requires running dek
 dek current         requires running dek
-dek build
-dek video [slug] [--fps N]
-dek pdf
+dek build [--root-dist]
+dek video [slug] [--fps N] [--root-dist]
+dek pdf [--root-dist]
 dek help --agent
 
 Errors include hint with the next command to run.

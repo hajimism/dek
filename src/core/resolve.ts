@@ -1,8 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { DekError } from "./error.ts";
+import { walkUp } from "./optional.ts";
 import { parseScript } from "./parse.ts";
-import type { Deck } from "./schema.ts";
+import type { Deck, Section } from "./schema.ts";
 
 export type ProjectDeck = {
   name: string;
@@ -43,7 +44,7 @@ export function resolveDeck(dir: string): ResolvedDeck {
   if (!located) {
     throw new DekError("not a deck directory", {
       path: dir,
-      hint: "use --deck <name> or run from a deck directory",
+      hint: "pass a deck name or run from a deck directory",
     });
   }
   const loaded = readDeck(root, located.name);
@@ -58,6 +59,17 @@ export function resolveDeck(dir: string): ResolvedDeck {
 
 export function asResolvedDeck(input: string | ResolvedDeck): ResolvedDeck {
   return typeof input === "string" ? resolveDeck(input) : input;
+}
+
+export function requireSection(deck: ProjectDeck, slug: string): Section {
+  const section = deck.deck.sections.find((entry) => entry.slug === slug);
+  if (!section) {
+    throw new DekError(`section "${slug}" not found`, {
+      path: deck.scriptPath,
+      hint: "run `dek ls`",
+    });
+  }
+  return section;
 }
 
 export function listSlides(deckDir: string): { slug: string; path: string }[] {
@@ -78,18 +90,16 @@ export function listSlides(deckDir: string): { slug: string; path: string }[] {
 }
 
 function findRoot(startDir: string): { root: string; configPath: string } {
-  let dir = startDir;
-  while (true) {
+  const hit = walkUp(startDir, (dir) => {
     const configPath = join(dir, "dek.toml");
     if (existsSync(configPath) && statSync(configPath).isFile()) {
       return { root: dir, configPath };
     }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      throw new DekError("dek.toml not found", { path: startDir });
-    }
-    dir = parent;
+  });
+  if (!hit) {
+    throw new DekError("dek.toml not found", { path: startDir });
   }
+  return hit;
 }
 
 function loadDecks(root: string): {

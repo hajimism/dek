@@ -64,7 +64,7 @@ export async function voiceCommand(options: {
     const query = await fetchAudioQuery(baseUrl, text, styleId);
     query.speedScale = settings.speed;
     const wav = await fetchSynthesis(baseUrl, query, styleId);
-    const path = join(project.root, ".dek", "voice", deck.name, "say.wav");
+    const path = voiceCacheFile(deck.dir, "say.wav");
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, wav);
     await playWav(path);
@@ -85,8 +85,8 @@ export async function voiceCommand(options: {
     return { action: "dict", path, key, kana };
   }
   if (sub === "pin") {
-    const timelinePath = voiceCacheFile(project.root, deck.name, "timeline.json");
-    const audioPath = voiceCacheFile(project.root, deck.name, "audio.wav");
+    const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
+    const audioPath = voiceCacheFile(deck.dir, "audio.wav");
     if (!existsSync(timelinePath) || !existsSync(audioPath)) {
       throw new DekError("Timeline not found", {
         path: timelinePath,

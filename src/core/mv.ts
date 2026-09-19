@@ -2,21 +2,17 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "./error.ts";
 import { joinLines, splitLines } from "./lines.ts";
-import { resolveDeck } from "./resolve.ts";
+import { asResolvedDeck, type ResolvedDeck, requireSection } from "./resolve.ts";
 import { Id } from "./schema.ts";
 
-export function renameSection(dir: string, from: string, to: string): void {
+export function renameSection(dir: string, from: string, to: string): void;
+export function renameSection(source: ResolvedDeck, from: string, to: string): void;
+export function renameSection(input: string | ResolvedDeck, from: string, to: string): void {
   if (!Id.safeParse(to).success) {
     throw new DekError(`invalid id "${to}"`, { hint: "use [a-z0-9-] with at least one letter" });
   }
-  const { deck } = resolveDeck(dir);
-  const section = deck.deck.sections.find((entry) => entry.slug === from);
-  if (!section) {
-    throw new DekError(`section "${from}" not found`, {
-      path: deck.scriptPath,
-      hint: "run `dek ls`",
-    });
-  }
+  const { deck } = asResolvedDeck(input);
+  const section = requireSection(deck, from);
   if (deck.deck.sections.some((entry) => entry.slug === to)) {
     throw new DekError(`section "${to}" already exists`, {
       path: deck.scriptPath,
@@ -64,6 +60,16 @@ export function reorderSection(
   dir: string,
   slug: string,
   options: { before?: string; after?: string },
+): void;
+export function reorderSection(
+  source: ResolvedDeck,
+  slug: string,
+  options: { before?: string; after?: string },
+): void;
+export function reorderSection(
+  input: string | ResolvedDeck,
+  slug: string,
+  options: { before?: string; after?: string },
 ): void {
   const target = options.before ?? options.after;
   if (!target) {
@@ -77,21 +83,15 @@ export function reorderSection(
     });
   }
 
-  const { deck } = resolveDeck(dir);
+  const { deck } = asResolvedDeck(input);
   const sections = deck.deck.sections;
   const fromIndex = sections.findIndex((entry) => entry.slug === slug);
   if (fromIndex < 0) {
-    throw new DekError(`section "${slug}" not found`, {
-      path: deck.scriptPath,
-      hint: "run `dek ls`",
-    });
+    requireSection(deck, slug);
   }
   const targetIndex = sections.findIndex((entry) => entry.slug === target);
   if (targetIndex < 0) {
-    throw new DekError(`section "${target}" not found`, {
-      path: deck.scriptPath,
-      hint: "run `dek ls`",
-    });
+    requireSection(deck, target);
   }
 
   const source = readFileSync(deck.scriptPath, "utf8");

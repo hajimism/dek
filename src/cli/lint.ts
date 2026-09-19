@@ -1,6 +1,6 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
-import { DekError } from "../core/error.ts";
 import { lintDeck, syncDeck } from "../core/index.ts";
+import { playwrightMissingError } from "../core/playwright.ts";
 import { runRumdl } from "../core/rumdl.ts";
 import { mergeSarif, type SarifLog } from "../core/sarif.ts";
 import { lintVisualDeck } from "../core/visual.ts";
@@ -37,9 +37,9 @@ export async function lintCommand(options: {
       rumdlSarif = rumdlSarif ? mergeSarif(rumdlSarif, markdown.sarif) : markdown.sarif;
     }
     if (options.visual) {
-      const visual = await lintVisualDeck(deck.dir, { deck });
+      const visual = await lintVisualDeck({ project, deck });
       if (visual === null) {
-        throw new DekError("Playwright is not installed", { hint: "bunx playwright install" });
+        throw playwrightMissingError();
       }
       diagnostics.push(...visual);
     }

@@ -24,7 +24,7 @@ export function mvCommand(options: {
     });
   }
 
-  const { deck } = requireDeckFromCwd(options.cwd, options.deck);
+  const { project, deck } = requireDeckFromCwd(options.cwd, options.deck);
 
   if (options.before || options.after) {
     if (options.before && options.after) {
@@ -32,7 +32,7 @@ export function mvCommand(options: {
         hint: "usage: dek mv <slug> --before|--after <slug>",
       });
     }
-    reorderSection(deck.dir, slug, { before: options.before, after: options.after });
+    reorderSection({ project, deck }, slug, { before: options.before, after: options.after });
     return {
       from: slug,
       ...(options.before ? { before: options.before } : {}),
@@ -44,6 +44,6 @@ export function mvCommand(options: {
   if (!to) {
     throw new DekError("usage: dek mv <old> <new>", { hint: "usage: dek mv <old> <new>" });
   }
-  renameSection(deck.dir, slug, to);
+  renameSection({ project, deck }, slug, to);
   return { from: slug, to };
 }

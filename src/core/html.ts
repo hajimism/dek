@@ -1,20 +1,49 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { extname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { inlineAssets, inlineCssUrls, readTheme } from "./assets.ts";
 import { playerChromeCss } from "./chrome.ts";
-import type { DekConfig } from "./config.ts";
 import { DekError } from "./error.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { isInside } from "./path.ts";
-import type { PresenterSlide } from "./presenter.ts";
-import type { ProjectDeck } from "./resolve.ts";
+import { type ProjectDeck, requireSection } from "./resolve.ts";
+import { DEFAULT_LANG } from "./schema.ts";
 import { logicalSize } from "./size.ts";
 import { stepValuesForBeat } from "./step.ts";
-import { formatSectionScript, sectionTiming } from "./timing.ts";
+
+export { presenterSlides } from "./presenter.ts";
+export { inlineAssets, inlineCssUrls, readTheme };
 
 export type PageMode = "player" | "presenter" | "video";
 
+export function htmlShell(options: {
+  lang?: string;
+  title?: string;
+  head?: string;
+  body: string;
+  bodyAttrs?: string;
+}): string {
+  const lang = escapeAttr(options.lang ?? DEFAULT_LANG);
+  const title =
+    options.title === undefined ? "" : `\n  <title>${escapeHtml(options.title)}</title>`;
+  const head = options.head ? `\n  ${options.head}` : "";
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="utf-8">${title}${head}
+</head>
+<body${options.bodyAttrs ?? ""}>
+  ${options.body}
+</body>
+</html>
+`;
+}
+
+export function hasSlideClass(className: string | null | undefined): boolean {
+  return (className ?? "").split(/\s+/).some((token) => token.toLowerCase() === "slide");
+}
+
 export function isSlideOpenTag(openTag: string): boolean {
-  return classTokens(openTag).some((token) => token.toLowerCase() === "slide");
+  return hasSlideClass(classTokens(openTag).join(" "));
 }
 
 export function extractSlideSection(html: string): string | undefined {
@@ -83,34 +112,6 @@ export function minifyFragments(html: string): string {
   return html.replace(/>\s+</g, "><");
 }
 
-export function inlineAssets(html: string, deckDir: string): string {
-  return html.replace(/\bsrc=(["'])([^"']+)\1/gi, (match, quote: string, src: string) => {
-    if (src.startsWith("data:") || /^(https?:)?\/\//i.test(src)) {
-      return match;
-    }
-    const file = resolveAsset(src, deckDir);
-    if (!file) {
-      return match;
-    }
-    const bytes = readFileSync(file);
-    return `src=${quote}data:${mimeOf(file)};base64,${bytes.toString("base64")}${quote}`;
-  });
-}
-
-export function presenterSlides(deck: ProjectDeck, config: DekConfig): PresenterSlide[] {
-  const timing = sectionTiming(deck.deck.sections, deck.deck.duration, config);
-  const budgetBySlug = new Map(timing.map((row) => [row.slug, row.budgetSeconds]));
-  return deck.deck.sections.map((section) => ({
-    slug: section.slug,
-    title: section.title,
-    script: formatSectionScript(section),
-    beats: section.beats.map((beat) => ({ id: beat.id, title: beat.title })),
-    ...(budgetBySlug.get(section.slug) !== undefined
-      ? { budgetSeconds: budgetBySlug.get(section.slug) }
-      : {}),
-  }));
-}
-
 export function collectSlidesHtml(
   deck: ProjectDeck,
   options?: { inline?: boolean; requireAll?: boolean },
@@ -118,11 +119,9 @@ export function collectSlidesHtml(
   const parts: string[] = [];
   for (const section of deck.deck.sections) {
     if (options?.requireAll) {
-      let html = injectSlug(requireSlideSection(deck, section.slug), section.slug);
-      if (options.inline) {
-        html = inlineAssets(html, deck.dir);
-      }
-      parts.push(html);
+      parts.push(
+        slideWithSlug(requireSlideSection(deck, section.slug), section.slug, deck, options),
+      );
       continue;
     }
     parts.push(slideFragment(deck, section.slug, options) ?? missingSlidePlaceholder(section.slug));
@@ -150,11 +149,7 @@ export function slideFragment(
   if (!extracted) {
     return undefined;
   }
-  let html = injectSlug(extracted, slug);
-  if (options?.inline) {
-    html = inlineAssets(html, deck.dir);
-  }
-  return html;
+  return slideWithSlug(extracted, slug, deck, options);
 }
 
 export function collectPrintSlidesHtml(deck: ProjectDeck): string {
@@ -166,9 +161,19 @@ export function collectPrintSlidesHtml(deck: ProjectDeck): string {
       section.beats.map((beat) => ({ id: beat.id })),
       last,
     );
-    parts.push(applyShownClasses(injectSlug(extracted, section.slug), shown));
+    parts.push(applyShownClasses(slideWithSlug(extracted, section.slug, deck), shown));
   }
   return inlineAssets(minifyFragments(parts.join("")), deck.dir);
+}
+
+function slideWithSlug(
+  extracted: string,
+  slug: string,
+  deck: ProjectDeck,
+  options?: { inline?: boolean },
+): string {
+  const html = injectSlug(extracted, slug);
+  return options?.inline ? inlineAssets(html, deck.dir) : html;
 }
 
 function slideHtmlPath(deck: ProjectDeck, slug: string): string {
@@ -193,34 +198,52 @@ function requireSlideSection(deck: ProjectDeck, slug: string): string {
   return extracted;
 }
 
-export function renderSlideHtml(deck: ProjectDeck, slug: string, beatIndex: number): string {
-  const section = deck.deck.sections.find((entry) => entry.slug === slug);
-  if (!section) {
-    throw new DekError(`section "${slug}" not found`, {
-      path: deck.scriptPath,
-      hint: "run `dek ls`",
-    });
-  }
-  const extracted = requireSlideSection(deck, slug);
+export type SlideSources = {
+  themeCss: string;
+  fragments: Map<string, string>;
+};
+
+export function loadSlideSources(deck: ProjectDeck): SlideSources {
+  return {
+    themeCss: readTheme(deck.dir, false),
+    fragments: new Map(),
+  };
+}
+
+export function renderSlideHtml(
+  deck: ProjectDeck,
+  slug: string,
+  beatIndex: number,
+  sources?: SlideSources,
+): string {
+  const section = requireSection(deck, slug);
+  const extracted = fragmentFor(deck, slug, sources);
   const shown = stepValuesForBeat(
     section.beats.map((beat) => ({ id: beat.id })),
     beatIndex,
   );
-  const slide = inlineAssets(applyShownClasses(injectSlug(extracted, slug), shown), deck.dir);
-  const themeCss = readTheme(deck.dir, false);
+  const slide = inlineAssets(
+    applyShownClasses(slideWithSlug(extracted, slug, deck), shown),
+    deck.dir,
+  );
+  const themeCss = sources?.themeCss ?? readTheme(deck.dir, false);
   const size = logicalSize(deck.deck.ratio);
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <style>${playerChromeCss(size)}</style>
-  <style>${themeCss}</style>
-</head>
-<body>
-  <div id="deck">${slide}</div>
-</body>
-</html>
-`;
+  return htmlShell({
+    lang: deck.deck.lang,
+    head: `<style>${playerChromeCss(size)}</style>
+  <style>${themeCss}</style>`,
+    body: `<div id="deck">${slide}</div>`,
+  });
+}
+
+function fragmentFor(deck: ProjectDeck, slug: string, sources?: SlideSources): string {
+  const cached = sources?.fragments.get(slug);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const extracted = requireSlideSection(deck, slug);
+  sources?.fragments.set(slug, extracted);
+  return extracted;
 }
 
 export function applyShownClasses(html: string, shown: Set<string>): string {
@@ -231,8 +254,7 @@ export function applyShownClasses(html: string, shown: Set<string>): string {
         if (current) {
           return;
         }
-        const className = el.getAttribute("class") ?? "";
-        if (!className.split(/\s+/).some((token) => token.toLowerCase() === "slide")) {
+        if (!hasSlideClass(el.getAttribute("class"))) {
           return;
         }
         current = true;
@@ -295,84 +317,14 @@ export function renderIndexHtml(
     .join("");
   const failedItems = failed.map((entry) => `<li>${escapeHtml(entry.name)}</li>`).join("");
   const failedBlock = failed.length > 0 ? `<h2>failed</h2><ul>${failedItems}</ul>` : "";
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <title>dek</title>
-</head>
-<body>
-  <h1>decks</h1>
+  return htmlShell({
+    title: "dek",
+    body: `<h1>decks</h1>
   <ul>${items}</ul>
-  ${failedBlock}
-</body>
-</html>
-`;
-}
-
-export function inlineCssUrls(css: string, deckDir: string): string {
-  return css.replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/gi, (match, _quote: string, src: string) => {
-    const href = src.trim();
-    if (!href || href.startsWith("data:") || /^(https?:)?\/\//i.test(href)) {
-      return match;
-    }
-    const file = resolveAsset(href, deckDir);
-    if (!file) {
-      return match;
-    }
-    const bytes = readFileSync(file);
-    return `url("data:${mimeOf(file)};base64,${bytes.toString("base64")}")`;
+  ${failedBlock}`,
   });
-}
-
-export function readTheme(deckDir: string, minify: boolean): string {
-  const path = join(deckDir, "theme.css");
-  if (!existsSync(path)) {
-    return "";
-  }
-  const css = readFileSync(path, "utf8");
-  if (!minify) {
-    return css;
-  }
-  return inlineCssUrls(css, deckDir)
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function isSafeSlideSlug(slug: string): boolean {
   return slug.length > 0 && !slug.includes("/") && !slug.includes("\\") && !slug.includes("\0");
-}
-
-function resolveAsset(src: string, deckDir: string): string | undefined {
-  const candidates = [join(deckDir, src), join(deckDir, "slides", src)];
-  return candidates.find(
-    (path) => existsSync(path) && statSync(path).isFile() && isInside(path, deckDir),
-  );
-}
-
-function mimeOf(filePath: string): string {
-  switch (extname(filePath).toLowerCase()) {
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".gif":
-      return "image/gif";
-    case ".svg":
-      return "image/svg+xml";
-    case ".webp":
-      return "image/webp";
-    case ".woff":
-      return "font/woff";
-    case ".woff2":
-      return "font/woff2";
-    case ".ttf":
-      return "font/ttf";
-    case ".otf":
-      return "font/otf";
-    default:
-      return "application/octet-stream";
-  }
 }

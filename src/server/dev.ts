@@ -1,20 +1,22 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, watch } from "node:fs";
 import { join } from "node:path";
 import { renderDeckHtml } from "../core/document.ts";
 import { escapeHtml } from "../core/escape.ts";
-import { readTheme, renderIndexHtml, slideFragment } from "../core/html.ts";
+import { htmlShell, readTheme, renderIndexHtml, slideFragment } from "../core/html.ts";
 import { DekError, type Project, type ProjectDeck, resolveProject } from "../core/index.ts";
 import { isInside } from "../core/path.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { locateDeck } from "../core/resolve.ts";
 import type { Position } from "../core/step.ts";
+import { voiceCacheFile } from "../core/voice.ts";
 import { liveReloadScript, playerScript } from "../runtime/player.ts";
 import { parsePosition } from "../runtime/position.ts";
+import { isExactPath, splitDeckPath } from "../runtime/routes.ts";
 import { controlAuth, presenterAuth, wsHasControl } from "./auth.ts";
 import { createEventHub, type DevEvent, type EventHub } from "./hub.ts";
 import { generateRemotePassword, lanUrls } from "./lan.ts";
 import { isPidAlive, readDevServerLock, removeDevServerLock, writeDevServerLock } from "./lock.ts";
-import { type Stoppable, watchDeck } from "./watch.ts";
+import { type Stoppable, watchDeck, watchTargets } from "./watch.ts";
 
 export type { DevEvent };
 
@@ -30,7 +32,9 @@ export type DevServer = {
 
 export async function startDevServer(options: {
   cwd: string;
+  deck?: string;
   port?: number;
+  visual?: boolean;
   visualRunner?: PlaywrightRunner;
   remote?: boolean;
   password?: string;
@@ -44,18 +48,35 @@ export async function startDevServer(options: {
       hint: `open ${existing.url}`,
     });
   }
-  const deckScope = locateDeck(project.root, options.cwd);
-  const deckDir = deckScope?.dir;
-  const scopedDeckName = deckScope?.name;
+  const fromCwd = locateDeck(project.root, options.cwd);
+  const scopedDeckName = options.deck ?? fromCwd?.name;
+  if (options.deck) {
+    const known =
+      project.decks.some((entry) => entry.name === options.deck) ||
+      project.failed.some((entry) => entry.name === options.deck);
+    if (!known) {
+      throw new DekError(`deck "${options.deck}" not found`, {
+        path: join(project.root, "decks", options.deck),
+        hint: "run `dek ls`",
+      });
+    }
+  }
+  const deckDir = scopedDeckName ? join(project.root, "decks", scopedDeckName) : fromCwd?.dir;
   const remote = options.remote === true;
   const password = remote ? (options.password ?? generateRemotePassword()) : options.password;
   const listenHostname = remote ? "0.0.0.0" : "127.0.0.1";
   const pages = new Map<string, string>();
   const inner = createEventHub();
+  const watchers = new Map<string, Stoppable>();
+  const watchOptions = {
+    visual: options.visual === true,
+    visualRunner: options.visualRunner,
+  };
   const hub: EventHub = {
     emit(event) {
       if (event.type === "sync") {
         project = resolveProject(projectRoot);
+        reconcileWatchers();
       }
       if (event.type !== "diagnostics" && event.type !== "timeline") {
         pages.clear();
@@ -72,7 +93,22 @@ export async function startDevServer(options: {
       return inner[Symbol.asyncIterator]();
     },
   };
-  const watchers: Stoppable[] = [];
+  const reconcileWatchers = (): void => {
+    const targets = new Set(
+      scopedDeckName ? [join(project.root, "decks", scopedDeckName)] : watchTargets(project),
+    );
+    for (const dir of targets) {
+      if (!watchers.has(dir)) {
+        watchers.set(dir, watchDeck(dir, hub, watchOptions));
+      }
+    }
+    for (const [dir, watcher] of watchers) {
+      if (!targets.has(dir)) {
+        watcher.close();
+        watchers.delete(dir);
+      }
+    }
+  };
   const embed = {
     playerScript: await playerScript(),
     liveReloadScript: liveReloadScript(),
@@ -88,11 +124,55 @@ export async function startDevServer(options: {
     return html;
   };
 
-  if (deckDir) {
-    watchers.push(watchDeck(deckDir, hub, { visualRunner: options.visualRunner }));
-  } else {
-    for (const deck of project.decks) {
-      watchers.push(watchDeck(deck.dir, hub, { visualRunner: options.visualRunner }));
+  const liveDeckResponse = async (
+    req: Request,
+    dir: string,
+    mode: "player" | "presenter",
+  ): Promise<Response> => {
+    const unauthorized = presenterAuth(req, mode, password);
+    if (unauthorized) {
+      return unauthorized;
+    }
+    try {
+      return htmlResponse(
+        await cached(`${dir}:${mode}`, () =>
+          renderDeckHtml(dir, {
+            mode,
+            live: true,
+            includeNotes: mode === "presenter" || !remote,
+            ...embed,
+            ...(mode === "presenter" && password ? { wsToken: password } : {}),
+          }),
+        ),
+      );
+    } catch (error) {
+      return htmlResponse(errorPage(error), 500);
+    }
+  };
+
+  reconcileWatchers();
+  let decksDirWatcher: { close: () => void } | undefined;
+  if (!scopedDeckName) {
+    const decksDir = join(project.root, "decks");
+    const refresh = (): void => {
+      try {
+        project = resolveProject(projectRoot);
+        reconcileWatchers();
+      } catch {
+        /* project may be mid-write */
+      }
+    };
+    try {
+      const dirWatcher = watch(decksDir, { recursive: true }, refresh);
+      const timer = setInterval(refresh, 250);
+      decksDirWatcher = {
+        close() {
+          dirWatcher.close();
+          clearInterval(timer);
+        },
+      };
+    } catch {
+      decksDirWatcher = undefined;
     }
   }
 
@@ -148,9 +228,9 @@ export async function startDevServer(options: {
       if (url.pathname === "/events") {
         return sseResponse(hub);
       }
-      const fragment = matchSlideFragment(url.pathname, deckDir);
+      const fragment = matchSlideFragment(url.pathname, scopedDeckName);
       if (fragment) {
-        const deck = deckForFragment(fragment, project, scopedDeckName);
+        const deck = deckForName(project, fragment.deckName);
         if (!deck) {
           return new Response("Not found", { status: 404 });
         }
@@ -160,9 +240,9 @@ export async function startDevServer(options: {
         }
         return htmlResponse(html);
       }
-      const themeRoute = matchThemeRoute(url.pathname, deckDir);
+      const themeRoute = matchThemeRoute(url.pathname, scopedDeckName);
       if (themeRoute) {
-        const deck = deckForFragment(themeRoute, project, scopedDeckName);
+        const deck = deckForName(project, themeRoute.deckName);
         if (!deck) {
           return new Response("Not found", { status: 404 });
         }
@@ -173,9 +253,9 @@ export async function startDevServer(options: {
           },
         });
       }
-      const voice = matchVoiceRoute(url.pathname, deckDir, project.decks);
+      const voice = matchVoiceRoute(url.pathname, scopedDeckName, project.decks);
       if (voice) {
-        const file = join(project.root, ".dek", "voice", voice.deckName, voice.file);
+        const file = voiceCacheFile(voice.deckDir, voice.file);
         if (!existsSync(file)) {
           return new Response("Not found", { status: 404 });
         }
@@ -211,60 +291,23 @@ export async function startDevServer(options: {
         }
         return new Response("Method not allowed", { status: 405 });
       }
-      const asset = matchAssetFile(url.pathname, deckDir, project);
+      const asset = matchAssetFile(url.pathname, scopedDeckName, deckDir, project);
       if (asset) {
         return new Response(Bun.file(asset), {
           headers: { "cache-control": "no-store" },
         });
       }
       if (deckDir) {
-        const mode =
-          url.pathname === "/presenter" || url.pathname === "/presenter/" ? "presenter" : "player";
-        const unauthorized = presenterAuth(req, mode, password);
-        if (unauthorized) {
-          return unauthorized;
-        }
-        try {
-          return htmlResponse(
-            await cached(`${deckDir}:${mode}`, () =>
-              renderDeckHtml(deckDir, {
-                mode,
-                live: true,
-                includeNotes: mode === "presenter" || !remote,
-                ...embed,
-                ...(mode === "presenter" && password ? { wsToken: password } : {}),
-              }),
-            ),
-          );
-        } catch (error) {
-          return htmlResponse(errorPage(error), 500);
-        }
+        const mode = isExactPath(url.pathname, "/presenter") ? "presenter" : "player";
+        return liveDeckResponse(req, deckDir, mode);
       }
       const deckRoute = matchDeckRoute(url.pathname);
       if (deckRoute) {
-        const deck = project.decks.find((entry) => entry.name === deckRoute.name);
+        const deck = deckForName(project, deckRoute.name);
         if (!deck) {
           return new Response("Not found", { status: 404 });
         }
-        const unauthorized = presenterAuth(req, deckRoute.mode, password);
-        if (unauthorized) {
-          return unauthorized;
-        }
-        try {
-          return htmlResponse(
-            await cached(`${deck.dir}:${deckRoute.mode}`, () =>
-              renderDeckHtml(deck.dir, {
-                mode: deckRoute.mode,
-                live: true,
-                includeNotes: deckRoute.mode === "presenter" || !remote,
-                ...embed,
-                ...(deckRoute.mode === "presenter" && password ? { wsToken: password } : {}),
-              }),
-            ),
-          );
-        } catch (error) {
-          return htmlResponse(errorPage(error), 500);
-        }
+        return liveDeckResponse(req, deck.dir, deckRoute.mode);
       }
       if (url.pathname !== "/" && url.pathname !== "") {
         return new Response("Not found", { status: 404 });
@@ -328,9 +371,10 @@ export async function startDevServer(options: {
   try {
     writeDevServerLock(project.root, url, password);
   } catch (error) {
-    for (const watcher of watchers) {
+    for (const watcher of watchers.values()) {
       watcher.close();
     }
+    decksDirWatcher?.close();
     hub.close();
     await server.stop(true);
     throw error;
@@ -344,9 +388,10 @@ export async function startDevServer(options: {
     decks: project.decks.map((deck) => deck.name),
     events: hub,
     async close() {
-      for (const watcher of watchers) {
+      for (const watcher of watchers.values()) {
         watcher.close();
       }
+      decksDirWatcher?.close();
       hub.close();
       removeDevServerLock(project.root);
       await server.stop(true);
@@ -354,65 +399,70 @@ export async function startDevServer(options: {
   };
 }
 
+function matchDeckRest<T>(
+  pathname: string,
+  scopedDeckName: string | undefined,
+  matchRest: (rest: string, deckName: string) => T | undefined,
+): T | undefined {
+  const split = splitDeckPath(pathname, scopedDeckName);
+  if (!split) {
+    return undefined;
+  }
+  return matchRest(split.rest, split.deckName);
+}
+
 function matchSlideFragment(
   pathname: string,
-  deckDir: string | undefined,
-): { deckName?: string; slug: string } | undefined {
-  const deckSlide = pathname.match(/^\/decks\/([^/]+)\/slide\/([^/]+)\/?$/);
-  if (deckSlide?.[1] && deckSlide[2]) {
-    return { deckName: deckSlide[1], slug: decodeURIComponent(deckSlide[2]) };
-  }
-  const slide = pathname.match(/^\/slide\/([^/]+)\/?$/);
-  if (slide?.[1] && deckDir) {
-    return { slug: decodeURIComponent(slide[1]) };
-  }
-  return undefined;
+  scopedDeckName: string | undefined,
+): { deckName: string; slug: string } | undefined {
+  return matchDeckRest(pathname, scopedDeckName, (rest, deckName) => {
+    const slug = rest.match(/^\/slide\/([^/]+)\/?$/)?.[1];
+    if (!slug) {
+      return undefined;
+    }
+    return { deckName, slug: decodeURIComponent(slug) };
+  });
 }
 
 function matchThemeRoute(
   pathname: string,
-  deckDir: string | undefined,
-): { deckName?: string } | undefined {
-  const deckTheme = pathname.match(/^\/decks\/([^/]+)\/theme\/?$/);
-  if (deckTheme?.[1]) {
-    return { deckName: deckTheme[1] };
-  }
-  if ((pathname === "/theme" || pathname === "/theme/") && deckDir) {
-    return {};
-  }
-  return undefined;
+  scopedDeckName: string | undefined,
+): { deckName: string } | undefined {
+  return matchDeckRest(pathname, scopedDeckName, (rest, deckName) => {
+    if (!isExactPath(rest, "/theme")) {
+      return undefined;
+    }
+    return { deckName };
+  });
 }
 
-function deckForFragment(
-  route: { deckName?: string },
-  project: Project,
-  scopedDeckName: string | undefined,
-): ProjectDeck | undefined {
-  const name = route.deckName ?? scopedDeckName;
-  if (!name) {
-    return undefined;
-  }
+function deckForName(project: Project, name: string): ProjectDeck | undefined {
   return project.decks.find((entry) => entry.name === name);
 }
 
 function matchAssetFile(
   pathname: string,
+  scopedDeckName: string | undefined,
   deckDir: string | undefined,
   project: Project,
 ): string | undefined {
-  const scoped = pathname.match(/^\/assets\/(.+)$/);
-  if (scoped?.[1] && deckDir) {
-    return safeDeckAsset(deckDir, scoped[1]);
-  }
-  const prefixed = pathname.match(/^\/decks\/([^/]+)\/assets\/(.+)$/);
-  if (prefixed?.[1] && prefixed[2]) {
-    const deck = project.decks.find((entry) => entry.name === prefixed[1]);
-    if (!deck) {
+  return matchDeckRest(pathname, scopedDeckName, (rest, deckName) => {
+    const relative = rest.match(/^\/assets\/(.+)$/)?.[1];
+    if (!relative) {
       return undefined;
     }
-    return safeDeckAsset(deck.dir, prefixed[2]);
-  }
-  return undefined;
+    if (pathname.startsWith("/decks/")) {
+      const deck = deckForName(project, deckName);
+      if (!deck) {
+        return undefined;
+      }
+      return safeDeckAsset(deck.dir, relative);
+    }
+    if (!deckDir) {
+      return undefined;
+    }
+    return safeDeckAsset(deckDir, relative);
+  });
 }
 
 function safeDeckAsset(deckDir: string, relative: string): string | undefined {
@@ -425,31 +475,27 @@ function safeDeckAsset(deckDir: string, relative: string): string | undefined {
 }
 
 function matchWsRoom(pathname: string, scopedDeckName: string | undefined): string | undefined {
-  const deckWs = pathname.match(/^\/decks\/([^/]+)\/ws\/?$/);
-  if (deckWs?.[1]) {
-    return deckWs[1];
-  }
-  if ((pathname === "/ws" || pathname === "/ws/") && scopedDeckName) {
-    return scopedDeckName;
-  }
-  return undefined;
+  return matchDeckRest(pathname, scopedDeckName, (rest, deckName) => {
+    if (!isExactPath(rest, "/ws")) {
+      return undefined;
+    }
+    return deckName;
+  });
 }
 
 function matchNavRoute(
   pathname: string,
   scopedDeckName: string | undefined,
 ): { room: string; action: "current" | "goto" } | undefined {
-  const deckNav = pathname.match(/^\/decks\/([^/]+)\/(current|goto)\/?$/);
-  if (deckNav?.[1] && (deckNav[2] === "current" || deckNav[2] === "goto")) {
-    return { room: deckNav[1], action: deckNav[2] };
-  }
-  if ((pathname === "/current" || pathname === "/current/") && scopedDeckName) {
-    return { room: scopedDeckName, action: "current" };
-  }
-  if ((pathname === "/goto" || pathname === "/goto/") && scopedDeckName) {
-    return { room: scopedDeckName, action: "goto" };
-  }
-  return undefined;
+  return matchDeckRest(pathname, scopedDeckName, (rest, deckName) => {
+    if (isExactPath(rest, "/current")) {
+      return { room: deckName, action: "current" };
+    }
+    if (isExactPath(rest, "/goto")) {
+      return { room: deckName, action: "goto" };
+    }
+    return undefined;
+  });
 }
 
 function matchDeckRoute(
@@ -464,25 +510,20 @@ function matchDeckRoute(
 
 function matchVoiceRoute(
   pathname: string,
-  deckDir: string | undefined,
+  scopedDeckName: string | undefined,
   decks: ProjectDeck[],
-): { deckName: string; file: "timeline.json" | "audio.wav" } | undefined {
-  const nested = pathname.match(/^\/decks\/([^/]+)\/voice\/(timeline\.json|audio\.wav)$/);
-  if (nested?.[1] && nested[2]) {
-    if (!decks.some((deck) => deck.name === nested[1])) {
+): { deckDir: string; file: "timeline.json" | "audio.wav" } | undefined {
+  return matchDeckRest(pathname, scopedDeckName, (rest, deckName) => {
+    const file = rest.match(/^\/voice\/(timeline\.json|audio\.wav)$/)?.[1];
+    if (file !== "timeline.json" && file !== "audio.wav") {
       return undefined;
     }
-    return { deckName: nested[1], file: nested[2] as "timeline.json" | "audio.wav" };
-  }
-  const local = pathname.match(/^\/voice\/(timeline\.json|audio\.wav)$/);
-  if (local?.[1] && deckDir) {
-    const name = decks.find((deck) => deck.dir === deckDir)?.name;
-    if (!name) {
+    const deck = decks.find((entry) => entry.name === deckName);
+    if (!deck) {
       return undefined;
     }
-    return { deckName: name, file: local[1] as "timeline.json" | "audio.wav" };
-  }
-  return undefined;
+    return { deckDir: deck.dir, file };
+  });
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -509,17 +550,10 @@ function htmlResponse(html: string, status = 200): Response {
 function errorPage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const hint = error instanceof DekError && error.hint ? `\n${error.hint}` : "";
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <title>dek</title>
-</head>
-<body>
-  <pre>${escapeHtml(`${message}${hint}`)}</pre>
-</body>
-</html>
-`;
+  return htmlShell({
+    title: "dek",
+    body: `<pre>${escapeHtml(`${message}${hint}`)}</pre>`,
+  });
 }
 
 function sseResponse(hub: EventHub): Response {

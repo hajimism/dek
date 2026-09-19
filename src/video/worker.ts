@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
+import { importPlaywright } from "../core/playwright.ts";
 import type { Position } from "../core/step.ts";
 import {
   planCapture,
@@ -11,8 +11,9 @@ import {
 } from "./recorder.ts";
 import { VIDEO_CAPTURE_STRATEGY } from "./strategy.ts";
 
+let playwright: Awaited<ReturnType<typeof importPlaywright>>;
 try {
-  createRequire(import.meta.url).resolve("playwright");
+  playwright = await importPlaywright();
 } catch {
   process.exit(2);
 }
@@ -24,8 +25,6 @@ try {
 } catch {
   process.exit(2);
 }
-
-const playwright = await import("playwright");
 const browser = await playwright.chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({

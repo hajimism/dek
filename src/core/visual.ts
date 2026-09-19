@@ -1,13 +1,17 @@
+import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Diagnostic } from "./diagnostic.ts";
 import { DekError } from "./error.ts";
+import { loadSlideSources, renderSlideHtml } from "./html.ts";
+import { cacheDir } from "./path.ts";
 import {
   defaultPlaywrightRunner,
   type PlaywrightRunner,
   playwrightResolved,
+  type VisualPage,
   type VisualResponse,
 } from "./playwright.ts";
-import { type ProjectDeck, resolveDeck } from "./resolve.ts";
+import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { logicalSize } from "./size.ts";
 
 export type Box = {
@@ -51,20 +55,66 @@ export function parseCssRgb(color: string): Rgb | undefined {
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
+export type VisualDeckOptions = {
+  slug?: string;
+  runner?: PlaywrightRunner;
+  screenshot?: boolean;
+};
+
+export type VisualDeckResult = {
+  diagnostics: Diagnostic[];
+  screenshotPath?: string;
+};
+
 export async function lintVisualDeck(
   dir: string,
-  options: { slug?: string; runner?: PlaywrightRunner; deck?: ProjectDeck } = {},
+  options?: VisualDeckOptions,
+): Promise<Diagnostic[] | null>;
+export async function lintVisualDeck(
+  source: ResolvedDeck,
+  options?: VisualDeckOptions,
+): Promise<Diagnostic[] | null>;
+export async function lintVisualDeck(
+  input: string | ResolvedDeck,
+  options: VisualDeckOptions = {},
 ): Promise<Diagnostic[] | null> {
+  const result = await visualDeck(input, options);
+  return result ? result.diagnostics : null;
+}
+
+export async function runVisualDeck(
+  dir: string,
+  options?: VisualDeckOptions,
+): Promise<VisualDeckResult | null>;
+export async function runVisualDeck(
+  source: ResolvedDeck,
+  options?: VisualDeckOptions,
+): Promise<VisualDeckResult | null>;
+export async function runVisualDeck(
+  input: string | ResolvedDeck,
+  options: VisualDeckOptions = {},
+): Promise<VisualDeckResult | null> {
+  return visualDeck(input, options);
+}
+
+async function visualDeck(
+  input: string | ResolvedDeck,
+  options: VisualDeckOptions,
+): Promise<VisualDeckResult | null> {
   const runner = options.runner ?? defaultPlaywrightRunner;
   if (runner === defaultPlaywrightRunner && !playwrightResolved()) {
     return null;
   }
 
-  const deck = options.deck ?? resolveDeck(dir).deck;
-  const { renderSlideHtml } = await import("./html.ts");
+  const { deck } = asResolvedDeck(input);
+  const sources = loadSlideSources(deck);
   const diagnostics: Diagnostic[] = [];
-  const pages: Array<{ html: string; slug: string; step: string; path: string }> = [];
+  const pages: Array<VisualPage & { path: string }> = [];
   const size = logicalSize(deck.deck.ratio);
+  const shotDir = options.screenshot ? cacheDir(deck.dir, "shots") : undefined;
+  if (shotDir) {
+    mkdirSync(shotDir, { recursive: true });
+  }
 
   for (const section of deck.deck.sections) {
     if (options.slug && section.slug !== options.slug) {
@@ -72,14 +122,18 @@ export async function lintVisualDeck(
     }
     const slidePath = join(deck.dir, "slides", `${section.slug}.html`);
     const beatCount = Math.max(section.beats.length, 1);
+    const last = beatCount - 1;
     for (let beatIndex = 0; beatIndex < beatCount; beatIndex++) {
       try {
-        const html = renderSlideHtml(deck, section.slug, beatIndex);
+        const html = renderSlideHtml(deck, section.slug, beatIndex, sources);
         pages.push({
           html,
           slug: section.slug,
           step: section.beats[beatIndex]?.id ?? String(beatIndex + 1),
           path: slidePath,
+          ...(shotDir && beatIndex === last
+            ? { screenshotPath: join(shotDir, `${section.slug}.png`) }
+            : {}),
         });
       } catch (error) {
         if (error instanceof DekError) {
@@ -96,19 +150,31 @@ export async function lintVisualDeck(
   }
 
   if (pages.length === 0) {
-    return diagnostics.length > 0 ? diagnostics : [];
+    return { diagnostics };
   }
 
+  const actions: Array<"overflow" | "contrast" | "screenshot"> = ["overflow", "contrast"];
+  if (options.screenshot) {
+    actions.push("screenshot");
+  }
   const response = await runner({
     viewport: size,
-    actions: ["overflow", "contrast"],
-    pages: pages.map((page) => ({ html: page.html, slug: page.slug, step: page.step })),
+    actions,
+    pages: pages.map((page) => ({
+      html: page.html,
+      slug: page.slug,
+      step: page.step,
+      ...(page.screenshotPath ? { screenshotPath: page.screenshotPath } : {}),
+    })),
   });
   if (response === null) {
     return null;
   }
   diagnostics.push(...visualDiagnostics(response, pages[0]?.path ?? deck.dir));
-  return diagnostics;
+  return {
+    diagnostics,
+    screenshotPath: pages.find((page) => page.screenshotPath)?.screenshotPath,
+  };
 }
 
 function visualDiagnostics(response: VisualResponse, fallbackPath: string): Diagnostic[] {

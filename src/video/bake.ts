@@ -3,11 +3,13 @@ import { dirname, join } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { renderDeckDocument } from "../core/document.ts";
 import { DekError } from "../core/error.ts";
+import { cacheDir, type DistOptions, distDir, distFile } from "../core/path.ts";
 import {
   asResolvedDeck,
   type Project,
   type ProjectDeck,
   type ResolvedDeck,
+  requireSection,
 } from "../core/resolve.ts";
 import { logicalSize } from "../core/size.ts";
 import { sliceTimeline, slideTimeRange, type Timeline } from "../core/timeline.ts";
@@ -31,17 +33,20 @@ export type BakeVideoResult = {
   credits?: string;
 };
 
-export async function bakeVideo(
-  dir: string,
-  options?: { slug?: string; fps?: number; runner?: VideoRunner },
-): Promise<BakeVideoResult>;
+export type BakeVideoOptions = DistOptions & {
+  slug?: string;
+  fps?: number;
+  runner?: VideoRunner;
+};
+
+export async function bakeVideo(dir: string, options?: BakeVideoOptions): Promise<BakeVideoResult>;
 export async function bakeVideo(
   source: ResolvedDeck,
-  options?: { slug?: string; fps?: number; runner?: VideoRunner },
+  options?: BakeVideoOptions,
 ): Promise<BakeVideoResult>;
 export async function bakeVideo(
   input: string | ResolvedDeck,
-  options: { slug?: string; fps?: number; runner?: VideoRunner } = {},
+  options: BakeVideoOptions = {},
 ): Promise<BakeVideoResult> {
   const { project, deck } = asResolvedDeck(input);
   return bakeProjectDeck(project, deck, options);
@@ -50,7 +55,7 @@ export async function bakeVideo(
 export async function bakeProjectDeck(
   project: Project,
   deck: ProjectDeck,
-  options: { slug?: string; fps?: number; runner?: VideoRunner } = {},
+  options: BakeVideoOptions = {},
 ): Promise<BakeVideoResult> {
   if (!hasVoice(deck.dir)) {
     throw new DekError("voice.toml not found", {
@@ -58,14 +63,14 @@ export async function bakeProjectDeck(
       hint: "add voice/ then run `dek voice`",
     });
   }
-  const timelinePath = voiceCacheFile(project.root, deck.name, "timeline.json");
+  const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
   if (!existsSync(timelinePath)) {
     throw new DekError("Timeline not found", {
       path: timelinePath,
       hint: "run `dek voice`",
     });
   }
-  const loaded = loadCachedTimeline(project.root, deck.name);
+  const loaded = loadCachedTimeline(deck.dir);
   if (!loaded) {
     throw new DekError("Timeline not found", {
       path: timelinePath,
@@ -83,18 +88,14 @@ export async function bakeProjectDeck(
     playerScript: await playerScript(),
   });
 
-  const outDir = options.slug
-    ? join(project.root, ".dek", "video", deck.name)
-    : join(project.root, ".dek", "video", deck.name, "_full");
+  const videoCache = cacheDir(deck.dir, "video");
+  const outDir = options.slug ? videoCache : join(videoCache, "_full");
   mkdirSync(outDir, { recursive: true });
 
   if (options.slug) {
     const slideIndex = deck.deck.sections.findIndex((section) => section.slug === options.slug);
     if (slideIndex < 0) {
-      throw new DekError(`section "${options.slug}" not found`, {
-        path: deck.scriptPath,
-        hint: "run `dek ls`",
-      });
+      requireSection(deck, options.slug);
     }
     timeline = sliceTimelineAudio(timeline, slideIndex, join(outDir, `${options.slug}.wav`));
   }
@@ -115,8 +116,8 @@ export async function bakeProjectDeck(
   }
 
   const out = options.slug
-    ? join(project.root, ".dek", "video", deck.name, `${options.slug}.mp4`)
-    : join(project.root, "dist", `${deck.name}.mp4`);
+    ? join(videoCache, `${options.slug}.mp4`)
+    : distFile(project, deck, "mp4", options);
   mkdirSync(dirname(out), { recursive: true });
   await muxVideo({ frames: captured.frames, audioPath: timeline.audio, outPath: out });
 
@@ -129,7 +130,7 @@ export async function bakeProjectDeck(
     const beat = timeline.beats.find((entry) => entry.position.slideIndex === index);
     return { slug: section.slug, title: section.title, startMs: beat?.start ?? 0 };
   });
-  const stem = join(project.root, "dist", deck.name);
+  const stem = join(distDir(project, deck, options), deck.name);
   const sidecars = writeVideoSidecars({
     timeline,
     titles,

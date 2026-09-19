@@ -17,6 +17,7 @@ export {
   type Project,
   type ProjectDeck,
   type ResolvedDeck,
+  requireSection,
   resolveDeck,
   resolveProject,
 } from "./resolve.ts";

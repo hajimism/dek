@@ -144,10 +144,21 @@ function dictKeyPattern(key: string): string {
 }
 
 const SENTENCE_RE = /(?<=[。！？!?．])\s*|(?<=\.)(?=\s|$)\s*|\n+/;
+const ABBREV_END = /(?:^| )[A-Za-z]{1,3}\.$/;
 
 export function splitSentences(paragraph: string): string[] {
-  return paragraph
+  const parts = paragraph
     .split(SENTENCE_RE)
     .map((part) => part.trim())
     .filter(Boolean);
+  const merged: string[] = [];
+  for (const part of parts) {
+    const prev = merged.at(-1);
+    if (prev && ABBREV_END.test(prev)) {
+      merged[merged.length - 1] = `${prev} ${part}`;
+    } else {
+      merged.push(part);
+    }
+  }
+  return merged;
 }

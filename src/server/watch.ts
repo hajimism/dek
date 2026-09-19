@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync, watch } from "node:fs";
 import { join } from "node:path";
 import type { Diagnostic } from "../core/diagnostic.ts";
+import { DekError } from "../core/error.ts";
 import { lintDeck, resolveDeck, syncDeck } from "../core/index.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { lintVisualDeck } from "../core/visual.ts";
@@ -9,10 +10,27 @@ import { createSerialTask } from "./serial.ts";
 
 export type Stoppable = { close: () => void };
 
+export function watchTargets(project: {
+  decks: Array<{ dir: string }>;
+  failed: Array<{ dir: string }>;
+}): string[] {
+  const dirs: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of [...project.decks, ...project.failed]) {
+    if (seen.has(entry.dir)) {
+      continue;
+    }
+    seen.add(entry.dir);
+    dirs.push(entry.dir);
+  }
+  return dirs;
+}
+
 export function watchDeck(
   deckDir: string,
   hub: EventHub,
   options: {
+    visual?: boolean;
     visualRunner?: PlaywrightRunner;
     pollIntervalMs?: number;
     setInterval?: typeof setInterval;
@@ -33,7 +51,7 @@ export function watchDeck(
   const startInterval = options.setInterval ?? setInterval;
   const stopInterval = options.clearInterval ?? clearInterval;
 
-  let visualEnabled: boolean | undefined;
+  let visualEnabled = options.visual === true;
   let diagnosticsRunning = false;
   let diagnosticsQueued = false;
   let queuedAll = false;
@@ -71,14 +89,13 @@ export function watchDeck(
             resolved = resolveDeck(deckDir);
             diagnostics = [...lintDeck(resolved)];
           } catch (error) {
-            console.error(error);
+            diagnostics = [watchErrorDiagnostic(error)];
           }
-          if (visualEnabled !== false) {
+          if (visualEnabled && resolved) {
             try {
-              const visual = await lintVisualDeck(deckDir, {
+              const visual = await lintVisualDeck(resolved, {
                 ...(!all && only ? { slug: only } : {}),
                 ...(options.visualRunner ? { runner: options.visualRunner } : {}),
-                ...(resolved ? { deck: resolved.deck } : {}),
               });
               if (visual === null) {
                 visualEnabled = false;
@@ -88,7 +105,6 @@ export function watchDeck(
               }
             } catch (error) {
               console.error(error);
-              visualEnabled = false;
             }
           }
           hub.emit({ type: "diagnostics", diagnostics });
@@ -262,4 +278,19 @@ function mtime(path: string): number {
   } catch {
     return 0;
   }
+}
+
+function watchErrorDiagnostic(error: unknown): Diagnostic {
+  if (error instanceof DekError) {
+    return {
+      id: "parse",
+      message: error.message,
+      ...(error.path ? { path: error.path } : {}),
+      ...(error.line !== undefined ? { line: error.line } : {}),
+    };
+  }
+  return {
+    id: "error",
+    message: error instanceof Error ? error.message : String(error),
+  };
 }

@@ -60,7 +60,7 @@ Talk-script-first HTML slides.
 ## Principles
 
 - \`script.md\` is the source of truth for order, script, and timing.
-- Each slide is a self-contained HTML document.
+- Each slide is a \`<section class="slide">\` fragment.
 - Conventions are enforced by lint; a deck is done when lint passes.
 
 ## Conventions
@@ -90,17 +90,7 @@ For commands, run \`dek help --agent\`.
 
 function renderSkeleton(section: Section): string {
   const inner = section.beats.length === 0 ? renderTitleSlide(section) : renderBeatSlide(section);
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <link rel="stylesheet" href="../theme.css">
-</head>
-<body>
-  ${inner}
-</body>
-</html>
-`;
+  return `${inner}\n`;
 }
 
 function renderTitleSlide(section: Section): string {

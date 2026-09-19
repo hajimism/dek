@@ -1,4 +1,5 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
+import { withDeckPrefix } from "./routes.ts";
 import { applyIsShown, type StepElement } from "./step.ts";
 
 export type LiveSlide = {
@@ -21,6 +22,28 @@ export type LivePayload =
 export function slideSelector(slug: string): string {
   const escaped = slug.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `#deck > .slide[data-slug="${escaped}"]`;
+}
+
+export async function hydrateLiveEvent(
+  event: LivePayload,
+  pathname: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<LivePayload | undefined> {
+  if (event.type === "reload-slide") {
+    const response = await fetchImpl(liveSlidePath(pathname, event.slug));
+    if (!response.ok) {
+      return undefined;
+    }
+    return { ...event, html: await response.text() };
+  }
+  if (event.type === "reload-theme") {
+    const response = await fetchImpl(liveThemePath(pathname));
+    if (!response.ok) {
+      return undefined;
+    }
+    return { ...event, css: await response.text() };
+  }
+  return event;
 }
 
 export function applyLiveEvent(
@@ -57,13 +80,9 @@ export function formatLiveDiagnostics(diagnostics: Diagnostic[]): string | null 
 }
 
 export function liveSlidePath(pathname: string, slug: string): string {
-  const deck = pathname.match(/^\/decks\/([^/]+)/)?.[1];
-  return deck
-    ? `/decks/${deck}/slide/${encodeURIComponent(slug)}`
-    : `/slide/${encodeURIComponent(slug)}`;
+  return withDeckPrefix(pathname, `/slide/${encodeURIComponent(slug)}`);
 }
 
 export function liveThemePath(pathname: string): string {
-  const deck = pathname.match(/^\/decks\/([^/]+)/)?.[1];
-  return deck ? `/decks/${deck}/theme` : "/theme";
+  return withDeckPrefix(pathname, "/theme");
 }

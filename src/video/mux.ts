@@ -2,15 +2,27 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
+import { awaitPiped } from "../core/spawn.ts";
 import type { VideoFrame } from "./recorder.ts";
 
 export function ffmpegResolved(): boolean {
+  if (process.env.DEK_FFMPEG) {
+    return true;
+  }
   try {
     const result = Bun.spawnSync(["ffmpeg", "-version"], { stdout: "pipe", stderr: "pipe" });
     return result.exitCode === 0;
   } catch {
     return false;
   }
+}
+
+function ffmpegCommand(args: string[]): string[] {
+  const bin = process.env.DEK_FFMPEG;
+  if (bin) {
+    return bin.endsWith(".ts") ? ["bun", "--no-install", bin, ...args] : [bin, ...args];
+  }
+  return ["ffmpeg", ...args];
 }
 
 export async function muxVideo(options: {
@@ -63,11 +75,10 @@ export async function muxVideo(options: {
       "-shortest",
       options.outPath,
     ];
-    const proc = Bun.spawn(["ffmpeg", ...args], { stdout: "pipe", stderr: "pipe" });
-    const code = await proc.exited;
+    const proc = Bun.spawn(ffmpegCommand(args), { stdout: "pipe", stderr: "pipe" });
+    const { stderr, exitCode: code } = await awaitPiped(proc);
     if (code !== 0) {
-      const err = await new Response(proc.stderr).text();
-      throw new DekError("ffmpeg failed", { hint: err.slice(0, 200) || "check ffmpeg output" });
+      throw new DekError("ffmpeg failed", { hint: stderr.slice(0, 200) || "check ffmpeg output" });
     }
     return options.outPath;
   } finally {

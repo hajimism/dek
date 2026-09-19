@@ -27,6 +27,12 @@ export const Section = z.object({
 
 export type Section = z.infer<typeof Section>;
 
+export const DEFAULT_LANG = "ja";
+export const Lang = z
+  .string()
+  .regex(/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/)
+  .default(DEFAULT_LANG);
+
 /** Frontmatter fields written to `.dek/schema.json` for yaml-language-server. */
 export const Frontmatter = z.object({
   title: z.string(),
@@ -37,6 +43,7 @@ export const Frontmatter = z.object({
     .regex(/^\d+m$/)
     .optional(),
   ratio: z.enum(["16:9", "4:3"]).default("16:9"),
+  lang: Lang,
 });
 
 export type Frontmatter = z.infer<typeof Frontmatter>;

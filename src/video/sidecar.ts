@@ -25,13 +25,17 @@ function renderVtt(timeline: Timeline): string {
       cues.push(
         String(index),
         `${formatVtt(sentence.start)} --> ${formatVtt(sentence.end)}`,
-        sentence.text,
+        escapeVtt(sentence.text),
         "",
       );
       index += 1;
     }
   }
   return `${cues.join("\n")}\n`;
+}
+
+function escapeVtt(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\s+/g, " ").trim();
 }
 
 function renderChapters(titles: Array<{ title: string; startMs: number }>): string {

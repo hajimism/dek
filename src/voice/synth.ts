@@ -1,11 +1,12 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cuesFromDeck, splitSentences } from "../core/cue.ts";
-import { type Project, type ProjectDeck, resolveDeck } from "../core/resolve.ts";
+import { asResolvedDeck, type ResolvedDeck } from "../core/resolve.ts";
 import { scheduleVoice, type Utterance } from "../core/timeline.ts";
 import {
   loadVoiceDict,
   loadVoiceSettings,
+  parseTimelineJson,
   utteranceHash,
   voiceCacheDir,
   voiceCacheFile,
@@ -31,31 +32,22 @@ export type SynthResult = {
 };
 
 export async function synthDeck(dir: string): Promise<SynthResult>;
-export async function synthDeck(source: {
-  project: Project;
-  deck: ProjectDeck;
-}): Promise<SynthResult>;
-export async function synthDeck(
-  input: string | { project: Project; deck: ProjectDeck },
-): Promise<SynthResult> {
-  const { project, deck } = typeof input === "string" ? resolveDeck(input) : input;
-  const cacheDir = voiceCacheDir(project.root, deck.name);
+export async function synthDeck(source: ResolvedDeck): Promise<SynthResult>;
+export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResult> {
+  const { deck } = asResolvedDeck(input);
+  const cacheDir = voiceCacheDir(deck.dir);
   mkdirSync(cacheDir, { recursive: true });
-  const timelinePath = voiceCacheFile(project.root, deck.name, "timeline.json");
-  const audioPath = voiceCacheFile(project.root, deck.name, "audio.wav");
+  const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
+  const audioPath = voiceCacheFile(deck.dir, "audio.wav");
   const pinTimeline = join(deck.dir, "voice", "pin", "timeline.json");
   const pinAudio = join(deck.dir, "voice", "pin", "master.wav");
   if (existsSync(pinTimeline) && existsSync(pinAudio)) {
+    const parsed = parseTimelineJson(readFileSync(pinTimeline, "utf8"), pinTimeline);
     copyFileSync(pinAudio, audioPath);
-    try {
-      const parsed = JSON.parse(readFileSync(pinTimeline, "utf8")) as { audio?: string };
-      writeFileSync(
-        timelinePath,
-        `${JSON.stringify({ ...parsed, audio: "audio.wav" }, null, 2)}\n`,
-      );
-    } catch {
-      copyFileSync(pinTimeline, timelinePath);
-    }
+    writeFileSync(
+      timelinePath,
+      `${JSON.stringify({ ...parsed, audio: "audio.wav" }, null, 2)}\n`,
+    );
     return { timelinePath, audioPath, synthesized: 0, cached: 0 };
   }
 
@@ -73,7 +65,7 @@ export async function synthDeck(
   }
 
   const styleId = resolveStyleId(speakers, settings.speaker);
-  writeResolved(project.root, deck.name, {
+  writeResolved(deck.dir, {
     styleId,
     engineVersion: version,
     speaker: settings.speaker,

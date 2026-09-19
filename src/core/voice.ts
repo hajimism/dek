@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join } from "node:path";
 import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
 import { DekError } from "./error.ts";
+import { cacheDir } from "./path.ts";
 import { DEFAULT_PAUSE, type PauseConfig, type Timeline } from "./timeline.ts";
 
 export type VoiceSettings = {
@@ -44,12 +45,12 @@ export function hasVoice(deckDir: string): boolean {
   return existsSync(join(voiceDir(deckDir), "voice.toml"));
 }
 
-export function voiceCacheDir(projectRoot: string, deckName: string): string {
-  return join(projectRoot, ".dek", "voice", deckName);
+export function voiceCacheDir(deckDir: string): string {
+  return cacheDir(deckDir, "voice");
 }
 
-export function voiceCacheFile(projectRoot: string, deckName: string, file: string): string {
-  return join(voiceCacheDir(projectRoot, deckName), file);
+export function voiceCacheFile(deckDir: string, file: string): string {
+  return join(voiceCacheDir(deckDir), file);
 }
 
 export function loadVoiceSettings(deckDir: string): VoiceSettings {
@@ -156,13 +157,9 @@ const TimelineSchema = z.object({
   ),
 });
 
-export function loadCachedTimeline(projectRoot: string, deckName: string): Timeline | undefined {
-  const path = voiceCacheFile(projectRoot, deckName, "timeline.json");
-  if (!existsSync(path)) {
-    return undefined;
-  }
+export function parseTimelineJson(text: string, path?: string): Timeline {
   try {
-    const result = TimelineSchema.safeParse(JSON.parse(readFileSync(path, "utf8")));
+    const result = TimelineSchema.safeParse(JSON.parse(text));
     if (result.success) {
       return result.data;
     }
@@ -179,9 +176,17 @@ export function loadCachedTimeline(projectRoot: string, deckName: string): Timel
   });
 }
 
-export function tryLoadCachedTimeline(projectRoot: string, deckName: string): Timeline | undefined {
+export function loadCachedTimeline(deckDir: string): Timeline | undefined {
+  const path = voiceCacheFile(deckDir, "timeline.json");
+  if (!existsSync(path)) {
+    return undefined;
+  }
+  return parseTimelineJson(readFileSync(path, "utf8"), path);
+}
+
+export function tryLoadCachedTimeline(deckDir: string): Timeline | undefined {
   try {
-    return loadCachedTimeline(projectRoot, deckName);
+    return loadCachedTimeline(deckDir);
   } catch (error) {
     if (error instanceof DekError) {
       return undefined;
@@ -206,12 +211,8 @@ export function resolveTimelineAudio(
   return audio || beside;
 }
 
-export function writeResolved(
-  projectRoot: string,
-  deckName: string,
-  resolved: VoiceResolved,
-): string {
-  const dir = voiceCacheDir(projectRoot, deckName);
+export function writeResolved(deckDir: string, resolved: VoiceResolved): string {
+  const dir = voiceCacheDir(deckDir);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, "resolved.json");
   writeFileSync(path, `${JSON.stringify(resolved, null, 2)}\n`);

@@ -76,6 +76,15 @@ export function concatWavs(parts: Buffer[], pauseMs: number[], leadingMs = 0): B
     channels: parsed[0]?.channels ?? 1,
     bitsPerSample: parsed[0]?.bitsPerSample ?? 16,
   };
+  for (const wav of parsed) {
+    if (
+      wav.sampleRate !== format.sampleRate ||
+      wav.channels !== format.channels ||
+      wav.bitsPerSample !== format.bitsPerSample
+    ) {
+      throw new Error("wav format mismatch");
+    }
+  }
   const chunks: Buffer[] = [];
   if (leadingMs > 0) {
     chunks.push(silencePcm(leadingMs, format));

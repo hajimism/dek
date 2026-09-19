@@ -10,7 +10,7 @@ import {
 } from "./css.ts";
 import { cuesFromDeck, unknownAsciiWords } from "./cue.ts";
 import type { Diagnostic } from "./diagnostic.ts";
-import { consumeTransform } from "./html.ts";
+import { consumeTransform, hasSlideClass } from "./html.ts";
 import { isInside } from "./path.ts";
 import { asResolvedDeck, listSlides, type Project, type ProjectDeck } from "./resolve.ts";
 import type { Beat, Section } from "./schema.ts";
@@ -138,7 +138,7 @@ export function lintDeck(
   if (hasVoice(deck.dir)) {
     diagnostics.push(...lintVoice(deck, only));
   }
-  const timeline = tryLoadCachedTimeline(project.root, deck.name);
+  const timeline = tryLoadCachedTimeline(deck.dir);
   if (timeline) {
     diagnostics.push(...lintDuration(deck, timeline));
   }
@@ -254,6 +254,15 @@ function lintSlideHtml(
   const diagnostics: Diagnostic[] = [];
   const scan = scanSlideHtml(html);
 
+  if (scan.slug !== undefined && scan.slug !== section.slug) {
+    diagnostics.push({
+      id: "DEK006",
+      message: `data-slug "${scan.slug}" does not match section "${section.slug}"`,
+      path,
+      slug: section.slug,
+    });
+  }
+
   for (const step of scan.steps) {
     if (resolvesStep(step, section.beats)) {
       continue;
@@ -359,6 +368,7 @@ function resolvesStep(value: string, beats: Beat[]): boolean {
 }
 
 type HtmlScan = {
+  slug?: string;
   classes: string[];
   steps: string[];
   morphs: string[];
@@ -384,6 +394,14 @@ function scanSlideHtml(html: string): HtmlScan {
       element(el) {
         const tag = el.tagName.toLowerCase();
         const className = el.getAttribute("class");
+        if (tag === "section" && scan.slug === undefined) {
+          if (hasSlideClass(className)) {
+            const slug = el.getAttribute("data-slug");
+            if (slug !== null) {
+              scan.slug = slug;
+            }
+          }
+        }
         if (className) {
           scan.classes.push(...className.split(/\s+/).filter(Boolean));
         }

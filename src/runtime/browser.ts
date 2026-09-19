@@ -3,23 +3,34 @@
 import { type Position, stepValuesForBeat } from "../core/step.ts";
 import { playbackSchedule, type Timeline } from "../core/timeline.ts";
 import { formatClock } from "../core/timing.ts";
-import { deckScale, PRESENTER_RESERVED_RIGHT } from "./fit.ts";
-import { createGuardedGo } from "./go.ts";
+import { deckFitTransform } from "./fit.ts";
+import { applyIncomingPosition, createGuardedGo } from "./go.ts";
+import { applyLiveEvent, hydrateLiveEvent, type LiveHost, slideSelector } from "./live.ts";
 import {
-  applyLiveEvent,
-  type LiveHost,
-  liveSlidePath,
-  liveThemePath,
-  slideSelector,
-} from "./live.ts";
-import {
+  clampPosition,
   formatHash,
   hashChangeTarget,
   parseHash,
   parsePosition,
   positionsEqual,
 } from "./position.ts";
+import {
+  elapsedTone,
+  isPresenterToggleKey,
+  presenterSearch,
+  progressFill,
+  totalBudgetSeconds,
+} from "./presenter.ts";
+import {
+  clampRailWidth,
+  isRailToggleKey,
+  RAIL_VISIBLE_KEY,
+  RAIL_WIDTH_KEY,
+  readStoredRailVisible,
+  readStoredRailWidth,
+} from "./rail.ts";
 import { createRehearseDriver, type RehearseDriver } from "./rehearse.ts";
+import { withDeckPrefix } from "./routes.ts";
 import { waitForPlaybackSettle } from "./settle.ts";
 import {
   advance,
@@ -44,26 +55,32 @@ if (dataEl?.textContent) {
   const slides = JSON.parse(dataEl.textContent) as Slide[];
   const slugs = slides.map((slide) => slide.slug);
   let slideEls = [...document.querySelectorAll("#deck > .slide")];
-  const presenter =
-    new URLSearchParams(location.search).has("presenter") ||
-    document.body.dataset.mode === "presenter";
   const presenterRoot = document.body.dataset.presenter
     ? document.getElementById(document.body.dataset.presenter)
     : null;
-  if (presenter && presenterRoot) {
+  const progressEl = document.getElementById("dek-progress");
+  if (
+    presenterRoot &&
+    (new URLSearchParams(location.search).has("presenter") ||
+      document.body.dataset.mode === "presenter")
+  ) {
     presenterRoot.hidden = false;
+    document.body.classList.add("is-presenter");
+    if (progressEl) {
+      progressEl.hidden = false;
+    }
   }
   const channel = new BroadcastChannel("dek");
   let pos = parseHash(location.hash, slugs);
   let startedAt: number | undefined;
   const elapsedEl = document.getElementById("dek-elapsed");
   const budgetEl = document.getElementById("dek-budget");
+  const talkBudget = totalBudgetSeconds(slides);
   const sockets: WebSocket[] = [];
   const rehearseMode = new URLSearchParams(location.search).has("rehearse");
   let rehearseDriver: RehearseDriver | undefined;
   if (location.protocol === "http:" || location.protocol === "https:") {
-    const deckMatch = location.pathname.match(/^\/decks\/([^/]+)/);
-    const wsPath = deckMatch?.[1] ? `/decks/${deckMatch[1]}/ws` : "/ws";
+    const wsPath = withDeckPrefix(location.pathname, "/ws");
     const token = document.body.dataset.wsToken;
     const wsQuery = token ? `?token=${encodeURIComponent(token)}` : "";
     const ws = new WebSocket(
@@ -78,16 +95,71 @@ if (dataEl?.textContent) {
     sockets.push(ws);
   }
 
+  function presenterOpen(): boolean {
+    return Boolean(presenterRoot && !presenterRoot.hidden);
+  }
+
+  function setPresenterOpen(open: boolean): void {
+    if (!presenterRoot) {
+      return;
+    }
+    presenterRoot.hidden = !open;
+    document.body.classList.toggle("is-presenter", open);
+    if (progressEl) {
+      progressEl.hidden = !open;
+    }
+    const search = presenterSearch(location.search, open);
+    if (search !== location.search) {
+      history.replaceState(null, "", `${location.pathname}${search}${location.hash}`);
+    }
+    fitDeck();
+    render();
+  }
+
+  function railOpen(): boolean {
+    return !document.body.classList.contains("is-rail-hidden");
+  }
+
+  function persistRail(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // file:// or private mode may reject storage
+    }
+  }
+
+  function setRailWidth(px: number): number {
+    const width = clampRailWidth(px);
+    document.documentElement.style.setProperty("--dek-rail-w", `${width}px`);
+    return width;
+  }
+
+  function setRailOpen(open: boolean, persist = true): void {
+    document.body.classList.toggle("is-rail-hidden", !open);
+    if (persist) {
+      persistRail(RAIL_VISIBLE_KEY, open ? "1" : "0");
+    }
+    fitDeck();
+  }
+
+  function syncElapsed(): void {
+    if (!elapsedEl || startedAt === undefined) {
+      return;
+    }
+    const elapsed = (Date.now() - startedAt) / 1000;
+    elapsedEl.textContent = formatClock(elapsed);
+    const tone = elapsedTone(elapsed, talkBudget);
+    elapsedEl.classList.toggle("is-warn", tone === "warn");
+    elapsedEl.classList.toggle("is-over", tone === "over");
+  }
+
   function ensureTimer(): void {
     if (startedAt !== undefined) {
       return;
     }
     startedAt = Date.now();
-    window.setInterval(() => {
-      if (elapsedEl && startedAt !== undefined) {
-        elapsedEl.textContent = formatClock((Date.now() - startedAt) / 1000);
-      }
-    }, 1000);
+    window.setInterval(syncElapsed, 1000);
+    syncElapsed();
   }
 
   function slideEl(slug: string | undefined): Element | undefined {
@@ -95,6 +167,135 @@ if (dataEl?.textContent) {
       return undefined;
     }
     return document.querySelector(slideSelector(slug)) ?? undefined;
+  }
+
+  function stripPreviewClone(root: HTMLElement): void {
+    root.removeAttribute("id");
+    root.removeAttribute("view-transition-name");
+    for (const el of root.querySelectorAll("[id], [view-transition-name]")) {
+      el.removeAttribute("id");
+      el.removeAttribute("view-transition-name");
+    }
+  }
+
+  function neuterRailMedia(root: HTMLElement): void {
+    for (const el of root.querySelectorAll("video, audio, iframe, object, embed")) {
+      el.removeAttribute("src");
+      el.removeAttribute("srcdoc");
+      el.replaceChildren();
+    }
+  }
+
+  function fillRailThumbs(): void {
+    const rail = document.getElementById("dek-rail");
+    const deckEl = document.getElementById("deck");
+    if (!rail || !deckEl) {
+      return;
+    }
+    const width = deckEl.offsetWidth || 1280;
+    const height = deckEl.offsetHeight || 720;
+    for (const [index, slide] of slides.entries()) {
+      const frame = rail.querySelector(`[data-slide-index="${index}"] .dek-thumb-frame`);
+      if (!(frame instanceof HTMLElement)) {
+        continue;
+      }
+      const source = slideEl(slide.slug);
+      if (!(source instanceof HTMLElement)) {
+        frame.replaceChildren();
+        continue;
+      }
+      const clone = source.cloneNode(true);
+      if (!(clone instanceof HTMLElement)) {
+        frame.replaceChildren();
+        continue;
+      }
+      clone.classList.add("is-current");
+      stripPreviewClone(clone);
+      neuterRailMedia(clone);
+      const stage = document.createElement("div");
+      stage.className = "dek-thumb-stage";
+      stage.style.width = `${width}px`;
+      stage.style.height = `${height}px`;
+      stage.append(clone);
+      frame.replaceChildren(stage);
+      fitStage(stage, frame);
+    }
+  }
+
+  function fitRailThumbs(): void {
+    const rail = document.getElementById("dek-rail");
+    if (!rail || rail.offsetParent === null) {
+      return;
+    }
+    for (const frame of rail.querySelectorAll(".dek-thumb-frame")) {
+      if (!(frame instanceof HTMLElement)) {
+        continue;
+      }
+      const stage = frame.querySelector(".dek-thumb-stage");
+      if (stage instanceof HTMLElement) {
+        fitStage(stage, frame);
+      }
+    }
+  }
+
+  function syncRailCurrent(): void {
+    const rail = document.getElementById("dek-rail");
+    if (!rail) {
+      return;
+    }
+    for (const el of rail.querySelectorAll(".dek-thumb")) {
+      const current = Number(el.getAttribute("data-slide-index")) === pos.slideIndex;
+      el.classList.toggle("is-current", current);
+      if (current) {
+        el.setAttribute("aria-current", "page");
+        el.scrollIntoView({ block: "nearest" });
+      } else {
+        el.removeAttribute("aria-current");
+      }
+    }
+  }
+
+  function renderNextPreview(nextPos: Position | null, nextSlide: Slide | undefined): void {
+    const stage = document.getElementById("dek-next-stage");
+    if (!stage) {
+      return;
+    }
+    if (!presenterOpen() || !nextPos || !nextSlide) {
+      stage.replaceChildren();
+      return;
+    }
+    const source = slideEl(nextSlide.slug);
+    const deckEl = document.getElementById("deck");
+    if (!(source instanceof HTMLElement) || !deckEl) {
+      stage.replaceChildren();
+      return;
+    }
+    const clone = source.cloneNode(true);
+    if (!(clone instanceof HTMLElement)) {
+      stage.replaceChildren();
+      return;
+    }
+    // Theme CSS hides unrevealed [data-step] only on .is-current.
+    clone.classList.add("is-current");
+    stripPreviewClone(clone);
+    applyIsShown(
+      [...clone.querySelectorAll("[data-step]")],
+      stepValuesForBeat(nextSlide.beats, nextPos.beatIndex),
+    );
+    const frame = document.createElement("div");
+    frame.className = "dek-preview-frame";
+    frame.style.width = `${deckEl.offsetWidth || 1280}px`;
+    frame.style.height = `${deckEl.offsetHeight || 720}px`;
+    frame.append(clone);
+    stage.replaceChildren(frame);
+    fitStage(frame, stage);
+  }
+
+  function fitStage(el: HTMLElement, stage: HTMLElement): void {
+    el.style.transform = deckFitTransform(
+      { width: stage.clientWidth, height: stage.clientHeight },
+      { width: el.offsetWidth || 1280, height: el.offsetHeight || 720 },
+    );
   }
 
   function render(): void {
@@ -117,9 +318,16 @@ if (dataEl?.textContent) {
     if (scriptEl && current) {
       scriptEl.textContent = current.script;
     }
+    const counts = slides.map((slide) => slide.beats.length);
+    const nextPos = advance(pos, counts);
+    const nextSlide = nextPos ? slides[nextPos.slideIndex] : undefined;
     const nextEl = document.getElementById("dek-next");
     if (nextEl) {
-      nextEl.textContent = slides[pos.slideIndex + 1]?.title ?? "";
+      nextEl.textContent = nextSlide?.title ?? "";
+    }
+    const nextEnd = document.getElementById("dek-next-end");
+    if (nextEnd) {
+      nextEnd.hidden = Boolean(nextPos);
     }
     const beatsEl = document.getElementById("dek-beats");
     if (beatsEl && current) {
@@ -132,7 +340,7 @@ if (dataEl?.textContent) {
         }),
       );
     }
-    document.querySelectorAll("[data-beat-index]").forEach((el) => {
+    document.querySelectorAll("#dek-beats [data-beat-index]").forEach((el) => {
       el.classList.toggle(
         "is-current-beat",
         Number(el.getAttribute("data-beat-index")) === pos.beatIndex,
@@ -142,6 +350,32 @@ if (dataEl?.textContent) {
       budgetEl.textContent =
         current?.budgetSeconds !== undefined ? formatClock(current.budgetSeconds) : "";
     }
+    const pageEl = document.getElementById("dek-page");
+    if (pageEl) {
+      const total = document.createElement("span");
+      total.className = "dek-page-total";
+      total.textContent = `/ ${slides.length}`;
+      pageEl.replaceChildren(document.createTextNode(`${pos.slideIndex + 1} `), total);
+    }
+    if (progressEl) {
+      progressEl.replaceChildren(
+        ...slides.map((slide, index) => {
+          const span = document.createElement("span");
+          if (index < pos.slideIndex) {
+            span.className = "is-done";
+          } else if (index === pos.slideIndex) {
+            span.className = "is-current";
+            span.style.setProperty(
+              "--dek-fill",
+              `${progressFill(pos.beatIndex, slide.beats.length) * 100}%`,
+            );
+          }
+          return span;
+        }),
+      );
+    }
+    renderNextPreview(nextPos, nextSlide);
+    syncRailCurrent();
     const hash = formatHash(pos, slugs);
     if (hash && location.hash !== hash) {
       location.hash = hash;
@@ -181,16 +415,24 @@ if (dataEl?.textContent) {
   });
 
   function applyRemotePosition(next: Position): void {
-    if (positionsEqual(pos, next)) {
+    const clamped = clampPosition(
+      next,
+      slides.map((slide) => ({ beats: slide.beats.length })),
+    );
+    if (!clamped) {
       return;
     }
-    if (rehearseDriver) {
-      rehearseDriver.seek(next);
-      return;
-    }
-    pos = next;
-    render();
-    ensureTimer();
+    applyIncomingPosition(go, clamped, {
+      equal: positionsEqual,
+      current: () => pos,
+      ...(rehearseDriver
+        ? {
+            seek: (target: Position) => {
+              rehearseDriver?.seek(target);
+            },
+          }
+        : {}),
+    });
   }
 
   channel.addEventListener("message", (event: MessageEvent) => {
@@ -201,6 +443,20 @@ if (dataEl?.textContent) {
     }
   });
   document.addEventListener("keydown", (event) => {
+    if (isPresenterToggleKey(event)) {
+      if (presenterRoot) {
+        event.preventDefault();
+        setPresenterOpen(!presenterOpen());
+      }
+      return;
+    }
+    if (isRailToggleKey(event)) {
+      if (document.getElementById("dek-rail") && !presenterOpen()) {
+        event.preventDefault();
+        setRailOpen(!railOpen());
+      }
+      return;
+    }
     const counts = slides.map((slide) => slide.beats.length);
     if (rehearseDriver) {
       if (event.key === " ") {
@@ -236,19 +492,72 @@ if (dataEl?.textContent) {
 
   function fitDeck(): void {
     const deckEl = document.getElementById("deck");
-    if (!deckEl) {
-      return;
+    const currentStage = document.getElementById("dek-current-stage");
+    if (deckEl instanceof HTMLElement && currentStage) {
+      fitStage(deckEl, currentStage);
     }
-    const reserved =
-      presenter && presenterRoot && !presenterRoot.hidden ? PRESENTER_RESERVED_RIGHT : 0;
-    const scale = deckScale({
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      logical: { width: deckEl.offsetWidth || 1280, height: deckEl.offsetHeight || 720 },
-      reservedRight: reserved,
-    });
-    deckEl.style.transform = `scale(${scale})`;
+    const preview = document.querySelector("#dek-next-stage .dek-preview-frame");
+    const nextStage = document.getElementById("dek-next-stage");
+    if (preview instanceof HTMLElement && nextStage && presenterOpen()) {
+      fitStage(preview, nextStage);
+    }
+    fitRailThumbs();
   }
   window.addEventListener("resize", fitDeck);
+  const railEl = document.getElementById("dek-rail");
+  const railResize = document.getElementById("dek-rail-resize");
+  if (railEl) {
+    setRailWidth(readStoredRailWidth(localStorage));
+    setRailOpen(readStoredRailVisible(localStorage), false);
+    railEl.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+        return;
+      }
+      const thumb = event.target;
+      if (!(thumb instanceof HTMLElement) || !thumb.classList.contains("dek-thumb")) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const index = Number(thumb.getAttribute("data-slide-index"));
+      const nextIndex = index + (event.key === "ArrowDown" ? 1 : -1);
+      if (!slides[nextIndex]) {
+        return;
+      }
+      void go({ slideIndex: nextIndex, beatIndex: 0 });
+      const nextThumb = railEl.querySelector(`[data-slide-index="${nextIndex}"]`);
+      if (nextThumb instanceof HTMLElement) {
+        nextThumb.focus({ preventScroll: true });
+      }
+    });
+    if (railResize) {
+      railResize.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        try {
+          railResize.setPointerCapture(event.pointerId);
+        } catch {
+          // synthetic events may not support capture
+        }
+        railResize.setAttribute("data-dragging", "");
+        let width = setRailWidth(event.clientX);
+        const move = (ev: PointerEvent): void => {
+          width = setRailWidth(ev.clientX);
+          fitDeck();
+        };
+        const up = (): void => {
+          railResize.removeEventListener("pointermove", move);
+          railResize.removeEventListener("pointerup", up);
+          railResize.removeEventListener("pointercancel", up);
+          railResize.removeAttribute("data-dragging");
+          persistRail(RAIL_WIDTH_KEY, String(width));
+        };
+        railResize.addEventListener("pointermove", move);
+        railResize.addEventListener("pointerup", up);
+        railResize.addEventListener("pointercancel", up);
+      });
+    }
+  }
+  fillRailThumbs();
   fitDeck();
   render();
   // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekGo"]
@@ -256,10 +565,7 @@ if (dataEl?.textContent) {
 
   let startRehearse: (() => Promise<void>) | undefined;
   if (rehearseMode) {
-    const deckMatch = location.pathname.match(/^\/decks\/([^/]+)/);
-    const timelinePath = deckMatch?.[1]
-      ? `/decks/${deckMatch[1]}/voice/timeline.json`
-      : "/voice/timeline.json";
+    const timelinePath = withDeckPrefix(location.pathname, "/voice/timeline.json");
     const audioPath = timelinePath.replace("timeline.json", "audio.wav");
     startRehearse = async () => {
       const response = await fetch(timelinePath);
@@ -308,19 +614,19 @@ if (dataEl?.textContent) {
       await startRehearse?.();
       return;
     }
-    if (event.type === "reload-slide") {
-      const response = await fetch(liveSlidePath(location.pathname, event.slug));
-      event = { ...event, html: await response.text() };
-    } else if (event.type === "reload-theme") {
-      const response = await fetch(liveThemePath(location.pathname));
-      event = { ...event, css: await response.text() };
+    const hydrated = await hydrateLiveEvent(event, location.pathname);
+    if (!hydrated) {
+      location.reload();
+      return;
     }
+    event = hydrated;
     const current = slides[pos.slideIndex];
     const shown = current ? stepValuesForBeat(current.beats, pos.beatIndex) : new Set<string>();
     if (applyLiveEvent(event, liveHost, { shown }).reload) {
       location.reload();
       return;
     }
+    fillRailThumbs();
     render();
   };
 }

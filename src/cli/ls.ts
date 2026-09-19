@@ -85,7 +85,7 @@ function summarizeDeck(deck: ProjectDeck, project: Project): LsListResult["decks
 function formatDeck(deck: ProjectDeck, config: DekConfig, project: Project): LsDeckResult {
   const timing = sectionTiming(deck.deck.sections, deck.deck.duration, config);
   const estimateTotal = timing.reduce((sum, row) => sum + row.estimateSeconds, 0);
-  const timeline = tryLoadCachedTimeline(project.root, deck.name);
+  const timeline = tryLoadCachedTimeline(deck.dir);
 
   return {
     kind: "deck",

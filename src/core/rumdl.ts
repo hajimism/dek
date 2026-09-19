@@ -1,12 +1,21 @@
 import { dirname } from "node:path";
 import type { Diagnostic } from "./diagnostic.ts";
+import { resolveBinFromAncestors } from "./optional.ts";
 import type { SarifLog } from "./sarif.ts";
+import { awaitPiped } from "./spawn.ts";
 
 export type RumdlRunner = (scriptPath: string) => Promise<string | null>;
 
+export function resolveRumdlBin(): string | undefined {
+  if (process.env.DEK_RUMDL) {
+    return process.env.DEK_RUMDL;
+  }
+  return Bun.which("rumdl") ?? resolveBinFromAncestors("rumdl", process.cwd());
+}
+
 export async function defaultRumdlRunner(scriptPath: string): Promise<string | null> {
-  const bin = process.env.DEK_RUMDL ?? "rumdl";
-  if (!process.env.DEK_RUMDL && !Bun.which("rumdl")) {
+  const bin = resolveRumdlBin();
+  if (!bin) {
     return null;
   }
 
@@ -18,7 +27,7 @@ export async function defaultRumdlRunner(scriptPath: string): Promise<string | n
       stdout: "pipe",
       stderr: "pipe",
     });
-    const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    const { stdout, exitCode } = await awaitPiped(proc);
     if (exitCode === 2) {
       return null;
     }

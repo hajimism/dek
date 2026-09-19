@@ -1,6 +1,7 @@
 import { DekError } from "../core/error.ts";
 import { type Diagnostic, lintDeck } from "../core/index.ts";
-import { lintVisualDeck } from "../core/visual.ts";
+import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
+import { runVisualDeck } from "../core/visual.ts";
 import { hasVoice, loadCachedTimeline } from "../core/voice.ts";
 import { requireDeckFromCwd, requireSection } from "./scope.ts";
 
@@ -25,6 +26,7 @@ export async function checkCommand(options: {
   shot?: boolean;
   voice?: boolean;
   deck?: string;
+  runner?: PlaywrightRunner;
 }): Promise<CheckCliResult> {
   const slug = options.slug?.trim();
   if (!slug) {
@@ -35,17 +37,21 @@ export async function checkCommand(options: {
   requireSection(deck, slug);
 
   const diagnostics = lintDeck({ project, deck }, { slug });
-  const visual = await lintVisualDeck(deck.dir, { slug, deck });
+  const visual = await runVisualDeck(
+    { project, deck },
+    {
+      slug,
+      screenshot: options.shot === true,
+      ...(options.runner ? { runner: options.runner } : {}),
+    },
+  );
   if (visual) {
-    diagnostics.push(...visual);
+    diagnostics.push(...visual.diagnostics);
+  } else if (options.shot) {
+    throw playwrightMissingError();
   }
 
-  let shot: string | undefined;
-  if (options.shot) {
-    const { shotDeck } = await import("../core/shot.ts");
-    const shots = await shotDeck({ project, deck }, { slug });
-    shot = shots[0]?.path;
-  }
+  const shot = visual?.screenshotPath;
 
   let voice: CheckCliResult["voice"];
   if (options.voice) {
@@ -57,7 +63,7 @@ export async function checkCommand(options: {
     }
     const { synthDeck } = await import("../voice/synth.ts");
     await synthDeck({ project, deck });
-    const timeline = loadCachedTimeline(project.root, deck.name);
+    const timeline = loadCachedTimeline(deck.dir);
     if (!timeline) {
       throw new DekError("Timeline not found", {
         hint: "run `dek voice`",

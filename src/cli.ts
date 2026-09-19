@@ -2,6 +2,7 @@
 import { parseArgs } from "node:util";
 import { agentHelpText, formatError, formatErrorText, helpText } from "./cli/format.ts";
 import { type CliResult, writeSuccess } from "./cli/result.ts";
+import { peelDeckArg } from "./cli/scope.ts";
 import { shouldColor } from "./cli/tty.ts";
 import { DekError } from "./core/error.ts";
 
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
       step: { type: "string" },
       accent: { type: "string" },
       fps: { type: "string" },
+      "root-dist": { type: "boolean", default: false },
     },
   });
 
@@ -49,7 +51,15 @@ async function main(): Promise<void> {
   const command = positionals[0];
   let result: CliResult;
 
-  const deck = stringFlag(values.deck);
+  const peeled = peelDeckArg(cwd, {
+    command,
+    deck: stringFlag(values.deck),
+    args: positionals.slice(1),
+    before: stringFlag(values.before),
+    after: stringFlag(values.after),
+  });
+  const deck = peeled.deck;
+  const args = peeled.rest;
   const themeFrom = stringFlag(values["theme-from"]);
   const format = stringFlag(values.format);
   const before = stringFlag(values.before);
@@ -61,7 +71,10 @@ async function main(): Promise<void> {
   switch (command) {
     case "init": {
       const { initCommand } = await import("./cli/init.ts");
-      result = { command: "init", data: initCommand({ cwd, dir: positionals[1], deck }) };
+      result = {
+        command: "init",
+        data: initCommand({ cwd, dir: positionals[1], deck: stringFlag(values.deck) }),
+      };
       break;
     }
     case "new": {
@@ -83,14 +96,13 @@ async function main(): Promise<void> {
         data: lsCommand({
           cwd,
           deck,
-          positionalDeck: positionals[1],
         }),
       };
       break;
     }
     case "show": {
       const { showCommand } = await import("./cli/show.ts");
-      result = { command: "show", data: showCommand({ cwd, slug: positionals[1], deck }) };
+      result = { command: "show", data: showCommand({ cwd, slug: args[0], deck }) };
       break;
     }
     case "sync": {
@@ -117,8 +129,8 @@ async function main(): Promise<void> {
         command: "mv",
         data: mvCommand({
           cwd,
-          slug: positionals[1],
-          to: positionals[2],
+          slug: args[0],
+          to: args[1],
           before,
           after,
           deck,
@@ -128,7 +140,10 @@ async function main(): Promise<void> {
     }
     case "build": {
       const { buildCommand } = await import("./cli/build.ts");
-      result = { command: "build", data: await buildCommand({ cwd, deck }) };
+      result = {
+        command: "build",
+        data: await buildCommand({ cwd, deck, rootDist: values["root-dist"] === true }),
+      };
       break;
     }
     case "check": {
@@ -137,7 +152,7 @@ async function main(): Promise<void> {
         command: "check",
         data: await checkCommand({
           cwd,
-          slug: positionals[1],
+          slug: args[0],
           shot: values.shot === true,
           voice: values.voice === true,
           deck,
@@ -149,7 +164,7 @@ async function main(): Promise<void> {
       const { gotoCommand } = await import("./cli/goto.ts");
       result = {
         command: "goto",
-        data: await gotoCommand({ cwd, slug: positionals[1], deck }),
+        data: await gotoCommand({ cwd, slug: args[0], deck }),
       };
       break;
     }
@@ -162,13 +177,16 @@ async function main(): Promise<void> {
       const { shotCommand } = await import("./cli/shot.ts");
       result = {
         command: "shot",
-        data: await shotCommand({ cwd, slug: positionals[1], step, deck }),
+        data: await shotCommand({ cwd, slug: args[0], step, deck }),
       };
       break;
     }
     case "pdf": {
       const { pdfCommand } = await import("./cli/pdf.ts");
-      result = { command: "pdf", data: await pdfCommand({ cwd, deck }) };
+      result = {
+        command: "pdf",
+        data: await pdfCommand({ cwd, deck, rootDist: values["root-dist"] === true }),
+      };
       break;
     }
     case "cues": {
@@ -183,8 +201,8 @@ async function main(): Promise<void> {
         data: await voiceCommand({
           cwd,
           deck,
-          sub: positionals[1],
-          rest: positionals.slice(2),
+          sub: args[0],
+          rest: args.slice(1),
           accent,
         }),
       };
@@ -196,9 +214,10 @@ async function main(): Promise<void> {
         command: "video",
         data: await videoCommand({
           cwd,
-          slug: positionals[1],
+          slug: args[0],
           deck,
           fps,
+          rootDist: values["root-dist"] === true,
         }),
       };
       break;
@@ -207,7 +226,7 @@ async function main(): Promise<void> {
       const { rehearseCommand } = await import("./cli/rehearse.ts");
       await rehearseCommand({
         cwd,
-        slug: positionals[1],
+        slug: args[0],
         deck,
         remote: values.remote === true,
         password: stringFlag(values.password),
@@ -216,14 +235,28 @@ async function main(): Promise<void> {
     }
     default:
       if (command) {
+        const asDeck = peelDeckArg(cwd, { args: [command] });
+        if (asDeck.deck === command) {
+          const { serveCommand } = await import("./cli/serve.ts");
+          await serveCommand({
+            cwd,
+            deck: command,
+            remote: values.remote === true,
+            password: stringFlag(values.password),
+            visual: values.visual === true,
+          });
+          return;
+        }
         throw new DekError(`unknown command: ${command}`, { hint: `run \`dek help --agent\`` });
       }
       {
         const { serveCommand } = await import("./cli/serve.ts");
         await serveCommand({
           cwd,
+          deck,
           remote: values.remote === true,
           password: stringFlag(values.password),
+          visual: values.visual === true,
         });
       }
       return;
