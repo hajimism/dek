@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
-import { loadCachedTimeline, resolveTimelineAudio, voiceCacheFile } from "../../src/core/voice.ts";
+import {
+  loadCachedTimeline,
+  parseUtteranceJson,
+  resolveTimelineAudio,
+  voiceCacheFile,
+} from "../../src/core/voice.ts";
 import { silentWav } from "../../src/voice/wav.ts";
 import { startFakeVoicevox } from "../helpers/fake-voicevox.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -49,6 +54,19 @@ describe("resolveTimelineAudio", () => {
       const resolved = resolveTimelineAudio({ audio: "/no/such/moved/audio.wav" }, timelinePath);
       expect(resolved).toBe(join(dir, "audio.wav"));
     });
+  });
+});
+
+describe("parseUtteranceJson", () => {
+  test("returns an Utterance for valid cache JSON", () => {
+    expect(
+      parseUtteranceJson(JSON.stringify({ text: "hello", kana: "ハロー", durationMs: 12 })),
+    ).toEqual({ text: "hello", kana: "ハロー", durationMs: 12 });
+  });
+
+  test("returns undefined for JSON that is not an Utterance", () => {
+    expect(parseUtteranceJson('{"text":"hello"}')).toBeUndefined();
+    expect(parseUtteranceJson("not-json")).toBeUndefined();
   });
 });
 
@@ -108,6 +126,41 @@ describe("synthDeck timeline audio", () => {
         expect(resolveTimelineAudio(pinned, restored.timelinePath)).toBe(
           voiceCacheFile(deckDir, "audio.wav"),
         );
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.DEK_VOICE_URL;
+      } else {
+        process.env.DEK_VOICE_URL = previous;
+      }
+      await fake.close();
+    }
+  });
+
+  test("treats a corrupt utterance cache as a miss", async () => {
+    const fake = await startFakeVoicevox();
+    const previous = process.env.DEK_VOICE_URL;
+    process.env.DEK_VOICE_URL = fake.url;
+    try {
+      await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await mkdir(join(deckDir, "voice"), { recursive: true });
+        await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
+        const { synthDeck } = await import("../../src/voice/synth.ts");
+        const first = await synthDeck(deckDir);
+        expect(first.synthesized).toBe(1);
+        expect(first.cached).toBe(0);
+
+        const cacheDir = join(deckDir, ".cache", "voice");
+        const meta = (await readdir(cacheDir)).find(
+          (name) => name.endsWith(".json") && name !== "timeline.json" && name !== "resolved.json",
+        );
+        expect(meta).toBeDefined();
+        await writeFile(join(cacheDir, meta ?? ""), '{"text":"hello"}\n');
+
+        const second = await synthDeck(deckDir);
+        expect(second.synthesized).toBe(1);
+        expect(second.cached).toBe(0);
       });
     } finally {
       if (previous === undefined) {

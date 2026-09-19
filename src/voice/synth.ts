@@ -7,6 +7,7 @@ import {
   loadVoiceDict,
   loadVoiceSettings,
   parseTimelineJson,
+  parseUtteranceJson,
   utteranceHash,
   voiceCacheDir,
   voiceCacheFile,
@@ -88,13 +89,16 @@ export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResu
     });
     const clipPath = join(cacheDir, `${hash}.wav`);
     const metaPath = join(cacheDir, `${hash}.json`);
-    let utterance: Utterance;
-    let wav: Buffer;
+    let utterance: Utterance | undefined;
+    let wav: Buffer | undefined;
     if (existsSync(clipPath) && existsSync(metaPath)) {
-      utterance = JSON.parse(readFileSync(metaPath, "utf8")) as Utterance;
-      wav = readFileSync(clipPath);
-      cached += 1;
-    } else {
+      utterance = parseUtteranceJson(readFileSync(metaPath, "utf8"));
+      if (utterance) {
+        wav = readFileSync(clipPath);
+        cached += 1;
+      }
+    }
+    if (!utterance || !wav) {
       const query = await fetchAudioQuery(baseUrl, text, styleId);
       query.speedScale = settings.speed;
       wav = await fetchSynthesis(baseUrl, query, styleId);

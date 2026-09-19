@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
 import { DekError } from "./error.ts";
 import { cacheDir } from "./path.ts";
-import { DEFAULT_PAUSE, type PauseConfig, type Timeline } from "./timeline.ts";
+import { DEFAULT_PAUSE, type PauseConfig, type Timeline, type Utterance } from "./timeline.ts";
 
 export type VoiceSettings = {
   engine: string;
@@ -134,6 +134,12 @@ pause   = { sentence = ${DEFAULT_PAUSE.sentence}, beat = ${DEFAULT_PAUSE.beat} }
 `;
 }
 
+const UtteranceSchema = z.object({
+  text: z.string(),
+  kana: z.string(),
+  durationMs: z.number(),
+});
+
 const TimelineSchema = z.object({
   audio: z.string(),
   durationMs: z.number(),
@@ -156,6 +162,18 @@ const TimelineSchema = z.object({
     }),
   ),
 });
+
+export function parseUtteranceJson(text: string): Utterance | undefined {
+  try {
+    const result = UtteranceSchema.safeParse(JSON.parse(text));
+    if (result.success) {
+      return result.data;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
 
 export function parseTimelineJson(text: string, path?: string): Timeline {
   try {
