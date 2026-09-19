@@ -47,7 +47,7 @@
 <img class="figure figure-small" data-morph="pipeline" src="assets/pipeline.svg">
 ```
 
-ランタイムが `data-morph` を `view-transition-name` に変換し、ブラウザが 2 枚の間で位置とサイズを補間する。図が右上に小さく退いて次の話が始まる、という表現が属性 1 つで書け、スライドは単体で開ける完結した HTML のまま。
+ランタイムが `data-morph` を `view-transition-name` に変換し、ブラウザが 2 枚の間で位置とサイズを補間する。図が右上に小さく退いて次の話が始まる、という表現が属性 1 つで書け、スライドは `<section class="slide">` フラグメントのまま。
 
 同一スライド内で `data-morph` の名前が重複すると [DEK005](/reference/lint#dek005)。
 

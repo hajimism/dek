@@ -8,13 +8,13 @@
 
 エラーは次の一手を hint に含む。エージェント向けの圧縮ヘルプは `dek help --agent`。
 
-スコープは実行場所で決まる。詳細は [プロジェクト構造](/guide/structure#実行場所がスコープを決める)。どこからでも `--deck <name>` でデッキを指定できる。
+スコープは実行場所で決まる。詳細は [プロジェクト構造](/guide/structure#実行場所がスコープを決める)。どこからでもデッキ名、または `--deck <name>` でデッキを指定できる。`dek lint why-dek`、`dek show why-dek intro`、`dek why-dek`。
 
 ## 開発
 
 | コマンド | 役割 |
 | --- | --- |
-| `dek` | 開発サーバ。sync・HMR・lint・プレゼンタービューを内包 |
+| `dek [deck]` | 開発サーバ。sync・HMR・lint・プレゼンタービューを内包 |
 | `dek --remote [--password PWD]` | LAN に公開。プレゼンターノートと goto/current はパスワード保護 |
 | `dek rehearse [slug]` | Timeline に沿って自走。動画は焼かない |
 
@@ -50,9 +50,9 @@
 | `dek voice say TEXT` | 1 文を再生 |
 | `dek voice dict add WORD KANA` | 辞書 |
 | `dek voice pin` | TTS の master.wav + timeline.json を固定 |
-| `dek build` | 単一 HTML。アセット全インライン、プレゼンタービュー内蔵 |
-| `dek video [slug] [--fps N]` | `dist/<deck>.mp4`、または 1 枚を `.dek/video/` |
-| `dek pdf` | PDF |
+| `dek build [--root-dist]` | 単一 HTML。既定は `decks/<deck>/dist/<deck>.html`。`--root-dist` はプロジェクト直下 |
+| `dek video [slug] [--fps N] [--root-dist]` | 全体は `dist/<deck>.mp4`、1 枚は `.cache/video/` |
+| `dek pdf [--root-dist]` | PDF。出力先は build と同じ |
 | `dek help [--agent]` | ヘルプ |
 
-フラグ `--json` と `--deck` はグローバル。
+フラグ `--json` と `--deck` はグローバル。デッキ名は位置引数でも渡せる。`dek build` / `dek pdf` / `dek video` は `--root-dist` でプロジェクト直下の `dist/` に書く。

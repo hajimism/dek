@@ -36,7 +36,7 @@ bunx github:hajimism/dek
 
 ## 開発サーバなしで発表できるか
 
-できる。`dek build` の単一 HTML を USB に入れる。`?presenter` で手元のウィンドウが BroadcastChannel で追従する。別デバイスが要るときだけ `dek --remote`。
+できる。`dek build` の単一 HTML を USB に入れる。`?presenter` または `p` で手元のウィンドウが BroadcastChannel で追従する。別デバイスが要るときだけ `dek --remote`。
 
 ## Playwright / ffmpeg / VOICEVOX は必須か
 

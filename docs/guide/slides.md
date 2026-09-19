@@ -1,28 +1,19 @@
 # スライド
 
-目標: 1 枚を完結した HTML として書き、テーマのクラスだけを使う。
+目標: 1 枚を `<section class="slide">` として書き、テーマのクラスだけを使う。
 
 ```html
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <link rel="stylesheet" href="../theme.css">
-</head>
-<body>
-  <section class="slide" data-layout="two-col">
-    <h2 class="slide-title">script.md が親</h2>
-    <div class="col">
-      <p class="node">script.md</p>
-      <p class="node node-parent" data-step="script-parent">script.md ← 親</p>
-    </div>
-    <div class="col" data-step="slides-hang">
-      <p class="node">intro.html</p>
-      <p class="node">architecture.html</p>
-    </div>
-  </section>
-</body>
-</html>
+<section class="slide" data-layout="two-col">
+  <h2 class="slide-title">script.md が親</h2>
+  <div class="col">
+    <p class="node">script.md</p>
+    <p class="node node-parent" data-step="script-parent">script.md ← 親</p>
+  </div>
+  <div class="col" data-step="slides-hang">
+    <p class="node">intro.html</p>
+    <p class="node">architecture.html</p>
+  </div>
+</section>
 ```
 
 - ルートは `<section class="slide">` ひとつ。id はファイル名から決まり、`data-slug` は build が注入する。
@@ -32,11 +23,13 @@
 - CSS はテーマのクラス語彙のみ。スライド内の `<style>` と `style=` は lint で禁止。
 - 見た目の差し替えはトークンの `var()`。
 - JS はスライドに置かない。動きはすべてランタイムと `theme.css` が担う。
+- `lang` は `script.md` の frontmatter。殻（DOCTYPE / html / head / body）はレンダラが巻く。
 
-ビルドを通さず確認する。
+確認は開発サーバと `dek check`。
 
 ```bash
-open decks/2026-04-vite/slides/architecture.html
+dek
+dek check architecture --shot
 ```
 
 ## 骨格

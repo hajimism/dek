@@ -40,7 +40,7 @@ dek voice pin
 dek rehearse
 ```
 
-同じ開発サーバを、Timeline を時計にして自走させる。動画は焼かない。`.dek/voice/<deck>/timeline.json` があればブラウザがビートを時間どおりに送る。rehearse 中の Space は再生/停止。矢印と `dek goto` は今のビートへ音と位置を追従させる。エンジンが無くても、手書きの Timeline があれば自走を確認できる。
+同じ開発サーバを、Timeline を時計にして自走させる。動画は焼かない。`.cache/voice/timeline.json` があればブラウザがビートを時間どおりに送る。rehearse 中の Space は再生/停止。矢印と `dek goto` は今のビートへ音と位置を追従させる。エンジンが無くても、手書きの Timeline があれば自走を確認できる。
 
 ## 動画
 
@@ -49,7 +49,7 @@ dek video
 dek video architecture
 ```
 
-デッキ全体は `dist/<deck>.mp4`。1 枚は `.dek/video/<deck>/<slug>.mp4`。`ffmpeg` が必須。`.vtt` / `.chapters.txt` / `.credits.txt` も出す。クレジットは動画に焼き込まない。
+デッキ全体は `dist/<deck>.mp4`（デッキ内。`--root-dist` ならプロジェクト直下）。1 枚は `.cache/video/<slug>.mp4`。`ffmpeg` が必須。`.vtt` / `.chapters.txt` / `.credits.txt` も出す。クレジットは動画に焼き込まない。
 
 録画はトーク尺ぶん待たない。ホールドは 1 枚、アニメーション中だけ fps。View Transitions が仮想時間に従わなければ、アニメ区間だけ実時間で撮る。
 

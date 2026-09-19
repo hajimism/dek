@@ -13,7 +13,7 @@ Agents use the same CLI as humans. Run `dek help --agent`. Result commands accep
 - [はじめる](https://hajimism.github.io/dek/guide/getting-started.html): インストールから骨格のまま喋るまで。
 - [プロジェクト構造](https://hajimism.github.io/dek/guide/structure.html): 1 プロジェクト = N デッキ。テーマはコピー。cwd がスコープ。
 - [台本](https://hajimism.github.io/dek/guide/script.html): ## が 1 枚、### がビート、段落だけが喋り。
-- [スライド](https://hajimism.github.io/dek/guide/slides.html): 1 枚 1 完結 HTML。クラス語彙のみ。JS 禁止。
+- [スライド](https://hajimism.github.io/dek/guide/slides.html): 1 枚は `<section class="slide">`。クラス語彙のみ。JS 禁止。
 - [ビート](https://hajimism.github.io/dek/guide/steps.html): data-step と data-morph。順序は台本、見た目は CSS。
 - [テーマ](https://hajimism.github.io/dek/guide/theme.html): 13 トークン。.slide にスコープ。語彙を増やすのは設計判断。
 - [Lint](https://hajimism.github.io/dek/guide/lint.html): lint が通ることが完成。--visual は幾何。

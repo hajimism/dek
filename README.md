@@ -36,7 +36,7 @@ cd decks/2026-04-vite
 ```bash
 $EDITOR script.md   # ① 喋ることを書く（ここに一番時間をかける）
 bunx dek            # ② 開発サーバ。見出しからスライドが生え、保存のたびに描画と lint が走る
-bunx dek build      # ③ ../../dist/2026-04-vite.html — この 1 ファイルで発表できる
+bunx dek build      # ③ dist/2026-04-vite.html — この 1 ファイルで発表できる
 ```
 
 `script.md` を書いて `dek` を叩けば、骨格スライドが生えて同梱テーマのまま喋れます。HTML を一行も書く必要はありません。
@@ -45,12 +45,13 @@ bunx dek build      # ③ ../../dist/2026-04-vite.html — この 1 ファイル
 
 ## Sample
 
-`sample/` が、dek 自身を題材にした約 8 分のデッキです。`script.md` を開くと、順序と喋りと尺が全部そこにあります。
+`sample/` が、dek 自身を題材にした約 8 分のデッキです。Playwright・rumdl・voice まで入れたフル構成。手順は [sample/README.md](sample/README.md)。
 
 ```bash
-cd sample/decks/why-dek
-bunx github:hajimism/dek
-bunx github:hajimism/dek build   # ../../dist/why-dek.html
+cd sample
+bun install
+bun run setup          # Chromium
+bun run dev            # または bun run lint:visual / bun run build
 ```
 
 ## 開発

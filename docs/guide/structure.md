@@ -17,13 +17,12 @@ my-talks/                       # プロジェクト（dek init）
 │       ├── script.md           # 単一の真実
 │       ├── theme.css           # このデッキのもの
 │       ├── slides/
-│       └── assets/
-├── .dek/
-│   ├── schema.json
-│   ├── voice/<deck>/
-│   └── video/<deck>/
-└── dist/
-    └── 2026-04-vite.html
+│       ├── assets/
+│       ├── dist/               # dek build / pdf / video の成果物
+│       │   └── 2026-04-vite.html
+│       └── .cache/             # voice / video / shots の中間物
+└── .dek/
+    └── schema.json
 ```
 
 プロジェクトはデッキを置く場所であって、デッキが依存する実行環境ではない。
@@ -57,7 +56,7 @@ cp decks/2026-09-dek/theme.css theme.css
 | --- | --- |
 | プロジェクト直下 | 全デッキ |
 | デッキの中 | そのデッキ |
-| どこでも `--deck <name>` | 指定したデッキ |
+| どこでも `<name>` または `--deck <name>` | 指定したデッキ |
 
 プロジェクト外で `dek new` を叩くと `dek init` を促して終了する。
 

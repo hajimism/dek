@@ -19,17 +19,19 @@ my-talks/
 │       │   ├── dict.toml
 │       │   └── pin/
 │       ├── slides/
-│       └── assets/
-├── .dek/
-│   ├── schema.json
-│   ├── voice/<deck>/
-│   └── video/<deck>/
-└── dist/
-    ├── 2026-04-vite.html
-    ├── 2026-04-vite.mp4
-    ├── 2026-04-vite.vtt
-    ├── 2026-04-vite.chapters.txt
-    └── 2026-04-vite.credits.txt
+│       ├── assets/
+│       ├── dist/
+│       │   ├── 2026-04-vite.html
+│       │   ├── 2026-04-vite.mp4
+│       │   ├── 2026-04-vite.vtt
+│       │   ├── 2026-04-vite.chapters.txt
+│       │   └── 2026-04-vite.credits.txt
+│       └── .cache/
+│           ├── voice/
+│           ├── video/
+│           └── shots/
+└── .dek/
+    └── schema.json
 ```
 
 単位の説明は [プロジェクト構造](/guide/structure)。
@@ -81,6 +83,7 @@ ratio: 16:9
 | `date` | いいえ | `YYYY-MM-DD` |
 | `duration` | いいえ | `\d+m`。トークの予算 |
 | `ratio` | いいえ | `16:9`（既定）または `4:3` |
+| `lang` | いいえ | BCP 47。既定 `ja`。player / shot / pdf の `<html lang>` |
 
 セクション id は `[a-z0-9-]+` かつ英字を 1 つ含む。数字だけは `data-step` の番号と衝突する。
 

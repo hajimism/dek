@@ -113,7 +113,7 @@ bunx dek
 bunx dek build
 ```
 
-`my-talks/dist/2026-04-vite.html` ができる。この 1 ファイルをブラウザで開けば発表できる。
+`decks/2026-04-vite/dist/2026-04-vite.html` ができる。この 1 ファイルをブラウザで開けば発表できる。プロジェクト直下へ出すなら `dek build --root-dist`。
 
 ## 次
 
