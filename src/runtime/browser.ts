@@ -1,11 +1,17 @@
 /// <reference lib="dom" />
 
+import {
+  nextPresenterTitle,
+  type PresenterSlide,
+  presenterState,
+} from "../core/presenter-state.ts";
 import { type Position, stepValuesForBeat } from "../core/step.ts";
 import { playbackSchedule, type Timeline } from "../core/timeline.ts";
 import { formatClock } from "../core/timing.ts";
 import { deckFitTransform } from "./fit.ts";
 import { applyIncomingPosition, createGuardedGo } from "./go.ts";
-import { applyLiveEvent, hydrateLiveEvent, type LiveHost, slideSelector } from "./live.ts";
+import { applyLiveEvent, hydrateLiveEvent, slideSelector } from "./live.ts";
+import { documentLiveHost } from "./live-host.ts";
 import {
   clampPosition,
   formatHash,
@@ -42,17 +48,9 @@ import {
   shouldUseViewTransition,
 } from "./step.ts";
 
-type Slide = {
-  slug: string;
-  title: string;
-  script: string;
-  beats: Array<{ id?: string; title: string }>;
-  budgetSeconds?: number;
-};
-
 const dataEl = document.getElementById("dek-data");
 if (dataEl?.textContent) {
-  const slides = JSON.parse(dataEl.textContent) as Slide[];
+  const slides = JSON.parse(dataEl.textContent) as PresenterSlide[];
   const slugs = slides.map((slide) => slide.slug);
   let slideEls = [...document.querySelectorAll("#deck > .slide")];
   const presenterRoot = document.body.dataset.presenter
@@ -255,7 +253,10 @@ if (dataEl?.textContent) {
     }
   }
 
-  function renderNextPreview(nextPos: Position | null, nextSlide: Slide | undefined): void {
+  function renderNextPreview(
+    nextPos: Position | null,
+    nextSlide: PresenterSlide | undefined,
+  ): void {
     const stage = document.getElementById("dek-next-stage");
     if (!stage) {
       return;
@@ -314,25 +315,26 @@ if (dataEl?.textContent) {
         clearMorphNames([...el.querySelectorAll("[data-morph]")]);
       }
     }
+    const state = current ? presenterState(slides, pos) : undefined;
     const scriptEl = document.getElementById("dek-script");
-    if (scriptEl && current) {
-      scriptEl.textContent = current.script;
+    if (scriptEl && state) {
+      scriptEl.textContent = state.script;
     }
     const counts = slides.map((slide) => slide.beats.length);
     const nextPos = advance(pos, counts);
     const nextSlide = nextPos ? slides[nextPos.slideIndex] : undefined;
     const nextEl = document.getElementById("dek-next");
     if (nextEl) {
-      nextEl.textContent = nextSlide?.title ?? "";
+      nextEl.textContent = state ? nextPresenterTitle(state) : "";
     }
     const nextEnd = document.getElementById("dek-next-end");
     if (nextEnd) {
       nextEnd.hidden = Boolean(nextPos);
     }
     const beatsEl = document.getElementById("dek-beats");
-    if (beatsEl && current) {
+    if (beatsEl && state) {
       beatsEl.replaceChildren(
-        ...current.beats.map((beat, i) => {
+        ...state.current.beats.map((beat, i) => {
           const li = document.createElement("li");
           li.setAttribute("data-beat-index", String(i));
           li.textContent = beat.title;
@@ -628,50 +630,5 @@ if (dataEl?.textContent) {
     }
     fillRailThumbs();
     render();
-  };
-}
-
-function documentLiveHost(onReplace?: () => void): LiveHost {
-  return {
-    replaceSlide(slug, html) {
-      const current = document.querySelector(slideSelector(slug));
-      if (!current) {
-        return undefined;
-      }
-      const wasCurrent = current.classList.contains("is-current");
-      current.outerHTML = html;
-      onReplace?.();
-      const next = document.querySelector(slideSelector(slug));
-      if (!next) {
-        return undefined;
-      }
-      if (wasCurrent) {
-        next.classList.add("is-current");
-      }
-      return {
-        querySelectorAll(selector) {
-          return [...next.querySelectorAll(selector)];
-        },
-      };
-    },
-    setTheme(css) {
-      const el = document.querySelector("style[data-dek-theme]");
-      if (el) {
-        el.textContent = css;
-      }
-    },
-    setDiagnostics(text) {
-      let el = document.querySelector(".dek-diagnostics");
-      if (!text) {
-        el?.remove();
-        return;
-      }
-      if (!el) {
-        el = document.createElement("div");
-        el.className = "dek-diagnostics";
-        document.body.prepend(el);
-      }
-      el.textContent = text;
-    },
   };
 }
