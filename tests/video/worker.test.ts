@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { renderDeckHtml } from "../../src/core/document.ts";
-import { playwrightResolved } from "../../src/core/playwright.ts";
+import { resolvePlaywrightModule } from "../../src/core/playwright.ts";
 import type { Timeline } from "../../src/core/timeline.ts";
 import { playerScript } from "../../src/runtime/player.ts";
 import { defaultVideoRunner } from "../../src/video/recorder.ts";
@@ -11,8 +11,10 @@ import { withTempProject } from "../helpers/project.ts";
 
 const defaultTheme = await Bun.file(new URL("../../src/theme/default.css", import.meta.url)).text();
 
+const skipCapture = resolvePlaywrightModule() === undefined || Boolean(process.env.DEK_VIDEO);
+
 describe("video worker", () => {
-  test.skipIf(!playwrightResolved() || Boolean(process.env.DEK_VIDEO))(
+  test.skipIf(skipCapture)(
     "captures distinct mid-transition frames between two slides",
     async () => {
       await withTempProject(
