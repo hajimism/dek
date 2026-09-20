@@ -106,10 +106,54 @@ export function queryDurationMs(query: AudioQuery): number {
   return Math.max(0, Math.round((seconds / speed) * 1000));
 }
 
+const ENGINE_SETUP: Record<string, { label: string; url: string; docker?: string }> = {
+  voicevox: {
+    label: "VOICEVOX",
+    url: "https://voicevox.hiroshiba.jp/",
+    docker: "docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest",
+  },
+  aivis: {
+    label: "AivisSpeech",
+    url: "https://aivis-project.com/",
+    docker:
+      "docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest",
+  },
+  coeiroink: { label: "COEIROINK", url: "https://coeiroink.com/" },
+  sharevox: { label: "SHAREVOX", url: "https://www.sharevox.app/" },
+};
+
+export function engineNameForUrl(baseUrl: string): string | undefined {
+  let port: string;
+  try {
+    port = new URL(baseUrl).port;
+  } catch {
+    return undefined;
+  }
+  return Object.keys(ENGINE_PORTS).find((name) => String(ENGINE_PORTS[name]) === port);
+}
+
+export function engineSetupHint(engine: string): string {
+  const fallback = "or point DEK_VOICE_URL or voice.toml engine at a running engine";
+  if (/^https?:\/\//i.test(engine)) {
+    return `start the engine at ${engine}, ${fallback}`;
+  }
+  const setup = ENGINE_SETUP[engine.split(":")[0] ?? ""];
+  if (!setup) {
+    return `start ${engine}, ${fallback}`;
+  }
+  const docker = setup.docker ? ` or run \`${setup.docker}\`` : "";
+  return `install ${setup.label} from ${setup.url}${docker}, ${fallback}`;
+}
+
+export class EngineMissingError extends DekError {
+  constructor(engine: string, baseUrl: string) {
+    super(`${engine} was not found at ${baseUrl}`, { hint: engineSetupHint(engine) });
+    this.name = "DekError";
+  }
+}
+
 export function engineMissingError(engine: string, baseUrl: string): DekError {
-  return new DekError(`${engine} was not found at ${baseUrl}`, {
-    hint: `start the engine or set voice.toml engine (tried ${baseUrl})`,
-  });
+  return new EngineMissingError(engine, baseUrl);
 }
 
 async function engineFetch(baseUrl: string, path: string, init?: RequestInit): Promise<Response> {
@@ -120,7 +164,7 @@ async function engineFetch(baseUrl: string, path: string, init?: RequestInit): P
     if (error instanceof DekError) {
       throw error;
     }
-    throw engineMissingError("voice engine", baseUrl);
+    throw engineMissingError(engineNameForUrl(baseUrl) ?? "voice engine", baseUrl);
   }
   if (!res.ok) {
     throw new DekError(`voice engine returned ${res.status} for ${path}`, {

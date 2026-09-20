@@ -20,7 +20,11 @@ dek cues
 
 ## 合成
 
-`dek.toml` に `[voice]` があるとき、`dek new` は `voice/voice.toml` をデッキへコピーする。VOICEVOX 互換のローカルエンジンが `voice` / `rehearse` / `video` に必要。未検出ならそのコマンドだけが次の一手付きで失敗する。
+`dek.toml` に `[voice]` があるとき、`dek new` は `voice/voice.toml` をデッキへコピーする。VOICEVOX 互換のローカルエンジンが `voice` / `rehearse` / `video` に必要。未検出ならそのコマンドだけが次の一手付きで失敗する。エラーの hint に配布ページと Docker コマンドが入る。
+
+- VOICEVOX: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/) か `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
+- AivisSpeech: [aivis-project.com](https://aivis-project.com/) か `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`（`engine = "aivis"`）
+- 別の場所で動いているなら `DEK_VOICE_URL` か `voice.toml` の `engine` に URL を書く
 
 ```bash
 dek voice

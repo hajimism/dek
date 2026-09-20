@@ -40,7 +40,7 @@ bunx github:hajimism/dek
 
 ## Playwright / ffmpeg / VOICEVOX は必須か
 
-任意依存。未検出ならそのコマンドだけが次の一手付きで失敗する。CLI 全体はいかなる場合も起動できる。`--visual` / `shot` / `pdf` / `video` は Playwright。`video` の結合は ffmpeg。`voice` / `rehearse` / `video` は VOICEVOX 互換エンジン。
+任意依存。未検出ならそのコマンドだけが次の一手付きで失敗する。CLI 全体はいかなる場合も起動できる。`--visual` / `shot` / `pdf` / `video` は Playwright。`video` の結合は ffmpeg。`voice` / `rehearse` / `video` は VOICEVOX 互換エンジン。エンジンの入れ方はエラーの hint と [声と動画](./voice#合成) にある。
 
 ## 待ち時間はどこに書くか
 

@@ -109,7 +109,29 @@ describe("dek voice", () => {
         env: { DEK_VOICE_URL: "http://127.0.0.1:9" },
       });
       expect(result.exitCode).toBe(1);
-      expect(result.stdout).toContain("hint");
+      const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
+      expect(json.error.message).toContain("voicevox");
+      expect(json.error.hint).toContain("https://voicevox.hiroshiba.jp/");
+      expect(json.error.hint).toContain("docker run");
+    });
+  });
+
+  test("dek voice speakers gives the same setup hint when the engine is down", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, "voice"), { recursive: true });
+      await writeFile(
+        join(deckDir, "voice", "voice.toml"),
+        voiceToml.replace('"voicevox"', '"aivis"'),
+      );
+      const result = await runDek(["voice", "speakers", "--json"], {
+        cwd: deckDir,
+        env: { DEK_VOICE_URL: "http://127.0.0.1:9" },
+      });
+      expect(result.exitCode).toBe(1);
+      const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
+      expect(json.error.message).toContain("aivis");
+      expect(json.error.hint).toContain("https://aivis-project.com/");
     });
   });
 });

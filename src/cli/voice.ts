@@ -4,7 +4,9 @@ import { dirname, join } from "node:path";
 import { DekError } from "../core/error.ts";
 import { loadVoiceDict, loadVoiceSettings, voiceCacheFile, writeVoiceDict } from "../core/voice.ts";
 import {
+  EngineMissingError,
   engineBaseUrl,
+  engineMissingError,
   fetchAudioQuery,
   fetchSpeakers,
   fetchSynthesis,
@@ -41,7 +43,8 @@ export async function voiceCommand(options: {
   }
   if (sub === "speakers") {
     const settings = loadVoiceSettings(deck.dir);
-    const speakers = await fetchSpeakers(engineBaseUrl(settings.engine));
+    const baseUrl = engineBaseUrl(settings.engine);
+    const speakers = await withEngine(settings.engine, baseUrl, () => fetchSpeakers(baseUrl));
     return {
       action: "speakers",
       speakers: speakers.map((speaker) => ({
@@ -59,7 +62,7 @@ export async function voiceCommand(options: {
     }
     const settings = loadVoiceSettings(deck.dir);
     const baseUrl = engineBaseUrl(settings.engine);
-    const speakers = await fetchSpeakers(baseUrl);
+    const speakers = await withEngine(settings.engine, baseUrl, () => fetchSpeakers(baseUrl));
     const styleId = resolveStyleId(speakers, settings.speaker);
     const query = await fetchAudioQuery(baseUrl, text, styleId);
     query.speedScale = settings.speed;
@@ -104,6 +107,18 @@ export async function voiceCommand(options: {
   throw new DekError(`unknown voice command: ${sub}`, {
     hint: "dek voice | dek voice speakers | dek voice say | dek voice dict add | dek voice pin",
   });
+}
+
+/** Re-raise "engine is down" with the configured engine name so the hint names the right setup. */
+async function withEngine<T>(engine: string, baseUrl: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof EngineMissingError) {
+      throw engineMissingError(engine, baseUrl);
+    }
+    throw error;
+  }
 }
 
 async function playWav(path: string): Promise<void> {
