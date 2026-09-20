@@ -144,6 +144,30 @@ describe("defaultPlaywrightRunner", () => {
   });
 });
 
+describe("playwright worker", () => {
+  test.skipIf(!playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT))(
+    "reports font size and weight with each contrast sample",
+    async () => {
+      const response = await defaultPlaywrightRunner({
+        viewport: { width: 1280, height: 720 },
+        actions: ["contrast"],
+        pages: [
+          {
+            html: `<html><body style="margin:0;background:#fff"><section class="slide" style="background:#fff">
+  <h2 style="font-size:32px;font-weight:700;color:#777">big</h2>
+</section></body></html>`,
+            slug: "intro",
+            step: "1",
+          },
+        ],
+      });
+      const sample = response?.contrasts.find((entry) => entry.slug === "intro");
+      expect(sample?.fontSize).toBeCloseTo(32, 0);
+      expect(sample?.fontWeight).toBe(700);
+    },
+  );
+});
+
 describe("resolvePlaywrightModule", () => {
   test("finds playwright in an ancestor node_modules from a nested cwd", async () => {
     await withTempDir(async (dir) => {

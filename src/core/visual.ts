@@ -48,6 +48,31 @@ export function contrastRatio(foreground: Rgb, background: Rgb): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+export type TextSample = {
+  fontSize?: number;
+  fontWeight?: number;
+};
+
+/** WCAG large text: 24px (18pt) regular, or 18.66px (14pt) bold. */
+export const LARGE_TEXT_PX = 24;
+export const LARGE_BOLD_TEXT_PX = 18.66;
+export const BOLD_WEIGHT = 700;
+
+export function isLargeText(sample: TextSample): boolean {
+  if (sample.fontSize === undefined) {
+    return false;
+  }
+  if (sample.fontSize >= LARGE_TEXT_PX) {
+    return true;
+  }
+  return sample.fontSize >= LARGE_BOLD_TEXT_PX && (sample.fontWeight ?? 400) >= BOLD_WEIGHT;
+}
+
+/** 3:1 for large text, 4.5:1 otherwise. Unknown size falls back to 4.5:1. */
+export function contrastThreshold(sample: TextSample): 3 | 4.5 {
+  return isLargeText(sample) ? 3 : 4.5;
+}
+
 export function parseCssRgb(color: string): Rgb | undefined {
   const match = color.match(/rgba?\(\s*([\d.]+)(?:\s*,\s*|\s+)([\d.]+)(?:\s*,\s*|\s+)([\d.]+)/i);
   if (!match) {
@@ -192,13 +217,15 @@ function visualDiagnostics(response: VisualResponse, fallbackPath: string): Diag
     });
   }
   for (const contrast of response.contrasts) {
-    if (contrast.ratio >= 4.5) {
+    const threshold = contrastThreshold(contrast);
+    if (contrast.ratio >= threshold) {
       continue;
     }
     const ratio = Math.round(contrast.ratio * 10) / 10;
+    const size = threshold === 3 ? " (large text)" : "";
     diagnostics.push({
       id: "DEK031",
-      message: `contrast ${ratio} is below 4.5:1 at step ${contrast.step || "1"}`,
+      message: `contrast ${ratio} is below ${threshold}:1${size} at step ${contrast.step || "1"}`,
       path: contrast.slug ? join(dirname(fallbackPath), `${contrast.slug}.html`) : fallbackPath,
     });
   }

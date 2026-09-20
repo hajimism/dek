@@ -5,6 +5,7 @@ import type { VisualRequest } from "../../src/core/playwright.ts";
 import { shotDeck } from "../../src/core/shot.ts";
 import {
   contrastRatio,
+  contrastThreshold,
   lintVisualDeck,
   overflowsSlide,
   parseCssRgb,
@@ -49,6 +50,21 @@ describe("contrastRatio", () => {
 
   test("is below 4.5 for gray text on white", () => {
     expect(contrastRatio([119, 119, 119], [255, 255, 255])).toBeLessThan(4.5);
+  });
+});
+
+describe("contrastThreshold", () => {
+  test("uses 3:1 for WCAG large text and 4.5:1 otherwise", () => {
+    expect(contrastThreshold({ fontSize: 24, fontWeight: 400 })).toBe(3);
+    expect(contrastThreshold({ fontSize: 18.66, fontWeight: 700 })).toBe(3);
+    expect(contrastThreshold({ fontSize: 18, fontWeight: 700 })).toBe(4.5);
+    expect(contrastThreshold({ fontSize: 23.9, fontWeight: 400 })).toBe(4.5);
+    expect(contrastThreshold({ fontSize: 24 })).toBe(3);
+  });
+
+  test("falls back to 4.5:1 when the runner did not report a size", () => {
+    expect(contrastThreshold({})).toBe(4.5);
+    expect(contrastThreshold({ fontWeight: 700 })).toBe(4.5);
   });
 });
 
@@ -108,6 +124,40 @@ describe("lintVisualDeck", () => {
         const dek031 = diagnostics?.find((d) => d.id === "DEK031");
         expect(dek031?.path).toContain("slides/intro.html");
         expect(dek031?.message).toContain("2.1");
+      },
+    );
+  });
+
+  test("accepts 3:1 for large text and says so when it still fails", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const passing = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [{ slug: "intro", step: "1", ratio: 3.2, fontSize: 32, fontWeight: 400 }],
+          }),
+        });
+        expect(passing?.some((d) => d.id === "DEK031")).toBe(false);
+
+        const failing = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [{ slug: "intro", step: "1", ratio: 2.8, fontSize: 32, fontWeight: 400 }],
+          }),
+        });
+        const dek031 = failing?.find((d) => d.id === "DEK031");
+        expect(dek031?.message).toContain("2.8");
+        expect(dek031?.message).toContain("3:1");
+        expect(dek031?.message).toContain("large text");
+
+        const small = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [{ slug: "intro", step: "1", ratio: 3.2, fontSize: 20, fontWeight: 400 }],
+          }),
+        });
+        expect(small?.find((d) => d.id === "DEK031")?.message).toContain("4.5:1");
       },
     );
   });

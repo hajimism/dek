@@ -22,7 +22,15 @@ export type VisualRequest = {
 
 export type VisualResponse = {
   overflows: Array<{ slug: string; step: string; box: string }>;
-  contrasts: Array<{ slug: string; step: string; ratio: number }>;
+  contrasts: Array<{
+    slug: string;
+    step: string;
+    ratio: number;
+    /** Computed font-size in px; missing from older workers. */
+    fontSize?: number;
+    /** Computed font-weight as a number; missing from older workers. */
+    fontWeight?: number;
+  }>;
   screenshotPath?: string;
   pdfPath?: string;
 };

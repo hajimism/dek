@@ -49,6 +49,8 @@ try {
             slug: pageReq.slug ?? "",
             step: pageReq.step ?? "1",
             ratio: contrastRatio(fg, bg),
+            fontSize: sample.fontSize,
+            fontWeight: sample.fontWeight,
           });
         }
       }
@@ -78,7 +80,7 @@ try {
 async function measureSlide(page: { evaluate<T>(fn: () => T | Promise<T>): Promise<T> }): Promise<{
   slideBox: Box | undefined;
   children: Array<{ box: string; rect: Box }>;
-  samples: Array<{ fg: string; bg: string }>;
+  samples: Array<{ fg: string; bg: string; fontSize: number; fontWeight: number }>;
 }> {
   return page.evaluate(() => {
     const slide = document.querySelector(".slide");
@@ -93,7 +95,7 @@ async function measureSlide(page: { evaluate<T>(fn: () => T | Promise<T>): Promi
       bottom: slideRect.bottom,
     };
     const children: Array<{ box: string; rect: Box }> = [];
-    const samples: Array<{ fg: string; bg: string }> = [];
+    const samples: Array<{ fg: string; bg: string; fontSize: number; fontWeight: number }> = [];
     for (const el of slide.querySelectorAll("*")) {
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
@@ -115,7 +117,12 @@ async function measureSlide(page: { evaluate<T>(fn: () => T | Promise<T>): Promi
         background = getComputedStyle(current).backgroundColor;
         current = current.parentElement;
       }
-      samples.push({ fg: style.color, bg: background });
+      samples.push({
+        fg: style.color,
+        bg: background,
+        fontSize: Number.parseFloat(style.fontSize),
+        fontWeight: Number(style.fontWeight) || 400,
+      });
     }
     return { slideBox, children, samples };
   });
