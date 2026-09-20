@@ -720,6 +720,47 @@ hello dek
     );
   });
 
+  test("DEK042: flags a beat with visible body but no spoken paragraph when voice/ exists", async () => {
+    const script = `---
+title: Demo
+---
+
+## intro
+
+hello
+
+### hook {#hook}
+
+spoken
+
+### shown {#shown}
+
+- list only
+`;
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: titleSlide } }] },
+      async (root) => {
+        expect(lintDeck(join(root, "decks", "demo")).some((d) => d.id === "DEK042")).toBe(false);
+        const dir = join(root, "decks", "demo", "voice");
+        await mkdir(dir, { recursive: true });
+        await writeFile(
+          join(dir, "voice.toml"),
+          `engine = "voicevox"\nspeaker = "ずんだもん/ノーマル"\n`,
+        );
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        const dek042 = diagnostics.find((d) => d.id === "DEK042");
+        expect(dek042).toBeDefined();
+        expect(dek042?.message).toContain('"intro"');
+        expect(dek042?.message).toContain("beat 2");
+        expect(dek042?.message).toContain("not synthesized");
+        expect(dek042?.path).toContain("script.md");
+        expect(dek042?.line).toBe(13);
+        expect(dek042?.slug).toBe("intro");
+        expect(lintDeck(join(root, "decks", "demo"), { slug: "other" })).toEqual([]);
+      },
+    );
+  });
+
   test("DEK041: flags a large gap between duration budget and Timeline length", async () => {
     await withTempProject(
       {

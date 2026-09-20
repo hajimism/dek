@@ -8,7 +8,7 @@ import {
   isScopedThemeSelector,
   topLevelSelectors,
 } from "./css.ts";
-import { cuesFromDeck, unknownAsciiWords } from "./cue.ts";
+import { cuesFromDeck, silentCues, unknownAsciiWords } from "./cue.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 import { consumeTransform, hasSlideClass } from "./html.ts";
 import { isInside } from "./path.ts";
@@ -145,9 +145,32 @@ export function lintDeck(
   return diagnostics;
 }
 
+/** DEK042: a beat that shows a list, code, or table but has nothing to say. */
+export function silentCueDiagnostics(deck: ProjectDeck, only?: string): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const cue of silentCues(deck.deck)) {
+    if (only !== undefined && cue.slug !== only) {
+      continue;
+    }
+    const section = deck.deck.sections[cue.position.slideIndex];
+    const where =
+      section && section.beats.length > 0
+        ? `"${cue.slug}" beat ${cue.position.beatIndex + 1}`
+        : `"${cue.slug}"`;
+    diagnostics.push({
+      id: "DEK042",
+      message: `no spoken paragraph in ${where}; lists, code, and tables are not synthesized`,
+      path: deck.scriptPath,
+      line: cue.line,
+      slug: cue.slug,
+    });
+  }
+  return diagnostics;
+}
+
 function lintVoice(deck: ProjectDeck, only?: string): Diagnostic[] {
   const dict = loadVoiceDict(deck.dir);
-  const diagnostics: Diagnostic[] = [];
+  const diagnostics: Diagnostic[] = silentCueDiagnostics(deck, only);
   for (const cue of cuesFromDeck(deck.deck)) {
     if (only !== undefined && cue.slug !== only) {
       continue;

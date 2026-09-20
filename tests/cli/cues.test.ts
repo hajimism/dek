@@ -12,6 +12,7 @@ type CuesOk = {
     line: number;
     paragraphs: string[];
   }>;
+  diagnostics: Array<{ id: string; message: string; line?: number }>;
 };
 
 describe("dek cues", () => {
@@ -66,6 +67,7 @@ Use \`dek\`.
             paragraphs: ["さて。", "Use dek."],
           },
         ]);
+        expect(json.diagnostics).toEqual([]);
       },
     );
   });
@@ -92,6 +94,47 @@ hello
         expect(result.exitCode).toBe(0);
         expect(result.stdout).toContain("intro #1");
         expect(result.stdout).toContain("hello");
+      },
+    );
+  });
+
+  test("warns about beats whose body is never spoken, even without voice/", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+### hook {#hook}
+
+spoken
+
+### shown {#shown}
+
+- list only
+`,
+          },
+        ],
+      },
+      async (root) => {
+        const json = await runDek(["cues", "--json"], { cwd: join(root, "decks", "demo") });
+        expect(json.exitCode).toBe(0);
+        const parsed = jsonStdout<CuesOk>(json);
+        expect(parsed.diagnostics).toHaveLength(1);
+        expect(parsed.diagnostics[0]?.id).toBe("DEK042");
+        expect(parsed.diagnostics[0]?.line).toBe(13);
+
+        const text = await runDek(["cues"], { cwd: join(root, "decks", "demo") });
+        expect(text.exitCode).toBe(0);
+        expect(text.stdout).toContain("intro #2");
+        expect(text.stdout).toContain("DEK042");
       },
     );
   });

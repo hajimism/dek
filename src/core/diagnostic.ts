@@ -17,7 +17,8 @@ export type RuleId =
   | "DEK030"
   | "DEK031"
   | "DEK040"
-  | "DEK041";
+  | "DEK041"
+  | "DEK042";
 
 export type Diagnostic = {
   id: string;

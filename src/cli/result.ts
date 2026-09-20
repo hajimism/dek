@@ -222,18 +222,22 @@ function formatLs(data: LsListResult | LsDeckResult): string {
 }
 
 function formatCues(data: CuesResult): string {
-  if (data.cues.length === 0) {
-    return `${data.name}  0 cues`;
+  const body =
+    data.cues.length === 0
+      ? `${data.name}  0 cues`
+      : data.cues
+          .map((cue) => {
+            const header = `${cue.slug} #${cue.position.beatIndex + 1}`;
+            if (cue.paragraphs.length === 0) {
+              return header;
+            }
+            return `${header}\n${cue.paragraphs.map((paragraph) => `  ${paragraph}`).join("\n")}`;
+          })
+          .join("\n\n");
+  if (data.diagnostics.length === 0) {
+    return body;
   }
-  return data.cues
-    .map((cue) => {
-      const header = `${cue.slug} #${cue.position.beatIndex + 1}`;
-      if (cue.paragraphs.length === 0) {
-        return header;
-      }
-      return `${header}\n${cue.paragraphs.map((paragraph) => `  ${paragraph}`).join("\n")}`;
-    })
-    .join("\n\n");
+  return `${body}\n\n${formatDiagnostics(data.diagnostics, { color: shouldColor(process.stdout) })}`;
 }
 
 function formatVoice(data: VoiceCliResult): string {

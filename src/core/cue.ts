@@ -81,36 +81,63 @@ export function unknownAsciiWords(text: string, dict: VoiceDict): string[] {
   return found;
 }
 
-export function cuesFromDeck(deck: Deck, dict: VoiceDict = {}): Cue[] {
-  const cues: Cue[] = [];
+export type CueSource = {
+  position: Position;
+  slug: string;
+  line: number;
+  markdown: string;
+};
+
+/** One entry per cue: the markdown that feeds it. Beat 0 also carries the section body. */
+export function cueSources(deck: Deck): CueSource[] {
+  const sources: CueSource[] = [];
   for (const [slideIndex, section] of deck.sections.entries()) {
     if (section.beats.length === 0) {
-      cues.push(
-        cueAt(section.slug, { slideIndex, beatIndex: 0 }, section.line, section.body, dict),
-      );
+      sources.push({
+        position: { slideIndex, beatIndex: 0 },
+        slug: section.slug,
+        line: section.line,
+        markdown: section.body,
+      });
       continue;
     }
     for (const [beatIndex, beat] of section.beats.entries()) {
-      const markdown = beatIndex === 0 ? joinBodies(section.body, beat.body) : beat.body;
-      cues.push(cueAt(section.slug, { slideIndex, beatIndex }, beat.line, markdown, dict));
+      sources.push({
+        position: { slideIndex, beatIndex },
+        slug: section.slug,
+        line: beat.line,
+        markdown: beatIndex === 0 ? joinBodies(section.body, beat.body) : beat.body,
+      });
     }
   }
-  return cues;
+  return sources;
 }
 
-function cueAt(
-  slug: string,
-  position: Position,
-  line: number,
-  markdown: string,
-  dict: VoiceDict,
-): Cue {
-  return {
-    position,
-    slug,
-    line,
-    paragraphs: spokenParagraphs(markdown).map((paragraph) => applyDict(paragraph, dict)),
-  };
+export function cuesFromDeck(deck: Deck, dict: VoiceDict = {}): Cue[] {
+  return cueSources(deck).map((source) => ({
+    position: source.position,
+    slug: source.slug,
+    line: source.line,
+    paragraphs: spokenParagraphs(source.markdown).map((paragraph) => applyDict(paragraph, dict)),
+  }));
+}
+
+export type SilentCue = Pick<CueSource, "position" | "slug" | "line">;
+
+/**
+ * Cues that show something (list, code, table) but say nothing. An empty or
+ * blockquote-only beat is a deliberate pause and is not reported.
+ */
+export function silentCues(deck: Deck): SilentCue[] {
+  return cueSources(deck)
+    .filter(
+      (source) => spokenParagraphs(source.markdown).length === 0 && hasVisibleBody(source.markdown),
+    )
+    .map(({ position, slug, line }) => ({ position, slug, line }));
+}
+
+function hasVisibleBody(markdown: string): boolean {
+  return markdown.split(/\r?\n/).some((line) => line.trim() !== "" && !BLOCKQUOTE_RE.test(line));
 }
 
 function joinBodies(a: string, b: string): string {

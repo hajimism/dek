@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   applyDict,
   cuesFromDeck,
+  silentCues,
   spokenParagraphs,
   unknownAsciiWords,
   type VoiceDict,
@@ -157,5 +158,67 @@ title: Talk
 Use \`dek\`.
 `);
     expect(cuesFromDeck(deck, dict)[0]?.paragraphs).toEqual(["Use デック."]);
+  });
+});
+
+describe("silentCues", () => {
+  const deck = parseScript(`---
+title: Demo
+---
+
+## intro
+
+hello
+
+## list-only {#list-only}
+
+- shown but never spoken
+- another item
+
+## architecture
+
+### hook {#hook}
+
+spoken here
+
+### quiet {#quiet}
+
+### direction {#direction}
+
+> pause here
+
+### table {#table}
+
+| a | b |
+| - | - |
+| 1 | 2 |
+
+## joined {#joined}
+
+section paragraph is spoken
+
+### first {#first}
+
+- only a list in the beat body
+`);
+
+  test("returns cues whose body is visible but never spoken", () => {
+    const silent = silentCues(deck);
+    expect(silent.map((cue) => `${cue.slug}#${cue.position.beatIndex}`)).toEqual([
+      "list-only#0",
+      "architecture#3",
+    ]);
+  });
+
+  test("carries the beat line so lint can point at script.md", () => {
+    const silent = silentCues(deck);
+    expect(silent[0]?.line).toBe(9);
+    expect(silent[1]?.line).toBe(26);
+  });
+
+  test("ignores empty beats and blockquote-only beats", () => {
+    const ids = silentCues(deck).map((cue) => cue.position.beatIndex);
+    expect(ids).not.toContain(1);
+    expect(ids).not.toContain(2);
   });
 });
