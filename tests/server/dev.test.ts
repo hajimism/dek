@@ -237,34 +237,40 @@ more
   });
 
   test("watches a deck that failed to parse at start", async () => {
-    await withTempProject({ decks: [{ name: "demo", slides: { intro: introHtml } }] }, async (root) => {
-      const brokenDir = join(root, "decks", "broken");
-      await mkdir(join(brokenDir, "slides"), { recursive: true });
-      await writeFile(join(brokenDir, "script.md"), "not a script\n");
-      await withDevServer({ cwd: root }, async (server) => {
-        const synced = waitForEvent(server.events, (event) => event.type === "sync");
-        await writeFile(join(brokenDir, "script.md"), defaultScript("Broken"));
-        await synced;
-        await waitForOk(new URL("/decks/broken/", server.url).href);
-        const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
-        await writeFile(join(brokenDir, "slides", "intro.html"), introHtml);
-        expect(await pending).toMatchObject({ type: "reload-slide", slug: "intro" });
-      });
-    });
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const brokenDir = join(root, "decks", "broken");
+        await mkdir(join(brokenDir, "slides"), { recursive: true });
+        await writeFile(join(brokenDir, "script.md"), "not a script\n");
+        await withDevServer({ cwd: root }, async (server) => {
+          const synced = waitForEvent(server.events, (event) => event.type === "sync");
+          await writeFile(join(brokenDir, "script.md"), defaultScript("Broken"));
+          await synced;
+          await waitForOk(new URL("/decks/broken/", server.url).href);
+          const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
+          await writeFile(join(brokenDir, "slides", "intro.html"), introHtml);
+          expect(await pending).toMatchObject({ type: "reload-slide", slug: "intro" });
+        });
+      },
+    );
   });
 
   test("watches a deck created after the server starts", async () => {
-    await withTempProject({ decks: [{ name: "demo", slides: { intro: introHtml } }] }, async (root) => {
-      await withDevServer({ cwd: root }, async (server) => {
-        const created = join(root, "decks", "newone");
-        await mkdir(join(created, "slides"), { recursive: true });
-        await writeFile(join(created, "script.md"), defaultScript("New"));
-        await waitForOk(new URL("/decks/newone/", server.url).href);
-        const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
-        await writeFile(join(created, "slides", "intro.html"), introHtml);
-        expect(await pending).toMatchObject({ type: "reload-slide", slug: "intro" });
-      });
-    });
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: root }, async (server) => {
+          const created = join(root, "decks", "newone");
+          await mkdir(join(created, "slides"), { recursive: true });
+          await writeFile(join(created, "script.md"), defaultScript("New"));
+          await waitForOk(new URL("/decks/newone/", server.url).href);
+          const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
+          await writeFile(join(created, "slides", "intro.html"), introHtml);
+          expect(await pending).toMatchObject({ type: "reload-slide", slug: "intro" });
+        });
+      },
+    );
   });
 
   test("emits reload-slide and keeps diagnostics visible", async () => {

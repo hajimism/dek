@@ -176,7 +176,10 @@ describe("synthDeck timeline audio", () => {
     await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, "voice", "pin"), { recursive: true });
-      await writeFile(join(deckDir, "voice", "pin", "timeline.json"), `${JSON.stringify({ not: "a timeline" })}\n`);
+      await writeFile(
+        join(deckDir, "voice", "pin", "timeline.json"),
+        `${JSON.stringify({ not: "a timeline" })}\n`,
+      );
       await writeFile(join(deckDir, "voice", "pin", "master.wav"), silentWav(50));
       const { synthDeck } = await import("../../src/voice/synth.ts");
       await expect(synthDeck(deckDir)).rejects.toMatchObject({

@@ -45,10 +45,7 @@ export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResu
   if (existsSync(pinTimeline) && existsSync(pinAudio)) {
     const parsed = parseTimelineJson(readFileSync(pinTimeline, "utf8"), pinTimeline);
     copyFileSync(pinAudio, audioPath);
-    writeFileSync(
-      timelinePath,
-      `${JSON.stringify({ ...parsed, audio: "audio.wav" }, null, 2)}\n`,
-    );
+    writeFileSync(timelinePath, `${JSON.stringify({ ...parsed, audio: "audio.wav" }, null, 2)}\n`);
     return { timelinePath, audioPath, synthesized: 0, cached: 0 };
   }
 
