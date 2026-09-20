@@ -1,4 +1,5 @@
-import { mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "./error.ts";
 import { loadSlideSources, renderSlideHtml } from "./html.ts";
@@ -48,10 +49,12 @@ export async function shotDeck(
 
   const pages = sections.map((section) => {
     const beat = resolveBeat(section, options.step);
-    const filename =
-      options.step === undefined ? `${section.slug}.png` : `${section.slug}-${beat.label}.png`;
+    const html = renderSlideHtml(deck, section.slug, beat.index, sources);
+    const step = options.step === undefined ? undefined : beat.label;
+    const filename = shotFileName(section.slug, step, html);
+    pruneStaleShots(outDir, section.slug, step, filename);
     return {
-      html: renderSlideHtml(deck, section.slug, beat.index, sources),
+      html,
       slug: section.slug,
       step: beat.label,
       screenshotPath: join(outDir, filename),
@@ -71,6 +74,42 @@ export async function shotDeck(
     step: page.step,
     path: page.screenshotPath,
   }));
+}
+
+/**
+ * `<slug>[-<step>].<hash>.png`, where the hash covers the rendered HTML
+ * (theme, slide, shown steps, inlined assets). A changed rendering gets a
+ * new path, so nothing that caches by path can show a stale image.
+ */
+export function shotFileName(slug: string, step: string | undefined, html: string): string {
+  const hash = createHash("sha256").update(html).digest("hex").slice(0, 8);
+  return `${shotBaseName(slug, step)}.${hash}.png`;
+}
+
+/** Remove other hashes (and the legacy unhashed name) for the same slug/step. */
+export function pruneStaleShots(
+  dir: string,
+  slug: string,
+  step: string | undefined,
+  keep: string,
+): void {
+  const base = shotBaseName(slug, step).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stale = new RegExp(`^${base}(?:\\.[0-9a-f]{8})?\\.png$`);
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (name !== keep && stale.test(name)) {
+      rmSync(join(dir, name), { force: true });
+    }
+  }
+}
+
+function shotBaseName(slug: string, step: string | undefined): string {
+  return step === undefined ? slug : `${slug}-${step}`;
 }
 
 function resolveBeat(section: Section, step?: string): { index: number; label: string } {

@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { VisualRequest } from "../../src/core/playwright.ts";
+import { shotDeck } from "../../src/core/shot.ts";
 import {
   contrastRatio,
   lintVisualDeck,
   overflowsSlide,
   parseCssRgb,
+  runVisualDeck,
 } from "../../src/core/visual.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
@@ -47,6 +49,29 @@ describe("contrastRatio", () => {
 
   test("is below 4.5 for gray text on white", () => {
     expect(contrastRatio([119, 119, 119], [255, 255, 255])).toBeLessThan(4.5);
+  });
+});
+
+describe("runVisualDeck screenshot", () => {
+  test("names the screenshot exactly like shotDeck for the same slide", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const runner = async (request: VisualRequest) => {
+          for (const page of request.pages) {
+            if (page.screenshotPath) {
+              await Bun.write(page.screenshotPath, "");
+            }
+          }
+          return { overflows: [], contrasts: [] };
+        };
+        const visual = await runVisualDeck(deckDir, { slug: "intro", screenshot: true, runner });
+        const shots = await shotDeck(deckDir, { slug: "intro", runner });
+        expect(visual?.screenshotPath).toMatch(/\/intro\.[0-9a-f]{8}\.png$/);
+        expect(visual?.screenshotPath).toBe(shots[0]?.path);
+      },
+    );
   });
 });
 

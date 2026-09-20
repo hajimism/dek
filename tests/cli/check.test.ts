@@ -164,6 +164,7 @@ more
         expect(result.exitCode).toBe(0);
         const json = jsonStdout<CheckOk>(result);
         expect(json.shot).toContain(".cache/shots/intro");
+        expect(json.shot).toMatch(/intro\.[0-9a-f]{8}\.png$/);
         expect(await Bun.file(json.shot ?? "").exists()).toBe(true);
       },
     );

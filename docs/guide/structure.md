@@ -21,7 +21,7 @@ my-talks/                       # プロジェクト（dek init）
 │       ├── assets/
 │       ├── dist/               # dek build / pdf / video の成果物
 │       │   └── 2026-04-vite.html
-│       └── .cache/             # voice / video / shots の中間物
+│       └── .cache/             # voice / video / shots の中間物。shots はハッシュ付き
 └── .dek/
     └── schema.json
 ```

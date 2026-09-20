@@ -32,7 +32,7 @@
 | --- | --- |
 | `dek show <slug>` | 台本と HTML をまとめて出す |
 | `dek check <slug> [--shot] [--voice]` | 1 枚を lint。`--shot` はスクショ、`--voice` は読み |
-| `dek shot [slug] [--step <id\|n>]` | スクリーンショット。既定は全要素表示の最終ステップ |
+| `dek shot [slug] [--step <id\|n>]` | スクリーンショット。既定は全要素表示の最終ステップ。ファイル名は `<slug>[-<step>].<hash>.png` で、`hash` は描画内容から決まる。テーマや HTML が変われば別パスになり、同じ枚の古い画像は消える |
 | `dek mv <old> <new>` | セクション id と HTML の改名 |
 | `dek mv <slug> --before\|--after <slug>` | 並べ替え |
 | `dek goto <slug>` | 開いているブラウザを飛ばす。開発サーバ必須 |

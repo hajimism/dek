@@ -12,6 +12,7 @@ import {
   type VisualResponse,
 } from "./playwright.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
+import { pruneStaleShots, shotFileName } from "./shot.ts";
 import { logicalSize } from "./size.ts";
 
 export type Box = {
@@ -126,14 +127,18 @@ async function visualDeck(
     for (let beatIndex = 0; beatIndex < beatCount; beatIndex++) {
       try {
         const html = renderSlideHtml(deck, section.slug, beatIndex, sources);
+        let screenshotPath: string | undefined;
+        if (shotDir && beatIndex === last) {
+          const filename = shotFileName(section.slug, undefined, html);
+          pruneStaleShots(shotDir, section.slug, undefined, filename);
+          screenshotPath = join(shotDir, filename);
+        }
         pages.push({
           html,
           slug: section.slug,
           step: section.beats[beatIndex]?.id ?? String(beatIndex + 1),
           path: slidePath,
-          ...(shotDir && beatIndex === last
-            ? { screenshotPath: join(shotDir, `${section.slug}.png`) }
-            : {}),
+          ...(screenshotPath ? { screenshotPath } : {}),
         });
       } catch (error) {
         if (error instanceof DekError) {
