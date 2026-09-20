@@ -31,6 +31,8 @@ async function main(): Promise<void> {
       before: { type: "string" },
       after: { type: "string" },
       step: { type: "string" },
+      to: { type: "string" },
+      at: { type: "string" },
       accent: { type: "string" },
       fps: { type: "string" },
       "root-dist": { type: "boolean", default: false },
@@ -65,6 +67,8 @@ async function main(): Promise<void> {
   const before = stringFlag(values.before);
   const after = stringFlag(values.after);
   const step = stringFlag(values.step);
+  const to = stringFlag(values.to);
+  const at = stringFlag(values.at);
   const accent = stringFlag(values.accent);
   const fps = stringFlag(values.fps);
 
@@ -177,7 +181,7 @@ async function main(): Promise<void> {
       const { shotCommand } = await import("./cli/shot.ts");
       result = {
         command: "shot",
-        data: await shotCommand({ cwd, slug: args[0], step, deck }),
+        data: await shotCommand({ cwd, slug: args[0], step, to, at, deck }),
       };
       break;
     }

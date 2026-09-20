@@ -20,7 +20,9 @@ Project
 Slide
   dek show <slug>     print a section's script and HTML
   dek check <slug>    lint one slide; --shot adds a screenshot; --voice adds readings
-  dek shot [slug]     write screenshots
+  dek shot [slug]     write screenshots; --step <id|n> picks a beat
+  dek shot <a> --to <b> [--at 0.5]
+                      freeze the transition from a into b (morph check)
   dek mv <old> <new>  rename a section id and its HTML
   dek mv <slug> --before|--after <slug>
                       reorder a section
@@ -70,6 +72,7 @@ dek cues
 dek voice [speakers | say TEXT | dict add WORD KANA | pin]
 dek check <slug> [--shot] [--voice]
 dek shot [slug] [--step <id|n>]
+dek shot <a> --to <b> [--at 0..1]   frame of the a→b transition, default 0.5
 dek goto <slug>     requires running dek
 dek current         requires running dek
 dek build [--root-dist]

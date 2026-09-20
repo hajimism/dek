@@ -51,6 +51,14 @@
 
 同一スライド内で `data-morph` の名前が重複すると [DEK005](/reference/lint#dek005)。
 
+補間の途中は静止画では見えない。採否を目で決めるときは、遷移を途中で止めて撮る。
+
+```bash
+dek shot problem --to architecture --at 0.5
+```
+
+`problem` の最終ビートから `architecture` の先頭へ移る View Transition を 50% で止めた 1 フレームが `.cache/shots/` に書かれる。`--at 0` と `--at 1` で両端も撮れる。動画と同じプレイヤー文書で撮るので、`dek video` に写るものと一致する。
+
 既定テーマは `prefers-reduced-motion` を尊重し、指定があればすべての動きを省く。
 
 ## 次

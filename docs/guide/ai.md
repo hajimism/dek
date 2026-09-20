@@ -55,4 +55,8 @@ dek current のスライドを、台本の次のビートまで data-step で出
 script.md に ## recap {#recap} を足した。dek sync せず、開発サーバに任せて。足りない HTML だけ骨格を生やして。
 ```
 
+```
+problem の図を architecture へ data-morph で連れていって。dek shot problem --to architecture --at 0.5 で途中を撮って、位置の補間が変じゃないか見て。
+```
+
 サイトの目次をエージェントに渡すときは [`/llms.txt`](/llms.txt) を使う。

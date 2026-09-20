@@ -168,6 +168,67 @@ describe("playwright worker", () => {
   );
 });
 
+describe("playwright worker morph", () => {
+  test.skipIf(!playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT))(
+    "freezes a view transition at --at and produces a distinct frame",
+    async () => {
+      const { withTempProject } = await import("../helpers/project.ts");
+      const { slideDocument } = await import("../helpers/html.ts");
+      const { shotMorph } = await import("../../src/core/shot.ts");
+      const { playerScript } = await import("../../src/runtime/player.ts");
+      const { defaultTheme } = await import("../../src/cli/files.ts");
+      const script = `---
+title: Demo
+---
+
+## problem
+
+first
+
+## architecture
+
+second
+`;
+      const problem = slideDocument(`<section class="slide" data-layout="default">
+  <h2 class="slide-title">problem</h2>
+  <p class="node" data-morph="pipeline">pipeline</p>
+</section>`);
+      const architecture = slideDocument(`<section class="slide" data-layout="title">
+  <p class="node node-parent" data-morph="pipeline">pipeline</p>
+</section>`);
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              script,
+              theme: defaultTheme(),
+              slides: { problem, architecture },
+            },
+          ],
+        },
+        async (root) => {
+          const deckDir = join(root, "decks", "demo");
+          const player = await playerScript();
+          const frames: Buffer[] = [];
+          for (const at of [0, 0.5, 1]) {
+            const [shot] = await shotMorph(deckDir, {
+              from: "problem",
+              to: "architecture",
+              at,
+              playerScript: player,
+            });
+            frames.push(Buffer.from(await Bun.file(shot?.path ?? "").arrayBuffer()));
+          }
+          expect(frames[0]?.equals(frames[1] ?? Buffer.alloc(0))).toBe(false);
+          expect(frames[1]?.equals(frames[2] ?? Buffer.alloc(0))).toBe(false);
+          expect(frames[0]?.equals(frames[2] ?? Buffer.alloc(0))).toBe(false);
+        },
+      );
+    },
+  );
+});
+
 describe("resolvePlaywrightModule", () => {
   test("finds playwright in an ancestor node_modules from a nested cwd", async () => {
     await withTempDir(async (dir) => {

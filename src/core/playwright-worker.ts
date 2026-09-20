@@ -1,5 +1,10 @@
 #!/usr/bin/env bun
-import { importPlaywright, type VisualRequest, type VisualResponse } from "./playwright.ts";
+import {
+  importPlaywright,
+  type MorphRequest,
+  type VisualRequest,
+  type VisualResponse,
+} from "./playwright.ts";
 import { type Box, contrastRatio, overflowsSlide, parseCssRgb } from "./visual.ts";
 
 let playwright: Awaited<ReturnType<typeof importPlaywright>>;
@@ -25,6 +30,16 @@ try {
       const page = await browser.newPage({
         viewport: { width: request.viewport.width, height: request.viewport.height },
       });
+      if (request.actions.includes("morph") && request.morph) {
+        await page.emulateMedia({ reducedMotion: "no-preference" });
+        await page.setContent(pageReq.html, { waitUntil: "load" });
+        await freezeTransition(page, request.morph);
+        if (pageReq.screenshotPath) {
+          await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
+          response.screenshotPath = pageReq.screenshotPath;
+        }
+        continue;
+      }
       await page.setContent(pageReq.html, { waitUntil: "load" });
       const measured = await measureSlide(page);
       if (request.actions.includes("overflow") && measured.slideBox) {
@@ -126,4 +141,47 @@ async function measureSlide(page: { evaluate<T>(fn: () => T | Promise<T>): Promi
     }
     return { slideBox, children, samples };
   });
+}
+
+/**
+ * Run the player's own `go` for `from`, then start `go(to)` and stop every
+ * animation (view-transition pseudo-elements included) at `at` of its
+ * duration. `startViewTransition` is wrapped only to get hold of the
+ * transition object; the runtime is not modified.
+ */
+async function freezeTransition(
+  page: { evaluate<T, A>(fn: (arg: A) => T | Promise<T>, arg?: A): Promise<T> },
+  morph: MorphRequest,
+): Promise<void> {
+  await page.evaluate(async ({ from, to, at }) => {
+    type Go = (next: unknown) => Promise<void>;
+    const go = (window as unknown as { dekGo?: Go }).dekGo;
+    if (!go) {
+      return;
+    }
+    await go(from);
+    const original = document.startViewTransition?.bind(document);
+    let captured: ViewTransition | undefined;
+    if (original) {
+      const wrapped: typeof document.startViewTransition = (update) => {
+        captured = original(update);
+        return captured;
+      };
+      document.startViewTransition = wrapped;
+    }
+    const pending = go(to);
+    void pending.catch(() => undefined);
+    if (!captured) {
+      await pending;
+      return;
+    }
+    await captured.ready;
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      const timing = animation.effect?.getComputedTiming();
+      const duration = typeof timing?.duration === "number" ? timing.duration : 0;
+      const total = (timing?.delay ?? 0) + duration;
+      animation.currentTime = at * total;
+    }
+  }, morph);
 }

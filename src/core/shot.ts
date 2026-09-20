@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { loadConfig } from "./config.ts";
+import { renderDeckDocument } from "./document.ts";
 import { DekError } from "./error.ts";
 import { loadSlideSources, renderSlideHtml } from "./html.ts";
 import { cacheDir } from "./path.ts";
@@ -17,6 +19,10 @@ export type ShotFile = {
   slug: string;
   step: string;
   path: string;
+  /** Set on a morph frame: the slide the transition goes to. */
+  to?: string;
+  /** Set on a morph frame: where in the transition the frame was taken, 0..1. */
+  at?: number;
 };
 
 export type ShotDeckOptions = {
@@ -74,6 +80,88 @@ export async function shotDeck(
     step: page.step,
     path: page.screenshotPath,
   }));
+}
+
+export type ShotMorphOptions = {
+  from: string;
+  to: string;
+  at: number;
+  /** The player runtime to embed; `playerScript()` from src/runtime. */
+  playerScript: string;
+  runner?: PlaywrightRunner;
+};
+
+export function parseMorphAt(value: string | undefined): number {
+  if (value === undefined) {
+    return 0.5;
+  }
+  const at = Number(value);
+  if (!Number.isFinite(at) || at < 0 || at > 1) {
+    throw new DekError(`invalid --at "${value}"`, {
+      hint: "use a number between 0 and 1, e.g. --at 0.5",
+    });
+  }
+  return at;
+}
+
+/**
+ * Screenshot the view transition from the last beat of `from` into beat 0 of
+ * `to`, frozen at `at`. The page is the video document (all slides plus the
+ * player runtime), so morphs and theme transitions run exactly as in `dek video`.
+ */
+export async function shotMorph(dir: string, options: ShotMorphOptions): Promise<ShotFile[]>;
+export async function shotMorph(
+  source: ResolvedDeck,
+  options: ShotMorphOptions,
+): Promise<ShotFile[]>;
+export async function shotMorph(
+  input: string | ResolvedDeck,
+  options: ShotMorphOptions,
+): Promise<ShotFile[]> {
+  const { project, deck } = asResolvedDeck(input);
+  const runner = options.runner ?? defaultPlaywrightRunner;
+  const at = parseMorphAt(String(options.at));
+  const fromSection = requireSection(deck, options.from);
+  const toSection = requireSection(deck, options.to);
+  const from = {
+    slideIndex: deck.deck.sections.indexOf(fromSection),
+    beatIndex: Math.max(fromSection.beats.length - 1, 0),
+  };
+  const to = { slideIndex: deck.deck.sections.indexOf(toSection), beatIndex: 0 };
+
+  const html = await renderDeckDocument(deck, {
+    mode: "video",
+    inlineAssets: true,
+    includeNotes: false,
+    config: loadConfig(project.configPath),
+    playerScript: options.playerScript,
+  });
+
+  const outDir = cacheDir(deck.dir, "shots");
+  mkdirSync(outDir, { recursive: true });
+  const base = `${options.from}-to-${options.to}`;
+  const filename = shotFileName(base, String(at), `${at}\0${html}`);
+  pruneStaleShots(outDir, base, String(at), filename);
+  const screenshotPath = join(outDir, filename);
+
+  const response = await runner({
+    viewport: logicalSize(deck.deck.ratio),
+    actions: ["morph"],
+    pages: [{ html, slug: options.from, step: String(from.beatIndex + 1), screenshotPath }],
+    morph: { from, to, at },
+  });
+  if (response === null) {
+    throw playwrightMissingError();
+  }
+  return [
+    {
+      slug: options.from,
+      step: String(from.beatIndex + 1),
+      path: screenshotPath,
+      to: options.to,
+      at,
+    },
+  ];
 }
 
 /**

@@ -5,6 +5,7 @@ import { DekError } from "./error.ts";
 import { resolvePackageFromAncestors } from "./optional.ts";
 import { moduleFilePath } from "./path.ts";
 import { awaitPiped } from "./spawn.ts";
+import type { Position } from "./step.ts";
 
 export type VisualPage = {
   html: string;
@@ -13,11 +14,19 @@ export type VisualPage = {
   screenshotPath?: string;
 };
 
+/** Freeze the view transition from `from` to `to` at `at` (0..1) and screenshot it. */
+export type MorphRequest = {
+  from: Position;
+  to: Position;
+  at: number;
+};
+
 export type VisualRequest = {
   viewport: { width: number; height: number };
-  actions: Array<"overflow" | "contrast" | "screenshot" | "pdf">;
+  actions: Array<"overflow" | "contrast" | "screenshot" | "pdf" | "morph">;
   pages: VisualPage[];
   pdfPath?: string;
+  morph?: MorphRequest;
 };
 
 export type VisualResponse = {

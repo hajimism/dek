@@ -156,6 +156,85 @@ second
     );
   });
 
+  test("--to writes a mid-transition frame and names it after both slides", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## architecture
+
+body
+`,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const result = await withFakePlaywright(root, [
+          "shot",
+          "intro",
+          "--to",
+          "architecture",
+          "--json",
+        ]);
+        expect(result.exitCode).toBe(0);
+        const json = jsonStdout<ShotOk & { shots: Array<{ to?: string; at?: number }> }>(result);
+        expect(json.shots).toHaveLength(1);
+        expect(json.shots[0]).toMatchObject({ slug: "intro", to: "architecture", at: 0.5 });
+        expect(json.shots[0]?.path).toMatch(/intro-to-architecture-0\.5\.[0-9a-f]{8}\.png$/);
+        expect(await Bun.file(json.shots[0]?.path ?? "").exists()).toBe(true);
+      },
+    );
+  });
+
+  test("--to needs a source slug and refuses --step and a bad --at", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const missing = await withFakePlaywright(root, ["shot", "--to", "intro", "--json"]);
+        expect(missing.exitCode).toBe(1);
+        expect(jsonStdout<ErrorJson>(missing).error.hint).toContain("dek shot <slug> --to <slug>");
+
+        const both = await withFakePlaywright(root, [
+          "shot",
+          "intro",
+          "--to",
+          "intro",
+          "--step",
+          "1",
+          "--json",
+        ]);
+        expect(both.exitCode).toBe(1);
+        expect(jsonStdout<ErrorJson>(both).error.hint).toContain("--step");
+
+        const at = await withFakePlaywright(root, [
+          "shot",
+          "intro",
+          "--to",
+          "intro",
+          "--at",
+          "2",
+          "--json",
+        ]);
+        expect(at.exitCode).toBe(1);
+        expect(jsonStdout<ErrorJson>(at).error.hint).toContain("0 and 1");
+
+        const lonely = await withFakePlaywright(root, ["shot", "intro", "--at", "0.3", "--json"]);
+        expect(lonely.exitCode).toBe(1);
+        expect(jsonStdout<ErrorJson>(lonely).error.hint).toContain("--to");
+      },
+    );
+  });
+
   test("fails with a playwright install hint when the runner is missing", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

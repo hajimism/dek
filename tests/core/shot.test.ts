@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import type { VisualRequest } from "../../src/core/playwright.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
-import { shotDeck, shotFileName } from "../../src/core/shot.ts";
+import { shotDeck, shotFileName, shotMorph } from "../../src/core/shot.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -189,6 +189,115 @@ describe("shotFileName", () => {
     expect(shotFileName("intro", undefined, "<html>b</html>")).not.toBe(a);
     expect(shotFileName("intro", "hook", "<html>a</html>")).toMatch(
       /^intro-hook\.[0-9a-f]{8}\.png$/,
+    );
+  });
+});
+
+describe("shotMorph", () => {
+  const morphScript = `---
+title: Demo
+---
+
+## problem
+
+### one {#one}
+
+first
+
+### two {#two}
+
+second
+
+## architecture
+
+body
+`;
+  const problemHtml = slideDocument(`<section class="slide" data-layout="default">
+  <h2 class="slide-title">problem</h2>
+  <p class="node" data-morph="pipeline" data-step="one">a</p>
+  <p class="node" data-step="two">b</p>
+</section>`);
+  const morphedHtml = slideDocument(`<section class="slide" data-layout="title">
+  <p class="node node-parent" data-morph="pipeline">a</p>
+</section>`);
+
+  test("asks the runner for one morph frame between the last beat of a and beat 0 of b", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: morphScript,
+            slides: { problem: problemHtml, architecture: morphedHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const requests: VisualRequest[] = [];
+        const shots = await shotMorph(join(root, "decks", "demo"), {
+          from: "problem",
+          to: "architecture",
+          at: 0.5,
+          playerScript: "/* player */",
+          runner: async (request) => {
+            requests.push(request);
+            for (const page of request.pages) {
+              if (page.screenshotPath) {
+                await Bun.write(page.screenshotPath, "");
+              }
+            }
+            return { overflows: [], contrasts: [] };
+          },
+        });
+        expect(requests).toHaveLength(1);
+        const request = requests[0];
+        expect(request?.actions).toEqual(["morph"]);
+        expect(request?.morph).toEqual({
+          from: { slideIndex: 0, beatIndex: 1 },
+          to: { slideIndex: 1, beatIndex: 0 },
+          at: 0.5,
+        });
+        expect(request?.pages).toHaveLength(1);
+        expect(request?.pages[0]?.html).toContain('data-slug="problem"');
+        expect(request?.pages[0]?.html).toContain('data-slug="architecture"');
+        expect(request?.pages[0]?.html).toContain("/* player */");
+        expect(shots).toHaveLength(1);
+        expect(shots[0]).toMatchObject({ slug: "problem", to: "architecture", at: 0.5 });
+        expect(shots[0]?.path).toMatch(
+          /\/\.cache\/shots\/problem-to-architecture-0\.5\.[0-9a-f]{8}\.png$/,
+        );
+        expect(await Bun.file(shots[0]?.path ?? "").exists()).toBe(true);
+      },
+    );
+  });
+
+  test("rejects an unknown target slug and an --at outside 0..1", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: morphScript,
+            slides: { problem: problemHtml, architecture: morphedHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const runner = async () => ({ overflows: [], contrasts: [] });
+        const deckDir = join(root, "decks", "demo");
+        await expect(
+          shotMorph(deckDir, { from: "problem", to: "nope", at: 0.5, playerScript: "", runner }),
+        ).rejects.toMatchObject({ name: "DekError", message: 'section "nope" not found' });
+        await expect(
+          shotMorph(deckDir, {
+            from: "problem",
+            to: "architecture",
+            at: 1.5,
+            playerScript: "",
+            runner,
+          }),
+        ).rejects.toMatchObject({ name: "DekError", message: expect.stringContaining("--at") });
+      },
     );
   });
 });
