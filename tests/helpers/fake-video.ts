@@ -12,15 +12,12 @@ const PNG = Buffer.from(
 const stdin = await new Response(Bun.stdin).text();
 const request = JSON.parse(stdin) as VideoCaptureRequest;
 mkdirSync(request.outDir, { recursive: true });
-const animationMs = Number(process.env.DEK_VIDEO_ANIMATION_MS ?? "0");
-const plan = planCapture(request.timeline, request.fps, () =>
-  Number.isFinite(animationMs) ? animationMs : 0,
-);
+const plan = planCapture(request.timeline, request.fps);
 const frames = [];
 for (const [index, planned] of plan.frames.entries()) {
   const path = join(request.outDir, `frame-${String(index).padStart(4, "0")}.png`);
   writeFileSync(path, PNG);
-  frames.push({ path, durationMs: planned.durationMs });
+  frames.push({ path, durationMs: planned.durationMs, kind: planned.kind });
 }
 process.stdout.write(
   `${JSON.stringify({

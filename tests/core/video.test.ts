@@ -5,7 +5,13 @@ import { join } from "node:path";
 import { playwrightResolved } from "../../src/core/playwright.ts";
 import type { Timeline } from "../../src/core/timeline.ts";
 import { ffmpegResolved, muxVideo } from "../../src/video/mux.ts";
-import { captureHoldFrames, defaultVideoRunner, planCapture } from "../../src/video/recorder.ts";
+import {
+  captureHoldFrames,
+  defaultVideoRunner,
+  frameStops,
+  holdMs,
+  planCapture,
+} from "../../src/video/recorder.ts";
 import { encodeWav, parseWav, silentWav, sliceWav } from "../../src/voice/wav.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -43,13 +49,37 @@ describe("planCapture", () => {
     expect(plan.frames.every((frame) => frame.kind === "hold")).toBe(true);
     expect(plan.frames).toHaveLength(2);
   });
+});
 
-  test("animation interval uses fps; hold stays one frame", () => {
-    const plan = planCapture(timeline, 10, () => 200);
-    expect(plan.gos).toHaveLength(2);
-    const first = plan.frames.filter((frame) => frame.afterGo === 0);
-    expect(first.filter((frame) => frame.kind === "animation")).toHaveLength(2);
-    expect(first.filter((frame) => frame.kind === "hold")).toHaveLength(1);
+describe("frameStops", () => {
+  test("splits the animation into fps-sized stops ending at the full duration", () => {
+    expect(frameStops(300, 10)).toEqual([100, 200, 300]);
+  });
+  test("never returns fewer than one stop for a non-zero animation", () => {
+    expect(frameStops(20, 10)).toEqual([20]);
+  });
+  test("returns no stops for a zero-length animation", () => {
+    expect(frameStops(0, 30)).toEqual([]);
+  });
+  test("rounds to whole frames and spreads the remainder evenly", () => {
+    const stops = frameStops(333, 10);
+    expect(stops).toHaveLength(3);
+    expect(stops.at(-1)).toBe(333);
+  });
+});
+
+describe("holdMs", () => {
+  test("is the beat minus the animation, never below one millisecond", () => {
+    expect(holdMs(2000, 300)).toBe(1700);
+    expect(holdMs(200, 300)).toBe(1);
+  });
+});
+
+describe("frame durations", () => {
+  test("animation stops plus hold add up to the beat", () => {
+    const stops = frameStops(300, 10);
+    const durations = stops.map((t, i) => t - (stops[i - 1] ?? 0));
+    expect(durations.reduce((a, b) => a + b, 0) + holdMs(2000, 300)).toBe(2000);
   });
 });
 
@@ -65,6 +95,9 @@ describe("captureHoldFrames", () => {
       });
       expect(captured.frames).toHaveLength(2);
       expect(captured.frames[0]?.durationMs).toBe(1700);
+      expect(captured.frames.reduce((sum, frame) => sum + frame.durationMs, 0)).toBe(
+        timeline.durationMs,
+      );
     });
   });
 });

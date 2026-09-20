@@ -18,7 +18,7 @@ const frames = [];
 for (const [index, planned] of plan.frames.entries()) {
   const path = join(request.outDir, `frame-${String(index).padStart(4, "0")}.png`);
   writeFileSync(path, PNG);
-  frames.push({ path, durationMs: planned.durationMs });
+  frames.push({ path, durationMs: planned.durationMs, kind: planned.kind });
 }
 process.stdout.write(
   `${JSON.stringify({

@@ -11,6 +11,7 @@ import { VIDEO_CAPTURE_STRATEGY } from "./strategy.ts";
 export type VideoFrame = {
   path: string;
   durationMs: number;
+  kind?: "animation" | "hold";
 };
 
 export type VideoCaptureRequest = {
@@ -48,12 +49,23 @@ const PNG = Buffer.from(
 
 const SPAWN_TIMEOUT_MS = 15_000;
 
-export function planCapture(
-  timeline: Timeline,
-  fps: number,
-  animationMs: (from: Position | undefined, to: Position) => number = () => 0,
-): CapturePlan {
-  const gos = playbackSchedule(timeline, animationMs);
+export function frameStops(animationMs: number, fps: number): number[] {
+  if (animationMs <= 0) {
+    return [];
+  }
+  const frameMs = 1000 / Math.max(1, fps);
+  const count = Math.max(1, Math.round(animationMs / frameMs));
+  return Array.from({ length: count }, (_, i) =>
+    i === count - 1 ? animationMs : ((i + 1) * animationMs) / count,
+  );
+}
+
+export function holdMs(beatMs: number, animationMs: number): number {
+  return Math.max(1, beatMs - animationMs);
+}
+
+export function planCapture(timeline: Timeline, _fps = 30): CapturePlan {
+  const gos = playbackSchedule(timeline);
   const frames: PlannedFrame[] = [];
   for (const [index, event] of gos.entries()) {
     const beat = timeline.beats[index];
@@ -62,20 +74,9 @@ export function planCapture(
       1,
       (next?.start ?? timeline.durationMs) - (beat?.start ?? event.at),
     );
-    const prev = index > 0 ? gos[index - 1]?.position : undefined;
-    const anim = Math.max(0, animationMs(prev, event.position));
-    const animClamped = Math.min(anim, Math.max(0, beatDuration - 1));
-    if (animClamped > 0) {
-      const frameMs = 1000 / Math.max(1, fps);
-      const count = Math.max(1, Math.round(animClamped / frameMs));
-      const each = animClamped / count;
-      for (let i = 0; i < count; i++) {
-        frames.push({ kind: "animation", durationMs: each, afterGo: index });
-      }
-    }
     frames.push({
       kind: "hold",
-      durationMs: Math.max(1, beatDuration - animClamped),
+      durationMs: beatDuration,
       afterGo: index,
     });
   }
@@ -152,12 +153,12 @@ export function captureHoldFrames(request: VideoCaptureRequest): VideoCaptureRes
     if (!existsSync(path)) {
       writeFileSync(path, PNG);
     }
-    frames.push({ path, durationMs: planned.durationMs });
+    frames.push({ path, durationMs: planned.durationMs, kind: planned.kind });
   }
   if (frames.length === 0) {
     const path = join(request.outDir, "frame-0000.png");
     writeFileSync(path, PNG);
-    frames.push({ path, durationMs: Math.max(1, request.timeline.durationMs) });
+    frames.push({ path, durationMs: Math.max(1, request.timeline.durationMs), kind: "hold" });
   }
   return { frames, strategy: VIDEO_CAPTURE_STRATEGY, gos: plan.gos.map((event) => event.position) };
 }
