@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { cssClassNames, cssCustomProperties, cssDeclarations } from "../../src/core/css.ts";
+import {
+  cssClassNames,
+  cssCustomProperties,
+  cssDeclarations,
+  topLevelSelectors,
+} from "../../src/core/css.ts";
 import { lintDeck } from "../../src/core/index.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -112,5 +117,55 @@ describe("cssDeclarations", () => {
       { selector: ".slide", property: "transition", value: "none", line: 4 },
       { selector: "from", property: "opacity", value: "0", line: 7 },
     ]);
+  });
+});
+
+const braceInString = `.slide .a::before { content: "}"; color: var(--fg); }
+.slide .b { content: '{'; color: var(--fg); }
+.slide .c { background: url("x}y.png"); }
+body { color: red; }`;
+
+describe("string-aware scanning", () => {
+  test("cssClassNames sees every class when a value contains a brace", () => {
+    expect([...cssClassNames(braceInString)].sort()).toEqual(["a", "b", "c", "slide"]);
+  });
+
+  test("topLevelSelectors reports only the real top-level rules", () => {
+    expect(topLevelSelectors(braceInString)).toEqual([
+      ".slide .a::before",
+      ".slide .b",
+      ".slide .c",
+      "body",
+    ]);
+  });
+
+  test("cssDeclarations keeps selector, property, value, and line intact", () => {
+    const decls = cssDeclarations(braceInString);
+    expect(decls.map((d) => `${d.selector}|${d.property}|${d.line}`)).toEqual([
+      ".slide .a::before|content|1",
+      ".slide .a::before|color|1",
+      ".slide .b|content|2",
+      ".slide .b|color|2",
+      ".slide .c|background|3",
+      "body|color|4",
+    ]);
+    expect(decls[0]?.value).toBe('"}"');
+  });
+
+  test("escaped quotes inside a string do not end it", () => {
+    const css = `.slide .q::after { content: "\\"}"; color: var(--fg); }\n.slide .r { color: var(--fg); }`;
+    expect([...cssClassNames(css)].sort()).toEqual(["q", "r", "slide"]);
+    expect(topLevelSelectors(css)).toEqual([".slide .q::after", ".slide .r"]);
+  });
+
+  test("a brace in a string inside @media does not leak rules to the top level", () => {
+    const css = `@media (min-width: 1px) { .slide .m::before { content: "}"; } }\n.slide .n { color: var(--fg); }`;
+    expect(topLevelSelectors(css)).toEqual([".slide .n"]);
+    expect([...cssClassNames(css)].sort()).toEqual(["m", "n", "slide"]);
+  });
+
+  test("cssCustomProperties reads tokens after a string-bearing rule", () => {
+    const css = `.slide .x::before { content: "{"; }\n.slide { --fg: #fff; }`;
+    expect([...cssCustomProperties(css)]).toEqual(["--fg"]);
   });
 });

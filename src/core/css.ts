@@ -5,6 +5,14 @@ export type CssDeclaration = {
   line: number;
 };
 
+type CssRule = {
+  selector: string;
+  atPath: string[];
+  bodyStart: number;
+  bodyEnd: number;
+  depth: number;
+};
+
 export function stripCssComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, "");
 }
@@ -15,7 +23,7 @@ function stripCssCommentsPreserveLines(css: string): string {
 
 export function cssCustomProperties(css: string): Set<string> {
   const names = new Set<string>();
-  for (const decl of collectDeclarations(stripCssCommentsPreserveLines(css), 0, undefined, false)) {
+  for (const decl of collectDeclarations(stripCssCommentsPreserveLines(css), false)) {
     if (decl.selector === ".slide" && decl.property.startsWith("--")) {
       names.add(decl.property);
     }
@@ -24,7 +32,7 @@ export function cssCustomProperties(css: string): Set<string> {
 }
 
 export function cssDeclarations(css: string): CssDeclaration[] {
-  return collectDeclarations(stripCssCommentsPreserveLines(css), 0, undefined, true);
+  return collectDeclarations(stripCssCommentsPreserveLines(css), true);
 }
 
 export function cssClassNames(css: string): Set<string> {
@@ -40,50 +48,7 @@ export function cssClassNames(css: string): Set<string> {
 }
 
 function cssSelectors(css: string): string[] {
-  return collectSelectors(stripCssComments(css), 0);
-}
-
-function collectSelectors(source: string, start: number, end = source.length): string[] {
-  const selectors: string[] = [];
-  let i = start;
-  while (i < end) {
-    while (i < end && /\s/.test(source[i] ?? "")) {
-      i++;
-    }
-    if (i >= end) {
-      break;
-    }
-    if (source[i] === "}") {
-      i++;
-      continue;
-    }
-    if (source[i] === "@") {
-      while (i < end && source[i] !== "{" && source[i] !== ";") {
-        i++;
-      }
-      if (source[i] === "{") {
-        const blockEnd = skipBlock(source, i);
-        selectors.push(...collectSelectors(source, i + 1, blockEnd - 1));
-        i = blockEnd;
-      } else if (source[i] === ";") {
-        i++;
-      }
-      continue;
-    }
-    const selStart = i;
-    while (i < end && source[i] !== "{" && source[i] !== "}") {
-      i++;
-    }
-    if (source[i] !== "{") {
-      break;
-    }
-    const selector = source.slice(selStart, i).trim();
-    if (selector) {
-      selectors.push(selector);
-    }
-    i = skipBlock(source, i);
-  }
-  return selectors;
+  return [...walkRules(stripCssComments(css))].map((rule) => rule.selector);
 }
 
 export function cssLayoutNames(css: string): Set<string> {
@@ -99,41 +64,9 @@ export function cssLayoutNames(css: string): Set<string> {
 }
 
 export function topLevelSelectors(css: string): string[] {
-  const source = stripCssComments(css);
-  const selectors: string[] = [];
-  let i = 0;
-  while (i < source.length) {
-    while (i < source.length && /\s/.test(source[i] ?? "")) {
-      i++;
-    }
-    if (i >= source.length) {
-      break;
-    }
-    if (source[i] === "@") {
-      while (i < source.length && source[i] !== "{" && source[i] !== ";") {
-        i++;
-      }
-      if (source[i] === "{") {
-        i = skipBlock(source, i);
-      } else if (source[i] === ";") {
-        i++;
-      }
-      continue;
-    }
-    const start = i;
-    while (i < source.length && source[i] !== "{") {
-      i++;
-    }
-    if (i >= source.length) {
-      break;
-    }
-    const selector = source.slice(start, i).trim();
-    if (selector) {
-      selectors.push(selector);
-    }
-    i = skipBlock(source, i);
-  }
-  return selectors;
+  return [...walkRules(stripCssComments(css))]
+    .filter((rule) => rule.depth === 0)
+    .map((rule) => rule.selector);
 }
 
 export function isScopedThemeSelector(selector: string): boolean {
@@ -149,13 +82,13 @@ export function isScopedThemeSelector(selector: string): boolean {
   });
 }
 
-function collectDeclarations(
+function* walkRules(
   source: string,
-  start: number,
+  start = 0,
   end = source.length,
-  recurseAt: boolean,
-): CssDeclaration[] {
-  const decls: CssDeclaration[] = [];
+  atPath: string[] = [],
+  depth = 0,
+): Generator<CssRule> {
   let i = start;
   while (i < end) {
     while (i < end && /\s/.test(source[i] ?? "")) {
@@ -169,31 +102,47 @@ function collectDeclarations(
       continue;
     }
     if (source[i] === "@") {
-      while (i < end && source[i] !== "{" && source[i] !== ";") {
-        i++;
-      }
+      const atStart = i;
+      i = scanUntilBrace(source, i, end, [";"]);
       if (source[i] === "{") {
+        const atName = source.slice(atStart, i).trim();
         const blockEnd = skipBlock(source, i);
-        if (recurseAt) {
-          decls.push(...collectDeclarations(source, i + 1, blockEnd - 1, recurseAt));
-        }
+        yield* walkRules(source, i + 1, blockEnd - 1, [...atPath, atName], depth + 1);
         i = blockEnd;
       } else if (source[i] === ";") {
         i++;
+      } else {
+        break;
       }
       continue;
     }
     const selStart = i;
-    while (i < end && source[i] !== "{" && source[i] !== "}") {
-      i++;
-    }
+    i = scanUntilBrace(source, i, end);
     if (source[i] !== "{") {
       break;
     }
     const selector = source.slice(selStart, i).trim();
     const blockEnd = skipBlock(source, i);
-    decls.push(...parseRuleDeclarations(source, selector, i + 1, blockEnd - 1));
+    if (selector) {
+      yield {
+        selector,
+        atPath,
+        bodyStart: i + 1,
+        bodyEnd: blockEnd - 1,
+        depth,
+      };
+    }
     i = blockEnd;
+  }
+}
+
+function collectDeclarations(source: string, recurseAt: boolean): CssDeclaration[] {
+  const decls: CssDeclaration[] = [];
+  for (const rule of walkRules(source)) {
+    if (!recurseAt && rule.atPath.length > 0) {
+      continue;
+    }
+    decls.push(...parseRuleDeclarations(source, rule.selector, rule.bodyStart, rule.bodyEnd));
   }
   return decls;
 }
@@ -240,23 +189,10 @@ function parseRuleDeclarations(
     i++;
     const valueStart = i;
     let depth = 0;
-    let quote: string | undefined;
     while (i < end) {
       const ch = source[i];
-      if (quote !== undefined) {
-        if (ch === "\\") {
-          i += 2;
-          continue;
-        }
-        if (ch === quote) {
-          quote = undefined;
-        }
-        i++;
-        continue;
-      }
       if (ch === '"' || ch === "'") {
-        quote = ch;
-        i++;
+        i = consumeString(source, i, end);
         continue;
       }
       if (ch === "(") {
@@ -289,18 +225,63 @@ function lineAt(source: string, index: number): number {
   return line;
 }
 
+function consumeString(source: string, start: number, end = source.length): number {
+  const quote = source[start];
+  let i = start + 1;
+  while (i < end) {
+    const ch = source[i];
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (ch === quote) {
+      return i + 1;
+    }
+    i++;
+  }
+  return i;
+}
+
+function scanUntilBrace(
+  source: string,
+  start: number,
+  end = source.length,
+  extraStops: string[] = [],
+): number {
+  let i = start;
+  while (i < end) {
+    const ch = source[i];
+    if (ch === '"' || ch === "'") {
+      i = consumeString(source, i, end);
+      continue;
+    }
+    if (ch === "{" || ch === "}" || extraStops.includes(ch ?? "")) {
+      return i;
+    }
+    i++;
+  }
+  return i;
+}
+
 function skipBlock(source: string, openIndex: number): number {
   let depth = 0;
-  for (let i = openIndex; i < source.length; i++) {
-    const ch = source[i];
-    if (ch === "{") {
+  let i = openIndex;
+  while (i < source.length) {
+    i = scanUntilBrace(source, i);
+    if (source[i] === "{") {
       depth++;
-    } else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        return i + 1;
-      }
+      i++;
+      continue;
     }
+    if (source[i] === "}") {
+      depth--;
+      i++;
+      if (depth === 0) {
+        return i;
+      }
+      continue;
+    }
+    return source.length;
   }
   return source.length;
 }
