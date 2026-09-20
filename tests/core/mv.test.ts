@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
+import { lintDeck } from "../../src/core/lint.ts";
 import { renameSection, reorderSection } from "../../src/core/mv.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -77,6 +78,31 @@ body
         expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(before);
         expect(existsSync(join(deckDir, "slides", "problem.html"))).toBe(true);
         expect(await readFile(dest, "utf8")).toBe(problemHtml);
+      },
+    );
+  });
+
+  test("rewrites data-slug in the moved HTML so DEK006 does not fire", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(
+                `<section class="slide" data-slug="intro" data-layout="title"><h2 class="slide-title">x</h2></section>`,
+              ),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        renameSection(deckDir, "intro", "cover");
+        const html = await readFile(join(deckDir, "slides", "cover.html"), "utf8");
+        expect(html).toContain('data-slug="cover"');
+        expect(html).not.toContain('data-slug="intro"');
+        expect(lintDeck(deckDir)).toEqual([]);
       },
     );
   });

@@ -54,6 +54,9 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
     }
     throw error;
   }
+  if (renamed) {
+    rewriteDataSlug(toPath, from, to);
+  }
 }
 
 export function reorderSection(
@@ -120,6 +123,14 @@ export function reorderSection(
   const insertAt = options.before ? remainingTarget : remainingTarget + 1;
   chunks.splice(insertAt, 0, moved);
   writeFileSync(deck.scriptPath, joinLines(source, [...head, ...chunks.flat()]));
+}
+
+function rewriteDataSlug(path: string, from: string, to: string): void {
+  const html = readFileSync(path, "utf8");
+  const next = html.replaceAll(`data-slug="${from}"`, `data-slug="${to}"`);
+  if (next !== html) {
+    writeFileSync(path, next);
+  }
 }
 
 function rewriteHeadingId(heading: string, from: string, to: string): string {
