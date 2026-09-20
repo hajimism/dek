@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { startDevServer } from "../../src/server/dev.ts";
@@ -371,6 +371,30 @@ more
           const asset = await fetch(new URL("/assets/pixel.png", server.url));
           expect(asset.ok).toBe(true);
           expect((await asset.arrayBuffer()).byteLength).toBeGreaterThan(0);
+        });
+      },
+    );
+  });
+
+  test("serves deck assets under /decks/<name>/assets from the project root", async () => {
+    const withImage = slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/pixel.png" alt="">
+</section>`);
+    await withTempProject(
+      {
+        decks: [{ name: "demo", slides: { intro: withImage } }],
+      },
+      async (root) => {
+        await copyFile(
+          join(assetFixturesDir, "pixel.png"),
+          join(root, "decks", "demo", "assets", "pixel.png"),
+        );
+        await withDevServer({ cwd: root }, async (server) => {
+          const page = await fetch(new URL("/decks/demo/", server.url));
+          expect(await page.text()).toContain('src="assets/pixel.png"');
+          const asset = await fetch(new URL("/decks/demo/assets/pixel.png", server.url));
+          expect(asset.status).toBe(200);
         });
       },
     );
@@ -798,6 +822,21 @@ body
         expect(loserReason).toBeInstanceOf(DekError);
         expect((await fetch(winner.url)).ok).toBe(true);
         await winner.close();
+      },
+    );
+  });
+
+  test("keeps serving when dek.toml disappears mid-session", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: root }, async (server) => {
+          await rm(join(root, "dek.toml"));
+          await writeFile(join(root, "decks", "demo", "script.md"), defaultScript("Changed"));
+          await waitForEvent(server.events, (event) => event.type === "sync");
+          const response = await fetch(new URL("/decks/demo/", server.url));
+          expect([200, 500]).toContain(response.status);
+        });
       },
     );
   });

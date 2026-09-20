@@ -75,8 +75,12 @@ export async function startDevServer(options: {
   const hub: EventHub = {
     emit(event) {
       if (event.type === "sync") {
-        project = resolveProject(projectRoot);
-        reconcileWatchers();
+        try {
+          project = resolveProject(projectRoot);
+          reconcileWatchers();
+        } catch {
+          // dek.toml may disappear mid-session; keep the last known project.
+        }
       }
       if (event.type !== "diagnostics" && event.type !== "timeline") {
         pages.clear();
