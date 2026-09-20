@@ -6,6 +6,7 @@ import { DekError } from "../../src/core/error.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { resolveTimelineAudio, voiceCacheFile } from "../../src/core/voice.ts";
 import { bakeVideo, sliceTimelineAudio } from "../../src/video/bake.ts";
+import { ffmpegResolved } from "../../src/video/mux.ts";
 import { captureHoldFrames } from "../../src/video/recorder.ts";
 import { encodeWav, parseWav, silentWav } from "../../src/voice/wav.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -141,4 +142,65 @@ describe("bakeVideo", () => {
       },
     );
   });
+
+  test("writes one slide under .cache/video/", async () => {
+    if (!ffmpegResolved()) {
+      return;
+    }
+    await withPreparedVoiceDeck(async (root, resolved) => {
+      const runner = async (request: Parameters<typeof captureHoldFrames>[0]) =>
+        captureHoldFrames(request);
+      const result = await bakeVideo(resolved, { runner, slug: "intro" });
+      expect(result.out).toBe(join(root, "decks", "demo", ".cache", "video", "intro.mp4"));
+      expect(await Bun.file(result.out).exists()).toBe(true);
+    });
+  });
+
+  test("writes project dist/<deck>.mp4 with rootDist", async () => {
+    if (!ffmpegResolved()) {
+      return;
+    }
+    await withPreparedVoiceDeck(async (root, resolved) => {
+      const runner = async (request: Parameters<typeof captureHoldFrames>[0]) =>
+        captureHoldFrames(request);
+      const result = await bakeVideo(resolved, { runner, rootDist: true });
+      expect(result.out).toBe(join(root, "dist", "demo.mp4"));
+      expect(result.vtt).toBe(join(root, "dist", "demo.vtt"));
+      expect(await Bun.file(result.out).exists()).toBe(true);
+    });
+  });
 });
+
+async function withPreparedVoiceDeck(
+  fn: (root: string, resolved: ReturnType<typeof resolveDeck>) => Promise<void>,
+): Promise<void> {
+  await withTempProject(
+    { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+    async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      mkdirSync(join(deckDir, "voice"), { recursive: true });
+      await writeFile(
+        join(deckDir, "voice", "voice.toml"),
+        `engine = "voicevox"\nspeaker = "ずんだもん/ノーマル"\nspeed = 1\n`,
+      );
+      mkdirSync(join(deckDir, ".cache", "voice"), { recursive: true });
+      await writeFile(voiceCacheFile(deckDir, "audio.wav"), silentWav(200));
+      await writeFile(
+        voiceCacheFile(deckDir, "timeline.json"),
+        `${JSON.stringify({
+          audio: "audio.wav",
+          durationMs: 200,
+          beats: [
+            {
+              position: { slideIndex: 0, beatIndex: 0 },
+              start: 0,
+              end: 200,
+              sentences: [{ text: "hello", kana: "ハロー", start: 0, end: 200 }],
+            },
+          ],
+        })}\n`,
+      );
+      await fn(root, resolveDeck(deckDir));
+    },
+  );
+}

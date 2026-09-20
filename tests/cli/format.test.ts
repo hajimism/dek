@@ -22,6 +22,7 @@ describe("helpText", () => {
     expect(text).toContain("Slide");
     expect(text).toContain("CI");
     expect(text).toContain("dek help --agent");
+    expect(text).toContain("--root-dist");
     expect(text).toContain(
       "Commands that print a result accept --json. dek and dek rehearse stay running.",
     );
@@ -70,6 +71,7 @@ describe("agentHelpText", () => {
     expect(text).toContain("pdf");
     expect(text).toContain("--remote");
     expect(text).toContain("pin");
+    expect(text).toContain("--root-dist");
     expect(text).toContain("Result commands accept --json. dek / rehearse do not (long-running).");
     expect(text).not.toContain("All commands accept --json");
     expect(text.split("\n").length).toBeLessThan(80);

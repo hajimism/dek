@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
-import { renameSection } from "../../src/core/mv.ts";
+import { renameSection, reorderSection } from "../../src/core/mv.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -77,6 +77,113 @@ body
         expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(before);
         expect(existsSync(join(deckDir, "slides", "problem.html"))).toBe(true);
         expect(await readFile(dest, "utf8")).toBe(problemHtml);
+      },
+    );
+  });
+});
+
+const introHtml = slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+</section>`);
+
+const architectureHtml = slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">architecture</h2>
+</section>`);
+
+describe("reorderSection", () => {
+  test("moves a section before another and keeps HTML files in place", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## architecture
+
+body
+`,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        reorderSection(deckDir, "architecture", { before: "intro" });
+        const script = await readFile(join(deckDir, "script.md"), "utf8");
+        expect(script.indexOf("## architecture")).toBeLessThan(script.indexOf("## intro"));
+        expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);
+        expect(existsSync(join(deckDir, "slides", "architecture.html"))).toBe(true);
+      },
+    );
+  });
+
+  test("moves a section after another", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## architecture
+
+body
+
+## intro
+
+hello
+`,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        reorderSection(deckDir, "architecture", { after: "intro" });
+        const script = await readFile(join(deckDir, "script.md"), "utf8");
+        expect(script.indexOf("## intro")).toBeLessThan(script.indexOf("## architecture"));
+      },
+    );
+  });
+
+  test("rejects both --before and --after", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## architecture
+
+body
+`,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        expect(() =>
+          reorderSection(join(root, "decks", "demo"), "architecture", {
+            before: "intro",
+            after: "intro",
+          }),
+        ).toThrow(DekError);
       },
     );
   });

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { syncCommand } from "../../src/cli/sync.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { extractSlide } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -66,7 +67,9 @@ more
       },
     );
   });
+});
 
+describe("syncCommand", () => {
   test("syncs every deck from the project root", async () => {
     await withTempProject(
       {
@@ -91,13 +94,11 @@ more
         ],
       },
       async (root) => {
-        const result = await runDek(["sync", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<SyncOk>(result);
-        expect(json.created.some((path) => path.endsWith("decks/alpha/slides/extra.html"))).toBe(
+        const result = syncCommand({ cwd: root });
+        expect(result.created.some((path) => path.endsWith("decks/alpha/slides/extra.html"))).toBe(
           true,
         );
-        expect(json.created.some((path) => path.endsWith("decks/beta/slides/intro.html"))).toBe(
+        expect(result.created.some((path) => path.endsWith("decks/beta/slides/intro.html"))).toBe(
           true,
         );
       },

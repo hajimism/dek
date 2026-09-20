@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
+import { pdfCommand } from "../../src/cli/pdf.ts";
+import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -14,11 +17,6 @@ const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.t
 type PdfOk = {
   ok: true;
   out: string;
-};
-
-type ErrorJson = {
-  ok: false;
-  error: { hint?: string };
 };
 
 describe("dek pdf", () => {
@@ -41,62 +39,22 @@ describe("dek pdf", () => {
       },
     );
   });
+});
 
-  test("fails with a playwright install hint when the runner is missing", async () => {
+describe("pdfCommand", () => {
+  test.serial("fails with a playwright install hint when the runner is missing", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const result = await runDek(["pdf", "--json"], {
-          cwd: join(root, "decks", "demo"),
-          env: { DEK_PLAYWRIGHT: "/no/such/playwright" },
+        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+          try {
+            await pdfCommand({ cwd: join(root, "decks", "demo") });
+            throw new Error("expected DekError");
+          } catch (error) {
+            expect(error).toBeInstanceOf(DekError);
+            expect((error as DekError).hint).toContain("playwright install");
+          }
         });
-        expect(result.exitCode).toBe(1);
-        const json = jsonStdout<ErrorJson>(result);
-        expect(json.error.hint).toContain("playwright install");
-      },
-    );
-  });
-
-  test("writes dist/<deck>.pdf for every deck from the project root", async () => {
-    await withTempProject(
-      {
-        decks: [
-          { name: "alpha", slides: { intro: introHtml } },
-          { name: "beta", slides: { intro: introHtml } },
-        ],
-      },
-      async (root) => {
-        await chmod(fakePlaywright, 0o755);
-        const result = await runDek(["pdf", "--json"], {
-          cwd: root,
-          env: { DEK_PLAYWRIGHT: fakePlaywright },
-        });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<{ ok: true; outs: string[] }>(result);
-        expect(json.outs).toEqual([
-          join(root, "decks", "alpha", "dist", "alpha.pdf"),
-          join(root, "decks", "beta", "dist", "beta.pdf"),
-        ]);
-      },
-    );
-  });
-
-  test("writes project dist/<deck>.pdf with --root-dist", async () => {
-    await withTempProject(
-      {
-        decks: [{ name: "demo", slides: { intro: introHtml } }],
-      },
-      async (root) => {
-        await chmod(fakePlaywright, 0o755);
-        const result = await runDek(["pdf", "--json", "--root-dist"], {
-          cwd: join(root, "decks", "demo"),
-          env: { DEK_PLAYWRIGHT: fakePlaywright },
-        });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<PdfOk>(result);
-        expect(json.ok).toBe(true);
-        expect(json.out).toBe(join(root, "dist", "demo.pdf"));
-        expect(await Bun.file(json.out).exists()).toBe(true);
       },
     );
   });

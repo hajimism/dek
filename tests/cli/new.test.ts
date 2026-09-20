@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { newCommand } from "../../src/cli/new.ts";
+import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -11,11 +13,6 @@ type NewOk = {
   name: string;
   dir: string;
   created: string[];
-};
-
-type NewErr = {
-  ok: false;
-  error: { message: string; hint?: string };
 };
 
 describe("dek new", () => {
@@ -42,18 +39,17 @@ describe("dek new", () => {
       },
     );
   });
+});
 
-  test("copies theme.css from --theme-from", async () => {
+describe("newCommand", () => {
+  test("copies theme.css from themeFrom", async () => {
     await withTempProject(
       {
         theme: "/* project */\n",
         decks: [{ name: "old", theme: "/* from-old */\n" }],
       },
       async (root) => {
-        const result = await runDek(["new", "2026-09-dek", "--theme-from", "old", "--json"], {
-          cwd: root,
-        });
-        expect(result.exitCode).toBe(0);
+        newCommand({ cwd: root, name: "2026-09-dek", themeFrom: "old" });
         expect(await readFile(join(root, "decks", "2026-09-dek", "theme.css"), "utf8")).toBe(
           "/* from-old */\n",
         );
@@ -63,20 +59,27 @@ describe("dek new", () => {
 
   test("fails on a name with path separators", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      const result = await runDek(["new", "../evil", "--json"], { cwd: root });
-      expect(result.exitCode).not.toBe(0);
-      const json = jsonStdout<NewErr>(result);
-      expect(json.error.message).toContain("invalid deck name");
+      expect(() => newCommand({ cwd: root, name: "../evil" })).toThrow(DekError);
+      try {
+        newCommand({ cwd: root, name: "../evil" });
+      } catch (error) {
+        expect(error).toBeInstanceOf(DekError);
+        expect((error as DekError).message).toContain("invalid deck name");
+      }
     });
   });
 
   test("fails outside a project and points to dek init", async () => {
     await withTempDir(async (dir) => {
-      const result = await runDek(["new", "demo", "--json"], { cwd: dir });
-      expect(result.exitCode).not.toBe(0);
-      const json = jsonStdout<NewErr>(result);
-      expect(json.ok).toBe(false);
-      expect(`${json.error.message} ${json.error.hint ?? ""}`).toContain("dek init");
+      expect(() => newCommand({ cwd: dir, name: "demo" })).toThrow(DekError);
+      try {
+        newCommand({ cwd: dir, name: "demo" });
+      } catch (error) {
+        expect(error).toBeInstanceOf(DekError);
+        expect(`${(error as DekError).message} ${(error as DekError).hint ?? ""}`).toContain(
+          "dek init",
+        );
+      }
     });
   });
 });

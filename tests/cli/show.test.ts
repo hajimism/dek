@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { showCommand } from "../../src/cli/show.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -37,8 +38,10 @@ describe("dek show", () => {
       },
     );
   });
+});
 
-  test("accepts a positional deck name from the project root", async () => {
+describe("showCommand", () => {
+  test("accepts a named deck from the project root", async () => {
     await withTempProject(
       {
         decks: [
@@ -47,25 +50,18 @@ describe("dek show", () => {
         ],
       },
       async (root) => {
-        const result = await runDek(["show", "beta", "intro", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<ShowOk>(result);
-        expect(json.slug).toBe("intro");
+        const result = showCommand({ cwd: root, slug: "intro", deck: "beta" });
+        expect(result.slug).toBe("intro");
       },
     );
   });
 
   test("returns html null when the slide file is missing", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      const result = await runDek(["show", "intro", "--json"], {
-        cwd: join(root, "decks", "demo"),
-      });
-      expect(result.exitCode).toBe(0);
-      const json = jsonStdout<ShowOk>(result);
-      expect(json.ok).toBe(true);
-      expect(json.slug).toBe("intro");
-      expect(json.script).toContain("hello");
-      expect(json.html).toBeNull();
+      const result = showCommand({ cwd: join(root, "decks", "demo"), slug: "intro" });
+      expect(result.slug).toBe("intro");
+      expect(result.script).toContain("hello");
+      expect(result.html).toBeNull();
     });
   });
 });

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { buildCommand } from "../../src/cli/build.ts";
+import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -14,49 +16,6 @@ type BuildOk = {
 };
 
 describe("dek build", () => {
-  test("writes dist/<deck>.html and returns the path as JSON", async () => {
-    await withTempProject(
-      {
-        decks: [
-          {
-            name: "demo",
-            theme: ".slide { width: 1280px; }\n",
-            slides: { intro: introHtml },
-          },
-        ],
-      },
-      async (root) => {
-        const result = await runDek(["build", "--json"], { cwd: join(root, "decks", "demo") });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<BuildOk>(result);
-        expect(json.ok).toBe(true);
-        expect(json.out).toBe(join(root, "decks", "demo", "dist", "demo.html"));
-      },
-    );
-  });
-
-  test("builds every deck from the project root", async () => {
-    await withTempProject(
-      {
-        decks: [
-          { name: "alpha", theme: ".slide { width: 1280px; }\n", slides: { intro: introHtml } },
-          { name: "beta", theme: ".slide { width: 1280px; }\n", slides: { intro: introHtml } },
-        ],
-      },
-      async (root) => {
-        const result = await runDek(["build", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<{ ok: true; outs: string[] }>(result);
-        expect(json.outs).toEqual([
-          join(root, "decks", "alpha", "dist", "alpha.html"),
-          join(root, "decks", "beta", "dist", "beta.html"),
-        ]);
-        expect(await Bun.file(json.outs[0] ?? "").exists()).toBe(true);
-        expect(await Bun.file(json.outs[1] ?? "").exists()).toBe(true);
-      },
-    );
-  });
-
   test("writes project dist/<deck>.html with --root-dist", async () => {
     await withTempProject(
       {
@@ -79,8 +38,30 @@ describe("dek build", () => {
       },
     );
   });
+});
 
-  test("builds one deck from a positional name", async () => {
+describe("buildCommand", () => {
+  test("writes dist/<deck>.html", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: ".slide { width: 1280px; }\n",
+            slides: { intro: introHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const result = await buildCommand({ cwd: join(root, "decks", "demo") });
+        expect("out" in result && result.out).toBe(
+          join(root, "decks", "demo", "dist", "demo.html"),
+        );
+      },
+    );
+  });
+
+  test("builds every deck from the project root", async () => {
     await withTempProject(
       {
         decks: [
@@ -89,11 +70,35 @@ describe("dek build", () => {
         ],
       },
       async (root) => {
-        const result = await runDek(["build", "beta", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<BuildOk>(result);
-        expect(json.out).toBe(join(root, "decks", "beta", "dist", "beta.html"));
-        expect(await Bun.file(json.out).exists()).toBe(true);
+        const result = await buildCommand({ cwd: root });
+        expect("outs" in result && result.outs).toEqual([
+          join(root, "decks", "alpha", "dist", "alpha.html"),
+          join(root, "decks", "beta", "dist", "beta.html"),
+        ]);
+        if ("outs" in result) {
+          expect(await Bun.file(result.outs[0] ?? "").exists()).toBe(true);
+          expect(await Bun.file(result.outs[1] ?? "").exists()).toBe(true);
+        }
+      },
+    );
+  });
+
+  test("builds one deck from a named deck", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "alpha", theme: ".slide { width: 1280px; }\n", slides: { intro: introHtml } },
+          { name: "beta", theme: ".slide { width: 1280px; }\n", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const result = await buildCommand({ cwd: root, deck: "beta" });
+        expect("out" in result && result.out).toBe(
+          join(root, "decks", "beta", "dist", "beta.html"),
+        );
+        if ("out" in result) {
+          expect(await Bun.file(result.out).exists()).toBe(true);
+        }
         expect(await Bun.file(join(root, "decks", "alpha", "dist", "alpha.html")).exists()).toBe(
           false,
         );
@@ -101,7 +106,7 @@ describe("dek build", () => {
     );
   });
 
-  test("writes every deck into project dist with --root-dist", async () => {
+  test("writes every deck into project dist with rootDist", async () => {
     await withTempProject(
       {
         decks: [
@@ -110,15 +115,15 @@ describe("dek build", () => {
         ],
       },
       async (root) => {
-        const result = await runDek(["build", "--json", "--root-dist"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<{ ok: true; outs: string[] }>(result);
-        expect(json.outs).toEqual([
+        const result = await buildCommand({ cwd: root, rootDist: true });
+        expect("outs" in result && result.outs).toEqual([
           join(root, "dist", "alpha.html"),
           join(root, "dist", "beta.html"),
         ]);
-        expect(await Bun.file(json.outs[0] ?? "").exists()).toBe(true);
-        expect(await Bun.file(json.outs[1] ?? "").exists()).toBe(true);
+        if ("outs" in result) {
+          expect(await Bun.file(result.outs[0] ?? "").exists()).toBe(true);
+          expect(await Bun.file(result.outs[1] ?? "").exists()).toBe(true);
+        }
       },
     );
   });
@@ -146,9 +151,15 @@ more
         ],
       },
       async (root) => {
-        const result = await runDek(["build", "--json"], { cwd: join(root, "decks", "demo") });
-        expect(result.exitCode).toBe(1);
-        expect(result.stdout).toContain("dek sync");
+        await expect(buildCommand({ cwd: join(root, "decks", "demo") })).rejects.toMatchObject({
+          name: "DekError",
+          hint: expect.stringContaining("dek sync"),
+        });
+        try {
+          await buildCommand({ cwd: join(root, "decks", "demo") });
+        } catch (error) {
+          expect(error).toBeInstanceOf(DekError);
+        }
       },
     );
   });

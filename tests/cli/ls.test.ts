@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { lsCommand } from "../../src/cli/ls.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -20,26 +21,6 @@ type LsListOk = {
     diagnostics: unknown[];
   }>;
   failed?: Array<{ name: string }>;
-};
-
-type LsDeckOk = {
-  ok: true;
-  name: string;
-  title: string;
-  event?: string;
-  date?: string;
-  duration?: string;
-  estimateSeconds: number;
-  videoSeconds?: number;
-  sections: Array<{
-    slug: string;
-    title: string;
-    beats: number;
-    estimateSeconds: number;
-    budgetSeconds?: number;
-    videoSeconds?: number;
-  }>;
-  diagnostics: unknown[];
 };
 
 describe("dek ls", () => {
@@ -64,7 +45,9 @@ describe("dek ls", () => {
       },
     );
   });
+});
 
+describe("lsCommand", () => {
   test("includes decks that failed to load", async () => {
     await withTempProject(
       {
@@ -72,11 +55,12 @@ describe("dek ls", () => {
       },
       async (root) => {
         await mkdir(join(root, "decks", "orphan"), { recursive: true });
-        const result = await runDek(["ls", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsListOk>(result);
-        expect(json.decks.map((deck) => deck.name)).toEqual(["demo"]);
-        expect(json.failed).toEqual([{ name: "orphan" }]);
+        const result = lsCommand({ cwd: root });
+        if (result.kind !== "list") {
+          throw new Error("expected list");
+        }
+        expect(result.decks.map((deck) => deck.name)).toEqual(["demo"]);
+        expect(result.failed).toEqual([{ name: "orphan" }]);
       },
     );
   });
@@ -106,14 +90,13 @@ body
         ],
       },
       async (root) => {
-        const result = await runDek(["ls", "demo", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.ok).toBe(true);
-        expect(json.name).toBe("demo");
-        expect(json.title).toBe("Demo");
-        expect("kind" in json).toBe(false);
-        expect(json.sections).toMatchObject([
+        const result = lsCommand({ cwd: root, deck: "demo" });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.name).toBe("demo");
+        expect(result.title).toBe("Demo");
+        expect(result.sections).toMatchObject([
           { slug: "intro", title: "intro", beats: 0 },
           { slug: "architecture", title: "architecture", beats: 1 },
         ]);
@@ -127,12 +110,12 @@ body
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = await runDek(["ls", "--json"], { cwd: join(root, "decks", "demo") });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.ok).toBe(true);
-        expect(json.name).toBe("demo");
-        expect(json.sections[0]?.slug).toBe("intro");
+        const result = lsCommand({ cwd: join(root, "decks", "demo") });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.name).toBe("demo");
+        expect(result.sections[0]?.slug).toBe("intro");
       },
     );
   });
@@ -143,11 +126,11 @@ body
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = await runDek(["ls", "--deck", "demo", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.ok).toBe(true);
-        expect(json.name).toBe("demo");
+        const result = lsCommand({ cwd: root, deck: "demo" });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.name).toBe("demo");
       },
     );
   });
@@ -175,15 +158,16 @@ a b c d e f g h i j k l m
         ],
       },
       async (root) => {
-        const result = await runDek(["ls", "demo", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.duration).toBeUndefined();
-        expect(json.estimateSeconds).toBe(7);
-        expect(json.sections[0]).toMatchObject({ slug: "intro", estimateSeconds: 1 });
-        expect(json.sections[1]).toMatchObject({ slug: "architecture", estimateSeconds: 6 });
-        expect(json.sections[0]?.budgetSeconds).toBeUndefined();
-        expect(json.sections[1]?.budgetSeconds).toBeUndefined();
+        const result = lsCommand({ cwd: root, deck: "demo" });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.duration).toBeUndefined();
+        expect(result.estimateSeconds).toBe(7);
+        expect(result.sections[0]).toMatchObject({ slug: "intro", estimateSeconds: 1 });
+        expect(result.sections[1]).toMatchObject({ slug: "architecture", estimateSeconds: 6 });
+        expect(result.sections[0]?.budgetSeconds).toBeUndefined();
+        expect(result.sections[1]?.budgetSeconds).toBeUndefined();
       },
     );
   });
@@ -214,17 +198,18 @@ duration: 10m
         ],
       },
       async (root) => {
-        const result = await runDek(["ls", "demo", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.duration).toBe("10m");
-        expect(json.estimateSeconds).toBe(3);
-        expect(json.sections[0]).toMatchObject({
+        const result = lsCommand({ cwd: root, deck: "demo" });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.duration).toBe("10m");
+        expect(result.estimateSeconds).toBe(3);
+        expect(result.sections[0]).toMatchObject({
           slug: "intro",
           estimateSeconds: 1,
           budgetSeconds: 200,
         });
-        expect(json.sections[1]).toMatchObject({
+        expect(result.sections[1]).toMatchObject({
           slug: "architecture",
           estimateSeconds: 2,
           budgetSeconds: 400,
@@ -257,12 +242,13 @@ a b c d e f g h i j k l m
         ],
       },
       async (root) => {
-        const result = await runDek(["ls", "demo", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.estimateSeconds).toBe(120);
-        expect(json.sections[0]?.estimateSeconds).toBe(60);
-        expect(json.sections[1]?.estimateSeconds).toBe(60);
+        const result = lsCommand({ cwd: root, deck: "demo" });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.estimateSeconds).toBe(120);
+        expect(result.sections[0]?.estimateSeconds).toBe(60);
+        expect(result.sections[1]?.estimateSeconds).toBe(60);
       },
     );
   });
@@ -312,17 +298,18 @@ body
             ],
           }),
         );
-        const result = await runDek(["ls", "demo", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.videoSeconds).toBe(8);
-        expect(json.sections[0]?.videoSeconds).toBe(4);
-        expect(json.sections[1]?.videoSeconds).toBe(4);
+        const result = lsCommand({ cwd: root, deck: "demo" });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.videoSeconds).toBe(8);
+        expect(result.sections[0]?.videoSeconds).toBe(4);
+        expect(result.sections[1]?.videoSeconds).toBe(4);
       },
     );
   });
 
-  test("includes event and date in JSON", async () => {
+  test("includes event and date", async () => {
     await withTempProject(
       {
         decks: [
@@ -344,12 +331,13 @@ hello
         ],
       },
       async (root) => {
-        const result = await runDek(["ls", "demo", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<LsDeckOk>(result);
-        expect(json.event).toBe("Tokyo Frontend Meetup #42");
-        expect(json.date).toBe("2026-04-18");
-        expect(json.duration).toBe("20m");
+        const result = lsCommand({ cwd: root, deck: "demo" });
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        expect(result.event).toBe("Tokyo Frontend Meetup #42");
+        expect(result.date).toBe("2026-04-18");
+        expect(result.duration).toBe("20m");
       },
     );
   });
