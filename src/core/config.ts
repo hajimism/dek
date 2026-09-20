@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { DekError } from "./error.ts";
+import { formatZodIssues } from "./zod.ts";
 
 const DekToml = z.object({
   max_classes: z.number().optional(),
@@ -44,7 +45,7 @@ export function parseDekToml(source: string, path?: string): DekConfig {
 
   const result = DekToml.safeParse(parsed ?? {});
   if (!result.success) {
-    throw new DekError(result.error.message, { path });
+    throw new DekError(formatZodIssues(result.error), { path });
   }
 
   const voice = result.data.voice

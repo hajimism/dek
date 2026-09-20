@@ -5,6 +5,7 @@ import { isAbsolute, join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
   loadCachedTimeline,
+  loadVoiceSettings,
   parseUtteranceJson,
   resolveTimelineAudio,
   voiceCacheFile,
@@ -27,6 +28,17 @@ const voiceToml = `engine = "voicevox"
 speaker = "ずんだもん/ノーマル"
 speed = 1
 `;
+
+describe("loadVoiceSettings", () => {
+  test("names the missing key when voice.toml lacks speaker", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, "voice"), { recursive: true });
+      await writeFile(join(deckDir, "voice", "voice.toml"), 'engine = "voicevox"\n');
+      expect(() => loadVoiceSettings(deckDir)).toThrow(/^speaker: /);
+    });
+  });
+});
 
 describe("resolveTimelineAudio", () => {
   test("resolves a relative audio name beside timeline.json", async () => {

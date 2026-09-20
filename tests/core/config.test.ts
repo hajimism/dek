@@ -35,6 +35,10 @@ latin_per_minute = 100
   test("throws DekError for invalid TOML", () => {
     expect(() => parseDekToml("max_classes = [")).toThrow(DekError);
   });
+
+  test("names the bad key when dek.toml has a wrong type", () => {
+    expect(() => parseDekToml('max_classes = "many"')).toThrow(/^max_classes: /);
+  });
 });
 
 describe("loadConfig", () => {

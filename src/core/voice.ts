@@ -6,6 +6,7 @@ import type { VoiceDict } from "./cue.ts";
 import { DekError } from "./error.ts";
 import { cacheDir } from "./path.ts";
 import { DEFAULT_PAUSE, type PauseConfig, type Timeline, type Utterance } from "./timeline.ts";
+import { formatZodIssues } from "./zod.ts";
 
 export type VoiceSettings = {
   engine: string;
@@ -69,7 +70,7 @@ export function loadVoiceSettings(deckDir: string): VoiceSettings {
   }
   const result = VoiceToml.safeParse(parsed ?? {});
   if (!result.success) {
-    throw new DekError(result.error.message, { path });
+    throw new DekError(formatZodIssues(result.error), { path });
   }
   return {
     engine: result.data.engine,
@@ -100,7 +101,7 @@ export function loadVoiceDict(deckDir: string): VoiceDict {
   for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
     const entry = DictEntry.safeParse(value);
     if (!entry.success) {
-      throw new DekError(`invalid dict entry "${key}"`, { path });
+      throw new DekError(`invalid dict entry "${key}": ${formatZodIssues(entry.error)}`, { path });
     }
     dict[key] = entry.data;
   }

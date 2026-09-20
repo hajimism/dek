@@ -1,6 +1,7 @@
 import { DekError } from "./error.ts";
 import { splitLines } from "./lines.ts";
 import { type Beat, Deck, Frontmatter, Id, type Section } from "./schema.ts";
+import { formatZodIssues } from "./zod.ts";
 
 const HEADING_RE = /^(#{2,3})(?!#)\s+(.*)$/;
 const TRAILING_ATTR_RE = /^(.*?)\s*\{([^}]*)\}\s*$/;
@@ -14,7 +15,7 @@ export function parseScript(source: string, filename?: string): Deck {
 
   const result = Deck.safeParse({ ...frontmatter, sections });
   if (!result.success) {
-    throw new DekError(result.error.message, { path: filename });
+    throw new DekError(formatZodIssues(result.error), { path: filename });
   }
   return result.data;
 }
@@ -54,7 +55,7 @@ function parseFrontmatter(yaml: string, filename?: string): Frontmatter {
 
   const result = Frontmatter.safeParse(parsed);
   if (!result.success) {
-    throw new DekError(result.error.message, { path: filename });
+    throw new DekError(formatZodIssues(result.error), { path: filename });
   }
   return result.data;
 }
@@ -70,9 +71,16 @@ function quoteUnquotedHashes(yaml: string): string {
       if (!match) {
         return line;
       }
-      const value = (match[3] ?? "").trimEnd();
+      let value = (match[3] ?? "").trimEnd();
       if (!value || /^["'[{]/.test(value)) {
         return line;
+      }
+      const comment = value.match(/^(.*) # .+$/);
+      if (comment) {
+        value = (comment[1] ?? "").trimEnd();
+        if (!value) {
+          return line;
+        }
       }
       const prefix = `${match[1] ?? ""}${match[2] ?? ""}`;
       return `${prefix}${JSON.stringify(value)}`;

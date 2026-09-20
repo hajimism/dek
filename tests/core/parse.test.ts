@@ -138,4 +138,30 @@ body
     expect(deck.sections[0]?.beats[0]?.title).toBe("ただの区切り");
     expect(deck.sections[0]?.beats[0]?.body).toContain("body");
   });
+
+  test("reports a missing title as 'title: ...' not as JSON", () => {
+    try {
+      parseScript("---\nevent: x\n---\n\n## intro\n");
+      throw new Error("expected DekError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(DekError);
+      const message = (error as DekError).message;
+      expect(message.startsWith("title: ")).toBe(true);
+      expect(message).not.toMatch(/^\s*\[/);
+    }
+  });
+
+  test("reports a deck with no sections as a section problem", () => {
+    expect(() => parseScript("---\ntitle: T\n---\n\nno headings\n")).toThrow(/^sections: /);
+  });
+
+  test("keeps a trailing YAML comment out of the value", () => {
+    const deck = parseScript("---\ntitle: T\ndate: 2026-01-01 # tentative\n---\n\n## intro\n");
+    expect(deck.date).toBe("2026-01-01");
+  });
+
+  test("still keeps a hash that is part of the value", () => {
+    expect(parseScript("---\ntitle: Meetup #42\n---\n\n## intro\n").title).toBe("Meetup #42");
+    expect(parseScript("---\ntitle: Meetup #42 # ok\n---\n\n## intro\n").title).toBe("Meetup #42");
+  });
 });
