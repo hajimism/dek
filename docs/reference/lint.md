@@ -1,64 +1,68 @@
-# Lint ルール
+# Lint Rules
 
-使い方は [Lint](/guide/lint)。このページは ID と条件の表。
+How lint fits the workflow is in [Lint](/guide/lint). This page is the table of ids and conditions.
 
-| ID | 内容 | fix |
+| ID | Condition | `--fix` |
 | --- | --- | --- |
-| `DEK001` | `script.md` にあるが `slides/` に HTML がない | 骨格 HTML を足す |
-| `DEK002` | `slides/` にあるが `script.md` に対応セクションがない | — |
-| `DEK003` | `data-step` がその枚のビート id でも番号でもない | — |
-| `DEK004` | セクション id がデッキ内で、またはビート id が同一セクション内で重複 | — |
-| `DEK005` | 同一スライド内で `data-morph` の名前が重複 | — |
-| `DEK006` | `data-slug` が `script.md` のセクション id と一致しない | — |
-| `DEK010` | テーマに定義のないクラスを使用 | — |
-| `DEK011` | スライド内に `<style>` / `style=` / `<script>` | — |
-| `DEK012` | テーマにトップレベルセレクタ | — |
-| `DEK013` | `theme.css` のクラス数が上限を超過（既定 40） | — |
-| `DEK014` | テーマにトークン以外の生の色・`font-family`・絶対単位 | — |
-| `DEK015` | 既定契約のトークンが `.slide` に無い | — |
-| `DEK020` | 外部 URL（CDN・リモート画像）の参照 | — |
-| `DEK021` | 参照している画像ファイルが存在しない | — |
-| `DEK022` | デッキディレクトリの外を参照している | — |
-| `DEK030` | 描画時に内容がスライド枠外へはみ出す。全ステップで評価 | — |
-| `DEK031` | コントラスト比が 4.5:1 未満。24px 以上、または 18.66px 以上の太字（WCAG の large text）は 3:1 | — |
-| `DEK040` | 辞書にない ASCII 語。警告 | — |
-| `DEK041` | `duration` 予算と Timeline 実尺の大きなずれ。警告 | — |
-| `DEK042` | 本文（リスト・コード・表）はあるのに喋る段落が無いビート。警告 | — |
+| `DEK001` | A section in `script.md` has no HTML in `slides/` | Creates the skeleton |
+| `DEK002` | An HTML file in `slides/` has no section in `script.md` | — |
+| `DEK003` | A `data-step` is neither a beat id nor a valid position on its slide | — |
+| `DEK004` | A section id is repeated in the deck, or a beat id is repeated in its section | — |
+| `DEK005` | A `data-morph` name is repeated on one slide | — |
+| `DEK006` | `data-slug` does not match the section id | — |
+| `DEK010` | A class the theme does not define | — |
+| `DEK011` | `<style>`, `style=`, or `<script>` inside a slide | — |
+| `DEK012` | A top-level selector in the theme | — |
+| `DEK013` | The theme defines more classes than `max_classes` (default 40) | — |
+| `DEK014` | A raw color, `font-family`, or absolute unit outside a token assignment | — |
+| `DEK015` | A required token is missing from `.slide` | — |
+| `DEK020` | A remote URL (CDN, remote image) | — |
+| `DEK021` | A referenced image file does not exist | — |
+| `DEK022` | A path that leaves the deck directory | — |
+| `DEK023` | A local `src` that does not start with `assets/` | — |
+| `DEK030` | Content overflows the slide when rendered, at any beat | — |
+| `DEK031` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
+| `DEK040` | An ASCII word missing from the pronunciation dictionary. Warning | — |
+| `DEK041` | Narrated length far from the `duration` budget. Warning | — |
+| `DEK042` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
 
-## 条件
+## Conditions
 
-- `DEK030` / `DEK031` は `--visual`。Playwright が必要。
-- `DEK040` は `voice/` があるデッキだけ。
-- `DEK041` は Timeline があるデッキだけ。
-- `DEK042` は `voice/` があるデッキだけ。`dek cues` は `voice/` の有無に関わらず同じ診断を出す。
-- `DEK040` `DEK041` `DEK042` は警告。ライブ専用の「lint 通過 = 完成」は変わらない。
+- `DEK030` and `DEK031` run only with `--visual` and require Playwright.
+- `DEK040` and `DEK042` apply only to decks with `voice/`. `dek cues` reports `DEK042` regardless.
+- `DEK041` applies only to decks with a Timeline.
+- `DEK040`, `DEK041`, and `DEK042` are warnings. A live-only deck's definition of done is unchanged.
 
-## 補足
+## Notes
 
 ### DEK001 / DEK002
 
-`--fix` は骨格 HTML を足す。既存ファイルは触らない。1 件ずつなら改名を疑って `dek mv <old> <new>` を次の一手に出す。2 件以上は推測しない。
+`--fix` creates the skeleton and never touches an existing file. Exactly one of each suggests a rename, and lint proposes `dek mv <old> <new>`. More than one of either and it does not guess.
 
 ### DEK003
 
-解決できない参照。ビートに要素が無いのは構わない。番号が 1 から連続している必要もない。
+An unresolvable reference. A beat with no element is fine, and positions need not be consecutive.
+
+### DEK005
+
+A `data-morph` name must be unique within a slide, because it becomes a `view-transition-name` and the browser needs exactly one element on each side of the transition. The same name on two different slides is the intended use.
 
 ### DEK010
 
-`theme.css` にクラスを足せば回避できる。語彙を増やすのは設計判断。lint が担うのは一手の摩擦として可視化すること。DEK013 がその一手の上限。
+Clear it by defining the class in `theme.css`. Growing the vocabulary is a design decision; lint makes it one visible step. `DEK013` caps how often that step can be repeated.
 
 ### DEK014 / DEK015
 
-`--*` への代入以外の生値は DEK014。13 個の公開トークンが `.slide { }` に無いのは DEK015。トークンを足すのはクラスと同じく設計判断。
+Raw values are allowed only when assigning a `--*` property. Unitless `0`, `thin`, and `em` pass. `var()` with a raw fallback does not. All thirteen tokens in the contract must be published on `.slide`; extra tokens are welcome.
+
+### DEK020 / DEK021 / DEK022 / DEK023
+
+Self-containment. Nothing remote, nothing from the project root, nothing from a sibling deck. Local `src` values start with `assets/`. This is what allows `dek build` to inline every asset and the project-root dev server to serve them.
 
 ### DEK031
 
-閾値は WCAG AA に合わせる。本文は 4.5:1、大きな文字は 3:1。大きな文字の定義は計算後の `font-size` が 24px 以上、または 18.66px 以上で `font-weight` が 700 以上。大きな数字だけ淡い色にする、といった設計がこの範囲で通る。閾値を変える手段は持たない。
-
-### DEK020 / DEK021 / DEK022
-
-デッキの自己完結。リモートも、プロジェクト直下も、隣のデッキも、デッキの中からは参照できない。`build` が全アセットをインライン化できるのは、この制約があるから。
+Thresholds follow WCAG AA: 4.5:1 for body text, 3:1 for large text. Large text is a computed `font-size` of 24px or more, or 18.66px or more at `font-weight` 700 or above. A big number in a soft color passes; the same color on body text fails. The thresholds are not configurable.
 
 ### DEK042
 
-段落だけが喋りになる。リスト・コード・表しか無いビートは、画面には出るが声にはならず、`pause.beat` の長さで次へ進む。台本を書いた時点で気づけるように、`dek cues` と `voice/` 付きデッキの lint が警告する。本文が空、または blockquote だけのビートは意図的な間として扱い、警告しない。
+Only paragraphs are spoken. A beat that shows a list, code, or a table without a paragraph passes in `pause.beat` milliseconds when narrated. Empty beats and blockquote-only beats are treated as deliberate pauses and are not flagged.

@@ -1,65 +1,79 @@
-# 声と動画
+# Voice and Video
 
-目標: オプトインしたデッキで、台本から声と mp4 を派生させる。
+Voice is opt-in. A deck with a `voice/` directory can synthesize its script with a local text-to-speech engine, rehearse to that audio, and bake an MP4. A deck without `voice/` is unaffected, and its definition of done does not change.
 
-声と動画は台本の派生物。`script.md` は見た目も声も知らない。`voice/` の無いデッキでは、lint 通過 = 完成の定義は変わらない。
+Voice and video are derived from the script. The script knows nothing about either.
 
 ```
 script.md → Deck → Cue → Synth → Timeline → schedule
-                                      ├→ rehearse（ブラウザが自走）
-                                      └→ video（フレーム → mux）
+                                      ├→ rehearse  (the browser drives itself)
+                                      └→ video     (frames → ffmpeg)
 ```
 
-## 段落だけが喋り
+## Only paragraphs are spoken
 
 ```bash
 dek cues
 ```
 
-エンジンは不要。blockquote、リスト、コード、表は合成対象にならない。インラインの強調はテキストに剥がす。本文があるのに喋る段落が無いビートは DEK042（警告）として一緒に出る。
+This prints the spoken cues for every beat and needs no engine. Blockquotes, lists, code, and tables are dropped; inline emphasis, links, and code spans are flattened to text. A beat with visible content but no paragraph is reported as `DEK042` alongside the cues, so you notice it while you are still writing.
 
-## 合成
+## Setup
 
-`dek.toml` に `[voice]` があるとき、`dek new` は `voice/voice.toml` をデッキへコピーする。VOICEVOX 互換のローカルエンジンが `voice` / `rehearse` / `video` に必要。未検出ならそのコマンドだけが次の一手付きで失敗する。エラーの hint に配布ページと Docker コマンドが入る。
+Add a `[voice]` table to `dek.toml`, and `dek new` copies it into each new deck as `voice/voice.toml`. For an existing deck, write the file yourself.
 
-- VOICEVOX: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/) か `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
-- AivisSpeech: [aivis-project.com](https://aivis-project.com/) か `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`（`engine = "aivis"`）
-- 別の場所で動いているなら `DEK_VOICE_URL` か `voice.toml` の `engine` に URL を書く
+```toml
+# decks/<deck>/voice/voice.toml
+engine  = "voicevox"
+speaker = "ずんだもん/ノーマル"
+speed   = 1
+pause   = { sentence = 350, beat = 700 }
+```
+
+`voice`, `rehearse`, and `video` need a running VOICEVOX-compatible engine. If none is found, only that command fails, and the hint tells you how to install one.
+
+- **VOICEVOX** at port 50021: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/), or `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
+- **AivisSpeech** at port 10101 with `engine = "aivis"`: [aivis-project.com](https://aivis-project.com/), or `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`
+- COEIROINK and SHAREVOX are recognized by name.
+- Any compatible engine elsewhere: set `engine` to its URL, or export `DEK_VOICE_URL`.
+
+## Synthesis
 
 ```bash
 dek voice
 dek voice speakers
-dek voice say "こんにちは"
+dek voice say "Hello"
 dek voice dict add dek デック
 dek voice pin
 ```
 
-`dek voice` は変わった文だけ再合成する。保存時にも走る。辞書にない ASCII 語は DEK040（警告）。
+`dek voice` synthesizes only the sentences that changed and writes the audio, the per-sentence cache, and `timeline.json` under `.cache/voice/`. The dev server does the same on save. An ASCII word missing from `voice/dict.toml` is `DEK040`, a warning; add readings with `dict add`. `dek voice pin` copies the master audio and Timeline into `voice/pin/`, a portable snapshot that survives a cleared cache.
 
-カナと尺は機械可読。クラウド TTS を既定にしない。
+Kana and durations are machine-readable. dek does not default to a cloud TTS.
 
-## リハーサル
+## Rehearsal
 
 ```bash
 dek rehearse
 ```
 
-同じ開発サーバを、Timeline を時計にして自走させる。動画は焼かない。`.cache/voice/timeline.json` があればブラウザがビートを時間どおりに送る。rehearse 中の Space は再生/停止。矢印と `dek goto` は今のビートへ音と位置を追従させる。エンジンが無くても、手書きの Timeline があれば自走を確認できる。
+The dev server starts with the Timeline as its clock and the browser advances beats on time with the audio. Nothing is recorded. `Space` plays and pauses; the arrow keys and `dek goto` seek, and the audio follows. A hand-written `timeline.json` is enough to rehearse without an engine.
 
-## 動画
+## Video
 
 ```bash
 dek video
 dek video architecture
+dek video --fps 30 --root-dist
 ```
 
-デッキ全体は `dist/<deck>.mp4`（デッキ内。`--root-dist` ならプロジェクト直下）。1 枚は `.cache/video/<slug>.mp4`。`ffmpeg` が必須。`.vtt` / `.chapters.txt` / `.credits.txt` も出す。クレジットは動画に焼き込まない。
+A whole deck becomes `dist/<deck>.mp4`, or `<root>/dist/<deck>.mp4` with `--root-dist`. A single slide goes to `.cache/video/<slug>.mp4`. Requires Playwright, ffmpeg, and a Timeline; without a Timeline the hint says to run `dek voice` first. Alongside the MP4, dek writes `.vtt` captions, a `.chapters.txt` chapter list, and a `.credits.txt` file naming the speaker. Credits are not burned into the picture.
 
-録画はトーク尺ぶん待たない。ホールドは 1 枚、アニメーション中だけ fps。View Transitions が仮想時間に従わなければ、アニメ区間だけ実時間で撮る。
+Baking does not replay the talk in real time. Each beat is one held frame plus whatever the transition needs.
 
-Timeline があるとき、`dek ls` は予算と実尺を並置する。大きなずれは DEK041（警告）。待ち時間の記法は台本にも設定にも作らない。本文のないビートは遷移と `pause.beat` だけ通過する。
+When a Timeline exists, `dek ls` shows the narrated length next to the word-count estimate, and a large gap from the `duration` budget is `DEK041`, a warning. There is no notation for silent time: a beat with no paragraph passes through the transition and `pause.beat`, and nothing else.
 
-## 日常の 4 手
+## The daily four
 
 ```bash
 $EDITOR script.md
@@ -68,8 +82,8 @@ dek rehearse
 dek video
 ```
 
-ライブ専用なら [はじめる](./getting-started) の 3 手で終わる。
+For a live-only talk, the three commands in [Getting Started](./getting-started) are all there is.
 
-## 次
+## Next
 
-エージェントと一往復で直す → [AI と作る](./ai)
+Let an agent write, check, and fix slides: [Working with AI Agents](./ai).

@@ -1,8 +1,6 @@
 # Lint
 
-目標: 保存のたびに lint が通る状態を保ち、完成の定義を機械に預ける。
-
-lint が通ることが完成の定義。開発サーバは保存のたびに走らせるので、普通に編集していれば常に通っている。明示的に `dek lint` を叩く必要はない。CI や 1 枚の確認のために個別に呼ぶ。
+Passing lint is the definition of done. The dev server lints on every save, so a deck you are working on is always passing or telling you why not. You rarely run `dek lint` by hand; it exists for CI and for checking one slide.
 
 ```bash
 dek lint
@@ -12,46 +10,48 @@ dek lint --format sarif
 dek check architecture --shot
 ```
 
-`--fix` は DEK001 の骨格 HTML を足す。既存ファイルは触らない。
+`--fix` creates skeleton HTML for missing slides (`DEK001`). It never edits an existing file.
 
-## 層
+## Layers
 
-一般的な Markdown のルールは rumdl に完全に委譲する。自作するのは rumdl が原理的に見られないドメイン固有のルールだけ。
+dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl) and writes only the rules rumdl cannot know about. rumdl is optional: dek looks for it on `PATH`, in `node_modules/.bin`, or at `DEK_RUMDL`, and skips it quietly when absent. `dek init` writes a `.rumdl.toml` that disables the first-line-heading rule, since a script starts with frontmatter and `##`.
 
-| 層 | 担当 |
+| Layer | Covers |
 | --- | --- |
-| Markdown の作法 | rumdl |
-| スキーマ | Zod |
-| 整合性 | `script.md` ↔ `slides/*.html`、ビート ↔ `data-step` |
-| テーマ準拠 | 未定義クラス、インライン style、トークン契約 |
-| 自己完結 | 外部 URL、欠落画像、デッキ外参照 |
-| 描画 | Playwright（はみ出し、コントラスト） |
-| 読み | `voice/` があるデッキだけ |
-| 尺 | Timeline があるデッキだけ |
+| Markdown style | rumdl |
+| Schema | Frontmatter and config, validated with Zod |
+| Consistency | `script.md` ↔ `slides/*.html`, beats ↔ `data-step` |
+| Theme contract | Unknown classes, inline styles, tokens, scoping |
+| Self-containment | Remote URLs, missing images, paths outside the deck |
+| Rendering | Overflow and contrast, measured in a browser |
+| Narration | Only for decks with `voice/` |
+| Length | Only for decks with a Timeline |
 
 ## `--visual`
 
-はみ出し（DEK030）とコントラスト（DEK031）は Playwright で測る。幾何で真偽が決まる。スクリーンショットを見せて「はみ出ていますか」と尋ねない。コントラストは文字サイズを見る。24px 以上（太字なら 18.66px 以上）は WCAG の large text として 3:1、それ以外は 4.5:1。
+Overflow (`DEK030`) and contrast (`DEK031`) are measured in a real browser through Playwright. Both are questions of geometry with definite answers. dek does not show a screenshot and ask whether the text fits; it measures. Every beat of every slide is rendered in one browser session.
 
-Playwright が無ければ、そのコマンドだけが次の一手付きで失敗する。CLI 全体は起動できる。
+Contrast thresholds follow WCAG AA. Body text needs 4.5:1. Large text, meaning 24px or larger, or 18.66px and bold, needs 3:1. That is what lets a big number in a soft color pass while the same color on body text fails.
 
-- `lint --visual` — 検証。SARIF を返す。AI が自分の出力を確認する一次手段。
-- `dek shot` — 判定ではなく観察。デザインの良し悪しと最終確認は人間に残す。
+Without Playwright, only the commands that need it fail, each with the install command in its hint. The rest of the CLI runs.
 
-## 完成の定義は voice で変わらない
+- `dek lint --visual` is a verdict. It returns SARIF, and it is the primary way an agent checks its own output.
+- `dek shot` is an observation, not a verdict. Whether a slide looks good stays a human call.
 
-DEK040（辞書にない英単語）と DEK042（喋る段落の無いビート）は `voice/` があるデッキだけ。DEK041（予算と実尺のずれ）は Timeline があるデッキだけ。すべて警告。ライブ専用デッキの「lint 通過 = 完成」は変わらない。
+## The definition of done does not change with voice
 
-## 出力
+`DEK040` (an English word missing from the pronunciation dictionary) and `DEK042` (a beat that shows something but says nothing) apply only to decks with `voice/`. `DEK041` (narrated length far from the `duration` budget) applies only when a Timeline exists. All three are warnings. A live-only deck that passes lint is finished, and adding voice never changes that.
 
-診断は SARIF 2.1.0 に統一する。rumdl の `runs[]` とマージするため、VS Code、CI、AI エージェントがすべて同じ形式を読む。人間向けには ESLint 風のテキストが既定。
+## Output
+
+Diagnostics are SARIF 2.1.0 so that VS Code, CI, and agents all read the same format. rumdl's results are merged in as a second run. Humans get ESLint-style text by default.
 
 ```bash
 dek lint --format sarif > results.sarif
 ```
 
-ルールの全表は [Lint ルール](/reference/lint) を見る。
+Every rule is listed in [Lint Rules](/reference/lint).
 
-## 次
+## Next
 
-本番の送り方 → [発表](./present)
+Step through the deck and export it: [Presenting](./present).

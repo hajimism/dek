@@ -1,35 +1,35 @@
-# はじめる
+# Getting Started
 
-このページでやること:
+This page takes you from nothing to a deck you can present. You will:
 
-1. dek を入れる
-2. プロジェクトと最初のデッキを作る
-3. 台本を書いて、骨格のままブラウザで送る
-4. 会場用の単一 HTML を書き出す
+1. Install dek
+2. Create a project and a first deck
+3. Write a script and step through the generated slides in a browser
+4. Export a single HTML file for the venue
 
-HTML はまだ書かない。声も動画も出さない。成功条件は、同梱テーマの骨格スライドで喋れること。
+You will not write HTML, and you will not touch voice or video. The goal is a presentable deck of skeleton slides in the bundled theme.
 
-## 前提
+## Prerequisites
 
-[Bun](https://bun.sh) 1.3 以上。
-
-dek は npm に載せていない。GitHub から実行する。
+[Bun](https://bun.sh) 1.3 or later. dek is not published to npm; it runs straight from GitHub.
 
 ```bash
 bunx github:hajimism/dek
 ```
 
-トーク用プロジェクトに固定するなら、そのディレクトリで:
+To pin dek to a project, add it as a dependency inside that project. After that, `bunx dek` is enough.
 
 ```bash
 bun add github:hajimism/dek
 ```
 
-固定したあとは `bunx dek` で足りる。`bunx` は PATH に `dek` を置かない。*dek* は *deck* の異綴りで、Kong の decK が `deck` を使っているため一文字落としている。
+::: tip Why "dek"?
+*dek* is *deck* with one letter dropped. The `deck` name on npm belongs to Kong's decK.
+:::
 
-## プロジェクトを作る
+## Create a project
 
-dek のリポジトリの外で、トーク用のプロジェクトを作る。
+Create the project somewhere outside the dek repository.
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite
@@ -38,38 +38,38 @@ bun add github:hajimism/dek
 cd decks/2026-04-vite
 ```
 
-プロジェクトを作るのは最初の一度だけ。最初のデッキも一緒にできる。`bun add` は CLI をプロジェクトに固定するだけで、デッキの HTML は `node_modules` を見ない。
+You create a project once. The first deck comes with it. Pinning dek with `bun add` only fixes the CLI version; deck HTML never looks inside `node_modules`.
 
-## 何ができたか
+## What you have
 
 ```
 my-talks/
 ├── package.json
-├── dek.toml
-├── .gitignore
-├── theme.css
-├── AGENTS.md
-├── assets/
+├── dek.toml            # lint thresholds and speaking rate
+├── .gitignore          # dist/, .cache/, .dek/server.json
+├── .rumdl.toml         # Markdown rules for script.md
+├── theme.css           # the starting point for every new deck
+├── assets/             # shared source material; decks copy what they use
 ├── decks/
 │   └── 2026-04-vite/
-│       ├── script.md
-│       ├── theme.css
-│       ├── slides/
+│       ├── script.md   # the single source of truth
+│       ├── theme.css   # this deck's own copy
+│       ├── slides/     # one HTML file per slide
 │       └── assets/
 └── .dek/
-    └── schema.json
+    └── schema.json     # frontmatter schema for your editor
 ```
 
-`decks/` はデッキが 1 つでも必ずある。プロジェクト直下の `theme.css` は新しいデッキの出発点で、`dek init` / `dek new` がデッキの中へコピーする。
+There is always a `decks/` directory, even with a single deck. The `theme.css` at the project root is a template: `dek init` and `dek new` copy it into each new deck.
 
-## 台本を書く
+## Write the script
 
-`script.md` を開く。見出しひとつが 1 枚になる。
+Open `script.md`. Each `##` heading becomes one slide.
 
 ```markdown
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
-title: HTML スライドツールを作った話
+title: How I Built an HTML Slide Tool
 event: Tokyo Frontend Meetup #42
 date: 2026-04-18
 duration: 20m
@@ -77,47 +77,48 @@ duration: 20m
 
 ## intro
 
-こんにちは。今日は、スライドツールを自分で作った話をします。
+Hi. Today I want to talk about building my own slide tool.
 
-> 自己紹介は短く。時計を見ない。
+> Keep the introduction short. Do not look at the clock.
 
 ## architecture
 
-さて、ここが今日いちばん覚えて帰ってほしいところです。
+This is the one thing I want you to take home.
 
-### script.md が親 {#script-parent}
+### The script is the parent {#script-parent}
 
-まず script.md がいて、
+First there is the script.
 
-### スライドがぶら下がる {#slides-hang}
+### Slides hang off it {#slides-hang}
 
-その下にスライドがぶら下がっている。逆ではありません。
+The slides hang off it. Never the other way around.
 ```
 
-`##` がスライド、`###` がその中のビート。段落が喋り。`>` はディレクションで、声にも尺にも入らない。
+The rules are few. A `##` heading is a slide. A `###` heading is a **beat**: a pause in the speaking, and a moment where the screen may advance. Paragraphs are what you say. A `>` blockquote is a stage direction; it is neither spoken nor counted toward timing.
 
-## 開発サーバを起動する
+## Start the dev server
 
-デッキの中で:
+From inside the deck:
 
 ```bash
 bunx dek
 ```
 
-見出しから骨格スライドが生える。`## intro` は先頭なので `title` が見出しになり、`## architecture` はビートのリストだけの枚になる（id だけの見出しは表示しない）。保存のたびに描画と lint が走る。ブラウザで送り、ビートが進むことを確認する。
+The server generates a skeleton slide for every heading. The first section takes the deck title as its heading; `## architecture` becomes a slide with its beats listed one by one. Every save re-renders, re-syncs, and lints. Open the printed URL, press the right arrow, and watch the beats appear in order.
 
-明示的に `dek sync` や `dek lint` を叩く必要はない。
+You never need to run `dek sync` or `dek lint` by hand while the server is up.
 
-## 会場 HTML を書き出す
+## Export for the venue
 
 ```bash
 bunx dek build
 ```
 
-`decks/2026-04-vite/dist/2026-04-vite.html` ができる。この 1 ファイルをブラウザで開けば発表できる。プロジェクト直下へ出すなら `dek build --root-dist`。
+This writes `decks/2026-04-vite/dist/2026-04-vite.html`. Open that one file in a browser and give the talk. Pass `--root-dist` to collect builds under the project's own `dist/` instead.
 
-## 次
+## Next
 
-- 台本の書き方を固める → [台本](./script)
-- 1 枚の見た目を整える → [スライド](./slides)
-- エージェントと回す → [AI と作る](./ai)
+- Build a real deck from start to finish: [Tutorial](./tutorial)
+- Learn the script rules in depth: [The Script](./script)
+- Style a slide: [Slides](./slides)
+- Hand the deck to an agent: [Working with AI Agents](./ai)

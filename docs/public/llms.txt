@@ -1,30 +1,32 @@
 # dek
 
-> Talk-script-first HTML slides. 台本から組み立てる HTML スライド。
+> Talk-script-first HTML slides. Write what you will say; the slides follow.
 
 Site: https://hajimism.github.io/dek/
+Japanese: https://hajimism.github.io/dek/ja/
 Repo: https://github.com/hajimism/dek
 
-Agents use the same CLI as humans. Run `dek help --agent`. Result commands accept `--json`. Diagnostics: `dek lint --format sarif`. Do not parse human text output.
+Agents use the same CLI as humans. Run `dek help --agent`. Result commands accept `--json`. Diagnostics: `dek lint --format sarif`. Do not parse human-oriented text output.
 
 ## Guide
 
-- [なぜ dek か](https://hajimism.github.io/dek/guide/why.html): 箱が先だと喋れない。script.md が親。三原則と比較。
-- [はじめる](https://hajimism.github.io/dek/guide/getting-started.html): インストールから骨格のまま喋るまで。
-- [プロジェクト構造](https://hajimism.github.io/dek/guide/structure.html): 1 プロジェクト = N デッキ。テーマはコピー。cwd がスコープ。
-- [台本](https://hajimism.github.io/dek/guide/script.html): ## が 1 枚、### がビート、段落だけが喋り。
-- [スライド](https://hajimism.github.io/dek/guide/slides.html): 1 枚は `<section class="slide">`。クラス語彙のみ。JS 禁止。
-- [ビート](https://hajimism.github.io/dek/guide/steps.html): data-step と data-morph。順序は台本、見た目は CSS。
-- [テーマ](https://hajimism.github.io/dek/guide/theme.html): 13 トークン。.slide にスコープ。語彙を増やすのは設計判断。
-- [Lint](https://hajimism.github.io/dek/guide/lint.html): lint が通ることが完成。--visual は幾何。
-- [発表](https://hajimism.github.io/dek/guide/present.html): 開発サーバ、プレゼンター、USB 1 ファイル。
-- [声と動画](https://hajimism.github.io/dek/guide/voice.html): オプトイン。Cue → Timeline → rehearse / video。
-- [AI と作る](https://hajimism.github.io/dek/guide/ai.html): CLI + AGENTS.md。check --shot --voice。MCP なし。
-- [FAQ](https://hajimism.github.io/dek/guide/faq.html): Slidev を使うべきとき、voice は必須か、など。
-- [アーキテクチャ](https://hajimism.github.io/dek/guide/architecture.html): core を CLI と dev server が共有する。
+- [Why dek](https://hajimism.github.io/dek/guide/why.html): Boxes first means a deck you cannot deliver. The script is the parent. Three principles and a comparison.
+- [Getting Started](https://hajimism.github.io/dek/guide/getting-started.html): Install to a presentable skeleton deck without writing HTML.
+- [Tutorial](https://hajimism.github.io/dek/guide/tutorial.html): Build a ten-minute talk end to end: script, beats, a hand-written slide, a morph, a theme change, a single-file build.
+- [Projects and Decks](https://hajimism.github.io/dek/guide/structure.html): One project, many decks. Themes are copied. The working directory sets the scope.
+- [The Script](https://hajimism.github.io/dek/guide/script.html): `##` is a slide, `###` is a beat, only paragraphs are spoken. Ids, renaming, timing.
+- [Slides](https://hajimism.github.io/dek/guide/slides.html): One `<section class="slide">`. Theme classes only. No JavaScript. Skeletons.
+- [Beats](https://hajimism.github.io/dek/guide/steps.html): `data-step` and `data-morph`. Order from the script, appearance from CSS.
+- [Themes](https://hajimism.github.io/dek/guide/theme.html): Thirteen tokens on `.slide`. Growing the vocabulary is a design decision.
+- [Lint](https://hajimism.github.io/dek/guide/lint.html): Passing lint is the definition of done. `--visual` measures geometry.
+- [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys, one file on a USB stick, remote, PDF.
+- [Voice and Video](https://hajimism.github.io/dek/guide/voice.html): Opt-in. Cue, Timeline, rehearse, video.
+- [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): CLI plus `AGENTS.md`. `check --shot --voice`. No MCP.
+- [FAQ](https://hajimism.github.io/dek/guide/faq.html): When to use Slidev, whether voice is required, and more.
+- [Architecture](https://hajimism.github.io/dek/guide/architecture.html): Core shared by the CLI and the dev server. Optional dependencies.
 
 ## Reference
 
-- [CLI](https://hajimism.github.io/dek/reference/cli.html): コマンドとフラグ。
-- [Lint ルール](https://hajimism.github.io/dek/reference/lint.html): DEK001–041。
-- [設定](https://hajimism.github.io/dek/reference/config.html): ディレクトリ、dek.toml、frontmatter、トークン。
+- [CLI](https://hajimism.github.io/dek/reference/cli.html): Commands, flags, environment variables.
+- [Lint Rules](https://hajimism.github.io/dek/reference/lint.html): DEK001 to DEK042.
+- [Configuration](https://hajimism.github.io/dek/reference/config.html): Directory layout, `dek.toml`, frontmatter, `voice.toml`, tokens, layouts.

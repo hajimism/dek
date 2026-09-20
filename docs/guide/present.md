@@ -1,66 +1,82 @@
-# 発表
+# Presenting
 
-目標: 開発中に送り、会場では USB 1 ファイルで喋る。
+While you work, the dev server keeps the browser in step with your files. At the venue, one HTML file is all you need. This page covers both, plus the presenter view, remote control from another device, and PDF export.
 
-## 開発サーバ
+## The dev server
 
-デッキの中で叩けばそのデッキを、プロジェクト直下で叩けばデッキ一覧をインデックスとして出す。
+Run `dek` inside a deck to serve that deck. Run it at the project root to get an index of every deck.
 
 ```bash
 dek
+dek --visual
 ```
 
-保存のたびに、次が起きる。
+On every save:
 
-- `script.md` を保存 — 新しい見出しに対応する骨格スライドを生成し、対応のなくなった HTML をブラウザに警告表示する。`voice/` があれば変わった文だけ再合成する
-- `slides/*.html` を保存 — HMR で該当スライドを再描画し、lint を走らせ、診断をブラウザのオーバーレイと端末の両方に出す
-- `theme.css` を保存 — 全スライドを再描画し、クラス語彙を再解決する
-- Playwright があれば、描画系のルール（はみ出し・コントラスト）も保存ごとに評価する
+- **`script.md`** — a skeleton is generated for any new heading, orphaned HTML is flagged in the browser, and presenter notes refresh. If the deck has `voice/`, only the changed sentences are re-synthesized.
+- **`slides/*.html`** — the changed slide is swapped in place, lint runs, and diagnostics appear both in the terminal and as an overlay in the browser.
+- **`theme.css`** — every slide re-renders and the class vocabulary is re-resolved.
+- With `--visual` and Playwright installed, the saved slide is also measured for overflow and contrast.
 
-## プレゼンタービュー
+Only one server runs per project. A second `dek` finds the first one's lock in `.dek/server.json` and tells you where it is.
 
-`/presenter` を開く、または `p` を押す。現在のスライド、次のビートのプレビュー、そのセクションの台本が並び、今喋っているビートがハイライトされる。上端にデッキ全体の進捗、下端に枚数と経過時間（最初の送りから）、今いるセクションの予算が出る。送るとまずビートが進み、使い切ると次のスライドへ。同じウィンドウで `p` をもう一度押すと観客ビューに戻る。WebSocket 経由で接続中の全インスタンス（別ウィンドウ、別デバイス、スマホ）が追従する。
+## The presenter view
+
+Open `/presenter`, or press `p` in the player. You see the current slide, a preview of the next beat or slide, and the script for the current section with the current beat highlighted. A progress bar across the top tracks the whole deck. Along the bottom: the slide count, the budget for the current section, and the time elapsed since your first advance, which turns yellow past 80% of the talk's budget and red past 100%. Press `p` again to return to the audience view in the same window.
+
+Every connected window follows the presenter over WebSocket: a second monitor, another laptop, or a phone.
 
 ```bash
 dek goto architecture
 dek current
 ```
 
-開発サーバが立っている間、端末から人間のブラウザを動かし、人間が今見ている枚を知る。エージェントも同じコマンドを使う。
+While the server is running, the terminal can drive the browser and ask which slide is on screen. Agents use the same two commands.
 
-## 会場 HTML
+## Keys
+
+| Key | Action |
+| --- | --- |
+| `→` `PageDown` | Next beat, then next slide |
+| `←` | Previous beat, then previous slide |
+| `p` | Toggle the presenter view |
+| `s` | Toggle the slide rail |
+| `↑` `↓` | Move within the slide rail |
+| `Space` | Play or pause during `dek rehearse` |
+
+## The single file
 
 ```bash
 dek build
 ```
 
-`decks/<deck>/dist/<deck>.html` ができる。全アセットをインライン化し、minify した単一ファイル。会場ではこのファイルだけをブラウザで開く。プロジェクト直下の `dist/` にまとめたいときは `dek build --root-dist`。
+You get `decks/<deck>/dist/<deck>.html`: every slide, the theme, the images as data URIs, and the player runtime, minified into one file. Open it in a browser and present. Use `--root-dist` to collect every deck's build under the project's `dist/`.
 
-build がやることは 4 つ。
+Build does four things: extracts each `<section class="slide">` and tags it with `data-slug`, minifies the theme, inlines `assets/` as data URIs, and embeds the runtime. It uses no external HTML minifier, so the output has one shape regardless of how the input was written. Build fails if any section is missing its HTML; run the dev server or `dek sync` first.
 
-1. 各スライドの `<section class="slide">` を抽出し、`data-slug` を付けて結合する
-2. `theme.css` を minify する
-3. `assets/` の画像を data URI にする
-4. ランタイム JS を minify して埋め込む
+Open the file with `?presenter`, or press `p`, for the presenter view. A second window of the same file follows the first through `BroadcastChannel`: the audience view on the projector, the presenter view on your laptop, with no server and no network. The audience view has a slide rail on the left; click a thumbnail to jump, press `s` to hide it, and drag its edge to resize it.
 
-外部の HTML minifier は使わない。入力の形は問わず、出力は常に同じ形になる。
+## Another device
 
-`?presenter` を付けて開くか `p` を押すとプレゼンタービューになり、同じブラウザで開いた別ウィンドウが `BroadcastChannel` で追従する。外部モニタに本体、手元にプレゼンター、という構成が、サーバもネットワークも要らずに成立する。観客ビューでは左側にスライド一覧が出て、クリックでその枚へ飛ぶ。`s` で一覧の表示を切り替え、右端をドラッグして幅を変えられる。プレゼンタービューでは一覧は出ない。
-
-## 別デバイス
-
-スマホをリモコンにしたいなど、別デバイスからの操作が必要なときだけ開発サーバを使う。
+Use the dev server at the venue only when you want to control the deck from another device, such as a phone as a remote.
 
 ```bash
 dek --remote
+dek --remote --password s3cret
 ```
 
-LAN に公開する。プレゼンターのノートと `goto` / `current` はパスワード保護。
+This serves on the LAN. The presenter view, `goto`, and `current` are behind HTTP Basic authentication; the audience view is open. If you omit `--password`, dek generates one and prints it with the URLs.
 
-USB メモリに 1 ファイル入れておけば必ず発表できる、という状態を最優先にしている。
+The one file on a USB stick is the fallback that always works. Everything else is optional.
 
-PDF が要るときは `dek pdf`。
+## PDF
 
-## 次
+```bash
+dek pdf
+```
 
-声を乗せるなら [声と動画](./voice)。ライブだけで足りるなら [AI と作る](./ai)。
+Renders every slide at its last beat into `dist/<deck>.pdf`. Requires Playwright.
+
+## Next
+
+Add narration and turn the deck into a video: [Voice and Video](./voice). If a live talk is all you need, skip to [Working with AI Agents](./ai).

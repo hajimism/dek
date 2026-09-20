@@ -1,13 +1,15 @@
-# 台本
+# The Script
 
-目標: `script.md` に順序と喋りと尺を書く。
+`script.md` holds three things and nothing else: the order of the talk, the words you will say, and how long you have. Layout and decoration belong to the slide HTML. Voice belongs to `voice/`. The script knows about neither.
 
-覚えるルールは 3 つ。`## 見出し` が 1 スライド、その配下に書いたものが台本、段落だけが喋り。見出しのテキストは自由。日本語でも、疑問文でも構わない。
+## Three rules
+
+There are three rules to remember. A `##` heading is one slide. Everything under it is that slide's script. Only paragraphs are spoken.
 
 ```markdown
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
-title: HTML スライドツールを作った話
+title: How I Built an HTML Slide Tool
 event: Tokyo Frontend Meetup #42
 date: 2026-04-18
 duration: 20m
@@ -15,83 +17,81 @@ duration: 20m
 
 ## intro
 
-こんにちは。今日は、スライドツールを自分で作った話をします。
+Hi. Today I want to talk about building my own slide tool.
 
-> 自己紹介は短く。時計を見ない。
+> Keep the introduction short. Do not look at the clock.
 
-## 発表の前日に何をしていますか {#problem}
+## What do you do the day before a talk? {#problem}
 
-みなさん、発表の前日に何をしていますか。
+What do you do the day before a talk?
 
-聴衆が「自分ごと」だと思うまで喋る。3 つ目が本命。
+Keep going until the audience feels it is about them. The third example is the real one.
 
 ## architecture
 
-さて、ここが今日いちばん覚えて帰ってほしいところです。
+This is the one thing I want you to take home.
 
-### script.md が親 {#script-parent}
+### The script is the parent {#script-parent}
 
-まず script.md がいて、
+First there is the script.
 
-### スライドがぶら下がる {#slides-hang}
+### Slides hang off it {#slides-hang}
 
-その下にスライドがぶら下がっている。逆ではありません。
+The slides hang off it. Never the other way around.
 ```
 
-プレゼンタービューはセクションの Markdown をそのまま描画する。声になるのは段落だけ。blockquote、リスト、コード、表は画面用かディレクションで、合成対象にならない。インラインの強調・リンク・`code` はテキストに剥がす。ライブの見た目は変わらない。効くのは `dek cues` 以降の合成だけ。リストだけで段落の無いビートは、声にすると一瞬で次へ進む。`dek cues` と `voice/` 付きデッキの lint が DEK042（警告）で知らせる。
+Heading text is free-form. Write it in any language, as a question, with punctuation. The presenter view shows each section's Markdown as written.
 
-ディレクションを台本と見分けたければ blockquote を使う。TTS を入れるとこれは規約になる。命令形の短文を検出する、のような曖昧なルールは持たない。専用の待ち時間記法もない。
+Only paragraphs become speech. Blockquotes, lists, code blocks, and tables are for the screen or for your own direction; they are never synthesized. Inline emphasis, links, and `code` are flattened to plain text before synthesis. None of this affects the live presentation. It only matters once you run `dek cues` or add voice. A beat with a list but no paragraph is visible on screen yet passes in an instant when narrated, so `dek cues` and lint on a deck with `voice/` warn about it as `DEK042`.
 
-見た目に関する情報は `script.md` に置かない。レイアウトも装飾も、スライド HTML 側の責務。
+Use a blockquote for stage directions. Once you add narration this becomes a convention worth keeping. dek has no fuzzy rule for detecting directions, such as "short imperative sentences", and no special syntax for pauses.
 
-## 見出しと id
+## Headings and ids
 
-ファイル名と CLI の `<slug>` が使うのは id、プレゼンタービューが出すのは見出しテキスト。id は `[a-z0-9-]+`。数字だけは `data-step` の番号と区別できないので受け付けない。
+Files in `slides/` and the `<slug>` arguments to the CLI use the section **id**. The presenter view uses the heading **text**. An id matches `[a-z0-9-]+` and contains at least one letter; a digits-only id would collide with numeric `data-step` values.
 
-Pandoc と同じ `{#id}` で、表示と同一性を分ける。
+dek separates display from identity with Pandoc-style `{#id}`.
 
-- 見出しがすでに id として適格なら、それが id になる。`## intro` → `slides/intro.html`
-- そうでなければ `{#id}` が必須。`## 発表の前日に何をしていますか {#problem}` → `slides/problem.html`
-- 適格な見出しにも `{#id}` は付けられる。表示名とファイル名を分けたいとき
-- id だけの見出しは表示名を持たない。`sync` の骨格では `<h2>` が空になる（先頭セクションだけ `title` が入る）。プレゼンタービューには id が出る
+- If the heading already qualifies as an id, it is the id. `## intro` becomes `slides/intro.html`.
+- Otherwise `{#id}` is required. `## What do you do the day before a talk? {#problem}` becomes `slides/problem.html`. A qualifying heading without one is an error that points at the line.
+- A qualifying heading may still carry `{#id}` when you want the display name and the file name to differ. `## intro {#opening}` is displayed as "intro" and stored as `opening.html`.
+- A heading that is only an id has no display text. The generated skeleton leaves its `<h2>` empty, except for the first section, which takes the deck `title`. The presenter view shows the id.
 
-`{#.class}` や `key=value` は持たない。属性は id だけ。セクションの id はデッキ内で一意、ビートの id はセクション内で一意。
+Only `{#id}` is supported. `{.class}` and `key=value` attributes are rejected. Section ids must be unique within a deck; beat ids must be unique within their section.
 
-## 改名と並べ替え
+## Renaming and reordering
 
-`sync` はファイルをリネームしない。`## problem` を `## the-problem` に書き換えると、新しい骨格 HTML が生まれ、古い HTML は DEK002 の孤児になる。紐付けが切れるだけで、中身は移らない。
+`dek sync` never renames a file. If you edit `## problem` to `## the-problem`, the server generates a new skeleton for `the-problem` and the old `problem.html` becomes an orphan (`DEK002`). The link is broken; the content does not move.
 
-同一性を付け替える操作は壊れやすい。CLI が持つ。
+Changing identity is fragile, so the CLI owns it.
 
 ```bash
 dek mv problem the-problem
 dek mv architecture --after intro
 ```
 
-`dek mv problem the-problem` は `script.md` の id を書き換え、`slides/problem.html` をリネームする。見出しテキストは触らない。
+The first command rewrites the id in `script.md` and renames `slides/problem.html`. It does not touch the heading text, and it refuses to run if `the-problem.html` already exists. The second moves the section in the script; HTML files stay where they are because they carry no order of their own.
 
-DEK001 と DEK002 が 1 件ずつなら、lint は改名を疑って `dek mv <old> <new>` を次の一手として出す。2 件以上なら推測しない。
+When lint sees exactly one missing slide (`DEK001`) and exactly one orphan (`DEK002`), it assumes a rename and suggests `dek mv <old> <new>`. With more than one of either, it does not guess.
 
-## ビート
+## Beats
 
-`##` が 1 枚なら、`###` はその中のビート。喋りの区切りであり、画面が次の段階へ進む瞬間でもある。テキストは自由で、プレゼンタービューの見出しになる。
+If `##` is a slide, `###` is a **beat** within it: a pause in the speaking, and a moment where the screen may advance. Beat text is free-form and appears as a heading in the presenter view.
 
-本番で矢印キーを押すと、まずビートが進み、ビートを使い切ると次のスライドへ移る。対応する要素のないビートがあっても構わない。画面はそのまま、喋りだけが進む区切りとして使える。
+During the talk, the right arrow first steps through the beats of the current slide, then moves to the next slide. A beat does not need a matching element in the HTML. It can simply be a place where you pause, with the screen unchanged.
 
-「いつ出すか」は喋りの決定なので `script.md` が持ち、「どう出すか」は見せ方なので `theme.css` が持つ。段階表示の HTML 側は [ビート](./steps) を読む。
+*When* something appears is a speaking decision, so the script owns it. *How* it appears is a visual decision, so `theme.css` owns it. The HTML side is described in [Beats](./steps).
 
-## 尺
+## Timing
 
-`duration: 20m` は、このトークの予算。見積もりは台本の本文から出す。blockquote はディレクションなので数えない。CJK は 300 字/分、それ以外は 130 語/分。`dek.toml` で上書きできる。
+`duration: 20m` is the budget for the talk. dek estimates how long the script takes from its body text: CJK text at 300 characters per minute, everything else at 130 words per minute. Blockquotes are directions and are not counted. Both rates can be changed in `dek.toml`.
 
-`dek ls` はデッキの予算と見積もり、セクションごとの按分を出す。セクション予算は `duration` を字数比で割ったもの。`duration` がなければ見積もりだけ出す。Timeline があるとき、`dek ls` は `video` の実尺を見積もりの隣に出す。並置するが、同一視はしない。
+`dek ls` prints the budget, the estimate, and a per-section breakdown. Each section's budget is `duration` split in proportion to its share of the text. Without `duration`, you get the estimate alone. If a Timeline exists from voice synthesis, `dek ls` shows the actual narrated length next to the estimate. They sit side by side and are never conflated.
 
-デモで操作が長く、台本が短いと見積もりは短く出る。その間に喋ることがあるなら、それは台本に書く。書けば見積もりに入る。黙って進める時間までをツールが知る必要はない。待ち時間の記法は台本にも設定にも作らない。
+A slide with a long demo and a short script will estimate short. If you plan to speak during the demo, write those words down. They then count. dek has no notation for silent time, in the script or in configuration.
 
-`event` と `date` は `dek ls` の表示に使い、タイトルスライドから参照できる。
+`event` and `date` appear in `dek ls` and are available to the title slide.
 
-## 次
+## Next
 
-1 枚の HTML を書く → [スライド](./slides)
-
-frontmatter のフィールド一覧は [設定](/reference/config) を見る。
+Write the HTML for one slide: [Slides](./slides). The full list of frontmatter fields is in [Configuration](/reference/config).

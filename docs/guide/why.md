@@ -1,73 +1,83 @@
-# なぜ dek か
+# Why dek
 
-スライドは喋るための資料だ。ところが PowerPoint も Google Slides も Slidev も、まず箱を置き、あとから中身を考える。その結果、立派だが本番で喋り切れない資料ができあがる。
+Slides exist so that you can talk. Every mainstream tool forgets this. PowerPoint, Keynote, Google Slides, Marp, Slidev: all of them start with an empty box and ask you to fill it. You add a heading, then a diagram, then an animation. The deck grows more polished, and the talk grows harder to deliver. On the day, you watch the clock, skip three slides, and leave out the one thing you came to say.
 
-順序は逆である。何を、どの順で、どれだけの尺で喋るか。その瞬間に画面に何が出ているべきか。dek は `script.md` を親に据え、スライドはそこから生やす。
+dek starts from the other end. You write what you will say, in what order, and for how long. Only then do you ask what should be on screen at each moment. The script is the parent. Slides are derived from it.
 
-## トークは一度きりではない
+## Three problems dek exists to solve
 
-発表のたびに新しいリポジトリを切ると、見た目も規約も毎回ゼロから積み直す。dek はプロジェクトを一度作り、その中にデッキを溜める。規約はプロジェクトのもの、見た目は前回の続きから、台本とスライドはデッキごと。過去のデッキがそのまま次の出発点になる。
+### A talk is not a one-off
 
-## AI と作るなら、ファイルは小さく分かれているべき
+Most slide tools treat a deck as a project. Every talk gets a fresh repository, a fresh theme, a fresh set of conventions, and everything you learned last time stays behind.
 
-3,000 行の `slides.md` の 7 枚目だけを直す、というタスクは LLM にとって不必要に難しい。1 スライド = 1 HTML なら、編集対象は 40 行のファイルがひとつ。差分が読め、壊れてもその 1 枚で済む。
+dek treats a **project** as a place that holds many **decks**. Conventions belong to the project. The look carries forward from your last deck. Each deck owns its script and slides. Your past talks are the starting point for the next one.
 
-## AI は自分が書いた HTML がどう見えるか知らない
+### Agents need small files
 
-文字が枠からはみ出していても、テキストとして出力された HTML は完璧に見える。人間が本番 30 分前に気づく。dek は描画結果を機械可読な診断として返し、AI が自分で確認して直すループを回せるようにする。
+Fixing slide seven in a 3,000-line `slides.md` is an oddly hard task for a language model. The context is enormous, the diff is noisy, and one bad edit can break the whole deck.
 
-## 三原則
+In dek, one slide is one HTML file of roughly forty lines. The edit target is small, the diff is readable, and if something breaks it breaks one slide. This is the single biggest reason dek exists as a separate tool rather than a Slidev theme.
 
-### 1. `script.md` が順序と台本と尺の単一の真実
+### Agents cannot see what they render
 
-デッキの順序とトークスクリプトと尺は `script.md` だけが持つ。スライド HTML は各セクションに従属する。親子関係を構造で固定することで、片方だけが更新されて食い違う事態を防ぐ。
+An agent that writes HTML has no idea whether the text fits in the box. The markup looks perfect as text. A human notices the overflow thirty minutes before going on stage.
 
-`slides/` のファイル名は id のみで、連番を持たない。順序を持つファイルは `script.md` ひとつ。スライド内で要素が現れる順序も同じで、HTML は `script.md` のビートを id で指すだけだ。番号は「その枚の k 番目」の省略形に過ぎない。
+dek renders the slide and reports what it sees as machine-readable diagnostics: overflow, contrast, missing images. The agent writes, checks, reads the result, and fixes its own mistake. The loop closes without a human in it.
 
-### 2. スライドは `<section class="slide">` ひとつ
+## Three principles
 
-各 `slides/*.html` のルートは `<section class="slide">`。見た目は `theme.css`、殻と結合はレンダラ。AI に渡す編集対象は 40 行のフラグメントで、文脈はファイルひとつで足りる。`lang` は `script.md` の frontmatter（既定 `ja`）。
+Everything in dek follows from three rules. Each one is enforced by structure or by lint, not by documentation.
 
-同じ性質をデッキ全体にも広げる。自己完結な単位はファイルではなくデッキディレクトリだ。デッキは外を参照しない。`theme.css` も画像もその中にあり、ディレクトリごとコピーしても、zip で誰かに送っても、5 年後に開いても同じように描画される。プロジェクトはデッキを置く場所であって、デッキが依存する実行環境ではない。
+### 1. `script.md` is the single source of truth
 
-### 3. 規約は lint で担保する
+Order, spoken words, and timing live in `script.md` and nowhere else. Slide HTML files belong to sections of that script. Because the relationship is structural, one side cannot drift from the other.
 
-「使える CSS クラスはこれだけ」「トークン以外の生値は書かない」「デッキの外を参照しない」といった規約は、ドキュメントに書くだけでは守られない。すべて lint ルールとして実装し、SARIF で出力する。
+This is why slide files carry no sequence numbers. The only file that knows the order is the script. The same rule applies inside a slide: elements appear in the order of the script's beats, and HTML refers to those beats by id. A number in `data-step` is shorthand for "the k-th beat of this slide", nothing more.
 
-lint が通ることが完成の定義だ。開発サーバは保存のたびに lint を走らせるので、普通に作業していれば常に通っている。`voice/` の無いデッキではこの定義は変わらない。声の診断は `voice/` があるデッキだけに足される。
+### 2. A slide is one `<section class="slide">`
 
-声と動画は台本の派生物だ。`script.md` は見た目も声も知らない。
+Every file in `slides/` has a single root: `<section class="slide">`. Appearance comes from `theme.css`; the document shell and the player come from the renderer. What you hand to an agent is a forty-line fragment, and that one file is all the context it needs.
 
-## 他のツールとの違い
+The same property scales up to the deck directory. A deck never references anything outside itself. Its theme, its images, its voice settings all live inside. Copy the directory, zip it, open it five years later, and it renders the same way. The project is where decks live, not a runtime they depend on.
 
-| | PowerPoint / Keynote | Marp | Slidev | dek |
+### 3. Conventions are enforced by lint
+
+"Only use these CSS classes." "No raw values outside tokens." "Never reference a file outside the deck." Rules like these are not kept by writing them down. dek implements every one as a lint rule and reports them as SARIF.
+
+**Passing lint is the definition of done.** The dev server lints on every save, so a deck you are working on is always either passing or telling you exactly why not. A deck without voice has the same definition of done as one with it. Voice adds diagnostics; it never changes what "finished" means.
+
+Voice and video are derived from the script. The script itself knows nothing about how it looks or sounds.
+
+## How dek compares
+
+|  | PowerPoint / Keynote | Marp | Slidev | dek |
 | --- | --- | --- | --- | --- |
-| 作成順序 | スライド先行 | スライド先行 | スライド先行 | 台本先行 |
-| プロジェクトの単位 | 1 ファイル = 1 デッキ | 1 ファイル = 1 デッキ | 1 リポジトリ = 1 デッキ | 1 プロジェクト = N デッキ |
-| スライドの実体 | バイナリ | Markdown | 単一 `slides.md` | 1 スライド = 1 HTML |
-| トークスクリプト | ノート（子） | 弱い | HTML コメント（子） | `script.md`（親） |
-| 段階表示 | アニメーション | 断片的 | `v-click`（スライド側が順序） | `###` ビート（台本側が順序） |
-| 尺 | なし | なし | なし | `duration` + 字数 +（任意）TTS 実尺 |
-| 動き | 独自 | CSS | Vue + 独自 DSL | CSS + View Transitions |
-| エージェント | 弱い | テキスト | MCP サーバ | CLI + `AGENTS.md` |
-| 想定用途 | 一般 | 単純な Markdown スライド | 動くデモを含む技術トーク | 喋りが主役のトーク |
+| Authoring order | Slides first | Slides first | Slides first | Script first |
+| Unit of work | One file, one deck | One file, one deck | One repo, one deck | One project, many decks |
+| Slide source | Binary | Markdown | One `slides.md` | One HTML file per slide |
+| Speaker script | Notes (child) | Weak | HTML comments (child) | `script.md` (parent) |
+| Progressive reveal | Animations | Partial | `v-click` (slide owns order) | `###` beats (script owns order) |
+| Timing | None | None | None | `duration` + word count + optional TTS length |
+| Motion | Proprietary | CSS | Vue + custom DSL | CSS + View Transitions |
+| Agent interface | Weak | Text | MCP server | CLI + `AGENTS.md` |
+| Best for | General use | Simple Markdown decks | Technical talks with live demos | Talks where the speaking matters most |
 
-Slidev は同じ領域の最も成熟した実装であり、プレゼンター同期、Playwright のオプショナル化、CSS のスコープ規約はいずれも Slidev の解法を踏襲している。決定的に違うのはファイル分割、台本の位置づけ、そして単位だ。
+Slidev is the most mature tool in this space, and dek borrows from it freely: presenter sync, optional Playwright, scoped CSS conventions. The decisive differences are file granularity, where the script sits in the hierarchy, and what counts as the unit of work.
 
-Vue / UnoCSS / Monaco / Mermaid を抱えないぶん、lint も build も単純になる。素の HTML/CSS で完結することを強みとして維持する。
+dek carries no Vue, UnoCSS, Monaco, or Mermaid. That keeps lint and build simple, and it keeps plain HTML and CSS as a strength rather than a limitation.
 
-## 向いていないこと
+## What dek is not for
 
-次が必要なら Slidev を使う。
+Use Slidev if you need any of the following.
 
-- スライド内のインタラクション（クリックで動くデモ、スライド内 JS）
-- ライブコーディング、埋め込みエディタ
-- テーマの npm ギャラリー
-- CSS の外に出るアニメーション DSL
-- PPTX / Keynote エクスポート、WYSIWYG
+- Interactive slides: clickable demos, JavaScript inside a slide
+- Live coding or an embedded editor
+- A gallery of npm themes
+- An animation DSL beyond what CSS provides
+- PPTX or Keynote export, or a WYSIWYG editor
 
-dek は喋りが主役のトークのために、自分で保守できるサイズを保つ。詳細は [FAQ](./faq) を読む。
+dek stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
 
-## 次
+## Next
 
-[はじめる](./getting-started) で、骨格のまま喋れるところまで行く。
+[Getting Started](./getting-started) takes you from install to a deck you can present with the bundled theme, without writing any HTML.

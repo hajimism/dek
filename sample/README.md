@@ -1,44 +1,46 @@
 # dek sample
 
-dek 自身を題材にした約 8 分のデッキです。`script.md` を開くと、順序と喋りと尺が全部そこにあります。Playwright・rumdl・voice まで入れたトークプロジェクトの形です。
+An eight-minute deck about dek itself. Open `script.md` and you will find the order, the spoken words, and the timing all in one place. The project is set up the way a real talk project would be, with Playwright, rumdl, and voice included.
 
-## セットアップ
+[日本語](./README.ja.md)
 
-リポジトリを clone したうえで:
+## Setup
+
+After cloning the repository:
 
 ```bash
 cd sample
 bun install
-bun run setup          # Playwright の Chromium
+bun run setup          # Chromium for Playwright
 ```
 
-任意のシステム依存。未検出ならそのコマンドだけが次の一手付きで失敗します。CLI 全体は起動できます。
+Two system dependencies are optional. When one is missing, only the command that needs it fails, with the install step in its hint. The rest of the CLI runs.
 
-- `video` の結合 — [ffmpeg](https://ffmpeg.org/)（`brew install ffmpeg`）
-- `voice` / `rehearse` / `video` — [VOICEVOX](https://voicevox.hiroshiba.jp/) 互換エンジンを `127.0.0.1:50021` で起動
+- Muxing video: [ffmpeg](https://ffmpeg.org/) (`brew install ffmpeg`)
+- `voice`, `rehearse`, `video`: a [VOICEVOX](https://voicevox.hiroshiba.jp/)-compatible engine listening on `127.0.0.1:50021`
 
-## 日常
+## Day to day
 
 ```bash
-bun run dev            # 開発サーバ。保存のたびに描画と lint
-bun run lint:visual    # はみ出し・コントラスト（Playwright）
-bun run build          # 各 decks/<deck>/dist/<deck>.html
+bun run dev            # dev server: render and lint on every save
+bun run lint:visual    # overflow and contrast (Playwright)
+bun run build          # decks/<deck>/dist/<deck>.html for each deck
 ```
 
-スクリプトはデッキを固定しない。プロジェクト直下は全デッキ、デッキの中ならそのデッキ。1 つに絞るなら `bun run build -- why-dek` か `cd decks/why-dek`。`shot` / `cues` / `voice` / `rehearse` / `video` はデッキが要るので、直下なら `-- why-dek`。
+The scripts do not pin a deck. From the project root they apply to every deck; from inside a deck, to that deck. To target one deck from the root, pass its name: `bun run build -- why-dek`, or `cd decks/why-dek`. `shot`, `cues`, `voice`, `rehearse`, and `video` need a single deck, so from the root pass `-- why-dek`.
 
-| script | コマンド |
+| Script | Command |
 | --- | --- |
 | `bun run lint` | `dek lint` |
-| `bun run shot` | スクリーンショット |
+| `bun run shot` | Screenshots |
 | `bun run pdf` | PDF |
-| `bun run cues` | 喋りの Cue[]（エンジン不要） |
-| `bun run voice` | 差分合成（VOICEVOX） |
-| `bun run rehearse` | Timeline に沿って自走 |
-| `bun run video` | `decks/<deck>/dist/<deck>.mp4`（Playwright + ffmpeg + 声） |
+| `bun run cues` | Spoken cues as `Cue[]`, no engine needed |
+| `bun run voice` | Synthesize changed sentences (VOICEVOX) |
+| `bun run rehearse` | Auto-advance from the Timeline |
+| `bun run video` | `decks/<deck>/dist/<deck>.mp4` (Playwright + ffmpeg + voice) |
 
-## 構成
+## Layout
 
-`dek` は `file:..` でこのリポジトリ自身を指します。Playwright と rumdl は sample の `devDependencies` です。
+`dek` resolves to `file:..`, this repository itself. Playwright and rumdl are `devDependencies` of the sample.
 
-`dek.toml` の `[voice]` は `dek new` が新しいデッキへコピーする既定です。why-dek の実体は `decks/why-dek/voice/`（`voice.toml` と ASCII 語の `dict.toml`）。エンジンが止まっていても開発サーバは落ちません。合成だけが失敗します。
+The `[voice]` table in `dek.toml` is the default that `dek new` copies into new decks. The why-dek deck's actual settings live in `decks/why-dek/voice/`: `voice.toml`, and a `dict.toml` with readings for ASCII words. When the engine is down the dev server keeps running; only synthesis fails.

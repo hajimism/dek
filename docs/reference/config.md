@@ -1,13 +1,14 @@
-# 設定
+# Configuration
 
-設定ファイルは 2 つ。プロジェクトの `dek.toml` と、デッキの `script.md` frontmatter。
+There are three places to configure dek: the project's `dek.toml`, the frontmatter of each deck's `script.md`, and the optional `voice/` files inside a deck.
 
-## ディレクトリ
+## Directory layout
 
 ```
 my-talks/
 ├── dek.toml
 ├── .gitignore
+├── .rumdl.toml
 ├── theme.css
 ├── AGENTS.md
 ├── assets/
@@ -15,7 +16,7 @@ my-talks/
 │   └── 2026-04-vite/
 │       ├── script.md
 │       ├── theme.css
-│       ├── voice/                 # 任意
+│       ├── voice/                 # optional
 │       │   ├── voice.toml
 │       │   ├── dict.toml
 │       │   └── pin/
@@ -23,6 +24,7 @@ my-talks/
 │       ├── assets/
 │       ├── dist/
 │       │   ├── 2026-04-vite.html
+│       │   ├── 2026-04-vite.pdf
 │       │   ├── 2026-04-vite.mp4
 │       │   ├── 2026-04-vite.vtt
 │       │   ├── 2026-04-vite.chapters.txt
@@ -32,10 +34,11 @@ my-talks/
 │           ├── video/
 │           └── shots/
 └── .dek/
-    └── schema.json
+    ├── schema.json
+    └── server.json                # while the dev server runs
 ```
 
-単位の説明は [プロジェクト構造](/guide/structure)。
+The boundary between project and deck is explained in [Projects and Decks](/guide/structure).
 
 ## `dek.toml`
 
@@ -46,71 +49,103 @@ cjk_per_minute = 300
 latin_per_minute = 130
 
 [voice]
-engine = "http://127.0.0.1:50021"
-speaker = "1"
+engine = "voicevox"
+speaker = "ずんだもん/ノーマル"
 speed = 1.0
 ```
 
-| キー | 既定 | 役割 |
+| Key | Default | Purpose |
 | --- | --- | --- |
-| `max_classes` | `40` | DEK013 の上限 |
-| `cjk_per_minute` | `300` | 尺の見積もり |
-| `latin_per_minute` | `130` | 尺の見積もり |
-| `voice.engine` | （任意） | VOICEVOX 互換エンドポイント |
-| `voice.speaker` | （`[voice]` があるとき必須） | 話者 |
-| `voice.speed` | （任意） | 速度 |
+| `max_classes` | `40` | Upper bound for `DEK013` |
+| `cjk_per_minute` | `300` | Speaking rate for CJK text, in characters |
+| `latin_per_minute` | `130` | Speaking rate for other text, in words |
+| `voice.engine` | `"voicevox"` | Engine name (`voicevox`, `aivis`, `coeiroink`, `sharevox`) or a base URL |
+| `voice.speaker` | required when `[voice]` is present | Speaker, as `name/style` |
+| `voice.speed` | `1.0` | Speaking speed |
 
-`[voice]` があるとき、`dek new` は `voice/voice.toml` をデッキへコピーする。
+Unknown keys are ignored. When `[voice]` is present, `dek new` copies it into the new deck as `voice/voice.toml`.
 
-## frontmatter
+## Frontmatter
 
-Zod で定義し、`.dek/schema.json` を `sync` のたびに書き出す。frontmatter 冒頭の `$schema` コメントで yaml-language-server に食わせる。
+The schema is defined with Zod and written to `.dek/schema.json` on every sync. The `$schema` comment on the first line lets yaml-language-server validate as you type.
 
 ```yaml
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
-title: HTML スライドツールを作った話
+title: How I Built an HTML Slide Tool
 event: Tokyo Frontend Meetup #42
 date: 2026-04-18
 duration: 20m
 ratio: 16:9
+lang: en
 ---
 ```
 
-| キー | 必須 | 値 |
+| Key | Required | Value |
 | --- | --- | --- |
-| `title` | はい | 文字列 |
-| `event` | いいえ | 文字列。`dek ls` とタイトルスライド |
-| `date` | いいえ | `YYYY-MM-DD` |
-| `duration` | いいえ | `\d+m`。トークの予算 |
-| `ratio` | いいえ | `16:9`（既定）または `4:3` |
-| `lang` | いいえ | BCP 47。既定 `ja`。player / shot / pdf の `<html lang>` |
+| `title` | yes | String. Used as the heading of the first skeleton slide |
+| `event` | no | String. Shown by `dek ls` and available to the title slide |
+| `date` | no | `YYYY-MM-DD` |
+| `duration` | no | `<n>m`, such as `20m`. The talk's budget |
+| `ratio` | no | `16:9` (default, 1280 × 720) or `4:3` (1024 × 768) |
+| `lang` | no | BCP 47 tag. Default `ja`. Becomes `<html lang>` in the player, screenshots, and PDF |
 
-セクション id は `[a-z0-9-]+` かつ英字を 1 つ含む。数字だけは `data-step` の番号と衝突する。
+Section and beat ids match `[a-z0-9-]+` and contain at least one letter. Digits-only ids would collide with numeric `data-step` values.
 
-## 既定トークン
+## `voice/voice.toml`
 
-`.slide` 上のカスタムプロパティ。`:root` には置かない。
+```toml
+engine  = "voicevox"
+speaker = "ずんだもん/ノーマル"
+speed   = 1
+pause   = { sentence = 350, beat = 700 }
+```
 
-| トークン | 役割 |
+| Key | Purpose |
 | --- | --- |
-| `--fg` `--bg` `--accent` `--muted` | 色 |
-| `--font-title` `--font-body` | 書体 |
-| `--size-title` `--size-body` `--size-caption` | 字サイズ |
-| `--gap` `--pad` | 余白 |
-| `--radius` | 角丸 |
-| `--step-transition` | モーション |
+| `engine` | Engine name or base URL. `DEK_VOICE_URL` overrides it |
+| `speaker` | `name/style`. `dek voice speakers` lists what the engine offers |
+| `speed` | Speaking speed |
+| `pause.sentence` | Silence between sentences, in milliseconds |
+| `pause.beat` | Silence at a beat boundary, in milliseconds |
 
-## 既定レイアウト
+## `voice/dict.toml`
 
-`data-layout` の値。既定テーマが持つ。
+Readings for words the engine would otherwise mispronounce. Keys are matched as whole ASCII words, longest first.
 
-| 値 | 用途 |
+```toml
+[dek]
+kana = "デック"
+
+["script.md"]
+kana = "スクリプトエムディー"
+```
+
+`dek voice dict add WORD KANA` appends an entry. A word not in the dictionary is `DEK040`.
+
+## Theme tokens
+
+Custom properties every theme publishes on `.slide`. Never on `:root`.
+
+| Token | Role |
 | --- | --- |
-| `title` | ビートの無いタイトル |
-| `default` | ビート付きの既定。上詰めなので、ビートで要素が増えてもタイトルが動かない |
-| `two-col` | 2 カラム |
-| `full-bleed` | 全面 |
-| `quote` | 引用 |
+| `--fg` `--bg` `--accent` `--muted` | Color |
+| `--font-title` `--font-body` | Type |
+| `--size-title` `--size-body` `--size-caption` | Size |
+| `--gap` `--pad` | Space |
+| `--radius` | Corners |
+| `--step-transition` | Motion |
 
-骨格 HTML は、ビートがなければ `title`、あれば `default`。
+## Bundled layouts
+
+Values of `data-layout` in the bundled theme.
+
+| Value | Use |
+| --- | --- |
+| `title` | A title with no beats |
+| `default` | The default for slides with beats. Top-aligned, so the heading stays put as elements appear |
+| `two-col` | Two columns |
+| `full-bleed` | Edge to edge, no padding |
+| `quote` | A quotation |
+
+Skeletons use `title` for a section without beats and `default` otherwise.

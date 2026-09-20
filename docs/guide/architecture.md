@@ -1,6 +1,6 @@
-# アーキテクチャ
+# Architecture
 
-core を独立モジュールとして切り出すのが要点。CLI と開発サーバが同じパーサ、同じルールセット、同じプロジェクト解決を共有する。パーサが 2 箇所にあると必ず挙動がズレる。
+The design decision that matters most is that **core** is a standalone module. The CLI and the dev server share one parser, one rule set, and one project resolver. Two parsers would drift.
 
 ```
                  ┌─────────────────┐
@@ -12,27 +12,29 @@ core を独立モジュールとして切り出すのが要点。CLI と開発�
              ┌────┴────┐    ┌─────┴─────┐
              │   CLI   │    │ dev server│
              └────┬────┘    └─────┬─────┘
-                  └──── HTTP ─────┘   goto / current / check
+                  └──── HTTP ─────┘   goto / current
 ```
 
-CLI は開発サーバが立っていればそれに HTTP で問い合わせ、立っていなければ自分で core を呼ぶ。`goto` と `current` のようにブラウザの状態を扱うコマンドだけが、開発サーバを必須とする。
+The CLI works on files directly. Only the two commands that need to know or change what a browser is showing, `goto` and `current`, talk to a running dev server over HTTP, and they fail with a hint when none is running.
 
-## 声と動画
+## Voice and video
 
-声と動画は同じ core の上に、別ドライバとして載る。core は Cue / Timeline / schedule だけを知り、エンジンと ffmpeg と CDP はアダプタ。
+Voice and video sit on the same core as separate drivers. Core knows about Cues, Timelines, and schedules; the speech engine, ffmpeg, and the browser are adapters.
 
 ```
 script.md → Deck → Cue → Synth → Timeline → schedule
-                                      ├→ RehearseDriver → Player.go()
-                                      └→ VideoDriver    → Player.go() + frames → Mux
+                                      ├→ RehearseDriver → player.go()
+                                      └→ VideoDriver    → player.go() + frames → mux
 ```
 
-録画は仮想時間を試み、View Transitions が従わなければアニメーション区間だけ実時間で撮る。1x 壁時計録画は採用していない。トーク尺ぶん待たない。
+Video capture does not replay the talk at wall-clock speed. The worker starts each `go`, pauses the Web Animations, and screenshots at `currentTime` stops from `frameStops`. One hold frame covers the rest of the beat, so rendering time follows the amount of motion rather than the length of the talk.
 
-## 任意依存
+## Optional dependencies
 
-Playwright / ffmpeg / VOICEVOX は任意。未検出ならそのコマンドだけが次の一手付きで失敗する。CLI 全体はいかなる場合も起動できる。
+Playwright, ffmpeg, and the speech engine are optional. When one is missing, only the command that needs it fails, and its hint says what to install. The CLI itself always starts.
 
-Playwright は Bun の部分的な Node 互換性の影響を受ける。`--visual` / `shot` / `pdf` / `video` は Playwright を別プロセスで起動し、依存はオプショナルかつ動的 import とする。
+Playwright runs in a separate worker process, resolved from `node_modules` at run time, because Bun's Node compatibility is partial. `DEK_PLAYWRIGHT` can point at an alternative worker, which is also how the tests run without a browser. rumdl is found on `PATH`, in `node_modules/.bin`, or at `DEK_RUMDL`.
 
-エージェントとの接点は CLI。[AI と作る](./ai) を読む。コマンドの一覧は [CLI](/reference/cli) を見る。
+## Where agents plug in
+
+At the CLI. Every result command takes `--json`, diagnostics are SARIF, and `dek help --agent` is the compact reference. See [Working with AI Agents](./ai) and the [CLI reference](/reference/cli).

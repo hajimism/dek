@@ -2,37 +2,36 @@
 layout: home
 hero:
   name: dek
-  text: 台本から組み立てる HTML スライド
-  tagline: Talk-script-first HTML slides.
+  text: Talk-script-first HTML slides
+  tagline: Write what you will say. The slides follow.
   actions:
     - theme: brand
-      text: はじめる
+      text: Get Started
       link: /guide/getting-started
     - theme: alt
-      text: なぜ dek か
+      text: Why dek
       link: /guide/why
     - theme: alt
       text: GitHub
       link: https://github.com/hajimism/dek
 features:
-  - title: 台本が親
-    details: 順序と尺と喋りは script.md だけが持つ。スライドはそこから生える。箱を先に置くと、立派だが喋れない資料になる。
-  - title: 1 枚 1 HTML
-    details: 1 枚は section フラグメントひとつ。編集対象は 40 行。壊れてもその 1 枚で済む。
-  - title: lint が完成
-    details: 使えるクラス、自己完結、はみ出し、コントラスト。規約はドキュメントではなくルール。通ることが完成の定義。
-  - title: USB 1 ファイル
-    details: dek build が会場 HTML を 1 つに固める。サーバもネットワークも要らない。スマホが要るときだけ --remote。
+  - title: The script is the parent
+    details: Order, timing, and every spoken word live in one Markdown file. Slides hang off its headings. Put the boxes first and you get a polished deck you cannot deliver.
+  - title: One slide, one HTML file
+    details: Each slide is a single &lt;section class="slide"&gt; fragment, about forty lines. Small enough to read in a diff, small enough for an agent to edit without breaking anything else.
+  - title: Lint is the definition of done
+    details: Allowed classes, self-containment, overflow, contrast. Conventions are rules, not prose. When lint passes, the deck is finished.
+  - title: One file on a USB stick
+    details: dek build folds the whole talk into a single HTML file. No server, no network. Reach for the dev server only when you want your phone as a remote.
 ---
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite
-cd my-talks
-bun add github:hajimism/dek
+cd my-talks && bun add github:hajimism/dek
 cd decks/2026-04-vite
-$EDITOR script.md
-bunx dek
-bunx dek build
+$EDITOR script.md   # write what you will say
+bunx dek            # dev server: skeleton slides, live reload, lint on save
+bunx dek build      # dist/2026-04-vite.html — the whole talk in one file
 ```
 
-HTML はまだ書かない。[はじめる](/guide/getting-started) で骨格のまま喋れるところまで行く。
+You have not written a line of HTML yet, and you can already give the talk. Start with the [Getting Started](/guide/getting-started) guide, or read the [Tutorial](/guide/tutorial) to build a real deck from script to single-file build.

@@ -1,33 +1,33 @@
-# ビート
+# Beats
 
-目標: 台本のビートを画面の段階表示に結びつける。順序は台本、見た目は CSS。
+A beat is a `###` heading in the script. On screen, a beat is the moment an element appears. This page covers the HTML side of that link, the transition between slides, and how to carry an element from one slide to the next. The order always comes from the script; the appearance always comes from CSS.
 
 ## `data-step`
 
-`data-step` はビートの id を指す。値が正の整数のときだけ「その枚の k 番目」の省略形。ランタイムがやるのは、現在のビートまでに当たる要素へ `is-shown` を付けることだけ。どう現れるかは `theme.css` が決める。
+`data-step` names the beat an element belongs to. Its value is a beat id, or a positive integer meaning "the k-th beat of this slide". The runtime does one thing: when you reach a beat, it adds `is-shown` to every element bound to that beat or an earlier one. The theme decides what shown and hidden look like.
 
 ```html
 <div class="col" data-step="slides-hang">…</div>
 <div class="col" data-step="2">…</div>
 ```
 
-途中に `###` を足すと番号はすべてズレる。id で指していれば、足したビートに要素を付けるまで既存の HTML は壊れない。番号と id が同じ枚に混ざっても、整数は番号・それ以外は id、と一意に解ける。
+Prefer ids. Inserting a `###` in the middle of a section shifts every number, but an id keeps pointing at the same beat, so existing HTML survives until you choose to bind something to the new beat. Numbers and ids can be mixed on one slide without ambiguity: an integer is a position, anything else is an id.
 
 ```css
 /* theme.css */
-.slide [data-step] { opacity: 0; transform: translateY(0.5em); transition: var(--step-transition); }
-.slide [data-step].is-shown { opacity: 1; transform: none; }
+.slide.is-current [data-step] { opacity: 0; transform: translateY(0.5em); transition: var(--step-transition); }
+.slide.is-current [data-step].is-shown { opacity: 1; transform: none; }
 ```
 
-フェードでもスライドインでも、テーマを書く人の判断。アニメーションの記法は CSS そのもので、dek が語彙を足すことはない。
+Fade, slide in, or anything else CSS can express: the choice belongs to whoever writes the theme. dek adds no vocabulary of its own.
 
-既定テーマは `opacity` と `transform` で隠す。`display: none` を使わないのは、レイアウトがステップによって動かないようにするため。これで `lint --visual` のはみ出し判定がどのステップでも同じ結果になる。
+The bundled theme hides elements with `opacity` and `transform` rather than `display: none`, so the layout is identical at every beat. That is what lets `lint --visual` give the same overflow verdict no matter which beat it measures.
 
-ビートに要素が無いのは構わない。喋りだけの区切りとして使える。番号が 1 から連続している必要もない。解決できない参照だけが [DEK003](/reference/lint#dek003) になる。
+A beat with no bound element is fine; it is a pause in the speaking. Numbers need not be consecutive. The only error is a `data-step` that resolves to nothing, reported as [DEK003](/reference/lint#dek003).
 
 ## View Transitions
 
-スライド間の遷移はブラウザ標準の View Transitions API を使う。ランタイムは `document.startViewTransition()` を呼ぶだけで、動きはテーマが書く。
+Moving between slides uses the browser's View Transitions API. The runtime calls `document.startViewTransition()`; the theme writes the animation.
 
 ```css
 /* theme.css */
@@ -37,7 +37,7 @@
 
 ## `data-morph`
 
-要素を次の枚へ連れていく。
+To carry an element into the next slide, give it the same `data-morph` name on both slides.
 
 ```html
 <!-- problem.html -->
@@ -47,20 +47,20 @@
 <img class="figure figure-small" data-morph="pipeline" src="assets/pipeline.svg">
 ```
 
-ランタイムが `data-morph` を `view-transition-name` に変換し、ブラウザが 2 枚の間で位置とサイズを補間する。図が右上に小さく退いて次の話が始まる、という表現が属性 1 つで書け、スライドは `<section class="slide">` フラグメントのまま。
+The runtime turns `data-morph` into a `view-transition-name`, and the browser interpolates position and size between the two slides. A figure that shrinks into the corner as the next topic begins is one attribute, and both slides remain plain `<section class="slide">` fragments.
 
-同一スライド内で `data-morph` の名前が重複すると [DEK005](/reference/lint#dek005)。
+Two elements with the same `data-morph` on one slide is [DEK005](/reference/lint#dek005).
 
-補間の途中は静止画では見えない。採否を目で決めるときは、遷移を途中で止めて撮る。
+A morph is invisible in a still image. To judge one, freeze the transition part-way and look:
 
 ```bash
 dek shot problem --to architecture --at 0.5
 ```
 
-`problem` の最終ビートから `architecture` の先頭へ移る View Transition を 50% で止めた 1 フレームが `.cache/shots/` に書かれる。`--at 0` と `--at 1` で両端も撮れる。動画と同じプレイヤー文書で撮るので、`dek video` に写るものと一致する。
+This writes one frame of the transition from the last beat of `problem` into `architecture`, stopped at 50%, to `.cache/shots/problem-to-architecture-0.5.<hash>.png`. Use `--at 0` and `--at 1` for the endpoints. The frame comes from the same player document that `dek video` records, so what you see is what the video shows.
 
-既定テーマは `prefers-reduced-motion` を尊重し、指定があればすべての動きを省く。
+The bundled theme honors `prefers-reduced-motion` and drops every animation when it is set.
 
-## 次
+## Next
 
-色と字と余白をテーマで決める → [テーマ](./theme)
+Colors, type, and spacing in one file: [Themes](./theme).

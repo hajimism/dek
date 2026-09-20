@@ -1,31 +1,33 @@
-# テーマ
+# Themes
 
-目標: デッキの見た目を `theme.css` だけで差し替える。
+`theme.css` is the only file that decides how a deck looks. Slides supply structure and class names; the theme supplies everything visible. This page covers the token contract, how to grow a theme's vocabulary, and why each deck owns a copy.
 
-クラス語彙が HTML の契約なら、カスタムプロパティは見た目の差し替え面。既定テーマは次の 13 個を `.slide` で公開する。`:root` には置かない。プレゼンター UI へ漏れないようにするためで、トップレベルセレクタを禁じる DEK012 と同じ理由。
+## Thirteen tokens
 
-| トークン | 役割 |
+If class names are the contract between HTML and theme, custom properties are the surface where appearance is swapped. Every theme publishes these thirteen tokens on `.slide`. They live on `.slide`, not `:root`, so they never leak into the presenter chrome. That is the same reason top-level selectors are forbidden (`DEK012`).
+
+| Token | Role |
 | --- | --- |
-| `--fg` `--bg` `--accent` `--muted` | 色 |
-| `--font-title` `--font-body` | 書体 |
-| `--size-title` `--size-body` `--size-caption` | 字サイズ |
-| `--gap` `--pad` | 余白 |
-| `--radius` | 角丸 |
-| `--step-transition` | モーション |
+| `--fg` `--bg` `--accent` `--muted` | Color |
+| `--font-title` `--font-body` | Type |
+| `--size-title` `--size-body` `--size-caption` | Size |
+| `--gap` `--pad` | Space |
+| `--radius` | Corners |
+| `--step-transition` | Motion |
 
-生の色・`font-family`・絶対単位は、`--*` への代入だけに書く。それ以外は `var()` と `calc(var() …)`。13 個が `.slide { }` に無いと DEK015。デッキ固有の `--*` を足すのは構わない。
+Raw colors, `font-family` values, and absolute units may appear only when assigning a `--*` property. Everywhere else, use `var()` or `calc(var() …)`. Unitless `0`, `thin`, and `em` are allowed. A `var()` with a raw fallback, such as `var(--fg, #fff)`, counts as a raw value. A missing token is `DEK015`; a raw value outside a token is `DEK014`. You may add as many deck-specific tokens as you like.
 
-テーマのセレクタは必ず `.slide` 配下にスコープする。トップレベルセレクタはプレゼンター UI を汚染する。
+Every selector must sit under `.slide`. `::view-transition-*` pseudo-elements and at-rules such as `@keyframes` and `@media` are the only exceptions.
 
-## 語彙を増やす
+## Growing the vocabulary
 
-未定義クラスは DEK010。このルールは `theme.css` にクラスを足せば回避できる。意図的だ。語彙を増やすのは設計判断であって、lint が禁じるべきものではない。lint が担うのは、それを一手の摩擦と、レビュー可能な差分として可視化することだけ。DEK013 は、その一手が無限に繰り返されないための上限（既定 40）。
+A class the theme does not define is `DEK010`. You clear it by adding the class to `theme.css`. That is intentional: extending the vocabulary is a design decision, and lint should not forbid it. Lint's job is to make the decision cost one deliberate step and to leave a reviewable diff. `DEK013` caps the total class count (40 by default) so that step is not repeated forever.
 
-クラスが増えるのはデッキの `theme.css` の中だけなので、他のデッキには波及しない。気に入った語彙だけを、あとから `cp` でプロジェクトの `theme.css` に引き上げる。
+New classes land in the deck's own `theme.css`, so no other deck is affected. When a class earns its place, lift it into the project theme with `cp`.
 
-## コピーして固定する
+## Copy, then freeze
 
-プロジェクト直下の `theme.css` は新しいデッキの出発点。編集の向きは常に一方向。
+The project's `theme.css` is the starting point for new decks. Edits flow in one direction: down into a new deck on creation, and back up by hand when you decide something is worth keeping.
 
 ```bash
 dek new 2026-09-dek
@@ -33,8 +35,8 @@ dek new 2026-09-dek --theme-from 2026-04-vite
 cp decks/2026-09-dek/theme.css theme.css
 ```
 
-詳細は [プロジェクト構造](./structure) を読む。
+The reasoning is in [Projects and Decks](./structure#themes-are-copied-not-shared).
 
-## 次
+## Next
 
-規約を lint で回す → [Lint](./lint)
+Turn conventions into a loop you cannot forget: [Lint](./lint).

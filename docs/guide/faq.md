@@ -1,47 +1,41 @@
 # FAQ
 
-## どう入れるか
+## How do I install it?
 
-npm には載せていない。GitHub から実行する。
+dek is not on npm. Run it from GitHub with `bunx github:hajimism/dek`, or pin it inside a project with `bun add github:hajimism/dek` and then use `bunx dek`. See [Getting Started](./getting-started).
 
-```bash
-bunx github:hajimism/dek
-```
+## When should I use Slidev instead?
 
-トーク用プロジェクトに固定するなら `bun add github:hajimism/dek`。固定したあとは `bunx dek`。手順は [はじめる](./getting-started) を見る。
+When you need live coding, Vue components inside slides, npm themes, or an embedded editor. dek is for talks where the speaking carries the weight, and it keeps plain HTML and CSS as its whole surface. The comparison is in [Why dek](./why#how-dek-compares).
 
-## Slidev を使うべきとき
+## Do I have to write HTML?
 
-ライブコーディング、スライド内の Vue コンポーネント、テーマの npm ギャラリー、埋め込みエディタが必要なら Slidev を使う。dek は喋りが主役のトーク向けで、素の HTML/CSS で完結することを強みとして維持する。比較は [なぜ dek か](./why#他のツールとの違い) を見る。
+No. Write `script.md`, run `dek`, and the skeleton slides in the bundled theme are enough to present. Write HTML when you want the screen to say more than the script does.
 
-## HTML は必須か
+## Do I have to use voice?
 
-必須ではない。`script.md` を書いて `dek` を叩けば骨格スライドが生え、同梱テーマのまま喋れる。HTML は、画面を台本以上のものにしたくなったときに書き始める。
+No. A deck without `voice/` has exactly the same definition of done: lint passes. Voice adds warnings (`DEK040`, `DEK041`, `DEK042`) only to decks that opt in.
 
-## 声は必須か
+## Why do slide files have no numbers?
 
-必須ではない。`voice/` の無いデッキでは lint 通過 = 完成の定義は変わらない。声の診断（DEK040）は `voice/` があるデッキだけに足される。
+Only one file may know the order, and that file is `script.md`. Numbered file names would force a rename on every reorder and destroy the diff. Reorder with `dek mv <slug> --before|--after <other>`.
 
-## 連番のファイル名はなぜ無いか
+## Does `sync` overwrite my HTML?
 
-順序を持つファイルは `script.md` ひとつにする。`slides/` のファイル名は id のみ。連番を付けると、並べ替えのたびにリネームが走り、差分が壊れる。並べ替えは `dek mv <slug> --before|--after <slug>`。
+Never. It creates skeletons for missing slides and flags orphans. It does not rename either. Renaming is `dek mv`.
 
-## `sync` は HTML を上書きするか
+## What does an agent call?
 
-しない。足りないものを骨格として作り、余ったものを警告するだけ。リネームもしない。改名は `dek mv`。
+The same CLI as a human: `dek help --agent`, `dek check <slug> --shot`, `dek lint --format sarif`. There is no MCP server. See [Working with AI Agents](./ai).
 
-## エージェントは何を叩くか
+## Can I present without the dev server?
 
-人間と同じ CLI。`dek help --agent`、`dek check <slug> --shot`、`dek lint --format sarif`。MCP サーバは持たない。[AI と作る](./ai) を読む。
+Yes. `dek build` produces one HTML file. Put it on a USB stick. Press `p` or open it with `?presenter`, and a second window follows the first through `BroadcastChannel`. Use `dek --remote` only when another device needs to drive the deck.
 
-## 開発サーバなしで発表できるか
+## Are Playwright, ffmpeg, and VOICEVOX required?
 
-できる。`dek build` の単一 HTML を USB に入れる。`?presenter` または `p` で手元のウィンドウが BroadcastChannel で追従する。別デバイスが要るときだけ `dek --remote`。
+No. Each is optional, and only the commands that need it fail when it is missing, always with the install step in the hint. `--visual`, `shot`, `pdf`, and `video` use Playwright; `video` also uses ffmpeg; `voice`, `rehearse`, and `video` use a VOICEVOX-compatible engine. Engine setup is in [Voice and Video](./voice#setup).
 
-## Playwright / ffmpeg / VOICEVOX は必須か
+## Where do I write pauses or silent time?
 
-任意依存。未検出ならそのコマンドだけが次の一手付きで失敗する。CLI 全体はいかなる場合も起動できる。`--visual` / `shot` / `pdf` / `video` は Playwright。`video` の結合は ffmpeg。`voice` / `rehearse` / `video` は VOICEVOX 互換エンジン。エンジンの入れ方はエラーの hint と [声と動画](./voice#合成) にある。
-
-## 待ち時間はどこに書くか
-
-書かない。本文のないビートは遷移と `pause.beat` だけ通過する。デモの間に喋ることがあるなら、それを台本の段落に書く。書けば見積もりに入る。
+Nowhere. A beat with no paragraph passes through the transition and the configured `pause.beat`, and nothing else. If you will speak during a demo, write those words in the script so they count toward the estimate.

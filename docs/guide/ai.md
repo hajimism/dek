@@ -1,62 +1,65 @@
-# AI と作る
+# Working with AI Agents
 
-目標: 人間と同じ CLI で、書いた HTML を見て聴いて直す。
+Agents use the same CLI you do. There is no MCP server and no tool schema to install. A coding agent already has a shell and a file editor; a slide is a forty-line HTML file, so the agent's own editor is the most precise and cheapest way to change it. dek adds only what an agent cannot do well on its own: seeing how the slide renders, hearing how it reads, and the fragile operations of renaming and reordering.
 
-専用の MCP もツール定義もない。コーディングエージェントはシェルとファイル編集を既に持っている。スライドは 1 枚 40 行の HTML なので、エージェント自身の編集ツールで直接書くのがいちばん正確で、いちばん安い。並べ替えと改名のように壊れやすい操作だけ `dek mv` として用意する。
+## What the agent reads
 
-## エージェントが読むもの
-
-`sync` が `AGENTS.md` を短く保つ。三原則、規約、テーマのクラス語彙とトークン、`dek help --agent` へのポインタ。数十行で収め、詳細は必要なときに CLI から引かせる。
+`dek sync` writes a short `AGENTS.md` at the project root and keeps it current: the three principles, the conventions, the class names, tokens, and layouts from the project theme, and a pointer to the CLI's own reference. It stays under a hundred lines. Anything more detailed is pulled from the CLI when needed.
 
 ```bash
 dek help --agent
 ```
 
-これで Claude Code でも Codex でも OpenCode でも、追加設定なしに dek を扱える。
+That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a dek project with no extra configuration.
 
-## CLI が守ること
+## What the CLI promises
 
-1. 結果を出すコマンドに `--json`。`dek` と `dek rehearse` は起動したままなので対象外。診断は SARIF。テキストをパースさせる出力を作らない。
-2. エラーは次の一手を言う。「`slides/intro.html` がありません。`dek sync` で生成できます」のように、そのまま実行できる文で失敗する。
-3. `dek help --agent`。全コマンドの使い方を数百トークンに圧縮する。CLI 自身が自分のリファレンス。
-4. `AGENTS.md` は短く保つ。
+1. **Every result command accepts `--json`.** Success is `{ "ok": true, ... }`; failure is `{ "ok": false, "error": { "message", "path", "hint" } }` with exit code 1. `dek` and `dek rehearse` stay running and are the only exceptions. Diagnostics are SARIF. Nothing forces an agent to parse prose.
+2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is.
+3. **`dek help --agent` is a few hundred tokens.** The CLI documents itself.
+4. **`AGENTS.md` stays short.**
 
-## 一往復で直す
+## One round trip
 
 ```bash
 dek check architecture --shot
 dek check architecture --voice
 ```
 
-`check` はその 1 枚だけを lint し（Playwright があれば描画系のルールも含む）、スクリーンショットを書き出し、SARIF と画像のパスを返す。画像のパスは描画内容のハッシュを含むので、返ってきたパスをそのまま開けば古い画像を見ることはない。`--voice` はカナと尺を `--json` で返す。HTML を書き、`check` を叩き、返ってきた画像と読みを自分で見て直す。書いた → 見た → 聴いた → 直した、が一往復で閉じる。
+`check` lints one slide, including the rendering rules when Playwright is available, writes a screenshot, and returns the diagnostics and the image path. The path contains a hash of the rendered content, so an agent that opens the returned path never sees a stale image. `--voice` returns the kana reading and duration for each sentence. Write the HTML, run `check`, look at the picture, read the pronunciation, fix. Write, see, hear, fix: one loop, closed.
 
-幾何で確定判定できるものは lint ルールにする。はみ出しもコントラストも、Playwright で測れば真偽が決まる。スクリーンショットを見せて「はみ出ていますか」と尋ねるより精度が高い。
+Anything geometry can decide is a lint rule. Overflow and contrast have definite answers once a browser measures them, and a measured verdict is more reliable than showing an agent a screenshot and asking whether the text fits.
 
-## 指差しは双方向
+## Pointing goes both ways
 
 ```bash
 dek goto architecture
 dek current
 ```
 
-エージェントが編集した直後に人間の画面を該当スライドへ飛ばす。人間が「この枚、右の図を小さくして」と言えば、エージェントは `dek current` で slug を知り、聞き返さずに直せる。
+After editing a slide, the agent can jump the human's browser to it. When the human says "make the figure on this slide smaller", the agent runs `dek current`, learns the slug, and fixes it without asking which slide.
 
-## 例
-
-```
-architecture.html の右カラムを小さくして。終わったら dek check architecture --shot を叩いて、はみ出しが無いことを確認して。
-```
+## Prompts that work
 
 ```
-dek current のスライドを、台本の次のビートまで data-step で出して。
+Shrink the right column of architecture.html, then run
+dek check architecture --shot and confirm nothing overflows.
 ```
 
 ```
-script.md に ## recap {#recap} を足した。dek sync せず、開発サーバに任せて。足りない HTML だけ骨格を生やして。
+On the slide from dek current, reveal the elements beat by beat with
+data-step, following the script's ### headings.
 ```
 
 ```
-problem の図を architecture へ data-morph で連れていって。dek shot problem --to architecture --at 0.5 で途中を撮って、位置の補間が変じゃないか見て。
+I added ## recap {#recap} to script.md. Do not run dek sync;
+the dev server will generate the skeleton. Fill it in.
 ```
 
-サイトの目次をエージェントに渡すときは [`/llms.txt`](/llms.txt) を使う。
+```
+Carry the figure from problem into architecture with data-morph.
+Run dek shot problem --to architecture --at 0.5 and check the
+interpolated position looks right.
+```
+
+To hand the whole documentation site to an agent, give it [`/llms.txt`](/llms.txt).

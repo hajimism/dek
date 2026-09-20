@@ -1,59 +1,66 @@
 # CLI
 
-導入は `bunx github:hajimism/dek` と `bun add github:hajimism/dek`。[はじめる](/guide/getting-started) を見る。以降の例はコマンド名を `dek` と書く。実体は `bunx dek`、まだ固定していなければ `bunx github:hajimism/dek`。
+Install with `bunx github:hajimism/dek` and pin with `bun add github:hajimism/dek`; see [Getting Started](/guide/getting-started). The examples below write `dek` for what is really `bunx dek`, or `bunx github:hajimism/dek` before pinning.
 
-結果を出すコマンドは `--json` を受け付ける。`dek` と `dek rehearse` は起動したままなので JSON にしない。人間向けはテキスト、機械向けは JSON か SARIF。診断は `dek lint --format sarif`。
+## Conventions
 
-`init` と `sync` は既存ファイルを上書きしない。足りないものを骨格として作り、余ったものを警告するだけ。リネームもしない。
+- **Scope follows the working directory.** The project root means every deck; a deck directory means that deck. From anywhere, name a deck as the first argument or with `--deck <name>`: `dek lint why-dek`, `dek show why-dek intro`, `dek why-dek`. Details in [Projects and Decks](/guide/structure#where-you-run-a-command-decides-its-scope).
+- **Result commands accept `--json`.** Success is `{ "ok": true, ... }`. Failure is `{ "ok": false, "error": { "message", "path", "line", "hint" } }` with exit code 1. `dek` and `dek rehearse` stay running and do not take `--json`.
+- **Diagnostics are SARIF** with `dek lint --format sarif`. The default is ESLint-style text.
+- **`init` and `sync` never overwrite.** They create what is missing and warn about what is left over. Neither renames.
+- **Every error carries a hint** naming the next command to run.
+- **`--json` and `--deck` are global.**
 
-エラーは次の一手を hint に含む。エージェント向けの圧縮ヘルプは `dek help --agent`。
+## Development
 
-スコープは実行場所で決まる。詳細は [プロジェクト構造](/guide/structure#実行場所がスコープを決める)。どこからでもデッキ名、または `--deck <name>` でデッキを指定できる。`dek lint why-dek`、`dek show why-dek intro`、`dek why-dek`。
-
-## 開発
-
-| コマンド | 役割 |
+| Command | Purpose |
 | --- | --- |
-| `dek [deck]` | 開発サーバ。sync・HMR・lint・プレゼンタービューを内包 |
-| `dek --remote [--password PWD]` | LAN に公開。プレゼンターノートと goto/current はパスワード保護 |
-| `dek rehearse [slug]` | Timeline に沿って自走。動画は焼かない |
+| `dek [deck] [--visual]` | Start the dev server: sync, live reload, lint on save, presenter view. `--visual` adds overflow and contrast on save. |
+| `dek --remote [--password PWD]` | Serve on the LAN. The presenter view, `goto`, and `current` require the password; one is generated if omitted. |
+| `dek rehearse [slug]` | Auto-advance from the Timeline. Records nothing. |
 
-## プロジェクト
+## Project
 
-| コマンド | 役割 |
+| Command | Purpose |
 | --- | --- |
-| `dek init [dir] [--deck NAME]` | プロジェクトを作る（省略時はカレント）。`.gitignore` も作る |
-| `dek new <name> [--theme-from DECK]` | デッキを追加 |
-| `dek ls [deck]` | デッキ一覧、または 1 つの概要（枚数・lint・尺・セクション） |
+| `dek init [dir] [--deck NAME]` | Create a project in `dir` (default: the current directory), optionally with a first deck. Writes `dek.toml`, `theme.css`, `.gitignore`, `.rumdl.toml`, `assets/`, `decks/`, and `.dek/schema.json`. |
+| `dek new <name> [--theme-from DECK]` | Add a deck. Copies the project `theme.css`, or the named deck's. |
+| `dek ls [deck]` | List decks, or summarize one: sections, slides, diagnostics, budget, estimate, and narrated length when a Timeline exists. |
 
-## スライド
+## Slide
 
-| コマンド | 役割 |
+| Command | Purpose |
 | --- | --- |
-| `dek show <slug>` | 台本と HTML をまとめて出す |
-| `dek check <slug> [--shot] [--voice]` | 1 枚を lint。`--shot` はスクショ、`--voice` は読み |
-| `dek shot <a> --to <b> [--at 0..1]` | `a` の最終ビートから `b` へ移る View Transition を `--at`（既定 0.5）で止めた 1 フレーム。`data-morph` の補間を目で確かめる。`.cache/shots/<a>-to-<b>-<at>.<hash>.png` |
-| `dek shot [slug] [--step <id\|n>]` | スクリーンショット。既定は全要素表示の最終ステップ。ファイル名は `<slug>[-<step>].<hash>.png` で、`hash` は描画内容から決まる。テーマや HTML が変われば別パスになり、同じ枚の古い画像は消える |
-| `dek mv <old> <new>` | セクション id と HTML の改名 |
-| `dek mv <slug> --before\|--after <slug>` | 並べ替え |
-| `dek goto <slug>` | 開いているブラウザを飛ばす。開発サーバ必須 |
-| `dek current` | 今表示している枚。開発サーバ必須 |
-| `dek sync` | 足りない骨格スライドと `AGENTS.md`。上書きしない |
+| `dek show <slug>` | Print a section's script and HTML. `html` is `null` when the file is missing. |
+| `dek check <slug> [--shot] [--voice]` | Lint one slide, including rendering rules when Playwright is available. `--shot` writes a screenshot and returns its path. `--voice` returns kana and durations. |
+| `dek shot [slug] [--step <id\|n>]` | Screenshot one slide, or every slide, at the last beat by default. Files are `.cache/shots/<slug>[-<step>].<hash>.png`; the hash is of the rendered content, so a changed theme or slide yields a new path and the stale image is removed. |
+| `dek shot <a> --to <b> [--at 0..1]` | One frame of the View Transition from the last beat of `a` into `b`, frozen at `--at` (default 0.5). Written to `.cache/shots/<a>-to-<b>-<at>.<hash>.png`. Does not combine with `--step`. |
+| `dek mv <old> <new>` | Rename a section id and its HTML file. Heading text is untouched. Refuses if the destination exists. |
+| `dek mv <slug> --before\|--after <other>` | Reorder a section in `script.md`. |
+| `dek goto <slug>` | Jump the open browser. Requires a running dev server. |
+| `dek current` | Print the slide on screen. Requires a running dev server. |
+| `dek sync` | Create missing skeleton slides, refresh `AGENTS.md` and `.dek/schema.json`. Never overwrites. |
 
-## 成果物
+## Output
 
-| コマンド | 役割 |
+| Command | Purpose |
 | --- | --- |
-| `dek lint [--fix] [--visual] [--format sarif]` | 検証 |
-| `dek cues` | Deck → Cue[]。段落だけが喋り。エンジン不要 |
-| `dek voice` | 差分合成。保存時にも走る |
-| `dek voice speakers` | 話者一覧 |
-| `dek voice say TEXT` | 1 文を再生 |
-| `dek voice dict add WORD KANA` | 辞書 |
-| `dek voice pin` | TTS の master.wav + timeline.json を固定 |
-| `dek build [--root-dist]` | 単一 HTML。既定は `decks/<deck>/dist/<deck>.html`。`--root-dist` はプロジェクト直下 |
-| `dek video [slug] [--fps N] [--root-dist]` | 全体は `dist/<deck>.mp4`、1 枚は `.cache/video/` |
-| `dek pdf [--root-dist]` | PDF。出力先は build と同じ |
-| `dek help [--agent]` | ヘルプ |
+| `dek lint [--fix] [--visual] [--format sarif]` | Lint. `--fix` creates missing skeletons. `--visual` adds overflow and contrast. |
+| `dek cues` | Print the spoken cues as `Cue[]`. Paragraphs only. No engine needed. |
+| `dek voice` | Synthesize changed sentences into `.cache/voice/`. Also runs on save. |
+| `dek voice speakers` | List the engine's speakers. |
+| `dek voice say TEXT` | Speak one sentence. |
+| `dek voice dict add WORD KANA` | Add a reading to `voice/dict.toml`. |
+| `dek voice pin` | Copy the master audio and `timeline.json` into `voice/pin/`. |
+| `dek build [--root-dist]` | Write one HTML file to `decks/<deck>/dist/<deck>.html`, or `<root>/dist/<deck>.html` with `--root-dist`. |
+| `dek video [slug] [--fps N] [--root-dist]` | Bake `dist/<deck>.mp4` with `.vtt`, `.chapters.txt`, and `.credits.txt`. One slide goes to `.cache/video/<slug>.mp4`. |
+| `dek pdf [--root-dist]` | Write `dist/<deck>.pdf` with every slide at its last beat. |
+| `dek help [--agent]` | Help. `--agent` is the compact reference for agents. |
 
-フラグ `--json` と `--deck` はグローバル。デッキ名は位置引数でも渡せる。`dek build` / `dek pdf` / `dek video` は `--root-dist` でプロジェクト直下の `dist/` に書く。
+## Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `DEK_PLAYWRIGHT` | Path to an alternative Playwright worker script. |
+| `DEK_RUMDL` | Path to the rumdl binary, ahead of `PATH` and `node_modules/.bin`. |
+| `DEK_VOICE_URL` | Base URL of the speech engine, overriding `voice.toml`. |

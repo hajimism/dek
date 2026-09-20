@@ -1,28 +1,28 @@
 # dek
 
-**台本から組み立てる HTML スライド。** — *Talk-script-first HTML slides.*
+**Talk-script-first HTML slides.** Write what you will say. The slides follow.
 
-`dek` はトークスクリプトを起点にスライドを組み立てる CLI です。台本を Markdown で書き、その見出しひとつひとつが 1 枚の HTML スライドになります。テーマと規約はプロジェクトで共有し、発表のたびにデッキを足していく。AI エージェントと一緒に作ることを前提に設計されています。
+[Documentation](https://hajimism.github.io/dek/) · [日本語 README](./README.ja.md)
 
-**ドキュメント:** [hajimism.github.io/dek](https://hajimism.github.io/dek/)
+dek is a CLI that builds a slide deck from your talk script. You write the script in Markdown, and every `##` heading becomes one HTML slide. A project holds many decks, so the theme and conventions carry forward from one talk to the next. It is designed from the start to be worked on together with AI agents.
 
-> *dek* は *deck* の異綴りです。`deck` は Kong の decK が使っているため一文字落としています。
+> *dek* is *deck* with one letter dropped; the `deck` name belongs to Kong's decK.
 
 ## Why
 
-**スライドは喋るための資料です。** ところが PowerPoint も Google Slides も Slidev も、まず箱を置き、あとから中身を考える順序で作られています。その結果、立派だが本番で喋り切れない資料ができあがる。本来の順序は逆です。何を、どの順で、どれだけの尺で喋るか → その瞬間に画面に何が出ているべきか。`dek` は `script.md` を親に据え、スライドはそこから生やします。
+**Slides exist so that you can talk.** Every mainstream tool starts with an empty box and asks you to fill it, and the deck grows more polished as the talk grows harder to deliver. dek starts from the other end: what you will say, in what order, for how long, and only then what should be on screen. The script is the parent. Slides are derived from it.
 
-**トークは一度きりではありません。** 発表のたびに新しいリポジトリを切ると、見た目も規約も毎回ゼロから積み直すことになります。`dek` はプロジェクトを一度作り、その中にデッキを溜めていきます。規約はプロジェクトのもの、見た目は前回の続きから、台本とスライドはデッキごと。過去のデッキがそのまま次の出発点になります。
+**A talk is not a one-off.** A dek project holds many decks. Conventions belong to the project, the look carries forward from your last deck, and every deck owns its script and slides.
 
-**AI と作るなら、ファイルは小さく分かれているべきです。** 3,000 行の `slides.md` の 7 枚目だけを直す、というタスクは LLM にとって不必要に難しい。1 スライド = 1 HTML なら、編集対象は 40 行のファイルがひとつ。差分が読め、壊れてもその 1 枚で済みます。
+**Agents need small files.** One slide is one HTML file of about forty lines. The edit target is small, the diff is readable, and a broken edit breaks one slide.
 
-**AI は自分が書いた HTML がどう見えるか知りません。** 文字が枠からはみ出していても、テキストとして出力された HTML は完璧に見える。人間が本番 30 分前に気づきます。`dek` は描画結果を機械可読な診断として返し、AI が自分で確認して直すループを回せるようにします。
+**Agents cannot see what they render.** dek renders each slide and reports overflow, contrast, and missing images as machine-readable diagnostics, so an agent can check and fix its own output.
 
-三原則、Slidev との違い、スコープ外は [なぜ dek か](https://hajimism.github.io/dek/guide/why.html) にあります。
+The three principles and the comparison with Slidev are in [Why dek](https://hajimism.github.io/dek/guide/why.html).
 
-## Quick Start
+## Quick start
 
-[Bun](https://bun.sh) 1.3 以上。npm には載せていません。GitHub から実行します。
+[Bun](https://bun.sh) 1.3 or later. dek is not on npm; it runs from GitHub.
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite
@@ -31,30 +31,30 @@ bun add github:hajimism/dek
 cd decks/2026-04-vite
 ```
 
-プロジェクトを作るのは最初の一度だけです。`bun add` したあとは `bunx dek` で足ります。あとは 3 手です。ライブ専用ならここで終わります。
+You create the project once. After `bun add`, `bunx dek` is enough. Three commands remain, and for a live talk that is all there is.
 
 ```bash
-$EDITOR script.md   # ① 喋ることを書く（ここに一番時間をかける）
-bunx dek            # ② 開発サーバ。見出しからスライドが生え、保存のたびに描画と lint が走る
-bunx dek build      # ③ dist/2026-04-vite.html — この 1 ファイルで発表できる
+$EDITOR script.md   # 1. write what you will say — spend your time here
+bunx dek            # 2. dev server: skeleton slides, live reload, lint on save
+bunx dek build      # 3. dist/2026-04-vite.html — the whole talk in one file
 ```
 
-`script.md` を書いて `dek` を叩けば、骨格スライドが生えて同梱テーマのまま喋れます。HTML を一行も書く必要はありません。
+Write the script, run `dek`, and you can present with the bundled theme without writing a line of HTML.
 
-続きは [はじめる](https://hajimism.github.io/dek/guide/getting-started.html)。コマンド一覧は [CLI](https://hajimism.github.io/dek/reference/cli.html)。
+Continue with [Getting Started](https://hajimism.github.io/dek/guide/getting-started.html), or build a real deck end to end in the [Tutorial](https://hajimism.github.io/dek/guide/tutorial.html). Every command is listed in the [CLI reference](https://hajimism.github.io/dek/reference/cli.html).
 
 ## Sample
 
-`sample/` が、dek 自身を題材にした約 8 分のデッキです。Playwright・rumdl・voice まで入れたフル構成。手順は [sample/README.md](sample/README.md)。
+`sample/` is an eight-minute deck about dek itself, set up as a full project with Playwright, rumdl, and voice. See [sample/README.md](sample/README.md).
 
 ```bash
 cd sample
 bun install
-bun run setup          # Chromium
-bun run dev            # または bun run lint:visual / bun run build
+bun run setup          # Chromium for Playwright
+bun run dev            # or bun run lint:visual / bun run build
 ```
 
-## 開発
+## Development
 
 ```bash
 bun install
@@ -64,10 +64,10 @@ bun run check             # Biome format + lint
 bun run docs:dev          # VitePress
 ```
 
-CI は `biome ci`、`typecheck`、全テスト、`docs:build` を必須にする。
+CI runs `biome ci`, `typecheck`, the full test suite, and `docs:build`.
 
-ドキュメントサイトは GitHub Pages（Actions）で出します。初回だけリポジトリの **Settings → Pages → Source: GitHub Actions** を選んでください。
+The documentation site deploys to GitHub Pages through Actions. Once, in the repository settings, set **Pages → Source** to **GitHub Actions**.
 
-## ライセンス
+## License
 
 MIT

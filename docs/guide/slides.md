@@ -1,13 +1,13 @@
-# スライド
+# Slides
 
-目標: 1 枚を `<section class="slide">` として書き、テーマのクラスだけを使う。
+A slide is one file in `slides/`, named after its section id, with a single root element: `<section class="slide">`. You style it with the classes your theme defines and nothing else.
 
 ```html
 <section class="slide" data-layout="two-col">
-  <h2 class="slide-title">script.md が親</h2>
+  <h2 class="slide-title">The script is the parent</h2>
   <div class="col">
     <p class="node">script.md</p>
-    <p class="node node-parent" data-step="script-parent">script.md ← 親</p>
+    <p class="node node-parent" data-step="script-parent">script.md ← parent</p>
   </div>
   <div class="col" data-step="slides-hang">
     <p class="node">intro.html</p>
@@ -16,47 +16,48 @@
 </section>
 ```
 
-- ルートは `<section class="slide">` ひとつ。id はファイル名から決まり、`data-slug` は build が注入する。
-- 書き方は自由。終了タグを閉じても省略しても、属性に引用符を付けても付けなくても、正しい HTML5 であれば受け付ける。minify は build が一括で行う。
-- レイアウトは `data-layout` で選ぶ。既定テーマは `title` / `default` / `two-col` / `full-bleed` / `quote` を持つ。`default` は上詰めで、ビートで要素が増えてもタイトルの位置が変わらない。動画にしたとき枚ごとに揺れないためのもの。
-- 論理サイズは 1280 × 720 固定。表示側で `transform: scale()` してビューポートに合わせる。
-- CSS はテーマのクラス語彙のみ。スライド内の `<style>` と `style=` は lint で禁止。
-- 見た目の差し替えはトークンの `var()`。
-- JS はスライドに置かない。動きはすべてランタイムと `theme.css` が担う。
-- `lang` は `script.md` の frontmatter。殻（DOCTYPE / html / head / body）はレンダラが巻く。
+## The rules
 
-確認は開発サーバと `dek check`。
+- **One root.** The file is a `<section class="slide">` fragment. Its id comes from the file name; `dek build` injects `data-slug` for you. If you write `data-slug` yourself it must match the section id (`DEK006`).
+- **Write HTML your way.** Close tags or leave them open, quote attributes or do not. Anything that is valid HTML5 is accepted, and a full document with `<html>` and `<body>` around the section works too. Minification happens once, at build time.
+- **Pick a layout with `data-layout`.** The bundled theme ships `title`, `default`, `two-col`, `full-bleed`, and `quote`. `default` is top-aligned, so the heading stays put as beats add elements below it; that matters when the deck becomes a video.
+- **The canvas is 1280 × 720.** A `4:3` deck is 1024 × 768. The player scales the whole slide with `transform: scale()` to fit the viewport.
+- **Only theme classes.** A class the theme does not define is `DEK010`. Inline `<style>`, `style=` attributes, and `<script>` are `DEK011`.
+- **Change appearance through tokens.** Colors, type, spacing, and motion come from `var(--*)` in the theme, never from the slide.
+- **No JavaScript.** Motion and interaction belong to the runtime and to `theme.css`.
+- **Stay inside the deck.** Reference images as `assets/name.png`, never through `../`. Remote URLs are `DEK020`, a missing file is `DEK021`, a path that leaves the deck directory is `DEK022`, and a local `src` that does not start with `assets/` is `DEK023`.
+
+The document shell, the `lang` attribute from the script's frontmatter, and the player are added by the renderer. Check your work with the dev server or with one command:
 
 ```bash
-dek
 dek check architecture --shot
 ```
 
-## 骨格
+## Skeletons
 
-`sync` が作るのは空ファイルではない。見出しテキストを `<h2>` にし、ビートを `data-step` 付きのリストにした骨格。日本語の見出しはそのまま日本語で出る。ビートがなければ `data-layout="title"`、あれば `default`。
-
-id だけの見出し（`## recap`）は見出しテキストが無いものとして扱い、`<h2>` を空にする。先頭のセクションだけは frontmatter の `title` が入る。英語の slug がそのまま本番に出る事故を防ぐため。表示したい文言があるなら `## まとめ {#recap}` と書く。
+`dek sync`, and the dev server on every save, generates a skeleton for any section that has no HTML. The skeleton is not an empty file. It puts the heading text in an `<h2>` and lists the beats with `data-step` already bound.
 
 ```html
 <section class="slide" data-layout="default">
   <h2 class="slide-title">architecture</h2>
   <ul>
-    <li data-step="script-parent">script.md が親</li>
-    <li data-step="slides-hang">スライドがぶら下がる</li>
-    <li data-step="inverted">逆だと喋れない</li>
+    <li data-step="script-parent">The script is the parent</li>
+    <li data-step="slides-hang">Slides hang off it</li>
+    <li data-step="3">A beat with no id</li>
   </ul>
 </section>
 ```
 
-`script.md` を書いて `dek` を叩いた時点で、同梱テーマのまま喋れる。HTML は、画面を台本以上のものにしたくなったときに書き始める。書き始めるなら、先にビートへ `{#id}` を付けて `data-step` を名前にしておくと、以降の挿入でスライドが壊れない。
+A section without beats gets `data-layout="title"`; with beats, `default`. Beats with an id are bound by id; beats without one are bound by their 1-based position.
 
-既存ファイルは今までどおり触れない。ビートを足しても、すでに書いた HTML は更新されない。紐付けは `data-step` の仕事。
+A heading that is only an id, such as `## recap`, has no display text, so its skeleton `<h2>` is empty. The first section is the exception: it takes the deck `title`. This keeps an English slug from ending up on a projected slide by accident. If you want words there, write `## Recap {#recap}`.
 
-## 密度はテーマが決める
+Sync never touches an existing file. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide.
 
-1 枚にどれだけ載せられるかは、`theme.css` のフォントサイズと余白が決める。文字を大きく取っておけば、詰め込んだ瞬間に枠からはみ出し、`lint --visual` が客観的に鳴る。閾値を数で決める代わりに、幾何で真偽が決まるルールに密度の管理を委ねる。詰め込みたければテーマの文字を小さくする。その一手が、意図的な設計判断として差分に残る。
+## Density is the theme's job
 
-## 次
+How much fits on a slide is decided by font sizes and spacing in `theme.css`, not by a rule about word counts. Set the type large, and a crowded slide overflows the canvas the moment you cram it. `dek lint --visual` measures the overflow and reports it as `DEK030`, a verdict that comes from geometry rather than opinion. If you want denser slides, make the type smaller in the theme. That decision then lives in a diff where it can be reviewed.
 
-段階表示と要素の移動 → [ビート](./steps)
+## Next
+
+Reveal elements in step with your speaking, and carry an element across slides: [Beats](./steps).
