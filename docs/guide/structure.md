@@ -9,6 +9,7 @@
 ```
 my-talks/                       # プロジェクト（dek init）
 ├── dek.toml                    # lint 閾値と字数/分
+├── .gitignore                  # dist/ .cache/ .dek/server.json
 ├── theme.css                   # 新しいデッキの出発点
 ├── AGENTS.md                   # AI 向け規約（sync が生成）
 ├── assets/                     # 素材の置き場。デッキへはコピーして使う

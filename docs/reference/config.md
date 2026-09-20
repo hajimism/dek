@@ -7,6 +7,7 @@
 ```
 my-talks/
 ├── dek.toml
+├── .gitignore
 ├── theme.css
 ├── AGENTS.md
 ├── assets/

@@ -41,6 +41,35 @@ describe("dek init", () => {
     });
   });
 
+  test("creates .gitignore that ignores dist, .cache, and the dev-server lock", async () => {
+    await withTempDir(async (dir) => {
+      const target = join(dir, "my-talks");
+      const result = await runDek(["init", target, "--json"]);
+      expect(result.exitCode).toBe(0);
+      const json = jsonStdout<InitOk>(result);
+      expect(json.created).toContain(join(target, ".gitignore"));
+      const gitignore = await readFile(join(target, ".gitignore"), "utf8");
+      expect(gitignore).toContain("dist/");
+      expect(gitignore).toContain(".cache/");
+      expect(gitignore).toContain(".dek/server.json");
+      expect(gitignore).toContain("node_modules/");
+      expect(gitignore).not.toContain("schema.json");
+    });
+  });
+
+  test("does not overwrite an existing .gitignore", async () => {
+    await withTempDir(async (dir) => {
+      const target = join(dir, "my-talks");
+      await mkdir(target, { recursive: true });
+      await writeFile(join(target, ".gitignore"), "# mine\n");
+      const result = await runDek(["init", target, "--json"]);
+      expect(result.exitCode).toBe(0);
+      expect(await readFile(join(target, ".gitignore"), "utf8")).toBe("# mine\n");
+      const json = jsonStdout<InitOk>(result);
+      expect(json.created).not.toContain(join(target, ".gitignore"));
+    });
+  });
+
   test("rejects a deck name with path separators", async () => {
     await withTempDir(async (dir) => {
       const target = join(dir, "my-talks");

@@ -12,6 +12,15 @@ export function defaultToml(): string {
   return "# dek project\n";
 }
 
+export function defaultGitignore(): string {
+  return `# dek
+dist/
+.cache/
+.dek/server.json
+node_modules/
+`;
+}
+
 export function defaultRumdl(): string {
   return `# Markdown rules for script.md
 # ## is a slide. Frontmatter is allowed. Keep heading skips, line length, and broken links.

@@ -3,6 +3,7 @@ import { DekError, writeFrontmatterSchema } from "../core/index.ts";
 import { isDeckName } from "../core/path.ts";
 import {
   createDeck,
+  defaultGitignore,
   defaultRumdl,
   defaultTheme,
   defaultToml,
@@ -35,6 +36,11 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
     created,
     join(root, ".rumdl.toml"),
     writeIfMissing(join(root, ".rumdl.toml"), defaultRumdl()),
+  );
+  trackWrite(
+    created,
+    join(root, ".gitignore"),
+    writeIfMissing(join(root, ".gitignore"), defaultGitignore()),
   );
   trackWrite(created, join(root, "assets"), ensureDir(join(root, "assets")));
   trackWrite(created, join(root, "decks"), ensureDir(join(root, "decks")));

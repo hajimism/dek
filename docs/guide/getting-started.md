@@ -46,6 +46,7 @@ cd decks/2026-04-vite
 my-talks/
 ├── package.json
 ├── dek.toml
+├── .gitignore
 ├── theme.css
 ├── AGENTS.md
 ├── assets/

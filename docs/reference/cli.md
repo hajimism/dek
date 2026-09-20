@@ -22,7 +22,7 @@
 
 | コマンド | 役割 |
 | --- | --- |
-| `dek init [dir] [--deck NAME]` | プロジェクトを作る（省略時はカレント） |
+| `dek init [dir] [--deck NAME]` | プロジェクトを作る（省略時はカレント）。`.gitignore` も作る |
 | `dek new <name> [--theme-from DECK]` | デッキを追加 |
 | `dek ls [deck]` | デッキ一覧、または 1 つの概要（枚数・lint・尺・セクション） |
 
