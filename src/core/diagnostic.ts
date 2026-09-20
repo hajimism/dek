@@ -14,6 +14,7 @@ export type RuleId =
   | "DEK020"
   | "DEK021"
   | "DEK022"
+  | "DEK023"
   | "DEK030"
   | "DEK031"
   | "DEK040"

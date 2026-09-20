@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, posix, resolve } from "node:path";
 import { loadConfig } from "./config.ts";
 import {
   cssClassNames,
@@ -377,6 +377,13 @@ function lintSlideHtml(
         message: `missing image "${ref.value}"`,
         path,
       });
+    } else if (kind === "ok" && ref.attr === "src" && !isCanonicalAssetSrc(ref.value)) {
+      diagnostics.push({
+        id: "DEK023",
+        message: `asset "${ref.value}" must be referenced as assets/${posix.basename(ref.value.trim())}`,
+        path,
+        slug: section.slug,
+      });
     }
   }
 
@@ -486,6 +493,17 @@ function classifyRef(
     return "missing";
   }
   return "ok";
+}
+
+function isCanonicalAssetSrc(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("data:")) {
+    return true;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    return true;
+  }
+  return trimmed.startsWith("assets/");
 }
 
 function suggestRename(diagnostics: Diagnostic[]): void {

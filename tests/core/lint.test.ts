@@ -361,6 +361,48 @@ b
     );
   });
 
+  test("DEK010/DEK012 stay quiet when theme.css has a brace inside content", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: `.slide {
+  --fg: #fff;
+  --bg: #111;
+  --accent: #f00;
+  --muted: #888;
+  --font-title: inherit;
+  --font-body: inherit;
+  --size-title: 1em;
+  --size-body: 1em;
+  --size-caption: 1em;
+  --gap: 1em;
+  --pad: 1em;
+  --radius: 0;
+  --step-transition: 0s;
+}
+.slide .brace::before { content: "}"; }
+.slide .after { color: var(--fg); }
+`,
+            slides: {
+              intro: slideDocument(
+                `<section class="slide"><p class="brace"></p><p class="after"></p></section>`,
+              ),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        expect(
+          lintDeck(join(root, "decks", "demo")).filter(
+            (d) => d.id === "DEK010" || d.id === "DEK012",
+          ),
+        ).toEqual([]);
+      },
+    );
+  });
+
   test("DEK013: theme class count exceeds the default of 40", async () => {
     const classes = Array.from({ length: 41 }, (_, i) => `.slide .c${i} {}`).join("\n");
     await withTempProject(
@@ -619,6 +661,84 @@ b
         const diagnostics = lintDeck(join(root, "decks", "demo"));
         expect(diagnostics.some((d) => d.id === "DEK022")).toBe(false);
         expect(diagnostics.some((d) => d.id === "DEK021")).toBe(false);
+      },
+    );
+  });
+
+  test("DEK023: src that reaches assets through ../ is flagged", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            assets: { "pixel.png": "png" },
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="../assets/pixel.png" alt="">
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const diagnostics = lintDeck(deckDir).filter((d) => d.id === "DEK023");
+        expect(diagnostics).toHaveLength(1);
+        expect(diagnostics[0]).toMatchObject({
+          path: join(deckDir, "slides", "intro.html"),
+          slug: "intro",
+        });
+        expect(diagnostics[0]?.message).toContain("assets/pixel.png");
+      },
+    );
+  });
+
+  test("DEK023: deck-relative assets/ src, data:, #, and link href are not flagged", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            assets: { "pixel.png": "png" },
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/pixel.png" alt="">
+  <img src="data:image/png;base64,AA" alt="">
+  <a href="#x">here</a>
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        expect(lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK023")).toEqual([]);
+      },
+    );
+  });
+
+  test("DEK023: does not double-report with DEK020 or DEK022", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="https://x/y.png" alt="">
+  <img src="../../outside.png" alt="">
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const ids = lintDeck(join(root, "decks", "demo")).map((d) => d.id);
+        expect(ids).toContain("DEK020");
+        expect(ids).toContain("DEK022");
+        expect(ids).not.toContain("DEK023");
       },
     );
   });
