@@ -36,6 +36,8 @@ dek check architecture --shot
 
 `sync` が作るのは空ファイルではない。見出しテキストを `<h2>` にし、ビートを `data-step` 付きのリストにした骨格。日本語の見出しはそのまま日本語で出る。ビートがなければ `data-layout="title"`、あれば `default`。
 
+id だけの見出し（`## recap`）は見出しテキストが無いものとして扱い、`<h2>` を空にする。先頭のセクションだけは frontmatter の `title` が入る。英語の slug がそのまま本番に出る事故を防ぐため。表示したい文言があるなら `## まとめ {#recap}` と書く。
+
 ```html
 <section class="slide" data-layout="default">
   <h2 class="slide-title">architecture</h2>

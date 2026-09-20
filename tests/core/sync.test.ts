@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekError, resolveDeck, syncDeck } from "../../src/core/index.ts";
+import { DekError, lintDeck, resolveDeck, syncDeck } from "../../src/core/index.ts";
 import { extractSlide } from "../helpers/html.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
 
@@ -54,7 +54,7 @@ more
         expect(extra).not.toContain("<!DOCTYPE html>");
         expect(extra.trimStart().startsWith('<section class="slide"')).toBe(true);
         expect(extractSlide(extra)).toContain('data-layout="title"');
-        expect(extractSlide(extra)).toContain('<h2 class="slide-title">extra</h2>');
+        expect(extractSlide(extra)).toContain('<h2 class="slide-title"></h2>');
       },
     );
   });
@@ -71,8 +71,48 @@ more
         expect(html).not.toContain("<!DOCTYPE html>");
         expect(html.trimStart().startsWith('<section class="slide"')).toBe(true);
         expect(extractSlide(html)).toBe(
-          '<section class="slide" data-layout="title"><h2 class="slide-title">intro</h2></section>',
+          '<section class="slide" data-layout="title"><h2 class="slide-title">Demo</h2></section>',
         );
+      },
+    );
+  });
+
+  test("leaves the heading empty when a later section is only an id", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## cover
+
+hello
+
+## recap
+
+more
+
+## 締め {#close}
+
+bye
+`,
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        syncDeck(deckDir);
+        const cover = await readFile(join(deckDir, "slides", "cover.html"), "utf8");
+        expect(extractSlide(cover)).toContain('<h2 class="slide-title">Demo</h2>');
+        const recap = await readFile(join(deckDir, "slides", "recap.html"), "utf8");
+        expect(extractSlide(recap)).toContain('<h2 class="slide-title"></h2>');
+        expect(recap).not.toContain(">recap<");
+        const close = await readFile(join(deckDir, "slides", "close.html"), "utf8");
+        expect(extractSlide(close)).toContain('<h2 class="slide-title">締め</h2>');
+        expect(lintDeck(deckDir)).toEqual([]);
       },
     );
   });
@@ -122,7 +162,8 @@ c
         const architecture = await readFile(join(deckDir, "slides", "architecture.html"), "utf8");
         const slide = extractSlide(architecture);
         expect(slide).toContain('data-layout="default"');
-        expect(slide).toContain('<h2 class="slide-title">architecture</h2>');
+        expect(slide).toContain('<h2 class="slide-title"></h2>');
+        expect(slide).not.toContain(">architecture<");
         expect(slide).toContain('<li data-step="script-parent">script.md が親</li>');
         expect(slide).toContain('<li data-step="2">ただの区切り</li>');
         expect(slide).toContain('<li data-step="inverted">逆だと喋れない</li>');

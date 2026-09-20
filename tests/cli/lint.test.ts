@@ -126,10 +126,10 @@ more
         const intro = await Bun.file(join(deckDir, "slides", "intro.html")).text();
         expect(intro).not.toContain("<!DOCTYPE html>");
         expect(intro.trimStart().startsWith('<section class="slide"')).toBe(true);
-        expect(intro).toContain("intro");
+        expect(intro).toContain('<h2 class="slide-title">Demo</h2>');
 
         const extra = await Bun.file(join(deckDir, "slides", "extra.html")).text();
-        expect(extra).toContain("extra");
+        expect(extra).toContain('<h2 class="slide-title"></h2>');
 
         expect(await Bun.file(join(deckDir, "slides", "leftover.html")).text()).toBe(leftover);
       },

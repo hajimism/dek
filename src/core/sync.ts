@@ -25,7 +25,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
   const existing = new Set(listSlides(deck.dir).map((slide) => slide.slug));
   const created: string[] = [];
 
-  for (const section of deck.deck.sections) {
+  for (const [index, section] of deck.deck.sections.entries()) {
     if (existing.has(section.slug)) {
       continue;
     }
@@ -33,7 +33,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
     if (existsSync(path)) {
       continue;
     }
-    writeFileSync(path, renderSkeleton(section));
+    writeFileSync(path, renderSkeleton(section, skeletonHeading(section, index, deck.deck.title)));
     created.push(path);
   }
 
@@ -88,18 +88,35 @@ For commands, run \`dek help --agent\`.
   );
 }
 
-function renderSkeleton(section: Section): string {
-  const inner = section.beats.length === 0 ? renderTitleSlide(section) : renderBeatSlide(section);
+/**
+ * A heading that is only an id (`## intro`) has no display text. The first
+ * section takes the deck title; later ones stay empty so the slug never ends
+ * up on a published slide.
+ */
+export function skeletonHeading(
+  section: Pick<Section, "slug" | "title">,
+  index: number,
+  deckTitle: string,
+): string {
+  if (section.title !== section.slug) {
+    return section.title;
+  }
+  return index === 0 ? deckTitle : "";
+}
+
+function renderSkeleton(section: Section, heading: string): string {
+  const inner =
+    section.beats.length === 0 ? renderTitleSlide(heading) : renderBeatSlide(section, heading);
   return `${inner}\n`;
 }
 
-function renderTitleSlide(section: Section): string {
+function renderTitleSlide(heading: string): string {
   return `<section class="slide" data-layout="title">
-    <h2 class="slide-title">${escapeHtml(section.title)}</h2>
+    <h2 class="slide-title">${escapeHtml(heading)}</h2>
   </section>`;
 }
 
-function renderBeatSlide(section: Section): string {
+function renderBeatSlide(section: Section, heading: string): string {
   const items = section.beats
     .map((beat, index) => {
       const step = beat.id ?? String(index + 1);
@@ -107,7 +124,7 @@ function renderBeatSlide(section: Section): string {
     })
     .join("\n");
   return `<section class="slide" data-layout="default">
-    <h2 class="slide-title">${escapeHtml(section.title)}</h2>
+    <h2 class="slide-title">${escapeHtml(heading)}</h2>
     <ul>
 ${items}
     </ul>
