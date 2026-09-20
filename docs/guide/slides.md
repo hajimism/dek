@@ -18,7 +18,7 @@
 
 - ルートは `<section class="slide">` ひとつ。id はファイル名から決まり、`data-slug` は build が注入する。
 - 書き方は自由。終了タグを閉じても省略しても、属性に引用符を付けても付けなくても、正しい HTML5 であれば受け付ける。minify は build が一括で行う。
-- レイアウトは `data-layout` で選ぶ。既定テーマは `title` / `default` / `two-col` / `full-bleed` / `quote` を持つ。
+- レイアウトは `data-layout` で選ぶ。既定テーマは `title` / `default` / `two-col` / `full-bleed` / `quote` を持つ。`default` は上詰めで、ビートで要素が増えてもタイトルの位置が変わらない。動画にしたとき枚ごとに揺れないためのもの。
 - 論理サイズは 1280 × 720 固定。表示側で `transform: scale()` してビューポートに合わせる。
 - CSS はテーマのクラス語彙のみ。スライド内の `<style>` と `style=` は lint で禁止。
 - 見た目の差し替えはトークンの `var()`。

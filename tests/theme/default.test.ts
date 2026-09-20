@@ -44,6 +44,12 @@ describe("default theme", () => {
     }
   });
 
+  test("default layout is top-aligned so titles stay put across beats", () => {
+    const rule = css.match(/\.slide\[data-layout="default"\]\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(rule).toContain("flex-direction: column");
+    expect(rule).not.toContain("justify-content: center");
+  });
+
   test("hides data-step with opacity and transform, not display none", () => {
     expect(css).toContain("[data-step]");
     expect(css).toContain(".is-shown");

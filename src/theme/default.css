@@ -39,7 +39,6 @@
 .slide[data-layout="default"] {
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
 .slide[data-layout="two-col"] {
