@@ -151,8 +151,8 @@ function unwrapInline(text: string): string {
     .replace(/`([^`]+)`/g, "$1")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/__([^_]+)__/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/_([^_]+)_/g, "$1");
+    .replace(/(?<![A-Za-z0-9_])\*([^*]+)\*(?![A-Za-z0-9_])/g, "$1")
+    .replace(/(?<![A-Za-z0-9_])_([^_]+)_(?![A-Za-z0-9_])/g, "$1");
 }
 
 function normalizeSpoken(text: string): string {

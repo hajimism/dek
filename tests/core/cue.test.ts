@@ -50,6 +50,12 @@ second paragraph.
     expect(spokenParagraphs("See ![logo](./logo.png) here.")).toEqual(["See here."]);
   });
 
+  test("keeps underscores inside identifiers and unwraps standalone emphasis", () => {
+    expect(spokenParagraphs("snake_case_name を使います")).toEqual(["snake_case_name を使います"]);
+    expect(spokenParagraphs("これは _強調_ です")).toEqual(["これは 強調 です"]);
+    expect(spokenParagraphs("__bold__ and **bold**")).toEqual(["bold and bold"]);
+  });
+
   test("returns an empty list for whitespace-only markdown", () => {
     expect(spokenParagraphs("\n\n> only a note\n")).toEqual([]);
   });
