@@ -24,10 +24,13 @@ export function slideSelector(slug: string): string {
   return `#deck > .slide[data-slug="${escaped}"]`;
 }
 
+/** The slice of `fetch` the live client uses; keeps test stubs free of the fetch namespace. */
+export type LiveFetch = (input: string) => Promise<Response>;
+
 export async function hydrateLiveEvent(
   event: LivePayload,
   pathname: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: LiveFetch = fetch,
 ): Promise<LivePayload | undefined> {
   if (event.type === "reload-slide") {
     const response = await fetchImpl(liveSlidePath(pathname, event.slug));
