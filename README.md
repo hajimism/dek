@@ -58,13 +58,14 @@ bun run dev            # or bun run lint:visual / bun run build
 
 ```bash
 bun install
+bunx playwright install chromium   # once, for the tests that drive a real browser
 bun test --watch
 bun run typecheck
 bun run check             # Biome format + lint
 bun run docs:dev          # VitePress
 ```
 
-CI runs `biome ci`, `typecheck`, the full test suite, and `docs:build`.
+CI runs `biome ci`, `typecheck`, the full test suite (the browser tests in Chromium), and `docs:build`.
 
 The documentation site deploys to GitHub Pages through Actions. Once, in the repository settings, set **Pages → Source** to **GitHub Actions**.
 

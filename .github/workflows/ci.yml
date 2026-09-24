@@ -15,13 +15,16 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
+      # The visual checks, shots, and video capture are tested in a real Chromium.
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
       - name: Install rumdl
         run: |
           mkdir -p "$HOME/.local/bin"

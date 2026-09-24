@@ -58,13 +58,14 @@ bun run dev            # または bun run lint:visual / bun run build
 
 ```bash
 bun install
+bunx playwright install chromium   # 最初に一度。実ブラウザを動かすテストに使う
 bun test --watch
 bun run typecheck
 bun run check             # Biome の format + lint
 bun run docs:dev          # VitePress
 ```
 
-CI では `biome ci`、`typecheck`、全テスト、`docs:build` を走らせます。
+CI では `biome ci`、`typecheck`、全テスト（ブラウザを使うものは Chromium で）、`docs:build` を走らせます。
 
 ドキュメントサイトは GitHub Actions 経由で GitHub Pages に出します。初回だけ、リポジトリの設定で **Pages → Source** を **GitHub Actions** にしてください。
 
