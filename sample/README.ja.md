@@ -1,6 +1,6 @@
 # dek sample
 
-dek 自身を題材にした約 8 分のデッキです。`script.md` を開くと、順序と喋る言葉と尺がすべてそこにあります。Playwright、rumdl、声まで入れた、実際のトーク用プロジェクトと同じ形です。
+dek 自身を題材にした約 12 分のデッキで、配布資料としても読めるように作っています。どのスライドも言いたいことを文で書き、それぞれの図を持っているので、PDF にすれば話を聞かなくても追えます。`script.md` を開くと、順序と喋る言葉と尺がすべてそこにあります。どのスライドも、そこから `dek` が作った骨格を仕上げたものです。Playwright、rumdl、声まで入れた、実際のトーク用プロジェクトと同じ形です。
 
 [English](./README.md)
 
@@ -45,6 +45,8 @@ bun run build          # 各 decks/<deck>/dist/<deck>.html
 
 `dek.toml` の `[voice]` は、`dek new` が新しいデッキへコピーする既定値です。why-dek の実際の設定は `decks/why-dek/voice/` にあり、`voice.toml` と、ASCII 語の読みを収めた `dict.toml` です。エンジンが止まっていても開発サーバは動き続けます。合成だけが失敗します。
 
-`voice.toml` にはタイミングの調整例もあります。デッキ全体の `lead`、全面写真の `usb` スライドに入るときの長めの `lead`、`recap` の最後のビートの後の長めの `pause` です。
+`voice.toml` にはタイミングの調整例もあります。デッキ全体の `lead`、台本に注釈を付けた `anatomy` に入るときの長めの `lead`、`recap` の最後のビートの後の長めの `pause` です。
 
-見た目のほとんどは `decks/why-dek/theme.css` が決めます。1 枚でしか使わない装飾は、そのスライドの横に置いています。`slides/intro.css` はヒーローマークを左右反転し、`slides/files.css` は大きな数字の書式を決めます。`slides/files.ts` は、スライドに入ると同時にその数字を 40 まで数え上げます。描画は `t` だけから決まるので、動画・スクリーンショット・PDF にも同じ動きか、その最終状態が出ます。
+共通の見た目は `decks/why-dek/theme.css` が決めます。印刷にも向く明るいテーマで、朱はいつも台本を、藍はいつも画面を表します。`night-before` の工程図、`beats` のレーン、`rules` のルール表といった各スライドの図は、そのスライドの `slides/<id>.css` に置いているので、テーマのクラスは少ないままです。`slides/timing.ts` と `slides/one-file.ts` は、スライドに入ると同時にグラフを伸ばします。元の数値は `data-*` 属性に書いた `dek ls` の出力と `slides/` の行数です。描画は `t` だけから決まるので、動画・スクリーンショット・PDF にも同じ動きか、その最終状態が出ます。
+
+`assets/` の画像は `dek shot` で撮ったものです。骨格のままの `night-before` と仕上げたあとの `night-before`、それにはみ出すスライドの画面で、その実際の `DEK030` の診断を `blind` に載せています。

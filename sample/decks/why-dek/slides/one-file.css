@@ -1,0 +1,127 @@
+/* A column per slide, stacked by file kind; the whole deck as one file is the number beside it. */
+.slide {
+  --chart-height: 12.5rem;
+  --html: var(--screen);
+  --css: #8aa3c4;
+  --ts: var(--script);
+}
+
+.lede {
+  font-size: var(--size-body);
+}
+
+.kinds {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: calc(var(--gap) * 0.7);
+  row-gap: calc(var(--gap) * 0.55);
+  align-items: baseline;
+  margin: calc(var(--gap) * 1.1) 0 calc(var(--gap) * 0.9);
+  padding: calc(var(--gap) * 0.8) 0;
+  border-top: var(--hairline) solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
+  font-size: var(--size-small);
+}
+
+.kinds dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+.card {
+  padding: calc(var(--gap) * 0.8) var(--gap);
+}
+
+.totals {
+  display: flex;
+  gap: calc(var(--gap) * 1.6);
+  margin: 0 0 var(--gap);
+  padding-bottom: calc(var(--gap) * 0.6);
+  border-bottom: var(--hairline) solid var(--line);
+}
+
+.totals .label {
+  margin-bottom: calc(var(--gap) * 0.2);
+}
+
+.totals small {
+  font-family: var(--font-body);
+  font-size: var(--size-small);
+  font-weight: 400;
+}
+
+.chart {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  column-gap: calc(var(--gap) * 0.35);
+}
+
+.col-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--gap) * 0.3);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  height: var(--chart-height);
+  border-bottom: var(--hairline) solid var(--fg);
+}
+
+.seg-html {
+  background: var(--html);
+}
+
+.seg-css {
+  background: var(--css);
+}
+
+.seg-ts {
+  background: var(--ts);
+}
+
+.slug {
+  writing-mode: vertical-rl;
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  line-height: 1;
+  color: var(--muted);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin: calc(var(--gap) * 0.6) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.legend span[class^="key"] {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.8em;
+}
+
+.legend .key-html {
+  margin-left: 0;
+  background: var(--html);
+}
+
+.key-css {
+  background: var(--css);
+}
+
+.key-ts {
+  background: var(--ts);
+}
+
+.source {
+  margin-left: auto;
+}

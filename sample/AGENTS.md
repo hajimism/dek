@@ -22,51 +22,69 @@ Talk-script-first HTML slides.
 
 From the project `theme.css`. A deck's own `theme.css` can differ; `dek theme` lists what a deck's theme defines.
 
-- `claim`
+- `card`
+- `code`
+- `code-title`
 - `col`
-- `exhibit`
 - `figure`
-- `figure-small`
-- `flow`
-- `icon`
+- `hue-screen`
+- `hue-script`
 - `is-current`
 - `is-shown`
 - `kicker`
+- `label`
 - `lede`
-- `mark`
 - `meta`
-- `node`
-- `node-parent`
 - `note`
 - `num`
 - `slide`
 - `slide-title`
-- `stack`
+- `stage`
 - `stat`
+- `tag`
+- `tok-c`
+- `tok-h`
+- `tok-k`
+- `tok-s`
 
 ## Theme tokens
 
 - `--accent`
 - `--bg`
-- `--brand`
-- `--brand-soft`
-- `--canvas`
+- `--code-bg`
+- `--code-dim`
+- `--code-fg`
+- `--code-screen`
+- `--code-script`
+- `--code-string`
 - `--fg`
 - `--font-body`
+- `--font-mono`
 - `--font-title`
 - `--gap`
 - `--hairline`
-- `--icon`
-- `--icon-lg`
 - `--line`
+- `--line-strong`
 - `--muted`
 - `--pad`
+- `--pad-bottom`
+- `--pad-top`
 - `--pad-x`
-- `--pad-y`
+- `--page-transition`
+- `--pin`
 - `--radius`
-- `--rail`
+- `--rule`
+- `--screen`
+- `--screen-soft`
+- `--script`
+- `--script-soft`
+- `--shadow`
 - `--size-body`
 - `--size-caption`
+- `--size-code`
+- `--size-hero`
+- `--size-lead`
+- `--size-small`
 - `--size-stat`
 - `--size-title`
 - `--step-transition`
@@ -78,14 +96,8 @@ From the project `theme.css`. A deck's own `theme.css` can differ; `dek theme` l
 
 - `close`
 - `default`
-- `full-bleed`
-- `pipeline`
-- `process`
-- `quote`
 - `split`
 - `title`
-- `tree`
-- `two-col`
 
 For a layout's markup, run `dek theme <layout>`.
 

@@ -45,7 +45,7 @@ bunx dek build      # 3. dist/2026-04-vite.html — トーク全体がこの 1 �
 
 ## サンプル
 
-`sample/` は dek 自身を題材にした約 8 分のデッキで、Playwright、rumdl、声まで入れたフル構成のプロジェクトです。手順は [sample/README.ja.md](sample/README.ja.md)。
+`sample/` は dek 自身を題材にした、配布資料としても読める約 12 分のデッキで、Playwright、rumdl、声まで入れたフル構成のプロジェクトです。手順は [sample/README.ja.md](sample/README.ja.md)。
 
 ```bash
 cd sample

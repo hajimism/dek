@@ -1,0 +1,139 @@
+/* Four moments of one slide, read left to right; each lane is one owner. */
+.slide {
+  --name-width: 4.5rem;
+  --row-press: 1.8rem;
+  --row-line: 2.4rem;
+  --row-screen: 7.4rem;
+  --row-html: 1.8rem;
+  --ghost: repeating-linear-gradient(-45deg, rgba(93, 87, 75, 0.18) 0 1px, transparent 1px 6px);
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.9);
+}
+
+.lanes {
+  display: grid;
+  grid-template-columns: var(--name-width) repeat(4, minmax(0, 1fr));
+  column-gap: calc(var(--gap) * 0.6);
+}
+
+.lane-names,
+.state {
+  display: grid;
+  grid-template-rows: var(--row-press) var(--row-line) var(--row-screen) var(--row-html);
+  row-gap: calc(var(--gap) * 0.35);
+  align-items: center;
+  font-size: var(--size-small);
+}
+
+.lane-names {
+  font-size: var(--size-caption);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.press {
+  font-size: var(--size-caption);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.key {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7em;
+  height: 1.5em;
+  margin-right: 0.3em;
+  border: var(--hairline) solid var(--line-strong);
+  border-bottom-width: calc(var(--hairline) * 3);
+  border-radius: calc(var(--radius) * 0.6);
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.line {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 calc(var(--gap) * 0.5);
+  border-left: var(--rule) solid var(--script);
+  background: var(--script-soft);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.line b {
+  margin-right: 0.5em;
+  font-family: var(--font-mono);
+  color: var(--script);
+}
+
+.screen {
+  box-sizing: border-box;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.3);
+  padding: calc(var(--gap) * 0.5);
+  background: var(--surface);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius);
+}
+
+.w-title {
+  width: 60%;
+  height: 0.7em;
+  background: var(--fg);
+  border-radius: calc(var(--radius) * 0.4);
+}
+
+.w-block {
+  flex: 1;
+  background: var(--ghost);
+  border: var(--hairline) dashed var(--line-strong);
+  border-radius: calc(var(--radius) * 0.6);
+}
+
+.w-block.is-on {
+  background: var(--screen-soft);
+  border: var(--hairline) solid var(--screen);
+}
+
+.w-chart {
+  flex: 1;
+  background:
+    linear-gradient(var(--screen), var(--screen)) 0 20% / 70% 14% no-repeat,
+    linear-gradient(var(--screen), var(--screen)) 0 50% / 45% 14% no-repeat,
+    linear-gradient(var(--screen), var(--screen)) 0 80% / 85% 14% no-repeat;
+  opacity: 0.55;
+}
+
+.html {
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.is-next .line {
+  border-left-color: var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+}
+
+.is-next .line b {
+  color: var(--muted);
+}
+
+.owners {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: var(--gap);
+  margin-left: calc(var(--name-width) + var(--gap) * 0.6);
+}
+
+.owners .code {
+  padding: calc(var(--gap) * 0.45) calc(var(--gap) * 0.7);
+}

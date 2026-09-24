@@ -1,0 +1,129 @@
+/* One template above, three decks below, each with its own copy of the look. */
+.slide {
+  --apr: #1f4f8f;
+  --jun: #2d6a3e;
+  --sep: #b3321c;
+  --arrow: 0.32rem;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.45);
+}
+
+.proj {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: calc(var(--gap) * 0.55) calc(var(--gap) * 0.85);
+  background: var(--surface-strong);
+  border-radius: var(--radius);
+}
+
+.proj .tag {
+  font-size: var(--size-small);
+  font-weight: 600;
+  background: var(--surface);
+}
+
+.links,
+.decks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--gap);
+}
+
+.links span {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding-left: calc(var(--gap) * 0.85);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.links span::before {
+  content: "↓";
+  font-family: var(--font-body);
+  font-size: var(--size-lead);
+  color: var(--line-strong);
+}
+
+.links .up {
+  color: var(--script);
+}
+
+.links .up::before {
+  content: "↑";
+  color: var(--script);
+}
+
+.deck {
+  --deck-accent: var(--apr);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.45);
+  padding: calc(var(--gap) * 0.7) calc(var(--gap) * 0.85);
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-top: calc(var(--rule) * 2) solid var(--deck-accent);
+  border-radius: var(--radius);
+}
+
+.is-jun {
+  --deck-accent: var(--jun);
+}
+
+.is-sep {
+  --deck-accent: var(--sep);
+}
+
+.deck-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+}
+
+.deck-name .when {
+  font-family: var(--font-title);
+  font-size: var(--size-lead);
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.mock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+  aspect-ratio: 16 / 2.6;
+  padding: 0.8em 1em;
+  background: var(--bg);
+  border: var(--hairline) solid var(--line);
+  border-radius: calc(var(--radius) * 0.6);
+}
+
+.mock-bar {
+  width: 55%;
+  height: 0.8em;
+  background: var(--deck-accent);
+  border-radius: calc(var(--radius) * 0.4);
+}
+
+.mock-line {
+  width: 85%;
+  height: 0.4em;
+  background: var(--line);
+  border-radius: calc(var(--radius) * 0.4);
+}
+
+.mock-line + .mock-line {
+  width: 65%;
+}
+
+.code {
+  margin-top: calc(var(--gap) * 0.3);
+  padding: calc(var(--gap) * 0.5) calc(var(--gap) * 0.85);
+}

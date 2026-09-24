@@ -1,0 +1,32 @@
+<section class="slide" data-layout="split">
+  <div class="col">
+    <p class="kicker">Ⅲ　運用</p>
+    <h2 class="slide-title">始めかた</h2>
+    <p class="lede">要るのは Bun だけ。プロジェクトを作り、台本を書き、開発サーバを立ち上げる。最初の 1 枚は骨格のままでいい。通しで喋れるようになってから、必要なスライドだけを仕上げる。</p>
+    <div class="needs">
+      <p class="label">必要なもの</p>
+      <p class="need"><span class="tag">Bun 1.3+</span><span class="note"><strong>必須。</strong>dek は GitHub から直接動かす</span></p>
+      <p class="need"><span class="tag">Playwright</span><span class="note">描画の lint、スクリーンショット、PDF、動画</span></p>
+      <p class="need"><span class="tag">ffmpeg</span><span class="note">動画の書き出し</span></p>
+      <p class="need"><span class="tag">VOICEVOX</span><span class="note">音声合成。互換エンジンでもよい</span></p>
+      <p class="note">足りないものがあっても、それを使うコマンドだけが止まり、入れ方を教えてくれる。</p>
+    </div>
+  </div>
+  <div class="col">
+    <pre class="code"><span class="code-title"><span>terminal</span><span>ドキュメント hajimism.github.io/dek</span></span><span class="tok-c"># 1. プロジェクトと最初のデッキを作る</span>
+<span class="tok-c">$</span> bunx github:hajimism/dek init my-talks <span class="tok-k">--deck</span> 2026-10-meetup
+<span class="tok-c">$</span> cd my-talks &amp;&amp; bun add github:hajimism/dek
+<span class="tok-c">$</span> cd decks/2026-10-meetup
+
+<span class="tok-h"># 2. 台本を書く ── 時間はここに使う</span>
+<span class="tok-c">$</span> $EDITOR script.md
+
+<span class="tok-c"># 3. 開発サーバ。保存のたびに骨格・再描画・lint</span>
+<span class="tok-c">$</span> bunx dek
+
+<span class="tok-c"># 4. 配る</span>
+<span class="tok-c">$</span> bunx dek build     <span class="tok-s"># dist/2026-10-meetup.html</span>
+<span class="tok-c">$</span> bunx dek pdf       <span class="tok-s"># dist/2026-10-meetup.pdf</span></pre>
+  </div>
+  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
+</section>

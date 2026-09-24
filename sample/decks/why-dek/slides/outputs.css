@@ -1,0 +1,92 @@
+/* One deck on the left fans out into everything you bring to the venue. */
+.stage {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: calc(var(--gap) * 2.4);
+  align-items: center;
+}
+
+.source {
+  position: relative;
+  padding: calc(var(--gap) * 0.8) var(--gap);
+  background: var(--surface-strong);
+  border-radius: var(--radius);
+}
+
+.source::after {
+  content: "→";
+  position: absolute;
+  top: 50%;
+  right: calc(var(--gap) * -1.75);
+  transform: translateY(-50%);
+  font-size: var(--size-title);
+  color: var(--accent);
+}
+
+.tree {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  line-height: 1.9;
+}
+
+.outs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--gap) * 0.7);
+}
+
+.out {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: calc(var(--gap) * 0.6);
+  row-gap: calc(var(--gap) * 0.25);
+  align-items: baseline;
+  padding: calc(var(--gap) * 0.7) calc(var(--gap) * 0.85);
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius);
+}
+
+.is-main {
+  border: var(--rule) solid var(--screen);
+}
+
+.out p {
+  margin: 0;
+}
+
+.cmd {
+  grid-row: 1;
+}
+
+.file {
+  grid-row: 1;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  font-weight: 600;
+  color: var(--screen);
+}
+
+.out > .note {
+  grid-column: 1 / -1;
+}
+
+.size {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  font-weight: 600;
+}
+
+.size .stat {
+  color: var(--screen);
+}
+
+.aside {
+  margin: calc(var(--gap) * 0.9) 0 0;
+  font-size: var(--size-small);
+  color: var(--muted);
+}

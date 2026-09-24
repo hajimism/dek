@@ -1,6 +1,6 @@
 # dek sample
 
-An eight-minute deck about dek itself. Open `script.md` and you will find the order, the spoken words, and the timing all in one place. The project is set up the way a real talk project would be, with Playwright, rumdl, and voice included.
+A twelve-minute deck about dek itself, built to double as a handout: every slide states its point in a full sentence and carries its own figure, so the PDF reads without the talk. Open `script.md` and you will find the order, the spoken words, and the timing all in one place. Every slide started as the skeleton `dek` generated from it. The project is set up the way a real talk project would be, with Playwright, rumdl, and voice included.
 
 [日本語](./README.ja.md)
 
@@ -45,6 +45,8 @@ The scripts do not pin a deck. From the project root they apply to every deck; f
 
 The `[voice]` table in `dek.toml` is the default that `dek new` copies into new decks. The why-dek deck's actual settings live in `decks/why-dek/voice/`: `voice.toml`, and a `dict.toml` with readings for ASCII words. When the engine is down the dev server keeps running; only synthesis fails.
 
-`voice.toml` also shows the timing knobs: `lead` for the whole deck, a longer lead into the full-bleed `usb` slide, and a longer pause after the last beat of `recap`.
+`voice.toml` also shows the timing knobs: `lead` for the whole deck, a longer lead into the annotated script on `anatomy`, and a longer pause after the last beat of `recap`.
 
-Most of the look comes from `decks/why-dek/theme.css`. Decoration that only one slide uses sits beside that slide instead: `slides/intro.css` flips the hero mark, and `slides/files.css` styles the big number. `slides/files.ts` makes that number count up to 40 as the slide enters. It draws from `t` alone, so the video, screenshots, and PDF show the same motion or its end state.
+The shared look comes from `decks/why-dek/theme.css`: a light, print-friendly theme where vermilion always means the script and indigo always means the screen. Each slide's figure, such as the tracks on `night-before`, the lanes on `beats`, and the rule table on `rules`, lives in that slide's own `slides/<id>.css`, so the theme keeps a small vocabulary. `slides/timing.ts` and `slides/one-file.ts` grow their charts as the slide enters, from numbers written into `data-*` attributes: the output of `dek ls` and the line counts of `slides/`. They draw from `t` alone, so the video, screenshots, and PDF show the same motion or its end state.
+
+The images in `assets/` are screenshots taken with `dek shot`: `night-before` as the raw skeleton and as finished, and a slide that overflows, whose real `DEK030` diagnostic appears on `blind`.

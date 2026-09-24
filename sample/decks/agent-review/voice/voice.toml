@@ -1,4 +1,0 @@
-engine  = "voicevox"
-speaker = "ずんだもん/ノーマル"
-speed   = 1
-pause   = { sentence = 350, beat = 700 }

@@ -1,0 +1,39 @@
+<section class="slide" data-layout="split">
+  <div class="col">
+    <p class="kicker">Ⅱ　仕組み</p>
+    <h2 class="slide-title">script.md の書き方</h2>
+    <p class="lede">台本は普通の Markdown。見出しが画面の区切りを、段落が喋る言葉を決める。右はこの資料の 2 枚目の台本。</p>
+    <ol class="legend">
+      <li data-step="headings"><span class="num">2</span><span class="term"><span class="tag">##</span> 見出し</span><span class="note">スライド 1 枚。文章は自由に書ける</span></li>
+      <li data-step="headings"><span class="num">3</span><span class="term"><span class="tag">{#id}</span></span><span class="note">ファイル名になる。slides/night-before.html</span></li>
+      <li data-step="headings"><span class="num">4</span><span class="term"><span class="tag">###</span> 見出し</span><span class="note">ビート。喋りの区切りで、画面が一段進む</span></li>
+      <li data-step="paragraphs"><span class="num">5</span><span class="term">段落</span><span class="note">喋る言葉。尺に数え、音声合成で声にする</span></li>
+      <li data-step="paragraphs"><span class="num">6</span><span class="term"><span class="tag">&gt;</span> 引用</span><span class="note">ト書き。発表者ビューにだけ出て、尺にも声にも入らない</span></li>
+      <li data-step="paragraphs"><span class="num">1</span><span class="term"><span class="tag">duration</span></span><span class="note">トーク全体の持ち時間。尺の予算になる</span></li>
+    </ol>
+  </div>
+  <div class="col">
+    <pre class="code" data-morph="script"><span class="code-title"><span>decks/why-dek/script.md</span><span>抜粋</span></span><span class="tok-c">---</span>
+<span class="tok-k">title:</span> 喋る順に、スライドを組み立てる
+<span class="tok-k">duration:</span> <span class="tok-s">12m</span> <span class="num">1</span>
+<span class="tok-c">---</span>
+
+<span class="tok-h">##</span> <span class="num">2</span> 前日の夜に、尺が合わないと気づく <span class="tok-c">{#night-before}</span> <span class="num">3</span>
+
+発表の前日の夜を思い出してください。スライドは <span class="num">5</span>
+三十枚そろっていて、見た目も悪くない。ところが
+通しで喋ってみると、二十分の枠で三十分かかる。
+
+<span class="tok-h">###</span> <span class="num">4</span> 箱から作る <span class="tok-c">{#box-first}</span>
+
+いまの道具は、まず空の箱を出してきます。テンプレート
+を選び、箱を並べ、中身を埋める。喋ってみるのは最後です。
+
+<span class="tok-h">###</span> 台本から作る <span class="tok-c">{#script-first}</span>
+
+dek は順番を逆にします。先に喋ることを書き、…
+
+<span class="tok-c">&gt; 聴衆がうなずくまで待つ。</span> <span class="num">6</span></pre>
+  </div>
+  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
+</section>

@@ -1,24 +1,55 @@
-<section class="slide" data-layout="tree">
-  <p class="kicker">今日いちばん覚えて帰ってほしいこと</p>
-  <h2 class="slide-title">台本が親で、スライドは従う。</h2>
-  <p class="node node-parent" data-step="script-parent" data-morph="script">
-    <img class="icon" src="assets/icon-script.svg" alt="">
-    script.md
-    <span class="note">順序も、喋りも、尺も</span>
-  </p>
-  <div class="col stack" data-step="slides-hang">
-    <p class="node">
-      <img class="icon" src="assets/icon-slide.svg" alt="">
-      intro.html
-    </p>
-    <p class="node">
-      <img class="icon" src="assets/icon-slide.svg" alt="">
-      problem.html
-    </p>
-    <p class="node">
-      <img class="icon" src="assets/icon-slide.svg" alt="">
-      order.html
-    </p>
+<section class="slide" data-layout="default">
+  <p class="kicker">Ⅱ　仕組み</p>
+  <h2 class="slide-title">台本が親で、スライドは子</h2>
+  <p class="lede">script.md の <strong>##</strong> 見出しひとつが、slides/ の HTML 1 枚になる。<br>左はこの資料の台本、右はそこから生まれたファイル。</p>
+  <div class="stage">
+    <pre class="code" data-morph="script"><span class="code-title"><span>script.md</span><span>見出しだけを抜粋</span></span><span class="tok-h">##</span> 喋る順に、スライドを組み立てる <span class="tok-c">{#cover}</span>
+<span class="tok-h">##</span> 前日の夜に、尺が合わないと気づく <span class="tok-c">{#night-before}</span>
+<span class="tok-h">##</span> 台本が親で、スライドは子 <span class="tok-c">{#parent}</span>
+<span class="tok-h">##</span> script.md の書き方 <span class="tok-c">{#anatomy}</span>
+<span class="tok-h">##</span> 保存すると、骨格ができる <span class="tok-c">{#skeleton}</span>
+<span class="tok-h">##</span> 1 枚は、小さな 1 ファイル <span class="tok-c">{#one-file}</span>
+<span class="tok-h">##</span> 喋りが画面を進める <span class="tok-c">{#beats}</span>
+<span class="tok-h">##</span> 尺は、書いた時点でわかる <span class="tok-c">{#timing}</span>
+<span class="tok-h">##</span> エージェントは、画面を見られない <span class="tok-c">{#blind}</span>
+<span class="tok-h">##</span> 規約は、lint が守る <span class="tok-c">{#rules}</span>
+<span class="tok-h">##</span> テーマは、コピーして引き継ぐ <span class="tok-c">{#themes}</span>
+<span class="tok-h">##</span> 1 ファイルで持っていく <span class="tok-c">{#outputs}</span>
+<span class="tok-h">##</span> 始めかた <span class="tok-c">{#start}</span>
+<span class="tok-h">##</span> まとめ <span class="tok-c">{#recap}</span></pre>
+    <pre class="code wires"><span class="code-title"><span>&nbsp;</span></span><span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span>
+<span class="wire"></span></pre>
+    <pre class="code files"><span class="code-title"><span>slides/</span><span>1 見出し = 1 ファイル</span></span><span class="tok-k">cover</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">night-before</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">parent</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">anatomy</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">skeleton</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">one-file</span>.html <span class="tok-c">.css .ts</span>
+<span class="tok-k">beats</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">timing</span>.html <span class="tok-c">.css .ts</span>
+<span class="tok-k">blind</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">rules</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">themes</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">outputs</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">start</span>.html <span class="tok-c">.css</span>
+<span class="tok-k">recap</span>.html <span class="tok-c">.css</span></pre>
+    <ol class="points">
+      <li><span class="num">1</span><p class="note"><strong>見出しが増えると、ファイルが増える。</strong>保存するたびに、足りない 1 枚を開発サーバが作る。</p></li>
+      <li><span class="num">2</span><p class="note"><strong>ファイル名は <span class="tag">{#id}</span> から。</strong>連番は付かないので、途中に 1 枚足しても他のファイルは動かない。</p></li>
+      <li><span class="num">3</span><p class="note"><strong>順番を持つのは台本だけ。</strong>並べ替えは見出しを入れ替えるか、<span class="tag">dek mv</span> で。</p></li>
+    </ol>
   </div>
-  <p class="meta"><span>dek sample</span><span>2026.09.18</span></p>
+  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
 </section>

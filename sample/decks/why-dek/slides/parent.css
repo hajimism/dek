@@ -1,0 +1,82 @@
+/* Script lines and file rows share one panel structure, so the wires between them line up. */
+.slide {
+  --row: 1.5rem;
+}
+
+.stage {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto auto auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.code {
+  line-height: var(--row);
+}
+
+.code-title {
+  line-height: 1.6;
+}
+
+.wires {
+  padding-left: calc(var(--gap) * 0.3);
+  padding-right: calc(var(--gap) * 0.3);
+  background: transparent;
+}
+
+.wire {
+  position: relative;
+  display: inline-block;
+  width: calc(var(--gap) * 2.2);
+  height: 0;
+  vertical-align: middle;
+  border-top: var(--hairline) solid var(--line-strong);
+}
+
+.wire::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: calc(var(--gap) * -0.17 - var(--hairline) / 2);
+  border-left: calc(var(--gap) * 0.3) solid var(--line-strong);
+  border-top: calc(var(--gap) * 0.17) solid transparent;
+  border-bottom: calc(var(--gap) * 0.17) solid transparent;
+}
+
+.wires .code-title {
+  border-bottom-color: transparent;
+}
+
+.files {
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  color: var(--muted);
+}
+
+.files .code-title {
+  border-bottom-color: var(--line);
+  color: var(--muted);
+}
+
+.files .tok-k {
+  color: var(--screen);
+  font-weight: 600;
+}
+
+.files .tok-c {
+  color: var(--muted);
+}
+
+.points {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.9);
+  padding-top: calc(var(--gap) * 2.4);
+  padding-left: calc(var(--gap) * 1.4);
+}
+
+.points li {
+  display: flex;
+  gap: calc(var(--gap) * 0.5);
+  align-items: baseline;
+}

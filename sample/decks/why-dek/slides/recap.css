@@ -1,0 +1,61 @@
+/* Three cards, each pointing back to the pages that made the point. */
+.slide-title {
+  margin-bottom: calc(var(--gap) * 1.2);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.5);
+  padding: var(--gap);
+  border-top: calc(var(--rule) * 2) solid var(--accent);
+}
+
+.stat {
+  color: var(--accent);
+}
+
+.claim {
+  margin: calc(var(--gap) * 0.3) 0 0;
+  font-family: var(--font-title);
+  font-size: calc(var(--size-title) * 0.8);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.card .note {
+  flex: 1;
+  font-size: var(--size-body);
+  line-height: 1.75;
+}
+
+.card .code {
+  padding: calc(var(--gap) * 0.45) calc(var(--gap) * 0.7);
+}
+
+.see {
+  margin: 0;
+  padding-top: calc(var(--gap) * 0.5);
+  border-top: var(--hairline) solid var(--line);
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.see::before {
+  content: "→ ";
+  color: var(--accent);
+}
+
+.links {
+  display: flex;
+  gap: calc(var(--gap) * 2);
+  margin: calc(var(--gap) * 0.9) 0 0;
+  font-size: var(--size-small);
+  color: var(--muted);
+}
+
+.links b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--fg);
+}

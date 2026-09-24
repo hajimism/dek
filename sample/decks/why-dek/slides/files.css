@@ -1,9 +1,0 @@
-.stat {
-  display: block;
-  font-family: var(--font-title);
-  font-size: var(--size-stat);
-  font-weight: 700;
-  line-height: 0.9;
-  letter-spacing: -0.05em;
-  font-variant-numeric: tabular-nums;
-}

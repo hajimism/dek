@@ -1,22 +1,32 @@
 <section class="slide" data-layout="close">
-  <p class="kicker">三原則</p>
-  <h2 class="slide-title">持ち帰るのは、この 3 つだけ。</h2>
-  <ol class="flow">
-    <li class="node" data-step="recap-script">
-      <span class="num">01</span>
-      <span class="claim">台本が親</span>
-      <span class="note">順序と尺の単一の真実</span>
+  <p class="kicker">まとめ</p>
+  <h2 class="slide-title">持ち帰ってほしいことは、三つ</h2>
+  <ol class="stage">
+    <li class="card" data-step="recap-script">
+      <span class="stat">01</span>
+      <p class="claim">台本が親</p>
+      <p class="note">順番も、喋る言葉も、尺も、script.md が持つ。スライドはそこから生えてくる。</p>
+      <pre class="code"><span class="tok-h">##</span> 見出し   <span class="tok-c">→ 1 枚</span>
+<span class="tok-h">###</span> 見出し  <span class="tok-c">→ ビート</span></pre>
+      <p class="see">script.md の書き方 · 尺は、書いた時点でわかる</p>
     </li>
-    <li class="node" data-step="recap-html">
-      <span class="num">02</span>
-      <span class="claim">1 枚 1 HTML</span>
-      <span class="note">小さく、壊れても 1 枚</span>
+    <li class="card" data-step="recap-file">
+      <span class="stat">02</span>
+      <p class="claim">1 枚は 1 ファイル</p>
+      <p class="note">スライドは小さなファイルに分かれていて、人もエージェントも 1 枚ずつ直せる。</p>
+      <pre class="code">slides/<span class="tok-k">night-before</span>.html
+slides/<span class="tok-k">night-before</span>.css</pre>
+      <p class="see">1 枚は、小さな 1 ファイル · 喋りが画面を進める</p>
     </li>
-    <li class="node" data-step="recap-lint">
-      <span class="num">03</span>
-      <span class="claim">lint が完成</span>
-      <span class="note">通ることが、完成の定義</span>
+    <li class="card" data-step="recap-lint">
+      <span class="stat">03</span>
+      <p class="claim">lint が通れば完成</p>
+      <p class="note">規約はすべて lint が確かめる。描画まで測るので、エージェントも自分で直せる。</p>
+      <pre class="code"><span class="tok-c">$</span> dek lint --visual
+<span class="tok-s">no diagnostics</span></pre>
+      <p class="see">エージェントは、画面を見られない · 規約は、lint が守る</p>
     </li>
   </ol>
-  <p class="meta"><span>dek sample</span><span>2026.09.18</span></p>
+  <p class="links"><span>ドキュメント　<b>hajimism.github.io/dek</b></span><span>この資料の台本とスライド　<b>sample/decks/why-dek</b></span></p>
+  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
 </section>

@@ -1,0 +1,33 @@
+/* What you need, as a short checklist beside the commands. */
+.slide {
+  --need-width: 7.2rem;
+}
+
+.needs {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.4);
+  margin-top: calc(var(--gap) * 1.3);
+  padding-top: calc(var(--gap) * 0.7);
+  border-top: var(--hairline) solid var(--line);
+}
+
+.need {
+  display: grid;
+  grid-template-columns: var(--need-width) minmax(0, 1fr);
+  align-items: baseline;
+  margin: 0;
+}
+
+.need .tag {
+  justify-self: start;
+}
+
+.needs > .note {
+  margin-top: calc(var(--gap) * 0.4);
+}
+
+.code {
+  font-size: var(--size-small);
+  line-height: 1.85;
+}

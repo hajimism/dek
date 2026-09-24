@@ -1,0 +1,134 @@
+/* A bar per section: the solid bar is the estimate, the tick is its share of the budget. */
+.slide {
+  --slug-width: 7.4rem;
+  --time-width: 5.6rem;
+  --bar-height: 0.62rem;
+  --tick-height: 1.05rem;
+}
+
+.lede {
+  font-size: var(--size-body);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--gap);
+  row-gap: calc(var(--gap) * 0.4);
+  margin: calc(var(--gap) * 1.1) 0 calc(var(--gap) * 0.9);
+  padding: calc(var(--gap) * 0.8) 0;
+  border-top: var(--hairline) solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
+  font-size: var(--size-small);
+}
+
+.facts dt {
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+.card {
+  padding: calc(var(--gap) * 0.8) var(--gap);
+}
+
+.totals {
+  display: flex;
+  gap: calc(var(--gap) * 2);
+  margin: 0 0 calc(var(--gap) * 0.7);
+  padding-bottom: calc(var(--gap) * 0.6);
+  border-bottom: var(--hairline) solid var(--line);
+}
+
+.totals .label {
+  margin-bottom: calc(var(--gap) * 0.2);
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.12);
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: var(--slug-width) minmax(0, 1fr) var(--time-width);
+  align-items: center;
+  column-gap: calc(var(--gap) * 0.6);
+  font-size: var(--size-caption);
+  line-height: 1.55;
+}
+
+.slug {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+.track {
+  position: relative;
+  height: var(--tick-height);
+  display: flex;
+  align-items: center;
+}
+
+.bar {
+  display: block;
+  height: var(--bar-height);
+  background: var(--screen);
+  border-radius: 0 calc(var(--radius) * 0.4) calc(var(--radius) * 0.4) 0;
+}
+
+.budget {
+  position: absolute;
+  top: 0;
+  width: var(--rule);
+  height: var(--tick-height);
+  background: var(--fg);
+}
+
+.time {
+  font-family: var(--font-mono);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.of {
+  color: var(--muted);
+}
+
+.is-long .slug {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin: calc(var(--gap) * 0.7) 0 0;
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.key-est,
+.key-budget {
+  display: inline-block;
+  width: 1.6em;
+  height: var(--bar-height);
+  background: var(--screen);
+}
+
+.key-budget {
+  width: var(--rule);
+  height: var(--tick-height);
+  margin-left: 1em;
+  background: var(--fg);
+}
+
+.source {
+  margin-left: auto;
+  font-family: var(--font-mono);
+}

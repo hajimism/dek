@@ -1,0 +1,36 @@
+<section class="slide" data-layout="default">
+  <p class="kicker">Ⅲ　運用</p>
+  <h2 class="slide-title">テーマは、コピーして引き継ぐ</h2>
+  <p class="lede">新しいデッキには、プロジェクトのテーマがコピーされる。共有ではないので、9 月にテーマを直しても<br>4 月に話したデッキの見た目は変わらない。過去のデッキが、そのままテーマの見本帳になる。</p>
+  <div class="stage">
+    <div class="proj">
+      <span class="tag">my-talks/theme.css</span>
+      <span class="note"><strong>プロジェクトのひな形。</strong>dek new のたびに、ここからデッキへコピーされる。</span>
+    </div>
+    <div class="links">
+      <span>dek new でコピー</span>
+      <span>dek new でコピー</span>
+      <span class="up">cp で書き戻す</span>
+    </div>
+    <div class="decks">
+      <div class="deck">
+        <p class="deck-name"><span class="tag">decks/2026-04-vite/</span><span class="when">4 月</span></p>
+        <span class="mock"><span class="mock-bar"></span><span class="mock-line"></span><span class="mock-line"></span></span>
+        <p class="note">話し終えたデッキ。ひな形をあとで直しても、このままの見た目で残る。</p>
+      </div>
+      <div class="deck is-jun">
+        <p class="deck-name"><span class="tag">decks/2026-06-react/</span><span class="when">6 月</span></p>
+        <span class="mock"><span class="mock-bar"></span><span class="mock-line"></span><span class="mock-line"></span></span>
+        <p class="note"><span class="tag">--theme-from</span> で、4 月のデッキのテーマを引き継いで作った。</p>
+      </div>
+      <div class="deck is-sep">
+        <p class="deck-name"><span class="tag">decks/2026-09-dek/</span><span class="when">9 月</span></p>
+        <span class="mock"><span class="mock-bar"></span><span class="mock-line"></span><span class="mock-line"></span></span>
+        <p class="note">いちばん新しいデッキ。気に入った変更は、ひな形に書き戻す。</p>
+      </div>
+    </div>
+    <pre class="code"><span class="tok-c">$</span> dek new 2026-06-react <span class="tok-k">--theme-from</span> 2026-04-vite   <span class="tok-c"># 前回のデッキから引き継ぐ</span>
+<span class="tok-c">$</span> cp decks/2026-09-dek/theme.css theme.css        <span class="tok-c"># 気に入ったらひな形に戻す</span></pre>
+  </div>
+  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
+</section>

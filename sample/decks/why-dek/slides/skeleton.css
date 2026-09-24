@@ -1,0 +1,39 @@
+/* Before and after, at the same size, so the only difference is the work. */
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: calc(var(--gap) * 0.9);
+}
+
+.shot {
+  margin: 0;
+}
+
+.shot figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: calc(var(--gap) * 0.4);
+}
+
+.shot .label {
+  margin: 0;
+}
+
+.shot .figure {
+  width: 100%;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.shot .note {
+  margin-top: calc(var(--gap) * 0.5);
+}
+
+.arrow {
+  margin: 0;
+  font-size: var(--size-title);
+  color: var(--accent);
+}

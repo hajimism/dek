@@ -1,11 +1,12 @@
+# voice dictionary
 [AI]
 kana = "エーアイ"
 
-[DSL]
-kana = "ディーエスエル"
+[Bun]
+kana = "バン"
 
-[Google]
-kana = "グーグル"
+[CSS]
+kana = "シーエスエス"
 
 [HTML]
 kana = "エイチティーエムエル"
@@ -13,17 +14,14 @@ kana = "エイチティーエムエル"
 [LAN]
 kana = "ラン"
 
-[LLM]
-kana = "エルエルエム"
+[Markdown]
+kana = "マークダウン"
 
-[PowerPoint]
-kana = "パワーポイント"
+[PDF]
+kana = "ピーディーエフ"
 
-[Slides]
-kana = "スライズ"
-
-[Slidev]
-kana = "スライデヴ"
+[TypeScript]
+kana = "タイプスクリプト"
 
 [USB]
 kana = "ユーエスビー"
@@ -31,29 +29,23 @@ kana = "ユーエスビー"
 [build]
 kana = "ビルド"
 
-[data-morph]
-kana = "データモーフ"
+[data-step]
+kana = "データステップ"
 
 [dek]
 kana = "デック"
 
+[duration]
+kana = "デュレーション"
+
+[id]
+kana = "アイディー"
+
 [lint]
 kana = "リント"
 
+[ls]
+kana = "エルエス"
+
 ["script.md"]
 kana = "スクリプトエムディー"
-
-["slides.md"]
-kana = "スライドエムディー"
-
-["theme.css"]
-kana = "テーマシーエスエス"
-
-[class]
-kana = "クラス"
-
-[section]
-kana = "セクション"
-
-[slide]
-kana = "スライド"

@@ -1,133 +1,210 @@
+/*
+ * Handout theme. Paper, ink, and two hues with fixed meanings:
+ * vermilion (--script) for what the talk says, indigo (--screen) for what the screen shows.
+ * Every slide reads on its own, so the PDF works as a handout.
+ */
 .slide {
-  --fg: #f7f4fc;
-  --bg: #0a0a0a;
-  --accent: #c084fc;
-  --muted: #b0a8bc;
-  --surface: #141216;
-  --surface-strong: #1c1822;
-  --line: #2e2a36;
-  --brand: #a600ff;
-  --brand-soft: rgba(166, 0, 255, 0.16);
-  --canvas: radial-gradient(ellipse 70% 80% at 108% -8%, rgba(166, 0, 255, 0.34), transparent 56%),
-    radial-gradient(ellipse 45% 50% at -12% 108%, rgba(125, 0, 196, 0.16), transparent 50%),
-    #0a0a0a;
-  --font-title: "Avenir Next", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Segoe UI",
-    system-ui, sans-serif;
-  --font-body: "Avenir Next", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Segoe UI",
-    system-ui, sans-serif;
-  --size-title: 3rem;
-  --size-body: 1.2rem;
-  --size-caption: 0.82rem;
-  --size-stat: 4.6rem;
-  --gap: 1.5rem;
-  --pad-x: 80px;
-  --pad-y: 56px;
-  --pad: var(--pad-y) var(--pad-x);
-  --radius: 8px;
+  --fg: #1b1915;
+  --bg: #f4f0e6;
+  --accent: #b3321c;
+  --muted: #5d574b;
+  --script: #b3321c;
+  --script-soft: #efdfd5;
+  --screen: #1f4f8f;
+  --screen-soft: #dfe4ea;
+  --surface: #fbf9f3;
+  --surface-strong: #ebe5d7;
+  --line: #d6cdba;
+  --line-strong: #a79c86;
+  --shadow: 0 0.6em 1.6em rgba(27, 25, 21, 0.12);
+  --code-bg: #1d1b18;
+  --code-fg: #ece6d8;
+  --code-dim: #9a927f;
+  --code-script: #f2937a;
+  --code-screen: #93b9ee;
+  --code-string: #b5d08f;
+  --font-title: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
+  --font-body: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Consolas", "Hiragino Sans", monospace;
+  --size-title: 2.35rem;
+  --size-hero: 3.9rem;
+  --size-lead: 1.15rem;
+  --size-body: 1rem;
+  --size-small: 0.875rem;
+  --size-caption: 0.78rem;
+  --size-code: 0.8rem;
+  --size-stat: 2.6rem;
+  --gap: 24px;
+  --pad-x: 72px;
+  --pad-top: 52px;
+  --pad-bottom: 76px;
+  --pad: var(--pad-top) var(--pad-x) var(--pad-bottom);
+  --radius: 6px;
   --hairline: 1px;
-  --rail: 4px;
-  --icon: 1.55rem;
-  --icon-lg: 2.4rem;
-  --tracking: 0.08em;
-  --step-transition: 0.35s ease;
+  --rule: 2px;
+  --pin: 1.45em;
+  --tracking: 0.14em;
+  --step-transition: 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
   box-sizing: border-box;
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
   padding: var(--pad);
-  padding-bottom: calc(var(--pad-y) * 1.55);
-  background: var(--canvas);
+  background: var(--bg);
   color: var(--fg);
   font-family: var(--font-body);
-  font-weight: 400;
+  font-size: var(--size-body);
+  line-height: 1.6;
+  font-feature-settings: "palt";
   -webkit-font-smoothing: antialiased;
 }
 
-.slide .slide-title {
-  margin: 0 0 var(--gap);
-  font-family: var(--font-title);
-  font-size: var(--size-title);
-  font-weight: 700;
-  line-height: 1.18;
-  letter-spacing: -0.03em;
-  text-wrap: balance;
-  font-feature-settings: "palt";
+/* Running head: a short vermilion rule at the top-left corner, like a printed page. */
+.slide::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--pad-x);
+  width: calc(var(--gap) * 2.5);
+  height: calc(var(--rule) * 2);
+  background: var(--accent);
 }
 
 .slide .kicker {
   display: flex;
-  align-items: center;
-  margin: 0 0 calc(var(--gap) * 0.4);
+  align-items: baseline;
+  gap: 0.9em;
+  margin: 0 0 calc(var(--gap) * 0.45);
   font-size: var(--size-caption);
   font-weight: 600;
   letter-spacing: var(--tracking);
   color: var(--accent);
 }
 
-.slide .kicker::before {
-  content: ">";
-  margin-right: 0.45em;
-  font-weight: 700;
+.slide .slide-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--size-title);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
 }
 
-.slide .lede,
-.slide .note {
-  margin: 0;
-  font-size: var(--size-body);
-  line-height: 1.5;
-  font-weight: 400;
+.slide .lede {
+  margin: calc(var(--gap) * 0.6) 0 0;
+  max-width: 44em;
+  font-size: var(--size-lead);
+  line-height: 1.75;
   color: var(--muted);
   text-wrap: pretty;
 }
 
-.slide .lede {
-  margin: calc(var(--gap) * 0.35) 0 0;
-  max-width: 22em;
+.slide .note {
+  margin: 0;
+  font-size: var(--size-small);
+  line-height: 1.7;
+  color: var(--muted);
+  text-wrap: pretty;
 }
 
-.slide .claim {
-  margin: 0;
-  font-family: var(--font-title);
-  font-weight: 700;
-  line-height: 1.28;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-  font-feature-settings: "palt";
+.slide .note strong,
+.slide .lede strong {
+  font-weight: 600;
+  color: var(--fg);
 }
 
 .slide .meta {
   position: absolute;
   left: var(--pad-x);
   right: var(--pad-x);
-  bottom: calc(var(--pad-y) * 0.42);
+  bottom: calc(var(--gap) * 1.1);
   display: flex;
   justify-content: space-between;
   margin: 0;
-  padding-top: calc(var(--gap) * 0.4);
+  padding-top: calc(var(--gap) * 0.45);
   border-top: var(--hairline) solid var(--line);
   font-size: var(--size-caption);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--muted);
 }
 
-.slide .icon {
-  display: block;
-  box-sizing: content-box;
-  width: var(--icon);
-  height: var(--icon);
-  padding: calc(var(--gap) * 0.32);
-  flex: none;
-  background: var(--surface-strong);
+.slide .col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The area under the heading that holds the figure. */
+.slide .stage {
+  position: relative;
+  min-height: 0;
+  margin-top: calc(var(--gap) * 1.1);
+}
+
+.slide .card {
+  box-sizing: border-box;
+  margin: 0;
+  padding: calc(var(--gap) * 0.75) calc(var(--gap) * 0.85);
+  background: var(--surface);
   border: var(--hairline) solid var(--line);
   border-radius: var(--radius);
 }
 
-.slide .node-parent .icon {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-  background: var(--brand-soft);
-  border-color: var(--brand);
+.slide .label {
+  display: block;
+  margin: 0 0 calc(var(--gap) * 0.35);
+  font-size: var(--size-caption);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+/* A numbered pin: ties a callout in the figure to its line in the legend. */
+.slide .num {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--pin);
+  height: var(--pin);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--surface);
+  font-family: var(--font-body);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.slide .tag {
+  display: inline-block;
+  padding: 0.1em 0.55em;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: calc(var(--radius) * 0.6);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--fg);
+}
+
+.slide .stat {
+  display: block;
+  font-family: var(--font-title);
+  font-size: var(--size-stat);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.slide .hue-script {
+  color: var(--script);
+}
+
+.slide .hue-screen {
+  color: var(--screen);
 }
 
 .slide .figure {
@@ -136,490 +213,159 @@
   height: auto;
 }
 
-.slide .figure-small {
-  max-width: 40%;
+/* Code and terminal panels. */
+.slide .code {
+  box-sizing: border-box;
+  margin: 0;
+  padding: calc(var(--gap) * 0.7) calc(var(--gap) * 0.85);
+  overflow: hidden;
+  background: var(--code-bg);
+  border-radius: var(--radius);
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+  font-size: var(--size-code);
+  line-height: 1.75;
+  white-space: pre;
+  font-feature-settings: normal;
 }
 
-.slide .exhibit {
-  width: auto;
-  max-width: 100%;
-  max-height: calc(var(--size-title) * 11);
-  object-fit: contain;
-  mix-blend-mode: lighten;
+.slide .code-title {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--gap) * 1.5);
+  margin: calc(var(--gap) * -0.7) calc(var(--gap) * -0.85) calc(var(--gap) * 0.55);
+  padding: calc(var(--gap) * 0.3) calc(var(--gap) * 0.85);
+  border-bottom: var(--hairline) solid var(--code-dim);
+  font-size: var(--size-caption);
+  letter-spacing: 0.04em;
+  color: var(--code-dim);
+}
+
+.slide .tok-h {
+  color: var(--code-script);
+  font-weight: 600;
+}
+
+.slide .tok-k {
+  color: var(--code-screen);
+}
+
+.slide .tok-s {
+  color: var(--code-string);
+}
+
+.slide .tok-c {
+  color: var(--code-dim);
+}
+
+.slide ul,
+.slide ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A bare list, as the skeleton writes it: one beat per ruled line. */
+.slide > ul {
+  margin-top: calc(var(--gap) * 1.2);
+  border-top: var(--hairline) solid var(--line);
+}
+
+.slide > ul > li {
+  padding: calc(var(--gap) * 0.55) 0;
+  border-bottom: var(--hairline) solid var(--line);
+  font-size: var(--size-lead);
 }
 
 /* @layout title
 <section class="slide" data-layout="title">
   <div class="col">
-    <p class="kicker">Kicker</p>
-    <h2 class="slide-title">The talk in one line.</h2>
-    <p class="lede" data-step="1">An optional line that comes in on a beat.</p>
+    <p class="kicker">Event · 2026.01.01</p>
+    <h2 class="slide-title">The talk<br>in one line</h2>
+    <p class="lede">What the audience takes home, in one sentence.</p>
   </div>
-  <img class="figure exhibit" src="assets/image.jpg" alt="">
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+  <div class="col">
+    <p class="label">Contents</p>
+    <ol>
+      <li>The problem</li>
+      <li>How it works</li>
+    </ol>
+  </div>
+  <p class="meta"><span>Talk title</span><span>Event · 2026.01.01</span></p>
 </section>
 */
 .slide[data-layout="title"] {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: var(--gap);
-}
-
-.slide[data-layout="title"] .col {
-  justify-content: center;
-  gap: calc(var(--gap) * 0.35);
-}
-
-.slide[data-layout="title"] .kicker {
-  margin-bottom: 0;
+  column-gap: calc(var(--gap) * 2.5);
 }
 
 .slide[data-layout="title"] .slide-title {
-  margin: 0;
-  max-width: 8.6em;
-  font-size: calc(var(--size-title) * 1.12);
-}
-
-.slide[data-layout="title"] .lede {
-  margin: calc(var(--gap) * 0.45) 0 0;
-}
-
-.slide[data-layout="title"] .exhibit {
-  justify-self: end;
-  align-self: center;
-  object-position: right center;
+  font-size: var(--size-hero);
+  line-height: 1.25;
+  letter-spacing: 0.02em;
 }
 
 /* @layout default
 <section class="slide" data-layout="default">
-  <p class="kicker">Kicker</p>
-  <h2 class="slide-title">A heading</h2>
-  <ol class="flow">
-    <li class="node" data-step="1"><span class="claim">One point per beat</span></li>
-    <li class="node" data-step="2"><span class="claim">The next point</span></li>
-  </ol>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+  <p class="kicker">Chapter</p>
+  <h2 class="slide-title">One claim per slide</h2>
+  <p class="lede">The claim as a full sentence, so the handout reads without the talk.</p>
+  <div class="stage">
+    <div class="card" data-step="1">A figure that fills the rest of the page</div>
+  </div>
+  <p class="meta"><span>Talk title</span><span>Event · 2026.01.01</span></p>
 </section>
 */
 .slide[data-layout="default"] {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
 }
 
-.slide[data-layout="default"] .flow {
-  align-content: start;
-}
-
-.slide[data-layout="default"] .stack .node {
-  flex: none;
-  min-height: calc(var(--gap) * 4.8);
-}
-
-/* @layout two-col
-<section class="slide" data-layout="two-col">
-  <p class="kicker">Kicker</p>
-  <h2 class="slide-title">Two sides, side by side</h2>
-  <ul class="stack">
-    <li class="node">Left, first</li>
-    <li class="node">Left, second</li>
-  </ul>
-  <ul class="stack">
-    <li class="node" data-step="1">Right, first</li>
-    <li class="node" data-step="2">Right, second</li>
-  </ul>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
-</section>
-*/
-.slide[data-layout="two-col"] {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto 1fr;
-  gap: var(--gap);
-  align-items: stretch;
-  align-content: start;
-}
-
-.slide[data-layout="two-col"] > .kicker,
-.slide[data-layout="two-col"] > .slide-title {
-  grid-column: 1 / -1;
-}
-
-.slide[data-layout="two-col"] > .slide-title {
-  margin-bottom: 0;
-}
-
-/* @layout full-bleed
-<section class="slide" data-layout="full-bleed">
-  <img class="figure exhibit" src="assets/image.jpg" alt="">
-  <div class="col">
-    <p class="kicker">Kicker</p>
-    <h2 class="slide-title">A caption over the picture.</h2>
-  </div>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
-</section>
-*/
-.slide[data-layout="full-bleed"] {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-items: stretch;
-  padding: 0;
-}
-
-.slide[data-layout="full-bleed"] .exhibit {
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  min-height: 0;
-  justify-self: stretch;
-  object-fit: contain;
-  object-position: center center;
-}
-
-.slide[data-layout="full-bleed"] .col {
-  padding: 0 var(--pad-x) calc(var(--pad-y) * 1.55);
-  gap: calc(var(--gap) * 0.28);
-}
-
-.slide[data-layout="full-bleed"] .kicker {
-  margin: 0;
-}
-
-.slide[data-layout="full-bleed"] .slide-title {
-  margin: 0;
-  max-width: 14em;
-  font-size: calc(var(--size-title) * 0.92);
-}
-
-/* @layout quote
-<section class="slide" data-layout="quote">
-  <div class="col">
-    <p class="kicker">Kicker</p>
-    <p class="claim">One sentence<br>worth remembering.</p>
-  </div>
-  <img class="figure exhibit" src="assets/image.jpg" alt="">
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
-</section>
-*/
-.slide[data-layout="quote"] {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  align-items: center;
-  column-gap: calc(var(--gap) * 0.75);
-}
-
-.slide[data-layout="quote"] .col {
-  justify-content: center;
-}
-
-.slide[data-layout="quote"] .kicker {
-  margin-bottom: calc(var(--gap) * 0.45);
-}
-
-.slide[data-layout="quote"] .claim {
-  font-size: calc(var(--size-title) * 1.08);
-  max-width: 7.4em;
-}
-
-.slide[data-layout="quote"] .exhibit {
-  justify-self: end;
-  align-self: center;
-  object-position: right center;
-}
-
-/* @layout process
-<section class="slide" data-layout="process">
-  <p class="kicker">Kicker</p>
-  <h2 class="slide-title">Steps, in order</h2>
-  <ol class="flow">
-    <li class="node" data-step="1">
-      <img class="icon" src="assets/icon.svg" alt="">
-      <span class="num">01</span>
-      <span class="claim">First</span>
-    </li>
-    <li class="node" data-step="2">
-      <img class="icon" src="assets/icon.svg" alt="">
-      <span class="num">02</span>
-      <span class="claim">Second</span>
-    </li>
-    <li class="node" data-step="3">
-      <img class="icon" src="assets/icon.svg" alt="">
-      <span class="num">03</span>
-      <span class="claim">Third</span>
-    </li>
-    <li class="node" data-step="4">
-      <img class="icon" src="assets/icon.svg" alt="">
-      <span class="num">04</span>
-      <span class="claim">Fourth</span>
-    </li>
-  </ol>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
-</section>
-*/
-.slide[data-layout="process"] {
-  display: flex;
-  flex-direction: column;
-}
-
-.slide[data-layout="process"] .slide-title {
-  margin-bottom: calc(var(--gap) * 0.7);
-}
-
-.slide[data-layout="process"] .flow {
-  flex: none;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--gap);
-  align-items: stretch;
-}
-
-.slide[data-layout="process"] .flow .node {
-  position: relative;
-  min-height: 0;
-  justify-content: flex-start;
-  gap: calc(var(--gap) * 0.45);
-}
-
-.slide[data-layout="process"] .node + .node::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: var(--gap);
-  height: var(--hairline);
-  background: var(--line);
-  transform: translate(-100%, -50%);
-}
-
-.slide[data-layout="process"] .node:last-child {
-  background: var(--surface-strong);
-  border-color: var(--brand);
-}
-
-.slide[data-layout="process"] .claim {
-  font-size: var(--size-body);
-  font-weight: 400;
-  line-height: 1.35;
-}
-
-/* @layout tree
-<section class="slide" data-layout="tree">
-  <p class="kicker">Kicker</p>
-  <h2 class="slide-title">One parent, its children</h2>
-  <p class="node node-parent" data-step="1">
-    <img class="icon" src="assets/icon.svg" alt="">
-    Parent
-    <span class="note">What it holds</span>
-  </p>
-  <div class="col stack" data-step="2">
-    <p class="node">Child</p>
-    <p class="node">Child</p>
-  </div>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
-</section>
-*/
-.slide[data-layout="tree"] {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  grid-template-rows: auto auto auto;
-  column-gap: calc(var(--gap) * 0.75);
-  row-gap: calc(var(--gap) * 0.5);
-  align-items: stretch;
-  align-content: start;
-}
-
-.slide[data-layout="tree"] > .kicker,
-.slide[data-layout="tree"] > .slide-title {
-  grid-column: 1 / -1;
-}
-
-.slide[data-layout="tree"] > .slide-title {
-  margin-bottom: 0;
-}
-
-.slide[data-layout="tree"] .node-parent {
-  min-height: 0;
-}
-
-.slide[data-layout="tree"] .node-parent .note {
-  font-family: var(--font-body);
-  font-size: var(--size-body);
-  font-weight: 400;
-  max-width: 11em;
-}
-
-.slide[data-layout="tree"] .stack {
-  padding-left: calc(var(--gap) * 0.9);
-  border-left: var(--rail) solid var(--brand);
-  justify-content: center;
-}
-
-.slide[data-layout="tree"] .stack .node {
-  position: relative;
-}
-
-.slide[data-layout="tree"] .stack .node::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: calc(var(--gap) * -0.9);
-  width: calc(var(--gap) * 0.9);
-  height: var(--hairline);
-  background: var(--brand);
-  transform: translateY(-50%);
+.slide[data-layout="default"] > .stage {
+  flex: 1;
 }
 
 /* @layout split
 <section class="slide" data-layout="split">
-  <p class="kicker">Kicker</p>
-  <h2 class="slide-title">One source, two results</h2>
-  <p class="node node-parent">
-    <img class="icon" src="assets/icon.svg" alt="">
-    Source
-  </p>
-  <p class="node" data-step="1">
-    <span class="num">Result</span>
-    <span class="note">What the first one means</span>
-  </p>
-  <p class="node" data-step="2">
-    <span class="num">Result</span>
-    <span class="note">What the second one means</span>
-  </p>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+  <div class="col">
+    <p class="kicker">Chapter</p>
+    <h2 class="slide-title">Text on the left</h2>
+    <p class="lede">The claim as a full sentence.</p>
+    <p class="note" data-step="1">A detail that arrives on a beat.</p>
+  </div>
+  <div class="col">
+    <pre class="code"><span class="code-title"><span>file.md</span></span>a figure on the right</pre>
+  </div>
+  <p class="meta"><span>Talk title</span><span>Event · 2026.01.01</span></p>
 </section>
 */
 .slide[data-layout="split"] {
   display: grid;
-  grid-template-columns: auto 1fr 1fr;
-  grid-template-rows: auto auto auto;
-  gap: var(--gap);
-  align-items: stretch;
-  align-content: start;
-}
-
-.slide[data-layout="split"] > .kicker,
-.slide[data-layout="split"] > .slide-title {
-  grid-column: 1 / -1;
-}
-
-.slide[data-layout="split"] > .slide-title {
-  margin-bottom: 0;
-}
-
-.slide[data-layout="split"] .node {
-  min-height: calc(var(--gap) * 9);
-  justify-content: center;
-  gap: calc(var(--gap) * 0.4);
-  padding: calc(var(--gap) * 0.9);
-}
-
-.slide[data-layout="split"] .node-parent {
-  flex: none;
-  align-self: center;
-  min-height: 0;
-  font-size: var(--size-body);
-  padding: calc(var(--gap) * 0.75);
-  max-width: calc(var(--gap) * 8);
-}
-
-.slide[data-layout="split"] .num {
-  margin: 0;
-}
-
-/* @layout pipeline
-<section class="slide" data-layout="pipeline">
-  <p class="kicker">Kicker</p>
-  <h2 class="slide-title">This leads to that</h2>
-  <p class="node" data-step="1">
-    <img class="icon" src="assets/icon.svg" alt="">
-    <span class="num">01</span>
-    <span class="claim">Cause</span>
-    <span class="note">A line of detail</span>
-  </p>
-  <p class="node" data-step="2">
-    <img class="icon" src="assets/icon.svg" alt="">
-    <span class="num">02</span>
-    <span class="claim">Effect</span>
-    <span class="note">A line of detail</span>
-  </p>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
-</section>
-*/
-.slide[data-layout="pipeline"] {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto auto;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   column-gap: calc(var(--gap) * 2);
-  row-gap: calc(var(--gap) * 0.5);
   align-items: stretch;
-  align-content: start;
 }
 
-.slide[data-layout="pipeline"] > .kicker,
-.slide[data-layout="pipeline"] > .slide-title {
-  grid-column: 1 / -1;
-}
-
-.slide[data-layout="pipeline"] > .slide-title {
-  margin-bottom: 0;
-}
-
-.slide[data-layout="pipeline"] > .node {
-  position: relative;
-  min-height: calc(var(--gap) * 10);
+.slide[data-layout="split"] > .col:last-of-type {
   justify-content: center;
-  gap: calc(var(--gap) * 0.45);
 }
 
-.slide[data-layout="pipeline"] .icon {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-}
-
-.slide[data-layout="pipeline"] > .node + .node::before {
-  content: "→";
-  position: absolute;
-  top: 50%;
-  left: 0;
-  color: var(--accent);
-  font-size: calc(var(--size-title) * 0.72);
-  font-weight: 400;
-  line-height: 1;
-  transform: translate(-50%, -50%) translateX(calc(var(--gap) * -1));
-}
-
-.slide[data-layout="pipeline"] .claim {
-  font-size: calc(var(--size-title) * 0.55);
-  font-weight: 700;
-}
-
-.slide[data-layout="pipeline"] .note {
-  max-width: 14em;
+.slide[data-layout="split"] .lede {
+  font-size: var(--size-body);
 }
 
 /* @layout close
 <section class="slide" data-layout="close">
-  <p class="kicker">Kicker</p>
-  <h2 class="slide-title">Take home these three.</h2>
-  <ol class="flow">
-    <li class="node" data-step="1">
-      <span class="num">01</span>
-      <span class="claim">First</span>
-      <span class="note">In a few words</span>
-    </li>
-    <li class="node" data-step="2">
-      <span class="num">02</span>
-      <span class="claim">Second</span>
-      <span class="note">In a few words</span>
-    </li>
-    <li class="node" data-step="3">
-      <span class="num">03</span>
-      <span class="claim">Third</span>
-      <span class="note">In a few words</span>
-    </li>
+  <p class="kicker">Summary</p>
+  <h2 class="slide-title">Take home these three</h2>
+  <ol class="stage">
+    <li class="card" data-step="1"><span class="num">1</span><p class="lede">First</p></li>
+    <li class="card" data-step="2"><span class="num">2</span><p class="lede">Second</p></li>
+    <li class="card" data-step="3"><span class="num">3</span><p class="lede">Third</p></li>
   </ol>
-  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+  <p class="meta"><span>Talk title</span><span>Event · 2026.01.01</span></p>
 </section>
 */
 .slide[data-layout="close"] {
@@ -627,143 +373,20 @@
   flex-direction: column;
 }
 
-.slide[data-layout="close"] .slide-title {
-  margin-bottom: calc(var(--gap) * 0.7);
-}
-
-.slide[data-layout="close"] .flow {
+.slide[data-layout="close"] > .stage {
   flex: 1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: calc(var(--gap) * 1.35);
-  align-items: stretch;
-}
-
-.slide[data-layout="close"] .node {
-  min-height: 0;
-  justify-content: flex-start;
-  gap: calc(var(--gap) * 0.45);
-  padding: calc(var(--gap) * 0.7) 0 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  border-top: var(--rail) solid var(--brand);
-}
-
-.slide[data-layout="close"] .claim {
-  font-size: calc(var(--size-title) * 0.52);
-}
-
-.slide[data-layout="close"] .note {
-  max-width: 12em;
-  font-size: calc(var(--size-caption) * 1.15);
-}
-
-.slide ul {
-  margin: 0;
-  padding-left: 1.25em;
-  font-size: var(--size-body);
-  line-height: 1.6;
-}
-
-.slide .col {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.slide .stack {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--gap) * 0.45);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.slide[data-layout="two-col"] .stack {
-  flex: 1;
-}
-
-.slide[data-layout="two-col"] .stack .node {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.slide .flow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(calc(var(--gap) * 6.4), 1fr));
-  gap: calc(var(--gap) * 0.55);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
 }
 
-.slide .flow .icon {
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-}
-
-.slide .flow .node {
-  min-height: calc(var(--gap) * 10);
-  justify-content: flex-start;
-}
-
-.slide .node {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: calc(var(--gap) * 0.4);
-  margin: 0;
-  padding: calc(var(--gap) * 0.65) calc(var(--gap) * 0.7);
-  background: var(--surface);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius);
-  font-size: var(--size-body);
-  line-height: 1.4;
-}
-
-.slide .stack .node {
-  flex-direction: row;
-  align-items: center;
-  gap: calc(var(--gap) * 0.7);
-}
-
-.slide .node-parent {
-  flex: 1;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  gap: calc(var(--gap) * 0.55);
-  min-height: calc(var(--gap) * 12);
-  padding: calc(var(--gap) * 0.9);
-  background: var(--surface-strong);
-  border-color: var(--line);
-  border-left: var(--rail) solid var(--brand);
-  font-family: var(--font-title);
-  font-size: calc(var(--size-title) * 0.62);
-  font-weight: 700;
-}
-
-.slide .num {
-  display: block;
-  margin-bottom: calc(var(--gap) * 0.12);
-  font-size: var(--size-caption);
-  font-weight: 600;
-  letter-spacing: var(--tracking);
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.slide .stack .num {
-  margin-bottom: 0;
-}
-
+/* Beats: hidden until reached, with no layout shift, so every beat measures the same. */
 .slide.is-current [data-step] {
   opacity: 0;
-  transform: translateY(0.4em);
-  transition: var(--step-transition);
+  transform: translateY(0.6em);
+  transition:
+    opacity var(--step-transition),
+    transform var(--step-transition);
 }
 
 .slide.is-current [data-step].is-shown {
@@ -771,38 +394,47 @@
   transform: none;
 }
 
-@keyframes fade-out {
-  from {
-    opacity: 1;
-  }
+/* Pages turn left, like a handout; elements with data-morph fly between pages on their own. */
+@keyframes page-out {
   to {
-    opacity: 0;
+    transform: translateX(-3%);
   }
 }
 
-@keyframes fade-in {
+@keyframes page-in {
   from {
     opacity: 0;
-  }
-  to {
-    opacity: 1;
+    transform: translateX(4%);
   }
 }
 
+/* View-transition pseudo-elements hang off the document root, not .slide, so they get their own tokens. */
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-group(*) {
+  --page-transition: 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --morph-duration: 0.6s;
+}
+
+/* The old page stays opaque underneath while the new one fades in over it, so nothing dims. */
 ::view-transition-old(root) {
-  --step-transition: 0.3s ease;
-  animation: fade-out var(--step-transition);
+  animation: page-out var(--page-transition);
+  mix-blend-mode: normal;
 }
 
 ::view-transition-new(root) {
-  --step-transition: 0.3s ease;
-  animation: fade-in var(--step-transition);
+  animation: page-in var(--page-transition);
+  mix-blend-mode: normal;
+}
+
+::view-transition-group(*) {
+  animation-duration: var(--morph-duration);
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .slide.is-current [data-step] {
     transition: none;
-    animation: none;
   }
 
   ::view-transition-old(root),

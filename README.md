@@ -45,7 +45,7 @@ Continue with [Getting Started](https://hajimism.github.io/dek/guide/getting-sta
 
 ## Sample
 
-`sample/` is an eight-minute deck about dek itself, set up as a full project with Playwright, rumdl, and voice. See [sample/README.md](sample/README.md).
+`sample/` is a twelve-minute deck about dek itself, built to read as a handout, set up as a full project with Playwright, rumdl, and voice. See [sample/README.md](sample/README.md).
 
 ```bash
 cd sample

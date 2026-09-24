@@ -1,0 +1,54 @@
+/* The table of contents is the script's own headings, set in the script's hue. */
+.slide {
+  --toc-width: 25rem;
+}
+
+.lede {
+  margin-top: calc(var(--gap) * 1.2);
+  font-size: var(--size-lead);
+}
+
+.byline {
+  margin: calc(var(--gap) * 2.2) 0 0;
+  padding-top: calc(var(--gap) * 0.5);
+  width: calc(var(--gap) * 8);
+  border-top: var(--rule) solid var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  letter-spacing: 0.08em;
+}
+
+.toc {
+  width: var(--toc-width);
+  padding-left: calc(var(--gap) * 1.4);
+  border-left: var(--hairline) solid var(--line-strong);
+}
+
+.toc ol {
+  font-size: var(--size-small);
+  line-height: 1.95;
+}
+
+.toc li {
+  display: flex;
+  gap: 0.7em;
+  white-space: nowrap;
+}
+
+.toc-part {
+  margin-top: calc(var(--gap) * 0.45);
+  font-size: var(--size-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking);
+  color: var(--muted);
+}
+
+.toc-part:first-child {
+  margin-top: 0;
+}
+
+.toc-mark {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--script);
+}
