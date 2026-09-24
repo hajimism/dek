@@ -7,9 +7,7 @@ describe("formatZodIssues", () => {
     const r = z.object({ title: z.string() }).safeParse({});
     expect(r.success).toBe(false);
     if (r.success) return;
-    expect(formatZodIssues(r.error)).toBe(
-      "title: Invalid input: expected string, received undefined",
-    );
+    expect(formatZodIssues(r.error)).toBe("title: required");
   });
 
   test("joins multiple issues with '; ' and keeps nested paths", () => {

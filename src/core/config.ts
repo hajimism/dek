@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { DekError } from "./error.ts";
-import { formatZodIssues } from "./zod.ts";
+import { causeText, configHint, formatZodIssues } from "./zod.ts";
 
 const DekToml = z.object({
   max_classes: z.number().optional(),
@@ -40,12 +40,16 @@ export function parseDekToml(source: string, path?: string): DekConfig {
   try {
     parsed = Bun.TOML.parse(source);
   } catch (error) {
-    throw new DekError("invalid dek.toml", { path, cause: error });
+    throw new DekError(`invalid dek.toml: ${causeText(error)}`, {
+      path,
+      cause: error,
+      hint: configHint("dek-toml"),
+    });
   }
 
   const result = DekToml.safeParse(parsed ?? {});
   if (!result.success) {
-    throw new DekError(formatZodIssues(result.error), { path });
+    throw new DekError(formatZodIssues(result.error), { path, hint: configHint("dek-toml") });
   }
 
   const voice = result.data.voice

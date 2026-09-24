@@ -1,7 +1,7 @@
 import { DekError } from "./error.ts";
 import { splitLines } from "./lines.ts";
 import { type Beat, Deck, Frontmatter, Id, type Section } from "./schema.ts";
-import { formatZodIssues } from "./zod.ts";
+import { causeText, configHint, formatZodIssues } from "./zod.ts";
 
 const HEADING_RE = /^(#{2,3})(?!#)\s+(.*)$/;
 const TRAILING_ATTR_RE = /^(.*?)\s*\{([^}]*)\}\s*$/;
@@ -50,12 +50,19 @@ function parseFrontmatter(yaml: string, filename?: string): Frontmatter {
   try {
     parsed = Bun.YAML.parse(quoteUnquotedHashes(yaml));
   } catch (error) {
-    throw new DekError("invalid YAML frontmatter", { path: filename, cause: error });
+    throw new DekError(`invalid YAML frontmatter: ${causeText(error)}`, {
+      path: filename,
+      cause: error,
+      hint: configHint("frontmatter"),
+    });
   }
 
   const result = Frontmatter.safeParse(parsed);
   if (!result.success) {
-    throw new DekError(formatZodIssues(result.error), { path: filename });
+    throw new DekError(formatZodIssues(result.error), {
+      path: filename,
+      hint: configHint("frontmatter"),
+    });
   }
   return result.data;
 }

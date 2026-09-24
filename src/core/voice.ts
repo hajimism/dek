@@ -15,7 +15,7 @@ import {
   type Timeline,
   type Utterance,
 } from "./timeline.ts";
-import { formatZodIssues } from "./zod.ts";
+import { causeText, configHint, formatZodIssues } from "./zod.ts";
 
 export type VoiceSettings = {
   engine: string;
@@ -85,11 +85,18 @@ export function loadVoiceSettings(deckDir: string): VoiceSettings {
   try {
     parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
   } catch (error) {
-    throw new DekError("invalid voice.toml", { path, cause: error });
+    throw new DekError(`invalid voice.toml: ${causeText(error)}`, {
+      path,
+      cause: error,
+      hint: configHint("voice-voice-toml"),
+    });
   }
   const result = VoiceToml.safeParse(parsed ?? {});
   if (!result.success) {
-    throw new DekError(formatZodIssues(result.error), { path });
+    throw new DekError(formatZodIssues(result.error), {
+      path,
+      hint: configHint("voice-voice-toml"),
+    });
   }
   return {
     engine: result.data.engine,
@@ -168,7 +175,11 @@ export function loadVoiceDict(deckDir: string): VoiceDict {
   try {
     parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
   } catch (error) {
-    throw new DekError("invalid dict.toml", { path, cause: error });
+    throw new DekError(`invalid dict.toml: ${causeText(error)}`, {
+      path,
+      cause: error,
+      hint: configHint("voice-dict-toml"),
+    });
   }
   if (!parsed || typeof parsed !== "object") {
     return {};
@@ -177,7 +188,10 @@ export function loadVoiceDict(deckDir: string): VoiceDict {
   for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
     const entry = DictEntry.safeParse(value);
     if (!entry.success) {
-      throw new DekError(`invalid dict entry "${key}": ${formatZodIssues(entry.error)}`, { path });
+      throw new DekError(`invalid dict entry "${key}": ${formatZodIssues(entry.error)}`, {
+        path,
+        hint: configHint("voice-dict-toml"),
+      });
     }
     dict[key] = entry.data;
   }
