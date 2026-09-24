@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dek-ref",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd sample && bunx dek dek-ref --port 4777"
+      ],
+      "port": 4777
+    },
+    {
+      "name": "dek-ref-dist",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4778",
+        "-d",
+        "sample/decks/dek-ref/dist"
+      ],
+      "port": 4778
+    }
+  ]
+}
