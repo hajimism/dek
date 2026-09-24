@@ -10,7 +10,7 @@ my-talks/                       # project (dek init)
 ├── .gitignore                  # dist/, .cache/, .dek/server.json
 ├── .rumdl.toml                 # Markdown rules for script.md
 ├── theme.css                   # the starting point for new decks
-├── AGENTS.md                   # conventions for agents (written by sync)
+├── AGENTS.md                   # conventions for agents (written by init, new, and sync)
 ├── tsconfig.json               # editor types for slide scripts (written by dek init)
 ├── assets/                     # shared source material; decks copy what they use
 ├── decks/

@@ -72,7 +72,9 @@ dek mv architecture --after intro
 
 前者は `script.md` の id を書き換え、`slides/problem.html` と、あれば `problem.css` と `problem.ts` をリネームし、`data-slug` と `voice/voice.toml` の該当キーも書き換えます。見出しの文言には触れず、宛先のファイルがひとつでもあれば実行を拒みます。すべてのファイルが変わるか、どれも変わらないかのどちらかです。後者は台本の中でセクションを動かします。HTML ファイルは順序を持たないので、その場に留まります。
 
-lint が「HTML のないセクション（`DEK001`）」と「セクションのない HTML（`DEK002`）」をちょうど 1 件ずつ見つけたときは、改名だと推定して `dek mv <old> <new>` を提案します。どちらかが 2 件以上あるときは推測しません。
+見出しを先に書き換えてから `dek mv` を実行してもかまいません。`script.md` がすでに新しい id になっていれば、`dek mv problem the-problem` はファイルだけを動かします。開発サーバが保存時に生成した骨格のままの `the-problem.html` は置き換え、手を入れたファイルがあれば実行を拒みます。
+
+lint が「セクションのない HTML（`DEK002`）」を 1 件と、自分の HTML を持たないセクションを 1 件だけ見つけたときは、改名だと推定して `` run `dek mv problem the-problem` `` を hint として返します。後者は HTML がない（`DEK001`）か、生成された骨格のままのセクションです。候補が 2 件以上あるときは推測しません。
 
 ## ビート
 

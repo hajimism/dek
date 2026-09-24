@@ -29,6 +29,24 @@
 
 すべてのクラスにその一手が要るわけではありません。1 枚でしか使わない装飾は、その枚のスタイルシートに置きます。そこなら `DEK013` にも数えられず、他の枚にも漏れません。[スライドごとの CSS](./slides#スライドごとの-css)を参照してください。
 
+## レイアウトの HTML 例
+
+レイアウトは、どんなマークアップを受け取るかの約束です。`split` は親のノードと 2 つの結果を、`tree` は親と子の並びを想定しています。その約束を、レイアウトの最初の規則のすぐ上にコメントとして書いておくと、テーマと一緒に受け継がれます。
+
+```css
+/* @layout split
+<section class="slide" data-layout="split">
+  <h2 class="slide-title">One source, two results</h2>
+  <p class="node node-parent">Source</p>
+  <p class="node" data-step="1">Result</p>
+  <p class="node" data-step="2">Result</p>
+</section>
+*/
+.slide[data-layout="split"] {
+```
+
+`dek theme split` でこの例を出力でき、`dek theme` でどのレイアウトに例があるかを一覧できます。同梱テーマと sample のテーマは全レイアウトに例を持っているので、エージェントは推測せずに、そのレイアウトが想定するマークアップからスライドを書き始められます。
+
 ## コピーして、固定する
 
 プロジェクト直下の `theme.css` は新しいデッキの出発点です。編集は一方向にしか流れません。作成時に新しいデッキへ下り、残す価値があると判断したときに手で上げる。

@@ -7,6 +7,7 @@
 - **スコープは実行場所で決まる。** プロジェクト直下なら全デッキ、デッキの中ならそのデッキ。どこからでも、最初の引数か `--deck <name>` でデッキを指定できます: `dek lint why-dek`、`dek show why-dek intro`、`dek why-dek`。詳細は[プロジェクトとデッキ](/ja/guide/structure#実行場所がスコープを決める)。
 - **結果を返すコマンドは `--json` を受け付ける。** 成功は `{ "ok": true, ... }`。失敗は `{ "ok": false, "error": { "message", "path", "line", "hint" } }` で終了コード 1。起動し続ける `dek` と `dek rehearse` は `--json` を取りません。
 - **診断は SARIF。** `dek lint --format sarif`。既定は ESLint 風のテキストです。
+- **失敗になるのは error だけ。** 各診断は `severity` を持ちます。error が残っていれば `lint` と `check` は `"ok": false` と終了コード 1 を返し、warning だけなら終了コード 0 です。
 - **`init` と `sync` は上書きしない。** 足りないものを作り、余ったものを警告します。リネームもしません。
 - **すべてのエラーが hint を持つ。** 次に叩くコマンドを名指しします。直し方が決まっている診断にも hint が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。
 - **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dek が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
@@ -25,8 +26,8 @@
 
 | コマンド | 役割 |
 | --- | --- |
-| `dek init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`.dek/schema.json`、`.dek/slide.d.ts` を書く |
-| `dek new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーする |
+| `dek init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dek/schema.json`、`.dek/slide.d.ts` を書く。最初のデッキは骨格スライド付きで作るので、そのまま lint を通る |
+| `dek new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る |
 | `dek ls [deck]` | デッキ一覧、または 1 つの概要。セクション数、枚数、診断、予算、見積もり、Timeline があれば実尺 |
 
 ## スライド
@@ -34,6 +35,7 @@
 | コマンド | 役割 |
 | --- | --- |
 | `dek show <slug>` | セクションの台本と HTML を出力。ファイルがなければ `html` は `null` |
+| `dek theme [layout]` | デッキ自身の `theme.css` が定義するレイアウト・クラス・トークンを一覧する。レイアウトを指定すると、`slides/<id>.html` にそのまま貼れる HTML 例を出力する |
 | `dek check <slug> [--shot] [--voice]` | 1 枚を lint。Playwright があれば描画系ルールも含む。`--shot` はスクリーンショットを書いてパスを返す。`--voice` はカナと尺を返す |
 | `dek shot [slug] [--step <id\|n>]` | 1 枚、または全枚のスクリーンショット。既定は最終ビート。ファイルは `.cache/shots/<slug>[-<step>].<hash>.png`。hash は描画内容から決まり、テーマや HTML が変われば別パスになり、古い画像は消える |
 | `dek shot <a> --to <b> [--at 0..1]` | `a` の最終ビートから `b` へ移る View Transition を `--at`（既定 0.5）で止めた 1 フレーム。`.cache/shots/<a>-to-<b>-<at>.<hash>.png` に書く。`--step` とは併用できない |
@@ -54,7 +56,7 @@
 | `dek voice say TEXT` | 1 文を再生 |
 | `dek voice dict add WORD KANA` | `voice/dict.toml` に読みを追加 |
 | `dek voice pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
-| `dek build [--root-dist]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される |
+| `dek build [--root-dist]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。問題があれば件数を表示し、`--json` には診断そのものが入る |
 | `dek video [slug] [--fps N] [--root-dist]` | `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` を添える。1 枚なら `.cache/video/<slug>.mp4` |
 | `dek pdf [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く |
 | `dek help [--agent]` | ヘルプ。`--agent` はエージェント向けの圧縮リファレンス |

@@ -52,13 +52,29 @@ Playwright がなければ、それを必要とするコマンドだけがイン
 
 ## 完成の定義は声で変わらない
 
-`DEK040`（読み辞書にない英単語）と `DEK042`（何かを見せるのに何も喋らないビート）は `voice/` のあるデッキにだけ適用されます。`DEK041`（ナレーションの長さが `duration` の予算から大きく外れている）は Timeline があるときだけです。`DEK043`（`voice.toml` の `[beats]` のキーがどこにも当たらない）は `voice/` のあるデッキにだけ適用されます。4 つとも警告です。ライブ専用のデッキは lint が通れば完成で、声を足してもそれは変わりません。
+`DEK040`（読み辞書にない英単語）と `DEK042`（何かを見せるのに何も喋らないビート）は `voice/` のあるデッキにだけ適用されます。`DEK041` はトークの長さを `duration` の予算と比べます。Timeline があればナレーションの実尺を、なければ `dek ls` が出す字数からの見積もりを使います。見積もりには間やデモが入らないので、許容幅を広く取ります（20% ではなく 35%）。`DEK043`（`voice.toml` の `[beats]` のキーがどこにも当たらない）は `voice/` のあるデッキにだけ適用されます。4 つとも警告で、報告はしますが lint を失敗させません。ライブ専用のデッキは lint が通れば完成で、声を足してもそれは変わりません。
 
 ## 出力
 
 診断は SARIF 2.1.0 で統一しています。VS Code も CI もエージェントも同じ形式を読めるようにするためで、rumdl の結果は 2 つ目の run として合流します。人間向けの既定は ESLint 風のテキストです。
 
 直し方が決まっている診断には `hint` が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。テキストでは `help:` 行、`--json` では `hint` フィールド、SARIF ではメッセージの末尾に出ます。
+
+すべての診断は `severity`（`error` か `warning`）を持ちます。失敗になるのは error だけです。error が 1 件でも残れば `dek lint` と `dek check` は終了コード 1 と `"ok": false` を返し、warning だけなら終了コード 0 と `"ok": true` を返します。テキストではルール ID の後ろに `warning:` と表示し、SARIF では `level` を設定します。rumdl の診断は error として扱います。
+
+診断は直すべきファイルを指します。`DEK001` は `script.md` の該当する見出し、スライド HTML のルールは問題の属性がある行です。メッセージに含まれる値は `data` フィールドにも入るので、エージェントはメッセージを解析せずに `{ "class": "headline" }` や `{ "edges": { "bottom": 591 }, "steps": ["1"] }` を読めます。
+
+```json
+{
+  "id": "DEK031",
+  "severity": "error",
+  "message": "p.note \"補足\" has contrast 1.5 (#333333 on #111111), below 4.5:1 at step 1",
+  "path": "slides/objection.html",
+  "slug": "objection",
+  "hint": "raise the contrast of its color against the background to 4.5:1",
+  "data": { "box": "p.note", "text": "補足", "ratio": 1.5, "threshold": 4.5, "fg": "#333333", "bg": "#111111", "steps": ["1"] }
+}
+```
 
 ```bash
 dek lint --format sarif > results.sarif

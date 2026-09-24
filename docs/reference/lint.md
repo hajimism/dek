@@ -17,6 +17,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 | `DEK014` | A raw color, `font-family`, or absolute unit outside a token assignment, in the theme or a slide stylesheet | — |
 | `DEK015` | A required token is missing from `.slide` | — |
 | `DEK016` | A slide script that cannot run: an import, a named export, no default export, a syntax error, top-level await or code that throws, a `motion` key that is not a beat of the slide, top-level code that does not finish, or a script saved as `.js` instead of `.ts` | — |
+| `DEK017` | A slide script that would not draw the same frame for the same `t`: a timer, `requestAnimationFrame`, `Date`, `performance.now`, or `Math.random`; or a class used to find an element (`querySelector`, `closest`, `matches`, `getElementsByClassName`) | — |
 | `DEK020` | A remote URL (CDN, remote image) | — |
 | `DEK021` | A referenced image file does not exist | — |
 | `DEK022` | A path that leaves the deck directory | — |
@@ -24,7 +25,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 | `DEK030` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
 | `DEK031` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK040` | An ASCII word missing from the pronunciation dictionary. Warning | — |
-| `DEK041` | Narrated length far from the `duration` budget. Warning | — |
+| `DEK041` | The talk's length far from the `duration` budget: narrated length with a Timeline, the reading-time estimate without. Warning | — |
 | `DEK042` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
 | `DEK043` | A `[beats]` key in `voice.toml` that matches no slide or beat. Warning | — |
 
@@ -32,14 +33,14 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 
 - `DEK030` and `DEK031` run only with `--visual` and require Playwright.
 - `DEK040`, `DEK042`, and `DEK043` apply only to decks with `voice/`. `dek cues` reports `DEK042` regardless.
-- `DEK041` applies only to decks with a Timeline.
-- `DEK040` through `DEK043` are warnings. A live-only deck's definition of done is unchanged.
+- `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin).
+- `DEK040` through `DEK043` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. A live-only deck's definition of done is unchanged.
 
 ## Notes
 
 ### DEK001 / DEK002
 
-`--fix` creates the skeleton and never touches an existing file. Exactly one of each suggests a rename, and lint proposes `dek mv <old> <new>`. More than one of either and it does not guess.
+`DEK001` points at the section heading in `script.md`; `data.expected` is the HTML path it looked for. `--fix` creates the skeleton and never touches an existing file. One orphan and one section without its own HTML (missing, or still the generated skeleton) suggest a rename: both diagnostics carry `` run `dek mv <old> <new>` `` as the hint, and the command works whether or not `script.md` was edited first. More than one candidate and lint does not guess.
 
 ### DEK003
 
@@ -55,13 +56,21 @@ Clear it by defining the class in `theme.css`, or in `slides/<id>.css` when only
 
 ### DEK014 / DEK015
 
+The hint names the theme tokens that could take the value's place: color tokens for a color, `--size-*` for a `font-size`, and so on. When none fits, it says to add one to `theme.css`.
+
 Raw values are allowed only when assigning a `--*` property. Unitless `0`, `thin`, and `em` pass. `var()` with a raw fallback does not. All thirteen tokens in the contract must be published on `.slide`; extra tokens are welcome.
+
+### DEK016 / DEK017
+
+`DEK016` means the script cannot run; `DEK017` means it runs but depends on something other than `t`, or finds elements by a class the theme may rename. Both point at the script file, and `DEK017` at the line. A script with an import is still evaluated with the import removed, so its `motion` keys are checked in the same run.
 
 ### DEK020 / DEK021 / DEK022 / DEK023
 
 Self-containment. Nothing remote, nothing from the project root, nothing from a sibling deck. Local `src` values start with `assets/`. This is what allows `dek build` to inline every asset and the project-root dev server to serve them.
 
 ### DEK030
+
+The hint keeps the fix on the slide: cut or split the content, or size it in `slides/<id>.css`. It never suggests changing a theme token, which would move every slide.
 
 The message names the element, the start of its text, the edge, and how many pixels it runs past. A child is reported only for an edge its parent stays inside, so a list that runs off the bottom is one finding. The same finding on several beats is one diagnostic that names every beat. Text is measured as well as boxes, so an unbreakable string such as a URL counts even when its box fits.
 

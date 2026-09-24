@@ -10,7 +10,7 @@ my-talks/                       # プロジェクト（dek init）
 ├── .gitignore                  # dist/ .cache/ .dek/server.json
 ├── .rumdl.toml                 # script.md 用の Markdown ルール
 ├── theme.css                   # 新しいデッキの出発点
-├── AGENTS.md                   # エージェント向けの規約（sync が書く）
+├── AGENTS.md                   # エージェント向けの規約（init・new・sync が書く）
 ├── tsconfig.json               # スライドのスクリプト用のエディタ設定（dek init が書く）
 ├── assets/                     # 素材置き場。デッキは使うものをコピーする
 ├── decks/

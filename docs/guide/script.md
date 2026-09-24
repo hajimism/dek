@@ -72,7 +72,9 @@ dek mv architecture --after intro
 
 The first command rewrites the id in `script.md`, renames `slides/problem.html` along with its `problem.css` and `problem.ts` if present, updates `data-slug`, and rewrites matching keys in `voice/voice.toml`. It does not touch the heading text, and it refuses to run if any of the destination files already exists. Either every file changes or none does. The second moves the section in the script; HTML files stay where they are because they carry no order of their own.
 
-When lint sees exactly one missing slide (`DEK001`) and exactly one orphan (`DEK002`), it assumes a rename and suggests `dek mv <old> <new>`. With more than one of either, it does not guess.
+You can also edit the heading first and run `dek mv` afterwards. When `script.md` already has the new id, `dek mv problem the-problem` moves only the files. A `the-problem.html` that is still the skeleton the dev server generated on save is replaced; one you have edited stops the command.
+
+When lint sees exactly one orphan (`DEK002`) and exactly one section without its own HTML, either missing (`DEK001`) or still the generated skeleton, it assumes a rename and gives `` run `dek mv problem the-problem` `` as the hint. With more than one candidate, it does not guess.
 
 ## Beats
 

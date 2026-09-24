@@ -37,6 +37,7 @@ function guide(p: string, t: Record<string, string>): DefaultTheme.SidebarItem[]
       items: [
         { text: t.faq, link: `${p}/guide/faq` },
         { text: t.architecture, link: `${p}/guide/architecture` },
+        { text: t.agentCriteria, link: `${p}/guide/agent-criteria` },
       ],
     },
   ];
@@ -74,6 +75,7 @@ const en = {
   more: "More",
   faq: "FAQ",
   architecture: "Architecture",
+  agentCriteria: "Agent Usability Criteria",
   reference: "Reference",
   cli: "CLI",
   lintRules: "Lint Rules",
@@ -99,6 +101,7 @@ const ja = {
   more: "その他",
   faq: "FAQ",
   architecture: "アーキテクチャ",
+  agentCriteria: "エージェント向けの品質基準",
   reference: "リファレンス",
   cli: "CLI",
   lintRules: "Lint ルール",

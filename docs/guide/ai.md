@@ -4,7 +4,7 @@ Agents use the same CLI you do. There is no MCP server and no tool schema to ins
 
 ## What the agent reads
 
-`dek sync` writes a short `AGENTS.md` at the project root and keeps it current: the three principles, the conventions, the class names, tokens, and layouts from the project theme, and a pointer to the CLI's own reference. It stays under a hundred lines. Anything more detailed is pulled from the CLI when needed.
+`dek init` writes a short `AGENTS.md` at the project root, and `dek new` and `dek sync` keep it current: the three principles, the conventions, the class names, tokens, and layouts from the project theme, and a pointer to the CLI's own reference. It stays under a hundred lines. Anything more detailed is pulled from the CLI when needed.
 
 ```bash
 dek help --agent
@@ -14,7 +14,7 @@ That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a
 
 ## What the CLI promises
 
-1. **Every result command accepts `--json`.** Success is `{ "ok": true, ... }`; failure is `{ "ok": false, "error": { "message", "path", "hint" } }` with exit code 1. `dek` and `dek rehearse` stay running and are the only exceptions. Diagnostics are SARIF. Nothing forces an agent to parse prose.
+1. **Every result command accepts `--json`.** Success is `{ "ok": true, ... }`; failure is `{ "ok": false, "error": { "message", "path", "hint" } }` with exit code 1. `dek` and `dek rehearse` stay running and are the only exceptions. Diagnostics are SARIF. Each diagnostic carries its `severity` and the values its message names as `data`, and only errors fail. Nothing forces an agent to parse prose.
 2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is. Diagnostics carry a hint too when the fix is known, such as `use hook, turn, or 1-2` for a `data-step` that names no beat.
 3. **`dek help --agent` is a few hundred tokens.** The CLI documents itself.
 4. **`AGENTS.md` stays short.**

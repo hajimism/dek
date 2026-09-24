@@ -29,6 +29,24 @@ New classes land in the deck's own `theme.css`, so no other deck is affected. Wh
 
 Not every class deserves that step. Decoration that one slide uses goes in that slide's own stylesheet instead, where it neither counts toward `DEK013` nor leaks into other slides. See [Slide stylesheets](./slides#slide-stylesheets).
 
+## Layout examples
+
+A layout is a promise about markup: `split` expects a parent node and two results, `tree` a parent and a stack. Write that promise down as a comment directly above the layout's first rule, and it travels with the theme.
+
+```css
+/* @layout split
+<section class="slide" data-layout="split">
+  <h2 class="slide-title">One source, two results</h2>
+  <p class="node node-parent">Source</p>
+  <p class="node" data-step="1">Result</p>
+  <p class="node" data-step="2">Result</p>
+</section>
+*/
+.slide[data-layout="split"] {
+```
+
+`dek theme split` prints the example, and `dek theme` lists which layouts have one. The bundled theme and the sample's themes carry an example for every layout, so an agent can start a slide from the markup the layout was designed for instead of guessing.
+
 ## Copy, then freeze
 
 The project's `theme.css` is the starting point for new decks. Edits flow in one direction: down into a new deck on creation, and back up by hand when you decide something is worth keeping.
