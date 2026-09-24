@@ -82,6 +82,8 @@ If `##` is a slide, `###` is a **beat** within it: a pause in the speaking, and 
 
 During the talk, the right arrow first steps through the beats of the current slide, then moves to the next slide. A beat does not need a matching element in the HTML. It can simply be a place where you pause, with the screen unchanged.
 
+The first beat begins as the slide arrives, and the paragraphs between `##` and the first `###` are spoken as part of it. Whatever the HTML binds to the first beat is therefore on screen from the start; to bring something in while you speak, bind it to a later beat. A slide with no `###` is a single beat, which `data-step` and `motion` call `1`.
+
 *When* something appears is a speaking decision, so the script owns it. *How* it appears is a visual decision, so `theme.css` owns it. The HTML side is described in [Beats](./steps).
 
 ## Timing
