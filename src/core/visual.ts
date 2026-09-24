@@ -6,6 +6,7 @@ import { loadSlideSources, renderSlideHtml } from "./html.ts";
 import { cacheDir } from "./path.ts";
 import {
   defaultPlaywrightRunner,
+  type Edge,
   type PlaywrightRunner,
   playwrightResolved,
   type VisualPage,
@@ -14,24 +15,66 @@ import {
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { pruneStaleShots, shotFileName } from "./shot.ts";
 import { logicalSize } from "./size.ts";
+import type { Box, MeasuredElement } from "./slide-measure.ts";
 import { stepKey } from "./step.ts";
 
-export type Box = {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-};
+export type { Box } from "./slide-measure.ts";
 
 export type Rgb = [number, number, number];
 
-export function overflowsSlide(slide: Box, child: Box): boolean {
-  return (
-    child.left < slide.left ||
-    child.top < slide.top ||
-    child.right > slide.right ||
-    child.bottom > slide.bottom
-  );
+const EDGES: Edge[] = ["top", "right", "bottom", "left"];
+
+export type Overflow = {
+  box: string;
+  text?: string;
+  by: Partial<Record<Edge, number>>;
+};
+
+function overflowAmounts(slide: Box, rect: Box): Partial<Record<Edge, number>> {
+  if (rect.right <= rect.left || rect.bottom <= rect.top) {
+    return {};
+  }
+  const past: Record<Edge, number> = {
+    top: slide.top - rect.top,
+    right: rect.right - slide.right,
+    bottom: rect.bottom - slide.bottom,
+    left: slide.left - rect.left,
+  };
+  const by: Partial<Record<Edge, number>> = {};
+  for (const edge of EDGES) {
+    // Sub-pixel layout rounding is not an overflow anyone can see.
+    if (past[edge] >= 1) {
+      by[edge] = Math.round(past[edge]);
+    }
+  }
+  return by;
+}
+
+/**
+ * The elements that cross an edge of the slide, each reported only for the
+ * edges its parent stays inside: a list that runs off the bottom is one
+ * finding, not one per item.
+ */
+export function findOverflows(
+  slide: Box,
+  elements: Array<Pick<MeasuredElement, "box" | "parent" | "rect" | "text">>,
+): Overflow[] {
+  const amounts = elements.map((element) => overflowAmounts(slide, element.rect));
+  const found: Overflow[] = [];
+  elements.forEach((element, index) => {
+    const parent = amounts[element.parent] ?? {};
+    const by: Partial<Record<Edge, number>> = {};
+    for (const edge of EDGES) {
+      const amount = amounts[index]?.[edge];
+      if (amount !== undefined && parent[edge] === undefined) {
+        by[edge] = amount;
+      }
+    }
+    if (Object.keys(by).length > 0) {
+      found.push({ box: element.box, ...(element.text ? { text: element.text } : {}), by });
+    }
+  });
+  return found;
 }
 
 export function relativeLuminance([r, g, b]: Rgb): number {
@@ -209,26 +252,121 @@ async function visualDeck(
   };
 }
 
+const SNIPPET_CHARS = 24;
+const HORIZONTAL_HINT = "shorten it, or let it wrap with overflow-wrap: anywhere in";
+const VERTICAL_HINT = "cut or split the content, or lower the size tokens";
+
+function describeTarget(box: string | undefined, text: string | undefined): string {
+  if (!box) {
+    return "";
+  }
+  if (!text) {
+    return `${box} `;
+  }
+  const chars = [...text];
+  const snippet =
+    chars.length > SNIPPET_CHARS ? `${chars.slice(0, SNIPPET_CHARS).join("")}…` : text;
+  return `${box} "${snippet}" `;
+}
+
+function atSteps(steps: string[]): string {
+  return steps.length === 1 ? `at step ${steps[0]}` : `at steps ${steps.join(", ")}`;
+}
+
+function toHex(color: string | undefined): string | undefined {
+  const rgb = color === undefined ? undefined : parseCssRgb(color);
+  return (
+    rgb && `#${rgb.map((channel) => Math.round(channel).toString(16).padStart(2, "0")).join("")}`
+  );
+}
+
+/** Groups findings that differ only by step, keeping the first-seen order. */
+function groupBySteps<T>(items: T[], key: (item: T) => string, step: (item: T) => string) {
+  const groups = new Map<string, { items: T[]; steps: string[] }>();
+  for (const item of items) {
+    const id = key(item);
+    const group = groups.get(id) ?? { items: [], steps: [] };
+    group.items.push(item);
+    const value = step(item) || "1";
+    if (!group.steps.includes(value)) {
+      group.steps.push(value);
+    }
+    groups.set(id, group);
+  }
+  return [...groups.values()];
+}
+
 function visualDiagnostics(response: VisualResponse, fallbackPath: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const overflow of response.overflows) {
-    diagnostics.push({
-      id: "DEK030",
-      message: `content overflows the slide at step ${overflow.step || "1"}`,
-      path: overflow.slug ? join(dirname(fallbackPath), `${overflow.slug}.html`) : fallbackPath,
-    });
-  }
-  for (const contrast of response.contrasts) {
-    const threshold = contrastThreshold(contrast);
-    if (contrast.ratio >= threshold) {
+  const pathOf = (slug: string): string =>
+    slug ? join(dirname(fallbackPath), `${slug}.html`) : fallbackPath;
+
+  const overflowGroups = groupBySteps(
+    response.overflows,
+    (o) => [o.slug, o.box, o.text ?? "", EDGES.filter((edge) => o.by?.[edge]).join()].join("\0"),
+    (o) => o.step,
+  );
+  for (const { items, steps } of overflowGroups) {
+    const [first] = items;
+    if (!first) {
       continue;
     }
-    const ratio = Math.round(contrast.ratio * 10) / 10;
+    const edges = EDGES.filter((edge) => first.by?.[edge] !== undefined);
+    const where =
+      edges.length === 0
+        ? "overflows the slide"
+        : `overflows ${edges
+            .map((edge) => {
+              const px = Math.max(...items.map((item) => item.by?.[edge] ?? 0));
+              return `the ${edge} edge by ${px}px`;
+            })
+            .join(" and ")}`;
+    const hints = [
+      ...(edges.some((edge) => edge === "left" || edge === "right")
+        ? [`${HORIZONTAL_HINT} slides/${first.slug}.css`]
+        : []),
+      ...(edges.some((edge) => edge === "top" || edge === "bottom") ? [VERTICAL_HINT] : []),
+    ];
+    const target =
+      edges.length === 0 && !first.text ? "content " : describeTarget(first.box, first.text);
+    diagnostics.push({
+      id: "DEK030",
+      message: `${target}${where} ${atSteps(steps)}`,
+      path: pathOf(first.slug),
+      ...(first.slug ? { slug: first.slug } : {}),
+      ...(hints.length > 0 ? { hint: hints.join("; ") } : {}),
+    });
+  }
+
+  const failing = response.contrasts.filter((sample) => sample.ratio < contrastThreshold(sample));
+  const contrastGroups = groupBySteps(
+    failing,
+    (c) =>
+      [c.slug, c.box ?? "", c.text ?? "", Math.round(c.ratio * 10), contrastThreshold(c)].join(
+        "\0",
+      ),
+    (c) => c.step,
+  );
+  for (const { items, steps } of contrastGroups) {
+    const [first] = items;
+    if (!first) {
+      continue;
+    }
+    const threshold = contrastThreshold(first);
+    const ratio = Math.round(first.ratio * 10) / 10;
     const size = threshold === 3 ? " (large text)" : "";
+    const fg = toHex(first.fg);
+    const bg = toHex(first.bg);
+    const colors = fg && bg ? ` (${fg} on ${bg})` : "";
+    const message = first.box
+      ? `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`
+      : `contrast ${ratio} is below ${threshold}:1${size} ${atSteps(steps)}`;
     diagnostics.push({
       id: "DEK031",
-      message: `contrast ${ratio} is below ${threshold}:1${size} at step ${contrast.step || "1"}`,
-      path: contrast.slug ? join(dirname(fallbackPath), `${contrast.slug}.html`) : fallbackPath,
+      message,
+      path: pathOf(first.slug),
+      ...(first.slug ? { slug: first.slug } : {}),
+      hint: `raise the contrast of its color against the background to ${threshold}:1`,
     });
   }
   return diagnostics;

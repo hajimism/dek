@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 import { freezeTransition } from "./freeze-transition.ts";
 import { importPlaywright, type VisualRequest, type VisualResponse } from "./playwright.ts";
-import { type Box, contrastRatio, overflowsSlide, parseCssRgb } from "./visual.ts";
+import { measureSlideInPage } from "./slide-measure.ts";
+import { contrastRatio, findOverflows, parseCssRgb } from "./visual.ts";
 
 let playwright: Awaited<ReturnType<typeof importPlaywright>>;
 try {
@@ -37,31 +38,35 @@ try {
         continue;
       }
       await page.setContent(pageReq.html, { waitUntil: "load" });
-      const measured = await measureSlide(page);
+      const measured = await page.evaluate(measureSlideInPage);
+      const slug = pageReq.slug ?? "";
+      const step = pageReq.step ?? "1";
       if (request.actions.includes("overflow") && measured.slideBox) {
-        for (const child of measured.children) {
-          if (overflowsSlide(measured.slideBox, child.rect)) {
-            response.overflows.push({
-              slug: pageReq.slug ?? "",
-              step: pageReq.step ?? "1",
-              box: child.box,
-            });
-          }
+        for (const overflow of findOverflows(measured.slideBox, measured.elements)) {
+          response.overflows.push({ slug, step, ...overflow });
         }
       }
       if (request.actions.includes("contrast")) {
-        for (const sample of measured.samples) {
-          const fg = parseCssRgb(sample.fg);
-          const bg = parseCssRgb(sample.bg);
+        for (const element of measured.elements) {
+          // Only text the element draws itself; an ancestor's sample would repeat it.
+          if (!element.ownText || element.opacity === 0) {
+            continue;
+          }
+          const fg = parseCssRgb(element.fg);
+          const bg = parseCssRgb(element.bg);
           if (!fg || !bg) {
             continue;
           }
           response.contrasts.push({
-            slug: pageReq.slug ?? "",
-            step: pageReq.step ?? "1",
+            slug,
+            step,
             ratio: contrastRatio(fg, bg),
-            fontSize: sample.fontSize,
-            fontWeight: sample.fontWeight,
+            fontSize: element.fontSize,
+            fontWeight: element.fontWeight,
+            box: element.box,
+            ...(element.text ? { text: element.text } : {}),
+            fg: element.fg,
+            bg: element.bg,
           });
         }
       }
@@ -86,55 +91,4 @@ try {
   }
 } catch {
   process.exit(2);
-}
-
-async function measureSlide(page: { evaluate<T>(fn: () => T | Promise<T>): Promise<T> }): Promise<{
-  slideBox: Box | undefined;
-  children: Array<{ box: string; rect: Box }>;
-  samples: Array<{ fg: string; bg: string; fontSize: number; fontWeight: number }>;
-}> {
-  return page.evaluate(() => {
-    const slide = document.querySelector(".slide");
-    if (!slide) {
-      return { slideBox: undefined, children: [], samples: [] };
-    }
-    const slideRect = slide.getBoundingClientRect();
-    const slideBox = {
-      left: slideRect.left,
-      top: slideRect.top,
-      right: slideRect.right,
-      bottom: slideRect.bottom,
-    };
-    const children: Array<{ box: string; rect: Box }> = [];
-    const samples: Array<{ fg: string; bg: string; fontSize: number; fontWeight: number }> = [];
-    for (const el of slide.querySelectorAll("*")) {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        children.push({
-          box: el.tagName.toLowerCase(),
-          rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
-        });
-      }
-      const style = getComputedStyle(el);
-      if (Number(style.opacity) === 0) {
-        continue;
-      }
-      if (!el.textContent?.trim()) {
-        continue;
-      }
-      let background = style.backgroundColor;
-      let current: Element | null = el.parentElement;
-      while (current && (background === "transparent" || /,\s*0\)/.test(background))) {
-        background = getComputedStyle(current).backgroundColor;
-        current = current.parentElement;
-      }
-      samples.push({
-        fg: style.color,
-        bg: background,
-        fontSize: Number.parseFloat(style.fontSize),
-        fontWeight: Number(style.fontWeight) || 400,
-      });
-    }
-    return { slideBox, children, samples };
-  });
 }

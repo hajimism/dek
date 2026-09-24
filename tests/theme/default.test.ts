@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cssCustomProperties } from "../../src/core/css.ts";
+import { cssCustomProperties, cssDeclarations } from "../../src/core/css.ts";
 import { lintDeck } from "../../src/core/index.ts";
 import { REQUIRED_TOKENS } from "../../src/core/tokens.ts";
+import { contrastRatio, type Rgb } from "../../src/core/visual.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -130,5 +131,22 @@ describe("default theme", () => {
         expect(diagnostics.filter((d) => d.id === "DEK014" || d.id === "DEK015")).toEqual([]);
       },
     );
+  });
+});
+
+describe("default theme colors", () => {
+  const tokens = new Map(
+    cssDeclarations(readFileSync(themePath, "utf8"))
+      .filter((decl) => decl.selector === ".slide" && decl.property.startsWith("--"))
+      .map((decl) => [decl.property, decl.value.trim()]),
+  );
+  const rgb = (name: string): Rgb => {
+    const hex = tokens.get(name)?.replace(/^#/, "") ?? "";
+    const full = hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex;
+    return [0, 2, 4].map((i) => Number.parseInt(full.slice(i, i + 2), 16)) as Rgb;
+  };
+
+  test.each(["--fg", "--muted", "--accent"])("%s is readable body text on --bg", (name) => {
+    expect(contrastRatio(rgb(name), rgb("--bg"))).toBeGreaterThanOrEqual(4.5);
   });
 });

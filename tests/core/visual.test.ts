@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { VisualRequest } from "../../src/core/playwright.ts";
+import type { VisualRequest, VisualResponse } from "../../src/core/playwright.ts";
 import { shotDeck } from "../../src/core/shot.ts";
 import {
   contrastRatio,
   contrastThreshold,
+  findOverflows,
   lintVisualDeck,
-  overflowsSlide,
   parseCssRgb,
   runVisualDeck,
 } from "../../src/core/visual.ts";
@@ -18,18 +18,6 @@ import { withTempProject } from "../helpers/project.ts";
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
 </section>`);
-
-describe("overflowsSlide", () => {
-  const slide = { left: 0, top: 0, right: 1280, bottom: 720 };
-
-  test("is false when the child is inside the slide", () => {
-    expect(overflowsSlide(slide, { left: 80, top: 64, right: 400, bottom: 200 })).toBe(false);
-  });
-
-  test("is true when the child extends past the slide", () => {
-    expect(overflowsSlide(slide, { left: 0, top: 0, right: 1280, bottom: 800 })).toBe(true);
-  });
-});
 
 describe("parseCssRgb", () => {
   test("parses comma and space separated rgb()", () => {
@@ -281,5 +269,124 @@ second
         expect(pages).toBe(2);
       },
     );
+  });
+});
+
+describe("findOverflows", () => {
+  const slideBox = { left: 0, top: 0, right: 1280, bottom: 720 };
+  const el = (box: string, rect: [number, number, number, number], parent = -1, text?: string) => ({
+    box,
+    parent,
+    rect: { left: rect[0], top: rect[1], right: rect[2], bottom: rect[3] },
+    ...(text ? { text } : {}),
+  });
+
+  test("reports the outermost element that overflows an edge, not every child", () => {
+    const found = findOverflows(slideBox, [
+      el("ul", [80, 150, 1200, 900], -1, "時間がかかる"),
+      el("li", [110, 150, 1200, 190], 0, "時間がかかる"),
+      el("li", [110, 860, 1200, 900], 0, "さらに追加"),
+    ]);
+    expect(found).toEqual([{ box: "ul", text: "時間がかかる", by: { bottom: 180 } }]);
+  });
+
+  test("reports a child only for the edges its parent stays inside", () => {
+    const found = findOverflows(slideBox, [
+      el("ul", [80, 150, 1200, 900]),
+      el("li", [110, 860, 1692, 900], 0, "https://example.com"),
+    ]);
+    expect(found).toEqual([
+      { box: "ul", by: { bottom: 180 } },
+      { box: "li", text: "https://example.com", by: { right: 412 } },
+    ]);
+  });
+
+  test("ignores empty boxes and sub-pixel rounding", () => {
+    expect(
+      findOverflows(slideBox, [el("span", [2000, 0, 2000, 0]), el("p", [80, 64, 1280.4, 719])]),
+    ).toEqual([]);
+  });
+});
+
+describe("lintVisualDeck messages", () => {
+  async function lintWith(response: VisualResponse) {
+    const diagnostics = await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      (root) => lintVisualDeck(join(root, "decks", "demo"), { runner: async () => response }),
+    );
+    return diagnostics ?? [];
+  }
+
+  test("names the element, its text, and how far it overflows, once across steps", async () => {
+    const overflow = {
+      slug: "intro",
+      box: 'li[data-step="vague"]',
+      text: "https://example.com/very/long/url/that/never/wraps",
+      by: { right: 412 },
+    };
+    const diagnostics = await lintWith({
+      overflows: [
+        { ...overflow, step: "slow" },
+        { ...overflow, step: "vague" },
+      ],
+      contrasts: [],
+    });
+    expect(diagnostics.filter((d) => d.id === "DEK030")).toEqual([
+      {
+        id: "DEK030",
+        message:
+          'li[data-step="vague"] "https://example.com/very…" overflows the right edge by 412px at steps slow, vague',
+        path: expect.stringContaining("slides/intro.html"),
+        slug: "intro",
+        hint: "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css",
+      },
+    ]);
+  });
+
+  test("keeps the largest amount and names every edge", async () => {
+    const diagnostics = await lintWith({
+      overflows: [
+        { slug: "intro", step: "1", box: "ul", by: { bottom: 120, right: 3 } },
+        { slug: "intro", step: "2", box: "ul", by: { bottom: 180, right: 3 } },
+      ],
+      contrasts: [],
+    });
+    const dek030 = diagnostics.find((d) => d.id === "DEK030");
+    expect(dek030?.message).toBe(
+      "ul overflows the right edge by 3px and the bottom edge by 180px at steps 1, 2",
+    );
+    expect(dek030?.hint).toBe(
+      "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut or split the content, or lower the size tokens",
+    );
+  });
+
+  test("names the element and both colors when contrast is low", async () => {
+    const sample = {
+      slug: "intro",
+      ratio: 1.94,
+      fontSize: 20,
+      fontWeight: 400,
+      box: "p.stat-label",
+      text: "手戻りの減少",
+      fg: "rgb(68, 68, 68)",
+      bg: "rgb(17, 17, 17)",
+    };
+    const diagnostics = await lintWith({
+      overflows: [],
+      contrasts: [
+        { ...sample, step: "1" },
+        { ...sample, step: "2" },
+      ],
+    });
+    expect(diagnostics.filter((d) => d.id === "DEK031")).toEqual([
+      {
+        id: "DEK031",
+        message:
+          'p.stat-label "手戻りの減少" has contrast 1.9 (#444444 on #111111), below 4.5:1 at steps 1, 2',
+        path: expect.stringContaining("slides/intro.html"),
+        slug: "intro",
+        hint: "raise the contrast of its color against the background to 4.5:1",
+      },
+    ]);
   });
 });

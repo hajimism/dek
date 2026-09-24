@@ -6,6 +6,7 @@ import { resolvePackageFromAncestors } from "../../src/core/optional.ts";
 import {
   defaultPlaywrightRunner,
   parseVisualResponse,
+  playwrightMissingError,
   playwrightResolved,
   resolvePlaywrightModule,
 } from "../../src/core/playwright.ts";
@@ -168,6 +169,74 @@ describe("playwright worker", () => {
   );
 });
 
+describe("playwright worker findings", () => {
+  test.skipIf(!playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT))(
+    "reports the list that runs off the slide once, and samples only elements with text",
+    async () => {
+      const items = Array.from({ length: 30 }, (_, i) => `<li>item ${i}</li>`).join("");
+      const response = await defaultPlaywrightRunner({
+        viewport: { width: 1280, height: 720 },
+        actions: ["overflow", "contrast"],
+        pages: [
+          {
+            html: `<html><body style="margin:0;background:#111"><section class="slide" style="width:1280px;height:720px;overflow:hidden;color:#444">
+  <div class="wrap"><ul class="list" style="margin:0;font-size:40px;line-height:1">${items}</ul></div>
+</section></body></html>`,
+            slug: "intro",
+            step: "1",
+          },
+        ],
+      });
+      expect(response?.overflows).toEqual([
+        {
+          slug: "intro",
+          step: "1",
+          box: "div.wrap",
+          text: expect.stringMatching(/^item 0 item 1 /),
+          by: { bottom: 480 },
+        },
+      ]);
+      const boxes = new Set(response?.contrasts.map((sample) => sample.box));
+      expect([...boxes]).toEqual(["li"]);
+      expect(response?.contrasts[0]).toMatchObject({
+        fg: "rgb(68, 68, 68)",
+        bg: "rgb(17, 17, 17)",
+      });
+    },
+  );
+});
+
+describe("playwright worker text overflow", () => {
+  test.skipIf(!playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT))(
+    "reports text that runs past the slide even when its box fits",
+    async () => {
+      const url = `https://example.com/${"a".repeat(200)}`;
+      const response = await defaultPlaywrightRunner({
+        viewport: { width: 1280, height: 720 },
+        actions: ["overflow"],
+        pages: [
+          {
+            html: `<html><body style="margin:0"><section class="slide" style="width:1280px;height:720px;overflow:hidden;padding:64px 80px;box-sizing:border-box">
+  <ul style="margin:0"><li>short</li><li>${url}</li></ul>
+</section></body></html>`,
+            slug: "intro",
+            step: "1",
+          },
+        ],
+      });
+      expect(response?.overflows).toEqual([
+        {
+          slug: "intro",
+          step: "1",
+          box: "li",
+          text: url,
+          by: { right: expect.any(Number) },
+        },
+      ]);
+    },
+  );
+});
+
 describe("playwright worker morph", () => {
   test.skipIf(!playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT))(
     "freezes a view transition at --at and produces a distinct frame",
@@ -276,5 +345,13 @@ describe("parseVisualResponse", () => {
       contrasts: [],
       pdfPath: "/tmp/demo.pdf",
     });
+  });
+});
+
+describe("playwrightMissingError", () => {
+  test("installs the module before the browser", () => {
+    expect(playwrightMissingError().hint).toBe(
+      "bun add -d playwright && bunx playwright install chromium",
+    );
   });
 });

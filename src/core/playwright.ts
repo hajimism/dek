@@ -29,12 +29,26 @@ export type VisualRequest = {
   morph?: MorphRequest;
 };
 
+export type Edge = "top" | "right" | "bottom" | "left";
+
 export type VisualResponse = {
-  overflows: Array<{ slug: string; step: string; box: string }>;
+  overflows: Array<{
+    slug: string;
+    step: string;
+    box: string;
+    text?: string;
+    /** Pixels past each edge; missing from older workers. */
+    by?: Partial<Record<Edge, number>>;
+  }>;
   contrasts: Array<{
     slug: string;
     step: string;
     ratio: number;
+    box?: string;
+    text?: string;
+    /** Computed colors as CSS rgb(); missing from older workers. */
+    fg?: string;
+    bg?: string;
     /** Computed font-size in px; missing from older workers. */
     fontSize?: number;
     /** Computed font-weight as a number; missing from older workers. */
@@ -69,8 +83,11 @@ export function playwrightResolved(): boolean {
   return resolvePlaywrightModule() !== undefined;
 }
 
+/** The module comes first; `playwright install` alone only fetches browsers. */
+export const PLAYWRIGHT_INSTALL = "bun add -d playwright && bunx playwright install chromium";
+
 export function playwrightMissingError(): DekError {
-  return new DekError("Playwright is not installed", { hint: "bunx playwright install" });
+  return new DekError("Playwright is not installed", { hint: PLAYWRIGHT_INSTALL });
 }
 
 export async function importPlaywright(): Promise<typeof import("playwright")> {
