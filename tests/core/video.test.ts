@@ -3,7 +3,7 @@ import { readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { playwrightResolved } from "../../src/core/playwright.ts";
-import type { Timeline } from "../../src/core/timeline.ts";
+import { DEFAULT_LEAD_MS, type Timeline } from "../../src/core/timeline.ts";
 import { ffmpegResolved, muxVideo } from "../../src/video/mux.ts";
 import {
   captureHoldFrames,
@@ -44,10 +44,51 @@ describe("planCapture", () => {
     const plan = planCapture(timeline, 30);
     expect(plan.gos).toEqual([
       { at: 0, position: { slideIndex: 0, beatIndex: 0 } },
-      { at: 1700, position: { slideIndex: 1, beatIndex: 0 } },
+      { at: 1700 - DEFAULT_LEAD_MS, position: { slideIndex: 1, beatIndex: 0 } },
     ]);
     expect(plan.frames.every((frame) => frame.kind === "hold")).toBe(true);
     expect(plan.frames).toHaveLength(2);
+  });
+
+  test("leads each go by the shared lead-in, like rehearse", () => {
+    const plan = planCapture(timeline, 30);
+    expect(plan.gos.map((go) => go.at)).toEqual([0, 1700 - DEFAULT_LEAD_MS]);
+  });
+
+  test("spans run from go to go and cover the whole audio", () => {
+    const plan = planCapture(timeline, 30);
+    expect(plan.frames.map((frame) => frame.durationMs)).toEqual([
+      1700 - DEFAULT_LEAD_MS,
+      2000 - (1700 - DEFAULT_LEAD_MS),
+    ]);
+  });
+
+  test("the first span starts at zero even when the first beat is silent lead", () => {
+    const late: Timeline = {
+      ...timeline,
+      beats: timeline.beats.map((beat, index) => (index === 0 ? { ...beat, start: 500 } : beat)),
+    };
+    const total = planCapture(late, 30).frames.reduce((sum, frame) => sum + frame.durationMs, 0);
+    expect(total).toBe(2000);
+  });
+
+  test("a lead longer than the beat before it keeps the gos in order", () => {
+    const early: Timeline = {
+      ...timeline,
+      beats: [
+        ...timeline.beats.slice(0, 1),
+        { position: { slideIndex: 1, beatIndex: 0 }, start: 1000, end: 1200, sentences: [] },
+        {
+          position: { slideIndex: 2, beatIndex: 0 },
+          start: 1700,
+          end: 2000,
+          sentences: [],
+          lead: 1500,
+        },
+      ],
+    };
+    const at = planCapture(early, 30).gos.map((go) => go.at);
+    expect(at).toEqual([0, 1000 - DEFAULT_LEAD_MS, 1000 - DEFAULT_LEAD_MS]);
   });
 });
 
@@ -94,7 +135,7 @@ describe("captureHoldFrames", () => {
         outDir: dir,
       });
       expect(captured.frames).toHaveLength(2);
-      expect(captured.frames[0]?.durationMs).toBe(1700);
+      expect(captured.frames[0]?.durationMs).toBe(1700 - DEFAULT_LEAD_MS);
       expect(captured.frames.reduce((sum, frame) => sum + frame.durationMs, 0)).toBe(
         timeline.durationMs,
       );

@@ -14,6 +14,7 @@ import {
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { pruneStaleShots, shotFileName } from "./shot.ts";
 import { logicalSize } from "./size.ts";
+import { stepKey } from "./step.ts";
 
 export type Box = {
   left: number;
@@ -133,7 +134,8 @@ async function visualDeck(
   }
 
   const { deck } = asResolvedDeck(input);
-  const sources = loadSlideSources(deck);
+  // A broken slide script is DEK016's to report; keep checking the slide without it.
+  const sources = loadSlideSources(deck, { strict: false });
   const diagnostics: Diagnostic[] = [];
   const pages: Array<VisualPage & { path: string }> = [];
   const size = logicalSize(deck.deck.ratio);
@@ -161,7 +163,7 @@ async function visualDeck(
         pages.push({
           html,
           slug: section.slug,
-          step: section.beats[beatIndex]?.id ?? String(beatIndex + 1),
+          step: stepKey(section.beats, beatIndex),
           path: slidePath,
           ...(screenshotPath ? { screenshotPath } : {}),
         });

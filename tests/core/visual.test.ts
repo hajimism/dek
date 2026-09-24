@@ -183,6 +183,42 @@ describe("lintVisualDeck", () => {
     });
   });
 
+  test("a broken slide script is left to DEK016 and every beat is still checked", async () => {
+    const twoBeats = `---
+title: Demo
+---
+
+## intro
+
+### one
+
+first
+
+### two
+
+second
+`;
+    await withTempProject(
+      { decks: [{ name: "demo", script: twoBeats, slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await Bun.write(
+          join(deckDir, "slides", "intro.ts"),
+          'import x from "x";\nexport default {};',
+        );
+        const steps: Array<string | undefined> = [];
+        const diagnostics = await lintVisualDeck(deckDir, {
+          runner: async (request: VisualRequest) => {
+            steps.push(...request.pages.map((page) => page.step));
+            return { overflows: [], contrasts: [] };
+          },
+        });
+        expect(diagnostics).toEqual([]);
+        expect(steps).toEqual(["one", "two"]);
+      },
+    );
+  });
+
   test("passes inlined asset HTML to the runner", async () => {
     const withImage = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>

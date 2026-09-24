@@ -809,6 +809,38 @@ b
     );
   });
 
+  test("DEK043: flags a voice.toml beat key that matches no slide or beat", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+こんにちは
+`,
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const dir = join(root, "decks", "demo", "voice");
+        await mkdir(dir, { recursive: true });
+        await writeFile(
+          join(dir, "voice.toml"),
+          `speaker = "ずんだもん/ノーマル"\n\n[beats.intro]\nlead = 0\n\n[beats."intro/gone"]\nlead = 0\n`,
+        );
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK043");
+        expect(found).toHaveLength(1);
+        expect(found[0]?.message).toContain("intro/gone");
+      },
+    );
+  });
+
   test("DEK040: flags English words missing from the deck dictionary when voice/ exists", async () => {
     await withTempProject(
       {

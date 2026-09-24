@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
+import { scopeSlideCss } from "./css.ts";
 import { isInside } from "./path.ts";
+import { listSlideFiles } from "./resolve.ts";
 
 export function inlineAssets(html: string, deckDir: string): string {
   return html.replace(/\bsrc=(["'])([^"']+)\1/gi, (match, quote: string, src: string) => {
@@ -31,12 +33,18 @@ export function inlineCssUrls(css: string, deckDir: string): string {
   });
 }
 
+/** The deck's stylesheet: theme.css, then each slide's own CSS scoped to that slide. */
 export function readTheme(deckDir: string, minify: boolean): string {
   const path = join(deckDir, "theme.css");
-  if (!existsSync(path)) {
-    return "";
-  }
-  const css = readFileSync(path, "utf8");
+  const theme = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const css = [
+    theme,
+    ...listSlideFiles(deckDir, ".css").map((slide) =>
+      scopeSlideCss(readFileSync(slide.path, "utf8"), slide.slug),
+    ),
+  ]
+    .filter(Boolean)
+    .join("\n");
   if (!minify) {
     return css;
   }

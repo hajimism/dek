@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { DekError, writeFrontmatterSchema } from "../core/index.ts";
 import { isDeckName } from "../core/path.ts";
+import { defaultTsconfig, writeSlideTypes } from "../core/sync.ts";
 import {
   createDeck,
   defaultGitignore,
@@ -45,6 +46,12 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
   trackWrite(created, join(root, "assets"), ensureDir(join(root, "assets")));
   trackWrite(created, join(root, "decks"), ensureDir(join(root, "decks")));
   created.push(writeFrontmatterSchema(root));
+  created.push(writeSlideTypes(root));
+  trackWrite(
+    created,
+    join(root, "tsconfig.json"),
+    writeIfMissing(join(root, "tsconfig.json"), defaultTsconfig()),
+  );
 
   if (options.deck) {
     if (!isDeckName(options.deck)) {

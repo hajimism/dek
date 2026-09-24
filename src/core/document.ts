@@ -5,6 +5,7 @@ import { collectSlidesHtml, htmlShell, type PageMode, readTheme } from "./html.t
 import { nextPresenterTitle, presenterSlides, presenterState } from "./presenter.ts";
 import { type ProjectDeck, resolveDeck } from "./resolve.ts";
 import { logicalSize } from "./size.ts";
+import { readSlideScripts, slideScriptTags } from "./slide-script.ts";
 import { formatClock } from "./timing.ts";
 
 export async function renderDeckHtml(
@@ -55,6 +56,7 @@ export async function renderDeckDocument(
     requireAll: !options.live,
   });
   const themeCss = readTheme(deck.dir, options.inlineAssets && !options.live);
+  const slideScripts = readSlideScripts(deck.dir, { strict: !options.live });
   const state = data[0] ? presenterState(data, { slideIndex: 0, beatIndex: 0 }) : undefined;
   const budget = data[0]?.budgetSeconds !== undefined ? formatClock(data[0].budgetSeconds) : "";
   const size = logicalSize(deck.deck.ratio);
@@ -112,6 +114,7 @@ export async function renderDeckDocument(
   </div>
   ${railResize}
   <script type="application/json" id="dek-data">${jsonForScript(data)}</script>
+  ${slideScriptTags(slideScripts)}
   <script>${options.playerScript}</script>
   ${options.live && options.liveReloadScript ? `<script>${options.liveReloadScript}</script>` : ""}`,
   });

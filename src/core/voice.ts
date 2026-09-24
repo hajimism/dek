@@ -5,7 +5,16 @@ import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
 import { DekError } from "./error.ts";
 import { cacheDir } from "./path.ts";
-import { DEFAULT_PAUSE, type PauseConfig, type Timeline, type Utterance } from "./timeline.ts";
+import type { Deck } from "./schema.ts";
+import type { Position } from "./step.ts";
+import {
+  type BeatTiming,
+  DEFAULT_LEAD_MS,
+  DEFAULT_PAUSE,
+  type PauseConfig,
+  type Timeline,
+  type Utterance,
+} from "./timeline.ts";
 import { formatZodIssues } from "./zod.ts";
 
 export type VoiceSettings = {
@@ -13,6 +22,9 @@ export type VoiceSettings = {
   speaker: string;
   speed: number;
   pause: PauseConfig;
+  lead: number;
+  /** Keyed like the URL hash: `slug`, `slug/beat-id`, or `slug/2`. */
+  beats: Record<string, BeatTiming>;
 };
 
 export type VoiceResolved = {
@@ -31,6 +43,13 @@ const VoiceToml = z.object({
       beat: z.number().optional(),
     })
     .optional(),
+  lead: z.number().min(0).default(DEFAULT_LEAD_MS),
+  beats: z
+    .record(
+      z.string(),
+      z.object({ lead: z.number().min(0).optional(), pause: z.number().min(0).optional() }),
+    )
+    .default({}),
 });
 
 const DictEntry = z.object({
@@ -80,7 +99,64 @@ export function loadVoiceSettings(deckDir: string): VoiceSettings {
       sentence: result.data.pause?.sentence ?? DEFAULT_PAUSE.sentence,
       beat: result.data.pause?.beat ?? DEFAULT_PAUSE.beat,
     },
+    lead: result.data.lead,
+    beats: result.data.beats,
   };
+}
+
+/**
+ * Maps voice.toml beat keys onto cue positions. A slide key frames the slide:
+ * its `lead` runs into the first beat and its `pause` follows the last one.
+ * A beat key refines its own beat. Keys that match nothing are returned in
+ * `unknown` so lint can report them.
+ */
+export function resolveBeatTiming(
+  deck: Deck,
+  settings: Pick<VoiceSettings, "lead" | "beats">,
+): { timing: (position: Position) => BeatTiming; unknown: string[] } {
+  const bySlide = new Map<number, BeatTiming>();
+  const byBeat = new Map<string, BeatTiming>();
+  const unknown: string[] = [];
+  for (const [key, value] of Object.entries(settings.beats)) {
+    const position = beatKeyPosition(deck, key);
+    if (!position) {
+      unknown.push(key);
+    } else if (key.includes("/")) {
+      byBeat.set(`${position.slideIndex}/${position.beatIndex}`, value);
+    } else {
+      bySlide.set(position.slideIndex, value);
+    }
+  }
+  return {
+    timing: (position) => {
+      const slide = bySlide.get(position.slideIndex);
+      const count = Math.max(1, deck.sections[position.slideIndex]?.beats.length ?? 0);
+      const merged = {
+        lead: position.beatIndex === 0 ? (slide?.lead ?? settings.lead) : settings.lead,
+        pause: position.beatIndex === count - 1 ? slide?.pause : undefined,
+        ...byBeat.get(`${position.slideIndex}/${position.beatIndex}`),
+      };
+      return Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== undefined));
+    },
+    unknown,
+  };
+}
+
+function beatKeyPosition(deck: Deck, key: string): Position | undefined {
+  const [slug, beat, ...rest] = key.split("/");
+  const slideIndex = deck.sections.findIndex((section) => section.slug === slug);
+  const section = deck.sections[slideIndex];
+  if (!section || rest.length > 0) {
+    return undefined;
+  }
+  if (beat === undefined) {
+    return { slideIndex, beatIndex: 0 };
+  }
+  const count = Math.max(1, section.beats.length);
+  const beatIndex = /^\d+$/.test(beat)
+    ? Number(beat) - 1
+    : section.beats.findIndex((entry) => entry.id === beat);
+  return beatIndex >= 0 && beatIndex < count ? { slideIndex, beatIndex } : undefined;
 }
 
 export function loadVoiceDict(deckDir: string): VoiceDict {
@@ -160,6 +236,7 @@ const TimelineSchema = z.object({
           end: z.number(),
         }),
       ),
+      lead: z.number().optional(),
     }),
   ),
 });

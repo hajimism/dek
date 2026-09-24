@@ -2,8 +2,10 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "./error.ts";
 import { joinLines, splitLines } from "./lines.ts";
-import { asResolvedDeck, type ResolvedDeck, requireSection } from "./resolve.ts";
+import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
 import { Id } from "./schema.ts";
+import { renameTableKeys } from "./toml-keys.ts";
+import { voiceDir } from "./voice.ts";
 
 export function renameSection(dir: string, from: string, to: string): void;
 export function renameSection(source: ResolvedDeck, from: string, to: string): void;
@@ -34,29 +36,137 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
 
   const fromPath = join(deck.dir, "slides", `${from}.html`);
   const toPath = join(deck.dir, "slides", `${to}.html`);
-  if (existsSync(toPath)) {
-    throw new DekError(`slide "${to}" already exists`, {
-      path: toPath,
-      hint: "run `dek ls`",
-    });
+  for (const target of [
+    toPath,
+    ...SLIDE_SIDECARS.map((ext) => join(deck.dir, "slides", `${to}${ext}`)),
+  ]) {
+    if (existsSync(target)) {
+      throw new DekError(`slide "${to}" already exists`, {
+        path: target,
+        hint: "run `dek ls`",
+      });
+    }
   }
 
-  let renamed = false;
+  // Everything that could refuse is worked out before the first file changes.
+  const voice = planVoiceBeatKeys(deck.dir, from, to);
+  const steps: FileStep[] = [writeStep(deck.scriptPath, source, joinLines(source, lines))];
   if (existsSync(fromPath)) {
-    renameSync(fromPath, toPath);
-    renamed = true;
+    steps.push(renameStep(fromPath, toPath));
+    const html = readFileSync(fromPath, "utf8");
+    const next = html.replaceAll(`data-slug="${from}"`, `data-slug="${to}"`);
+    if (next !== html) {
+      steps.push(writeStep(toPath, html, next));
+    }
   }
+  for (const ext of SLIDE_SIDECARS) {
+    const sidecar = join(deck.dir, "slides", `${from}${ext}`);
+    if (existsSync(sidecar)) {
+      steps.push(renameStep(sidecar, join(deck.dir, "slides", `${to}${ext}`)));
+    }
+  }
+  if (voice) {
+    steps.push(writeStep(voice.path, voice.source, voice.next));
+  }
+  applySteps(steps);
+}
+
+/** One file change `dek mv` makes, with how to take it back. */
+type FileStep = { path: string; apply: () => void; undo: () => void };
+
+function writeStep(path: string, before: string, after: string): FileStep {
+  return {
+    path,
+    apply: () => writeFileSync(path, after),
+    undo: () => writeFileSync(path, before),
+  };
+}
+
+function renameStep(from: string, to: string): FileStep {
+  return { path: to, apply: () => renameSync(from, to), undo: () => renameSync(to, from) };
+}
+
+/** Applies every step, or none: a failure takes back the steps already applied. */
+function applySteps(steps: FileStep[]): void {
+  const done: FileStep[] = [];
   try {
-    writeFileSync(deck.scriptPath, joinLines(source, lines));
+    for (const step of steps) {
+      step.apply();
+      done.push(step);
+    }
   } catch (error) {
-    if (renamed && existsSync(toPath) && !existsSync(fromPath)) {
-      renameSync(toPath, fromPath);
+    const stuck: string[] = [];
+    for (const step of done.reverse()) {
+      try {
+        step.undo();
+      } catch {
+        stuck.push(step.path);
+      }
+    }
+    if (stuck.length > 0) {
+      throw new DekError(`dek mv failed and could not restore ${stuck.join(", ")}`, {
+        cause: error,
+        hint: "check these files by hand",
+      });
     }
     throw error;
   }
-  if (renamed) {
-    rewriteDataSlug(toPath, from, to);
+}
+
+/**
+ * The voice.toml with its `[beats]` keys (`slug`, `"slug/beat"`) pointing at
+ * the renamed slide, or undefined when nothing changes. The rewrite is checked
+ * against the parsed file, so a layout it cannot rewrite stops the rename.
+ */
+function planVoiceBeatKeys(
+  deckDir: string,
+  from: string,
+  to: string,
+): { path: string; source: string; next: string } | undefined {
+  const path = join(voiceDir(deckDir), "voice.toml");
+  if (!existsSync(path)) {
+    return undefined;
   }
+  const source = readFileSync(path, "utf8");
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = Bun.TOML.parse(source) as Record<string, unknown>;
+  } catch {
+    // An unreadable voice.toml is the voice loader's to report, not mv's.
+    return undefined;
+  }
+  const beats = parsed.beats;
+  if (beats === null || typeof beats !== "object") {
+    return undefined;
+  }
+  const rename = (key: string): string | undefined => renameBeatKey(key, from, to);
+  const expected = {
+    ...parsed,
+    beats: Object.fromEntries(
+      Object.entries(beats).map(([key, value]) => [rename(key) ?? key, value]),
+    ),
+  };
+  const next = renameTableKeys(source, "beats", rename);
+  let actual: unknown;
+  try {
+    actual = Bun.TOML.parse(next);
+  } catch {
+    actual = undefined;
+  }
+  if (!Bun.deepEquals(actual, expected, true)) {
+    throw new DekError(`cannot rewrite the [beats] keys for "${from}" in voice.toml`, {
+      path,
+      hint: `write them as [beats."${from}/…"] tables or dotted keys, or rename them to "${to}" by hand`,
+    });
+  }
+  return next === source ? undefined : { path, source, next };
+}
+
+/** `slug` or `slug/beat` for the renamed slide, else undefined. */
+function renameBeatKey(key: string, from: string, to: string): string | undefined {
+  const slash = key.indexOf("/");
+  const slug = slash < 0 ? key : key.slice(0, slash);
+  return slug === from ? `${to}${slash < 0 ? "" : key.slice(slash)}` : undefined;
 }
 
 export function reorderSection(
@@ -123,14 +233,6 @@ export function reorderSection(
   const insertAt = options.before ? remainingTarget : remainingTarget + 1;
   chunks.splice(insertAt, 0, moved);
   writeFileSync(deck.scriptPath, joinLines(source, [...head, ...chunks.flat()]));
-}
-
-function rewriteDataSlug(path: string, from: string, to: string): void {
-  const html = readFileSync(path, "utf8");
-  const next = html.replaceAll(`data-slug="${from}"`, `data-slug="${to}"`);
-  if (next !== html) {
-    writeFileSync(path, next);
-  }
 }
 
 function rewriteHeadingId(heading: string, from: string, to: string): string {

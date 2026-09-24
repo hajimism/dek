@@ -9,6 +9,7 @@ import {
 } from "./playwright.ts";
 import { asResolvedDeck, type ProjectDeck, type ResolvedDeck } from "./resolve.ts";
 import { logicalSize } from "./size.ts";
+import { readSlideScripts, stillPageScript } from "./slide-script.ts";
 
 export type PdfResult = {
   outPath: string;
@@ -51,7 +52,8 @@ export function renderPdfHtml(deck: ProjectDeck): string {
     title: deck.deck.title,
     head: `<style>${themeCss}</style>
   <style>${printCss(size)}</style>`,
-    body: `<div id="deck">${slidesHtml}</div>`,
+    body: `<div id="deck">${slidesHtml}</div>
+  ${stillPageScript(readSlideScripts(deck.dir, { strict: true }))}`,
   });
 }
 

@@ -8,6 +8,7 @@ import {
   loadVoiceSettings,
   parseTimelineJson,
   parseUtteranceJson,
+  resolveBeatTiming,
   utteranceHash,
   voiceCacheDir,
   voiceCacheFile,
@@ -113,7 +114,13 @@ export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResu
     clips.push(wav);
   }
 
-  const scheduled = scheduleVoice(cues, utterances, settings.pause, "audio.wav");
+  const scheduled = scheduleVoice(
+    cues,
+    utterances,
+    settings.pause,
+    "audio.wav",
+    resolveBeatTiming(deck.deck, settings).timing,
+  );
   const audio =
     clips.length > 0
       ? concatWavs(clips, scheduled.pauseAfterMs, scheduled.leadingMs)

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
@@ -107,6 +107,179 @@ body
     );
   });
 });
+
+describe("renameSection and voice.toml", () => {
+  test("rewrites [beats] keys for the slide and its beats, leaving other slides alone", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(
+                `<section class="slide" data-layout="title"><h2 class="slide-title">x</h2></section>`,
+              ),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const voiceToml = join(deckDir, "voice", "voice.toml");
+        await Bun.write(
+          voiceToml,
+          [
+            'engine = "voicevox"',
+            "",
+            "# the cover [beats.intro] holds longer",
+            "[beats.intro]",
+            "lead = 600",
+            "",
+            '[beats."intro/2"]',
+            "pause = 900",
+            "",
+            "[beats.intro-two]",
+            "lead = 1",
+            "",
+            "[beats]",
+            "'intro/3' = { lead = 2 }",
+            "",
+          ].join("\n"),
+        );
+        renameSection(deckDir, "intro", "cover");
+        expect(await readFile(voiceToml, "utf8")).toBe(
+          [
+            'engine = "voicevox"',
+            "",
+            "# the cover [beats.intro] holds longer",
+            "[beats.cover]",
+            "lead = 600",
+            "",
+            '[beats."cover/2"]',
+            "pause = 900",
+            "",
+            "[beats.intro-two]",
+            "lead = 1",
+            "",
+            "[beats]",
+            "'cover/3' = { lead = 2 }",
+            "",
+          ].join("\n"),
+        );
+      },
+    );
+  });
+
+  test("rewrites dotted keys, under [beats] and from the top level", async () => {
+    await withIntroDeck(async (deckDir, voiceToml) => {
+      await Bun.write(
+        voiceToml,
+        [
+          "beats.intro.lead = 1",
+          'beats . "intro/2" . pause = 2',
+          "",
+          "[beats]",
+          "intro.pause = 3",
+          '"intro/3".lead = 4',
+          "intro-two.lead = 5",
+          "",
+        ].join("\n"),
+      );
+      renameSection(deckDir, "intro", "cover");
+      expect(await readFile(voiceToml, "utf8")).toBe(
+        [
+          "beats.cover.lead = 1",
+          'beats . "cover/2" . pause = 2',
+          "",
+          "[beats]",
+          "cover.pause = 3",
+          '"cover/3".lead = 4',
+          "intro-two.lead = 5",
+          "",
+        ].join("\n"),
+      );
+    });
+  });
+
+  test("leaves keys outside [beats] and text inside strings alone", async () => {
+    await withIntroDeck(async (deckDir, voiceToml) => {
+      const source = [
+        'speaker = "intro"',
+        "[pause]",
+        "intro = 1",
+        "[beats.other]",
+        'note = """',
+        "[beats.intro]",
+        'intro.lead = 1"""',
+        "",
+      ].join("\n");
+      await Bun.write(voiceToml, source);
+      renameSection(deckDir, "intro", "cover");
+      expect(await readFile(voiceToml, "utf8")).toBe(source);
+    });
+  });
+
+  test("refuses a layout it cannot rewrite before touching any file", async () => {
+    await withIntroDeck(async (deckDir, voiceToml) => {
+      const source = "beats = { intro = { lead = 1 } }\n";
+      await Bun.write(voiceToml, source);
+      expect(() => renameSection(deckDir, "intro", "cover")).toThrow(
+        expect.objectContaining({ name: "DekError", path: voiceToml }),
+      );
+      expect(await readFile(voiceToml, "utf8")).toBe(source);
+      expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);
+      expect(await readFile(join(deckDir, "script.md"), "utf8")).toContain("## intro");
+    });
+  });
+});
+
+describe("renameSection when a write fails", () => {
+  test("puts every file back as it was", async () => {
+    await withIntroDeck(async (deckDir, voiceToml) => {
+      const slides = join(deckDir, "slides");
+      await Bun.write(join(slides, "intro.css"), ".x { color: var(--c); }\n");
+      await Bun.write(join(slides, "intro.ts"), "export default {};\n");
+      await Bun.write(voiceToml, "[beats.intro]\nlead = 1\n");
+      const script = await readFile(join(deckDir, "script.md"), "utf8");
+      const html = await readFile(join(slides, "intro.html"), "utf8");
+      await chmod(voiceToml, 0o444);
+      try {
+        expect(() => renameSection(deckDir, "intro", "cover")).toThrow();
+      } finally {
+        await chmod(voiceToml, 0o644);
+      }
+      expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(script);
+      expect(await readFile(join(slides, "intro.html"), "utf8")).toBe(html);
+      expect(existsSync(join(slides, "intro.css"))).toBe(true);
+      expect(existsSync(join(slides, "intro.ts"))).toBe(true);
+      for (const ext of [".html", ".css", ".ts"]) {
+        expect(existsSync(join(slides, `cover${ext}`))).toBe(false);
+      }
+      expect(await readFile(voiceToml, "utf8")).toBe("[beats.intro]\nlead = 1\n");
+    });
+  });
+});
+
+async function withIntroDeck(fn: (deckDir: string, voiceToml: string) => Promise<void>) {
+  await withTempProject(
+    {
+      decks: [
+        {
+          name: "demo",
+          slides: {
+            intro: slideDocument(
+              `<section class="slide" data-layout="title"><h2 class="slide-title">x</h2></section>`,
+            ),
+          },
+        },
+      ],
+    },
+    async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await fn(deckDir, join(deckDir, "voice", "voice.toml"));
+    },
+  );
+}
 
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>

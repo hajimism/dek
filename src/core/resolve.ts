@@ -73,20 +73,35 @@ export function requireSection(deck: ProjectDeck, slug: string): Section {
 }
 
 export function listSlides(deckDir: string): { slug: string; path: string }[] {
+  return listSlideFiles(deckDir, ".html");
+}
+
+/** Files a slide may keep next to its HTML, moved and linted with it. */
+export const SLIDE_SIDECARS = [".css", ".ts"] as const;
+
+export type SlideSidecar = (typeof SLIDE_SIDECARS)[number];
+
+export function listSlideFiles(
+  deckDir: string,
+  ext: ".html" | ".js" | SlideSidecar,
+): { slug: string; path: string }[] {
   const dir = join(deckDir, "slides");
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
     return [];
   }
-  return readdirSync(dir)
-    .filter((name) => name.endsWith(".html"))
-    .sort((a, b) => a.localeCompare(b))
-    .flatMap((name) => {
-      const path = join(dir, name);
-      if (!statSync(path).isFile()) {
-        return [];
-      }
-      return [{ slug: name.slice(0, -".html".length), path }];
-    });
+  return (
+    readdirSync(dir)
+      // A declaration file carries types for the editor, not a slide.
+      .filter((name) => name.endsWith(ext) && !name.endsWith(".d.ts"))
+      .sort((a, b) => a.localeCompare(b))
+      .flatMap((name) => {
+        const path = join(dir, name);
+        if (!statSync(path).isFile()) {
+          return [];
+        }
+        return [{ slug: name.slice(0, -ext.length), path }];
+      })
+  );
 }
 
 function findRoot(startDir: string): { root: string; configPath: string } {

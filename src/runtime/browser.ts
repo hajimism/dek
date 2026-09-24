@@ -5,13 +5,14 @@ import {
   type PresenterSlide,
   presenterState,
 } from "../core/presenter-state.ts";
-import { type Position, stepValuesForBeat } from "../core/step.ts";
+import { type Position, stepKey, stepValuesForBeat } from "../core/step.ts";
 import { playbackSchedule, type Timeline } from "../core/timeline.ts";
 import { formatClock } from "../core/timing.ts";
 import { deckFitTransform } from "./fit.ts";
 import { applyIncomingPosition, createGuardedGo } from "./go.ts";
 import { applyLiveEvent, hydrateLiveEvent, slideSelector } from "./live.ts";
 import { documentLiveHost } from "./live-host.ts";
+import { createMotion, drawAtEnd, type MotionMode, type SlideModule } from "./motion.ts";
 import {
   clampPosition,
   formatHash,
@@ -68,6 +69,15 @@ if (dataEl?.textContent) {
       progressEl.hidden = false;
     }
   }
+  const videoMode = document.body.dataset.mode === "video";
+  const slideModules = (): Record<string, SlideModule> => window.__dekSlides ?? {};
+  const motion = createMotion({
+    now: () => performance.now(),
+    requestFrame: (fn) => requestAnimationFrame(fn),
+    cancelFrame: (id) => cancelAnimationFrame(id),
+    setTimer: (fn, ms) => window.setTimeout(fn, ms),
+    clearTimer: (id) => window.clearTimeout(id),
+  });
   const channel = new BroadcastChannel("dek");
   let pos = parseHash(location.hash, slugs);
   let startedAt: number | undefined;
@@ -160,11 +170,11 @@ if (dataEl?.textContent) {
     syncElapsed();
   }
 
-  function slideEl(slug: string | undefined): Element | undefined {
+  function slideEl(slug: string | undefined): HTMLElement | undefined {
     if (!slug) {
       return undefined;
     }
-    return document.querySelector(slideSelector(slug)) ?? undefined;
+    return document.querySelector<HTMLElement>(slideSelector(slug)) ?? undefined;
   }
 
   function stripPreviewClone(root: HTMLElement): void {
@@ -174,6 +184,33 @@ if (dataEl?.textContent) {
       el.removeAttribute("id");
       el.removeAttribute("view-transition-name");
     }
+  }
+
+  /** Draw the current slide's script. Only the live element animates; clones get `drawStill`. */
+  function showMotion(mode: MotionMode): void {
+    const current = slides[pos.slideIndex];
+    const el = slideEl(current?.slug);
+    if (!current || !el) {
+      motion.stop();
+      return;
+    }
+    motion.show(el, slideModules()[current.slug], current.beats, pos.beatIndex, mode);
+  }
+
+  function motionModeFor(from: Position, to: Position): MotionMode {
+    if (videoMode) {
+      return "hold";
+    }
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return "final";
+    }
+    const counts = slides.map((slide) => slide.beats.length);
+    const stepped = advance(from, counts);
+    return stepped && positionsEqual(stepped, to) ? "animate" : "final";
+  }
+
+  function drawStill(clone: HTMLElement, slide: PresenterSlide, index: number): void {
+    drawAtEnd(slideModules()[slide.slug], clone, index, stepKey(slide.beats, index));
   }
 
   function neuterRailMedia(root: HTMLElement): void {
@@ -210,6 +247,7 @@ if (dataEl?.textContent) {
       clone.classList.add("is-current");
       stripPreviewClone(clone);
       neuterRailMedia(clone);
+      drawStill(clone, slide, 0);
       const stage = document.createElement("div");
       stage.className = "dek-thumb-stage";
       stage.style.width = `${width}px`;
@@ -283,6 +321,7 @@ if (dataEl?.textContent) {
       [...clone.querySelectorAll("[data-step]")],
       stepValuesForBeat(nextSlide.beats, nextPos.beatIndex),
     );
+    drawStill(clone, nextSlide, nextPos.beatIndex);
     const frame = document.createElement("div");
     frame.className = "dek-preview-frame";
     frame.style.width = `${deckEl.offsetWidth || 1280}px`;
@@ -386,8 +425,13 @@ if (dataEl?.textContent) {
 
   const go = createGuardedGo(async (next: Position) => {
     const apply = (): void => {
+      const from = pos;
       pos = next;
       render();
+      // A hashchange echoing this same position must not cut a running animation short.
+      if (!positionsEqual(from, next)) {
+        showMotion(motionModeFor(from, next));
+      }
     };
     let viewTransition: { finished: Promise<unknown> } | undefined;
     if (
@@ -562,8 +606,15 @@ if (dataEl?.textContent) {
   fillRailThumbs();
   fitDeck();
   render();
+  showMotion(videoMode ? "hold" : "final");
   // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekGo"]
-  (window as unknown as Record<string, unknown>)["dekGo"] = go;
+  window["dekGo"] = go;
+  // The video recorder seeks slide scripts the way it seeks Web Animations.
+  // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekMotion"]
+  window["dekMotion"] = {
+    duration: () => motion.duration(),
+    seek: (t: number) => motion.seek(t),
+  };
 
   let startRehearse: (() => Promise<void>) | undefined;
   if (rehearseMode) {
@@ -580,7 +631,7 @@ if (dataEl?.textContent) {
       const current = pos;
       rehearseDriver?.stop();
       rehearseDriver = createRehearseDriver({
-        schedule: playbackSchedule(timeline, () => 300),
+        schedule: playbackSchedule(timeline),
         go: (position) => go(position),
         now: audio ? () => audio.currentTime * 1000 : undefined,
         onPlay: () => {
@@ -606,7 +657,7 @@ if (dataEl?.textContent) {
   });
   // Keep a string key so minify does not rename the hook liveReloadScript calls.
   // biome-ignore lint/complexity/useLiteralKeys: liveReloadScript looks up window["dekLive"]
-  (window as unknown as Record<string, unknown>)["dekLive"] = async (raw: unknown) => {
+  window["dekLive"] = async (raw: unknown) => {
     let event = raw as Parameters<typeof applyLiveEvent>[0];
     if (!event || typeof event !== "object" || !("type" in event)) {
       location.reload();
@@ -630,5 +681,6 @@ if (dataEl?.textContent) {
     }
     fillRailThumbs();
     render();
+    showMotion("final");
   };
 }

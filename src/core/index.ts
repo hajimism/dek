@@ -9,7 +9,7 @@ export {
 } from "./cue.ts";
 export type { Diagnostic, RuleId } from "./diagnostic.ts";
 export { DekError } from "./error.ts";
-export { DURATION_DRIFT_RATIO, lintDeck } from "./lint.ts";
+export { DURATION_DRIFT_RATIO, lintDeck, warmLintDeck } from "./lint.ts";
 export { parseScript } from "./parse.ts";
 export {
   asResolvedDeck,

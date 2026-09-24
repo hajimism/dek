@@ -7,6 +7,7 @@ export type CssDeclaration = {
 
 type CssRule = {
   selector: string;
+  selectorStart: number;
   atPath: string[];
   bodyStart: number;
   bodyEnd: number;
@@ -51,6 +52,27 @@ function cssSelectors(css: string): string[] {
   return [...walkRules(stripCssComments(css))].map((rule) => rule.selector);
 }
 
+/** Style rule selectors at any depth, skipping keyframe stops. */
+export function cssStyleSelectors(css: string): string[] {
+  return [...walkRules(stripCssComments(css))]
+    .filter((rule) => !rule.atPath.some((at) => /^@(-\w+-)?keyframes\b/.test(at)))
+    .map((rule) => rule.selector);
+}
+
+/** Every at-rule name in the stylesheet, such as `font-face` or `media`, in source order. */
+export function cssAtRuleNames(css: string): string[] {
+  return [...stripCssComments(css).matchAll(/@([-a-zA-Z]+)/g)].map((match) => match[1] ?? "");
+}
+
+/** Each `url()` reference with the line it sits on. */
+export function cssUrls(css: string): Array<{ value: string; line: number }> {
+  const source = stripCssCommentsPreserveLines(css);
+  return [...source.matchAll(/url\(\s*(["']?)([^"')]*)\1\s*\)/gi)].map((match) => ({
+    value: (match[2] ?? "").trim(),
+    line: lineAt(source, match.index ?? 0),
+  }));
+}
+
 export function cssLayoutNames(css: string): Set<string> {
   const names = new Set<string>();
   for (const match of stripCssComments(css).matchAll(
@@ -80,6 +102,91 @@ export function isScopedThemeSelector(selector: string): boolean {
     }
     return /^\.slide(?=$|[\s[.:#>])/.test(item);
   });
+}
+
+/**
+ * Scopes a slide's own stylesheet to that slide. A leading `.slide` compound
+ * gains `:where([data-slug])`; any other selector is nested under the scoped
+ * slide. The scope weighs exactly one `.slide`, so a rule behaves as if it were
+ * written at the end of theme.css: it beats the theme's `.slide .x`, and the
+ * theme's state rules (`.slide.is-current [data-step]`) still beat it.
+ * Local keyframes are renamed so two slides can both define `pop`.
+ */
+export function scopeSlideCss(css: string, slug: string): string {
+  const scope = `.slide:where([data-slug="${slug}"])`;
+  const source = stripCssCommentsPreserveLines(css);
+  const edits: Array<{ start: number; end: number; text: string }> = [];
+  for (const rule of walkRules(source)) {
+    if (rule.atPath.some((at) => /^@(-\w+-)?keyframes\b/.test(at))) {
+      continue;
+    }
+    const scoped = splitSelectorList(rule.selector)
+      .map((part) => {
+        const item = part.trim();
+        return LEADING_SLIDE_RE.test(item)
+          ? `${scope}${item.slice(".slide".length)}`
+          : `${scope} ${item}`;
+      })
+      .join(", ");
+    edits.push({
+      start: rule.selectorStart,
+      end: rule.selectorStart + rule.selector.length,
+      text: scoped,
+    });
+  }
+  let out = css;
+  for (const edit of edits.sort((a, b) => b.start - a.start)) {
+    out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
+  }
+  const names = [...source.matchAll(/@(?:-\w+-)?keyframes\s+([-_a-zA-Z][-_a-zA-Z0-9]*)/g)].map(
+    (match) => match[1] ?? "",
+  );
+  if (names.length === 0) {
+    return out;
+  }
+  const local = new RegExp(`(?<![-\\w])(${names.map(escapeRegExp).join("|")})(?![-\\w])`, "g");
+  const rename = (text: string): string => text.replace(local, `${slug}--$1`);
+  return out
+    .replace(
+      /(@(?:-\w+-)?keyframes\s+)([-_a-zA-Z][-_a-zA-Z0-9]*)/g,
+      (_, at, name) => at + rename(name),
+    )
+    .replace(/(\banimation(?:-name)?\s*:)([^;}]*)/g, (_, prop, value) => prop + rename(value));
+}
+
+/** Splits `a, b` on top-level commas only, leaving `:is(.a, .b)` whole. */
+export function splitSelectorList(selector: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote = "";
+  let start = 0;
+  for (let i = 0; i < selector.length; i++) {
+    const ch = selector[i];
+    if (quote) {
+      if (ch === "\\") {
+        i++;
+      } else if (ch === quote) {
+        quote = "";
+      }
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === "(" || ch === "[") {
+      depth++;
+    } else if (ch === ")" || ch === "]") {
+      depth--;
+    } else if (ch === "," && depth === 0) {
+      parts.push(selector.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(selector.slice(start));
+  return parts;
+}
+
+const LEADING_SLIDE_RE = /^\.slide(?=$|[\s[.:#>+~])/;
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function* walkRules(
@@ -126,6 +233,7 @@ function* walkRules(
     if (selector) {
       yield {
         selector,
+        selectorStart: selStart,
         atPath,
         bodyStart: i + 1,
         bodyEnd: blockEnd - 1,

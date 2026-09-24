@@ -193,6 +193,8 @@ export function formatDevEvent(event: DevEvent): string | null {
       return `reload-slide ${event.slug}`;
     case "reload-theme":
       return "reload-theme";
+    case "reload-script":
+      return `reload-script ${event.slugs.join(", ")}`;
     case "sync":
       if ((event.removed?.length ?? 0) > 0 && event.created.length === 0) {
         const count = event.removed?.length ?? 0;

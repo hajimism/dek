@@ -235,6 +235,9 @@ c
         expect(agents).toContain("script.md");
         expect(agents).toContain("self-contained");
         expect(agents).toContain("lint");
+        expect(agents).toContain("slides/<id>.css");
+        expect(agents).toContain("slides/<id>.ts");
+        expect(agents).toContain("satisfies DekSlide");
       },
     );
   });

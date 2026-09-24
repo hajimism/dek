@@ -16,6 +16,7 @@ export type LivePayload =
   | { type: "sync"; created: string[]; removed?: string[] }
   | { type: "reload-slide"; slug: string; html?: string }
   | { type: "reload-theme"; css?: string }
+  | { type: "reload-script"; slugs: string[] }
   | { type: "diagnostics"; diagnostics: Diagnostic[] }
   | { type: "timeline" };
 
@@ -56,6 +57,7 @@ export function applyLiveEvent(
 ): { reload: boolean } {
   switch (event.type) {
     case "sync":
+    case "reload-script":
       return { reload: true };
     case "reload-slide": {
       const slide = host.replaceSlide(event.slug, event.html ?? "");

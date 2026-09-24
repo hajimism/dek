@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { startGoPaused } from "../core/freeze-transition.ts";
 import { importPlaywright } from "../core/playwright.ts";
 import type { Position } from "../core/step.ts";
 import {
@@ -42,43 +43,12 @@ try {
 
   for (const [index, event] of plan.gos.entries()) {
     gos.push(event.position);
-    const beat = request.timeline.beats[index];
-    const next = request.timeline.beats[index + 1];
-    const beatMs = Math.max(
-      1,
-      (next?.start ?? request.timeline.durationMs) - (beat?.start ?? event.at),
-    );
+    const beatMs = plan.frames[index]?.durationMs ?? 1;
 
-    const duration = await page.evaluate(async (position) => {
-      type Go = (next: unknown) => Promise<void>;
-      const w = window as unknown as {
-        dekGo?: Go;
-        __dekPendingGo?: Promise<void>;
-      };
-      const go = w.dekGo;
-      if (!go) {
-        return 0;
-      }
-      const original = document.startViewTransition?.bind(document);
-      let captured: ViewTransition | undefined;
-      if (original) {
-        const wrapped: typeof document.startViewTransition = (update) => {
-          captured = original(update);
-          return captured;
-        };
-        document.startViewTransition = wrapped;
-      }
-      w.__dekPendingGo = go(position);
-      void w.__dekPendingGo.catch(() => undefined);
-      if (original) {
-        document.startViewTransition = original;
-      }
-      if (captured) {
-        await captured.ready;
-      } else {
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      }
-      let max = 0;
+    await page.evaluate(startGoPaused, event.position);
+    const duration = await page.evaluate(() => {
+      // Slide scripts are held at t=0 by the player in video mode; their motion counts too.
+      let max = window.dekMotion?.duration() ?? 0;
       for (const animation of document.getAnimations()) {
         animation.pause();
         const timing = animation.effect?.getComputedTiming();
@@ -86,7 +56,7 @@ try {
         max = Math.max(max, (timing?.delay ?? 0) + durationMs);
       }
       return max;
-    }, event.position);
+    });
 
     const stops = frameStops(duration, request.fps);
     let previous = 0;
@@ -95,6 +65,7 @@ try {
         for (const animation of document.getAnimations()) {
           animation.currentTime = ms;
         }
+        window.dekMotion?.seek(ms);
       }, stop);
       const path = join(request.outDir, `frame-${String(frames.length).padStart(4, "0")}.png`);
       await page.screenshot({ path, type: "png" });
@@ -102,15 +73,16 @@ try {
       previous = stop;
     }
 
-    await page.evaluate(async () => {
+    await page.evaluate(async (end) => {
       for (const animation of document.getAnimations()) {
         animation.finish();
       }
-      const pending = (window as unknown as { __dekPendingGo?: Promise<void> }).__dekPendingGo;
+      window.dekMotion?.seek(end);
+      const pending = window.__dekPendingGo;
       if (pending) {
         await pending;
       }
-    });
+    }, duration);
 
     const path = join(request.outDir, `frame-${String(frames.length).padStart(4, "0")}.png`);
     await page.screenshot({ path, type: "png" });

@@ -329,6 +329,40 @@ more
     );
   });
 
+  test("emits reload-theme when a slide stylesheet is saved, and serves it scoped", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", theme: ".slide { width: 1280px; }\n", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await withDevServer({ cwd: deckDir }, async (server) => {
+          const pending = waitForEvent(server.events, (event) => event.type === "reload-theme");
+          await writeFile(join(deckDir, "slides", "intro.css"), ".mark { opacity: 0; }\n");
+          expect(await pending).toMatchObject({ type: "reload-theme" });
+          const css = await (await fetch(new URL("/theme.css", server.url))).text();
+          expect(css).toContain('.slide:where([data-slug="intro"]) .mark');
+        });
+      },
+    );
+  });
+
+  test("reloads the page when a slide script is saved", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await withDevServer({ cwd: deckDir }, async (server) => {
+          const pending = waitForEvent(server.events, (event) => event.type === "reload-script");
+          await writeFile(join(deckDir, "slides", "intro.ts"), "export default {};\n");
+          expect(await pending).toEqual({ type: "reload-script", slugs: ["intro"] });
+        });
+      },
+    );
+  });
+
   test("streams reload events over SSE", async () => {
     await withTempProject(
       {

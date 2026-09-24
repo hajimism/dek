@@ -14,6 +14,7 @@ import {
 import { asResolvedDeck, type ResolvedDeck, requireSection } from "./resolve.ts";
 import type { Section } from "./schema.ts";
 import { logicalSize } from "./size.ts";
+import { stepKey } from "./step.ts";
 
 export type ShotFile = {
   slug: string;
@@ -203,8 +204,7 @@ function shotBaseName(slug: string, step: string | undefined): string {
 function resolveBeat(section: Section, step?: string): { index: number; label: string } {
   const last = Math.max(section.beats.length - 1, 0);
   if (step === undefined) {
-    const beat = section.beats[last];
-    return { index: last, label: beat?.id ?? String(last + 1) };
+    return { index: last, label: stepKey(section.beats, last) };
   }
   if (/^[1-9]\d*$/.test(step)) {
     const index = Number(step) - 1;

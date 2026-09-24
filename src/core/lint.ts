@@ -2,22 +2,42 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { loadConfig } from "./config.ts";
 import {
+  cssAtRuleNames,
   cssClassNames,
   cssCustomProperties,
   cssDeclarations,
+  cssStyleSelectors,
+  cssUrls,
   isScopedThemeSelector,
+  splitSelectorList,
   topLevelSelectors,
 } from "./css.ts";
 import { cuesFromDeck, silentCues, unknownAsciiWords } from "./cue.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 import { consumeTransform, hasSlideClass } from "./html.ts";
 import { isInside } from "./path.ts";
-import { asResolvedDeck, listSlides, type Project, type ProjectDeck } from "./resolve.ts";
+import {
+  asResolvedDeck,
+  listSlideFiles,
+  listSlides,
+  type Project,
+  type ProjectDeck,
+  SLIDE_SIDECARS,
+} from "./resolve.ts";
 import type { Beat, Section } from "./schema.ts";
+import { javascriptScriptProblem, slideScriptsProblems, warmSlideScripts } from "./slide-script.ts";
+import { stepKey } from "./step.ts";
 import type { Timeline } from "./timeline.ts";
 import { parseDurationSeconds } from "./timing.ts";
 import { isRawThemeValue, REQUIRED_TOKENS } from "./tokens.ts";
-import { hasVoice, loadVoiceDict, tryLoadCachedTimeline } from "./voice.ts";
+import {
+  hasVoice,
+  loadVoiceDict,
+  loadVoiceSettings,
+  resolveBeatTiming,
+  tryLoadCachedTimeline,
+  voiceDir,
+} from "./voice.ts";
 
 export const DURATION_DRIFT_RATIO = 0.2;
 
@@ -26,6 +46,38 @@ const POSITIVE_INT_RE = /^[1-9]\d*$/;
 export type LintDeckOptions = {
   slug?: string;
 };
+
+/**
+ * Evaluates the slide scripts `lintDeck` will check in the background, so a
+ * following `lintDeck` answers from the cache instead of blocking on a child
+ * process. The dev server awaits this before each lint.
+ */
+export async function warmLintDeck(
+  input: string | { project: Project; deck: ProjectDeck },
+  options?: LintDeckOptions,
+): Promise<void> {
+  const { deck } = asResolvedDeck(input);
+  await warmSlideScripts(lintedSlideScripts(deck, options?.slug).map((entry) => entry.input));
+}
+
+/** The `slides/<slug>.ts` scripts lint evaluates: one per section that has HTML. */
+function lintedSlideScripts(
+  deck: ProjectDeck,
+  only: string | undefined,
+): Array<{ section: Section; path: string; input: { code: string; steps: string[] } }> {
+  const html = new Set(listSlides(deck.dir).map((slide) => slide.slug));
+  const scripts = new Map(listSlideFiles(deck.dir, ".ts").map((file) => [file.slug, file.path]));
+  return uniqueSections(deck.deck.sections).flatMap((section) => {
+    const path = scripts.get(section.slug);
+    if (!path || !html.has(section.slug) || (only !== undefined && only !== section.slug)) {
+      return [];
+    }
+    const steps = Array.from({ length: Math.max(1, section.beats.length) }, (_, index) =>
+      stepKey(section.beats, index),
+    );
+    return [{ section, path, input: { code: readFileSync(path, "utf8"), steps } }];
+  });
+}
 
 export function lintDeck(dir: string, options?: LintDeckOptions): Diagnostic[];
 export function lintDeck(
@@ -111,8 +163,50 @@ export function lintDeck(
     });
   }
 
+  const sidecars = new Map(SLIDE_SIDECARS.map((ext) => [ext, listSlideFiles(deck.dir, ext)]));
+  const styleBySlug = new Map((sidecars.get(".css") ?? []).map((file) => [file.slug, file]));
+  for (const [ext, files] of sidecars) {
+    const kind = ext === ".css" ? "stylesheet" : "script";
+    for (const file of files) {
+      // A sidecar next to an orphaned HTML file travels with it; DEK002 already names the slug.
+      if (seenSlugs.has(file.slug) || htmlBySlug.has(file.slug) || !matches(file.slug)) {
+        continue;
+      }
+      diagnostics.push({
+        id: "DEK002",
+        message: `slide ${kind} has no section "${file.slug}"`,
+        path: file.path,
+        slug: file.slug,
+      });
+    }
+  }
+
+  for (const file of listSlideFiles(deck.dir, ".js")) {
+    if (matches(file.slug)) {
+      diagnostics.push({
+        id: "DEK016",
+        message: javascriptScriptProblem(file.slug),
+        path: file.path,
+        slug: file.slug,
+      });
+    }
+  }
+
+  // One evaluation for every script, so lint starts the sandbox once.
+  const scripted = lintedSlideScripts(deck, only);
+  const scriptProblems = slideScriptsProblems(scripted.map((entry) => entry.input));
+  const scriptDiagnostics = new Map(
+    scripted.map(({ section, path }, index) => [
+      section.slug,
+      (scriptProblems[index] ?? []).map(
+        (message): Diagnostic => ({ id: "DEK016", message, path, slug: section.slug }),
+      ),
+    ]),
+  );
+
   const themePath = join(deck.dir, "theme.css");
   const theme = existsSync(themePath) ? readFileSync(themePath, "utf8") : undefined;
+  const themeClasses = theme === undefined ? undefined : cssClassNames(theme);
   if (theme !== undefined) {
     diagnostics.push(...lintTheme(themePath, theme, config.maxClasses));
   }
@@ -126,10 +220,16 @@ export function lintDeck(
       continue;
     }
     const html = readFileSync(slide.path, "utf8");
+    const style = styleBySlug.get(section.slug);
+    const styleCss = style ? readFileSync(style.path, "utf8") : undefined;
+    if (style && styleCss !== undefined) {
+      diagnostics.push(...lintSlideStyle(section.slug, style.path, styleCss));
+    }
+    diagnostics.push(...(scriptDiagnostics.get(section.slug) ?? []));
     diagnostics.push(
       ...lintSlideHtml(section, slide.path, html, {
         deckDir: deck.dir,
-        classes: theme === undefined ? undefined : cssClassNames(theme),
+        classes: themeClasses && new Set([...themeClasses, ...cssClassNames(styleCss ?? "")]),
       }),
     );
   }
@@ -171,6 +271,16 @@ export function silentCueDiagnostics(deck: ProjectDeck, only?: string): Diagnost
 function lintVoice(deck: ProjectDeck, only?: string): Diagnostic[] {
   const dict = loadVoiceDict(deck.dir);
   const diagnostics: Diagnostic[] = silentCueDiagnostics(deck, only);
+  if (only === undefined) {
+    const voiceToml = join(voiceDir(deck.dir), "voice.toml");
+    for (const key of resolveBeatTiming(deck.deck, loadVoiceSettings(deck.dir)).unknown) {
+      diagnostics.push({
+        id: "DEK043",
+        message: `voice.toml [beats."${key}"] matches no slide or beat`,
+        path: voiceToml,
+      });
+    }
+  }
   for (const cue of cuesFromDeck(deck.deck)) {
     if (only !== undefined && cue.slug !== only) {
       continue;
@@ -254,19 +364,72 @@ function lintTheme(path: string, css: string, maxClasses: number): Diagnostic[] 
     });
   }
 
-  for (const decl of cssDeclarations(css)) {
-    if (!isRawThemeValue(decl.property, decl.value)) {
-      continue;
+  diagnostics.push(...rawValueDiagnostics(css, path));
+  return diagnostics;
+}
+
+/** A slide's own stylesheet: tokens only, and nothing that reaches past the slide. */
+function lintSlideStyle(slug: string, path: string, css: string): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const selector of cssStyleSelectors(css)) {
+    const parts = splitSelectorList(selector).map((part) => part.trim());
+    const message = parts.some((part) => part.startsWith("::view-transition"))
+      ? `"${selector}" applies to every slide; view transitions belong in theme.css`
+      : parts.some((part) => PAGE_SELECTOR_RE.test(part))
+        ? `"${selector}" never matches inside a slide; page-wide rules belong in theme.css`
+        : undefined;
+    if (message) {
+      diagnostics.push({ id: "DEK012", message, path, slug });
     }
-    diagnostics.push({
+  }
+  for (const name of cssAtRuleNames(css)) {
+    if (name === "font-face" || name === "import") {
+      diagnostics.push({
+        id: "DEK012",
+        message: `@${name} applies to the whole deck; it belongs in theme.css`,
+        path,
+        slug,
+      });
+    }
+  }
+  for (const url of cssUrls(css)) {
+    if (/^(https?:)?\/\//i.test(url.value)) {
+      diagnostics.push({
+        id: "DEK020",
+        message: `remote URL "${url.value}"`,
+        path,
+        line: url.line,
+        slug,
+      });
+    } else if (!isCanonicalAssetSrc(url.value)) {
+      diagnostics.push({
+        id: "DEK023",
+        message: `asset "${url.value}" must be referenced as assets/${posix.basename(url.value)}`,
+        path,
+        line: url.line,
+        slug,
+      });
+    }
+  }
+  diagnostics.push(...rawValueDiagnostics(css, path, slug));
+  return diagnostics;
+}
+
+/** DEK014 for theme.css and slide stylesheets alike: design values come from tokens. */
+function rawValueDiagnostics(css: string, path: string, slug?: string): Diagnostic[] {
+  return cssDeclarations(css)
+    .filter((decl) => isRawThemeValue(decl.property, decl.value))
+    .map((decl) => ({
       id: "DEK014",
       message: `raw value in "${decl.property}: ${decl.value}"; use a theme token`,
       path,
       line: decl.line,
-    });
-  }
-  return diagnostics;
+      ...(slug === undefined ? {} : { slug }),
+    }));
 }
+
+/** Selectors that name the page, which a scoped slide rule can never reach. */
+const PAGE_SELECTOR_RE = /^(:root|html|body)(?=$|[\s[.:#>+~])/;
 
 function lintSlideHtml(
   section: Section,
@@ -508,7 +671,9 @@ function isCanonicalAssetSrc(value: string): boolean {
 
 function suggestRename(diagnostics: Diagnostic[]): void {
   const missing = diagnostics.filter((diagnostic) => diagnostic.id === "DEK001");
-  const orphans = diagnostics.filter((diagnostic) => diagnostic.id === "DEK002");
+  const orphans = diagnostics.filter(
+    (diagnostic) => diagnostic.id === "DEK002" && diagnostic.path?.endsWith(".html"),
+  );
   if (missing.length !== 1 || orphans.length !== 1) {
     return;
   }

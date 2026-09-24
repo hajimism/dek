@@ -135,6 +135,44 @@ describe("watchDeck", () => {
     );
   });
 
+  test("a slide script that hangs does not stall the server while lint runs", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const hub = createEventHub();
+        const diagnostics = waitForEvent(
+          hub,
+          (event) =>
+            event.type === "diagnostics" &&
+            event.diagnostics.some((diagnostic) => diagnostic.id === "DEK016"),
+        );
+        const watcher = watchDeck(deckDir(root), hub, { pollIntervalMs: 20 });
+        let last = performance.now();
+        let worstGap = 0;
+        const probe = setInterval(() => {
+          const now = performance.now();
+          worstGap = Math.max(worstGap, now - last);
+          last = now;
+        }, 10);
+        try {
+          await writeFile(
+            join(deckDir(root), "slides", "intro.ts"),
+            "while (true) {}\nexport default {};\n// watch-stall",
+          );
+          await diagnostics;
+          // Let the probe run once more so it measures a stall that just ended.
+          await Bun.sleep(30);
+          // A synchronous evaluation would freeze the loop for the sandbox's 1s timeout.
+          expect(worstGap).toBeLessThan(500);
+        } finally {
+          clearInterval(probe);
+          watcher.close();
+          hub.close();
+        }
+      },
+    );
+  }, 15_000);
+
   test("emits a diagnostic when script.md becomes unparsable", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

@@ -3,7 +3,9 @@ import { cuesFromDeck, splitSentences } from "../../src/core/cue.ts";
 import { parseScript } from "../../src/core/parse.ts";
 import {
   buildTimeline,
+  DEFAULT_LEAD_MS,
   playbackSchedule,
+  scheduleVoice,
   sliceTimeline,
   slideVideoSeconds,
   timelineSeconds,
@@ -132,7 +134,7 @@ Hello.
     expect(timeline.durationMs).toBe(2400);
   });
 
-  test("playbackSchedule subtracts lead-in from beat start", () => {
+  test("playbackSchedule defaults to the shared lead-in", () => {
     const timeline = buildTimeline(
       [
         {
@@ -141,12 +143,7 @@ Hello.
           line: 1,
           paragraphs: ["Hello."],
         },
-        {
-          position: { slideIndex: 0, beatIndex: 1 },
-          slug: "intro",
-          line: 2,
-          paragraphs: ["Next."],
-        },
+        { position: { slideIndex: 1, beatIndex: 0 }, slug: "next", line: 2, paragraphs: ["Next."] },
       ],
       [
         { text: "Hello.", kana: "", durationMs: 1000 },
@@ -154,10 +151,68 @@ Hello.
       ],
       pause,
     );
-    expect(playbackSchedule(timeline, () => 300)).toEqual([
-      { at: 0, position: { slideIndex: 0, beatIndex: 0 } },
-      { at: 1400, position: { slideIndex: 0, beatIndex: 1 } },
-    ]);
+    expect(playbackSchedule(timeline).map((go) => go.at)).toEqual([0, 1700 - DEFAULT_LEAD_MS]);
+  });
+});
+
+describe("scheduleVoice beat timing", () => {
+  const pause = { sentence: 350, beat: 700 };
+  const cue = (slideIndex: number, paragraphs: string[]) => ({
+    position: { slideIndex, beatIndex: 0 },
+    slug: `s${slideIndex}`,
+    line: slideIndex + 1,
+    paragraphs,
+  });
+  const utterances = [
+    { text: "Hello.", kana: "", durationMs: 1000 },
+    { text: "Next.", kana: "", durationMs: 1000 },
+  ];
+
+  test("a beat pause replaces pause.beat after that beat", () => {
+    const { timeline, pauseAfterMs } = scheduleVoice(
+      [cue(0, ["Hello."]), cue(1, ["Next."])],
+      utterances,
+      pause,
+      "",
+      (position) => (position.slideIndex === 0 ? { pause: 2000 } : {}),
+    );
+    expect(pauseAfterMs[0]).toBe(2000);
+    expect(timeline.beats[1]?.start).toBe(3000);
+  });
+
+  test("an empty beat lasts its own pause", () => {
+    const { timeline } = scheduleVoice(
+      [cue(0, ["Hello."]), cue(1, []), cue(2, ["Next."])],
+      utterances,
+      pause,
+      "",
+      (position) => (position.slideIndex === 1 ? { pause: 1500 } : {}),
+    );
+    expect(timeline.beats[1]?.end).toBe((timeline.beats[1]?.start ?? 0) + 1500);
+  });
+
+  test("every beat records its lead, and playbackSchedule follows it", () => {
+    const { timeline } = scheduleVoice(
+      [cue(0, ["Hello."]), cue(1, ["Next."])],
+      utterances,
+      pause,
+      "",
+      (position) => (position.slideIndex === 1 ? { lead: 900 } : {}),
+    );
+    expect(timeline.beats.map((beat) => beat.lead)).toEqual([DEFAULT_LEAD_MS, 900]);
+    expect(playbackSchedule(timeline).map((go) => go.at)).toEqual([0, 1700 - 900]);
+  });
+
+  test("a lead longer than the beat before it never sends the screen back", () => {
+    const { timeline } = scheduleVoice(
+      [cue(0, ["Hello."]), cue(1, ["Next."]), cue(2, ["Last."])],
+      [...utterances, { text: "Last.", kana: "", durationMs: 1000 }],
+      pause,
+      "",
+      (position) => (position.slideIndex === 2 ? { lead: 5000 } : {}),
+    );
+    const at = playbackSchedule(timeline).map((go) => go.at);
+    expect(at).toEqual([0, 1700 - DEFAULT_LEAD_MS, 1700 - DEFAULT_LEAD_MS]);
   });
 });
 

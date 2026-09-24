@@ -2,8 +2,9 @@ import { existsSync, readdirSync, statSync, watch } from "node:fs";
 import { join } from "node:path";
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
-import { lintDeck, resolveDeck, syncDeck } from "../core/index.ts";
+import { lintDeck, resolveDeck, syncDeck, warmLintDeck } from "../core/index.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
+import { listSlideFiles, type SlideSidecar } from "../core/resolve.ts";
 import { lintVisualDeck } from "../core/visual.ts";
 import type { EventHub } from "./hub.ts";
 import { createSerialTask } from "./serial.ts";
@@ -40,10 +41,12 @@ export function watchDeck(
 ): Stoppable {
   const scriptPath = join(deckDir, "script.md");
   const themePath = join(deckDir, "theme.css");
-  const slidesDir = join(deckDir, "slides");
   let lastScript = mtime(scriptPath);
   let lastTheme = mtime(themePath);
-  let lastSlides = listSlideMtimes(slidesDir);
+  let lastSlides = listSlideMtimes(deckDir);
+  let lastStyles = listSlideMtimes(deckDir, ".css");
+  let lastScripts = listSlideMtimes(deckDir, ".ts");
+  let lastJavascript = listSlideMtimes(deckDir, ".js");
   const voiceDir = join(deckDir, "voice");
   let lastVoice = listVoiceMtimes(voiceDir);
   let closed = false;
@@ -87,6 +90,8 @@ export function watchDeck(
           let resolved: ReturnType<typeof resolveDeck> | undefined;
           try {
             resolved = resolveDeck(deckDir);
+            // Evaluate slide scripts off the event loop; lintDeck then reads the cache.
+            await warmLintDeck(resolved);
             diagnostics = [...lintDeck(resolved)];
           } catch (error) {
             diagnostics = [watchErrorDiagnostic(error)];
@@ -144,7 +149,7 @@ export function watchDeck(
       lastScript = scriptNow;
       try {
         const result = syncDeck(deckDir);
-        lastSlides = listSlideMtimes(slidesDir);
+        lastSlides = listSlideMtimes(deckDir);
         hub.emit({ type: "sync", created: result.created });
       } catch (error) {
         console.error(error);
@@ -161,7 +166,30 @@ export function watchDeck(
       emitDiagnostics();
     }
 
-    const slidesNow = listSlideMtimes(slidesDir);
+    const stylesNow = listSlideMtimes(deckDir, ".css");
+    if (mtimesChanged(lastStyles, stylesNow)) {
+      lastStyles = stylesNow;
+      hub.emit({ type: "reload-theme" });
+      emitDiagnostics();
+    }
+
+    // Slide scripts register once at page load, so a change reloads the page.
+    const scriptsNow = listSlideMtimes(deckDir, ".ts");
+    const scriptSlugs = changedKeys(lastScripts, scriptsNow);
+    if (scriptSlugs.length > 0) {
+      lastScripts = scriptsNow;
+      hub.emit({ type: "reload-script", slugs: scriptSlugs });
+      emitDiagnostics();
+    }
+
+    // dek does not load a `.js` script, but lint names it so the author can rename it.
+    const javascriptNow = listSlideMtimes(deckDir, ".js");
+    if (mtimesChanged(lastJavascript, javascriptNow)) {
+      lastJavascript = javascriptNow;
+      emitDiagnostics();
+    }
+
+    const slidesNow = listSlideMtimes(deckDir);
     const removed: string[] = [];
     for (const slug of Object.keys(lastSlides)) {
       if (!(slug in slidesNow)) {
@@ -227,18 +255,14 @@ export function watchDeck(
   };
 }
 
-function listSlideMtimes(slidesDir: string): Record<string, number> {
-  const times: Record<string, number> = {};
-  if (!existsSync(slidesDir)) {
-    return times;
-  }
-  for (const name of readdirSync(slidesDir)) {
-    if (!name.endsWith(".html")) {
-      continue;
-    }
-    times[name.slice(0, -".html".length)] = mtime(join(slidesDir, name));
-  }
-  return times;
+/** Mtimes of `slides/<slug><ext>`, keyed by slug; the same files lint and render read. */
+function listSlideMtimes(
+  deckDir: string,
+  ext: ".html" | ".js" | SlideSidecar = ".html",
+): Record<string, number> {
+  return Object.fromEntries(
+    listSlideFiles(deckDir, ext).map((file) => [file.slug, mtime(file.path)]),
+  );
 }
 
 function listVoiceMtimes(dir: string): Record<string, number> {
@@ -263,13 +287,13 @@ function listVoiceMtimes(dir: string): Record<string, number> {
 }
 
 function mtimesChanged(previous: Record<string, number>, next: Record<string, number>): boolean {
+  return changedKeys(previous, next).length > 0;
+}
+
+/** Keys whose mtime changed, including files added or removed. */
+function changedKeys(previous: Record<string, number>, next: Record<string, number>): string[] {
   const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
-  for (const key of keys) {
-    if ((previous[key] ?? 0) !== (next[key] ?? 0)) {
-      return true;
-    }
-  }
-  return false;
+  return [...keys].filter((key) => (previous[key] ?? 0) !== (next[key] ?? 0)).sort();
 }
 
 function mtime(path: string): number {

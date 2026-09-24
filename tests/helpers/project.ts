@@ -7,6 +7,8 @@ export type DeckSpec = {
   name: string;
   script?: string;
   slides?: Record<string, string>;
+  /** `slides/<slug>.css`, the slide's own stylesheet. */
+  styles?: Record<string, string>;
   theme?: string;
   assets?: Record<string, string>;
 };
@@ -64,6 +66,9 @@ async function writeDeck(root: string, spec: DeckSpec): Promise<void> {
   await writeAssets(join(dir, "assets"), spec.assets);
   for (const [slug, html] of Object.entries(spec.slides ?? {})) {
     await writeFile(join(dir, "slides", `${slug}.html`), html);
+  }
+  for (const [slug, css] of Object.entries(spec.styles ?? {})) {
+    await writeFile(join(dir, "slides", `${slug}.css`), css);
   }
 }
 

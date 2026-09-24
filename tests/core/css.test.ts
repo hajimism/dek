@@ -4,6 +4,7 @@ import {
   cssClassNames,
   cssCustomProperties,
   cssDeclarations,
+  scopeSlideCss,
   topLevelSelectors,
 } from "../../src/core/css.ts";
 import { lintDeck } from "../../src/core/index.ts";
@@ -167,5 +168,55 @@ describe("string-aware scanning", () => {
   test("cssCustomProperties reads tokens after a string-bearing rule", () => {
     const css = `.slide .x::before { content: "{"; }\n.slide { --fg: #fff; }`;
     expect([...cssCustomProperties(css)]).toEqual(["--fg"]);
+  });
+});
+
+describe("scopeSlideCss", () => {
+  const scope = '.slide:where([data-slug="usb"])';
+
+  test("prefixes a bare selector with the slide", () => {
+    expect(scopeSlideCss(".bar { opacity: 0; }", "usb")).toBe(`${scope} .bar { opacity: 0; }`);
+  });
+
+  test("attaches to a leading .slide compound instead of nesting under it", () => {
+    expect(scopeSlideCss(".slide { --fg: #fff; }", "usb")).toBe(`${scope} { --fg: #fff; }`);
+    expect(scopeSlideCss(".slide.is-current .bar { opacity: 1; }", "usb")).toBe(
+      `${scope}.is-current .bar { opacity: 1; }`,
+    );
+  });
+
+  test("does not mistake a class that starts with slide for .slide", () => {
+    expect(scopeSlideCss(".slide-title { margin: 0; }", "usb")).toBe(
+      `${scope} .slide-title { margin: 0; }`,
+    );
+  });
+
+  test("scopes each selector in a list and inside at-rules", () => {
+    expect(
+      scopeSlideCss("@media (prefers-reduced-motion: reduce) { .a, .b { opacity: 1; } }", "usb"),
+    ).toBe(`@media (prefers-reduced-motion: reduce) { ${scope} .a, ${scope} .b { opacity: 1; } }`);
+  });
+
+  test("adds only the specificity of .slide, so theme state rules still win", () => {
+    // `.slide.is-current [data-step]` in the theme must keep beating a slide's `.bar`.
+    expect(scopeSlideCss(".bar { opacity: 0.5; }", "usb")).toBe(
+      '.slide:where([data-slug="usb"]) .bar { opacity: 0.5; }',
+    );
+  });
+
+  test("keeps commas inside :is(), :where(), and :not() within their selector", () => {
+    expect(scopeSlideCss(":is(.a, .b) > p, .c:not(.d, .e) { opacity: 1; }", "usb")).toBe(
+      `${scope} :is(.a, .b) > p, ${scope} .c:not(.d, .e) { opacity: 1; }`,
+    );
+  });
+
+  test("renames local keyframes and the animations that use them", () => {
+    const out = scopeSlideCss(
+      "@keyframes pop { from { opacity: 0; } to { opacity: 1; } }\n.bar { animation: pop var(--step-transition); }\n.baz { animation-name: pop, fade; }",
+      "usb",
+    );
+    expect(out).toContain("@keyframes usb--pop { from { opacity: 0; } to { opacity: 1; } }");
+    expect(out).toContain(`${scope} .bar { animation: usb--pop var(--step-transition); }`);
+    expect(out).toContain(`${scope} .baz { animation-name: usb--pop, fade; }`);
   });
 });

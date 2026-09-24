@@ -30,6 +30,14 @@ export type TimelineBeat = {
   start: number;
   end: number;
   sentences: TimelineSentence[];
+  /** How far the screen change leads the voice. Absent in hand-written timelines. */
+  lead?: number;
+};
+
+/** Per-beat overrides from voice.toml. `pause` replaces `pause.beat` after the beat. */
+export type BeatTiming = {
+  lead?: number;
+  pause?: number;
 };
 
 export type Timeline = {
@@ -37,6 +45,9 @@ export type Timeline = {
   durationMs: number;
   beats: TimelineBeat[];
 };
+
+/** Screen changes lead the voice so a transition settles as the first word lands. */
+export const DEFAULT_LEAD_MS = 300;
 
 export type ScheduledGo = {
   at: number;
@@ -63,6 +74,7 @@ export function scheduleVoice(
   utterances: Iterable<Utterance>,
   pause: PauseConfig = DEFAULT_PAUSE,
   audio = "",
+  timing: (position: Position) => BeatTiming = () => ({}),
 ): VoiceSchedule {
   const queue = [...utterances];
   let next = 0;
@@ -86,9 +98,12 @@ export function scheduleVoice(
 
   for (const cue of cues) {
     const texts = cue.paragraphs.flatMap(splitSentences);
+    const override = timing(cue.position);
+    const lead = override.lead ?? DEFAULT_LEAD_MS;
+    const beatPause = override.pause ?? pause.beat;
     if (texts.length === 0) {
       const start = previousEnd;
-      const end = start + pause.beat;
+      const end = start + beatPause;
       if (end > t) {
         const extra = end - t;
         if (lastClipIndex >= 0) {
@@ -98,7 +113,7 @@ export function scheduleVoice(
         }
         t = end;
       }
-      beats.push({ position: cue.position, start, end, sentences: [] });
+      beats.push({ position: cue.position, start, end, sentences: [], lead });
       previousEnd = end;
       continue;
     }
@@ -118,13 +133,13 @@ export function scheduleVoice(
         pauseAfterMs.push(pause.sentence);
         t += pause.sentence;
       } else {
-        pauseAfterMs.push(pause.beat);
-        t += pause.beat;
+        pauseAfterMs.push(beatPause);
+        t += beatPause;
       }
       lastClipIndex = pauseAfterMs.length - 1;
     }
     const end = sentences[sentences.length - 1]?.end ?? start;
-    beats.push({ position: cue.position, start, end, sentences });
+    beats.push({ position: cue.position, start, end, sentences, lead });
     previousEnd = end;
   }
 
@@ -139,15 +154,16 @@ export function scheduleVoice(
   };
 }
 
-export function playbackSchedule(
-  timeline: Timeline,
-  leadInMs: (from: Position | undefined, to: Position) => number = () => 0,
-): ScheduledGo[] {
-  let previous: Position | undefined;
+/**
+ * When each beat's screen change fires: its lead ahead of the voice, but never
+ * before the previous change, so a long lead cannot send the screen back.
+ */
+export function playbackSchedule(timeline: Timeline): ScheduledGo[] {
+  let previousAt = 0;
   return timeline.beats.map((beat) => {
-    const lead = Math.max(0, leadInMs(previous, beat.position));
-    const at = Math.max(0, beat.start - lead);
-    previous = beat.position;
+    const lead = Math.max(0, beat.lead ?? DEFAULT_LEAD_MS);
+    const at = Math.max(previousAt, beat.start - lead);
+    previousAt = at;
     return { at, position: beat.position };
   });
 }

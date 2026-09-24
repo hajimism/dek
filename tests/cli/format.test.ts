@@ -185,6 +185,9 @@ describe("formatErrorText", () => {
 describe("formatDevEvent", () => {
   test("formats a slide reload as one line", () => {
     expect(formatDevEvent({ type: "reload-slide", slug: "intro" })).toBe("reload-slide intro");
+    expect(formatDevEvent({ type: "reload-script", slugs: ["intro", "usb"] })).toBe(
+      "reload-script intro, usb",
+    );
   });
 
   test("formats a theme reload as one line", () => {

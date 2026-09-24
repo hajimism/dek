@@ -3,10 +3,14 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
+import { parseScript } from "../../src/core/parse.ts";
+import { DEFAULT_LEAD_MS } from "../../src/core/timeline.ts";
 import {
   loadCachedTimeline,
   loadVoiceSettings,
+  parseTimelineJson,
   parseUtteranceJson,
+  resolveBeatTiming,
   resolveTimelineAudio,
   voiceCacheFile,
 } from "../../src/core/voice.ts";
@@ -37,6 +41,99 @@ describe("loadVoiceSettings", () => {
       await writeFile(join(deckDir, "voice", "voice.toml"), 'engine = "voicevox"\n');
       expect(() => loadVoiceSettings(deckDir)).toThrow(/^speaker: /);
     });
+  });
+
+  test("reads the deck lead and per-beat timing", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, "voice"), { recursive: true });
+      await writeFile(
+        join(deckDir, "voice", "voice.toml"),
+        `${voiceToml}lead = 200\n\n[beats."order/what"]\nlead = 600\npause = 1200\n`,
+      );
+      const settings = loadVoiceSettings(deckDir);
+      expect(settings.lead).toBe(200);
+      expect(settings.beats).toEqual({ "order/what": { lead: 600, pause: 1200 } });
+    });
+  });
+
+  test("defaults lead to the shared lead-in and beats to none", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, "voice"), { recursive: true });
+      await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
+      const settings = loadVoiceSettings(deckDir);
+      expect(settings.lead).toBe(DEFAULT_LEAD_MS);
+      expect(settings.beats).toEqual({});
+    });
+  });
+});
+
+describe("resolveBeatTiming", () => {
+  const deck = parseScript(`---
+title: Demo
+---
+
+## intro
+
+hello
+
+## order
+
+### what {#what}
+
+first
+
+### sequence {#sequence}
+
+second
+`);
+
+  test("addresses a slide by slug, a beat by id or by 1-based position", () => {
+    const { timing, unknown } = resolveBeatTiming(deck, {
+      lead: 250,
+      beats: { intro: { lead: 0 }, "order/sequence": { pause: 1500 }, "order/1": { lead: 700 } },
+    });
+    expect(unknown).toEqual([]);
+    expect(timing({ slideIndex: 0, beatIndex: 0 })).toEqual({ lead: 0 });
+    expect(timing({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 700 });
+    expect(timing({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 250, pause: 1500 });
+  });
+
+  test("a slide key leads into the slide and pauses after it; a beat key wins", () => {
+    const { timing } = resolveBeatTiming(deck, {
+      lead: 300,
+      beats: { order: { lead: 100, pause: 900 } },
+    });
+    expect(timing({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 100 });
+    expect(timing({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 300, pause: 900 });
+
+    const refined = resolveBeatTiming(deck, {
+      lead: 300,
+      beats: {
+        order: { lead: 100, pause: 900 },
+        "order/what": { lead: 500 },
+        "order/sequence": { pause: 1200 },
+      },
+    }).timing;
+    expect(refined({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 500 });
+    expect(refined({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 300, pause: 1200 });
+  });
+
+  test("on a one-beat slide, the slide key's lead and pause land on the same beat", () => {
+    const { timing } = resolveBeatTiming(deck, {
+      lead: 300,
+      beats: { intro: { lead: 0, pause: 2000 } },
+    });
+    expect(timing({ slideIndex: 0, beatIndex: 0 })).toEqual({ lead: 0, pause: 2000 });
+  });
+
+  test("reports keys that match no slide or beat", () => {
+    const { unknown } = resolveBeatTiming(deck, {
+      lead: 300,
+      beats: { gone: { lead: 1 }, "order/nope": { lead: 1 }, "order/9": { lead: 1 } },
+    });
+    expect(unknown).toEqual(["gone", "order/nope", "order/9"]);
   });
 });
 
@@ -138,6 +235,34 @@ describe("synthDeck timeline audio", () => {
         expect(resolveTimelineAudio(pinned, restored.timelinePath)).toBe(
           voiceCacheFile(deckDir, "audio.wav"),
         );
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.DEK_VOICE_URL;
+      } else {
+        process.env.DEK_VOICE_URL = previous;
+      }
+      await fake.close();
+    }
+  });
+
+  test("bakes voice.toml lead and beat pauses into timeline.json", async () => {
+    const fake = await startFakeVoicevox();
+    const previous = process.env.DEK_VOICE_URL;
+    process.env.DEK_VOICE_URL = fake.url;
+    try {
+      await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await mkdir(join(deckDir, "voice"), { recursive: true });
+        await writeFile(
+          join(deckDir, "voice", "voice.toml"),
+          `${voiceToml}\n[beats.intro]\nlead = 0\npause = 2000\n`,
+        );
+        const { synthDeck } = await import("../../src/voice/synth.ts");
+        const result = await synthDeck(deckDir);
+        const timeline = parseTimelineJson(await readFile(result.timelinePath, "utf8"));
+        expect(timeline.beats[0]?.lead).toBe(0);
+        expect(timeline.durationMs - (timeline.beats[0]?.end ?? 0)).toBe(2000);
       });
     } finally {
       if (previous === undefined) {

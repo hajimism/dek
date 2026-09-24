@@ -4,6 +4,7 @@ export type DevEvent =
   | { type: "sync"; created: string[]; removed?: string[] }
   | { type: "reload-slide"; slug: string }
   | { type: "reload-theme" }
+  | { type: "reload-script"; slugs: string[] }
   | { type: "diagnostics"; diagnostics: Diagnostic[] }
   | { type: "timeline" };
 

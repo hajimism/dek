@@ -8,7 +8,13 @@ import { isInside } from "./path.ts";
 import { type ProjectDeck, requireSection } from "./resolve.ts";
 import { DEFAULT_LANG } from "./schema.ts";
 import { logicalSize } from "./size.ts";
-import { stepValuesForBeat } from "./step.ts";
+import {
+  loadSlideScripts,
+  type SlideScriptEntry,
+  stillPageScript,
+  usableSlideScripts,
+} from "./slide-script.ts";
+import { stepKey, stepValuesForBeat } from "./step.ts";
 
 export { presenterSlides } from "./presenter.ts";
 export { inlineAssets, inlineCssUrls, readTheme };
@@ -161,7 +167,13 @@ export function collectPrintSlidesHtml(deck: ProjectDeck): string {
       section.beats.map((beat) => ({ id: beat.id })),
       last,
     );
-    parts.push(applyShownClasses(slideWithSlug(extracted, section.slug, deck), shown));
+    parts.push(
+      markBeat(
+        applyShownClasses(slideWithSlug(extracted, section.slug, deck), shown),
+        last,
+        stepKey(section.beats, last),
+      ),
+    );
   }
   return inlineAssets(minifyFragments(parts.join("")), deck.dir);
 }
@@ -201,12 +213,21 @@ function requireSlideSection(deck: ProjectDeck, slug: string): string {
 export type SlideSources = {
   themeCss: string;
   fragments: Map<string, string>;
+  scripts: SlideScriptEntry[];
+  /** Whether a broken slide script fails its page (shots) or is skipped (visual lint). */
+  strict: boolean;
 };
 
-export function loadSlideSources(deck: ProjectDeck): SlideSources {
+/** What a run of still pages shares, read once instead of once per page. */
+export function loadSlideSources(
+  deck: ProjectDeck,
+  options: { strict?: boolean } = {},
+): SlideSources {
   return {
     themeCss: readTheme(deck.dir, false),
     fragments: new Map(),
+    scripts: loadSlideScripts(deck.dir),
+    strict: options.strict ?? true,
   };
 }
 
@@ -223,16 +244,42 @@ export function renderSlideHtml(
     beatIndex,
   );
   const slide = inlineAssets(
-    applyShownClasses(slideWithSlug(extracted, slug, deck), shown),
+    markBeat(
+      applyShownClasses(slideWithSlug(extracted, slug, deck), shown),
+      beatIndex,
+      stepKey(section.beats, beatIndex),
+    ),
     deck.dir,
   );
   const themeCss = sources?.themeCss ?? readTheme(deck.dir, false);
+  const scripts = usableSlideScripts(
+    (sources?.scripts ?? loadSlideScripts(deck.dir, slug)).filter((entry) => entry.slug === slug),
+    sources?.strict ?? true,
+  );
   const size = logicalSize(deck.deck.ratio);
   return htmlShell({
     lang: deck.deck.lang,
     head: `<style>${playerChromeCss(size)}</style>
   <style>${themeCss}</style>`,
-    body: `<div id="deck">${slide}</div>`,
+    body: `<div id="deck">${slide}</div>
+  ${stillPageScript(scripts)}`,
+  });
+}
+
+/** Tells the still page's `stillDrawScript` which beat it shows. */
+function markBeat(html: string, index: number, step: string): string {
+  let done = false;
+  return rewriteHtml(html, (rewriter) => {
+    rewriter.on("section", {
+      element(el) {
+        if (done || !hasSlideClass(el.getAttribute("class"))) {
+          return;
+        }
+        done = true;
+        el.setAttribute("data-dek-beat", String(index));
+        el.setAttribute("data-dek-step", step);
+      },
+    });
   });
 }
 

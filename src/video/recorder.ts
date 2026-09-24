@@ -66,20 +66,15 @@ export function holdMs(beatMs: number, animationMs: number): number {
 
 export function planCapture(timeline: Timeline, _fps = 30): CapturePlan {
   const gos = playbackSchedule(timeline);
-  const frames: PlannedFrame[] = [];
-  for (const [index, event] of gos.entries()) {
-    const beat = timeline.beats[index];
-    const next = timeline.beats[index + 1];
-    const beatDuration = Math.max(
+  // Each span runs from one go to the next; the first starts with the audio.
+  const frames: PlannedFrame[] = gos.map((event, index) => ({
+    kind: "hold",
+    durationMs: Math.max(
       1,
-      (next?.start ?? timeline.durationMs) - (beat?.start ?? event.at),
-    );
-    frames.push({
-      kind: "hold",
-      durationMs: beatDuration,
-      afterGo: index,
-    });
-  }
+      (gos[index + 1]?.at ?? timeline.durationMs) - (index === 0 ? 0 : event.at),
+    ),
+    afterGo: index,
+  }));
   return { gos, frames };
 }
 

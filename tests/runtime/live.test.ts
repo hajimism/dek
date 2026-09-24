@@ -127,6 +127,14 @@ describe("applyLiveEvent", () => {
     expect(doc.diagnostics).toBeNull();
   });
 
+  test("reloads the page when a slide script changes, since scripts register once", () => {
+    const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: null };
+    const result = applyLiveEvent({ type: "reload-script", slugs: ["intro"] }, fakeHost(doc), {
+      shown: new Set(),
+    });
+    expect(result.reload).toBe(true);
+  });
+
   test("reloads on any sync so presenter notes pick up script edits", () => {
     const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: null };
     const host = fakeHost(doc);
