@@ -8,14 +8,16 @@ Install with `bunx github:hajimism/dek` and pin with `bun add github:hajimism/de
 - **Result commands accept `--json`.** Success is `{ "ok": true, ... }`. Failure is `{ "ok": false, "error": { "message", "path", "line", "hint" } }` with exit code 1. `dek` and `dek rehearse` stay running and do not take `--json`.
 - **Diagnostics are SARIF** with `dek lint --format sarif`. The default is ESLint-style text.
 - **`init` and `sync` never overwrite.** They create what is missing and warn about what is left over. Neither renames.
-- **Every error carries a hint** naming the next command to run.
+- **Every error carries a hint** naming the next command to run. Diagnostics carry one too when the fix is known: the beat ids a `data-step` may use, the classes a slide may use, the `assets/` path for a remote image.
+- **Paths into the source tree are relative to the working directory** in text and `--json` output: diagnostics, errors, and the files `init`, `new`, and `sync` create. Artifacts dek writes, such as a screenshot or a build, stay absolute. SARIF keeps absolute URIs.
+- **`dek check` without Playwright** reports `"visual": "skipped"` with a `hint` that installs it.
 - **`--json` and `--deck` are global.**
 
 ## Development
 
 | Command | Purpose |
 | --- | --- |
-| `dek [deck] [--visual]` | Start the dev server: sync, live reload, lint on save, presenter view. `--visual` adds overflow and contrast on save. |
+| `dek [deck] [--visual] [--port N]` | Start the dev server: sync, live reload, lint on save, presenter view. `--visual` adds overflow and contrast on save. `--port` fixes the port; without it the OS picks a free one. |
 | `dek --remote [--password PWD]` | Serve on the LAN. The presenter view, `goto`, and `current` require the password; one is generated if omitted. |
 | `dek rehearse [slug]` | Auto-advance from the Timeline. Records nothing. |
 

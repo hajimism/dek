@@ -28,5 +28,5 @@ Agents use the same CLI as humans. Run `dek help --agent`. Result commands accep
 ## Reference
 
 - [CLI](https://hajimism.github.io/dek/reference/cli.html): Commands, flags, environment variables.
-- [Lint Rules](https://hajimism.github.io/dek/reference/lint.html): DEK001 to DEK042.
+- [Lint Rules](https://hajimism.github.io/dek/reference/lint.html): DEK001 to DEK043.
 - [Configuration](https://hajimism.github.io/dek/reference/config.html): Directory layout, `dek.toml`, frontmatter, `voice.toml`, tokens, layouts.

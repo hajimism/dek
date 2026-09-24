@@ -71,11 +71,13 @@ export default {
   motion: { growth: 1200 },            // ms of motion, keyed like data-step
   draw(slide, { index, step, t }) {    // t: ms since this beat began
     const p = step === "growth" ? t / 1200 : 0;
-    const bar = slide.querySelector<HTMLElement>(".bar");
+    const bar = slide.querySelector<HTMLElement>("[data-bar]");
     if (bar) bar.style.width = `${p * 80}%`;
   },
 } satisfies DekSlide;
 ```
+
+Find elements with a `data-*` attribute, such as `<div data-bar>`, rather than a class. A class exists to be styled, so one used only as a hook is `DEK010` until a stylesheet defines it.
 
 `DekSlide` needs no import. `dek init` and `dek sync` write its definition to `.dek/slide.d.ts`, and `dek init` also writes a `tsconfig.json` that points your editor at it, so `slide` is an `HTMLElement`, `t` is a number, and a misspelled field or a Node global such as `process` is flagged as you type. `dek sync` never creates or edits `tsconfig.json`; if your project has its own, add `".dek/*.d.ts"` to its `include`. dek erases the types when it builds and does not run `tsc`; lint checks what matters at run time.
 

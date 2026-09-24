@@ -15,6 +15,8 @@ If class names are the contract between HTML and theme, custom properties are th
 | `--radius` | Corners |
 | `--step-transition` | Motion |
 
+The color tokens are all meant for text. In the bundled theme, `--fg`, `--muted`, and `--accent` each reach 4.5:1 against `--bg`, so any of them passes `DEK031` as body text. Keep that true when you change them.
+
 Raw colors, `font-family` values, and absolute units may appear only when assigning a `--*` property. Everywhere else, use `var()` or `calc(var() …)`. Unitless `0`, `thin`, and `em` are allowed. A `var()` with a raw fallback, such as `var(--fg, #fff)`, counts as a raw value. A missing token is `DEK015`; a raw value outside a token is `DEK014`. You may add as many deck-specific tokens as you like.
 
 Every selector must sit under `.slide`. `::view-transition-*` pseudo-elements and at-rules such as `@keyframes` and `@media` are the only exceptions.

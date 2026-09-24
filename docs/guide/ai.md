@@ -15,7 +15,7 @@ That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a
 ## What the CLI promises
 
 1. **Every result command accepts `--json`.** Success is `{ "ok": true, ... }`; failure is `{ "ok": false, "error": { "message", "path", "hint" } }` with exit code 1. `dek` and `dek rehearse` stay running and are the only exceptions. Diagnostics are SARIF. Nothing forces an agent to parse prose.
-2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is.
+2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is. Diagnostics carry a hint too when the fix is known, such as `use hook, turn, or 1-2` for a `data-step` that names no beat.
 3. **`dek help --agent` is a few hundred tokens.** The CLI documents itself.
 4. **`AGENTS.md` stays short.**
 
@@ -27,6 +27,8 @@ dek check architecture --voice
 ```
 
 `check` lints one slide, including the rendering rules when Playwright is available, writes a screenshot, and returns the diagnostics and the image path. The path contains a hash of the rendered content, so an agent that opens the returned path never sees a stale image. `--voice` returns the kana reading and duration for each sentence. Write the HTML, run `check`, look at the picture, read the pronunciation, fix. Write, see, hear, fix: one loop, closed.
+
+Without Playwright, `check` still lints and reports `"visual": "skipped"` with a hint that installs it, so an agent never mistakes a skipped measurement for a pass.
 
 Anything geometry can decide is a lint rule. Overflow and contrast have definite answers once a browser measures them, and a measured verdict is more reliable than showing an agent a screenshot and asking whether the text fits.
 

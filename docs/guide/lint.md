@@ -32,6 +32,17 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 
 Overflow (`DEK030`) and contrast (`DEK031`) are measured in a real browser through Playwright. Both are questions of geometry with definite answers. dek does not show a screenshot and ask whether the text fits; it measures. Every beat of every slide is rendered in one browser session.
 
+A finding names what to fix: the element, the start of its text, and the amount.
+
+```
+slides/objection.html: DEK030 li "https://example.com/very…" overflows the right edge by 102px at steps slow, vague
+  help: shorten it, or let it wrap with overflow-wrap: anywhere in slides/objection.css
+slides/objection.html: DEK031 p.note "補足" has contrast 1.5 (#333333 on #111111), below 4.5:1 at steps slow, vague
+  help: raise the contrast of its color against the background to 4.5:1
+```
+
+A list that runs off the bottom is one finding for the list, not one per item: a child is reported only for an edge its parent stays inside. The same finding on several beats is reported once, with every beat named. A string that cannot wrap, such as a URL, counts even when its box fits.
+
 Contrast thresholds follow WCAG AA. Body text needs 4.5:1. Large text, meaning 24px or larger, or 18.66px and bold, needs 3:1. That is what lets a big number in a soft color pass while the same color on body text fails.
 
 Without Playwright, only the commands that need it fail, each with the install command in its hint. The rest of the CLI runs.
@@ -46,6 +57,8 @@ Without Playwright, only the commands that need it fail, each with the install c
 ## Output
 
 Diagnostics are SARIF 2.1.0 so that VS Code, CI, and agents all read the same format. rumdl's results are merged in as a second run. Humans get ESLint-style text by default.
+
+Wherever the fix is known, a diagnostic carries a `hint`: the beat ids a `data-step` may use, the classes a slide may use, the `assets/` path for a remote image. Text output prints it as a `help:` line, `--json` as a `hint` field, and SARIF appends it to the message.
 
 ```bash
 dek lint --format sarif > results.sarif

@@ -40,7 +40,7 @@ First there is the script.
 The slides hang off it. Never the other way around.
 ```
 
-Heading text is free-form. Write it in any language, as a question, with punctuation. The presenter view shows each section's Markdown as written.
+Heading text is free-form. Write it in any language, as a question, with punctuation. The presenter view shows each section's Markdown as written, with the line breaks inside each paragraph joined.
 
 Only paragraphs become speech. Blockquotes, lists, code blocks, and tables are for the screen or for your own direction; they are never synthesized. Inline emphasis, links, and `code` are flattened to plain text before synthesis. None of this affects the live presentation. It only matters once you run `dek cues` or add voice. A beat with a list but no paragraph is visible on screen yet passes in an instant when narrated, so `dek cues` and lint on a deck with `voice/` warn about it as `DEK042`.
 
@@ -53,7 +53,7 @@ Files in `slides/` and the `<slug>` arguments to the CLI use the section **id**.
 dek separates display from identity with Pandoc-style `{#id}`.
 
 - If the heading already qualifies as an id, it is the id. `## intro` becomes `slides/intro.html`.
-- Otherwise `{#id}` is required. `## What do you do the day before a talk? {#problem}` becomes `slides/problem.html`. A qualifying heading without one is an error that points at the line.
+- Otherwise `{#id}` is required. `## What do you do the day before a talk? {#problem}` becomes `slides/problem.html`. A heading that does not qualify and has no `{#id}` is an error that points at the line and shows the fix: `## Why dek? {#why-dek}` when the heading has ASCII words to build an id from, `## まとめ {#your-id}` when it has none.
 - A qualifying heading may still carry `{#id}` when you want the display name and the file name to differ. `## intro {#opening}` is displayed as "intro" and stored as `opening.html`.
 - A heading that is only an id has no display text. The generated skeleton leaves its `<h2>` empty, except for the first section, which takes the deck `title`. The presenter view shows the id.
 

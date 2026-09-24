@@ -21,7 +21,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 | `DEK021` | A referenced image file does not exist | — |
 | `DEK022` | A path that leaves the deck directory | — |
 | `DEK023` | A local `src`, or a `url()` in a slide stylesheet, that does not start with `assets/` | — |
-| `DEK030` | Content overflows the slide when rendered, at any beat | — |
+| `DEK030` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
 | `DEK031` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK040` | An ASCII word missing from the pronunciation dictionary. Warning | — |
 | `DEK041` | Narrated length far from the `duration` budget. Warning | — |
@@ -43,7 +43,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 
 ### DEK003
 
-An unresolvable reference. A beat with no element is fine, and positions need not be consecutive.
+An unresolvable reference. A beat with no element is fine, and positions need not be consecutive. The hint lists the ids and positions the slide can use.
 
 ### DEK005
 
@@ -51,7 +51,7 @@ A `data-morph` name must be unique within a slide, because it becomes a `view-tr
 
 ### DEK010
 
-Clear it by defining the class in `theme.css`, or in `slides/<id>.css` when only that slide uses it. Growing the shared vocabulary is a design decision; lint makes it one visible step. `DEK013` caps how often that step can be repeated, and slide stylesheets do not count toward it.
+Clear it by defining the class in `theme.css`, or in `slides/<id>.css` when only that slide uses it. Growing the shared vocabulary is a design decision; lint makes it one visible step. `DEK013` caps how often that step can be repeated, and slide stylesheets do not count toward it. The hint lists the classes already defined. If the class is only there for `slides/<id>.ts` to find an element, use a `data-*` attribute instead.
 
 ### DEK014 / DEK015
 
@@ -61,9 +61,13 @@ Raw values are allowed only when assigning a `--*` property. Unitless `0`, `thin
 
 Self-containment. Nothing remote, nothing from the project root, nothing from a sibling deck. Local `src` values start with `assets/`. This is what allows `dek build` to inline every asset and the project-root dev server to serve them.
 
+### DEK030
+
+The message names the element, the start of its text, the edge, and how many pixels it runs past. A child is reported only for an edge its parent stays inside, so a list that runs off the bottom is one finding. The same finding on several beats is one diagnostic that names every beat. Text is measured as well as boxes, so an unbreakable string such as a URL counts even when its box fits.
+
 ### DEK031
 
-Thresholds follow WCAG AA: 4.5:1 for body text, 3:1 for large text. Large text is a computed `font-size` of 24px or more, or 18.66px or more at `font-weight` 700 or above. A big number in a soft color passes; the same color on body text fails. The thresholds are not configurable.
+Thresholds follow WCAG AA: 4.5:1 for body text, 3:1 for large text. Large text is a computed `font-size` of 24px or more, or 18.66px or more at `font-weight` 700 or above. A big number in a soft color passes; the same color on body text fails. The thresholds are not configurable. The message names the element, its text, and both colors.
 
 ### DEK042
 

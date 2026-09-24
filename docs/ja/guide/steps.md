@@ -71,11 +71,13 @@ export default {
   motion: { growth: 1200 },            // 動きの長さ（ms）。キーは data-step と同じ
   draw(slide, { index, step, t }) {    // t: このビートに入ってからの ms
     const p = step === "growth" ? t / 1200 : 0;
-    const bar = slide.querySelector<HTMLElement>(".bar");
+    const bar = slide.querySelector<HTMLElement>("[data-bar]");
     if (bar) bar.style.width = `${p * 80}%`;
   },
 } satisfies DekSlide;
 ```
+
+要素はクラスではなく、`<div data-bar>` のような `data-*` 属性で探します。クラスはスタイルを当てるためのものなので、目印としてだけ使ったクラスは、どこかのスタイルシートで定義するまで `DEK010` になります。
 
 `DekSlide` は import せずに使えます。`dek init` と `dek sync` がその定義を `.dek/slide.d.ts` に書き、`dek init` はエディタがそれを読むための `tsconfig.json` も置きます。これで `slide` は `HTMLElement`、`t` は数値になり、フィールド名の打ち間違いや `process` のような Node のグローバルは書いた時点で赤線になります。`dek sync` は `tsconfig.json` を作りも書き換えもしないので、自前の `tsconfig.json` がある場合はその `include` に `".dek/*.d.ts"` を足してください。dek はビルド時に型を消すだけで `tsc` は走らせず、実行時に効く誤りは lint が検査します。
 

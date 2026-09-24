@@ -9,7 +9,10 @@ Run `dek` inside a deck to serve that deck. Run it at the project root to get an
 ```bash
 dek
 dek --visual
+dek --port 3030
 ```
+
+Without `--port`, the OS picks a free port and `dek` prints the URL. Fix it when another tool needs to know the address in advance.
 
 On every save:
 
@@ -25,7 +28,7 @@ Only one server runs per project. A second `dek` finds the first one's lock in `
 
 ## The presenter view
 
-Open `/presenter`, or press `p` in the player. You see the current slide, a preview of the next beat or slide, and the script for the current section with the current beat highlighted. A progress bar across the top tracks the whole deck. Along the bottom: the slide count, the budget for the current section, and the time elapsed since your first advance, which turns yellow past 80% of the talk's budget and red past 100%. Press `p` again to return to the audience view in the same window.
+Open `/presenter`, or press `p` in the player. You see the current slide, a preview of the next beat or slide, and the script for the current section with the current beat highlighted. Line breaks inside a paragraph are joined, so the script wraps to the presenter's width rather than your editor's; Japanese joins without a space. Stage directions, lists, and code keep their lines. A progress bar across the top tracks the whole deck. Along the bottom: the slide count, the budget for the current section, and the time elapsed since your first advance, which turns yellow past 80% of the talk's budget and red past 100%. Press `p` again to return to the audience view in the same window.
 
 Every connected window follows the presenter over WebSocket: a second monitor, another laptop, or a phone.
 
