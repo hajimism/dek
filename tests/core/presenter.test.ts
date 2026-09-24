@@ -3,6 +3,7 @@ import {
   nextPresenterTitle,
   type PresenterSlide,
   presenterState,
+  reflowScript,
 } from "../../src/core/presenter.ts";
 
 const slides: PresenterSlide[] = [
@@ -62,5 +63,53 @@ describe("nextPresenterTitle", () => {
   test("is empty on the last beat of the last slide", () => {
     const state = presenterState(slides, { slideIndex: 1, beatIndex: 0 });
     expect(nextPresenterTitle(state)).toBe("");
+  });
+});
+
+describe("reflowScript", () => {
+  test("joins soft-wrapped Japanese lines without a space", () => {
+    expect(reflowScript("仕様が決まっていないことに\nすぐ気づけます。")).toBe(
+      "仕様が決まっていないことにすぐ気づけます。",
+    );
+  });
+
+  test("joins soft-wrapped Latin lines with one space", () => {
+    expect(reflowScript("Slides exist so that\n  you can talk.")).toBe(
+      "Slides exist so that you can talk.",
+    );
+  });
+
+  test("keeps paragraphs, stage directions, lists, and code on their own lines", () => {
+    const script = [
+      "first line",
+      "second line",
+      "",
+      "> 間を取る。",
+      "> 次で問いかける。",
+      "",
+      "- one",
+      "- two",
+      "",
+      "```",
+      "a",
+      "b",
+      "```",
+    ].join("\n");
+    expect(reflowScript(script)).toBe(
+      [
+        "first line second line",
+        "",
+        "> 間を取る。",
+        "> 次で問いかける。",
+        "",
+        "- one",
+        "- two",
+        "",
+        "```",
+        "a",
+        "b",
+        "```",
+      ].join("\n"),
+    );
   });
 });
