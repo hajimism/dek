@@ -1,0 +1,5 @@
+.big {
+  font-size: var(--size-stat);
+  color: var(--accent);
+  font-weight: 700;
+}
