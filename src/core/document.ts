@@ -93,6 +93,10 @@ export async function renderDeckDocument(
     : "";
   const currentLabel = includeNotes ? `<div class="dek-panel-label">Current</div>` : "";
   const rail = options.mode === "video" ? "" : renderRailHtml(data);
+  const hint =
+    options.mode === "player" && !options.live
+      ? renderKeyHintHtml(deck.deck.lang, { rail: rail !== "", presenter: includeNotes })
+      : "";
   const railResize = rail
     ? `<div id="dek-rail-resize" role="separator" aria-orientation="vertical" aria-label="Resize slide list" tabindex="0"></div>`
     : "";
@@ -113,6 +117,7 @@ export async function renderDeckDocument(
     ${presenter}
   </div>
   ${railResize}
+  ${hint}
   <script type="application/json" id="dek-data">${jsonForScript(data)}</script>
   ${slideScriptTags(slideScripts)}
   <script>${options.playerScript}</script>
@@ -129,6 +134,27 @@ export function renderRailHtml(slides: Array<{ slug: string; title: string }>): 
     })
     .join("");
   return `<nav id="dek-rail" aria-label="Slides">${items}</nav>`;
+}
+
+const KEY_HINT_LABELS = {
+  ja: { rail: "スライド一覧", presenter: "プレゼンタービュー" },
+  en: { rail: "Slide rail", presenter: "Presenter view" },
+};
+
+/**
+ * The keys a viewer of a built file cannot discover by looking: `s` and `p`. Shown once as
+ * the file opens, it fades on its own and goes away at the first key or move.
+ */
+export function renderKeyHintHtml(
+  lang: string,
+  keys: { rail: boolean; presenter: boolean },
+): string {
+  const labels = lang.toLowerCase().startsWith("ja") ? KEY_HINT_LABELS.ja : KEY_HINT_LABELS.en;
+  const items = [
+    keys.rail ? `<span><kbd>s</kbd>${labels.rail}</span>` : "",
+    keys.presenter ? `<span><kbd>p</kbd>${labels.presenter}</span>` : "",
+  ].join("");
+  return items ? `<div id="dek-hint" role="status">${items}</div>` : "";
 }
 
 function jsonForScript(value: unknown): string {

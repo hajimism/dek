@@ -76,6 +76,16 @@ describe("player runtime in happy-dom", () => {
     expect(document.getElementById("dek-page")?.textContent?.replace(/\s+/g, " ")).toBe("1 / 3");
   });
 
+  test.serial("shows the key hint until the first key", async () => {
+    // The hash the first render writes echoes back; that is not a move.
+    window.dispatchEvent(new Event("hashchange"));
+    await settle();
+    expect(document.getElementById("dek-hint")).not.toBeNull();
+    pressKey("Shift");
+    await settle();
+    expect(document.getElementById("dek-hint")).toBeNull();
+  });
+
   test.serial("ArrowRight walks beats, then slides, and writes the hash", async () => {
     pressKey("ArrowRight");
     await settle();

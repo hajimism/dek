@@ -423,7 +423,16 @@ if (dataEl?.textContent) {
     }
   }
 
+  /**
+   * The first key or move takes the key hint away. Removing it also drops its animation, which
+   * the first move would otherwise wait on before it settles.
+   */
+  function dismissKeyHint(): void {
+    document.getElementById("dek-hint")?.remove();
+  }
+
   const go = createGuardedGo(async (next: Position) => {
+    dismissKeyHint();
     const apply = (): void => {
       const from = pos;
       pos = next;
@@ -489,6 +498,7 @@ if (dataEl?.textContent) {
     }
   });
   document.addEventListener("keydown", (event) => {
+    dismissKeyHint();
     if (isPresenterToggleKey(event)) {
       if (presenterRoot) {
         event.preventDefault();

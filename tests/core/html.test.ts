@@ -355,6 +355,73 @@ hello
   });
 });
 
+describe("key hint", () => {
+  const english = `---
+title: Demo
+lang: en
+---
+
+## intro
+
+hello
+`;
+
+  test("a built player names the rail and presenter keys in the deck's language", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const html = await renderPage(join(root, "decks", "demo"));
+        expect(html).toContain('id="dek-hint"');
+        expect(html).toContain("<kbd>s</kbd>スライド一覧");
+        expect(html).toContain("<kbd>p</kbd>プレゼンタービュー");
+      },
+    );
+    await withTempProject(
+      { decks: [{ name: "demo", script: english, slides: { intro: introHtml } }] },
+      async (root) => {
+        const html = await renderPage(join(root, "decks", "demo"));
+        expect(html).toContain("<kbd>s</kbd>Slide rail");
+        expect(html).toContain("<kbd>p</kbd>Presenter view");
+        expect(html).not.toContain("スライド一覧");
+      },
+    );
+  });
+
+  test("leaves out the dev server, the presenter page, and video", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const dir = join(root, "decks", "demo");
+        for (const options of [
+          { live: true },
+          { mode: "presenter" as const },
+          { mode: "video" as const },
+        ]) {
+          expect(await renderPage(dir, options)).not.toContain('id="dek-hint"');
+        }
+      },
+    );
+  });
+
+  test("names only the rail when the build has no presenter view", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const { project, deck } = resolveDeck(join(root, "decks", "demo"));
+        const html = await renderDeckDocument(deck, {
+          mode: "player",
+          inlineAssets: false,
+          includeNotes: false,
+          config: loadConfig(project.configPath),
+          playerScript: "",
+        });
+        expect(html).toContain("<kbd>s</kbd>");
+        expect(html).not.toContain("<kbd>p</kbd>");
+      },
+    );
+  });
+});
+
 describe("renderIndexHtml", () => {
   test("links each deck", () => {
     const html = renderIndexHtml([{ name: "demo", title: "Demo" }]);

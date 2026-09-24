@@ -17,6 +17,16 @@ describe("playerChromeCss", () => {
     );
   });
 
+  test("fades the key hint in and out without catching the pointer", () => {
+    const css = playerChromeCss();
+    expect(css).toMatch(/#dek-hint \{[^}]*pointer-events: none;[^}]*animation: dek-hint /);
+    expect(css).toContain("@keyframes dek-hint");
+    expect(css).toMatch(/prefers-reduced-motion: reduce[^@]*#dek-hint/);
+    expect(css).toContain(
+      "body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: calc(50% + var(--dek-rail-w, 188px) / 2); }",
+    );
+  });
+
   test("sets transform-origin so scale fits from the top", () => {
     expect(playerChromeCss()).toContain("transform-origin");
   });
