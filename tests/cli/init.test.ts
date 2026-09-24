@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { initCommand } from "../../src/cli/init.ts";
 import { DekError } from "../../src/core/error.ts";
+import { lintDeck } from "../../src/core/index.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -27,6 +28,29 @@ describe("dek init", () => {
 });
 
 describe("initCommand", () => {
+  test("creates a first deck that already passes lint", async () => {
+    await withTempDir(async (dir) => {
+      const target = join(dir, "my-talks");
+      const result = initCommand({ cwd: dir, dir: target, deck: "demo" });
+      expect(result.created).toContain(join(target, "decks", "demo", "slides", "intro.html"));
+      expect(lintDeck(join(target, "decks", "demo"))).toEqual([]);
+    });
+  });
+
+  test("writes AGENTS.md with or without a first deck", async () => {
+    await withTempDir(async (dir) => {
+      for (const [name, deck] of [
+        ["bare", undefined],
+        ["with-deck", "demo"],
+      ] as const) {
+        const target = join(dir, name);
+        const result = initCommand({ cwd: dir, dir: target, ...(deck ? { deck } : {}) });
+        expect(result.created).toContain(join(target, "AGENTS.md"));
+        expect(await readFile(join(target, "AGENTS.md"), "utf8")).toContain("dek help --agent");
+      }
+    });
+  });
+
   test("creates a project with a first deck", async () => {
     await withTempDir(async (dir) => {
       const target = join(dir, "my-talks");

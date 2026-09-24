@@ -239,6 +239,8 @@ c
         expect(agents).toContain("slides/<id>.ts");
         expect(agents).toContain("satisfies DekSlide");
         expect(agents).toContain("find elements by data-* attributes");
+        expect(agents).toContain("For a layout's markup, run `dek theme <layout>`.");
+        expect(agents).toContain("A deck's own `theme.css` can differ");
       },
     );
   });

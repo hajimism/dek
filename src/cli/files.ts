@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { syncDeck } from "../core/sync.ts";
 import { formatVoiceToml } from "../core/voice.ts";
 
 const defaultThemePath = join(import.meta.dir, "..", "theme", "default.css");
@@ -99,5 +100,7 @@ export function createDeck(
       writeIfMissing(join(dir, "voice", "dict.toml"), "# voice dictionary\n"),
     );
   }
+  // A new deck passes lint as created: its skeleton slides and AGENTS.md come with it.
+  created.push(...syncDeck(dir).created, join(root, "AGENTS.md"));
   return created;
 }

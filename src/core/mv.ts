@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "./error.ts";
 import { joinLines, splitLines } from "./lines.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
 import { Id } from "./schema.ts";
+import { skeletonHtml } from "./sync.ts";
 import { renameTableKeys } from "./toml-keys.ts";
 import { voiceDir } from "./voice.ts";
 
@@ -14,8 +15,14 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
     throw new DekError(`invalid id "${to}"`, { hint: "use [a-z0-9-] with at least one letter" });
   }
   const { deck } = asResolvedDeck(input);
+  const has = (slug: string): boolean => deck.deck.sections.some((entry) => entry.slug === slug);
+  if (!has(from) && has(to)) {
+    // script.md was edited first; only the files still carry the old id.
+    applySteps(slideFileSteps(deck, from, to, { replaceSkeleton: true }));
+    return;
+  }
   const section = requireSection(deck, from);
-  if (deck.deck.sections.some((entry) => entry.slug === to)) {
+  if (has(to)) {
     throw new DekError(`section "${to}" already exists`, {
       path: deck.scriptPath,
       hint: "run `dek ls`",
@@ -33,30 +40,62 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
     });
   }
   lines[headingIndex] = rewriteHeadingId(heading, from, to);
+  applySteps([
+    writeStep(deck.scriptPath, source, joinLines(source, lines)),
+    ...slideFileSteps(deck, from, to, { replaceSkeleton: false }),
+  ]);
+}
 
+/**
+ * The steps that move `slides/<from>.*` to `<to>` and point voice.toml at it.
+ * Everything that could refuse is worked out before any file changes. With
+ * `replaceSkeleton`, a `<to>.html` that is still the generated skeleton is
+ * replaced rather than refused: the dev server writes one as soon as the
+ * heading changes.
+ */
+function slideFileSteps(
+  deck: ResolvedDeck["deck"],
+  from: string,
+  to: string,
+  options: { replaceSkeleton: boolean },
+): FileStep[] {
   const fromPath = join(deck.dir, "slides", `${from}.html`);
   const toPath = join(deck.dir, "slides", `${to}.html`);
+  if (options.replaceSkeleton && !existsSync(fromPath)) {
+    throw new DekError(`slide "${from}" not found`, {
+      path: fromPath,
+      hint: "run `dek lint` to see which slides have no section",
+    });
+  }
+  const skeleton = options.replaceSkeleton ? skeletonHtml(deck.deck, to) : undefined;
+  const replaced =
+    skeleton !== undefined && existsSync(toPath) && readFileSync(toPath, "utf8") === skeleton
+      ? skeleton
+      : undefined;
   for (const target of [
-    toPath,
+    ...(replaced === undefined ? [toPath] : []),
     ...SLIDE_SIDECARS.map((ext) => join(deck.dir, "slides", `${to}${ext}`)),
   ]) {
     if (existsSync(target)) {
       throw new DekError(`slide "${to}" already exists`, {
         path: target,
-        hint: "run `dek ls`",
+        hint: `merge slides/${from}.html into it by hand, or delete it and run \`dek mv ${from} ${to}\` again`,
       });
     }
   }
 
-  // Everything that could refuse is worked out before the first file changes.
   const voice = planVoiceBeatKeys(deck.dir, from, to);
-  const steps: FileStep[] = [writeStep(deck.scriptPath, source, joinLines(source, lines))];
+  const steps: FileStep[] = [];
   if (existsSync(fromPath)) {
-    steps.push(renameStep(fromPath, toPath));
     const html = readFileSync(fromPath, "utf8");
     const next = html.replaceAll(`data-slug="${from}"`, `data-slug="${to}"`);
-    if (next !== html) {
-      steps.push(writeStep(toPath, html, next));
+    if (replaced !== undefined) {
+      steps.push(writeStep(toPath, replaced, next), removeStep(fromPath, html));
+    } else {
+      steps.push(renameStep(fromPath, toPath));
+      if (next !== html) {
+        steps.push(writeStep(toPath, html, next));
+      }
     }
   }
   for (const ext of SLIDE_SIDECARS) {
@@ -68,7 +107,7 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   if (voice) {
     steps.push(writeStep(voice.path, voice.source, voice.next));
   }
-  applySteps(steps);
+  return steps;
 }
 
 /** One file change `dek mv` makes, with how to take it back. */
@@ -80,6 +119,10 @@ function writeStep(path: string, before: string, after: string): FileStep {
     apply: () => writeFileSync(path, after),
     undo: () => writeFileSync(path, before),
   };
+}
+
+function removeStep(path: string, before: string): FileStep {
+  return { path, apply: () => unlinkSync(path), undo: () => writeFileSync(path, before) };
 }
 
 function renameStep(from: string, to: string): FileStep {

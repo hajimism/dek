@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { cssClassNames, cssCustomProperties, cssLayoutNames } from "./css.ts";
 import { escapeHtml } from "./escape.ts";
 import { asResolvedDeck, listSlides, type ResolvedDeck } from "./resolve.ts";
-import { frontmatterJsonSchema, type Section } from "./schema.ts";
+import { type Deck, frontmatterJsonSchema, type Section } from "./schema.ts";
 import { stepKey } from "./step.ts";
 
 export type SyncResult = { created: string[] };
@@ -83,7 +83,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
   return { created };
 }
 
-function writeAgentsMd(root: string, themePath: string): void {
+export function writeAgentsMd(root: string, themePath: string): string {
   const path = join(root, "AGENTS.md");
   const theme = existsSync(themePath) ? readFileSync(themePath, "utf8") : "";
   const classes = [...cssClassNames(theme)].sort();
@@ -116,6 +116,8 @@ Talk-script-first HTML slides.
 
 ## Theme classes
 
+From the project \`theme.css\`. A deck's own \`theme.css\` can differ; \`dek theme\` lists what a deck's theme defines.
+
 ${classList}
 
 ## Theme tokens
@@ -126,9 +128,12 @@ ${tokenList}
 
 ${layoutList}
 
+For a layout's markup, run \`dek theme <layout>\`.
+
 For commands, run \`dek help --agent\`.
 `,
   );
+  return path;
 }
 
 /**
@@ -147,6 +152,13 @@ export function skeletonHeading(
   return index === 0 ? deckTitle : "";
 }
 
+/** The HTML `dek sync` would generate for `slug`, or undefined when the deck has no such section. */
+export function skeletonHtml(deck: Deck, slug: string): string | undefined {
+  const index = deck.sections.findIndex((section) => section.slug === slug);
+  const section = deck.sections[index];
+  return section && renderSkeleton(section, skeletonHeading(section, index, deck.title));
+}
+
 function renderSkeleton(section: Section, heading: string): string {
   const inner =
     section.beats.length === 0 ? renderTitleSlide(heading) : renderBeatSlide(section, heading);
@@ -155,8 +167,8 @@ function renderSkeleton(section: Section, heading: string): string {
 
 function renderTitleSlide(heading: string): string {
   return `<section class="slide" data-layout="title">
-    <h2 class="slide-title">${escapeHtml(heading)}</h2>
-  </section>`;
+  <h2 class="slide-title">${escapeHtml(heading)}</h2>
+</section>`;
 }
 
 function renderBeatSlide(section: Section, heading: string): string {
@@ -167,9 +179,9 @@ function renderBeatSlide(section: Section, heading: string): string {
     )
     .join("\n");
   return `<section class="slide" data-layout="default">
-    <h2 class="slide-title">${escapeHtml(heading)}</h2>
-    <ul>
+  <h2 class="slide-title">${escapeHtml(heading)}</h2>
+  <ul>
 ${items}
-    </ul>
-  </section>`;
+  </ul>
+</section>`;
 }

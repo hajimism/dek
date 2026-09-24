@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { DekError, writeFrontmatterSchema } from "../core/index.ts";
 import { isDeckName } from "../core/path.ts";
-import { defaultTsconfig, writeSlideTypes } from "../core/sync.ts";
+import { defaultTsconfig, writeAgentsMd, writeSlideTypes } from "../core/sync.ts";
 import {
   createDeck,
   defaultGitignore,
@@ -60,6 +60,8 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
       });
     }
     created.push(...createDeck(root, options.deck, join(root, "theme.css")));
+  } else {
+    created.push(writeAgentsMd(root, join(root, "theme.css")));
   }
 
   return { root, created };
