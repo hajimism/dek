@@ -8,6 +8,7 @@ import {
   extractSlideSection,
   injectSlug,
   loadSlideSources,
+  minifyFragments,
   renderIndexHtml,
   renderSlideHtml,
 } from "../../src/core/html.ts";
@@ -599,6 +600,24 @@ more
         }>;
         expect(data.map((slide) => slide.slug)).toEqual(["intro", "extra"]);
       },
+    );
+  });
+});
+
+describe("minifyFragments", () => {
+  test("drops indentation between tags but keeps one space, as the browser renders it", () => {
+    expect(
+      minifyFragments(
+        '<section class="slide">\n  <h2>a</h2>\n  <p><b>x</b> <i>y</i></p>\n</section>',
+      ),
+    ).toBe('<section class="slide"> <h2>a</h2> <p><b>x</b> <i>y</i></p> </section>');
+  });
+
+  test("leaves the inside of pre and textarea untouched", () => {
+    const pre = '<pre class="code"><span>one</span>\n<span>two</span>\n  <b>three</b></pre>';
+    const textarea = "<textarea>\n  <kept>\n</textarea>";
+    expect(minifyFragments(`<section>\n  ${pre}\n  ${textarea}\n</section>`)).toBe(
+      `<section> ${pre} ${textarea} </section>`,
     );
   });
 });

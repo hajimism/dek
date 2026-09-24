@@ -114,8 +114,23 @@ export function injectSlug(section: string, slug: string): string {
   });
 }
 
+/** Elements whose whitespace is content, so the build must keep it byte for byte. */
+const PRESERVED_WHITESPACE = /<(pre|textarea)\b[\s\S]*?<\/\1\s*>/gi;
+
+/**
+ * Collapses whitespace between tags to one space, which is how the browser renders it
+ * outside `pre`, so the build looks like the dev server; `pre` and `textarea` stay as written.
+ */
 export function minifyFragments(html: string): string {
-  return html.replace(/>\s+</g, "><");
+  // A slice's ends sit against a preserved element, so they count as tag edges too.
+  const collapse = (part: string): string => part.replace(/(^|>)\s+(?=<|$)/g, "$1 ");
+  let out = "";
+  let last = 0;
+  for (const match of html.matchAll(PRESERVED_WHITESPACE)) {
+    out += collapse(html.slice(last, match.index)) + match[0];
+    last = match.index + match[0].length;
+  }
+  return out + collapse(html.slice(last));
 }
 
 export function collectSlidesHtml(

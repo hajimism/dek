@@ -65,7 +65,7 @@ more
         expect(html).toContain("startViewTransition");
         expect(html).toContain("BroadcastChannel");
         expect(html.toLowerCase()).toContain("presenter");
-        expect(html).toContain("</h2><img");
+        expect(html).toContain("</h2> <img");
         expect(html).not.toContain("EventSource");
         expect(html).toContain("ArrowLeft");
 
