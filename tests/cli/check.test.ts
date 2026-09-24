@@ -187,6 +187,9 @@ more
           });
           expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(false);
           expect(result.visual).toBe("skipped");
+          expect(result.hint).toBe(
+            "bun add -d playwright && bunx playwright install chromium to also check overflow and contrast",
+          );
         });
       },
     );

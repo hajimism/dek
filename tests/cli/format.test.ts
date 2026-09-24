@@ -113,6 +113,17 @@ describe("formatDiagnostics", () => {
     );
   });
 
+  test("prints a diagnostic hint under its line", () => {
+    expect(
+      formatDiagnostics([
+        { id: "DEK003", message: 'data-step "3"', path: "slides/intro.html", hint: "use hook" },
+        { id: "DEK011", message: "style attribute", path: "slides/intro.html" },
+      ]),
+    ).toBe(
+      'slides/intro.html: DEK003 data-step "3"\n  help: use hook\nslides/intro.html: DEK011 style attribute',
+    );
+  });
+
   test("returns no diagnostics for an empty list", () => {
     expect(formatDiagnostics([])).toBe("no diagnostics");
   });
@@ -231,5 +242,13 @@ describe("writeDevEvent", () => {
     const chunks: string[] = [];
     writeDevEvent({ type: "diagnostics", diagnostics: [] }, { write: (s) => chunks.push(s) });
     expect(chunks).toEqual([]);
+  });
+});
+
+describe("formatError paths", () => {
+  test("prints the error path relative to cwd when one is given", () => {
+    const error = new DekError("section not found", { path: "/p/decks/demo/script.md" });
+    expect(formatError(error, { cwd: "/p/decks/demo" }).path).toBe("script.md");
+    expect(formatError(error).path).toBe("/p/decks/demo/script.md");
   });
 });

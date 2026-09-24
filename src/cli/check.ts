@@ -1,6 +1,10 @@
 import { DekError } from "../core/error.ts";
 import { type Diagnostic, lintDeck } from "../core/index.ts";
-import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
+import {
+  PLAYWRIGHT_INSTALL,
+  type PlaywrightRunner,
+  playwrightMissingError,
+} from "../core/playwright.ts";
 import { runVisualDeck } from "../core/visual.ts";
 import { hasVoice, loadCachedTimeline } from "../core/voice.ts";
 import { requireDeckFromCwd, requireSection } from "./scope.ts";
@@ -16,6 +20,8 @@ export type CheckCliResult = {
   slug: string;
   diagnostics: Diagnostic[];
   visual: "ok" | "skipped";
+  /** Set when visual is skipped: how to get overflow and contrast checked. */
+  hint?: string;
   shot?: string;
   voice?: { beats: VoiceCheckBeat[] };
 };
@@ -85,7 +91,9 @@ export async function checkCommand(options: {
   return {
     slug,
     diagnostics,
-    visual: visual === null ? "skipped" : "ok",
+    ...(visual === null
+      ? { visual: "skipped", hint: `${PLAYWRIGHT_INSTALL} to also check overflow and contrast` }
+      : { visual: "ok" }),
     ...(shot ? { shot } : {}),
     ...(voice ? { voice } : {}),
   };

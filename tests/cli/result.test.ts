@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatText } from "../../src/cli/result.ts";
+import { displayPaths, formatText } from "../../src/cli/result.ts";
 
 describe("formatText", () => {
   test("formats init and new", () => {
@@ -210,5 +210,94 @@ architecture  architecture      0:11   0:05
     expect(formatText({ command: "mv", data: { from: "intro", after: "architecture" } })).toBe(
       "moved intro after architecture",
     );
+  });
+});
+
+describe("formatText check", () => {
+  test("says why visual was skipped and how to turn it on", () => {
+    expect(
+      formatText({
+        command: "check",
+        data: { slug: "intro", diagnostics: [], visual: "skipped", hint: "install it" },
+      }),
+    ).toBe("no diagnostics\nvisual: skipped\n  help: install it");
+  });
+});
+
+describe("displayPaths", () => {
+  test("prints diagnostic paths relative to the working directory", () => {
+    const result = displayPaths(
+      {
+        command: "check",
+        data: {
+          slug: "intro",
+          diagnostics: [
+            { id: "DEK011", message: "style", path: "/p/decks/demo/slides/intro.html" },
+            { id: "DEK012", message: "raw", path: "/p/theme.css" },
+            { id: "DEK099", message: "no path" },
+          ],
+          visual: "ok",
+          shot: "/p/decks/demo/.cache/shots/intro.png",
+        },
+      },
+      "/p/decks/demo",
+    );
+    expect(result.command === "check" && result.data.diagnostics.map((d) => d.path)).toEqual([
+      "slides/intro.html",
+      "../../theme.css",
+      undefined,
+    ]);
+    expect(result.command === "check" && result.data.shot).toBe(
+      "/p/decks/demo/.cache/shots/intro.png",
+    );
+  });
+
+  test("covers lint, cues, and both ls shapes", () => {
+    const diagnostics = [{ id: "DEK001", message: "missing", path: "/p/decks/demo/script.md" }];
+    const cwd = "/p";
+    const lint = displayPaths({ command: "lint", data: { diagnostics, rumdl: "ok" } }, cwd);
+    const cues = displayPaths(
+      { command: "cues", data: { name: "demo", cues: [], diagnostics } },
+      cwd,
+    );
+    const list = displayPaths(
+      {
+        command: "ls",
+        data: {
+          kind: "list",
+          root: "/p",
+          decks: [{ name: "demo", title: "Demo", sections: 1, slides: 1, diagnostics }],
+          failed: [],
+        },
+      },
+      cwd,
+    );
+    expect(lint.command === "lint" && lint.data.diagnostics[0]?.path).toBe("decks/demo/script.md");
+    expect(cues.command === "cues" && cues.data.diagnostics[0]?.path).toBe("decks/demo/script.md");
+    expect(
+      list.command === "ls" &&
+        list.data.kind === "list" &&
+        list.data.decks[0]?.diagnostics[0]?.path,
+    ).toBe("decks/demo/script.md");
+    expect(diagnostics[0]?.path).toBe("/p/decks/demo/script.md");
+  });
+});
+
+describe("displayPaths created files", () => {
+  test("prints files dek created in the source tree relative to cwd", () => {
+    const cwd = "/p/decks/demo";
+    const sync = displayPaths(
+      { command: "sync", data: { created: ["/p/decks/demo/slides/intro.html"] } },
+      cwd,
+    );
+    const created = displayPaths(
+      {
+        command: "new",
+        data: { name: "next", dir: "/p/decks/next", created: ["/p/decks/next/script.md"] },
+      },
+      "/p",
+    );
+    expect(sync.command === "sync" && sync.data.created).toEqual(["slides/intro.html"]);
+    expect(created.command === "new" && created.data.created).toEqual(["decks/next/script.md"]);
   });
 });

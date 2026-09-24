@@ -1,9 +1,10 @@
+import type { Diagnostic } from "../core/diagnostic.ts";
 import { mergeSarif, toSarif } from "../core/sarif.ts";
 import { formatClock } from "../core/timing.ts";
 import type { BuildCliResult } from "./build.ts";
 import type { CheckCliResult } from "./check.ts";
 import type { CuesResult } from "./cues.ts";
-import { formatCreated, formatDiagnostics, formatTable } from "./format.ts";
+import { displayPath, formatCreated, formatDiagnostics, formatTable } from "./format.ts";
 import type { NavResult } from "./goto.ts";
 import type { InitResult } from "./init.ts";
 import type { LintCliResult } from "./lint.ts";
@@ -14,7 +15,7 @@ import type { PdfCliResult } from "./pdf.ts";
 import type { ShotCliResult } from "./shot.ts";
 import type { ShowResult } from "./show.ts";
 import type { SyncCliResult } from "./sync.ts";
-import { padEndWidth, shouldColor } from "./tty.ts";
+import { ansi, padEndWidth, shouldColor } from "./tty.ts";
 import type { VideoCliResult } from "./video.ts";
 import type { VoiceCliResult } from "./voice.ts";
 
@@ -39,12 +40,15 @@ export type CliResult =
 export type WriteSuccessOptions = {
   json: boolean;
   format?: string;
+  /** Print diagnostic paths relative to this directory. SARIF keeps absolute URIs. */
+  cwd?: string;
 };
 
-export function writeSuccess(result: CliResult, options: WriteSuccessOptions): void {
-  if (result.command === "lint" && options.format === "sarif") {
-    const dek = result.data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEK"));
-    process.stdout.write(`${JSON.stringify(mergeSarif(toSarif(dek), result.data.rumdlSarif))}\n`);
+export function writeSuccess(original: CliResult, options: WriteSuccessOptions): void {
+  const result = options.cwd === undefined ? original : displayPaths(original, options.cwd);
+  if (original.command === "lint" && options.format === "sarif") {
+    const dek = original.data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEK"));
+    process.stdout.write(`${JSON.stringify(mergeSarif(toSarif(dek), original.data.rumdlSarif))}\n`);
   } else if (options.json) {
     const failed =
       (result.command === "lint" || result.command === "check") &&
@@ -66,6 +70,64 @@ export function writeSuccess(result: CliResult, options: WriteSuccessOptions): v
     result.data.diagnostics.length > 0
   ) {
     process.exit(1);
+  }
+}
+
+/**
+ * Paths into the source tree (diagnostics, files dek created) relative to
+ * `cwd`, so an agent reads `slides/intro.html` instead of the same long
+ * absolute prefix on every line. Artifacts dek writes, such as `shot` or a
+ * build, stay absolute: they are meant to be opened as-is.
+ */
+export function displayPaths(result: CliResult, cwd: string): CliResult {
+  const relative = (diagnostics: Diagnostic[]): Diagnostic[] =>
+    diagnostics.map((diagnostic) =>
+      diagnostic.path === undefined
+        ? diagnostic
+        : { ...diagnostic, path: displayPath(diagnostic.path, cwd) },
+    );
+  const files = (paths: string[]): string[] => paths.map((path) => displayPath(path, cwd));
+  switch (result.command) {
+    case "init":
+      return { ...result, data: { ...result.data, created: files(result.data.created) } };
+    case "new":
+      return { ...result, data: { ...result.data, created: files(result.data.created) } };
+    case "sync":
+      return { ...result, data: { ...result.data, created: files(result.data.created) } };
+    case "lint":
+      return {
+        ...result,
+        data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
+      };
+    case "check":
+      return {
+        ...result,
+        data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
+      };
+    case "cues":
+      return {
+        ...result,
+        data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
+      };
+    case "ls":
+      if (result.data.kind === "deck") {
+        return {
+          ...result,
+          data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
+        };
+      }
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          decks: result.data.decks.map((deck) => ({
+            ...deck,
+            diagnostics: relative(deck.diagnostics),
+          })),
+        },
+      };
+    default:
+      return result;
   }
 }
 
@@ -104,11 +166,13 @@ export function formatText(result: CliResult): string {
     case "shot":
       return result.data.shots.map((shot) => shot.path).join("\n");
     case "check": {
-      const lines = [
-        formatDiagnostics(result.data.diagnostics, { color: shouldColor(process.stdout) }),
-      ];
+      const color = shouldColor(process.stdout);
+      const lines = [formatDiagnostics(result.data.diagnostics, { color })];
       if (result.data.visual === "skipped") {
         lines.push("visual: skipped");
+        if (result.data.hint) {
+          lines.push(`  ${ansi(color).yellow("help:")} ${result.data.hint}`);
+        }
       }
       if (result.data.shot) {
         lines.push(result.data.shot);

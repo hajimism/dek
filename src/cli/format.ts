@@ -1,3 +1,4 @@
+import { isAbsolute, relative } from "node:path";
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
 import type { DevEvent } from "../server/dev.ts";
@@ -7,7 +8,7 @@ export function helpText(): string {
   return `dek — talk-script-first HTML slides
 
 Dev
-  dek [deck] [--visual]
+  dek [deck] [--visual] [--port N]
                       start the dev server; --visual lints overflow/contrast on save
   dek --remote        share on LAN; presenter notes are password-protected
   dek rehearse [slug] auto-advance from a Timeline (no video)
@@ -58,7 +59,7 @@ export function agentHelpText(): string {
 Result commands accept --json. dek / rehearse do not (long-running). Diagnostics: dek lint --format sarif.
 Scope: project root = all decks; deck dir = that deck; NAME or --deck NAME.
 
-dek [deck] [--visual]
+dek [deck] [--visual] [--port N]
 dek --remote [--password PWD]
 dek rehearse [slug]
 dek init [dir] [--deck NAME]
@@ -102,10 +103,11 @@ export function formatDiagnostics(diagnostics: Diagnostic[], opts?: { color?: bo
     return "no diagnostics";
   }
   const c = ansi(opts?.color === true);
-  const lines = diagnostics.map((diagnostic) => {
+  const lines = diagnostics.flatMap((diagnostic) => {
     const where = formatLocation(diagnostic);
     const prefix = where ? `${c.cyan(where)}: ` : "";
-    return `${prefix}${c.yellow(diagnostic.id)} ${diagnostic.message}`;
+    const line = `${prefix}${c.yellow(diagnostic.id)} ${diagnostic.message}`;
+    return diagnostic.hint ? [line, `  ${c.yellow("help:")} ${diagnostic.hint}`] : [line];
   });
   const hint = diagnosticHint(diagnostics);
   if (hint) {
@@ -121,11 +123,19 @@ export type FormattedError = {
   hint?: string;
 };
 
-export function formatError(error: unknown): FormattedError {
+/** A path as the reader should type it: relative to `cwd` when one is given. */
+export function displayPath(path: string, cwd?: string): string {
+  if (cwd === undefined || !isAbsolute(path)) {
+    return path;
+  }
+  return relative(cwd, path) || ".";
+}
+
+export function formatError(error: unknown, opts?: { cwd?: string }): FormattedError {
   if (error instanceof DekError) {
     return {
       message: error.message,
-      ...(error.path !== undefined ? { path: error.path } : {}),
+      ...(error.path !== undefined ? { path: displayPath(error.path, opts?.cwd) } : {}),
       ...(error.line !== undefined ? { line: error.line } : {}),
       ...(error.hint !== undefined ? { hint: error.hint } : {}),
     };
@@ -133,8 +143,8 @@ export function formatError(error: unknown): FormattedError {
   return { message: error instanceof Error ? error.message : String(error) };
 }
 
-export function formatErrorText(error: unknown, opts?: { color?: boolean }): string {
-  const formatted = formatError(error);
+export function formatErrorText(error: unknown, opts?: { color?: boolean; cwd?: string }): string {
+  const formatted = formatError(error, opts);
   const c = ansi(opts?.color === true);
   const parts = [`${c.bold(c.red("error:"))} ${formatted.message}`];
   if (formatted.path) {
