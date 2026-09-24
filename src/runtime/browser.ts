@@ -247,13 +247,14 @@ if (dataEl?.textContent) {
       clone.classList.add("is-current");
       stripPreviewClone(clone);
       neuterRailMedia(clone);
-      drawStill(clone, slide, 0);
       const stage = document.createElement("div");
       stage.className = "dek-thumb-stage";
       stage.style.width = `${width}px`;
       stage.style.height = `${height}px`;
       stage.append(clone);
       frame.replaceChildren(stage);
+      // Drawn once in the document, so a script that measures its slide gets real boxes.
+      drawStill(clone, slide, 0);
       fitStage(stage, frame);
     }
   }
@@ -321,13 +322,13 @@ if (dataEl?.textContent) {
       [...clone.querySelectorAll("[data-step]")],
       stepValuesForBeat(nextSlide.beats, nextPos.beatIndex),
     );
-    drawStill(clone, nextSlide, nextPos.beatIndex);
     const frame = document.createElement("div");
     frame.className = "dek-preview-frame";
     frame.style.width = `${deckEl.offsetWidth || 1280}px`;
     frame.style.height = `${deckEl.offsetHeight || 720}px`;
     frame.append(clone);
     stage.replaceChildren(frame);
+    drawStill(clone, nextSlide, nextPos.beatIndex);
     fitStage(frame, stage);
   }
 
