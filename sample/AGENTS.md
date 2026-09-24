@@ -20,6 +20,8 @@ Talk-script-first HTML slides.
 
 ## Theme classes
 
+From the project `theme.css`. A deck's own `theme.css` can differ; `dek theme` lists what a deck's theme defines.
+
 - `claim`
 - `col`
 - `exhibit`
@@ -84,5 +86,7 @@ Talk-script-first HTML slides.
 - `title`
 - `tree`
 - `two-col`
+
+For a layout's markup, run `dek theme <layout>`.
 
 For commands, run `dek help --agent`.

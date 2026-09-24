@@ -48,3 +48,12 @@ kana = "スライドエムディー"
 
 ["theme.css"]
 kana = "テーマシーエスエス"
+
+[class]
+kana = "クラス"
+
+[section]
+kana = "セクション"
+
+[slide]
+kana = "スライド"

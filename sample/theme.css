@@ -162,6 +162,17 @@
   transform: scaleX(-1);
 }
 
+/* @layout title
+<section class="slide" data-layout="title">
+  <div class="col">
+    <p class="kicker">Kicker</p>
+    <h2 class="slide-title">The talk in one line.</h2>
+    <p class="lede" data-step="1">An optional line that comes in on a beat.</p>
+  </div>
+  <img class="figure exhibit" src="assets/image.jpg" alt="">
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="title"] {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
@@ -194,6 +205,17 @@
   object-position: right center;
 }
 
+/* @layout default
+<section class="slide" data-layout="default">
+  <p class="kicker">Kicker</p>
+  <h2 class="slide-title">A heading</h2>
+  <ol class="flow">
+    <li class="node" data-step="1"><span class="claim">One point per beat</span></li>
+    <li class="node" data-step="2"><span class="claim">The next point</span></li>
+  </ol>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="default"] {
   display: flex;
   flex-direction: column;
@@ -209,6 +231,21 @@
   min-height: calc(var(--gap) * 4.8);
 }
 
+/* @layout two-col
+<section class="slide" data-layout="two-col">
+  <p class="kicker">Kicker</p>
+  <h2 class="slide-title">Two sides, side by side</h2>
+  <ul class="stack">
+    <li class="node">Left, first</li>
+    <li class="node">Left, second</li>
+  </ul>
+  <ul class="stack">
+    <li class="node" data-step="1">Right, first</li>
+    <li class="node" data-step="2">Right, second</li>
+  </ul>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="two-col"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -227,6 +264,16 @@
   margin-bottom: 0;
 }
 
+/* @layout full-bleed
+<section class="slide" data-layout="full-bleed">
+  <img class="figure exhibit" src="assets/image.jpg" alt="">
+  <div class="col">
+    <p class="kicker">Kicker</p>
+    <h2 class="slide-title">A caption over the picture.</h2>
+  </div>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="full-bleed"] {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
@@ -260,6 +307,16 @@
   font-size: calc(var(--size-title) * 0.92);
 }
 
+/* @layout quote
+<section class="slide" data-layout="quote">
+  <div class="col">
+    <p class="kicker">Kicker</p>
+    <p class="claim">One sentence<br>worth remembering.</p>
+  </div>
+  <img class="figure exhibit" src="assets/image.jpg" alt="">
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="quote"] {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
@@ -286,6 +343,35 @@
   object-position: right center;
 }
 
+/* @layout process
+<section class="slide" data-layout="process">
+  <p class="kicker">Kicker</p>
+  <h2 class="slide-title">Steps, in order</h2>
+  <ol class="flow">
+    <li class="node" data-step="1">
+      <img class="icon" src="assets/icon.svg" alt="">
+      <span class="num">01</span>
+      <span class="claim">First</span>
+    </li>
+    <li class="node" data-step="2">
+      <img class="icon" src="assets/icon.svg" alt="">
+      <span class="num">02</span>
+      <span class="claim">Second</span>
+    </li>
+    <li class="node" data-step="3">
+      <img class="icon" src="assets/icon.svg" alt="">
+      <span class="num">03</span>
+      <span class="claim">Third</span>
+    </li>
+    <li class="node" data-step="4">
+      <img class="icon" src="assets/icon.svg" alt="">
+      <span class="num">04</span>
+      <span class="claim">Fourth</span>
+    </li>
+  </ol>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="process"] {
   display: flex;
   flex-direction: column;
@@ -331,6 +417,22 @@
   line-height: 1.35;
 }
 
+/* @layout tree
+<section class="slide" data-layout="tree">
+  <p class="kicker">Kicker</p>
+  <h2 class="slide-title">One parent, its children</h2>
+  <p class="node node-parent" data-step="1">
+    <img class="icon" src="assets/icon.svg" alt="">
+    Parent
+    <span class="note">What it holds</span>
+  </p>
+  <div class="col stack" data-step="2">
+    <p class="node">Child</p>
+    <p class="node">Child</p>
+  </div>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="tree"] {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
@@ -382,6 +484,25 @@
   transform: translateY(-50%);
 }
 
+/* @layout split
+<section class="slide" data-layout="split">
+  <p class="kicker">Kicker</p>
+  <h2 class="slide-title">One source, two results</h2>
+  <p class="node node-parent">
+    <img class="icon" src="assets/icon.svg" alt="">
+    Source
+  </p>
+  <p class="node" data-step="1">
+    <span class="num">Result</span>
+    <span class="note">What the first one means</span>
+  </p>
+  <p class="node" data-step="2">
+    <span class="num">Result</span>
+    <span class="note">What the second one means</span>
+  </p>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="split"] {
   display: grid;
   grid-template-columns: auto 1fr 1fr;
@@ -420,6 +541,25 @@
   margin: 0;
 }
 
+/* @layout pipeline
+<section class="slide" data-layout="pipeline">
+  <p class="kicker">Kicker</p>
+  <h2 class="slide-title">This leads to that</h2>
+  <p class="node" data-step="1">
+    <img class="icon" src="assets/icon.svg" alt="">
+    <span class="num">01</span>
+    <span class="claim">Cause</span>
+    <span class="note">A line of detail</span>
+  </p>
+  <p class="node" data-step="2">
+    <img class="icon" src="assets/icon.svg" alt="">
+    <span class="num">02</span>
+    <span class="claim">Effect</span>
+    <span class="note">A line of detail</span>
+  </p>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="pipeline"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -472,6 +612,30 @@
   max-width: 14em;
 }
 
+/* @layout close
+<section class="slide" data-layout="close">
+  <p class="kicker">Kicker</p>
+  <h2 class="slide-title">Take home these three.</h2>
+  <ol class="flow">
+    <li class="node" data-step="1">
+      <span class="num">01</span>
+      <span class="claim">First</span>
+      <span class="note">In a few words</span>
+    </li>
+    <li class="node" data-step="2">
+      <span class="num">02</span>
+      <span class="claim">Second</span>
+      <span class="note">In a few words</span>
+    </li>
+    <li class="node" data-step="3">
+      <span class="num">03</span>
+      <span class="claim">Third</span>
+      <span class="note">In a few words</span>
+    </li>
+  </ol>
+  <p class="meta"><span>Event</span><span>2026.01.01</span></p>
+</section>
+*/
 .slide[data-layout="close"] {
   display: flex;
   flex-direction: column;
