@@ -217,157 +217,174 @@ export async function startDevServer(options: {
     return jsonResponse({ ok: true, ...currentFor(room) });
   };
 
-  const server = Bun.serve<WsData>({
-    hostname: listenHostname,
-    port: options.port ?? 0,
-    async fetch(req, bunServer) {
-      const url = new URL(req.url);
-      const room = matchWsRoom(url.pathname, scopedDeckName);
-      if (room !== undefined) {
-        if (bunServer.upgrade(req, { data: { room, control: wsHasControl(req, password) } })) {
-          return;
-        }
-        return new Response("Expected WebSocket", { status: 400 });
-      }
-      if (url.pathname === "/events") {
-        return sseResponse(hub);
-      }
-      const fragment = matchSlideFragment(url.pathname, scopedDeckName);
-      if (fragment) {
-        const deck = deckForName(project, fragment.deckName);
-        if (!deck) {
-          return new Response("Not found", { status: 404 });
-        }
-        const html = slideFragment(deck, fragment.slug, { inline: false });
-        if (!html) {
-          return new Response("Not found", { status: 404 });
-        }
-        return htmlResponse(html);
-      }
-      const themeRoute = matchThemeRoute(url.pathname, scopedDeckName);
-      if (themeRoute) {
-        const deck = deckForName(project, themeRoute.deckName);
-        if (!deck) {
-          return new Response("Not found", { status: 404 });
-        }
-        return new Response(readTheme(deck.dir, false), {
-          headers: {
-            "content-type": "text/css; charset=utf-8",
-            "cache-control": "no-store",
-          },
-        });
-      }
-      const voice = matchVoiceRoute(url.pathname, scopedDeckName, project.decks);
-      if (voice) {
-        const file = voiceCacheFile(voice.deckDir, voice.file);
-        if (!existsSync(file)) {
-          return new Response("Not found", { status: 404 });
-        }
-        return new Response(Bun.file(file), {
-          headers: {
-            "content-type":
-              voice.file === "audio.wav" ? "audio/wav" : "application/json; charset=utf-8",
-            "cache-control": "no-store",
-          },
-        });
-      }
-      const nav = matchNavRoute(url.pathname, scopedDeckName);
-      if (nav) {
-        const unauthorized = controlAuth(req, password);
-        if (unauthorized) {
-          return unauthorized;
-        }
-        if (nav.action === "current" && req.method === "GET") {
-          return jsonResponse({ ok: true, ...currentFor(nav.room) });
-        }
-        if (nav.action === "goto" && req.method === "POST") {
-          let body: { slug?: string } = {};
-          try {
-            body = (await req.json()) as { slug?: string };
-          } catch {
-            body = {};
+  const stopWatching = (): void => {
+    for (const watcher of watchers.values()) {
+      watcher.close();
+    }
+    decksDirWatcher?.close();
+    hub.close();
+  };
+
+  const listen = () =>
+    Bun.serve<WsData>({
+      hostname: listenHostname,
+      port: options.port ?? 0,
+      async fetch(req, bunServer) {
+        const url = new URL(req.url);
+        const room = matchWsRoom(url.pathname, scopedDeckName);
+        if (room !== undefined) {
+          if (bunServer.upgrade(req, { data: { room, control: wsHasControl(req, password) } })) {
+            return;
           }
-          const slug = body.slug?.trim();
-          if (!slug) {
-            return jsonResponse({ ok: false, error: { message: "usage: dek goto <slug>" } }, 400);
-          }
-          return gotoRoom(nav.room, slug);
+          return new Response("Expected WebSocket", { status: 400 });
         }
-        return new Response("Method not allowed", { status: 405 });
-      }
-      const asset = matchAssetFile(url.pathname, scopedDeckName, deckDir, project);
-      if (asset) {
-        return new Response(Bun.file(asset), {
-          headers: { "cache-control": "no-store" },
-        });
-      }
-      if (deckDir) {
-        const mode = isExactPath(url.pathname, "/presenter") ? "presenter" : "player";
-        return liveDeckResponse(req, deckDir, mode);
-      }
-      const deckRoute = matchDeckRoute(url.pathname);
-      if (deckRoute) {
-        const deck = deckForName(project, deckRoute.name);
-        if (!deck) {
+        if (url.pathname === "/events") {
+          return sseResponse(hub);
+        }
+        const fragment = matchSlideFragment(url.pathname, scopedDeckName);
+        if (fragment) {
+          const deck = deckForName(project, fragment.deckName);
+          if (!deck) {
+            return new Response("Not found", { status: 404 });
+          }
+          const html = slideFragment(deck, fragment.slug, { inline: false });
+          if (!html) {
+            return new Response("Not found", { status: 404 });
+          }
+          return htmlResponse(html);
+        }
+        const themeRoute = matchThemeRoute(url.pathname, scopedDeckName);
+        if (themeRoute) {
+          const deck = deckForName(project, themeRoute.deckName);
+          if (!deck) {
+            return new Response("Not found", { status: 404 });
+          }
+          return new Response(readTheme(deck.dir, false), {
+            headers: {
+              "content-type": "text/css; charset=utf-8",
+              "cache-control": "no-store",
+            },
+          });
+        }
+        const voice = matchVoiceRoute(url.pathname, scopedDeckName, project.decks);
+        if (voice) {
+          const file = voiceCacheFile(voice.deckDir, voice.file);
+          if (!existsSync(file)) {
+            return new Response("Not found", { status: 404 });
+          }
+          return new Response(Bun.file(file), {
+            headers: {
+              "content-type":
+                voice.file === "audio.wav" ? "audio/wav" : "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            },
+          });
+        }
+        const nav = matchNavRoute(url.pathname, scopedDeckName);
+        if (nav) {
+          const unauthorized = controlAuth(req, password);
+          if (unauthorized) {
+            return unauthorized;
+          }
+          if (nav.action === "current" && req.method === "GET") {
+            return jsonResponse({ ok: true, ...currentFor(nav.room) });
+          }
+          if (nav.action === "goto" && req.method === "POST") {
+            let body: { slug?: string } = {};
+            try {
+              body = (await req.json()) as { slug?: string };
+            } catch {
+              body = {};
+            }
+            const slug = body.slug?.trim();
+            if (!slug) {
+              return jsonResponse({ ok: false, error: { message: "usage: dek goto <slug>" } }, 400);
+            }
+            return gotoRoom(nav.room, slug);
+          }
+          return new Response("Method not allowed", { status: 405 });
+        }
+        const asset = matchAssetFile(url.pathname, scopedDeckName, deckDir, project);
+        if (asset) {
+          return new Response(Bun.file(asset), {
+            headers: { "cache-control": "no-store" },
+          });
+        }
+        if (deckDir) {
+          const mode = isExactPath(url.pathname, "/presenter") ? "presenter" : "player";
+          return liveDeckResponse(req, deckDir, mode);
+        }
+        const deckRoute = matchDeckRoute(url.pathname);
+        if (deckRoute) {
+          const deck = deckForName(project, deckRoute.name);
+          if (!deck) {
+            return new Response("Not found", { status: 404 });
+          }
+          return liveDeckResponse(req, deck.dir, deckRoute.mode);
+        }
+        if (url.pathname !== "/" && url.pathname !== "") {
           return new Response("Not found", { status: 404 });
         }
-        return liveDeckResponse(req, deck.dir, deckRoute.mode);
-      }
-      if (url.pathname !== "/" && url.pathname !== "") {
-        return new Response("Not found", { status: 404 });
-      }
-      return htmlResponse(
-        await cached("index", () => {
-          const fresh = resolveProject(options.cwd);
-          return renderIndexHtml(
-            fresh.decks.map((deck) => ({ name: deck.name, title: deck.deck.title })),
-            fresh.failed.map((entry) => ({ name: entry.name })),
-          );
-        }),
-      );
-    },
-    websocket: {
-      open(ws) {
-        const clients = rooms.get(ws.data.room) ?? new Set();
-        clients.add(ws);
-        rooms.set(ws.data.room, clients);
-        const pos = positions.get(ws.data.room);
-        if (pos) {
-          ws.send(JSON.stringify(pos));
-        }
+        return htmlResponse(
+          await cached("index", () => {
+            const fresh = resolveProject(options.cwd);
+            return renderIndexHtml(
+              fresh.decks.map((deck) => ({ name: deck.name, title: deck.deck.title })),
+              fresh.failed.map((entry) => ({ name: entry.name })),
+            );
+          }),
+        );
       },
-      message(ws, message) {
-        if (!ws.data.control) {
-          return;
-        }
-        const payload = typeof message === "string" ? message : new TextDecoder().decode(message);
-        const pos = parsePosition(payload);
-        if (!pos) {
-          return;
-        }
-        positions.set(ws.data.room, pos);
-        const clients = rooms.get(ws.data.room);
-        if (!clients) {
-          return;
-        }
-        for (const client of clients) {
-          if (client !== ws) {
-            client.send(payload);
+      websocket: {
+        open(ws) {
+          const clients = rooms.get(ws.data.room) ?? new Set();
+          clients.add(ws);
+          rooms.set(ws.data.room, clients);
+          const pos = positions.get(ws.data.room);
+          if (pos) {
+            ws.send(JSON.stringify(pos));
           }
-        }
+        },
+        message(ws, message) {
+          if (!ws.data.control) {
+            return;
+          }
+          const payload = typeof message === "string" ? message : new TextDecoder().decode(message);
+          const pos = parsePosition(payload);
+          if (!pos) {
+            return;
+          }
+          positions.set(ws.data.room, pos);
+          const clients = rooms.get(ws.data.room);
+          if (!clients) {
+            return;
+          }
+          for (const client of clients) {
+            if (client !== ws) {
+              client.send(payload);
+            }
+          }
+        },
+        close(ws) {
+          const clients = rooms.get(ws.data.room);
+          if (!clients) {
+            return;
+          }
+          clients.delete(ws);
+          if (clients.size === 0) {
+            rooms.delete(ws.data.room);
+          }
+        },
       },
-      close(ws) {
-        const clients = rooms.get(ws.data.room);
-        if (!clients) {
-          return;
-        }
-        clients.delete(ws);
-        if (clients.size === 0) {
-          rooms.delete(ws.data.room);
-        }
-      },
-    },
-  });
+    });
+
+  let server: ReturnType<typeof listen>;
+  try {
+    server = listen();
+  } catch (error) {
+    stopWatching();
+    throw listenError(error, options.port);
+  }
 
   const port = server.port ?? 0;
   const url = `http://127.0.0.1:${port}/`;
@@ -375,11 +392,7 @@ export async function startDevServer(options: {
   try {
     writeDevServerLock(project.root, url, password);
   } catch (error) {
-    for (const watcher of watchers.values()) {
-      watcher.close();
-    }
-    decksDirWatcher?.close();
-    hub.close();
+    stopWatching();
     await server.stop(true);
     throw error;
   }
@@ -568,4 +581,13 @@ function sseResponse(hub: EventHub): Response {
       connection: "keep-alive",
     },
   });
+}
+
+function listenError(error: unknown, port: number | undefined): unknown {
+  if (port && (error as { code?: string } | null)?.code === "EADDRINUSE") {
+    return new DekError(`port ${port} is already in use`, {
+      hint: "pass another --port, or omit it to let the OS choose",
+    });
+  }
+  return error;
 }

@@ -822,6 +822,25 @@ body
     );
   });
 
+  test("names the taken port and how to pick another", async () => {
+    const taken = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("") });
+    try {
+      await withTempProject(
+        { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+        async (root) => {
+          await expect(
+            startDevServer({ cwd: join(root, "decks", "demo"), port: taken.port }),
+          ).rejects.toMatchObject({
+            message: `port ${taken.port} is already in use`,
+            hint: "pass another --port, or omit it to let the OS choose",
+          });
+        },
+      );
+    } finally {
+      taken.stop(true);
+    }
+  });
+
   test("refuses to start when another server lock is alive", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

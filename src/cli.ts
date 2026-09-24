@@ -21,6 +21,7 @@ async function main(): Promise<void> {
       "theme-from": { type: "string" },
       remote: { type: "boolean", default: false },
       password: { type: "string" },
+      port: { type: "string" },
       help: { type: "boolean", default: false },
       agent: { type: "boolean", default: false },
       fix: { type: "boolean", default: false },
@@ -241,32 +242,34 @@ async function main(): Promise<void> {
       if (command) {
         const asDeck = peelDeckArg(cwd, { args: [command] });
         if (asDeck.deck === command) {
-          const { serveCommand } = await import("./cli/serve.ts");
+          const { parsePort, serveCommand } = await import("./cli/serve.ts");
           await serveCommand({
             cwd,
             deck: command,
             remote: values.remote === true,
             password: stringFlag(values.password),
             visual: values.visual === true,
+            port: parsePort(stringFlag(values.port)),
           });
           return;
         }
         throw new DekError(`unknown command: ${command}`, { hint: `run \`dek help --agent\`` });
       }
       {
-        const { serveCommand } = await import("./cli/serve.ts");
+        const { parsePort, serveCommand } = await import("./cli/serve.ts");
         await serveCommand({
           cwd,
           deck,
           remote: values.remote === true,
           password: stringFlag(values.password),
           visual: values.visual === true,
+          port: parsePort(stringFlag(values.port)),
         });
       }
       return;
   }
 
-  writeSuccess(result, { json: values.json === true, format });
+  writeSuccess(result, { json: values.json === true, format, cwd });
 }
 
 try {
@@ -274,12 +277,13 @@ try {
 } catch (error) {
   const json = Bun.argv.includes("--json");
   const color = shouldColor(process.stderr);
+  const cwd = process.cwd();
   if (json) {
-    process.stdout.write(`${JSON.stringify({ ok: false, error: formatError(error) })}\n`);
+    process.stdout.write(`${JSON.stringify({ ok: false, error: formatError(error, { cwd }) })}\n`);
   } else if (error instanceof DekError && error.message.startsWith("unknown command:")) {
-    process.stderr.write(`${formatErrorText(error, { color })}\n\n${helpText()}\n`);
+    process.stderr.write(`${formatErrorText(error, { color, cwd })}\n\n${helpText()}\n`);
   } else {
-    process.stderr.write(`${formatErrorText(error, { color })}\n`);
+    process.stderr.write(`${formatErrorText(error, { color, cwd })}\n`);
   }
   process.exit(1);
 }

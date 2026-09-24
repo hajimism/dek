@@ -14,7 +14,10 @@ export type EventHub = AsyncIterable<DevEvent> & {
   subscribe(): ReadableStream<Uint8Array>;
 };
 
-export function createEventHub(): EventHub {
+/** Bun closes a request that is idle for 10s; an SSE comment keeps `/events` open. */
+export const SSE_HEARTBEAT_MS = 5_000;
+
+export function createEventHub(options: { heartbeatMs?: number } = {}): EventHub {
   const buffer: DevEvent[] = [];
   const waiters: Array<(event: IteratorResult<DevEvent>) => void> = [];
   const clients = new Set<ReadableStreamDefaultController<Uint8Array>>();
@@ -23,8 +26,7 @@ export function createEventHub(): EventHub {
 
   const take = (): DevEvent | undefined => buffer.shift();
 
-  const pushSse = (event: DevEvent): void => {
-    const bytes = encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+  const broadcast = (bytes: Uint8Array): void => {
     for (const client of clients) {
       try {
         client.enqueue(bytes);
@@ -32,7 +34,24 @@ export function createEventHub(): EventHub {
         clients.delete(client);
       }
     }
+    if (clients.size === 0) {
+      stopHeartbeat();
+    }
   };
+
+  const pushSse = (event: DevEvent): void => {
+    broadcast(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+  };
+
+  const ping = encoder.encode(": ping\n\n");
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  const startHeartbeat = (): void => {
+    heartbeat ??= setInterval(() => broadcast(ping), options.heartbeatMs ?? SSE_HEARTBEAT_MS);
+  };
+  function stopHeartbeat(): void {
+    clearInterval(heartbeat);
+    heartbeat = undefined;
+  }
 
   return {
     emit(event) {
@@ -60,6 +79,7 @@ export function createEventHub(): EventHub {
         }
       }
       clients.clear();
+      stopHeartbeat();
     },
     subscribe() {
       let client: ReadableStreamDefaultController<Uint8Array>;
@@ -68,9 +88,13 @@ export function createEventHub(): EventHub {
           client = controller;
           clients.add(controller);
           controller.enqueue(encoder.encode(": connected\n\n"));
+          startHeartbeat();
         },
         cancel() {
           clients.delete(client);
+          if (clients.size === 0) {
+            stopHeartbeat();
+          }
         },
       });
     },
