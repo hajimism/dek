@@ -90,6 +90,10 @@ Find elements with a `data-*` attribute, such as `<div data-bar>`, rather than a
 
 So draw from `t` alone, and set everything you touch on every call: the same `(index, t)` must give the same slide whatever was drawn before, because a jump or a step back draws only the end of the new beat. Timers, `requestAnimationFrame`, and state carried between calls break the video, because the recorder does not wait in real time. Lint reports a timer, `Date`, `performance.now`, or `Math.random` as `DEK017`, on its line. The script must be self-contained: one module with `export default` and no imports, whose top level only defines things; touch the slide inside `draw`. Anything else is `DEK016`, and so is a `motion` key that is not a beat of the slide. Lint evaluates the top level in a sandbox with no Node or Bun globals and stops it after a second. dek loads only `.ts`; a `slides/<id>.js` is `DEK016`, asking you to rename it. `dek build` inlines the script, `dek mv` moves it, and saving it reloads the dev server page.
 
-## Next
+## What a still shows
 
-Colors, type, and spacing in one file: [Themes](./theme).
+Every page that shows a beat without playing it shows the beat as it ends: `dek shot`, `lint --visual`, the PDF, and the slide a `dek shot <a> --to <b>` frame leaves. Slide scripts are drawn at the end of their motion, and every CSS animation and transition is run to its end, so an entrance in the theme is measured and photographed where it lands, not on its first frame.
+
+An animation that repeats forever, such as `animation-iteration-count: infinite`, has no end. Stills hold it at its first frame, so every still of the beat agrees. The player moves on without waiting for it, and `dek video` records it looping while the beat moves, then holds the first frame. Make the first frame the one you want in the handout.
+
+## Next

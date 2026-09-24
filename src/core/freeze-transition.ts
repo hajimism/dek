@@ -1,3 +1,4 @@
+import { finishBeat } from "./finish-beat.ts";
 import type { MorphRequest } from "./playwright.ts";
 import type { Position } from "./step.ts";
 
@@ -6,13 +7,15 @@ type EvaluatingPage = {
 };
 
 /**
- * Run the player's own `go` for `from`, then start `go(to)` and stop every
+ * Run the player's own `go` for `from` and end that beat, as the page stands
+ * when the talk moves on, then start `go(to)` and stop every
  * animation (view-transition pseudo-elements included) at `at` of its
  * duration. The slide script is held at the morph's moment in ms, not at
  * `at` of its own motion, the way the video recorder seeks both.
  */
 export async function freezeTransition(page: EvaluatingPage, morph: MorphRequest): Promise<void> {
   await page.evaluate((position) => window.dekGo?.(position), morph.from);
+  await page.evaluate(finishBeat);
   if (!(await page.evaluate(startGoPaused, morph.to))) {
     await page.evaluate(() => window.__dekPendingGo);
     return;

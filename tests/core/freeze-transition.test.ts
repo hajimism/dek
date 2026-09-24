@@ -22,8 +22,9 @@ describe("freezeTransition", () => {
   test("holds the morph and the slide script at the same moment, in ms", async () => {
     const animation = {
       currentTime: null as number | null,
+      finish() {},
       pause() {},
-      effect: { getComputedTiming: () => ({ delay: 0, duration: 400 }) },
+      effect: { getComputedTiming: () => ({ delay: 0, duration: 400, endTime: 400 }) },
     };
     const seeks: number[] = [];
     document.startViewTransition = ((update: () => void) => {
@@ -42,7 +43,36 @@ describe("freezeTransition", () => {
     await freezeTransition(page, { from, to, at: 0.5 });
 
     expect(animation.currentTime).toBe(200);
-    expect(seeks).toEqual([200]);
+    // The first seek ends the beat being left; the second is the morph's moment.
+    expect(seeks).toEqual([900, 200]);
+  });
+
+  test("leaves the page it transitions from at the end of its beat", async () => {
+    const order: string[] = [];
+    const entrance = {
+      currentTime: null as number | null,
+      finish() {
+        order.push("finish");
+      },
+      pause() {},
+      effect: { getComputedTiming: () => ({ delay: 0, duration: 400, endTime: 400 }) },
+    };
+    document.startViewTransition = ((update: () => void) => {
+      update();
+      return { ready: Promise.resolve(), finished: Promise.resolve() };
+    }) as unknown as typeof document.startViewTransition;
+    (document as { getAnimations: () => unknown[] }).getAnimations = () => [entrance];
+    window.dekGo = async (next) => {
+      order.push(`go ${next?.slideIndex}`);
+      if (next?.slideIndex === 1) {
+        document.startViewTransition(() => {});
+      }
+    };
+    window.dekMotion = { duration: () => 900, seek: (t) => order.push(`seek ${t}`) };
+
+    await freezeTransition(page, { from, to, at: 0.5 });
+
+    expect(order).toEqual(["go 0", "finish", "seek 900", "go 1", "seek 200"]);
   });
 
   test("puts the page's startViewTransition back", async () => {

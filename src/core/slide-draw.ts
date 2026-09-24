@@ -4,6 +4,7 @@
  * via `stillDrawScript`, so they reference nothing outside this file and use
  * only the global `DekSlide` types.
  */
+import { finishBeat } from "./finish-beat.ts";
 
 /** A beat's motion in ms, keyed like `data-step`; 0 when it has none or it is not positive. */
 export function stepMotionMs(module: DekSlide | undefined, step: string): number {
@@ -51,12 +52,14 @@ function drawMarkedSlides(): void {
   }
 }
 
+/** What a still page runs: each marked slide drawn at the end of its beat, then every animation ended. */
 export function stillDrawScript(): string {
   return `(function () {
 ${stepMotionMs}
 ${drawFrame}
 ${drawAtEnd}
 (${drawMarkedSlides})();
+(${finishBeat})();
 })();
 `;
 }

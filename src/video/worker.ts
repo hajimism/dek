@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { finishBeat } from "../core/finish-beat.ts";
 import { startGoPaused } from "../core/freeze-transition.ts";
 import { importPlaywright } from "../core/playwright.ts";
 import type { Position } from "../core/step.ts";
@@ -73,16 +74,8 @@ try {
       previous = stop;
     }
 
-    await page.evaluate(async (end) => {
-      for (const animation of document.getAnimations()) {
-        animation.finish();
-      }
-      window.dekMotion?.seek(end);
-      const pending = window.__dekPendingGo;
-      if (pending) {
-        await pending;
-      }
-    }, duration);
+    await page.evaluate(finishBeat);
+    await page.evaluate(() => window.__dekPendingGo);
 
     const path = join(request.outDir, `frame-${String(frames.length).padStart(4, "0")}.png`);
     await page.screenshot({ path, type: "png" });

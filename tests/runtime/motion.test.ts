@@ -202,7 +202,7 @@ describe("stillDrawScript", () => {
         chart: { motion: { growth: 900 }, draw: (el: unknown, f: unknown) => frames.push([el, f]) },
       },
     };
-    const document = { querySelectorAll: () => [chart, unmarked] };
+    const document = { querySelectorAll: () => [chart, unmarked], getAnimations: () => [] };
     new Function("window", "document", stillDrawScript())(window, document);
     expect(frames).toEqual([[chart, { index: 1, step: "growth", t: 900 }]]);
   });

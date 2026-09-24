@@ -23,6 +23,22 @@ describe("waitForPlaybackSettle", () => {
     expect(order.sort()).toEqual(["anim", "vt"]);
   });
 
+  test("does not wait for an animation that never ends", async () => {
+    const settled = await Promise.race([
+      waitForPlaybackSettle({
+        animations: [
+          {
+            playState: "running",
+            finished: new Promise(() => {}),
+            effect: { getComputedTiming: () => ({ endTime: Number.POSITIVE_INFINITY }) },
+          },
+        ],
+      }).then(() => "settled"),
+      new Promise((resolve) => setTimeout(() => resolve("stuck"), 50)),
+    ]);
+    expect(settled).toBe("settled");
+  });
+
   test("ignores a rejected view transition finished promise", async () => {
     await waitForPlaybackSettle({
       viewTransition: { finished: Promise.reject(new Error("aborted")) },

@@ -450,16 +450,18 @@ describe("still pages run slide scripts", () => {
         'invalid slide script "chart"',
       );
       const html = renderSlideHtml(deck, "chart", 1, loadSlideSources(deck, { strict: false }));
-      expect(html).not.toContain("<script");
+      expect(html).not.toContain("data-dek-slides");
       expect(html).toContain('data-dek-step="growth"');
     });
   });
 
-  test("a deck without slide scripts gets no script at all", async () => {
+  test("a deck without slide scripts still ends the theme's animations on its stills", async () => {
     await withTempProject(chartDeck, async (root) => {
       const { deck } = resolveDeck(join(root, "decks", "demo"));
-      expect(renderSlideHtml(deck, "chart", 1)).not.toContain("<script");
-      expect(renderPdfHtml(deck)).not.toContain("<script");
+      for (const html of [renderSlideHtml(deck, "chart", 1), renderPdfHtml(deck)]) {
+        expect(html).not.toContain("data-dek-slides");
+        expect(html).toContain(stillDrawScript());
+      }
     });
   });
 });

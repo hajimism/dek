@@ -31,7 +31,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 
 ## Conditions
 
-- `DEK030` and `DEK031` run only with `--visual` and require Playwright.
+- `DEK030` and `DEK031` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
 - `DEK040`, `DEK042`, and `DEK043` apply only to decks with `voice/`. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin).
 - `DEK040` through `DEK043` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. A live-only deck's definition of done is unchanged.

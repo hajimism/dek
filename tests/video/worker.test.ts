@@ -14,7 +14,7 @@ const defaultTheme = await Bun.file(new URL("../../src/theme/default.css", impor
 const skipCapture = resolvePlaywrightModule() === undefined || Boolean(process.env.DEK_VIDEO);
 
 describe("video worker", () => {
-  test.skipIf(skipCapture)(
+  test.serial.skipIf(skipCapture)(
     "captures distinct mid-transition frames between two slides",
     async () => {
       await withTempProject(
@@ -86,6 +86,68 @@ bye
               }
               expect(Buffer.from(current).equals(Buffer.from(previous))).toBe(false);
             }
+            const total = captured.frames.reduce((sum, frame) => sum + frame.durationMs, 0);
+            expect(Math.round(total)).toBe(timeline.durationMs);
+          });
+        },
+      );
+    },
+    30_000,
+  );
+
+  test.serial.skipIf(skipCapture)(
+    "records a slide whose animation never ends",
+    async () => {
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              theme: `${defaultTheme}
+@keyframes pulse { to { opacity: 0.4 } }
+.slide .pulse { animation: pulse 1s infinite alternate }`,
+              script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## next
+
+bye
+`,
+              slides: {
+                intro: slideDocument(
+                  `<section class="slide"><h2 class="pulse">AAAA</h2></section>`,
+                ),
+                next: slideDocument(`<section class="slide"><h2>BBBB</h2></section>`),
+              },
+            },
+          ],
+        },
+        async (root) => {
+          const html = await renderDeckHtml(join(root, "decks", "demo"), {
+            mode: "video",
+            playerScript: await playerScript(),
+          });
+          const timeline: Timeline = {
+            audio: "a.wav",
+            durationMs: 3000,
+            beats: [
+              { position: { slideIndex: 0, beatIndex: 0 }, start: 0, end: 1000, sentences: [] },
+              { position: { slideIndex: 1, beatIndex: 0 }, start: 1500, end: 2500, sentences: [] },
+            ],
+          };
+          await withTempDir(async (outDir) => {
+            const captured = await defaultVideoRunner({
+              html,
+              timeline,
+              fps: 10,
+              viewport: { width: 1280, height: 720 },
+              outDir,
+            });
             const total = captured.frames.reduce((sum, frame) => sum + frame.durationMs, 0);
             expect(Math.round(total)).toBe(timeline.durationMs);
           });

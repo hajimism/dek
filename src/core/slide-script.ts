@@ -381,11 +381,13 @@ export function slideScriptTags(scripts: SlideScript[]): string {
     .join("");
 }
 
-/** The scripts a still page needs, or "" when none of its slides has one. */
+/**
+ * What a still page runs: its slides' scripts, then the still script that draws
+ * them and ends every animation. Every still page carries it, since the theme's
+ * own animations need ending even where no slide has a script.
+ */
 export function stillPageScript(scripts: SlideScript[]): string {
-  return scripts.length > 0
-    ? `${slideScriptTags(scripts)}<script>${stillDrawScript()}</script>`
-    : "";
+  return `${slideScriptTags(scripts)}<script>${stillDrawScript()}</script>`;
 }
 
 export type SeekProblem = {
