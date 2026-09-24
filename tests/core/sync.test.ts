@@ -238,6 +238,7 @@ c
         expect(agents).toContain("slides/<id>.css");
         expect(agents).toContain("slides/<id>.ts");
         expect(agents).toContain("satisfies DekSlide");
+        expect(agents).toContain("find elements by data-* attributes");
       },
     );
   });

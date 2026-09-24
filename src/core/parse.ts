@@ -139,7 +139,7 @@ function parseSections(body: string, startLine: number, filename?: string): Sect
     const text = heading[2] ?? "";
     if (hashes === "##") {
       finishSection();
-      const parsed = parseHeading(text, lineNumber, { idRequired: true, filename });
+      const parsed = parseHeading(text, lineNumber, { idRequired: true, filename, hashes });
       current = {
         slug: parsed.id,
         title: parsed.title,
@@ -160,7 +160,7 @@ function parseSections(body: string, startLine: number, filename?: string): Sect
     if (current.beats.length === 0) {
       current.body = flushBody();
     }
-    const parsed = parseHeading(text, lineNumber, { idRequired: false, filename });
+    const parsed = parseHeading(text, lineNumber, { idRequired: false, filename, hashes });
     current.beat = { id: parsed.id, title: parsed.title, line: lineNumber };
   }
 
@@ -180,17 +180,17 @@ type DraftSection = {
 function parseHeading(
   text: string,
   line: number,
-  options: { idRequired: true; filename?: string },
+  options: { idRequired: true; filename?: string; hashes: string },
 ): { title: string; id: string };
 function parseHeading(
   text: string,
   line: number,
-  options: { idRequired: false; filename?: string },
+  options: { idRequired: false; filename?: string; hashes: string },
 ): { title: string; id?: string };
 function parseHeading(
   text: string,
   line: number,
-  options: { idRequired: boolean; filename?: string },
+  options: { idRequired: boolean; filename?: string; hashes: string },
 ): { title: string; id?: string } {
   const attrMatch = text.match(TRAILING_ATTR_RE);
   if (attrMatch) {
@@ -202,6 +202,7 @@ function parseHeading(
       throw new DekError("heading attribute must be {#id}", {
         line,
         path: options.filename,
+        hint: headingIdHint(options.hashes, title, attrs.trim().match(/^#(.+)$/)?.[1]),
       });
     }
     return { title, id };
@@ -212,7 +213,27 @@ function parseHeading(
     return { title, id: title };
   }
   if (options.idRequired) {
-    throw new DekError("heading requires {#id}", { line, path: options.filename });
+    throw new DekError("heading requires {#id}", {
+      line,
+      path: options.filename,
+      hint: headingIdHint(options.hashes, title),
+    });
   }
   return { title };
+}
+
+/** An id built from the ASCII words of `source`, when it has any letters. */
+function suggestId(source: string): string | undefined {
+  const id = source
+    .toLowerCase()
+    .match(/[a-z0-9]+/g)
+    ?.join("-");
+  return id && Id.safeParse(id).success ? id : undefined;
+}
+
+function headingIdHint(hashes: string, title: string, given?: string): string {
+  const id = (given && suggestId(given)) ?? suggestId(title);
+  return id
+    ? `write it as \`${hashes} ${title} {#${id}}\``
+    : `write it as \`${hashes} ${title} {#your-id}\`; ids use a-z, 0-9, and -`;
 }

@@ -97,6 +97,31 @@ body
     }
   });
 
+  function hintFor(heading: string): string | undefined {
+    try {
+      parseScript(`---\ntitle: Talk\n---\n\n${heading}\n\nbody\n`);
+    } catch (error) {
+      return (error as DekError).hint;
+    }
+    throw new Error("expected DekError");
+  }
+
+  test("shows how to add an id to a heading that has none", () => {
+    expect(hintFor("## まとめ")).toBe(
+      "write it as `## まとめ {#your-id}`; ids use a-z, 0-9, and -",
+    );
+  });
+
+  test("suggests an id from the ASCII words in the heading", () => {
+    expect(hintFor("## Why dek?")).toBe("write it as `## Why dek? {#why-dek}`");
+    expect(hintFor("## Vite 8 の新機能")).toBe("write it as `## Vite 8 の新機能 {#vite-8}`");
+  });
+
+  test("suggests a lowercase id when the given one is invalid", () => {
+    expect(hintFor("## Summary {#Summary_1}")).toBe("write it as `## Summary {#summary-1}`");
+    expect(hintFor("## Intro {.lead}")).toBe("write it as `## Intro {#intro}`");
+  });
+
   test("rejects {#.class} attributes", () => {
     const source = `---
 title: Talk

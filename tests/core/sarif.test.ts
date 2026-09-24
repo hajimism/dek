@@ -30,3 +30,10 @@ describe("mergeSarif", () => {
     expect(mergeSarif(dek).runs[0]?.tool.driver.name).toBe("dek");
   });
 });
+
+describe("toSarif", () => {
+  test("appends a diagnostic hint to the message text", () => {
+    const sarif = toSarif([{ id: "DEK003", message: 'data-step "3"', hint: "use hook or 1-1" }]);
+    expect(sarif.runs[0]?.results[0]?.message.text).toBe('data-step "3"; use hook or 1-1');
+  });
+});

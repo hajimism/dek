@@ -29,4 +29,6 @@ export type Diagnostic = {
   path?: string;
   line?: number;
   slug?: string;
+  /** The fix, phrased as what to do next. */
+  hint?: string;
 };

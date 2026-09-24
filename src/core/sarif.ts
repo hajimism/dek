@@ -27,7 +27,11 @@ export function toSarif(diagnostics: Diagnostic[]): SarifLog {
         tool: { driver: { name: "dek" } },
         results: diagnostics.map((diagnostic) => ({
           ruleId: diagnostic.id,
-          message: { text: diagnostic.message },
+          message: {
+            text: diagnostic.hint
+              ? `${diagnostic.message}; ${diagnostic.hint}`
+              : diagnostic.message,
+          },
           ...(diagnostic.path
             ? {
                 locations: [

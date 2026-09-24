@@ -229,6 +229,7 @@ export function lintDeck(
     diagnostics.push(
       ...lintSlideHtml(section, slide.path, html, {
         deckDir: deck.dir,
+        hasScript: scriptDiagnostics.has(section.slug),
         classes: themeClasses && new Set([...themeClasses, ...cssClassNames(styleCss ?? "")]),
       }),
     );
@@ -435,7 +436,7 @@ function lintSlideHtml(
   section: Section,
   path: string,
   html: string,
-  options: { deckDir: string; classes?: Set<string> },
+  options: { deckDir: string; classes?: Set<string>; hasScript?: boolean },
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const scan = scanSlideHtml(html);
@@ -458,6 +459,7 @@ function lintSlideHtml(
       message: `data-step "${step}" is not a beat id or index in "${section.slug}"`,
       path,
       slug: section.slug,
+      hint: stepHint(section),
     });
   }
 
@@ -485,6 +487,7 @@ function lintSlideHtml(
       message: "slide contains a <style> element",
       path,
       slug: section.slug,
+      hint: `move the rules to slides/${section.slug}.css`,
     });
   }
   if (scan.styleAttributes) {
@@ -493,6 +496,7 @@ function lintSlideHtml(
       message: "slide contains a style attribute",
       path,
       slug: section.slug,
+      hint: `move it to a class in slides/${section.slug}.css, using token var()`,
     });
   }
   if (scan.scriptElements) {
@@ -501,10 +505,18 @@ function lintSlideHtml(
       message: "slide contains a <script> element",
       path,
       slug: section.slug,
+      hint: `move motion to slides/${section.slug}.ts as a draw(t) function`,
     });
   }
 
   if (options.classes) {
+    const known = [...options.classes].sort();
+    const shown =
+      known.length > MAX_HINT_CLASSES ? [...known.slice(0, MAX_HINT_CLASSES), "…"] : known;
+    const scriptHint = options.hasScript
+      ? `; to find an element from slides/${section.slug}.ts, use a data-* attribute instead`
+      : "";
+    const classHint = `define it in slides/${section.slug}.css, or use one of: ${shown.join(", ")}${scriptHint}`;
     const unknown = new Set<string>();
     for (const name of scan.classes) {
       if (!options.classes.has(name)) {
@@ -516,6 +528,7 @@ function lintSlideHtml(
         id: "DEK010",
         message: `class "${name}" is not defined in theme.css`,
         path,
+        hint: classHint,
       });
     }
   }
@@ -527,6 +540,7 @@ function lintSlideHtml(
         id: "DEK020",
         message: `remote URL "${ref.value}"`,
         path,
+        hint: remoteHint(ref.value),
       });
     } else if (kind === "escape") {
       diagnostics.push({
@@ -551,6 +565,35 @@ function lintSlideHtml(
   }
 
   return diagnostics;
+}
+
+const MAX_HINT_CLASSES = 20;
+
+function stepHint(section: Section): string {
+  const count = section.beats.length;
+  if (count === 0) {
+    return `add a ### beat under "## ${section.title}" in script.md, or drop data-step`;
+  }
+  const choices = [
+    ...section.beats.flatMap((beat) => (beat.id ? [beat.id] : [])),
+    count === 1 ? "1" : `1-${count}`,
+  ];
+  const last = choices.pop();
+  if (choices.length === 0) {
+    return `use ${last}`;
+  }
+  const head = choices.join(", ");
+  return choices.length === 1 ? `use ${head} or ${last}` : `use ${head}, or ${last}`;
+}
+
+function remoteHint(value: string): string {
+  let name = "";
+  try {
+    name = posix.basename(new URL(value.trim(), "https://dek.invalid").pathname);
+  } catch {}
+  return name
+    ? `download it into assets/ and use assets/${name}`
+    : "download it into assets/ and reference it from there";
 }
 
 function resolvesStep(value: string, beats: Beat[]): boolean {

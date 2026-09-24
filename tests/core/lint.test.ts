@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError, lintDeck, resolveDeck } from "../../src/core/index.ts";
 import { slideDocument } from "../helpers/html.ts";
-import { withTempProject } from "../helpers/project.ts";
+import { type DeckSpec, withTempProject } from "../helpers/project.ts";
 
 const titleSlide = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -1142,5 +1142,119 @@ body
       const dek001 = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK001");
       expect(dek001?.slug).toBe("intro");
     });
+  });
+});
+
+describe("lintDeck hints", () => {
+  const beatScript = `---
+title: Demo
+---
+
+## intro
+
+### hook {#hook}
+
+one
+
+### turn {#turn}
+
+two
+`;
+
+  async function lintIntro(html: string, deck: Partial<DeckSpec> = {}) {
+    let diagnostics: ReturnType<typeof lintDeck> = [];
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: slideDocument(html) }, ...deck }] },
+      async (root) => {
+        diagnostics = lintDeck(join(root, "decks", "demo"));
+      },
+    );
+    return diagnostics;
+  }
+
+  test("DEK003 lists the beat ids and indexes the slide can use", async () => {
+    const diagnostics = await lintIntro(
+      `<section class="slide" data-layout="default">
+  <h2 class="slide-title">intro</h2>
+  <p data-step="3">late</p>
+</section>`,
+      { script: beatScript },
+    );
+    const hint = diagnostics.find((d) => d.id === "DEK003")?.hint;
+    expect(hint).toBe("use hook, turn, or 1-2");
+  });
+
+  test("DEK003 says when the section has no beats", async () => {
+    const diagnostics = await lintIntro(`<section class="slide" data-layout="default">
+  <h2 class="slide-title">intro</h2>
+  <p data-step="1">late</p>
+</section>`);
+    const hint = diagnostics.find((d) => d.id === "DEK003")?.hint;
+    expect(hint).toBe('add a ### beat under "## intro" in script.md, or drop data-step');
+  });
+
+  test("DEK010 names the slide stylesheet and the known classes", async () => {
+    const diagnostics = await lintIntro(
+      `<section class="slide" data-layout="title">
+  <h2 class="slide-title mystery">intro</h2>
+</section>`,
+      { theme: ".slide {}\n.slide .slide-title {}\n.slide .node {}\n" },
+    );
+    const hint = diagnostics.find((d) => d.id === "DEK010")?.hint;
+    expect(hint).toBe("define it in slides/intro.css, or use one of: node, slide, slide-title");
+  });
+
+  test("DEK010 suggests a data attribute when the slide has a script to find it", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: ".slide {}\n.slide .slide-title {}\n",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title"><span class="count">0</span></h2>
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        await writeFile(
+          join(root, "decks", "demo", "slides", "intro.ts"),
+          "export default { draw() {} } satisfies DekSlide;\n",
+        );
+        const hint = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK010")?.hint;
+        expect(hint).toBe(
+          "define it in slides/intro.css, or use one of: slide, slide-title; to find an element from slides/intro.ts, use a data-* attribute instead",
+        );
+      },
+    );
+  });
+
+  test("DEK011 points style attributes at the slide stylesheet", async () => {
+    const diagnostics = await lintIntro(`<section class="slide" data-layout="title">
+  <h2 class="slide-title" style="color: red">intro</h2>
+</section>`);
+    const hint = diagnostics.find((d) => d.id === "DEK011")?.hint;
+    expect(hint).toBe("move it to a class in slides/intro.css, using token var()");
+  });
+
+  test("DEK011 points scripts at the slide script", async () => {
+    const diagnostics = await lintIntro(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <script>1</script>
+</section>`);
+    const hint = diagnostics.find((d) => d.id === "DEK011")?.hint;
+    expect(hint).toBe("move motion to slides/intro.ts as a draw(t) function");
+  });
+
+  test("DEK020 names the asset path to download into", async () => {
+    const diagnostics = await lintIntro(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="https://cdn.example.com/img/logo.png?v=2" alt="">
+</section>`);
+    const hint = diagnostics.find((d) => d.id === "DEK020")?.hint;
+    expect(hint).toBe("download it into assets/ and use assets/logo.png");
   });
 });
