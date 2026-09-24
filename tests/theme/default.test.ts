@@ -88,6 +88,12 @@ describe("default theme", () => {
     expect(css).toContain("@keyframes fade-in");
   });
 
+  test("animates the slide between pages, not the whole player", () => {
+    expect(css).toContain("::view-transition-old(slide)");
+    expect(css).toContain("::view-transition-new(slide)");
+    expect(css).not.toMatch(/::view-transition-[a-z-]+\(root\)/);
+  });
+
   test("stops view-transition animation when motion is reduced", () => {
     const reduced =
       css.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/)?.[0] ?? "";

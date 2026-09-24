@@ -70,7 +70,6 @@ From the project `theme.css`. A deck's own `theme.css` can differ; `dek theme` l
 - `--pad-bottom`
 - `--pad-top`
 - `--pad-x`
-- `--page-transition`
 - `--pin`
 - `--radius`
 - `--rule`

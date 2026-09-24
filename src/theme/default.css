@@ -154,12 +154,12 @@
   }
 }
 
-::view-transition-old(root) {
+::view-transition-old(slide) {
   --step-transition: 0.3s ease;
   animation: fade-out var(--step-transition);
 }
 
-::view-transition-new(root) {
+::view-transition-new(slide) {
   --step-transition: 0.3s ease;
   animation: fade-in var(--step-transition);
 }
@@ -170,8 +170,8 @@
     animation: none;
   }
 
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-old(slide),
+  ::view-transition-new(slide) {
     animation: none;
   }
 }

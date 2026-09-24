@@ -8,6 +8,15 @@ describe("playerChromeCss", () => {
     expect(css).toContain("height: 768px");
   });
 
+  test("names the slide box so a page change animates only the slide", () => {
+    const css = playerChromeCss();
+    expect(css).toMatch(/#deck \{[^}]*view-transition-name: slide;/);
+    expect(css).toContain("::view-transition-group(slide) { overflow: clip; }");
+    expect(css).toContain(
+      "::view-transition-old(root), ::view-transition-new(root) { animation: none; }",
+    );
+  });
+
   test("sets transform-origin so scale fits from the top", () => {
     expect(playerChromeCss()).toContain("transform-origin");
   });

@@ -409,20 +409,20 @@
 }
 
 /* View-transition pseudo-elements hang off the document root, not .slide, so they get their own tokens. */
-::view-transition-old(root),
-::view-transition-new(root),
+::view-transition-old(slide),
+::view-transition-new(slide),
 ::view-transition-group(*) {
   --page-transition: 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --morph-duration: 0.6s;
 }
 
 /* The old page stays opaque underneath while the new one fades in over it, so nothing dims. */
-::view-transition-old(root) {
+::view-transition-old(slide) {
   animation: page-out var(--page-transition);
   mix-blend-mode: normal;
 }
 
-::view-transition-new(root) {
+::view-transition-new(slide) {
   animation: page-in var(--page-transition);
   mix-blend-mode: normal;
 }
@@ -437,8 +437,8 @@
     transition: none;
   }
 
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-old(slide),
+  ::view-transition-new(slide) {
     animation: none;
   }
 }

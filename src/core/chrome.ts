@@ -11,6 +11,9 @@ body:not(.is-presenter):not(.is-rail-hidden) #dek-shell:has(> #dek-rail) { grid-
 #dek-current-stage #deck { position: absolute; top: 0; left: 0; margin: 0; transform-origin: top left; }
 #deck { position: relative; width: ${width}px; height: ${height}px; margin: 0 auto; transform-origin: top center; }
 #deck > .slide:not(.is-current) { display: none; }
+#deck { view-transition-name: slide; }
+::view-transition-group(slide) { overflow: clip; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 #dek-rail { grid-area: rail; min-height: 0; background: #141414; border-right: 1px solid rgba(255,255,255,0.08); overflow: auto; padding: 12px 10px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; scrollbar-width: thin; }
 .dek-thumb { display: flex; align-items: flex-start; gap: 8px; color: inherit; text-decoration: none; outline: none; }
 .dek-thumb-num { width: 16px; flex: none; font: 500 11px/1.2 system-ui, sans-serif; text-align: right; color: rgba(255,255,255,0.55); padding-top: 2px; font-variant-numeric: tabular-nums; }

@@ -46,6 +46,12 @@ import {
   voiceDir,
 } from "./voice.ts";
 
+/**
+ * view-transition-names a data-morph may not take. The player names the slide box "slide",
+ * the browser names the page "root", and the rest are keywords of the property itself.
+ */
+const RESERVED_MORPHS = new Set(["slide", "root", "none", "auto", "match-element"]);
+
 export const DURATION_DRIFT_RATIO = 0.2;
 /** The reading-time estimate leaves out pauses and demos, so it gets more room than a Timeline. */
 export const ESTIMATE_DRIFT_RATIO = 0.35;
@@ -549,6 +555,20 @@ function lintSlideHtml(
       path,
       ...at(attributePattern("data-morph", morph), 2),
       slug: section.slug,
+      data: { morph },
+    });
+  }
+  for (const morph of seenMorphs) {
+    if (!RESERVED_MORPHS.has(morph)) {
+      continue;
+    }
+    diagnostics.push({
+      id: "DEK005",
+      message: `data-morph "${morph}" is reserved`,
+      path,
+      ...at(attributePattern("data-morph", morph)),
+      slug: section.slug,
+      hint: `rename it; the player uses "slide" and "root" for the page itself, and "none", "auto", and "match-element" are CSS keywords`,
       data: { morph },
     });
   }

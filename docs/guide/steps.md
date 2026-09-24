@@ -31,9 +31,11 @@ Moving between slides uses the browser's View Transitions API. The runtime calls
 
 ```css
 /* theme.css */
-::view-transition-old(root) { animation: fade-out var(--step-transition); }
-::view-transition-new(root) { animation: fade-in var(--step-transition); }
+::view-transition-old(slide) { animation: fade-out var(--step-transition); }
+::view-transition-new(slide) { animation: fade-in var(--step-transition); }
 ```
+
+The player names the slide box `slide`, so only the slide moves. The slide list, the presenter view, and the letterbox around the slide stay still, and anything that slides in from an edge is clipped to the slide. The page itself, `root`, does not animate.
 
 ## `data-morph`
 
@@ -49,7 +51,7 @@ To carry an element into the next slide, give it the same `data-morph` name on b
 
 The runtime turns `data-morph` into a `view-transition-name`, and the browser interpolates position and size between the two slides. A figure that shrinks into the corner as the next topic begins is one attribute, and both slides remain plain `<section class="slide">` fragments.
 
-Two elements with the same `data-morph` on one slide is [DEK005](/reference/lint#dek005).
+Two elements with the same `data-morph` on one slide is [DEK005](/reference/lint#dek005), and so is a name the player reserves, such as `slide`.
 
 A morph is invisible in a still image. To judge one, freeze the transition part-way and look:
 

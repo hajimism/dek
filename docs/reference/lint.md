@@ -8,7 +8,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 | `DEK002` | An HTML file, stylesheet, or script (`.ts`) in `slides/` has no section in `script.md` | — |
 | `DEK003` | A `data-step` is neither a beat id nor a valid position on its slide | — |
 | `DEK004` | A section id is repeated in the deck, or a beat id is repeated in its section | — |
-| `DEK005` | A `data-morph` name is repeated on one slide | — |
+| `DEK005` | A `data-morph` name is repeated on one slide, or is reserved (`slide`, `root`, `none`, `auto`, `match-element`) | — |
 | `DEK006` | `data-slug` does not match the section id | — |
 | `DEK010` | A class that neither the theme nor the slide's own stylesheet defines | — |
 | `DEK011` | `<style>`, `style=`, or `<script>` inside a slide | — |
@@ -49,6 +49,8 @@ An unresolvable reference. A beat with no element is fine, and positions need no
 ### DEK005
 
 A `data-morph` name must be unique within a slide, because it becomes a `view-transition-name` and the browser needs exactly one element on each side of the transition. The same name on two different slides is the intended use.
+
+Some names are taken. The player names the slide box `slide`, and the browser names the page `root`; a morph with either name would collide with the page change itself. `none`, `auto`, and `match-element` are keywords of `view-transition-name`, so the element would not morph at all.
 
 ### DEK010
 

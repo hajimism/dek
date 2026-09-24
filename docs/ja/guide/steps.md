@@ -31,9 +31,11 @@ id を使うことを勧めます。セクションの途中に `###` を挿す�
 
 ```css
 /* theme.css */
-::view-transition-old(root) { animation: fade-out var(--step-transition); }
-::view-transition-new(root) { animation: fade-in var(--step-transition); }
+::view-transition-old(slide) { animation: fade-out var(--step-transition); }
+::view-transition-new(slide) { animation: fade-in var(--step-transition); }
 ```
+
+プレイヤーはスライドの枠に `slide` という名前を付けているので、動くのはスライドだけです。スライド一覧、発表者ビュー、スライドまわりの余白は止まったままで、端から入ってくる動きもスライドの枠で切り取られます。ページ全体を表す `root` はアニメーションしません。
 
 ## `data-morph`
 
@@ -49,7 +51,7 @@ id を使うことを勧めます。セクションの途中に `###` を挿す�
 
 ランタイムが `data-morph` を `view-transition-name` に変換し、ブラウザが 2 枚の間で位置とサイズを補間します。次の話題が始まるのに合わせて図が隅へ小さく退く、という表現が属性 1 つで書け、どちらの枚も素の `<section class="slide">` フラグメントのままです。
 
-同じ枚に同じ `data-morph` 名が 2 つあると [DEK005](/ja/reference/lint#dek005) です。
+同じ枚に同じ `data-morph` 名が 2 つあると [DEK005](/ja/reference/lint#dek005) です。`slide` のようにプレイヤーが使う名前を付けた場合も DEK005 です。
 
 モーフは静止画では見えません。判断するには遷移を途中で止めて見ます:
 

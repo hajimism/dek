@@ -224,6 +224,33 @@ b
     );
   });
 
+  test("DEK005: a data-morph name the player reserves", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img data-morph="slide" alt="">
+  <img data-morph="root" alt="">
+  <img data-morph="pipeline" alt="">
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK005");
+        expect(found.map((d) => d.data?.morph)).toEqual(["slide", "root"]);
+        expect(found[0]?.message).toContain("reserved");
+        expect(found[0]?.hint).toContain("rename");
+        expect(found[1]?.line).toBe((found[0]?.line ?? 0) + 1);
+      },
+    );
+  });
+
   const vocabTheme = `.slide {}
 .slide .slide-title {}
 .slide .node {}
