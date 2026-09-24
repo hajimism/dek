@@ -7,8 +7,7 @@ export type StepElement = {
 
 export type MorphElement = {
   getAttribute(name: string): string | null;
-  setAttribute(name: string, value: string): void;
-  removeAttribute(name: string): void;
+  style: { setProperty(name: string, value: string): void; removeProperty(name: string): string };
 };
 
 export function applyIsShown(elements: StepElement[], shown: Set<string>): void {
@@ -66,14 +65,15 @@ export function applyMorphNames(elements: MorphElement[]): void {
   for (const el of elements) {
     const name = el.getAttribute("data-morph");
     if (name) {
-      el.setAttribute("view-transition-name", name);
+      // The browser reads the CSS property; an attribute of the same name does nothing.
+      el.style.setProperty("view-transition-name", name);
     }
   }
 }
 
 export function clearMorphNames(elements: MorphElement[]): void {
   for (const el of elements) {
-    el.removeAttribute("view-transition-name");
+    el.style.removeProperty("view-transition-name");
   }
 }
 

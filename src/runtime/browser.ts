@@ -179,10 +179,10 @@ if (dataEl?.textContent) {
 
   function stripPreviewClone(root: HTMLElement): void {
     root.removeAttribute("id");
-    root.removeAttribute("view-transition-name");
-    for (const el of root.querySelectorAll("[id], [view-transition-name]")) {
+    root.style.removeProperty("view-transition-name");
+    for (const el of root.querySelectorAll<HTMLElement>("[id], [data-morph]")) {
       el.removeAttribute("id");
-      el.removeAttribute("view-transition-name");
+      el.style.removeProperty("view-transition-name");
     }
   }
 
@@ -347,11 +347,11 @@ if (dataEl?.textContent) {
     const shown = current ? stepValuesForBeat(current.beats, pos.beatIndex) : new Set<string>();
     if (currentEl) {
       applyIsShown([...currentEl.querySelectorAll("[data-step]")], shown);
-      applyMorphNames([...currentEl.querySelectorAll("[data-morph]")]);
+      applyMorphNames([...currentEl.querySelectorAll<HTMLElement>("[data-morph]")]);
     }
     for (const el of slideEls) {
       if (el !== currentEl) {
-        clearMorphNames([...el.querySelectorAll("[data-morph]")]);
+        clearMorphNames([...el.querySelectorAll<HTMLElement>("[data-morph]")]);
       }
     }
     const state = current ? presenterState(slides, pos) : undefined;
@@ -440,7 +440,7 @@ if (dataEl?.textContent) {
     ) {
       const fromEl = slideEl(slides[pos.slideIndex]?.slug);
       if (fromEl) {
-        applyMorphNames([...fromEl.querySelectorAll("[data-morph]")]);
+        applyMorphNames([...fromEl.querySelectorAll<HTMLElement>("[data-morph]")]);
       }
       viewTransition = document.startViewTransition(apply);
     } else {

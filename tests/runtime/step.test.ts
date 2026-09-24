@@ -33,18 +33,23 @@ function stepEl(step: string): StepElement & { shown: boolean } {
   return el;
 }
 
-function morphEl(name: string): MorphElement & { attrs: Record<string, string> } {
+function morphEl(name: string): MorphElement & { props: Record<string, string> } {
   const attrs: Record<string, string> = { "data-morph": name };
+  const props: Record<string, string> = {};
   return {
-    attrs,
+    props,
     getAttribute(key: string) {
       return attrs[key] ?? null;
     },
-    setAttribute(key: string, value: string) {
-      attrs[key] = value;
-    },
-    removeAttribute(key: string) {
-      delete attrs[key];
+    style: {
+      setProperty(key: string, value: string) {
+        props[key] = value;
+      },
+      removeProperty(key: string) {
+        const value = props[key] ?? "";
+        delete props[key];
+        return value;
+      },
     },
   };
 }
@@ -146,18 +151,18 @@ describe("shouldUseViewTransition", () => {
 });
 
 describe("applyMorphNames", () => {
-  test("copies data-morph onto view-transition-name", () => {
+  test("copies data-morph onto the view-transition-name CSS property, which is what the browser reads", () => {
     const pipeline = morphEl("pipeline");
     applyMorphNames([pipeline]);
-    expect(pipeline.getAttribute("view-transition-name")).toBe("pipeline");
+    expect(pipeline.props["view-transition-name"]).toBe("pipeline");
   });
 
   test("applies names only to the given elements", () => {
     const current = morphEl("pipeline");
     const other = morphEl("pipeline");
     applyMorphNames([current]);
-    expect(current.getAttribute("view-transition-name")).toBe("pipeline");
-    expect(other.getAttribute("view-transition-name")).toBeNull();
+    expect(current.props["view-transition-name"]).toBe("pipeline");
+    expect(other.props["view-transition-name"]).toBeUndefined();
   });
 });
 
@@ -167,7 +172,7 @@ describe("clearMorphNames", () => {
     const other = morphEl("pipeline");
     applyMorphNames([current, other]);
     clearMorphNames([other]);
-    expect(current.getAttribute("view-transition-name")).toBe("pipeline");
-    expect(other.getAttribute("view-transition-name")).toBeNull();
+    expect(current.props["view-transition-name"]).toBe("pipeline");
+    expect(other.props["view-transition-name"]).toBeUndefined();
   });
 });
