@@ -70,7 +70,9 @@ describe("lintDeck", () => {
       const diagnostics = lintDeck(join(root, "decks", "demo"));
       expect(diagnostics.some((d) => d.id === "DEK001")).toBe(true);
       const dek001 = diagnostics.find((d) => d.id === "DEK001");
-      expect(dek001?.path).toContain("slides/intro.html");
+      expect(dek001?.path).toBe(join(root, "decks", "demo", "script.md"));
+      expect(dek001?.line).toBe(5);
+      expect(dek001?.data).toEqual({ expected: "slides/intro.html" });
     });
   });
 
@@ -804,7 +806,11 @@ b
         const diagnostics = lintDeck(join(root, "decks", "demo"));
         expect(diagnostics.some((d) => d.id === "DEK001")).toBe(true);
         expect(diagnostics.some((d) => d.id === "DEK002")).toBe(true);
-        expect(diagnostics.some((d) => d.message.includes("dek mv leftover intro"))).toBe(true);
+        const hints = diagnostics.filter((d) => d.id === "DEK001" || d.id === "DEK002");
+        expect(hints.map((d) => d.hint)).toEqual([
+          "run `dek mv leftover intro`",
+          "run `dek mv leftover intro`",
+        ]);
       },
     );
   });
@@ -951,6 +957,28 @@ hello
         );
         const diagnostics = lintDeck(join(root, "decks", "demo"));
         expect(diagnostics.some((d) => d.id === "DEK041")).toBe(true);
+      },
+    );
+  });
+
+  test("DEK041: without a Timeline, compares the estimated reading time to the budget", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\nduration: 5m\n---\n\n## intro\n\nこんにちは。\n",
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const dek041 = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK041");
+        expect(dek041).toMatchObject({
+          message: "the script reads in about 0:01, budget 5m; more than 35% apart",
+          data: { estimateSeconds: 1, budgetSeconds: 300 },
+          hint: "write more for the slot, or shorten duration in the frontmatter",
+        });
       },
     );
   });
@@ -1256,5 +1284,151 @@ two
 </section>`);
     const hint = diagnostics.find((d) => d.id === "DEK020")?.hint;
     expect(hint).toBe("download it into assets/ and use assets/logo.png");
+  });
+});
+
+describe("lintDeck locations and data", () => {
+  const script = `---
+title: Demo
+---
+
+## intro
+
+hello
+
+### hook
+
+body
+`;
+
+  async function lintSlide(html: string, css?: string) {
+    return withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script,
+            slides: { intro: html },
+            ...(css === undefined ? {} : { styles: { intro: css } }),
+            theme: `.slide { --fg: #fff; }\n.slide .slide-title { color: var(--fg); }\n`,
+          },
+        ],
+      },
+      async (root) => lintDeck(join(root, "decks", "demo")),
+    );
+  }
+
+  test("points HTML diagnostics at the line that has the problem", async () => {
+    const diagnostics = await lintSlide(`<section class="slide">
+  <h2 class="slide-title">intro</h2>
+  <p data-step="hok">x</p>
+  <p class="slide-title headline">y</p>
+  <p style="color: red">z</p>
+  <img src="https://example.com/a.png" alt="">
+  <img src="assets/missing.png" alt="">
+</section>
+`);
+    const lineOf = (id: string) => diagnostics.find((d) => d.id === id)?.line;
+    expect(lineOf("DEK003")).toBe(3);
+    expect(lineOf("DEK010")).toBe(4);
+    expect(lineOf("DEK011")).toBe(5);
+    expect(lineOf("DEK020")).toBe(6);
+    expect(lineOf("DEK021")).toBe(7);
+  });
+
+  test("carries the offending value as data", async () => {
+    const diagnostics = await lintSlide(
+      `<section class="slide">
+  <p data-step="hok" class="headline">x</p>
+  <img src="https://example.com/a.png" alt="">
+  <img src="assets/missing.png" alt="">
+</section>
+`,
+      ".headline { font-size: 96px; }\n",
+    );
+    const dataOf = (id: string) => diagnostics.find((d) => d.id === id)?.data;
+    expect(dataOf("DEK003")).toEqual({ step: "hok", choices: ["hook", "1"] });
+    expect(dataOf("DEK014")).toEqual({ property: "font-size", value: "96px" });
+    expect(dataOf("DEK020")).toEqual({ url: "https://example.com/a.png" });
+    expect(dataOf("DEK021")).toEqual({ src: "assets/missing.png" });
+  });
+
+  test("names the unknown class as data", async () => {
+    const diagnostics = await lintSlide(`<section class="slide">
+  <p class="headline">x</p>
+</section>
+`);
+    expect(diagnostics.find((d) => d.id === "DEK010")?.data).toEqual({ class: "headline" });
+  });
+
+  test("names the missing word as data", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n\nこんにちは、AI です。\n",
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const dir = join(root, "decks", "demo", "voice");
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, "voice.toml"), `engine = "voicevox"\nspeaker = "a"\n`);
+        const dek040 = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK040");
+        expect(dek040?.data).toEqual({ word: "AI" });
+      },
+    );
+  });
+});
+
+describe("DEK014 hints", () => {
+  const theme = `.slide {
+  --fg: #f5f5f5;
+  --accent: rgb(255 0 102);
+  --font-body: "Inter", sans-serif;
+  --size-body: 1.5rem;
+  --size-stat: 6rem;
+  --gap: 2rem;
+  --radius: 4px;
+  --step-transition: 0.3s ease;
+}
+`;
+
+  async function hintFor(css: string): Promise<string | undefined> {
+    return withTempProject(
+      { decks: [{ name: "demo", slides: { intro: titleSlide }, styles: { intro: css }, theme }] },
+      async (root) =>
+        lintDeck(join(root, "decks", "demo")).find(
+          (d) => d.id === "DEK014" && d.path?.endsWith(".css") && !d.path.endsWith("theme.css"),
+        )?.hint,
+    );
+  }
+
+  test("offers the theme's color tokens for a raw color", async () => {
+    expect(await hintFor(".x { color: #ff0066; }\n")).toBe("use var(--accent) or var(--fg)");
+  });
+
+  test("offers the size tokens for a raw font-size", async () => {
+    expect(await hintFor(".x { font-size: 96px; }\n")).toBe(
+      "use var(--size-body) or var(--size-stat)",
+    );
+  });
+
+  test("offers length tokens for raw spacing and radius", async () => {
+    expect(await hintFor(".x { margin: 12px; }\n")).toBe("use var(--gap)");
+    expect(await hintFor(".x { border-radius: 8px; }\n")).toBe("use var(--radius)");
+  });
+
+  test("offers the font tokens for a raw font-family", async () => {
+    expect(await hintFor('.x { font-family: "Noto Sans"; }\n')).toBe("use var(--font-body)");
+  });
+
+  test("points at theme.css when no token fits", async () => {
+    expect(await hintFor(".x { transition: opacity 200ms; }\n")).toBe("use var(--step-transition)");
+    expect(await hintFor(".x { width: 100px; }\n")).toBe(
+      "add a token for it to theme.css and use var() here",
+    );
   });
 });

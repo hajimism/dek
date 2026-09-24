@@ -1,4 +1,4 @@
-import type { Diagnostic } from "../core/diagnostic.ts";
+import { type Diagnostic, severityOf } from "../core/diagnostic.ts";
 import { withDeckPrefix } from "./routes.ts";
 import { applyIsShown, type StepElement } from "./step.ts";
 
@@ -81,7 +81,13 @@ export function formatLiveDiagnostics(diagnostics: Diagnostic[]): string | null 
   if (diagnostics.length === 0) {
     return null;
   }
-  return diagnostics.map((diagnostic) => `${diagnostic.id}: ${diagnostic.message}`).join("\n");
+  return diagnostics
+    .map((diagnostic) =>
+      severityOf(diagnostic) === "warning"
+        ? `${diagnostic.id} warning: ${diagnostic.message}`
+        : `${diagnostic.id}: ${diagnostic.message}`,
+    )
+    .join("\n");
 }
 
 export function liveSlidePath(pathname: string, slug: string): string {

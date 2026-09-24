@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chmod } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { lintCommand } from "../../src/cli/lint.ts";
 import { mergeSarif, toSarif } from "../../src/core/sarif.ts";
@@ -17,7 +17,14 @@ const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.t
 
 type LintOk = {
   ok: boolean;
-  diagnostics: Array<{ id: string; message: string; path?: string }>;
+  diagnostics: Array<{
+    id: string;
+    message: string;
+    path?: string;
+    line?: number;
+    severity?: string;
+    data?: Record<string, unknown>;
+  }>;
   rumdl?: "ok" | "skipped";
 };
 
@@ -44,6 +51,65 @@ describe("dek lint", () => {
       };
       expect(sarif.version).toBe("2.1.0");
       expect(sarif.runs?.[0]?.results?.some((r) => r.ruleId === "DEK001")).toBe(true);
+    });
+  });
+
+  test("passes with warnings only and labels each diagnostic's severity", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n\nこんにちは、AI です。\n",
+            slides: { intro: introHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const deck = join(root, "decks", "demo");
+        await mkdir(join(deck, "voice"), { recursive: true });
+        await writeFile(join(deck, "voice", "voice.toml"), 'engine = "voicevox"\nspeaker = "a"\n');
+        const result = await runDek(["lint", "--json"], { cwd: deck });
+        expect(result.exitCode).toBe(0);
+        const json = jsonStdout<LintOk>(result);
+        expect(json.ok).toBe(true);
+        expect(json.diagnostics.map((d) => [d.id, d.severity])).toEqual([["DEK040", "warning"]]);
+      },
+    );
+  });
+
+  test("fails when an error sits next to warnings", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n\nこんにちは、AI です。\n",
+          },
+        ],
+      },
+      async (root) => {
+        const deck = join(root, "decks", "demo");
+        await mkdir(join(deck, "voice"), { recursive: true });
+        await writeFile(join(deck, "voice", "voice.toml"), 'engine = "voicevox"\nspeaker = "a"\n');
+        const result = await runDek(["lint", "--json"], { cwd: deck });
+        expect(result.exitCode).toBe(1);
+        const json = jsonStdout<LintOk>(result);
+        expect(json.ok).toBe(false);
+        expect(json.diagnostics.find((d) => d.id === "DEK001")?.severity).toBe("error");
+      },
+    );
+  });
+
+  test("writes a SARIF level for every dek result", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const result = await runDek(["lint", "--format", "sarif"], {
+        cwd: join(root, "decks", "demo"),
+      });
+      const sarif = JSON.parse(result.stdout) as {
+        runs: Array<{ results: Array<{ ruleId: string; level?: string }> }>;
+      };
+      expect(sarif.runs[0]?.results.find((r) => r.ruleId === "DEK001")?.level).toBe("error");
     });
   });
 

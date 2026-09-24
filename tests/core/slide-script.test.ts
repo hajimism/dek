@@ -8,6 +8,7 @@ import { resolveDeck } from "../../src/core/resolve.ts";
 import { stillDrawScript } from "../../src/core/slide-draw.ts";
 import {
   readSlideScripts,
+  seekProblems,
   slideScriptProblems,
   slideScriptTags,
   warmSlideScripts,
@@ -72,6 +73,24 @@ describe("slideScriptProblems with the slide's beats", () => {
     expect(slideScriptProblems("export default { motion: { 1: 900 } };", { steps: ["1"] })).toEqual(
       [],
     );
+  });
+
+  test("still checks motion when the script has an import", () => {
+    expect(
+      slideScriptProblems(
+        'import gsap from "gsap";\nexport default { motion: { grwth: 900 } };',
+        steps,
+      ),
+    ).toEqual([
+      "imports are not supported; keep the slide script self-contained",
+      'motion key "grwth" is not a beat of this slide; use one of: base, growth',
+    ]);
+  });
+
+  test("does not blame the missing import's binding on the script", () => {
+    expect(
+      slideScriptProblems('import gsap from "gsap";\ngsap.init();\nexport default {};', steps),
+    ).toEqual(["imports are not supported; keep the slide script self-contained"]);
   });
 
   test("motion values are non-negative milliseconds", () => {
@@ -446,6 +465,22 @@ describe("still pages run slide scripts", () => {
 });
 
 describe("slide script lint and mv", () => {
+  test("DEK017: a clock or a class lookup in a slide script is an error on its line", async () => {
+    await withTempProject(chartDeck, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await Bun.write(
+        join(deckDir, "slides", "chart.ts"),
+        'export default {\n  draw(slide) {\n    setTimeout(() => {}, 1);\n    slide.querySelector(".bar");\n  },\n};\n',
+      );
+      const found = lintDeck(deckDir).filter((d) => d.id === "DEK017");
+      expect(found.map((d) => [d.line, d.slug, d.path])).toEqual([
+        [3, "chart", join(deckDir, "slides", "chart.ts")],
+        [4, "chart", join(deckDir, "slides", "chart.ts")],
+      ]);
+      expect(found[1]?.data).toEqual({ class: "bar" });
+    });
+  });
+
   test("DEK016: a slide script that cannot run is reported against its file", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
@@ -491,5 +526,77 @@ describe("slide script lint and mv", () => {
       expect(await Bun.file(join(deckDir, "slides", "growth-chart.ts")).exists()).toBe(true);
       expect(await Bun.file(join(deckDir, "slides", "chart.ts")).exists()).toBe(false);
     });
+  });
+});
+
+describe("seekProblems", () => {
+  test("accepts a script that draws from t and finds elements by data-*", () => {
+    expect(
+      seekProblems(`export default {
+  draw(slide, { t }) {
+    // setTimeout would break seeking; so would querySelector(".x")
+    for (const el of slide.querySelectorAll("[data-count]")) el.textContent = String(t);
+  },
+};`),
+    ).toEqual([]);
+  });
+
+  test("names each clock, timer, and random source with its line", () => {
+    expect(
+      seekProblems(`export default {
+  draw(slide, { t }) {
+    setTimeout(() => {}, 10);
+    const now = Date.now() + performance.now();
+    requestAnimationFrame(() => {});
+    slide.dataset.seed = String(Math.random() + new Date().getTime());
+  },
+};`).map(({ line, message }) => ({ line, message })),
+    ).toEqual([
+      {
+        line: 3,
+        message:
+          "setTimeout runs on its own clock; draw from t alone so video and screenshots can seek it",
+      },
+      {
+        line: 4,
+        message:
+          "Date.now runs on its own clock; draw from t alone so video and screenshots can seek it",
+      },
+      {
+        line: 4,
+        message:
+          "performance.now runs on its own clock; draw from t alone so video and screenshots can seek it",
+      },
+      {
+        line: 5,
+        message:
+          "requestAnimationFrame runs on its own clock; draw from t alone so video and screenshots can seek it",
+      },
+      {
+        line: 6,
+        message: "Math.random differs on every call; derive the value from t or the slide's beats",
+      },
+      {
+        line: 6,
+        message:
+          "new Date runs on its own clock; draw from t alone so video and screenshots can seek it",
+      },
+    ]);
+  });
+
+  test("names a class used to find an element", () => {
+    expect(
+      seekProblems(`export default {
+  draw(slide) {
+    slide.querySelector(".big");
+    slide.querySelectorAll("li.item");
+    slide.getElementsByClassName("big");
+    slide.querySelector("[data-x]").closest(".row");
+  },
+};`).map((problem) => problem.line),
+    ).toEqual([3, 4, 5, 6]);
+    expect(
+      seekProblems('export default { draw(s) { s.querySelector(".big"); } };')[0]?.message,
+    ).toBe('finds elements by class ".big"; give the element a data-* attribute and select that');
   });
 });

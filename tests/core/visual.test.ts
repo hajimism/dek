@@ -112,6 +112,7 @@ describe("lintVisualDeck", () => {
         const dek031 = diagnostics?.find((d) => d.id === "DEK031");
         expect(dek031?.path).toContain("slides/intro.html");
         expect(dek031?.message).toContain("2.1");
+        expect(dek031?.data).toEqual({ ratio: 2.1, threshold: 4.5, steps: ["1"] });
       },
     );
   });
@@ -339,6 +340,12 @@ describe("lintVisualDeck messages", () => {
         path: expect.stringContaining("slides/intro.html"),
         slug: "intro",
         hint: "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css",
+        data: {
+          box: 'li[data-step="vague"]',
+          text: "https://example.com/very/long/url/that/never/wraps",
+          edges: { right: 412 },
+          steps: ["slow", "vague"],
+        },
       },
     ]);
   });
@@ -356,7 +363,7 @@ describe("lintVisualDeck messages", () => {
       "ul overflows the right edge by 3px and the bottom edge by 180px at steps 1, 2",
     );
     expect(dek030?.hint).toBe(
-      "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut or split the content, or lower the size tokens",
+      "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut it, split it across beats or slides, or give it a smaller size in slides/intro.css",
     );
   });
 
@@ -386,6 +393,15 @@ describe("lintVisualDeck messages", () => {
         path: expect.stringContaining("slides/intro.html"),
         slug: "intro",
         hint: "raise the contrast of its color against the background to 4.5:1",
+        data: {
+          box: "p.stat-label",
+          text: "手戻りの減少",
+          ratio: 1.9,
+          threshold: 4.5,
+          fg: "#444444",
+          bg: "#111111",
+          steps: ["1", "2"],
+        },
       },
     ]);
   });

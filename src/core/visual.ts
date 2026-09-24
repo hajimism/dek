@@ -254,7 +254,8 @@ async function visualDeck(
 
 const SNIPPET_CHARS = 24;
 const HORIZONTAL_HINT = "shorten it, or let it wrap with overflow-wrap: anywhere in";
-const VERTICAL_HINT = "cut or split the content, or lower the size tokens";
+// Changing a size token would move every slide; the fix belongs to this one.
+const VERTICAL_HINT = "cut it, split it across beats or slides, or give it a smaller size in";
 
 function describeTarget(box: string | undefined, text: string | undefined): string {
   if (!box) {
@@ -325,16 +326,27 @@ function visualDiagnostics(response: VisualResponse, fallbackPath: string): Diag
       ...(edges.some((edge) => edge === "left" || edge === "right")
         ? [`${HORIZONTAL_HINT} slides/${first.slug}.css`]
         : []),
-      ...(edges.some((edge) => edge === "top" || edge === "bottom") ? [VERTICAL_HINT] : []),
+      ...(edges.some((edge) => edge === "top" || edge === "bottom")
+        ? [`${VERTICAL_HINT} slides/${first.slug}.css`]
+        : []),
     ];
     const target =
       edges.length === 0 && !first.text ? "content " : describeTarget(first.box, first.text);
+    const amounts = Object.fromEntries(
+      edges.map((edge) => [edge, Math.max(...items.map((item) => item.by?.[edge] ?? 0))]),
+    );
     diagnostics.push({
       id: "DEK030",
       message: `${target}${where} ${atSteps(steps)}`,
       path: pathOf(first.slug),
       ...(first.slug ? { slug: first.slug } : {}),
       ...(hints.length > 0 ? { hint: hints.join("; ") } : {}),
+      data: {
+        ...(first.box ? { box: first.box } : {}),
+        ...(first.text ? { text: first.text } : {}),
+        edges: amounts,
+        steps,
+      },
     });
   }
 
@@ -367,6 +379,14 @@ function visualDiagnostics(response: VisualResponse, fallbackPath: string): Diag
       path: pathOf(first.slug),
       ...(first.slug ? { slug: first.slug } : {}),
       hint: `raise the contrast of its color against the background to ${threshold}:1`,
+      data: {
+        ...(first.box ? { box: first.box } : {}),
+        ...(first.text ? { text: first.text } : {}),
+        ratio,
+        threshold,
+        ...(fg && bg ? { fg, bg } : {}),
+        steps,
+      },
     });
   }
   return diagnostics;

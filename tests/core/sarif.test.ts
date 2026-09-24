@@ -36,4 +36,12 @@ describe("toSarif", () => {
     const sarif = toSarif([{ id: "DEK003", message: 'data-step "3"', hint: "use hook or 1-1" }]);
     expect(sarif.runs[0]?.results[0]?.message.text).toBe('data-step "3"; use hook or 1-1');
   });
+
+  test("sets the SARIF level from the severity", () => {
+    const sarif = toSarif([
+      { id: "DEK010", message: "class" },
+      { id: "DEK040", message: "word" },
+    ]);
+    expect(sarif.runs[0]?.results.map((r) => r.level)).toEqual(["error", "warning"]);
+  });
 });

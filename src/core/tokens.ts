@@ -203,6 +203,87 @@ export function isRawThemeValue(property: string, value: string): boolean {
   return false;
 }
 
+type TokenKind = "color" | "font" | "size" | "radius" | "space" | "time";
+
+const TIME_RE = /(?:^|[^A-Za-z0-9_-])(?:\d*\.\d+|\d+\.?\d*)m?s(?:$|[^A-Za-z0-9_-])/i;
+const MAX_HINT_TOKENS = 6;
+
+function isColorValue(value: string): boolean {
+  return HEX_COLOR_RE.test(value) || COLOR_FN_RE.test(value) || hasNamedColor(value);
+}
+
+/** What a token holds, judged from its name and the value the theme gives it. */
+function tokenKind(name: string, value: string): TokenKind | undefined {
+  if (isColorValue(value)) {
+    return "color";
+  }
+  if (/font/.test(name)) {
+    return "font";
+  }
+  if (TIME_RE.test(value)) {
+    return "time";
+  }
+  if (BANNED_UNIT_RE.test(value)) {
+    return /size/.test(name) ? "size" : /radius/.test(name) ? "radius" : "space";
+  }
+  return undefined;
+}
+
+/** The kind of token a declaration wants, or undefined when no token kind fits it. */
+function wantedKind(property: string, value: string): TokenKind | undefined {
+  const rest = stripCssFunctions(value, ["var", "url"]);
+  if (isColorValue(rest)) {
+    return "color";
+  }
+  if (property === "font-family") {
+    return "font";
+  }
+  if (property === "font-size") {
+    return "size";
+  }
+  if (/radius$/.test(property)) {
+    return "radius";
+  }
+  if (/^(margin|padding)(-|$)|^(row-|column-)?gap$/.test(property)) {
+    return "space";
+  }
+  if (/^(transition|animation)(-|$)/.test(property)) {
+    return "time";
+  }
+  return undefined;
+}
+
+/**
+ * DEK014's hint: the theme tokens that could replace a raw value, such as
+ * `use var(--accent) or var(--fg)` for a hex color.
+ */
+export function rawValueHint(
+  property: string,
+  value: string,
+  tokens: Array<{ name: string; value: string }>,
+): string {
+  const kind = wantedKind(property, value);
+  const names = [
+    ...new Set(
+      tokens
+        .filter((token) => kind && tokenKind(token.name, token.value) === kind)
+        .map((t) => t.name),
+    ),
+  ].sort();
+  if (names.length === 0) {
+    return "add a token for it to theme.css and use var() here";
+  }
+  const shown = names.slice(0, MAX_HINT_TOKENS).map((name) => `var(${name})`);
+  if (names.length > MAX_HINT_TOKENS) {
+    shown.push("…");
+  }
+  const last = shown.pop();
+  if (shown.length === 0) {
+    return `use ${last}`;
+  }
+  return shown.length === 1 ? `use ${shown[0]} or ${last}` : `use ${shown.join(", ")}, or ${last}`;
+}
+
 function hasNamedColor(value: string): boolean {
   for (const match of value.matchAll(IDENT_RE)) {
     const ident = match[0]?.toLowerCase();

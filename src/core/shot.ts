@@ -14,7 +14,7 @@ import {
 import { asResolvedDeck, type ResolvedDeck, requireSection } from "./resolve.ts";
 import type { Section } from "./schema.ts";
 import { logicalSize } from "./size.ts";
-import { stepKey } from "./step.ts";
+import { formatStepChoices, stepChoices, stepKey } from "./step.ts";
 
 export type ShotFile = {
   slug: string;
@@ -216,14 +216,20 @@ function resolveBeat(section: Section, step?: string): { index: number; label: s
       return { index: 0, label: step };
     }
     throw new DekError(`step "${step}" not found in "${section.slug}"`, {
-      hint: "run `dek show` and pick a beat id or number",
+      hint: stepNotFoundHint(section),
     });
   }
   const index = section.beats.findIndex((beat) => beat.id === step);
   if (index < 0) {
     throw new DekError(`step "${step}" not found in "${section.slug}"`, {
-      hint: "run `dek show` and pick a beat id or number",
+      hint: stepNotFoundHint(section),
     });
   }
   return { index, label: step };
+}
+
+function stepNotFoundHint(section: Section): string {
+  return section.beats.length === 0
+    ? "this slide has no beats; use 1, or leave out --step"
+    : formatStepChoices(stepChoices(section.beats));
 }

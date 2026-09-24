@@ -114,6 +114,24 @@ describe("applyLiveEvent", () => {
     expect(doc.theme).toBe(".slide { background: red; }");
   });
 
+  test("labels warnings in the overlay", () => {
+    const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: null };
+    applyLiveEvent(
+      {
+        type: "diagnostics",
+        diagnostics: [
+          { id: "DEK040", message: "dictionary is missing English word: AI" },
+          { id: "DEK010", message: 'class "x"' },
+        ],
+      },
+      fakeHost(doc),
+      { shown: new Set() },
+    );
+    expect(doc.diagnostics).toBe(
+      'DEK040 warning: dictionary is missing English word: AI\nDEK010: class "x"',
+    );
+  });
+
   test("updates diagnostics and removes the overlay when empty", () => {
     const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: "DEK001: missing" };
     const host = fakeHost(doc);

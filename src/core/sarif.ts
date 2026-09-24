@@ -1,4 +1,4 @@
-import type { Diagnostic } from "./diagnostic.ts";
+import { type Diagnostic, severityOf } from "./diagnostic.ts";
 
 export type SarifLog = {
   version: "2.1.0";
@@ -7,6 +7,7 @@ export type SarifLog = {
     tool: { driver: { name: string } };
     results: Array<{
       ruleId: string;
+      level?: "error" | "warning" | "note" | "none";
       message: { text: string };
       locations?: Array<{
         physicalLocation: {
@@ -27,6 +28,7 @@ export function toSarif(diagnostics: Diagnostic[]): SarifLog {
         tool: { driver: { name: "dek" } },
         results: diagnostics.map((diagnostic) => ({
           ruleId: diagnostic.id,
+          level: severityOf(diagnostic),
           message: {
             text: diagnostic.hint
               ? `${diagnostic.message}; ${diagnostic.hint}`

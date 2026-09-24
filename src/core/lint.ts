@@ -7,6 +7,7 @@ import {
   cssCustomProperties,
   cssDeclarations,
   cssStyleSelectors,
+  cssTokenValues,
   cssUrls,
   isScopedThemeSelector,
   splitSelectorList,
@@ -25,11 +26,17 @@ import {
   SLIDE_SIDECARS,
 } from "./resolve.ts";
 import type { Beat, Section } from "./schema.ts";
-import { javascriptScriptProblem, slideScriptsProblems, warmSlideScripts } from "./slide-script.ts";
-import { stepKey } from "./step.ts";
+import {
+  javascriptScriptProblem,
+  seekProblems,
+  slideScriptsProblems,
+  warmSlideScripts,
+} from "./slide-script.ts";
+import { formatStepChoices, stepChoices, stepKey } from "./step.ts";
+import { skeletonHtml } from "./sync.ts";
 import type { Timeline } from "./timeline.ts";
-import { parseDurationSeconds } from "./timing.ts";
-import { isRawThemeValue, REQUIRED_TOKENS } from "./tokens.ts";
+import { formatClock, parseDurationSeconds, sectionTiming } from "./timing.ts";
+import { isRawThemeValue, REQUIRED_TOKENS, rawValueHint } from "./tokens.ts";
 import {
   hasVoice,
   loadVoiceDict,
@@ -40,6 +47,8 @@ import {
 } from "./voice.ts";
 
 export const DURATION_DRIFT_RATIO = 0.2;
+/** The reading-time estimate leaves out pauses and demos, so it gets more room than a Timeline. */
+export const ESTIMATE_DRIFT_RATIO = 0.35;
 
 const POSITIVE_INT_RE = /^[1-9]\d*$/;
 
@@ -145,9 +154,11 @@ export function lintDeck(
     diagnostics.push({
       id: "DEK001",
       message: `missing slide HTML for "${section.slug}"`,
-      path: join(deck.dir, "slides", `${section.slug}.html`),
+      path: scriptPath,
       line: section.line,
       slug: section.slug,
+      hint: "run `dek sync` to create the skeleton",
+      data: { expected: `slides/${section.slug}.html` },
     });
   }
 
@@ -196,11 +207,16 @@ export function lintDeck(
   const scripted = lintedSlideScripts(deck, only);
   const scriptProblems = slideScriptsProblems(scripted.map((entry) => entry.input));
   const scriptDiagnostics = new Map(
-    scripted.map(({ section, path }, index) => [
+    scripted.map(({ section, path, input }, index) => [
       section.slug,
-      (scriptProblems[index] ?? []).map(
-        (message): Diagnostic => ({ id: "DEK016", message, path, slug: section.slug }),
-      ),
+      [
+        ...(scriptProblems[index] ?? []).map(
+          (message): Diagnostic => ({ id: "DEK016", message, path, slug: section.slug }),
+        ),
+        ...seekProblems(input.code).map(
+          (problem): Diagnostic => ({ id: "DEK017", path, slug: section.slug, ...problem }),
+        ),
+      ],
     ]),
   );
 
@@ -223,7 +239,9 @@ export function lintDeck(
     const style = styleBySlug.get(section.slug);
     const styleCss = style ? readFileSync(style.path, "utf8") : undefined;
     if (style && styleCss !== undefined) {
-      diagnostics.push(...lintSlideStyle(section.slug, style.path, styleCss));
+      diagnostics.push(
+        ...lintSlideStyle(section.slug, style.path, styleCss, cssTokenValues(theme ?? "")),
+      );
     }
     diagnostics.push(...(scriptDiagnostics.get(section.slug) ?? []));
     diagnostics.push(
@@ -235,14 +253,12 @@ export function lintDeck(
     );
   }
 
-  suggestRename(diagnostics);
+  suggestRename(diagnostics, deck, htmlBySlug);
   if (hasVoice(deck.dir)) {
     diagnostics.push(...lintVoice(deck, only));
   }
   const timeline = tryLoadCachedTimeline(deck.dir);
-  if (timeline) {
-    diagnostics.push(...lintDuration(deck, timeline));
-  }
+  diagnostics.push(...(timeline ? lintDuration(deck, timeline) : lintEstimate(deck, config)));
   return diagnostics;
 }
 
@@ -293,6 +309,7 @@ function lintVoice(deck: ProjectDeck, only?: string): Diagnostic[] {
         path: deck.scriptPath,
         line: cue.line,
         slug: cue.slug,
+        data: { word },
       });
     }
   }
@@ -314,8 +331,40 @@ function lintDuration(deck: ProjectDeck, timeline: Timeline): Diagnostic[] {
       id: "DEK041",
       message: `video duration ${Math.round(actual)}s differs from budget ${deck.deck.duration} by more than ${Math.round(DURATION_DRIFT_RATIO * 100)}%`,
       path: deck.scriptPath,
+      hint: durationHint(actual < budget),
+      data: { videoSeconds: Math.round(actual), budgetSeconds: budget },
     },
   ];
+}
+
+/** DEK041 before any voice: the reading-time estimate `dek ls` shows, against the budget. */
+function lintEstimate(deck: ProjectDeck, config: ReturnType<typeof loadConfig>): Diagnostic[] {
+  const budget = parseDurationSeconds(deck.deck.duration);
+  if (budget === undefined || budget <= 0) {
+    return [];
+  }
+  const estimate = sectionTiming(deck.deck.sections, deck.deck.duration, config).reduce(
+    (sum, row) => sum + row.estimateSeconds,
+    0,
+  );
+  if (Math.abs(estimate - budget) / budget < ESTIMATE_DRIFT_RATIO) {
+    return [];
+  }
+  return [
+    {
+      id: "DEK041",
+      message: `the script reads in about ${formatClock(estimate)}, budget ${deck.deck.duration}; more than ${Math.round(ESTIMATE_DRIFT_RATIO * 100)}% apart`,
+      path: deck.scriptPath,
+      hint: durationHint(estimate < budget),
+      data: { estimateSeconds: estimate, budgetSeconds: budget },
+    },
+  ];
+}
+
+function durationHint(short: boolean): string {
+  return short
+    ? "write more for the slot, or shorten duration in the frontmatter"
+    : "cut the script, or lengthen duration in the frontmatter";
 }
 
 function uniqueSections(sections: Section[]): Section[] {
@@ -365,12 +414,17 @@ function lintTheme(path: string, css: string, maxClasses: number): Diagnostic[] 
     });
   }
 
-  diagnostics.push(...rawValueDiagnostics(css, path));
+  diagnostics.push(...rawValueDiagnostics(css, path, cssTokenValues(css)));
   return diagnostics;
 }
 
 /** A slide's own stylesheet: tokens only, and nothing that reaches past the slide. */
-function lintSlideStyle(slug: string, path: string, css: string): Diagnostic[] {
+function lintSlideStyle(
+  slug: string,
+  path: string,
+  css: string,
+  tokens: Array<{ name: string; value: string }>,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const selector of cssStyleSelectors(css)) {
     const parts = splitSelectorList(selector).map((part) => part.trim());
@@ -401,6 +455,7 @@ function lintSlideStyle(slug: string, path: string, css: string): Diagnostic[] {
         path,
         line: url.line,
         slug,
+        data: { url: url.value },
       });
     } else if (!isCanonicalAssetSrc(url.value)) {
       diagnostics.push({
@@ -409,15 +464,21 @@ function lintSlideStyle(slug: string, path: string, css: string): Diagnostic[] {
         path,
         line: url.line,
         slug,
+        data: { src: url.value },
       });
     }
   }
-  diagnostics.push(...rawValueDiagnostics(css, path, slug));
+  diagnostics.push(...rawValueDiagnostics(css, path, [...tokens, ...cssTokenValues(css)], slug));
   return diagnostics;
 }
 
 /** DEK014 for theme.css and slide stylesheets alike: design values come from tokens. */
-function rawValueDiagnostics(css: string, path: string, slug?: string): Diagnostic[] {
+function rawValueDiagnostics(
+  css: string,
+  path: string,
+  tokens: Array<{ name: string; value: string }>,
+  slug?: string,
+): Diagnostic[] {
   return cssDeclarations(css)
     .filter((decl) => isRawThemeValue(decl.property, decl.value))
     .map((decl) => ({
@@ -425,6 +486,8 @@ function rawValueDiagnostics(css: string, path: string, slug?: string): Diagnost
       message: `raw value in "${decl.property}: ${decl.value}"; use a theme token`,
       path,
       line: decl.line,
+      hint: rawValueHint(decl.property, decl.value, tokens),
+      data: { property: decl.property, value: decl.value },
       ...(slug === undefined ? {} : { slug }),
     }));
 }
@@ -440,12 +503,17 @@ function lintSlideHtml(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const scan = scanSlideHtml(html);
+  const at = (pattern: RegExp, nth = 1): { line?: number } => {
+    const line = lineOf(html, pattern, nth);
+    return line === undefined ? {} : { line };
+  };
 
   if (scan.slug !== undefined && scan.slug !== section.slug) {
     diagnostics.push({
       id: "DEK006",
       message: `data-slug "${scan.slug}" does not match section "${section.slug}"`,
       path,
+      ...at(attributePattern("data-slug", scan.slug)),
       slug: section.slug,
     });
   }
@@ -458,8 +526,10 @@ function lintSlideHtml(
       id: "DEK003",
       message: `data-step "${step}" is not a beat id or index in "${section.slug}"`,
       path,
+      ...at(attributePattern("data-step", step)),
       slug: section.slug,
       hint: stepHint(section),
+      data: { step, choices: stepChoices(section.beats) },
     });
   }
 
@@ -477,7 +547,9 @@ function lintSlideHtml(
       id: "DEK005",
       message: `duplicate data-morph "${morph}"`,
       path,
+      ...at(attributePattern("data-morph", morph), 2),
       slug: section.slug,
+      data: { morph },
     });
   }
 
@@ -486,6 +558,7 @@ function lintSlideHtml(
       id: "DEK011",
       message: "slide contains a <style> element",
       path,
+      ...at(/<style[\s>]/i),
       slug: section.slug,
       hint: `move the rules to slides/${section.slug}.css`,
     });
@@ -495,6 +568,7 @@ function lintSlideHtml(
       id: "DEK011",
       message: "slide contains a style attribute",
       path,
+      ...at(/\sstyle\s*=/i),
       slug: section.slug,
       hint: `move it to a class in slides/${section.slug}.css, using token var()`,
     });
@@ -504,6 +578,7 @@ function lintSlideHtml(
       id: "DEK011",
       message: "slide contains a <script> element",
       path,
+      ...at(/<script[\s>]/i),
       slug: section.slug,
       hint: `move motion to slides/${section.slug}.ts as a draw(t) function`,
     });
@@ -528,38 +603,49 @@ function lintSlideHtml(
         id: "DEK010",
         message: `class "${name}" is not defined in theme.css`,
         path,
+        ...at(classPattern(name)),
         hint: classHint,
+        data: { class: name },
       });
     }
   }
 
   for (const ref of scan.refs) {
     const kind = classifyRef(ref, path, options.deckDir);
+    const where = at(attributePattern(ref.attr, ref.value));
     if (kind === "remote") {
       diagnostics.push({
         id: "DEK020",
         message: `remote URL "${ref.value}"`,
         path,
+        ...where,
         hint: remoteHint(ref.value),
+        data: { url: ref.value },
       });
     } else if (kind === "escape") {
       diagnostics.push({
         id: "DEK022",
         message: `path "${ref.value}" is outside the deck directory`,
         path,
+        ...where,
+        data: { path: ref.value },
       });
     } else if (kind === "missing") {
       diagnostics.push({
         id: "DEK021",
         message: `missing image "${ref.value}"`,
         path,
+        ...where,
+        data: { src: ref.value },
       });
     } else if (kind === "ok" && ref.attr === "src" && !isCanonicalAssetSrc(ref.value)) {
       diagnostics.push({
         id: "DEK023",
         message: `asset "${ref.value}" must be referenced as assets/${posix.basename(ref.value.trim())}`,
         path,
+        ...where,
         slug: section.slug,
+        data: { src: ref.value },
       });
     }
   }
@@ -569,21 +655,43 @@ function lintSlideHtml(
 
 const MAX_HINT_CLASSES = 20;
 
+/** 1-based line of the `nth` match of `pattern` in `source`. */
+function lineOf(source: string, pattern: RegExp, nth = 1): number | undefined {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  let seen = 0;
+  for (const match of source.matchAll(new RegExp(pattern.source, flags))) {
+    seen += 1;
+    if (seen === nth) {
+      return source.slice(0, match.index).split("\n").length;
+    }
+  }
+  return undefined;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** `name="value"`, `name='value'`, or unquoted `name=value`. */
+function attributePattern(name: string, value: string): RegExp {
+  const v = escapeRegExp(value);
+  return new RegExp(`\\s${escapeRegExp(name)}\\s*=\\s*(?:"${v}"|'${v}'|${v}(?=[\\s/>]))`, "i");
+}
+
+/** A `class` attribute that lists `name` as one of its classes. */
+function classPattern(name: string): RegExp {
+  const n = escapeRegExp(name);
+  return new RegExp(
+    `\\sclass\\s*=\\s*(?:"(?:[^"]*\\s)?${n}(?:\\s[^"]*)?"|'(?:[^']*\\s)?${n}(?:\\s[^']*)?'|${n}(?=[\\s/>]))`,
+    "i",
+  );
+}
+
 function stepHint(section: Section): string {
-  const count = section.beats.length;
-  if (count === 0) {
+  if (section.beats.length === 0) {
     return `add a ### beat under "## ${section.title}" in script.md, or drop data-step`;
   }
-  const choices = [
-    ...section.beats.flatMap((beat) => (beat.id ? [beat.id] : [])),
-    count === 1 ? "1" : `1-${count}`,
-  ];
-  const last = choices.pop();
-  if (choices.length === 0) {
-    return `use ${last}`;
-  }
-  const head = choices.join(", ");
-  return choices.length === 1 ? `use ${head} or ${last}` : `use ${head}, or ${last}`;
+  return formatStepChoices(stepChoices(section.beats));
 }
 
 function remoteHint(value: string): string {
@@ -712,29 +820,42 @@ function isCanonicalAssetSrc(value: string): boolean {
   return trimmed.startsWith("assets/");
 }
 
-function suggestRename(diagnostics: Diagnostic[]): void {
-  const missing = diagnostics.filter((diagnostic) => diagnostic.id === "DEK001");
+/**
+ * One orphaned HTML file and one section without its own HTML look like a
+ * heading renamed in script.md first. The section either has no HTML yet, or
+ * only the skeleton the dev server generated on save. `dek mv` handles both.
+ */
+function suggestRename(
+  diagnostics: Diagnostic[],
+  deck: ProjectDeck,
+  htmlBySlug: Map<string, { path: string }>,
+): void {
   const orphans = diagnostics.filter(
     (diagnostic) => diagnostic.id === "DEK002" && diagnostic.path?.endsWith(".html"),
   );
-  if (missing.length !== 1 || orphans.length !== 1) {
+  const [orphan] = orphans;
+  if (orphans.length !== 1 || !orphan?.slug) {
     return;
   }
-  const missingSlug = slugFromPath(missing[0]?.path);
-  const orphanSlug = slugFromPath(orphans[0]?.path);
-  if (!missingSlug || !orphanSlug) {
+  const missing = diagnostics.filter((diagnostic) => diagnostic.id === "DEK001");
+  const targets =
+    missing.length > 0
+      ? missing.flatMap((diagnostic) => (diagnostic.slug ? [diagnostic.slug] : []))
+      : deck.deck.sections
+          .filter((section) => {
+            const slide = htmlBySlug.get(section.slug);
+            return (
+              slide && readFileSync(slide.path, "utf8") === skeletonHtml(deck.deck, section.slug)
+            );
+          })
+          .map((section) => section.slug);
+  const [target] = targets;
+  if (targets.length !== 1 || !target) {
     return;
   }
-  const hint = `dek mv ${orphanSlug} ${missingSlug}`;
-  if (missing[0] && !missing[0].message.includes(hint)) {
-    missing[0].message = `${missing[0].message}; ${hint}`;
+  const hint = `run \`dek mv ${orphan.slug} ${target}\``;
+  orphan.hint = hint;
+  for (const diagnostic of missing) {
+    diagnostic.hint = hint;
   }
-  if (orphans[0] && !orphans[0].message.includes(hint)) {
-    orphans[0].message = `${orphans[0].message}; ${hint}`;
-  }
-}
-
-function slugFromPath(path?: string): string | undefined {
-  const name = path?.split(/[/\\]/).pop();
-  return name?.replace(/\.html$/, "");
 }

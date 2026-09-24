@@ -82,7 +82,20 @@ export async function warmSlideScripts(
   }
 }
 
-type PendingScript = { index: number; code: string; steps: string[] };
+/**
+ * A pending evaluation. `withoutImports` marks a script evaluated with its
+ * imports removed, so lint can still check `motion`; what then fails at run
+ * time is the missing import's doing, already reported.
+ */
+type PendingScript = { index: number; code: string; steps: string[]; withoutImports: boolean };
+
+const IMPORTS_PROBLEM = "imports are not supported; keep the slide script self-contained";
+const IMPORT_RE = /^[ \t]*import\s+(?:type\s+)?(?:[\s\S]*?\sfrom\s*)?["'][^"'\n]+["'][ \t]*;?/gm;
+
+/** The code with its import declarations blanked out, lines kept in place. */
+function withoutImports(code: string): string {
+  return code.replace(IMPORT_RE, (match) => match.replace(/[^\n]/g, " "));
+}
 
 function prepareScripts(scripts: Array<{ code: string; steps?: string[] }>): {
   results: string[][];
@@ -92,13 +105,22 @@ function prepareScripts(scripts: Array<{ code: string; steps?: string[] }>): {
   const pending: PendingScript[] = [];
   for (const [index, script] of scripts.entries()) {
     const problems = staticProblems(script.code);
-    const compiled = problems.length > 0 ? undefined : compileSlideScript(script.code, "slide");
+    // Imports alone do not stop the rest of the checks: report everything in one run.
+    const importsOnly = problems.length > 0 && problems.every((p) => p === IMPORTS_PROBLEM);
+    const source = importsOnly ? withoutImports(script.code) : script.code;
+    const compiled =
+      problems.length > 0 && !importsOnly ? undefined : compileSlideScript(source, "slide");
     if (compiled && "problem" in compiled) {
       problems.push(compiled.problem);
     }
     results.push(problems);
     if (compiled && "code" in compiled && script.steps) {
-      pending.push({ index, code: compiled.code, steps: script.steps });
+      pending.push({
+        index,
+        code: compiled.code,
+        steps: script.steps,
+        withoutImports: importsOnly,
+      });
     }
   }
   return { results, pending };
@@ -106,7 +128,13 @@ function prepareScripts(scripts: Array<{ code: string; steps?: string[] }>): {
 
 function finishProblems(results: string[][], pending: PendingScript[]): string[][] {
   for (const entry of pending) {
-    results[entry.index] = moduleProblems(summaryCache.get(entry.code), entry.steps);
+    const summary = summaryCache.get(entry.code);
+    const blamedOnImports =
+      entry.withoutImports &&
+      summary !== undefined &&
+      ("threw" in summary || "timedOut" in summary);
+    const found = blamedOnImports ? [] : moduleProblems(summary, entry.steps);
+    results[entry.index] = [...(results[entry.index] ?? []), ...found];
   }
   return results;
 }
@@ -120,7 +148,7 @@ function staticProblems(code: string): string[] {
   }
   const problems: string[] = [];
   if (scan.imports.length > 0) {
-    problems.push("imports are not supported; keep the slide script self-contained");
+    problems.push(IMPORTS_PROBLEM);
   }
   for (const name of scan.exports.filter((entry) => entry !== "default")) {
     problems.push(`only a default export is allowed; found "${name}"`);
@@ -358,4 +386,109 @@ export function stillPageScript(scripts: SlideScript[]): string {
   return scripts.length > 0
     ? `${slideScriptTags(scripts)}<script>${stillDrawScript()}</script>`
     : "";
+}
+
+export type SeekProblem = {
+  line: number;
+  message: string;
+  /** The call that reads a clock, or the class used to find an element. */
+  data: { call: string } | { class: string };
+};
+
+const CLOCK_MESSAGE =
+  "runs on its own clock; draw from t alone so video and screenshots can seek it";
+
+type SeekFinding = { message: string; data: SeekProblem["data"] } | undefined;
+
+const clock = (call: string): SeekFinding => ({
+  message: `${call} ${CLOCK_MESSAGE}`,
+  data: { call },
+});
+const byClass = (name: string | undefined): SeekFinding =>
+  name
+    ? {
+        message: `finds elements by class ".${name}"; give the element a data-* attribute and select that`,
+        data: { class: name },
+      }
+    : undefined;
+
+const SEEK_PATTERNS: Array<{ re: RegExp; find: (match: RegExpMatchArray) => SeekFinding }> = [
+  {
+    re: /\b(setTimeout|setInterval|requestAnimationFrame|requestIdleCallback|Date\.now|performance\.now)\s*\(/g,
+    find: (m) => clock(m[1] ?? ""),
+  },
+  { re: /\bnew\s+Date\b/g, find: () => clock("new Date") },
+  {
+    re: /\bMath\.random\s*\(/g,
+    find: () => ({
+      message: "Math.random differs on every call; derive the value from t or the slide's beats",
+      data: { call: "Math.random" },
+    }),
+  },
+  {
+    re: /\b(?:querySelectorAll|querySelector|closest|matches)\s*\(\s*(["'`])((?:(?!\1)[^\\\n])*)\1/g,
+    find: (m) =>
+      byClass((m[2] ?? "").replace(/\[[^\]]*\]/g, "").match(/\.(-?[_a-zA-Z][\w-]*)/)?.[1]),
+  },
+  { re: /\bgetElementsByClassName\s*\(\s*(["'`])\s*([\w-]+)/g, find: (m) => byClass(m[2]) },
+];
+
+/**
+ * DEK017: what makes a slide script draw something other than a function of
+ * `t`, so a seek to the same `t` in video, screenshots, or the PDF would not
+ * give the same frame. Also classes used to find elements, which a theme may
+ * rename. Comments are ignored; lines are 1-based.
+ */
+export function seekProblems(code: string): SeekProblem[] {
+  const source = blankComments(code);
+  const found: Array<SeekProblem & { index: number }> = [];
+  for (const { re, find } of SEEK_PATTERNS) {
+    for (const match of source.matchAll(re)) {
+      const finding = find(match);
+      if (finding) {
+        const index = match.index ?? 0;
+        found.push({ index, line: source.slice(0, index).split("\n").length, ...finding });
+      }
+    }
+  }
+  return found.sort((a, b) => a.index - b.index).map(({ index: _index, ...problem }) => problem);
+}
+
+/** Comments replaced by spaces, newlines and string literals kept. */
+function blankComments(code: string): string {
+  let out = "";
+  let quote: string | undefined;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i] ?? "";
+    if (quote !== undefined) {
+      out += ch;
+      if (ch === "\\") {
+        out += code[i + 1] ?? "";
+        i++;
+      } else if (ch === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (ch === "/" && code[i + 1] === "/") {
+      while (i < code.length && code[i] !== "\n") {
+        out += " ";
+        i++;
+      }
+      out += code[i] ?? "";
+      continue;
+    }
+    if (ch === "/" && code[i + 1] === "*") {
+      const end = code.indexOf("*/", i + 2);
+      const stop = end < 0 ? code.length : end + 2;
+      out += code.slice(i, stop).replace(/[^\n]/g, " ");
+      i = stop - 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+    }
+    out += ch;
+  }
+  return out;
 }

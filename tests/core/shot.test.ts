@@ -99,7 +99,31 @@ describe("shotDeck", () => {
         ).rejects.toMatchObject({
           name: "DekError",
           message: 'step "2" not found in "intro"',
+          hint: "this slide has no beats; use 1, or leave out --step",
         });
+      },
+    );
+  });
+
+  test("names the beats a missing step could have been", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n\n### hook\n\na\n\n### turn\n\nb\n",
+            slides: { intro: introHtml },
+          },
+        ],
+      },
+      async (root) => {
+        await expect(
+          shotDeck(join(root, "decks", "demo"), {
+            slug: "intro",
+            step: "nope",
+            runner: async () => ({ overflows: [], contrasts: [] }),
+          }),
+        ).rejects.toMatchObject({ hint: "use hook, turn, or 1-2" });
       },
     );
   });
