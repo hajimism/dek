@@ -17,11 +17,12 @@ export type MeasuredElement = {
   text?: string;
   /** Whether `text` comes from the element's own text nodes. */
   ownText: boolean;
-  fg: string;
-  bg: string;
+  /** The line boxes of the element's own text, where its glyphs are drawn. */
+  textRects: Box[];
+  /** Its opacity with every ancestor's multiplied in: how faint the page draws it. */
+  opacity: number;
   fontSize: number;
   fontWeight: number;
-  opacity: number;
 };
 
 export type SlideMeasure = {
@@ -79,15 +80,22 @@ export function measureSlideInPage(): SlideMeasure {
     }
     return box;
   };
-  const backgroundOf = (el: Element): string => {
-    let background = getComputedStyle(el).backgroundColor;
-    let current: Element | null = el.parentElement;
-    while (current && (!background || background === "transparent" || /,\s*0\)/.test(background))) {
-      background = getComputedStyle(current).backgroundColor;
-      current = current.parentElement;
+  const opacityOf = (el: Element): number => {
+    let opacity = 1;
+    for (let current: Element | null = el; current; current = current.parentElement) {
+      const own = Number.parseFloat(getComputedStyle(current).opacity);
+      opacity *= Number.isNaN(own) ? 1 : own;
     }
-    return background;
+    return opacity;
   };
+  const lineBoxes = (textNodes: Node[]): Box[] =>
+    textNodes.flatMap((node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return [...range.getClientRects()]
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .map(toBox);
+    });
 
   const all = [...slide.querySelectorAll("*")];
   const indexOf = new Map(all.map((el, index) => [el, index]));
@@ -106,11 +114,10 @@ export function measureSlideInPage(): SlideMeasure {
       rect: extent(el, textNodes),
       ...(text ? { text } : {}),
       ownText: own !== "",
-      fg: style.color,
-      bg: backgroundOf(el),
+      textRects: lineBoxes(textNodes),
+      opacity: opacityOf(el),
       fontSize: Number.parseFloat(style.fontSize),
       fontWeight: Number(style.fontWeight) || 400,
-      opacity: style.opacity === "" ? 1 : Number(style.opacity),
     };
   });
   return { slideBox: toBox(slide.getBoundingClientRect()), elements };

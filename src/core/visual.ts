@@ -17,10 +17,10 @@ import { pruneStaleShots, shotFileName } from "./shot.ts";
 import { logicalSize } from "./size.ts";
 import type { Box, MeasuredElement } from "./slide-measure.ts";
 import { stepKey } from "./step.ts";
+import type { Rgb } from "./text-contrast.ts";
 
 export type { Box } from "./slide-measure.ts";
-
-export type Rgb = [number, number, number];
+export { contrastRatio, type Rgb, relativeLuminance } from "./text-contrast.ts";
 
 const EDGES: Edge[] = ["top", "right", "bottom", "left"];
 
@@ -75,21 +75,6 @@ export function findOverflows(
     }
   });
   return found;
-}
-
-export function relativeLuminance([r, g, b]: Rgb): number {
-  const linear = (channel: number): number => {
-    const value = channel / 255;
-    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
-}
-
-export function contrastRatio(foreground: Rgb, background: Rgb): number {
-  const first = relativeLuminance(foreground);
-  const second = relativeLuminance(background);
-  const [hi, lo] = first > second ? [first, second] : [second, first];
-  return (hi + 0.05) / (lo + 0.05);
 }
 
 export type TextSample = {

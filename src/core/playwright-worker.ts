@@ -2,7 +2,8 @@
 import { freezeTransition } from "./freeze-transition.ts";
 import { importPlaywright, type VisualRequest, type VisualResponse } from "./playwright.ts";
 import { measureSlideInPage } from "./slide-measure.ts";
-import { contrastRatio, findOverflows, parseCssRgb } from "./visual.ts";
+import { measurePageTextContrasts } from "./text-contrast.ts";
+import { findOverflows } from "./visual.ts";
 
 let playwright: Awaited<ReturnType<typeof importPlaywright>>;
 try {
@@ -47,28 +48,29 @@ try {
         }
       }
       if (request.actions.includes("contrast")) {
-        for (const element of measured.elements) {
-          // Only text the element draws itself; an ancestor's sample would repeat it.
-          if (!element.ownText || element.opacity === 0) {
-            continue;
-          }
-          const fg = parseCssRgb(element.fg);
-          const bg = parseCssRgb(element.bg);
-          if (!fg || !bg) {
-            continue;
+        // Only text the element draws itself; an ancestor's sample would repeat it.
+        const texts = measured.elements.filter((element) => element.ownText);
+        const measuredTexts = await measurePageTextContrasts(
+          page,
+          texts.map((element) => ({ rects: element.textRects, opacity: element.opacity })),
+        );
+        texts.forEach((element, index) => {
+          const contrast = measuredTexts[index];
+          if (!contrast) {
+            return;
           }
           response.contrasts.push({
             slug,
             step,
-            ratio: contrastRatio(fg, bg),
+            ratio: contrast.ratio,
             fontSize: element.fontSize,
             fontWeight: element.fontWeight,
             box: element.box,
             ...(element.text ? { text: element.text } : {}),
-            fg: element.fg,
-            bg: element.bg,
+            fg: `rgb(${contrast.fg.join(", ")})`,
+            bg: `rgb(${contrast.bg.join(", ")})`,
           });
-        }
+        });
       }
       if (request.actions.includes("screenshot") && pageReq.screenshotPath) {
         await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });

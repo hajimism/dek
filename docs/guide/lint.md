@@ -30,7 +30,7 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 
 ## `--visual`
 
-Overflow (`DEK030`) and contrast (`DEK031`) are measured in a real browser through Playwright. Both are questions of geometry with definite answers. dek does not show a screenshot and ask whether the text fits; it measures. Every beat of every slide is rendered in one browser session.
+Overflow (`DEK030`) and contrast (`DEK031`) are measured in a real browser through Playwright. Both are questions of geometry with definite answers. dek does not show a screenshot and ask whether the text fits; it measures. Every beat of every slide is rendered in one browser session. Contrast is read from the pixels as drawn, so text over a gradient, an image, or a glow is judged by what the audience sees; see [DEK031](/reference/lint#dek031).
 
 A finding names what to fix: the element, the start of its text, and the amount.
 

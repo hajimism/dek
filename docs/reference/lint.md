@@ -78,6 +78,10 @@ The message names the element, the start of its text, the edge, and how many pix
 
 Thresholds follow WCAG AA: 4.5:1 for body text, 3:1 for large text. Large text is a computed `font-size` of 24px or more, or 18.66px or more at `font-weight` 700 or above. A big number in a soft color passes; the same color on body text fails. The thresholds are not configurable. The message names the element, its text, and both colors.
 
+Contrast is measured from pixels, not from styles. Each beat is drawn with its text as shown, with every glyph transparent, and with every glyph filled white and then black. The white and black drawings show where the glyphs are, whatever their color; within them, each pixel of the text is compared with the pixel it sits on. Gradients, background images, glows, overlapping elements, opacity, and colors in any syntax are measured as drawn.
+
+Only the pixels a text's glyphs cover most are read, each taken back to the color a glyph covering the whole pixel would draw, so antialiasing never lowers a ratio and a thin hyphen reads at its own color. The ratio reported is the one all but the worst 2% of those pixels reach: text over a gradient is judged by the part that reads worst. `fg` and `bg` are the two colors at that pixel. Where two texts overlap, neither is judged by the shared pixels unless it has no others. What `::before` and `::after` draw counts as background, and `DEK030` does not measure it.
+
 ### DEK042
 
 Only paragraphs are spoken. A beat that shows a list, code, or a table without a paragraph passes in `pause.beat` milliseconds when narrated. Empty beats and blockquote-only beats are treated as deliberate pauses and are not flagged.

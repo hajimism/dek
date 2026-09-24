@@ -6,10 +6,11 @@ declare module "playwright" {
         emulateMedia(options: { reducedMotion?: "reduce" | "no-preference" }): Promise<void>;
         evaluate<T, A = unknown>(fn: (arg: A) => T | Promise<T>, arg?: A): Promise<T>;
         screenshot(options: {
-          path: string;
+          path?: string;
           fullPage?: boolean;
           type?: "png" | "jpeg";
         }): Promise<Buffer>;
+        addScriptTag(options: { content: string }): Promise<unknown>;
         pdf(options: {
           path: string;
           width?: string;
