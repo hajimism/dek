@@ -108,6 +108,9 @@ pause   = { sentence = 350, beat = 700 }
 | `speed` | 話速 |
 | `pause.sentence` | 文と文の間の無音（ミリ秒） |
 | `pause.beat` | ビート境界の無音（ミリ秒） |
+| `lead` | 画面の切り替えを第一声より何ミリ秒先にするか。既定 300 |
+| `beats."<key>".lead` | 1 枚の最初のビート（`slug`）、または 1 ビート（`slug/beat-id`、`slug/2`）だけの `lead` |
+| `beats."<key>".pause` | そのビート、またはその枚の最後のビートの直後の無音。`pause.beat` の代わり |
 
 ## `voice/dict.toml`
 

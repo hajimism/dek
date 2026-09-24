@@ -62,4 +62,9 @@ Run dek shot problem --to architecture --at 0.5 and check the
 interpolated position looks right.
 ```
 
+```
+Make the number on files count up as the slide enters. Put it in
+slides/files.ts, drawing from t alone, then run dek check files --shot.
+```
+
 To hand the whole documentation site to an agent, give it [`/llms.txt`](/llms.txt).

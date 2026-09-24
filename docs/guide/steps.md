@@ -61,6 +61,33 @@ This writes one frame of the transition from the last beat of `problem` into `ar
 
 The bundled theme honors `prefers-reduced-motion` and drops every animation when it is set.
 
+## Scripted motion
+
+When CSS cannot express a motion, such as a counter that runs, a chart that draws itself, or a canvas, put a script next to the slide as `slides/<id>.ts`. Plain JavaScript is valid TypeScript, so a script without types works as it is.
+
+```ts
+// slides/growth.ts
+export default {
+  motion: { growth: 1200 },            // ms of motion, keyed like data-step
+  draw(slide, { index, step, t }) {    // t: ms since this beat began
+    const p = step === "growth" ? t / 1200 : 0;
+    const bar = slide.querySelector<HTMLElement>(".bar");
+    if (bar) bar.style.width = `${p * 80}%`;
+  },
+} satisfies DekSlide;
+```
+
+`DekSlide` needs no import. `dek init` and `dek sync` write its definition to `.dek/slide.d.ts`, and `dek init` also writes a `tsconfig.json` that points your editor at it, so `slide` is an `HTMLElement`, `t` is a number, and a misspelled field or a Node global such as `process` is flagged as you type. `dek sync` never creates or edits `tsconfig.json`; if your project has its own, add `".dek/*.d.ts"` to its `include`. dek erases the types when it builds and does not run `tsc`; lint checks what matters at run time.
+
+`draw` is a function of time, and the runtime owns the clock:
+
+- A forward step runs `t` from 0 to the beat's `motion` on animation frames.
+- A jump, a step back, `prefers-reduced-motion`, the rail, the presenter's next preview, `dek shot`, `lint --visual`, and the PDF all draw once, at the end.
+- `dek video` seeks `t` frame by frame alongside the Web Animations, then holds the last frame for the rest of the beat.
+- A beat without a `motion` entry is drawn once, at `t = 0`.
+
+So draw from `t` alone, and set everything you touch on every call: the same `(index, t)` must give the same slide whatever was drawn before, because a jump or a step back draws only the end of the new beat. Timers, `requestAnimationFrame`, and state carried between calls break the video, because the recorder does not wait in real time. The script must be self-contained: one module with `export default` and no imports, whose top level only defines things; touch the slide inside `draw`. Anything else is `DEK016`, and so is a `motion` key that is not a beat of the slide. Lint evaluates the top level in a sandbox with no Node or Bun globals and stops it after a second. dek loads only `.ts`; a `slides/<id>.js` is `DEK016`, asking you to rename it. `dek build` inlines the script, `dek mv` moves it, and saving it reloads the dev server page.
+
 ## Next
 
 Colors, type, and spacing in one file: [Themes](./theme).

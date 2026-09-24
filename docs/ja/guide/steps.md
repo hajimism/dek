@@ -61,6 +61,33 @@ dek shot problem --to architecture --at 0.5
 
 同梱テーマは `prefers-reduced-motion` を尊重し、設定されていればすべてのアニメーションを省きます。
 
+## スクリプトで動かす
+
+数字が回るカウンタ、自分で描かれていくグラフ、canvas など、CSS で表せない動きは、スライドの横に `slides/<id>.ts` として置きます。素の JavaScript も TypeScript として有効なので、型を書かなくてもそのまま動きます。
+
+```ts
+// slides/growth.ts
+export default {
+  motion: { growth: 1200 },            // 動きの長さ（ms）。キーは data-step と同じ
+  draw(slide, { index, step, t }) {    // t: このビートに入ってからの ms
+    const p = step === "growth" ? t / 1200 : 0;
+    const bar = slide.querySelector<HTMLElement>(".bar");
+    if (bar) bar.style.width = `${p * 80}%`;
+  },
+} satisfies DekSlide;
+```
+
+`DekSlide` は import せずに使えます。`dek init` と `dek sync` がその定義を `.dek/slide.d.ts` に書き、`dek init` はエディタがそれを読むための `tsconfig.json` も置きます。これで `slide` は `HTMLElement`、`t` は数値になり、フィールド名の打ち間違いや `process` のような Node のグローバルは書いた時点で赤線になります。`dek sync` は `tsconfig.json` を作りも書き換えもしないので、自前の `tsconfig.json` がある場合はその `include` に `".dek/*.d.ts"` を足してください。dek はビルド時に型を消すだけで `tsc` は走らせず、実行時に効く誤りは lint が検査します。
+
+`draw` は時間の関数で、時計はランタイムが持ちます。
+
+- 前へ 1 ステップ進むと、アニメーションフレームごとに `t` を 0 からそのビートの `motion` まで進めます。
+- ジャンプ、戻る操作、`prefers-reduced-motion`、レール、発表者ビューの次のプレビュー、`dek shot`、`lint --visual`、PDF では、最終状態で 1 回だけ描きます。
+- `dek video` は Web Animations と一緒に `t` を 1 フレームずつシークし、ビートの残りは最後のフレームで止めます。
+- `motion` に書いていないビートは、`t = 0` で 1 回だけ描きます。
+
+なので、描画は `t` だけから決め、触る要素は毎回すべて書き直してください。ジャンプや一歩戻る操作では新しいビートの終わりだけを描くので、同じ `(index, t)` なら直前に何を描いていても同じ見た目になる必要があります。タイマー、`requestAnimationFrame`、呼び出しをまたいで持ち越す状態は動画を壊します。録画は実時間で待たないからです。スクリプトは自己完結させます。`export default` だけを持つ 1 つのモジュールで、import はできず、トップレベルでは定義だけを行い、スライドに触るのは `draw` の中です。それ以外は `DEK016` で、スライドのビートにない `motion` のキーも `DEK016` です。lint はトップレベルを Node や Bun のグローバルがないサンドボックスで評価し、1 秒で打ち切ります。dek が読むのは `.ts` だけで、`slides/<id>.js` は名前を変えるよう `DEK016` で知らせます。`dek build` はスクリプトをインライン化し、`dek mv` は一緒に動かし、開発サーバでは保存するとページを読み直します。
+
 ## 次
 
 色と書体と余白をひとつのファイルで → [テーマ](./theme)

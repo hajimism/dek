@@ -27,7 +27,7 @@ script.md → Deck → Cue → Synth → Timeline → schedule
                                       └→ VideoDriver    → player.go() + frames → mux
 ```
 
-Video capture does not replay the talk at wall-clock speed. The worker starts each `go`, pauses the Web Animations, and screenshots at `currentTime` stops from `frameStops`. One hold frame covers the rest of the beat, so rendering time follows the amount of motion rather than the length of the talk.
+Video capture does not replay the talk at wall-clock speed. The worker starts each `go`, pauses the Web Animations, and screenshots at `currentTime` stops from `frameStops`. One hold frame covers the rest of the beat, so rendering time follows the amount of motion rather than the length of the talk. Slide scripts share that clock: in video mode the player holds each script at `t = 0`, and the worker seeks it at the same stops through `window.dekMotion`.
 
 ## Optional dependencies
 

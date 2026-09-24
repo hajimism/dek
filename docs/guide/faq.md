@@ -14,7 +14,7 @@ No. Write `script.md`, run `dek`, and the skeleton slides in the bundled theme a
 
 ## Do I have to use voice?
 
-No. A deck without `voice/` has exactly the same definition of done: lint passes. Voice adds warnings (`DEK040`, `DEK041`, `DEK042`) only to decks that opt in.
+No. A deck without `voice/` has exactly the same definition of done: lint passes. Voice adds warnings (`DEK040` through `DEK043`) only to decks that opt in.
 
 ## Why do slide files have no numbers?
 
@@ -38,4 +38,12 @@ No. Each is optional, and only the commands that need it fail when it is missing
 
 ## Where do I write pauses or silent time?
 
-Nowhere. A beat with no paragraph passes through the transition and the configured `pause.beat`, and nothing else. If you will speak during a demo, write those words in the script so they count toward the estimate.
+Not in the script. A beat with no paragraph passes through the transition and the configured `pause.beat`, and nothing else. If you will speak during a demo, write those words in the script so they count toward the estimate. For narration, a longer pause after one beat or slide goes in `voice/voice.toml`; see [Timing](./voice#timing).
+
+## Can a slide run JavaScript?
+
+Not inside its HTML: `<script>` there is `DEK011`. Motion that CSS cannot express, such as a counter or a chart that draws itself, goes in `slides/<id>.ts` as a `draw` function of time. The runtime owns the clock, so the same script plays live, seeks frame by frame in `dek video`, and shows its end state in `dek shot` and the PDF. Clickable demos are out of scope. See [Scripted motion](./steps#scripted-motion).
+
+## Where does CSS for one slide go?
+
+In `slides/<id>.css`, next to the HTML. It is scoped to that slide and does not count toward `max_classes`. See [Slide stylesheets](./slides#slide-stylesheets).

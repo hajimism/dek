@@ -1,6 +1,6 @@
 # Themes
 
-`theme.css` is the only file that decides how a deck looks. Slides supply structure and class names; the theme supplies everything visible. This page covers the token contract, how to grow a theme's vocabulary, and why each deck owns a copy.
+`theme.css` decides how a deck looks. Slides supply structure and class names; the theme supplies the shared look, and a slide's own `slides/<id>.css` adds decoration that only that slide uses. This page covers the token contract, how to grow a theme's vocabulary, and why each deck owns a copy.
 
 ## Thirteen tokens
 
@@ -24,6 +24,8 @@ Every selector must sit under `.slide`. `::view-transition-*` pseudo-elements an
 A class the theme does not define is `DEK010`. You clear it by adding the class to `theme.css`. That is intentional: extending the vocabulary is a design decision, and lint should not forbid it. Lint's job is to make the decision cost one deliberate step and to leave a reviewable diff. `DEK013` caps the total class count (40 by default) so that step is not repeated forever.
 
 New classes land in the deck's own `theme.css`, so no other deck is affected. When a class earns its place, lift it into the project theme with `cp`.
+
+Not every class deserves that step. Decoration that one slide uses goes in that slide's own stylesheet instead, where it neither counts toward `DEK013` nor leaks into other slides. See [Slide stylesheets](./slides#slide-stylesheets).
 
 ## Copy, then freeze
 

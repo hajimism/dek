@@ -16,6 +16,9 @@ On every save:
 - **`script.md`** — a skeleton is generated for any new heading, orphaned HTML is flagged in the browser, and presenter notes refresh. If the deck has `voice/`, only the changed sentences are re-synthesized.
 - **`slides/*.html`** — the changed slide is swapped in place, lint runs, and diagnostics appear both in the terminal and as an overlay in the browser.
 - **`theme.css`** — every slide re-renders and the class vocabulary is re-resolved.
+- **`slides/*.css`** — styles re-apply in place, and lint runs.
+- **`slides/*.ts`** — the page reloads, because slide scripts register once at load, and lint runs.
+- **`voice/voice.toml`** — the deck is re-timed from cached clips.
 - With `--visual` and Playwright installed, the saved slide is also measured for overflow and contrast.
 
 Only one server runs per project. A second `dek` finds the first one's lock in `.dek/server.json` and tells you where it is.

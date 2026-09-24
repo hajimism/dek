@@ -11,17 +11,19 @@ my-talks/                       # プロジェクト（dek init）
 ├── .rumdl.toml                 # script.md 用の Markdown ルール
 ├── theme.css                   # 新しいデッキの出発点
 ├── AGENTS.md                   # エージェント向けの規約（sync が書く）
+├── tsconfig.json               # スライドのスクリプト用のエディタ設定（dek init が書く）
 ├── assets/                     # 素材置き場。デッキは使うものをコピーする
 ├── decks/
 │   └── 2026-04-vite/           # デッキ（dek new）
 │       ├── script.md           # 唯一の真実
 │       ├── theme.css           # このデッキ専用のコピー
-│       ├── slides/             # セクションごとに 1 HTML
+│       ├── slides/             # セクションごとに 1 HTML。任意で .css / .ts
 │       ├── assets/             # スライドが参照するものすべて
 │       ├── dist/               # build / pdf / video の成果物
 │       └── .cache/             # スクショ、声、動画の中間物
 └── .dek/
-    └── schema.json             # frontmatter スキーマ。sync のたびに再生成
+    ├── schema.json             # frontmatter スキーマ。sync のたびに再生成
+    └── slide.d.ts              # DekSlide の型。sync のたびに再生成
 ```
 
 デッキが 1 つでも `decks/` は必ずあります。CLI も開発サーバもエージェントも、どのプロジェクトでも同じやり方でパスを解決します。

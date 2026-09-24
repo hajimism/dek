@@ -11,17 +11,19 @@ my-talks/                       # project (dek init)
 ├── .rumdl.toml                 # Markdown rules for script.md
 ├── theme.css                   # the starting point for new decks
 ├── AGENTS.md                   # conventions for agents (written by sync)
+├── tsconfig.json               # editor types for slide scripts (written by dek init)
 ├── assets/                     # shared source material; decks copy what they use
 ├── decks/
 │   └── 2026-04-vite/           # deck (dek new)
 │       ├── script.md           # the single source of truth
 │       ├── theme.css           # this deck's own copy
-│       ├── slides/             # one HTML file per section
+│       ├── slides/             # one HTML file per section, plus optional .css / .ts
 │       ├── assets/             # everything the slides reference
 │       ├── dist/               # build, pdf, and video output
 │       └── .cache/             # screenshots, voice, and video intermediates
 └── .dek/
-    └── schema.json             # frontmatter schema, regenerated on sync
+    ├── schema.json             # frontmatter schema, regenerated on sync
+    └── slide.d.ts              # the DekSlide type, regenerated on sync
 ```
 
 The `decks/` directory always exists, even with one deck. The CLI, the dev server, and any agent resolve paths the same way in every project.

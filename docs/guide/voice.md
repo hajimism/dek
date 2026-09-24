@@ -71,7 +71,24 @@ A whole deck becomes `dist/<deck>.mp4`, or `<root>/dist/<deck>.mp4` with `--root
 
 Baking does not replay the talk in real time. Each beat is one held frame plus whatever the transition needs.
 
-When a Timeline exists, `dek ls` shows the narrated length next to the word-count estimate, and a large gap from the `duration` budget is `DEK041`, a warning. There is no notation for silent time: a beat with no paragraph passes through the transition and `pause.beat`, and nothing else.
+When a Timeline exists, `dek ls` shows the narrated length next to the word-count estimate, and a large gap from the `duration` budget is `DEK041`, a warning. The script has no notation for silent time: a beat with no paragraph passes through the transition and `pause.beat`, and nothing else. Timing lives in `voice.toml`, below.
+
+## Timing
+
+Rehearsal and video share one schedule. Each screen change leads its first word by `lead` milliseconds (300 by default), so a transition has settled by the time the voice arrives. A lead longer than the beat before it never fires ahead of that beat's own change. When one beat still feels early or late, adjust that beat in `voice/voice.toml`; the script stays as it is.
+
+```toml
+lead = 300                  # the whole deck
+
+[beats.order]               # the whole slide
+lead = 600                  # before its first beat
+pause = 1200                # after its last beat
+
+[beats."order/what"]        # one beat, by id or by 1-based position ("order/2")
+pause = 1500                # silence after it, instead of pause.beat
+```
+
+Keys follow the URL hash: `slug` for a slide, `slug/beat-id` or `slug/2` for a beat. A slide key frames the slide: its `lead` runs into the first beat and its `pause` follows the last. A beat key wins over its slide key. `dek mv` rewrites the keys along with the slide. A key that matches nothing is `DEK043`. On save, the dev server re-times the deck from cached clips, and `dek voice pin` freezes the timing together with the audio.
 
 ## The daily four
 

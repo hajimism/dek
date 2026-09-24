@@ -5,33 +5,35 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 | ID | Condition | `--fix` |
 | --- | --- | --- |
 | `DEK001` | A section in `script.md` has no HTML in `slides/` | Creates the skeleton |
-| `DEK002` | An HTML file in `slides/` has no section in `script.md` | — |
+| `DEK002` | An HTML file, stylesheet, or script (`.ts`) in `slides/` has no section in `script.md` | — |
 | `DEK003` | A `data-step` is neither a beat id nor a valid position on its slide | — |
 | `DEK004` | A section id is repeated in the deck, or a beat id is repeated in its section | — |
 | `DEK005` | A `data-morph` name is repeated on one slide | — |
 | `DEK006` | `data-slug` does not match the section id | — |
-| `DEK010` | A class the theme does not define | — |
+| `DEK010` | A class that neither the theme nor the slide's own stylesheet defines | — |
 | `DEK011` | `<style>`, `style=`, or `<script>` inside a slide | — |
-| `DEK012` | A top-level selector in the theme | — |
+| `DEK012` | A top-level selector in the theme, or a rule in a slide stylesheet that reaches past the slide (`::view-transition-*`, `@font-face`, `@import`, `:root`, `html`, `body`) | — |
 | `DEK013` | The theme defines more classes than `max_classes` (default 40) | — |
-| `DEK014` | A raw color, `font-family`, or absolute unit outside a token assignment | — |
+| `DEK014` | A raw color, `font-family`, or absolute unit outside a token assignment, in the theme or a slide stylesheet | — |
 | `DEK015` | A required token is missing from `.slide` | — |
+| `DEK016` | A slide script that cannot run: an import, a named export, no default export, a syntax error, top-level await or code that throws, a `motion` key that is not a beat of the slide, top-level code that does not finish, or a script saved as `.js` instead of `.ts` | — |
 | `DEK020` | A remote URL (CDN, remote image) | — |
 | `DEK021` | A referenced image file does not exist | — |
 | `DEK022` | A path that leaves the deck directory | — |
-| `DEK023` | A local `src` that does not start with `assets/` | — |
+| `DEK023` | A local `src`, or a `url()` in a slide stylesheet, that does not start with `assets/` | — |
 | `DEK030` | Content overflows the slide when rendered, at any beat | — |
 | `DEK031` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK040` | An ASCII word missing from the pronunciation dictionary. Warning | — |
 | `DEK041` | Narrated length far from the `duration` budget. Warning | — |
 | `DEK042` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
+| `DEK043` | A `[beats]` key in `voice.toml` that matches no slide or beat. Warning | — |
 
 ## Conditions
 
 - `DEK030` and `DEK031` run only with `--visual` and require Playwright.
-- `DEK040` and `DEK042` apply only to decks with `voice/`. `dek cues` reports `DEK042` regardless.
+- `DEK040`, `DEK042`, and `DEK043` apply only to decks with `voice/`. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies only to decks with a Timeline.
-- `DEK040`, `DEK041`, and `DEK042` are warnings. A live-only deck's definition of done is unchanged.
+- `DEK040` through `DEK043` are warnings. A live-only deck's definition of done is unchanged.
 
 ## Notes
 
@@ -49,7 +51,7 @@ A `data-morph` name must be unique within a slide, because it becomes a `view-tr
 
 ### DEK010
 
-Clear it by defining the class in `theme.css`. Growing the vocabulary is a design decision; lint makes it one visible step. `DEK013` caps how often that step can be repeated.
+Clear it by defining the class in `theme.css`, or in `slides/<id>.css` when only that slide uses it. Growing the shared vocabulary is a design decision; lint makes it one visible step. `DEK013` caps how often that step can be repeated, and slide stylesheets do not count toward it.
 
 ### DEK014 / DEK015
 

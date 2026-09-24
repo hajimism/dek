@@ -62,4 +62,10 @@ dek shot problem --to architecture --at 0.5 で途中を撮って、
 補間された位置が変じゃないか見て。
 ```
 
+```
+files の数字を、枚が入ってくるときにカウントアップさせて。
+slides/files.ts に t だけから描くように書いて、
+dek check files --shot で確かめて。
+```
+
 ドキュメントサイト全体をエージェントに渡すときは [`/llms.txt`](/llms.txt) を使ってください。

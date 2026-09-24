@@ -49,6 +49,7 @@ my-talks/
 ├── .gitignore          # dist/, .cache/, .dek/server.json
 ├── .rumdl.toml         # Markdown rules for script.md
 ├── theme.css           # the starting point for every new deck
+├── tsconfig.json       # editor types for slide scripts
 ├── assets/             # shared source material; decks copy what they use
 ├── decks/
 │   └── 2026-04-vite/
@@ -57,7 +58,8 @@ my-talks/
 │       ├── slides/     # one HTML file per slide
 │       └── assets/
 └── .dek/
-    └── schema.json     # frontmatter schema for your editor
+    ├── schema.json     # frontmatter schema for your editor
+    └── slide.d.ts      # the DekSlide type for slide scripts
 ```
 
 There is always a `decks/` directory, even with a single deck. The `theme.css` at the project root is a template: `dek init` and `dek new` copy it into each new deck.

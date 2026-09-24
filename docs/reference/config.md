@@ -108,6 +108,9 @@ pause   = { sentence = 350, beat = 700 }
 | `speed` | Speaking speed |
 | `pause.sentence` | Silence between sentences, in milliseconds |
 | `pause.beat` | Silence at a beat boundary, in milliseconds |
+| `lead` | How far each screen change leads its first word, in milliseconds. Default 300 |
+| `beats."<key>".lead` | `lead` into one slide's first beat (`slug`) or into one beat (`slug/beat-id`, `slug/2`) |
+| `beats."<key>".pause` | Silence after that beat, or after a slide's last beat, replacing `pause.beat` |
 
 ## `voice/dict.toml`
 

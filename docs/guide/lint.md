@@ -21,7 +21,8 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 | Markdown style | rumdl |
 | Schema | Frontmatter and config, validated with Zod |
 | Consistency | `script.md` ↔ `slides/*.html`, beats ↔ `data-step` |
-| Theme contract | Unknown classes, inline styles, tokens, scoping |
+| Theme contract | Unknown classes, inline styles, tokens, scoping, slide stylesheets |
+| Slide scripts | `slides/<id>.ts` evaluated in a sandbox |
 | Self-containment | Remote URLs, missing images, paths outside the deck |
 | Rendering | Overflow and contrast, measured in a browser |
 | Narration | Only for decks with `voice/` |
@@ -40,7 +41,7 @@ Without Playwright, only the commands that need it fail, each with the install c
 
 ## The definition of done does not change with voice
 
-`DEK040` (an English word missing from the pronunciation dictionary) and `DEK042` (a beat that shows something but says nothing) apply only to decks with `voice/`. `DEK041` (narrated length far from the `duration` budget) applies only when a Timeline exists. All three are warnings. A live-only deck that passes lint is finished, and adding voice never changes that.
+`DEK040` (an English word missing from the pronunciation dictionary) and `DEK042` (a beat that shows something but says nothing) apply only to decks with `voice/`. `DEK041` (narrated length far from the `duration` budget) applies only when a Timeline exists. `DEK043` (a `[beats]` key in `voice.toml` that matches nothing) applies only to decks with `voice/`. All four are warnings. A live-only deck that passes lint is finished, and adding voice never changes that.
 
 ## Output
 

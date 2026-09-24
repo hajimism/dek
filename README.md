@@ -14,7 +14,7 @@ dek is a CLI that builds a slide deck from your talk script. You write the scrip
 
 **A talk is not a one-off.** A dek project holds many decks. Conventions belong to the project, the look carries forward from your last deck, and every deck owns its script and slides.
 
-**Agents need small files.** One slide is one HTML file of about forty lines. The edit target is small, the diff is readable, and a broken edit breaks one slide.
+**Agents need small files.** One slide is one HTML file of about forty lines, with an optional stylesheet and script beside it. The edit target is small, the diff is readable, and a broken edit breaks one slide.
 
 **Agents cannot see what they render.** dek renders each slide and reports overflow, contrast, and missing images as machine-readable diagnostics, so an agent can check and fix its own output.
 

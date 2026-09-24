@@ -49,6 +49,7 @@ my-talks/
 ├── .gitignore          # dist/ .cache/ .dek/server.json
 ├── .rumdl.toml         # script.md 用の Markdown ルール
 ├── theme.css           # 新しいデッキの出発点
+├── tsconfig.json       # スライドのスクリプト用のエディタ設定
 ├── assets/             # 素材置き場。デッキは使うものをコピーする
 ├── decks/
 │   └── 2026-04-vite/
@@ -57,7 +58,8 @@ my-talks/
 │       ├── slides/     # 1 スライド 1 HTML
 │       └── assets/
 └── .dek/
-    └── schema.json     # frontmatter のスキーマ（エディタ用）
+    ├── schema.json     # frontmatter のスキーマ（エディタ用）
+    └── slide.d.ts      # スライドのスクリプト用の DekSlide 型
 ```
 
 デッキが 1 つでも `decks/` は必ずあります。プロジェクト直下の `theme.css` はテンプレートで、`dek init` と `dek new` が新しいデッキの中へコピーします。

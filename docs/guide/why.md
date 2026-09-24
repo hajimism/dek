@@ -36,7 +36,7 @@ This is why slide files carry no sequence numbers. The only file that knows the 
 
 ### 2. A slide is one `<section class="slide">`
 
-Every file in `slides/` has a single root: `<section class="slide">`. Appearance comes from `theme.css`; the document shell and the player come from the renderer. What you hand to an agent is a forty-line fragment, and that one file is all the context it needs.
+Every file in `slides/` has a single root: `<section class="slide">`. Appearance comes from `theme.css`, plus an optional `slides/<id>.css` scoped to that slide; the document shell and the player come from the renderer. What you hand to an agent is a forty-line fragment, and that one file is all the context it needs.
 
 The same property scales up to the deck directory. A deck never references anything outside itself. Its theme, its images, its voice settings all live inside. Copy the directory, zip it, open it five years later, and it renders the same way. The project is where decks live, not a runtime they depend on.
 
@@ -70,10 +70,10 @@ dek carries no Vue, UnoCSS, Monaco, or Mermaid. That keeps lint and build simple
 
 Use Slidev if you need any of the following.
 
-- Interactive slides: clickable demos, JavaScript inside a slide
+- Interactive slides: clickable demos, or code that reacts to the audience. A slide script in dek only draws a function of time.
 - Live coding or an embedded editor
 - A gallery of npm themes
-- An animation DSL beyond what CSS provides
+- An animation DSL beyond CSS and a seekable `draw(t)`
 - PPTX or Keynote export, or a WYSIWYG editor
 
 dek stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
