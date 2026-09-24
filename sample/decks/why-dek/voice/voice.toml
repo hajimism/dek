@@ -2,3 +2,12 @@ engine  = "voicevox"
 speaker = "ずんだもん/ノーマル"
 speed   = 1
 pause   = { sentence = 350, beat = 700 }
+lead    = 300
+
+# Let the full-bleed photo settle before the first word.
+[beats.usb]
+lead = 600
+
+# Hold the last point a little longer before the video ends.
+[beats."recap/recap-lint"]
+pause = 1500

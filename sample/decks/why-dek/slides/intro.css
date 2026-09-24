@@ -1,0 +1,4 @@
+/* The hero mark faces the title. */
+.mark {
+  transform: scaleX(-1);
+}

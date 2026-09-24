@@ -96,16 +96,6 @@
   font-feature-settings: "palt";
 }
 
-.slide .stat {
-  display: block;
-  font-family: var(--font-title);
-  font-size: var(--size-stat);
-  font-weight: 700;
-  line-height: 0.9;
-  letter-spacing: -0.05em;
-  font-variant-numeric: tabular-nums;
-}
-
 .slide .meta {
   position: absolute;
   left: var(--pad-x);
@@ -156,10 +146,6 @@
   max-height: calc(var(--size-title) * 11);
   object-fit: contain;
   mix-blend-mode: lighten;
-}
-
-.slide .mark {
-  transform: scaleX(-1);
 }
 
 .slide[data-layout="title"] {

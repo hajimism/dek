@@ -44,3 +44,7 @@ bun run build          # 各 decks/<deck>/dist/<deck>.html
 `dek` は `file:..`、つまりこのリポジトリ自身を指します。Playwright と rumdl は sample の `devDependencies` です。
 
 `dek.toml` の `[voice]` は、`dek new` が新しいデッキへコピーする既定値です。why-dek の実際の設定は `decks/why-dek/voice/` にあり、`voice.toml` と、ASCII 語の読みを収めた `dict.toml` です。エンジンが止まっていても開発サーバは動き続けます。合成だけが失敗します。
+
+`voice.toml` にはタイミングの調整例もあります。デッキ全体の `lead`、全面写真の `usb` スライドに入るときの長めの `lead`、`recap` の最後のビートの後の長めの `pause` です。
+
+見た目のほとんどは `decks/why-dek/theme.css` が決めます。1 枚でしか使わない装飾は、そのスライドの横に置いています。`slides/intro.css` はヒーローマークを左右反転し、`slides/files.css` は大きな数字の書式を決めます。`slides/files.ts` は、スライドに入ると同時にその数字を 40 まで数え上げます。描画は `t` だけから決まるので、動画・スクリーンショット・PDF にも同じ動きか、その最終状態が出ます。

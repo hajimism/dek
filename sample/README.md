@@ -44,3 +44,7 @@ The scripts do not pin a deck. From the project root they apply to every deck; f
 `dek` resolves to `file:..`, this repository itself. Playwright and rumdl are `devDependencies` of the sample.
 
 The `[voice]` table in `dek.toml` is the default that `dek new` copies into new decks. The why-dek deck's actual settings live in `decks/why-dek/voice/`: `voice.toml`, and a `dict.toml` with readings for ASCII words. When the engine is down the dev server keeps running; only synthesis fails.
+
+`voice.toml` also shows the timing knobs: `lead` for the whole deck, a longer lead into the full-bleed `usb` slide, and a longer pause after the last beat of `recap`.
+
+Most of the look comes from `decks/why-dek/theme.css`. Decoration that only one slide uses sits beside that slide instead: `slides/intro.css` flips the hero mark, and `slides/files.css` styles the big number. `slides/files.ts` makes that number count up to 40 as the slide enters. It draws from `t` alone, so the video, screenshots, and PDF show the same motion or its end state.

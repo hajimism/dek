@@ -11,9 +11,11 @@ Talk-script-first HTML slides.
 ## Conventions
 
 - One `##` heading is one slide. HTML lives in `slides/<id>.html`.
-- Use only classes defined in this deck's `theme.css`.
-- Color, type, space, radius, and motion in `theme.css` use token `var()` only.
-- Do not add `<style>`, `style=`, or `<script>` to slides.
+- Shared look lives in `theme.css`. Decoration only one slide uses lives in `slides/<id>.css`, which is scoped to that slide.
+- Use only classes defined in `theme.css` or in that slide's own `slides/<id>.css`.
+- Color, type, space, radius, and motion in either stylesheet use token `var()` only.
+- Do not add `<style>`, `style=`, or `<script>` inside slide HTML.
+- Motion CSS cannot express lives in `slides/<id>.ts`: `export default { motion: { <step>: ms }, draw(slide, { index, step, t }) {} } satisfies DekSlide`. `DekSlide` is global, from `.dek/slide.d.ts`; do not import it. Draw from `t` alone and set everything you touch on every call, with no timers and no imports, so video and screenshots can seek it.
 - Keep the deck self-contained: no remote URLs and no paths outside the deck.
 
 ## Theme classes
