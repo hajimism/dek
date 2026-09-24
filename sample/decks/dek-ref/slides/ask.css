@@ -1,0 +1,72 @@
+/* The three open questions as cards on the blue, each with the answer we lean toward. */
+.slide[data-layout="statement"] {
+  justify-content: flex-start;
+}
+
+.slide[data-layout="statement"] .display {
+  font-size: calc(var(--size-hero) * 0.8);
+}
+
+.asks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--gap) * 1.2);
+  flex: 1;
+  margin-top: calc(var(--gap) * 1.6);
+  padding-bottom: calc(var(--gap) * 0.6);
+}
+
+.q {
+  --muted: #4d463e;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.9em;
+  color: var(--ink);
+}
+
+.q-no {
+  align-self: flex-start;
+  padding: 0.15em 0.7em;
+  background: var(--sun);
+  border: var(--border) solid var(--ink);
+  border-radius: var(--pill);
+  font-family: var(--font-mono);
+  font-weight: 900;
+}
+
+.q-text {
+  margin: 0;
+  font-size: calc(var(--size-lead) * 1.45);
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.rec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45em;
+  margin: 0;
+  padding-top: 0.8em;
+  border-top: var(--border) dashed var(--ink);
+  font-size: var(--size-body);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.why {
+  margin: 0;
+  font-size: var(--size-small);
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.rec-label {
+  padding: 0.05em 0.6em;
+  background: var(--lime);
+  border: calc(var(--border) * 0.67) solid var(--ink);
+  border-radius: var(--pill);
+  font-size: var(--size-caption);
+}

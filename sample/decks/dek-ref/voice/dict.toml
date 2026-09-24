@@ -1,0 +1,51 @@
+# voice dictionary
+[CSS]
+kana = "シーエスエス"
+
+[GitHub]
+kana = "ギットハブ"
+
+[HTML]
+kana = "エイチティーエムエル"
+
+[PDF]
+kana = "ピーディーエフ"
+
+[URL]
+kana = "ユーアールエル"
+
+[dek]
+kana = "デック"
+
+["dek.toml"]
+kana = "デックトムル"
+
+[git]
+kana = "ギット"
+
+[id]
+kana = "アイディー"
+
+[ls]
+kana = "エルエス"
+
+[ref]
+kana = "レフ"
+
+[refs]
+kana = "レフス"
+
+[shot]
+kana = "ショット"
+
+[show]
+kana = "ショー"
+
+[sync]
+kana = "シンク"
+
+[take]
+kana = "テイク"
+
+[timing]
+kana = "タイミング"

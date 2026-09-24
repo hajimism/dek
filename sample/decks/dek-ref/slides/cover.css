@@ -1,0 +1,107 @@
+/* Words on the left; a fan of real dek decks on the right, dealt out as the slide enters. */
+.slide[data-layout="cover"] {
+  --fan-width: 30rem;
+  --deck-width: 23rem;
+  --cover-size: 5.2rem;
+  --blink: 1.1s;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--fan-width);
+  column-gap: calc(var(--gap) * 1.5);
+  align-items: center;
+}
+
+.slide[data-layout="cover"] .display {
+  font-size: var(--cover-size);
+  line-height: 1.12;
+  margin-left: -0.04em;
+}
+
+.row {
+  display: block;
+  white-space: nowrap;
+}
+
+.lede {
+  max-width: 24em;
+}
+
+.cmd {
+  align-self: flex-start;
+  margin-top: calc(var(--gap) * 1.3);
+}
+
+.pitch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.caret {
+  width: 0.55em;
+  height: 1.2em;
+  margin-left: -0.5em;
+  background: var(--lime);
+  animation: blink var(--blink) steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.fan {
+  position: relative;
+  height: 100%;
+}
+
+.deck {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--deck-width);
+  margin: 0;
+  background: var(--paper);
+  border: var(--border) solid var(--ink);
+  border-radius: calc(var(--radius) * 0.6);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transform-origin: 50% 100%;
+}
+
+.deck img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.deck .chip {
+  position: absolute;
+  right: calc(var(--gap) * 0.5);
+  top: calc(var(--gap) * 0.5);
+}
+
+.drop {
+  position: absolute;
+  right: 0;
+  bottom: 8%;
+  font-size: var(--size-small);
+  background: var(--lime);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+/* A sun disc behind the fan. */
+.fan::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 78%;
+  aspect-ratio: 1;
+  border: var(--border) solid var(--ink);
+  border-radius: 50%;
+  background: var(--sun);
+  transform: translate(-40%, -52%);
+}

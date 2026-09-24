@@ -1,0 +1,61 @@
+/* The claim on the left; the four layers of a dek deck stacked on the right. */
+.slide[data-layout="statement"] {
+  --stack-width: 29rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--stack-width);
+  column-gap: calc(var(--gap) * 2);
+  align-items: center;
+}
+
+.slide[data-layout="statement"] .display {
+  font-size: calc(var(--size-hero) * 0.86);
+  line-height: 1.15;
+}
+
+.lede {
+  max-width: 22em;
+}
+
+.stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.55);
+}
+
+.layer {
+  display: grid;
+  grid-template-columns: 3.2em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8em;
+  padding: calc(var(--gap) * 0.65) calc(var(--gap) * 0.9);
+  border: var(--border) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+
+.layer-name {
+  font-size: calc(var(--size-lead) * 1.2);
+  font-weight: 900;
+}
+
+.layer-what {
+  font-weight: 700;
+}
+
+.tag {
+  position: absolute;
+  right: calc(var(--gap) * -0.6);
+  bottom: calc(var(--gap) * -2.4);
+  background: var(--paper);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  --tilt: 3deg;
+}
+
+/* The one layer a PDF keeps. */
+.layer[data-layer="2"] {
+  outline: var(--border) dashed var(--paper);
+  outline-offset: calc(var(--border) * 2);
+}

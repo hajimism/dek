@@ -1,0 +1,103 @@
+/* Three promises, each with a small emblem of how it is kept. */
+.vows {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--gap) * 1.2);
+  align-items: stretch;
+  padding-bottom: var(--lift);
+}
+
+.vow {
+  display: flex;
+  flex-direction: column;
+}
+
+.vow-art {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0 0 calc(var(--gap) * 0.8);
+  background: var(--paper);
+  border: var(--border) solid var(--ink);
+  border-radius: calc(var(--radius) * 0.7);
+}
+
+.vow-title {
+  margin: 0 0 0.3em;
+  font-size: calc(var(--size-lead) * 1.2);
+  font-weight: 900;
+  letter-spacing: var(--tight);
+}
+
+.vow-text {
+  margin: 0;
+  min-height: 3.3em;
+  font-size: var(--size-small);
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.sha {
+  padding: 0.25em 0.6em;
+  background: var(--ink);
+  border-radius: var(--pill);
+  font-family: var(--font-mono);
+  font-size: calc(var(--size-lead) * 1.9);
+  font-weight: 800;
+  color: var(--lime);
+  transform: rotate(-4deg);
+}
+
+.sandbox {
+  padding: 0.7em 1.1em;
+  border: var(--border) dashed var(--ink);
+  border-radius: calc(var(--radius) * 0.6);
+  font-family: var(--font-mono);
+  font-size: calc(var(--size-lead) * 1.5);
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.csp {
+  font-size: var(--size-caption);
+  font-weight: 700;
+}
+
+.lic {
+  font-size: var(--size-lead);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.lic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.2em;
+  padding: 0.35em 0.5em 0.35em 0.9em;
+  border: calc(var(--border) * 0.67) solid var(--ink);
+  border-radius: var(--pill);
+  background: var(--cream);
+}
+
+.ok,
+.warn {
+  display: grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  border: calc(var(--border) * 0.67) solid var(--ink);
+}
+
+.ok {
+  background: var(--lime);
+}
+
+.warn {
+  background: var(--sun);
+}

@@ -1,0 +1,52 @@
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="num">04</span>Read only</p>
+  <div class="head">
+    <h2 class="slide-title">覚えるコマンドは<span class="hl">増えない</span></h2>
+    <p class="sticker lock">ref は読み取り専用のデッキ</p>
+  </div>
+  <div class="stage panes">
+    <article class="card pane" data-step="ls">
+      <p class="cmd">dek ls hajimism/decks/why-dek</p>
+      <div class="pane-body">
+        <p class="totals"><span><span class="label">持ち時間</span><span class="big">12:00</span></span><span><span class="label">見積もり</span><span class="big hot">9:46</span></span></p>
+        <ol class="bars">
+          <li class="row"><span class="slug">cover</span><span class="track"><span class="bar" data-est="35"></span><span class="budget" data-budget="43"></span></span></li>
+          <li class="row"><span class="slug">night-before</span><span class="track"><span class="bar" data-est="60"></span><span class="budget" data-budget="73"></span></span></li>
+          <li class="row"><span class="slug">parent</span><span class="track"><span class="bar" data-est="36"></span><span class="budget" data-budget="46"></span></span></li>
+          <li class="row"><span class="slug">anatomy</span><span class="track"><span class="bar" data-est="46"></span><span class="budget" data-budget="58"></span></span></li>
+          <li class="row"><span class="slug">skeleton</span><span class="track"><span class="bar" data-est="48"></span><span class="budget" data-budget="58"></span></span></li>
+          <li class="row"><span class="slug">one-file</span><span class="track"><span class="bar" data-est="42"></span><span class="budget" data-budget="54"></span></span></li>
+          <li class="row"><span class="slug">beats</span><span class="track"><span class="bar" data-est="42"></span><span class="budget" data-budget="51"></span></span></li>
+          <li class="row is-pick"><span class="slug">timing</span><span class="track"><span class="bar" data-est="40"></span><span class="budget" data-budget="48"></span></span></li>
+          <li class="row"><span class="slug">blind</span><span class="track"><span class="bar" data-est="54"></span><span class="budget" data-budget="66"></span></span></li>
+          <li class="row"><span class="slug">rules</span><span class="track"><span class="bar" data-est="44"></span><span class="budget" data-budget="51"></span></span></li>
+          <li class="row"><span class="slug">themes</span><span class="track"><span class="bar" data-est="45"></span><span class="budget" data-budget="54"></span></span></li>
+          <li class="row"><span class="slug">outputs</span><span class="track"><span class="bar" data-est="40"></span><span class="budget" data-budget="50"></span></span></li>
+          <li class="row"><span class="slug">start</span><span class="track"><span class="bar" data-est="24"></span><span class="budget" data-budget="30"></span></span></li>
+          <li class="row"><span class="slug">recap</span><span class="track"><span class="bar" data-est="30"></span><span class="budget" data-budget="39"></span></span></li>
+        </ol>
+      </div>
+      <p class="pane-say">構成と尺を見る</p>
+    </article>
+    <article class="card pane" data-step="show">
+      <p class="cmd">dek show hajimism/decks/why-dek timing</p>
+      <div class="pane-body">
+        <p class="script"><span class="script-h">## 尺は、書いた時点でわかる {#timing}</span>台本の文字数から、喋る長さをその場で見積もる。持ち時間は各スライドに…</p>
+        <pre class="code snippet"><span class="tok-c">&lt;</span><span class="tok-k">section</span> <span class="tok-h">class</span>=<span class="tok-s">"slide"</span>
+  <span class="tok-h">data-layout</span>=<span class="tok-s">"split"</span><span class="tok-c">&gt;</span>
+  <span class="tok-c">&lt;</span><span class="tok-k">dl</span> <span class="tok-h">class</span>=<span class="tok-s">"facts"</span><span class="tok-c">&gt;</span>…
+  <span class="tok-c">&lt;</span><span class="tok-k">ol</span> <span class="tok-h">class</span>=<span class="tok-s">"bars"</span><span class="tok-c">&gt;</span>…</pre>
+      </div>
+      <p class="pane-say">台本とマークアップを読む</p>
+    </article>
+    <article class="card pane" data-step="shot">
+      <p class="cmd">dek shot hajimism/decks/why-dek timing</p>
+      <div class="pane-body">
+        <img class="shot" src="assets/why-dek-timing.jpg" alt="why-dek の timing スライドを描画した画像">
+        <p class="chip path">.cache/shots/timing.76d74b6d.png</p>
+      </div>
+      <p class="pane-say">描画して確かめる</p>
+    </article>
+  </div>
+  <p class="meta"><span class="mark">dek ref</span><span>うまい発表は、借りていい。</span><span>05 / 13</span></p>
+</section>

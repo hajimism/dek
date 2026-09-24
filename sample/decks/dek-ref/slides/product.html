@@ -1,0 +1,32 @@
+<section class="slide" data-layout="split">
+  <div class="col">
+    <p class="kicker"><span class="num">03</span>Product</p>
+    <h2 class="slide-title">コマンドひとつで、<br><span class="hl">手元に</span></h2>
+    <p class="addr">
+      <span class="seg fill-pink"><span class="seg-value">hajimism</span><span class="seg-name">オーナー</span></span>
+      <span class="slash">/</span>
+      <span class="seg fill-sky"><span class="seg-value">decks</span><span class="seg-name">リポジトリ</span></span>
+      <span class="slash">/</span>
+      <span class="seg fill-lime"><span class="seg-value">why-dek</span><span class="seg-name">デッキ</span></span>
+    </p>
+    <p class="note">GitHub にある dek プロジェクトから、デッキをひとつだけ取ってくる。git も npm も要らない。</p>
+  </div>
+  <div class="col stage">
+    <div class="term">
+      <p class="term-bar">~/my-talks</p>
+      <pre class="code"><span class="tok-k">$</span> <span data-typed="dek ref hajimism/decks/why-dek">dek ref hajimism/decks/why-dek</span>
+<span data-line="0"><span class="tok-k">✓</span> fetched  <span class="tok-c">hajimism/decks</span> <span class="tok-h">@a5478de</span></span>
+<span data-line="1"><span class="tok-k">✓</span> saved    <span class="tok-s">refs/hajimism/decks/why-dek/</span></span>
+<span data-line="2"><span class="tok-k">✓</span> pinned   <span class="tok-s">dek.toml</span> <span class="tok-c">[refs]</span></span>
+<span data-line="3"><span class="tok-c">  14 sections · 12m · 9:46 estimated</span></span></pre>
+    </div>
+    <div class="card fill-lime pin" data-step="pin">
+      <p class="sticker pin-tag">版を固定</p>
+      <p class="label">dek.toml</p>
+      <pre class="toml"><span class="toml-key">[refs]</span>
+"hajimism/decks/why-dek" = <span class="toml-sha">"a5478de"</span></pre>
+      <p class="pin-note">相手が更新しても、手元は変わらない。</p>
+    </div>
+  </div>
+  <p class="meta"><span class="mark">dek ref</span><span>うまい発表は、借りていい。</span><span>04 / 13</span></p>
+</section>

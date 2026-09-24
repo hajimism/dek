@@ -1,0 +1,97 @@
+/* Three phases hanging off one thick rail. */
+.slide {
+  --dot-size-phase: 3rem;
+}
+
+.road {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--gap) * 1.2);
+  align-items: stretch;
+  padding-bottom: var(--lift);
+}
+
+.rail {
+  position: absolute;
+  top: calc(var(--dot-size-phase) * 0.5);
+  left: 0;
+  right: 0;
+  height: calc(var(--border) * 2);
+  background: var(--ink);
+  transform: translateY(-50%);
+}
+
+.rail::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 1em;
+  height: 1em;
+  border-top: calc(var(--border) * 2) solid var(--ink);
+  border-right: calc(var(--border) * 2) solid var(--ink);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.phase {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.9);
+}
+
+.dot {
+  display: grid;
+  place-items: center;
+  width: var(--dot-size-phase);
+  height: var(--dot-size-phase);
+  border: var(--border) solid var(--ink);
+  border-radius: 50%;
+  box-shadow: calc(var(--lift) * 0.6) calc(var(--lift) * 0.6) 0 var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--size-lead);
+  font-weight: 900;
+}
+
+.plan {
+  flex: 1;
+}
+
+.now {
+  position: absolute;
+  top: calc(var(--gap) * -0.8);
+  right: var(--gap);
+  background: var(--paper);
+  text-transform: none;
+  --tilt: 4deg;
+}
+
+.phase-title {
+  margin: 0 0 0.5em;
+  font-size: var(--size-title);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7em;
+  font-size: calc(var(--size-lead) * 0.95);
+  font-weight: 700;
+}
+
+.items li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35em;
+  padding-bottom: 0.7em;
+  border-bottom: calc(var(--border) * 0.5) solid var(--ink);
+}
+
+.items li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}

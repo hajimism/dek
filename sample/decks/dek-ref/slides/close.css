@@ -1,0 +1,55 @@
+/*
+ * The closing line on ink, the command under it, and a lime ticker running across the foot.
+ * The ticker is pseudo-element text, since it is meant to run past both edges.
+ */
+.slide[data-layout="close"] {
+  --tick: 18s;
+  justify-content: center;
+}
+
+.slide[data-layout="close"] .display {
+  font-size: calc(var(--size-mega) * 0.78);
+  line-height: 1.12;
+}
+
+.slide[data-layout="close"] .num {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.slide[data-layout="close"] .cmd {
+  align-self: flex-start;
+  margin-top: calc(var(--gap) * 1.6);
+  font-size: var(--size-lead);
+}
+
+.band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--pad-bottom) * 0.95);
+  overflow: hidden;
+  height: 2.6em;
+  display: flex;
+  align-items: center;
+  background: var(--lime);
+  border-block: var(--border) solid var(--ink);
+}
+
+.band::before {
+  content: attr(data-band);
+  display: block;
+  width: max-content;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: var(--ink);
+  animation: tick var(--tick) linear infinite;
+}
+
+@keyframes tick {
+  to {
+    transform: translateX(-50%);
+  }
+}
