@@ -15,7 +15,7 @@ export async function gotoCommand(options: {
 }): Promise<NavResult> {
   const slug = options.slug?.trim();
   if (!slug) {
-    throw new DekError("usage: dek goto <slug>", { hint: "usage: dek goto <slug>" });
+    throw new DekError("usage: dek goto <slug>", { hint: "run `dek ls` to see the slugs" });
   }
   const { deck } = requireDeckFromCwd(options.cwd, options.deck);
   requireSection(deck, slug);

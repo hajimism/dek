@@ -73,6 +73,8 @@ describe("agentHelpText", () => {
     expect(text).toContain("pin");
     expect(text).toContain("--root-dist");
     expect(text).toContain("Result commands accept --json. dek / rehearse do not (long-running).");
+    expect(text).toContain("only errors exit 1");
+    expect(text).toContain("dek theme [layout]");
     expect(text).not.toContain("All commands accept --json");
     expect(text.split("\n").length).toBeLessThan(80);
     expect(text).not.toBe(helpText());
@@ -86,13 +88,11 @@ describe("formatDiagnostics", () => {
         {
           id: "DEK001",
           message: 'missing slide HTML for "intro"',
-          path: "slides/intro.html",
+          path: "script.md",
           line: 3,
         },
       ]),
-    ).toBe(
-      'slides/intro.html:3: DEK001 missing slide HTML for "intro"\n  help: run `dek sync` to create the skeleton',
-    );
+    ).toBe('script.md:3: DEK001 missing slide HTML for "intro"');
   });
 
   test("formats path without a line", () => {
@@ -124,38 +124,31 @@ describe("formatDiagnostics", () => {
     );
   });
 
+  test("labels a warning after its rule id", () => {
+    expect(
+      formatDiagnostics([
+        {
+          id: "DEK040",
+          message: "dictionary is missing English word: AI",
+          path: "script.md",
+          line: 9,
+        },
+      ]),
+    ).toBe("script.md:9: DEK040 warning: dictionary is missing English word: AI");
+  });
+
   test("returns no diagnostics for an empty list", () => {
     expect(formatDiagnostics([])).toBe("no diagnostics");
   });
 
-  test("suggests dek mv when one DEK001 and one DEK002", () => {
+  test("prints only the hints the diagnostics carry", () => {
     expect(
       formatDiagnostics([
-        {
-          id: "DEK001",
-          message: 'missing slide HTML for "intro"',
-          path: "slides/intro.html",
-          line: 3,
-        },
-        {
-          id: "DEK002",
-          message: 'slide HTML has no section "orphan"',
-          path: "slides/orphan.html",
-        },
+        { id: "DEK001", message: 'missing slide HTML for "intro"', path: "script.md", line: 5 },
+        { id: "DEK002", message: 'slide HTML has no section "orphan"', path: "slides/orphan.html" },
       ]),
-    ).toBe(`slides/intro.html:3: DEK001 missing slide HTML for "intro"
-slides/orphan.html: DEK002 slide HTML has no section "orphan"
-  help: run \`dek mv <old> <new>\``);
-  });
-
-  test("does not suggest a fix when there are two DEK001 diagnostics", () => {
-    expect(
-      formatDiagnostics([
-        { id: "DEK001", message: 'missing slide HTML for "intro"', path: "slides/intro.html" },
-        { id: "DEK001", message: 'missing slide HTML for "outro"', path: "slides/outro.html" },
-      ]),
-    ).toBe(`slides/intro.html: DEK001 missing slide HTML for "intro"
-slides/outro.html: DEK001 missing slide HTML for "outro"`);
+    ).toBe(`script.md:5: DEK001 missing slide HTML for "intro"
+slides/orphan.html: DEK002 slide HTML has no section "orphan"`);
   });
 });
 
@@ -236,6 +229,19 @@ describe("writeDevEvent", () => {
     const chunks: string[] = [];
     writeDevEvent({ type: "reload-slide", slug: "intro" }, { write: (s) => chunks.push(s) });
     expect(chunks).toEqual(["reload-slide intro\n"]);
+  });
+
+  test("prints diagnostic paths relative to cwd when one is given", () => {
+    const chunks: string[] = [];
+    writeDevEvent(
+      {
+        type: "diagnostics",
+        diagnostics: [{ id: "DEK010", message: 'class "x"', path: "/p/decks/demo/slides/a.html" }],
+      },
+      { write: (s) => chunks.push(s) },
+      { cwd: "/p/decks/demo" },
+    );
+    expect(chunks).toEqual(['slides/a.html: DEK010 class "x"\n']);
   });
 
   test("writes nothing for a clean diagnostics event", () => {

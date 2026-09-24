@@ -20,7 +20,7 @@ export function mvCommand(options: {
   const slug = options.slug?.trim();
   if (!slug) {
     throw new DekError("usage: dek mv <old> <new> | dek mv <slug> --before|--after <slug>", {
-      hint: "usage: dek mv <old> <new> | dek mv <slug> --before|--after <slug>",
+      hint: "for example, `dek mv intro opening` or `dek mv intro --after agenda`",
     });
   }
 
@@ -42,7 +42,9 @@ export function mvCommand(options: {
 
   const to = options.to?.trim();
   if (!to) {
-    throw new DekError("usage: dek mv <old> <new>", { hint: "usage: dek mv <old> <new>" });
+    throw new DekError("usage: dek mv <old> <new>", {
+      hint: "for example, `dek mv intro opening`",
+    });
   }
   renameSection({ project, deck }, slug, to);
   return { from: slug, to };

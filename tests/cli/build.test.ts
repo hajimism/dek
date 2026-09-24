@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { buildCommand } from "../../src/cli/build.ts";
+import { defaultTheme } from "../../src/cli/files.ts";
+import { formatText } from "../../src/cli/result.ts";
 import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
@@ -14,6 +16,47 @@ type BuildOk = {
   ok: true;
   out: string;
 };
+
+describe("buildCommand and lint", () => {
+  test("builds a deck that fails lint, and says so", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: defaultTheme(),
+            slides: {
+              intro: slideDocument(`<section class="slide"><h2 class="nope">intro</h2></section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const result = await buildCommand({ cwd: join(root, "decks", "demo") });
+        expect("out" in result && result.out).toBe(
+          join(root, "decks", "demo", "dist", "demo.html"),
+        );
+        expect(result.diagnostics.map((d) => d.id)).toEqual(["DEK010"]);
+        expect(formatText({ command: "build", data: result })).toBe(
+          `wrote ${join(root, "decks", "demo", "dist", "demo.html")}\nlint: 1 error; run \`dek lint\` to see it`,
+        );
+      },
+    );
+  });
+
+  test("says nothing about lint when the deck is clean", async () => {
+    await withTempProject(
+      {
+        decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }],
+      },
+      async (root) => {
+        const result = await buildCommand({ cwd: join(root, "decks", "demo") });
+        expect(result.diagnostics).toEqual([]);
+        expect(formatText({ command: "build", data: result })).not.toContain("lint");
+      },
+    );
+  });
+});
 
 describe("dek build", () => {
   test("writes project dist/<deck>.html with --root-dist", async () => {

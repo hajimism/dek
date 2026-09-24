@@ -29,6 +29,11 @@
   line-height: 1.2;
 }
 
+/* @layout title
+<section class="slide" data-layout="title">
+  <h2 class="slide-title">The talk in one line</h2>
+</section>
+*/
 .slide[data-layout="title"] {
   display: flex;
   align-items: center;
@@ -36,11 +41,30 @@
   text-align: center;
 }
 
+/* @layout default
+<section class="slide" data-layout="default">
+  <h2 class="slide-title">A heading</h2>
+  <ul>
+    <li data-step="1">One point per beat</li>
+    <li data-step="2">The next point</li>
+  </ul>
+</section>
+*/
 .slide[data-layout="default"] {
   display: flex;
   flex-direction: column;
 }
 
+/* @layout two-col
+<section class="slide" data-layout="two-col">
+  <div class="col">
+    <h2 class="slide-title">Left: the claim</h2>
+  </div>
+  <div class="col">
+    <p class="node">Right: the evidence</p>
+  </div>
+</section>
+*/
 .slide[data-layout="two-col"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -48,10 +72,20 @@
   align-items: center;
 }
 
+/* @layout full-bleed
+<section class="slide" data-layout="full-bleed">
+  <img class="figure" src="assets/image.jpg" alt="">
+</section>
+*/
 .slide[data-layout="full-bleed"] {
   padding: 0;
 }
 
+/* @layout quote
+<section class="slide" data-layout="quote">
+  <p>One sentence worth remembering.</p>
+</section>
+*/
 .slide[data-layout="quote"] {
   display: flex;
   align-items: center;

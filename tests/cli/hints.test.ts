@@ -35,21 +35,24 @@ describe("dek error hints", () => {
     expect(json.error.hint).toContain("dek help --agent");
   });
 
-  test("repeats usage as the hint when show has no slug", async () => {
+  test("points at dek ls when show has no slug", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await runDek(["show", "--json"], { cwd: join(root, "decks", "demo") });
       expect(result.exitCode).toBe(1);
       const json = jsonStdout<ErrorJson>(result);
-      expect(json.error.hint).toContain("dek show <slug>");
+      expect(json.error.message).toBe("usage: dek show <slug>");
+      expect(json.error.hint).toBe("run `dek ls` to see the slugs");
     });
   });
 
-  test("repeats usage as the hint when mv has no slug", async () => {
+  test("gives an example when mv has no slug", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await runDek(["mv", "--json"], { cwd: join(root, "decks", "demo") });
       expect(result.exitCode).toBe(1);
       const json = jsonStdout<ErrorJson>(result);
-      expect(json.error.hint).toContain("dek mv");
+      expect(json.error.hint).toBe(
+        "for example, `dek mv intro opening` or `dek mv intro --after agenda`",
+      );
     });
   });
 
@@ -73,12 +76,13 @@ describe("dek error hints", () => {
     });
   });
 
-  test("repeats usage as the hint when new has no name", async () => {
+  test("gives an example when new has no name", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await runDek(["new", "--json"], { cwd: root });
       expect(result.exitCode).toBe(1);
       const json = jsonStdout<ErrorJson>(result);
-      expect(json.error.hint).toContain("dek new <name>");
+      expect(json.error.message).toBe("usage: dek new <name>");
+      expect(json.error.hint).toBe("for example, `dek new 2026-10-talk`");
     });
   });
 });

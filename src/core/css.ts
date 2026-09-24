@@ -393,3 +393,38 @@ function skipBlock(source: string, openIndex: number): number {
   }
   return source.length;
 }
+
+/** The `--*` assignments a stylesheet makes, first assignment of each name, in order. */
+export function cssTokenValues(css: string): Array<{ name: string; value: string }> {
+  const seen = new Set<string>();
+  return cssDeclarations(css).flatMap((decl) => {
+    if (!decl.property.startsWith("--") || seen.has(decl.property)) {
+      return [];
+    }
+    seen.add(decl.property);
+    return [{ name: decl.property, value: decl.value }];
+  });
+}
+
+const LAYOUT_EXAMPLE_RE = /\/\*\s*@layout\s+([A-Za-z0-9_-]+)[ \t]*\r?\n([\s\S]*?)\*\//g;
+
+export type ThemeLayout = { name: string; example?: string };
+
+/**
+ * The layouts a theme defines, by name, each with the markup its
+ * `/* @layout <name> ... *\/` comment gives. A theme documents how a layout
+ * expects to be filled that way, and the example travels with the theme.
+ */
+export function themeLayouts(css: string): ThemeLayout[] {
+  const examples = new Map<string, string>();
+  for (const match of css.matchAll(LAYOUT_EXAMPLE_RE)) {
+    const [, name, body] = match;
+    if (name && body !== undefined && !examples.has(name)) {
+      examples.set(name, body.trim());
+    }
+  }
+  return [...cssLayoutNames(css)].sort().map((name) => {
+    const example = examples.get(name);
+    return example === undefined ? { name } : { name, example };
+  });
+}

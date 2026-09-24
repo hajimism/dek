@@ -14,7 +14,7 @@ export type ShowResult = {
 export function showCommand(options: { cwd: string; slug?: string; deck?: string }): ShowResult {
   const slug = options.slug?.trim();
   if (!slug) {
-    throw new DekError("usage: dek show <slug>", { hint: "usage: dek show <slug>" });
+    throw new DekError("usage: dek show <slug>", { hint: "run `dek ls` to see the slugs" });
   }
 
   const { deck } = requireDeckFromCwd(options.cwd, options.deck);

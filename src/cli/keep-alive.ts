@@ -9,7 +9,7 @@ export async function keepDevServer(server: DevServer): Promise<void> {
   process.on("SIGTERM", shutdown);
   void (async () => {
     for await (const event of server.events) {
-      writeDevEvent(event, process.stderr);
+      writeDevEvent(event, process.stderr, { cwd: process.cwd() });
     }
   })();
   await new Promise<void>(() => {

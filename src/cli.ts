@@ -110,6 +110,11 @@ async function main(): Promise<void> {
       result = { command: "show", data: showCommand({ cwd, slug: args[0], deck }) };
       break;
     }
+    case "theme": {
+      const { themeCommand } = await import("./cli/theme.ts");
+      result = { command: "theme", data: themeCommand({ cwd, deck, layout: args[0] }) };
+      break;
+    }
     case "sync": {
       const { syncCommand } = await import("./cli/sync.ts");
       result = { command: "sync", data: syncCommand({ cwd, deck }) };

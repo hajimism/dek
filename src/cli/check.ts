@@ -36,7 +36,7 @@ export async function checkCommand(options: {
 }): Promise<CheckCliResult> {
   const slug = options.slug?.trim();
   if (!slug) {
-    throw new DekError("usage: dek check <slug>", { hint: "usage: dek check <slug>" });
+    throw new DekError("usage: dek check <slug>", { hint: "run `dek ls` to see the slugs" });
   }
 
   const { project, deck } = requireDeckFromCwd(options.cwd, options.deck);

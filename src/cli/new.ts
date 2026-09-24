@@ -15,7 +15,7 @@ export type NewResult = {
 export function newCommand(options: { cwd: string; name?: string; themeFrom?: string }): NewResult {
   const name = options.name?.trim();
   if (!name) {
-    throw new DekError("usage: dek new <name>", { hint: "usage: dek new <name>" });
+    throw new DekError("usage: dek new <name>", { hint: "for example, `dek new 2026-10-talk`" });
   }
   if (!isDeckName(name)) {
     throw new DekError(`invalid deck name "${name}"`, {

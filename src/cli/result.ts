@@ -1,4 +1,4 @@
-import type { Diagnostic } from "../core/diagnostic.ts";
+import { type Diagnostic, hasErrors, severityOf, withSeverity } from "../core/diagnostic.ts";
 import { mergeSarif, toSarif } from "../core/sarif.ts";
 import { formatClock } from "../core/timing.ts";
 import type { BuildCliResult } from "./build.ts";
@@ -15,6 +15,7 @@ import type { PdfCliResult } from "./pdf.ts";
 import type { ShotCliResult } from "./shot.ts";
 import type { ShowResult } from "./show.ts";
 import type { SyncCliResult } from "./sync.ts";
+import type { ThemeResult } from "./theme.ts";
 import { ansi, padEndWidth, shouldColor } from "./tty.ts";
 import type { VideoCliResult } from "./video.ts";
 import type { VoiceCliResult } from "./voice.ts";
@@ -25,6 +26,7 @@ export type CliResult =
   | { command: "ls"; data: LsListResult | LsDeckResult }
   | { command: "show"; data: ShowResult }
   | { command: "sync"; data: SyncCliResult }
+  | { command: "theme"; data: ThemeResult }
   | { command: "lint"; data: LintCliResult }
   | { command: "mv"; data: MvResult }
   | { command: "build"; data: BuildCliResult }
@@ -45,14 +47,15 @@ export type WriteSuccessOptions = {
 };
 
 export function writeSuccess(original: CliResult, options: WriteSuccessOptions): void {
-  const result = options.cwd === undefined ? original : displayPaths(original, options.cwd);
+  const labeled = mapDiagnostics(original, withSeverity);
+  const result = options.cwd === undefined ? labeled : displayPaths(labeled, options.cwd);
   if (original.command === "lint" && options.format === "sarif") {
     const dek = original.data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEK"));
     process.stdout.write(`${JSON.stringify(mergeSarif(toSarif(dek), original.data.rumdlSarif))}\n`);
   } else if (options.json) {
     const failed =
       (result.command === "lint" || result.command === "check") &&
-      result.data.diagnostics.length > 0;
+      hasErrors(result.data.diagnostics);
     process.stdout.write(`${JSON.stringify({ ok: !failed, ...jsonData(result) })}\n`);
   } else if (result.command === "lint") {
     process.stdout.write(
@@ -67,7 +70,7 @@ export function writeSuccess(original: CliResult, options: WriteSuccessOptions):
 
   if (
     (result.command === "lint" || result.command === "check") &&
-    result.data.diagnostics.length > 0
+    hasErrors(result.data.diagnostics)
   ) {
     process.exit(1);
   }
@@ -80,12 +83,6 @@ export function writeSuccess(original: CliResult, options: WriteSuccessOptions):
  * build, stay absolute: they are meant to be opened as-is.
  */
 export function displayPaths(result: CliResult, cwd: string): CliResult {
-  const relative = (diagnostics: Diagnostic[]): Diagnostic[] =>
-    diagnostics.map((diagnostic) =>
-      diagnostic.path === undefined
-        ? diagnostic
-        : { ...diagnostic, path: displayPath(diagnostic.path, cwd) },
-    );
   const files = (paths: string[]): string[] => paths.map((path) => displayPath(path, cwd));
   switch (result.command) {
     case "init":
@@ -94,36 +91,42 @@ export function displayPaths(result: CliResult, cwd: string): CliResult {
       return { ...result, data: { ...result.data, created: files(result.data.created) } };
     case "sync":
       return { ...result, data: { ...result.data, created: files(result.data.created) } };
+    case "theme":
+      return { ...result, data: { ...result.data, path: displayPath(result.data.path, cwd) } };
+    default:
+      return mapDiagnostics(result, (diagnostics) =>
+        diagnostics.map((diagnostic) =>
+          diagnostic.path === undefined
+            ? diagnostic
+            : { ...diagnostic, path: displayPath(diagnostic.path, cwd) },
+        ),
+      );
+  }
+}
+
+/** Applies `fn` to every diagnostic list a result carries. */
+function mapDiagnostics(
+  result: CliResult,
+  fn: (diagnostics: Diagnostic[]) => Diagnostic[],
+): CliResult {
+  switch (result.command) {
     case "lint":
-      return {
-        ...result,
-        data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
-      };
+      return { ...result, data: { ...result.data, diagnostics: fn(result.data.diagnostics) } };
     case "check":
-      return {
-        ...result,
-        data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
-      };
+      return { ...result, data: { ...result.data, diagnostics: fn(result.data.diagnostics) } };
     case "cues":
-      return {
-        ...result,
-        data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
-      };
+      return { ...result, data: { ...result.data, diagnostics: fn(result.data.diagnostics) } };
+    case "build":
+      return { ...result, data: { ...result.data, diagnostics: fn(result.data.diagnostics) } };
     case "ls":
       if (result.data.kind === "deck") {
-        return {
-          ...result,
-          data: { ...result.data, diagnostics: relative(result.data.diagnostics) },
-        };
+        return { ...result, data: { ...result.data, diagnostics: fn(result.data.diagnostics) } };
       }
       return {
         ...result,
         data: {
           ...result.data,
-          decks: result.data.decks.map((deck) => ({
-            ...deck,
-            diagnostics: relative(deck.diagnostics),
-          })),
+          decks: result.data.decks.map((deck) => ({ ...deck, diagnostics: fn(deck.diagnostics) })),
         },
       };
     default:
@@ -145,6 +148,8 @@ export function formatText(result: CliResult): string {
     }
     case "sync":
       return formatCreated(result.data.created);
+    case "theme":
+      return formatTheme(result.data);
     case "lint":
       return formatDiagnostics(result.data.diagnostics);
     case "mv":
@@ -158,7 +163,11 @@ export function formatText(result: CliResult): string {
         return `moved ${result.data.from} after ${result.data.after}`;
       }
       return `moved ${result.data.from}`;
-    case "build":
+    case "build": {
+      const paths = "outs" in result.data ? result.data.outs : [result.data.out];
+      const summary = lintSummary(result.data.diagnostics);
+      return [...paths.map((path) => `wrote ${path}`), ...(summary ? [summary] : [])].join("\n");
+    }
     case "pdf": {
       const paths = "outs" in result.data ? result.data.outs : [result.data.out];
       return paths.map((path) => `wrote ${path}`).join("\n");
@@ -283,6 +292,45 @@ function formatLs(data: LsListResult | LsDeckResult): string {
       ].join("\n");
     }
   }
+}
+
+/** "lint: 1 error and 2 warnings; run `dek lint` to see them", or nothing when clean. */
+function lintSummary(diagnostics: Diagnostic[]): string | undefined {
+  const errors = diagnostics.filter((diagnostic) => severityOf(diagnostic) === "error").length;
+  const warnings = diagnostics.length - errors;
+  const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
+  const parts = [
+    ...(errors > 0 ? [count(errors, "error")] : []),
+    ...(warnings > 0 ? [count(warnings, "warning")] : []),
+  ];
+  if (parts.length === 0) {
+    return undefined;
+  }
+  const them = diagnostics.length === 1 ? "it" : "them";
+  return `lint: ${parts.join(" and ")}; run \`dek lint\` to see ${them}`;
+}
+
+function formatTheme(data: ThemeResult): string {
+  if (data.layout) {
+    return data.layout.example;
+  }
+  const width = Math.max(0, ...data.tokens.map((token) => token.name.length));
+  return [
+    data.path,
+    "",
+    "LAYOUTS",
+    ...data.layouts.map(
+      (layout) => `  ${layout.name}${layout.example === undefined ? "  (no example)" : ""}`,
+    ),
+    "",
+    "CLASSES",
+    `  ${data.classes.join(" ")}`,
+    "",
+    "TOKENS",
+    ...data.tokens.map((token) => `  ${token.name.padEnd(width)}  ${token.value}`),
+    "",
+    "Markup for a layout: dek theme <layout>",
+  ].join("\n");
 }
 
 function formatCues(data: CuesResult): string {

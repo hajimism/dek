@@ -35,8 +35,9 @@ describe("dek check", () => {
       async (root) => {
         const result = await runDek(["check", "--json"], { cwd: join(root, "decks", "demo") });
         expect(result.exitCode).toBe(1);
-        const json = jsonStdout<{ ok: false; error: { hint?: string } }>(result);
-        expect(json.error.hint).toContain("dek check <slug>");
+        const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
+        expect(json.error.message).toBe("usage: dek check <slug>");
+        expect(json.error.hint).toBe("run `dek ls` to see the slugs");
       },
     );
   });
