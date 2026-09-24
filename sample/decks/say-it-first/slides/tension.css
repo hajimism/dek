@@ -1,0 +1,114 @@
+/* Three numbers that should agree and do not. The run-through overflows the budget in violet. */
+.slide {
+  --scale-height: 14px;
+  --limit-at: 66.667%;
+  --stripe: 6px;
+  --stripe-2: 12px;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--gap) * 2.6);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: var(--hairline) solid var(--line-strong);
+}
+
+.figure-cell {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 0.3em;
+  padding: calc(var(--gap) * 0.7) var(--gap) 0 0;
+}
+
+.figure-cell + .figure-cell {
+  padding-left: var(--gap);
+  border-left: var(--hairline) solid var(--line);
+}
+
+.big {
+  font-family: var(--font-title);
+  font-size: calc(var(--size-stat) * 1.2);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: var(--tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: calc(var(--size-lead) * 1.4);
+  font-weight: 800;
+}
+
+.figure-cell .note {
+  grid-column: 1 / -1;
+  margin-top: calc(var(--gap) * 0.4);
+}
+
+.is-hot .big,
+.is-hot .unit {
+  color: var(--accent);
+}
+
+.overrun {
+  padding-bottom: calc(var(--gap) * 0.2);
+}
+
+.scale {
+  position: relative;
+  height: var(--scale-height);
+  background: var(--surface-strong);
+}
+
+.fill,
+.over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.fill {
+  background: var(--fg);
+}
+
+.over {
+  left: var(--limit-at);
+  background: repeating-linear-gradient(-45deg, var(--accent) 0 var(--stripe), var(--glow-deep) var(--stripe) var(--stripe-2));
+}
+
+.limit {
+  position: absolute;
+  left: var(--limit-at);
+  top: calc(var(--scale-height) * -0.8);
+  bottom: calc(var(--scale-height) * -0.8);
+  width: var(--rule);
+  background: var(--fg);
+}
+
+.scale-labels {
+  position: relative;
+  display: flex;
+  margin: calc(var(--gap) * 0.55) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.limit-label {
+  position: absolute;
+  left: var(--limit-at);
+  transform: translateX(-50%);
+  color: var(--fg);
+}
+
+.over-label {
+  margin-left: auto;
+  color: var(--accent-text);
+}

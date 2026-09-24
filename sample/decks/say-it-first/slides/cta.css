@@ -1,0 +1,35 @@
+/* The close: the ask in two lines, and the one command it takes to act on it. */
+.display {
+  font-size: calc(var(--size-hero) * 1.12);
+  line-height: 1.12;
+}
+
+.start {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--gap) * 1.5);
+  margin-top: calc(var(--gap) * 1.6);
+}
+
+.start .cmd {
+  padding: 0.9em 1.3em;
+  font-size: var(--size-lead);
+}
+
+.needs {
+  margin: 0;
+  font-size: var(--size-small);
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.thanks {
+  position: absolute;
+  right: var(--pad-x);
+  top: var(--pad-top);
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--size-lead);
+  font-weight: 800;
+  letter-spacing: var(--tight);
+}

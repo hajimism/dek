@@ -1,0 +1,63 @@
+/* Four figures on one baseline. The zero is the point, so it takes the violet. */
+.slide {
+  --num-size: 10rem;
+}
+
+.slide::after {
+  right: auto;
+  left: 45%;
+  bottom: -70%;
+  width: 60%;
+}
+
+.stats {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  align-content: center;
+  margin-top: 0;
+}
+
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.4);
+  padding: 0 var(--gap) calc(var(--gap) * 0.4);
+  border-left: var(--hairline) solid var(--line-strong);
+}
+
+.figure-num {
+  font-family: var(--font-title);
+  font-size: var(--num-size);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.approx {
+  margin-right: 0.08em;
+  font-size: 0.45em;
+  vertical-align: 0.6em;
+  color: var(--muted);
+}
+
+.stat-label {
+  margin: calc(var(--gap) * 0.3) 0 0;
+  padding-top: calc(var(--gap) * 0.5);
+  border-top: var(--rule) solid var(--fg);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  letter-spacing: var(--tracking);
+  text-transform: uppercase;
+}
+
+.is-hot .figure-num {
+  color: var(--accent);
+}
+
+.is-hot .stat-label {
+  border-top-color: var(--accent);
+  color: var(--accent-text);
+}

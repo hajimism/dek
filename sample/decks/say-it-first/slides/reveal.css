@@ -1,0 +1,66 @@
+/* The product name, built by taking one letter out of the word it replaces. */
+.slide {
+  --word-size: 17rem;
+}
+
+.slide::after {
+  right: auto;
+  left: 8%;
+  bottom: -30%;
+  width: 80%;
+  height: 90%;
+  background: radial-gradient(closest-side, var(--glow-violet), var(--glow-blue) 45%, var(--glow-clear));
+  opacity: 0.5;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: calc(var(--gap) * 3);
+  padding-bottom: calc(var(--gap) * 2);
+}
+
+.word {
+  display: flex;
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--word-size);
+  font-weight: 800;
+  line-height: 0.82;
+  letter-spacing: -0.06em;
+}
+
+.glyph {
+  display: inline-block;
+  transform-origin: 50% 80%;
+}
+
+.is-dropped {
+  color: var(--accent-text);
+}
+
+.caption {
+  padding: calc(var(--gap) * 0.4) 0 calc(var(--gap) * 0.4) var(--gap);
+  border-left: var(--rule) solid var(--accent);
+}
+
+.equation {
+  margin: 0 0 calc(var(--gap) * 0.7);
+  font-family: var(--font-mono);
+  font-size: var(--size-lead);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.op {
+  color: var(--muted);
+}
+
+.caption .slide-title {
+  font-size: calc(var(--size-title) * 1.05);
+}
+
+.caption .note {
+  margin-top: calc(var(--gap) * 0.6);
+}

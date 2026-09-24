@@ -1,0 +1,133 @@
+/* Write, render, measure, fix: a dot runs the loop, lighting each stop as it passes. */
+.slide {
+  --orbit-size: 22rem;
+  --node-gap: 14px;
+  --ring-width: 2px;
+  --run-width: 4px;
+  --dot-size: 18px;
+  --halo: 0 0 0 8px var(--glow-deep), 0 0 32px var(--glow-violet);
+}
+
+.diag {
+  margin-top: calc(var(--gap) * 1.2);
+  font-size: var(--size-caption);
+}
+
+.stage {
+  align-items: center;
+}
+
+.orbit {
+  position: relative;
+  width: var(--orbit-size);
+  height: var(--orbit-size);
+}
+
+.ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring circle {
+  fill: none;
+}
+
+.ring-track {
+  stroke: var(--line-strong);
+  stroke-width: var(--ring-width);
+  stroke-dasharray: 3 7;
+}
+
+.ring-run {
+  stroke: var(--accent);
+  stroke-width: var(--run-width);
+  stroke-linecap: round;
+}
+
+.dot {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  margin: calc(var(--dot-size) * -0.5) 0 0 calc(var(--dot-size) * -0.5);
+  border-radius: 50%;
+  background: var(--fg);
+  box-shadow: var(--halo);
+}
+
+.node {
+  position: absolute;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 0.5em;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.5em 0.95em;
+  background: var(--surface);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: var(--size-small);
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+/* Each stop sits just outside the ring, on the side it names, so the dot's path stays clear. */
+.node-top {
+  left: 50%;
+  top: calc(12.5% - var(--node-gap));
+  transform: translate(-50%, -100%);
+}
+
+.node-right {
+  left: calc(87.5% + var(--node-gap));
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.node-bottom {
+  left: 50%;
+  top: calc(87.5% + var(--node-gap));
+  transform: translateX(-50%);
+}
+
+.node-left {
+  right: calc(87.5% + var(--node-gap));
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.node-num {
+  grid-row: 1 / 3;
+  align-self: start;
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+}
+
+.node-en {
+  grid-column: 2;
+  font-size: var(--size-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.node.is-lit {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.hub {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
