@@ -5,7 +5,7 @@ type SectionBodies = {
   beats: Array<{ body: string }>;
 };
 
-export function stripBlockquotes(markdown: string): string {
+function stripBlockquotes(markdown: string): string {
   return markdown
     .split(/\r?\n/)
     .filter((line) => !/^\s*>/.test(line))
@@ -24,7 +24,7 @@ export function formatSectionScript(section: SectionBodies): string {
   return joinSectionBodies(section, "\n\n");
 }
 
-export function speechChars(text: string): number {
+function speechChars(text: string): number {
   return stripBlockquotes(text).replace(/\s+/g, "").length;
 }
 

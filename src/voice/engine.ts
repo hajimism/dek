@@ -91,21 +91,6 @@ export function resolveStyleId(speakers: VoiceSpeaker[], speaker: string): numbe
   return style.id;
 }
 
-export function queryDurationMs(query: AudioQuery): number {
-  let seconds = query.prePhonemeLength + query.postPhonemeLength;
-  for (const phrase of query.accent_phrases) {
-    for (const mora of phrase.moras) {
-      seconds += mora.consonant_length ?? 0;
-      seconds += mora.vowel_length ?? 0;
-    }
-    if (phrase.pause_mora) {
-      seconds += phrase.pause_mora.vowel_length ?? 0;
-    }
-  }
-  const speed = query.speedScale || 1;
-  return Math.max(0, Math.round((seconds / speed) * 1000));
-}
-
 const ENGINE_SETUP: Record<string, { label: string; url: string; docker?: string }> = {
   voicevox: {
     label: "VOICEVOX",
@@ -156,14 +141,31 @@ export function engineMissingError(engine: string, baseUrl: string): DekError {
   return new EngineMissingError(engine, baseUrl);
 }
 
+/**
+ * Re-raises "engine is down" with the configured engine name so the hint
+ * names the right setup. An engine that is up but answers with an error is
+ * reported as it is; that is not an install problem.
+ */
+export async function withEngine<T>(
+  engine: string,
+  baseUrl: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof EngineMissingError) {
+      throw engineMissingError(engine, baseUrl);
+    }
+    throw error;
+  }
+}
+
 async function engineFetch(baseUrl: string, path: string, init?: RequestInit): Promise<Response> {
   let res: Response;
   try {
     res = await fetch(`${baseUrl}${path}`, init);
-  } catch (error) {
-    if (error instanceof DekError) {
-      throw error;
-    }
+  } catch {
     throw engineMissingError(engineNameForUrl(baseUrl) ?? "voice engine", baseUrl);
   }
   if (!res.ok) {

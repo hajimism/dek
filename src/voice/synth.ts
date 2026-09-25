@@ -16,13 +16,12 @@ import {
 } from "../core/voice.ts";
 import {
   engineBaseUrl,
-  engineMissingError,
   fetchAudioQuery,
   fetchEngineVersion,
   fetchSpeakers,
   fetchSynthesis,
   resolveStyleId,
-  type VoiceSpeaker,
+  withEngine,
 } from "./engine.ts";
 import { concatWavs, silentWav, wavDurationMs } from "./wav.ts";
 
@@ -54,14 +53,8 @@ export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResu
   const dict = loadVoiceDict(deck.dir);
   const baseUrl = engineBaseUrl(settings.engine);
 
-  let speakers: VoiceSpeaker[];
-  let version: string;
-  try {
-    speakers = await fetchSpeakers(baseUrl);
-    version = await fetchEngineVersion(baseUrl);
-  } catch {
-    throw engineMissingError(settings.engine, baseUrl);
-  }
+  const speakers = await withEngine(settings.engine, baseUrl, () => fetchSpeakers(baseUrl));
+  const version = await withEngine(settings.engine, baseUrl, () => fetchEngineVersion(baseUrl));
 
   const styleId = resolveStyleId(speakers, settings.speaker);
   writeResolved(deck.dir, {
