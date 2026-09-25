@@ -12,7 +12,9 @@ export function resolveRumdlBin(): string | undefined {
   }
   // Beside dek's own install, as `bun add -d rumdl` puts it, never the working directory's: a
   // repository someone else wrote can commit a node_modules/.bin/rumdl for `dek lint` to run.
-  return Bun.which("rumdl") ?? resolveBinFromAncestors("rumdl", import.meta.dir);
+  // The PATH as it is now: Bun.which alone searches the one the process started with.
+  const onPath = Bun.which("rumdl", { PATH: process.env.PATH ?? "" });
+  return onPath ?? resolveBinFromAncestors("rumdl", import.meta.dir);
 }
 
 export async function defaultRumdlRunner(scriptPath: string): Promise<string | null> {

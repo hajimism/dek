@@ -69,7 +69,7 @@ describe("resolveRumdlBin", () => {
       await withEnv({ DEK_RUMDL: undefined, PATH: emptyPath }, async () => {
         try {
           process.chdir(nested);
-          expect(Bun.which("rumdl")).toBeNull();
+          expect(Bun.which("rumdl", { PATH: emptyPath })).toBeNull();
           expect(resolveRumdlBin()).not.toBe(rumdl);
         } finally {
           process.chdir(cwd);
