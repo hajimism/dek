@@ -71,6 +71,25 @@ Build does four things: extracts each `<section class="slide">` and tags it with
 
 Open the file with `?presenter`, or press `p`, for the presenter view. A second window of the same file follows the first through `BroadcastChannel`: the audience view on the projector, the presenter view on your laptop, with no server and no network. Another deck's file open at the same time does not follow. The audience view has a slide rail on the left; click a thumbnail to jump, press `s` to hide it, and drag its edge to resize it. When the file opens, a short hint naming `s` and `p` fades in at the bottom and fades out on its own, or at the first key. The dev server does not show it, since it reloads on every save.
 
+## On the web
+
+The same file works on any static host. For a shared link to show a card with the title, description, and a picture, tell dek where `dist/` is served from:
+
+```toml
+# dek.toml
+url = "https://example.com/talks/"
+```
+
+The build then writes Open Graph and Twitter card tags into the page, and the first slide, at its last beat, as `dist/<deck>.png` beside it. Upload both. `og:url` and `og:image` are that URL plus each file name, because crawlers fetch only an absolute image URL. The title comes from the frontmatter `title`, and the description from `description`, or from `event` and `date` when there is none. Taking the picture needs Playwright; without it, or without a URL, the page still gets its title and description, and the build output says what is missing.
+
+A host that makes a new URL for each deploy, such as a preview deployment, cannot be named in `dek.toml`. Pass it at build time instead, from whatever variable the host sets, since `--url` wins over `dek.toml`:
+
+```bash
+dek build --root-dist --url "https://$DEPLOY_HOST/"
+```
+
+When the URL is only known after the upload, there is no absolute address to put in the page, and a shared link shows the title and description without the picture.
+
 To print, use the browser's own Print: every slide gets a page of its own at the deck's size and in its own layout, with every beat shown, each slide script drawn at its last beat, and no rail or hint. `dek pdf` writes the same pages without a dialog.
 
 ## Another device

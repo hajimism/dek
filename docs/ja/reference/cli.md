@@ -73,7 +73,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dek voice say TEXT` | 1 文を再生 |
 | `dek voice dict add WORD KANA [--accent N]` | `voice/dict.toml` に読みを追加。`--accent` でアクセント位置も指定する |
 | `dek voice pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
-| `dek build [--root-dist]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドする。問題があれば件数を表示し、`--json` には診断そのものが入る |
+| `dek build [--root-dist] [--url <url>]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドする。問題があれば件数を表示し、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照 |
 | `dek video [slug] [--fps N] [--root-dist]` | `dek voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` を添える。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
 | `dek pdf [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く |
 | `dek help [command] [--agent]` | ヘルプ。コマンドを渡すとその使い方とフラグ。`--agent` はエージェント向けの圧縮リファレンス。コマンドでない語は `dek <word>` と同じくエラーになり、`did you mean …?` で候補を示す |

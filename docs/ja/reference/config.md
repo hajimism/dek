@@ -27,6 +27,7 @@ my-talks/
 │       ├── assets/
 │       ├── dist/
 │       │   ├── 2026-04-vite.html
+│       │   ├── 2026-04-vite.png
 │       │   ├── 2026-04-vite.pdf
 │       │   ├── 2026-04-vite.mp4
 │       │   ├── 2026-04-vite.vtt
@@ -48,6 +49,7 @@ my-talks/
 
 ```toml
 # dek project
+url = "https://example.com/talks/"
 max_classes = 40
 cjk_per_minute = 300
 latin_per_minute = 130
@@ -63,6 +65,7 @@ speed = 1.0
 
 | キー | 既定 | 役割 |
 | --- | --- | --- |
+| `url` | なし | `dist/` を公開する http(s) の絶対 URL。あれば `dek build` が `og:url` と 1 枚目のスライドの `og:image` を書く。`--url` が優先される。[Web で公開する](/ja/guide/present#web-で公開する)を参照 |
 | `max_classes` | `40` | `DEK013` の上限 |
 | `cjk_per_minute` | `300` | CJK テキストの話速（字/分） |
 | `latin_per_minute` | `130` | それ以外のテキストの話速（語/分） |
@@ -81,6 +84,7 @@ dek は知らないキーを無視し、lint がそれぞれを `DEK008` とし�
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
 title: HTML スライドツールを作った話
+description: 発表のためのビルドシステムとは何か、なぜ台本から始めるのか。
 event: Tokyo Frontend Meetup #42
 date: 2026-04-18
 duration: 20m
@@ -92,6 +96,7 @@ lang: ja
 | キー | 必須 | 値 |
 | --- | --- | --- |
 | `title` | はい | 文字列。先頭の `##` 見出しが id だけのとき、その骨格スライドの見出しになる |
+| `description` | いいえ | 文字列。共有したリンクに出る説明。なければ `event` と `date` で代わりにする |
 | `event` | いいえ | 文字列。`dek ls` に表示される。スライドには入らない |
 | `date` | いいえ | `YYYY-MM-DD` |
 | `duration` | いいえ | `<n>m`（例: `20m`）。トークの予算 |

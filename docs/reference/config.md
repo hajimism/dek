@@ -27,6 +27,7 @@ my-talks/
 │       ├── assets/
 │       ├── dist/
 │       │   ├── 2026-04-vite.html
+│       │   ├── 2026-04-vite.png
 │       │   ├── 2026-04-vite.pdf
 │       │   ├── 2026-04-vite.mp4
 │       │   ├── 2026-04-vite.vtt
@@ -48,6 +49,7 @@ The boundary between project and deck is explained in [Projects and Decks](/guid
 
 ```toml
 # dek project
+url = "https://example.com/talks/"
 max_classes = 40
 cjk_per_minute = 300
 latin_per_minute = 130
@@ -63,6 +65,7 @@ speed = 1.0
 
 | Key | Default | Purpose |
 | --- | --- | --- |
+| `url` | none | The absolute http(s) URL `dist/` is served from. With it, `dek build` writes `og:url` and a first-slide `og:image`; `--url` overrides it. See [On the web](/guide/present#on-the-web) |
 | `max_classes` | `40` | Upper bound for `DEK013` |
 | `cjk_per_minute` | `300` | Speaking rate for CJK text, in characters |
 | `latin_per_minute` | `130` | Speaking rate for other text, in words |
@@ -81,6 +84,7 @@ The schema is defined with Zod and written to `.dek/schema.json` on every sync. 
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
 title: How I Built an HTML Slide Tool
+description: What a build system for talks looks like, and why the script comes first.
 event: Tokyo Frontend Meetup #42
 date: 2026-04-18
 duration: 20m
@@ -92,6 +96,7 @@ lang: en
 | Key | Required | Value |
 | --- | --- | --- |
 | `title` | yes | String. Used as the heading of the first skeleton slide when its `##` heading is only an id |
+| `description` | no | String. The description a shared link shows; without it, `event` and `date` stand in |
 | `event` | no | String. Shown by `dek ls`; not placed on any slide |
 | `date` | no | `YYYY-MM-DD` |
 | `duration` | no | `<n>m`, such as `20m`. The talk's budget |
