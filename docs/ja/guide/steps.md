@@ -79,7 +79,7 @@ export default {
 } satisfies DekSlide;
 ```
 
-要素はクラスではなく、`<div data-bar>` のような `data-*` 属性で探します。クラスはスタイルを当てるためのものなので、目印としてだけ使ったクラスは、どこかのスタイルシートで定義するまで `DEK010` になり、`querySelector` や `closest` に書いたクラスは `DEK017` になります。
+要素はクラスではなく、`<div data-bar>` のような `data-*` 属性で探します。クラスはスタイルを当てるためのものなので、目印としてだけ使ったクラスは、どこかのスタイルシートで定義するまで `DEK010` になり、`querySelector`、`closest`、`matches`、`getElementsByClassName` に書いたクラスは `DEK017` になります。
 
 `DekSlide` は import せずに使えます。`dek init` と `dek sync` がその定義を `.dek/slide.d.ts` に書き、`dek init` はエディタがそれを読むための `tsconfig.json` も置きます。これで `slide` は `HTMLElement`、`t` は数値になり、フィールド名の打ち間違いや `process` のような Node のグローバルは書いた時点で赤線になります。`dek sync` は `tsconfig.json` を作りも書き換えもしないので、自前の `tsconfig.json` がある場合はその `include` に `".dek/*.d.ts"` を足してください。dek はビルド時に型を消すだけで `tsc` は走らせず、実行時に効く誤りは lint が検査します。
 
@@ -92,7 +92,7 @@ export default {
 
 レールや次のプレビューも含めて、スライドの複製はどれも文書に入ってから描かれるので、`draw` の中でスライドを測っても構いません。測るときは `offsetWidth` のような、transform で拡縮されないレイアウトの寸法を使ってください。`getBoundingClientRect` はウィンドウの大きさで変わります。
 
-なので、描画は `t` だけから決め、触る要素は毎回すべて書き直してください。ジャンプや一歩戻る操作では新しいビートの終わりだけを描くので、同じ `(index, t)` なら直前に何を描いていても同じ見た目になる必要があります。タイマー、`requestAnimationFrame`、呼び出しをまたいで持ち越す状態は動画を壊します。録画は実時間で待たないからです。lint はタイマー、`Date`、`performance.now`、`Math.random` を、その行を指して `DEK017` として報告します。スクリプトは自己完結させます。`export default` だけを持つ 1 つのモジュールで、import はできず、トップレベルでは定義だけを行い、スライドに触るのは `draw` の中です。それ以外は `DEK016` で、スライドのビートにない `motion` のキーも `DEK016` です。lint はトップレベルを Node や Bun のグローバルがないサンドボックスで評価し、1 秒で打ち切ります。dek が読むのは `.ts` だけで、`slides/<id>.js` は名前を変えるよう `DEK016` で知らせます。`dek build` はスクリプトをインライン化し、`dek mv` は一緒に動かし、開発サーバでは保存するとページを読み直します。
+なので、描画は `t` だけから決め、触る要素は毎回すべて書き直してください。ジャンプや一歩戻る操作では新しいビートの終わりだけを描くので、同じ `(index, t)` なら直前に何を描いていても同じ見た目になる必要があります。タイマー、`requestAnimationFrame`、呼び出しをまたいで持ち越す状態は動画を壊します。録画は実時間で待たないからです。lint はタイマー、`requestAnimationFrame`、`Date`、`performance.now`、`Math.random` を、その行を指して `DEK017` として報告します。スクリプトは自己完結させます。`export default` だけを持つ 1 つのモジュールで、import はできず、トップレベルでは定義だけを行い、スライドに触るのは `draw` の中です。それ以外は `DEK016` で、スライドのビートにない `motion` のキーも `DEK016` です。lint はトップレベルを Node や Bun のグローバルがないサンドボックスで評価し、1 秒で打ち切ります。dek が読むのは `.ts` だけで、`slides/<id>.js` は名前を変えるよう `DEK016` で知らせます。`dek build` はスクリプトをインライン化し、`dek mv` は一緒に動かし、開発サーバでは保存するとページを読み直します。
 
 ## 静止画に写るもの
 

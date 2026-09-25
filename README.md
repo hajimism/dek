@@ -1,10 +1,10 @@
 # dek
 
-**Talk-script-first HTML slides.** Write what you will say. The slides follow.
+**A build system for talks.** Write what you will say; dek builds, measures, and ships the rest.
 
 [Documentation](https://hajimism.github.io/dek/) · [日本語 README](./README.ja.md)
 
-dek is a CLI that builds a slide deck from your talk script. You write the script in Markdown, and every `##` heading becomes one HTML slide. A project holds many decks, so the theme and conventions carry forward from one talk to the next. It is designed from the start to be worked on together with AI agents.
+dek treats a talk the way a build system treats code. The source is your talk script, in Markdown; every `##` heading becomes one HTML slide, and from the same source dek estimates the timing, lints and measures every slide, and builds a single HTML file, a PDF, and a narrated video. A project holds many decks, so the theme and conventions carry forward from one talk to the next. It is designed from the start to be worked on together with AI agents.
 
 > *dek* is *deck* with one letter dropped; the `deck` name belongs to Kong's decK.
 
@@ -22,16 +22,19 @@ The three principles and the comparison with Slidev are in [Why dek](https://haj
 
 ## Quick start
 
-[Bun](https://bun.sh) 1.3 or later. dek is not on npm; it runs from GitHub.
+[Bun](https://bun.sh) 1.3 or later. dek is not on npm yet; it installs from GitHub.
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite
 cd my-talks
-bun add github:hajimism/dek
+bun add -d github:hajimism/dek
 cd decks/2026-04-vite
 ```
 
-You create the project once. After `bun add`, `bunx dek` is enough. Three commands remain, and for a live talk that is all there is.
+`init` prints these same steps as it finishes. You create the project once. Once dek is a dev dependency of the project, `bunx dek` runs it. Three commands remain, and for a live talk that is all there is.
+
+> [!WARNING]
+> `dek` on npm is an unrelated package. `bunx dek` runs this dek only inside a project that has it installed; anywhere else it downloads and runs that other package. This package is `@hajimism/dek`; once it is on npm, `bun add -d @hajimism/dek` replaces the GitHub install.
 
 ```bash
 $EDITOR script.md   # 1. write what you will say — spend your time here
@@ -45,7 +48,7 @@ Continue with [Getting Started](https://hajimism.github.io/dek/guide/getting-sta
 
 ## Sample
 
-`sample/` is a twelve-minute deck about dek itself, built to read as a handout, set up as a full project with Playwright, rumdl, and voice. See [sample/README.md](sample/README.md).
+`sample/` is a full project with Playwright, rumdl, and voice, holding three decks about dek itself: `why-dek`, a twelve-minute explainer built to read as a handout; `lightning`, a three-minute lightning talk that builds a talk in a terminal; and `with-agents`, a six-minute talk about handing slides to an AI agent. See [sample/README.md](sample/README.md).
 
 ```bash
 cd sample

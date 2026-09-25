@@ -30,7 +30,7 @@ speed   = 1
 pause   = { sentence = 350, beat = 700 }
 ```
 
-`voice`、`rehearse`、`video` には起動中の VOICEVOX 互換エンジンが必要です。見つからなければそのコマンドだけが失敗し、hint がインストール方法を伝えます。
+`dek voice` には起動中の VOICEVOX 互換エンジンが必要です。`rehearse` と `video` に要るのは、それが書く Timeline だけです。エンジンが見つからなければ、それを必要とするコマンドだけが失敗し、hint がインストール方法を伝えます。
 
 - **VOICEVOX**（ポート 50021）: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/) か `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
 - **AivisSpeech**（ポート 10101、`engine = "aivis"`）: [aivis-project.com](https://aivis-project.com/) か `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`
@@ -47,7 +47,7 @@ dek voice dict add dek デック
 dek voice pin
 ```
 
-`dek voice` は変わった文だけを合成し、音声、文ごとのキャッシュ、`timeline.json` を `.cache/voice/` に書きます。開発サーバも保存時に同じことをします。`voice/dict.toml` にない ASCII の単語は `DEK040`（警告）で、`dict add` で読みを足します。`dek voice pin` はマスター音声と Timeline を `voice/pin/` にコピーします。キャッシュを消しても残る、持ち運べるスナップショットです。
+`dek voice` は変わった文だけを合成し、音声、文ごとのキャッシュ、`timeline.json` を `.cache/voice/` に書きます。開発サーバも保存時に同じことをします。`voice/dict.toml` にない ASCII の単語は `DEK040`（警告）で、`dict add` で読みを足します。`dek voice pin` はマスター音声と Timeline を `voice/pin/` にコピーします。キャッシュを消しても残る、持ち運べるスナップショットです。pin があるあいだ、`dek voice` と開発サーバは合成せずに pin を戻すので、台本や `voice.toml` を直しても音声には届きません。合成し直すときは `voice/pin/` を消してください。
 
 カナと尺は機械可読です。dek はクラウド TTS を既定にしません。
 

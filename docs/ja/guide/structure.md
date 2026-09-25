@@ -7,12 +7,13 @@
 ```
 my-talks/                       # プロジェクト（dek init）
 ├── dek.toml                    # lint の閾値、話速、声の既定値
-├── .gitignore                  # dist/ .cache/ .dek/server.json
+├── .gitignore                  # dist/ .cache/ .dek/server.json refs/
 ├── .rumdl.toml                 # script.md 用の Markdown ルール
 ├── theme.css                   # 新しいデッキの出発点
-├── AGENTS.md                   # エージェント向けの規約（init・new・sync が書く）
+├── AGENTS.md                   # エージェント向けの規約（dek は印の付いたブロックだけを書く。残りはあなたのもの）
 ├── tsconfig.json               # スライドのスクリプト用のエディタ設定（dek init が書く）
 ├── assets/                     # 素材置き場。デッキは使うものをコピーする
+├── refs/                       # 見本として読む他人のデッキ。dek.toml の [refs] から取得する
 ├── decks/
 │   └── 2026-04-vite/           # デッキ（dek new）
 │       ├── script.md           # 唯一の真実
@@ -51,6 +52,19 @@ cp decks/2026-09-dek/theme.css theme.css
 
 同じルールが `assets/` と声にも当てはまります。プロジェクト直下の `assets/` は素材置き場で、デッキは使うものを自分の `assets/` へコピーします。`dek.toml` に `[voice]` テーブルがあれば、`dek new` はそれをデッキの `voice/voice.toml` としてコピーするので、9 月に話者を変えても 4 月のナレーションは変わりません。
 
+## 他人のデッキは読むだけで、借りない
+
+見本にしたいデッキは、自分のものでも他人のものでも ref にします。`dek ref hajimism/dek/why-dek` は、`dek.toml` の `[refs]` に固定し、`refs/` に実体を取ってきます。実体は、元のプロジェクトと同じ配置です。
+
+```bash
+dek ref hajimism/dek/why-dek
+dek show hajimism/dek/why-dek timing
+```
+
+ref は読み取り専用です。`ls`・`show`・`theme`・`shot` で読めますが、書き換えるコマンドはありません。スライドを使いたいときは、必要な部分を自分のデッキにコピーして、自分のテーマで書き直します。自分のデッキが ref を参照することはないので、デッキは自己完結したままです。
+
+ref の本体は `dek.toml` の固定で、実体はそのコミットのコピーにすぎません。`refs/` は gitignore されます。消しても、別の場所に clone しても、何も失いません。次に読むときに、固定したコミットを取り直します。自分のデッキを lint やビルドするとき、`dek` が `refs/` を見ることはありません。
+
 ## 実行場所がスコープを決める
 
 dek はカレントディレクトリから上へ `dek.toml` を探してプロジェクトルートを決めます。Cargo がワークスペースを見つけるのと同じ方法です。
@@ -63,7 +77,7 @@ dek はカレントディレクトリから上へ `dek.toml` を探してプロ�
 
 プロジェクト直下の `dek lint` は全デッキを lint し、`dek build` は全デッキをビルドします。`dek show intro` のようにデッキが 1 つに決まる必要のあるコマンドは、名前を求めます。デッキ名は位置引数でも渡せます: `dek show 2026-04-vite intro`、`dek lint 2026-04-vite`、`dek 2026-04-vite`。
 
-プロジェクトの外で `dek new` を叩くと、`dek init` を案内して止まります。
+プロジェクトの外で `dek new` を叩くと、`dek init` を案内して止まります。`refs/` の中でコマンドを叩いたときも止まり、自分のプロジェクトに戻るよう案内します。
 
 ## 次
 

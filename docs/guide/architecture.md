@@ -15,7 +15,7 @@ The design decision that matters most is that **core** is a standalone module. T
                   └──── HTTP ─────┘   goto / current
 ```
 
-The CLI works on files directly. Only the two commands that need to know or change what a browser is showing, `goto` and `current`, talk to a running dev server over HTTP, and they fail with a hint when none is running.
+The CLI works on files directly. Only the two commands that need to know or change what a browser is showing, `goto` and `current`, talk to a running dev server over HTTP, and they fail with a hint when none is running. The only command that reaches the network is `dek ref`, which fetches a pinned commit from GitHub; `ls`, `show`, `theme`, and `shot` fetch it again when a ref's snapshot is missing. Lint, build, and sync never do.
 
 ## Voice and video
 

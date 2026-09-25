@@ -1,32 +1,35 @@
 # dek
 
-> Talk-script-first HTML slides. Write what you will say; the slides follow.
+> A build system for talks. Write what you will say; dek builds, measures, and ships the rest.
 
 Site: https://hajimism.github.io/dek/
 Japanese: https://hajimism.github.io/dek/ja/
 Repo: https://github.com/hajimism/dek
 
-Agents use the same CLI as humans. Run `dek help --agent`. Result commands accept `--json`. Diagnostics: `dek lint --format sarif`. Do not parse human-oriented text output.
+Install dek into the project with `bun add -d github:hajimism/dek` and run it as `bunx dek` from inside it; `dek` on npm is an unrelated package, which `bunx dek` runs anywhere dek is not installed.
+
+Agents use the same CLI as humans. Run `dek help --agent`, or `dek help <command>` for one command's flags. Result commands accept `--json`: branch on `ok`; every `"ok": false` carries `error` (`message`, `hint`, optional `path`/`line`), and lint, check, build, ls, and cues always carry `diagnostics` (with `line`/`column` and `data`). A check that did not run is in `skipped` with its `reason` and `hint`. 0.x: the JSON shape and DEK ids may change; DEK ids are never reused. Diagnostics: `dek lint --format sarif`. Do not parse human-oriented text output.
 
 ## Guide
 
 - [Why dek](https://hajimism.github.io/dek/guide/why.html): Boxes first means a deck you cannot deliver. The script is the parent. Three principles and a comparison.
 - [Getting Started](https://hajimism.github.io/dek/guide/getting-started.html): Install to a presentable skeleton deck without writing HTML.
 - [Tutorial](https://hajimism.github.io/dek/guide/tutorial.html): Build a ten-minute talk end to end: script, beats, a hand-written slide, a morph, a theme change, a single-file build.
-- [Projects and Decks](https://hajimism.github.io/dek/guide/structure.html): One project, many decks. Themes are copied. The working directory sets the scope.
+- [Projects and Decks](https://hajimism.github.io/dek/guide/structure.html): One project, many decks. Themes are copied. Other people's decks are read-only refs. The working directory sets the scope.
 - [The Script](https://hajimism.github.io/dek/guide/script.html): `##` is a slide, `###` is a beat, only paragraphs are spoken. Ids, renaming, timing.
-- [Slides](https://hajimism.github.io/dek/guide/slides.html): One `<section class="slide">`. Theme classes only. No JavaScript. Skeletons.
+- [Slides](https://hajimism.github.io/dek/guide/slides.html): One `<section class="slide">` per file. Theme classes only. No `<script>` in the HTML; motion lives in `slides/<id>.ts`. Skeletons, refreshed until you edit them.
 - [Beats](https://hajimism.github.io/dek/guide/steps.html): `data-step` and `data-morph`. Order from the script, appearance from CSS.
 - [Themes](https://hajimism.github.io/dek/guide/theme.html): Thirteen tokens on `.slide`. Growing the vocabulary is a design decision.
 - [Lint](https://hajimism.github.io/dek/guide/lint.html): Passing lint is the definition of done. `--visual` measures geometry.
-- [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys, one file on a USB stick, remote, PDF.
+- [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys and touch, one file on a USB stick, print, remote, PDF.
 - [Voice and Video](https://hajimism.github.io/dek/guide/voice.html): Opt-in. Cue, Timeline, rehearse, video.
-- [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): CLI plus `AGENTS.md`. `check --shot --voice`. No MCP.
+- [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): CLI plus `AGENTS.md`. `check --shot --voice`. `show` a slide, or a ref's, to use it as a model. No MCP.
 - [FAQ](https://hajimism.github.io/dek/guide/faq.html): When to use Slidev, whether voice is required, and more.
 - [Architecture](https://hajimism.github.io/dek/guide/architecture.html): Core shared by the CLI and the dev server. Optional dependencies.
+- [Agent Usability Criteria](https://hajimism.github.io/dek/guide/agent-criteria.html): The yardstick for agent-facing changes: accurate guidance, conventions that lint checks, verifiable output, actionable diagnostics, a clear definition of done.
 
 ## Reference
 
 - [CLI](https://hajimism.github.io/dek/reference/cli.html): Commands, flags, environment variables.
-- [Lint Rules](https://hajimism.github.io/dek/reference/lint.html): DEK001 to DEK043.
+- [Lint Rules](https://hajimism.github.io/dek/reference/lint.html): DEK001 to DEK044.
 - [Configuration](https://hajimism.github.io/dek/reference/config.html): Directory layout, `dek.toml`, frontmatter, `voice.toml`, tokens, layouts.

@@ -10,11 +10,11 @@ dek lint --format sarif
 dek check architecture --shot
 ```
 
-`--fix` creates skeleton HTML for missing slides (`DEK001`). It never edits an existing file.
+`--fix` syncs first: it creates skeleton HTML for missing slides (`DEK001`). It never touches a slide you have edited; only an untouched skeleton is rewritten or removed.
 
 ## Layers
 
-dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl) and writes only the rules rumdl cannot know about. rumdl is optional: dek looks for it on `PATH`, in `node_modules/.bin`, or at `DEK_RUMDL`, and skips it quietly when absent. `dek init` writes a `.rumdl.toml` that disables the first-line-heading rule, since a script starts with frontmatter and `##`.
+dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl) and writes only the rules rumdl cannot know about. rumdl is optional: dek uses `DEK_RUMDL` when it is set, else looks for it on `PATH` and then in `node_modules/.bin`, and skips it when absent: the text output says `rumdl: skipped (rumdl is not installed)` with a `help:` line on how to install it, `--json` lists it in `"skipped"` with the same reason and hint, and SARIF reports it as a tool execution notification. `dek init` writes a `.rumdl.toml` that disables the first-line-heading rule, since a script starts with frontmatter and `##`.
 
 | Layer | Covers |
 | --- | --- |
@@ -23,10 +23,10 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 | Consistency | `script.md` ↔ `slides/*.html`, beats ↔ `data-step` |
 | Theme contract | Unknown classes, inline styles, tokens, scoping, slide stylesheets |
 | Slide scripts | `slides/<id>.ts` evaluated in a sandbox |
-| Self-containment | Remote URLs, missing images, paths outside the deck |
+| Self-containment | Remote URLs, missing files, paths outside the deck |
 | Rendering | Overflow and contrast, measured in a browser |
 | Narration | Only for decks with `voice/` |
-| Length | Only for decks with a Timeline |
+| Length | Only for decks with a `duration` |
 
 ## `--visual`
 
@@ -47,7 +47,7 @@ Contrast thresholds follow WCAG AA. Body text needs 4.5:1. Large text, meaning 2
 
 Without Playwright, only the commands that need it fail, each with the install command in its hint. The rest of the CLI runs.
 
-- `dek lint --visual` is a verdict. It returns SARIF, and it is the primary way an agent checks its own output.
+- `dek lint --visual` is a verdict. It returns diagnostics (SARIF with `--format sarif`), and it is the primary way an agent checks its own output.
 - `dek shot` is an observation, not a verdict. Whether a slide looks good stays a human call.
 
 ## The definition of done does not change with voice
@@ -58,11 +58,11 @@ Without Playwright, only the commands that need it fail, each with the install c
 
 Diagnostics are SARIF 2.1.0 so that VS Code, CI, and agents all read the same format. rumdl's results are merged in as a second run. Humans get ESLint-style text by default.
 
-Wherever the fix is known, a diagnostic carries a `hint`: the beat ids a `data-step` may use, the classes a slide may use, the `assets/` path for a remote image. Text output prints it as a `help:` line, `--json` as a `hint` field, and SARIF appends it to the message.
+Wherever the fix is known, a diagnostic carries a `hint`: the beat ids a `data-step` may use, the classes a slide may use, the `assets/` path for a remote image. Text output prints it as a `help:` line, `--json` as a `hint` field, and SARIF as `properties.hint`, next to `slug` and `data`.
 
 Every diagnostic has a `severity`, `error` or `warning`. Only errors fail: `dek lint` and `dek check` exit 1 and return `"ok": false` when at least one error remains, and warnings alone exit 0 with `"ok": true`. Text output labels a warning after its rule id, and SARIF sets `level`. Diagnostics from rumdl count as errors.
 
-A diagnostic points at the file to change: `DEK001` at the section heading in `script.md`, rules about slide HTML at the line of the offending attribute. The values the message names are also in a `data` field, so an agent reads `{ "class": "headline" }` or `{ "edges": { "bottom": 591 }, "steps": ["1"] }` instead of parsing the message.
+A diagnostic points at the file to change: `DEK001` at the section heading in `script.md`, rules about slide HTML at the line and column of the offending element, attribute, or URL. Lint reports every occurrence, not the first of each kind, so one run lists everything to fix. The values the message names are also in a `data` field, so an agent reads `{ "class": "headline" }` or `{ "edges": { "bottom": 591 }, "steps": ["1"] }` instead of parsing the message.
 
 ```json
 {

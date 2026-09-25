@@ -18,14 +18,14 @@ A slide is one file in `slides/`, named after its section id, with a single root
 
 ## The rules
 
-- **One root.** The file is a `<section class="slide">` fragment. Its id comes from the file name; `dek build` injects `data-slug` for you. If you write `data-slug` yourself it must match the section id (`DEK006`).
+- **One root.** The file is a `<section class="slide">` fragment. A file with none draws nothing (`DEK007`), and a second one is dropped (`DEK009`). Its id comes from the file name; `dek build` injects `data-slug` for you. If you write `data-slug` yourself it must match the section id (`DEK006`).
 - **Write HTML your way.** Close tags or leave them open, quote attributes or do not. Anything that is valid HTML5 is accepted, and a full document with `<html>` and `<body>` around the section works too. Minification happens once, at build time.
-- **Pick a layout with `data-layout`.** The bundled theme ships `title`, `default`, `two-col`, `full-bleed`, and `quote`. `default` is top-aligned, so the heading stays put as beats add elements below it; that matters when the deck becomes a video.
+- **Pick a layout with `data-layout`.** The bundled theme ships `title`, `default`, `two-col`, `full-bleed`, and `quote`; a layout that neither the theme nor the slide's own stylesheet defines is `DEK019`. `default` is top-aligned, so the heading stays put as beats add elements below it; that matters when the deck becomes a video.
 - **The canvas is 1280 × 720.** A `4:3` deck is 1024 × 768. The player scales the whole slide with `transform: scale()` to fit the viewport.
-- **Only theme classes, or the slide's own.** A class that neither the theme nor the slide's `slides/<id>.css` defines is `DEK010`. Inline `<style>`, `style=` attributes, and `<script>` are `DEK011`.
+- **Only theme classes, or the slide's own.** A class that neither the theme nor the slide's `slides/<id>.css` defines is `DEK010`. Inline `<style>`, `style=` attributes, `<script>`, event handlers such as `onclick=`, and `javascript:` URLs are `DEK011`.
 - **Change appearance through tokens.** Colors, type, spacing, and motion come from `var(--*)`, in the theme or in the slide's own stylesheet. Never write raw values.
 - **Scripts sit beside the slide, not inside it.** Motion that CSS cannot express goes in `slides/<id>.ts`; see [Scripted motion](./steps#scripted-motion).
-- **Stay inside the deck.** Reference images as `assets/name.png`, never through `../`. Remote URLs are `DEK020`, a missing file is `DEK021`, a path that leaves the deck directory is `DEK022`, and a local `src` that does not start with `assets/` is `DEK023`.
+- **Stay inside the deck.** Reference images as `assets/name.png`, never through `../`. Remote URLs are `DEK020`, a missing file is `DEK021`, a path that leaves the deck directory is `DEK022`, and a local file that does not start with `assets/` is `DEK023`. `srcset`, `poster`, and `<video>`, `<audio>`, `<source>`, `<track>`, and `<iframe>` sources are checked the same way as `<img src>`.
 
 The document shell, the `lang` attribute from the script's frontmatter, and the player are added by the renderer. Check your work with the dev server or with one command:
 
@@ -39,7 +39,7 @@ dek check architecture --shot
 
 ```html
 <section class="slide" data-layout="default">
-  <h2 class="slide-title">architecture</h2>
+  <h2 class="slide-title"></h2>
   <ul>
     <li data-step="script-parent">The script is the parent</li>
     <li data-step="slides-hang">Slides hang off it</li>
@@ -50,9 +50,11 @@ dek check architecture --shot
 
 A section without beats gets `data-layout="title"`; with beats, `default`. Beats with an id are bound by id; beats without one are bound by their 1-based position.
 
-A heading that is only an id, such as `## recap`, has no display text, so its skeleton `<h2>` is empty. The first section is the exception: it takes the deck `title`. This keeps an English slug from ending up on a projected slide by accident. If you want words there, write `## Recap {#recap}`.
+A heading that is only an id, such as `## recap`, has no display text, so its skeleton `<h2>` is empty. The first section is the exception: it takes the deck `title`. This keeps an English slug from ending up on a projected slide by accident. Lint warns about the empty heading as `DEK024`. If you want words there, write `## Recap {#recap}`.
 
-Sync never touches an existing file. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide.
+Sync never touches a slide you have edited. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide.
+
+A skeleton nobody has edited yet is different: it is still sync's output, so sync rewrites it when the script moves on. Change the deck `title` or add a beat, and the untouched skeleton follows; the first edit you make to the file ends that. `dek sync` lists such files as `(updated)`.
 
 ## Slide stylesheets
 

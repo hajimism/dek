@@ -2,7 +2,11 @@
 
 ## How do I install it?
 
-dek is not on npm. Run it from GitHub with `bunx github:hajimism/dek`, or pin it inside a project with `bun add github:hajimism/dek` and then use `bunx dek`. See [Getting Started](./getting-started).
+dek is not on npm yet. Create a project straight from GitHub with `bunx github:hajimism/dek init`, then install it inside the project with `bun add -d github:hajimism/dek` and use `bunx dek` from there. The package is `@hajimism/dek`; once it is published, `bun add -d @hajimism/dek` will do. See [Getting Started](./getting-started).
+
+## Why does `bunx dek` run something else?
+
+`dek` on npm is an unrelated package. `bunx dek` runs the dek in the project's `node_modules`, and where there is none, it downloads that other package instead. Run `bunx dek` inside a project that has dek installed, or `bunx github:hajimism/dek` anywhere else.
 
 ## When should I use Slidev instead?
 
@@ -14,7 +18,7 @@ No. Write `script.md`, run `dek`, and the skeleton slides in the bundled theme a
 
 ## Do I have to use voice?
 
-No. A deck without `voice/` has exactly the same definition of done: lint passes. Voice adds warnings (`DEK040` through `DEK043`) only to decks that opt in.
+No. A deck without `voice/` has exactly the same definition of done: lint passes. Voice adds warnings (`DEK040`, `DEK042`, and `DEK043`) only to decks that opt in. `DEK041`, the check against `duration`, applies to every deck that sets one.
 
 ## Why do slide files have no numbers?
 
@@ -22,7 +26,7 @@ Only one file may know the order, and that file is `script.md`. Numbered file na
 
 ## Does `sync` overwrite my HTML?
 
-Never. It creates skeletons for missing slides and flags orphans. It does not rename either. Renaming is `dek mv`.
+Never once you have edited it. It creates skeletons for missing slides, rewrites a skeleton nobody has edited yet when its section changes, and removes such a skeleton when its section is gone. A file you have edited is never touched; if its section is gone, lint flags it as an orphan (`DEK002`). It does not rename either. Renaming is `dek mv`.
 
 ## What does an agent call?
 

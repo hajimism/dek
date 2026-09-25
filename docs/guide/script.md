@@ -6,6 +6,8 @@
 
 There are three rules to remember. A `##` heading is one slide. Everything under it is that slide's script. Only paragraphs are spoken.
 
+Only `##` and `###` (a beat, below) mean anything. A `#` or `####` heading is read as script text, and lint warns about it as `DEK044`.
+
 ```markdown
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
@@ -61,7 +63,7 @@ Only `{#id}` is supported. `{.class}` and `key=value` attributes are rejected. S
 
 ## Renaming and reordering
 
-`dek sync` never renames a file. If you edit `## problem` to `## the-problem`, the server generates a new skeleton for `the-problem` and the old `problem.html` becomes an orphan (`DEK002`). The link is broken; the content does not move.
+`dek sync` never renames a file. If you edit `## problem` to `## the-problem`, the server generates a new skeleton for `the-problem`. An old `problem.html` that is still the untouched skeleton, with no `problem.css` or `problem.ts` beside it, holds nothing the script cannot write again, so sync removes it; that is also what clears the example slides once you write your own script after `dek init`. One you have edited stays and becomes an orphan (`DEK002`). The link is broken; the content does not move.
 
 Changing identity is fragile, so the CLI owns it.
 
@@ -82,7 +84,7 @@ If `##` is a slide, `###` is a **beat** within it: a pause in the speaking, and 
 
 During the talk, the right arrow first steps through the beats of the current slide, then moves to the next slide. A beat does not need a matching element in the HTML. It can simply be a place where you pause, with the screen unchanged.
 
-The first beat begins as the slide arrives, and the paragraphs between `##` and the first `###` are spoken as part of it. Whatever the HTML binds to the first beat is therefore on screen from the start; to bring something in while you speak, bind it to a later beat. A slide with no `###` is a single beat, which `data-step` and `motion` call `1`.
+The first beat begins as the slide arrives, and the paragraphs between `##` and the first `###` are spoken as part of it. Whatever the HTML binds to the first beat is therefore on screen from the start; to bring something in while you speak, bind it to a later beat. A slide with no `###` is a single beat, which `motion` calls `1`. It has nothing for `data-step` to bind, since everything on it is shown from the start; a `data-step` there is `DEK003`.
 
 *When* something appears is a speaking decision, so the script owns it. *How* it appears is a visual decision, so `theme.css` owns it. The HTML side is described in [Beats](./steps).
 
@@ -94,7 +96,7 @@ The first beat begins as the slide arrives, and the paragraphs between `##` and 
 
 A slide with a long demo and a short script will estimate short. If you plan to speak during the demo, write those words down. They then count. dek has no notation for silent time, in the script or in configuration.
 
-`event` and `date` appear in `dek ls` and are available to the title slide.
+`event` and `date` appear in `dek ls`. Nothing puts them on a slide; write them into the title slide's HTML if you want them shown.
 
 ## Next
 

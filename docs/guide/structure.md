@@ -7,12 +7,13 @@ A **project** holds many **decks**. This page explains the boundary between the 
 ```
 my-talks/                       # project (dek init)
 ├── dek.toml                    # lint thresholds, speaking rate, voice defaults
-├── .gitignore                  # dist/, .cache/, .dek/server.json
+├── .gitignore                  # dist/, .cache/, .dek/server.json, refs/
 ├── .rumdl.toml                 # Markdown rules for script.md
 ├── theme.css                   # the starting point for new decks
-├── AGENTS.md                   # conventions for agents (written by init, new, and sync)
+├── AGENTS.md                   # conventions for agents (dek keeps its marked block; the rest is yours)
 ├── tsconfig.json               # editor types for slide scripts (written by dek init)
 ├── assets/                     # shared source material; decks copy what they use
+├── refs/                       # other people's decks to read, fetched from dek.toml [refs]
 ├── decks/
 │   └── 2026-04-vite/           # deck (dek new)
 │       ├── script.md           # the single source of truth
@@ -51,6 +52,19 @@ Your past decks are a theme library you never have to maintain.
 
 The same rule applies to `assets/` and to voice. The project's `assets/` holds source material; a deck copies what it uses into its own `assets/`. When `dek.toml` has a `[voice]` table, `dek new` copies it into the deck as `voice/voice.toml`, so changing the speaker in September leaves April's narration alone.
 
+## Other people's decks are read, not borrowed
+
+A deck you want to learn from, yours or someone else's, is a ref. `dek ref hajimism/dek/why-dek` pins it in `dek.toml` `[refs]` and fetches a snapshot into `refs/`, laid out as the project it came from.
+
+```bash
+dek ref hajimism/dek/why-dek
+dek show hajimism/dek/why-dek timing
+```
+
+A ref is read-only. `ls`, `show`, `theme`, and `shot` read it; nothing writes it. To use a slide, copy what you need into your own deck and rewrite it in your theme. Your deck never refers to a ref, so it stays self-contained.
+
+The pin in `dek.toml` is the ref; the snapshot is only a copy of that commit. `refs/` is gitignored, and deleting it, or cloning the project somewhere new, loses nothing: the next read fetches the pinned commit again. `dek` never looks in `refs/` when it lints or builds your decks.
+
 ## Where you run a command decides its scope
 
 dek finds the project root by walking up from the current directory until it finds `dek.toml`, the same way Cargo finds a workspace.
@@ -63,7 +77,7 @@ dek finds the project root by walking up from the current directory until it fin
 
 From the project root, `dek lint` lints every deck and `dek build` builds every deck. Commands that need exactly one deck, such as `dek show intro`, ask you to name it. The deck name can be a positional argument: `dek show 2026-04-vite intro`, `dek lint 2026-04-vite`, `dek 2026-04-vite`.
 
-Running `dek new` outside any project stops and points you at `dek init`.
+Running `dek new` outside any project stops and points you at `dek init`. A command run inside `refs/` stops too, and points you back at your project.
 
 ## Next
 

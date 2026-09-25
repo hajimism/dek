@@ -10,8 +10,11 @@ my-talks/
 ├── .gitignore
 ├── .rumdl.toml
 ├── theme.css
+├── tsconfig.json
 ├── AGENTS.md
 ├── assets/
+├── refs/                          # gitignore される。[refs] から取り直せる
+│   └── owner/repo/deck/
 ├── decks/
 │   └── 2026-04-vite/
 │       ├── script.md
@@ -35,6 +38,7 @@ my-talks/
 │           └── shots/
 └── .dek/
     ├── schema.json
+    ├── slide.d.ts
     └── server.json                # 開発サーバの起動中だけ
 ```
 
@@ -52,6 +56,9 @@ latin_per_minute = 130
 engine = "voicevox"
 speaker = "ずんだもん/ノーマル"
 speed = 1.0
+
+[refs]
+"hajimism/dek/why-dek" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
 ```
 
 | キー | 既定 | 役割 |
@@ -62,8 +69,9 @@ speed = 1.0
 | `voice.engine` | `"voicevox"` | エンジン名（`voicevox`、`aivis`、`coeiroink`、`sharevox`）またはベース URL |
 | `voice.speaker` | `[voice]` があるとき必須 | 話者。`名前/スタイル` の形 |
 | `voice.speed` | `1.0` | 話速 |
+| `refs` | なし | ref（`owner/repo/deck`）ごとに、固定したコミットの40桁の sha。`dek ref` が書く。[ref](/ja/reference/cli#ref) を参照 |
 
-未知のキーは無視されます。`[voice]` があるとき、`dek new` はそれを新しいデッキへ `voice/voice.toml` としてコピーします。
+dek は知らないキーを無視し、lint がそれぞれを `DEK008` として、おそらく意図したキーと一緒に示します。`[voice]` があるとき、`dek new` はそれを新しいデッキへ `voice/voice.toml` としてコピーします。
 
 ## frontmatter
 
@@ -83,12 +91,14 @@ lang: ja
 
 | キー | 必須 | 値 |
 | --- | --- | --- |
-| `title` | はい | 文字列。先頭の骨格スライドの見出しになる |
-| `event` | いいえ | 文字列。`dek ls` に表示され、タイトルスライドから参照できる |
+| `title` | はい | 文字列。先頭の `##` 見出しが id だけのとき、その骨格スライドの見出しになる |
+| `event` | いいえ | 文字列。`dek ls` に表示される。スライドには入らない |
 | `date` | いいえ | `YYYY-MM-DD` |
 | `duration` | いいえ | `<n>m`（例: `20m`）。トークの予算 |
 | `ratio` | いいえ | `16:9`（既定、1280 × 720）または `4:3`（1024 × 768） |
-| `lang` | いいえ | BCP 47 タグ。既定 `ja`。プレイヤー、スクリーンショット、PDF の `<html lang>` になる |
+| `lang` | いいえ | BCP 47 タグ。プレイヤー、スクリーンショット、PDF の `<html lang>` になる。省くと台本から決める。かながあれば `ja`、次にハングルなら `ko`、漢字なら `zh`、それ以外は `en` |
+
+これ以外のキーは無視され、lint が `DEK008` として示します。
 
 セクションとビートの id は `[a-z0-9-]+` にマッチし、英字を 1 文字以上含みます。数字だけの id は数値の `data-step` と衝突します。
 
@@ -103,11 +113,11 @@ pause   = { sentence = 350, beat = 700 }
 
 | キー | 役割 |
 | --- | --- |
-| `engine` | エンジン名かベース URL。`DEK_VOICE_URL` が優先する |
+| `engine` | エンジン名かベース URL。既定 `voicevox`。`DEK_VOICE_URL` が優先する |
 | `speaker` | `名前/スタイル`。`dek voice speakers` でエンジンの話者を一覧できる |
-| `speed` | 話速 |
-| `pause.sentence` | 文と文の間の無音（ミリ秒） |
-| `pause.beat` | ビート境界の無音（ミリ秒） |
+| `speed` | 話速。既定 1 |
+| `pause.sentence` | 文と文の間の無音（ミリ秒）。既定 350 |
+| `pause.beat` | ビート境界の無音（ミリ秒）。既定 700 |
 | `lead` | 画面の切り替えを第一声より何ミリ秒先にするか。既定 300 |
 | `beats."<key>".lead` | 1 枚の最初のビート（`slug`）、または 1 ビート（`slug/beat-id`、`slug/2`）だけの `lead` |
 | `beats."<key>".pause` | そのビート、またはその枚の最後のビートの直後の無音。`pause.beat` の代わり |

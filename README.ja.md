@@ -1,10 +1,10 @@
 # dek
 
-**台本から組み立てる HTML スライド。** 喋ることを書く。スライドはそこから生える。
+**発表のビルドシステム。** 喋ることを書けば、あとは dek が組み立て、測り、届ける。
 
 [ドキュメント](https://hajimism.github.io/dek/ja/) · [English README](./README.md)
 
-dek は、トークの台本からスライドを組み立てる CLI です。台本を Markdown で書くと、`##` の見出しひとつが 1 枚の HTML スライドになります。プロジェクトが複数のデッキを持つので、テーマも規約も前回のトークから次のトークへ引き継がれます。AI エージェントと一緒に作ることを、最初から前提に設計しています。
+dek は、ビルドシステムがコードを扱うように発表を扱う CLI です。ソースは Markdown で書くトークの台本で、`##` の見出しひとつが 1 枚の HTML スライドになります。同じソースから、尺を見積もり、どのスライドも lint して描画を測り、1 ファイルの HTML、PDF、読み上げ付きの動画をビルドします。プロジェクトが複数のデッキを持つので、テーマも規約も前回のトークから次のトークへ引き継がれます。AI エージェントと一緒に作ることを、最初から前提に設計しています。
 
 > *dek* は *deck* から一文字落とした綴りです。npm の `deck` は Kong の decK が使っています。
 
@@ -22,16 +22,19 @@ dek は、トークの台本からスライドを組み立てる CLI です。�
 
 ## クイックスタート
 
-[Bun](https://bun.sh) 1.3 以上。dek は npm にはなく、GitHub から実行します。
+[Bun](https://bun.sh) 1.3 以上。dek はまだ npm になく、GitHub から入れます。
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite
 cd my-talks
-bun add github:hajimism/dek
+bun add -d github:hajimism/dek
 cd decks/2026-04-vite
 ```
 
-プロジェクトを作るのは最初の一度だけです。`bun add` のあとは `bunx dek` で足ります。残るのは 3 手で、ライブ発表ならこれがすべてです。
+`init` は終わりに同じ手順を表示します。プロジェクトを作るのは最初の一度だけです。dek をプロジェクトの開発依存に入れたあとは `bunx dek` で動きます。残るのは 3 手で、ライブ発表ならこれがすべてです。
+
+> [!WARNING]
+> npm の `dek` は無関係の別パッケージです。`bunx dek` がこの dek を動かすのは、dek を入れたプロジェクトの中だけです。それ以外の場所では、その別パッケージをダウンロードして実行します。このパッケージの名前は `@hajimism/dek` で、npm に公開したあとは `bun add -d @hajimism/dek` が GitHub からのインストールに代わります。
 
 ```bash
 $EDITOR script.md   # 1. 喋ることを書く。時間をかけるのはここ
@@ -45,7 +48,7 @@ bunx dek build      # 3. dist/2026-04-vite.html — トーク全体がこの 1 �
 
 ## サンプル
 
-`sample/` は dek 自身を題材にした、配布資料としても読める約 12 分のデッキで、Playwright、rumdl、声まで入れたフル構成のプロジェクトです。手順は [sample/README.ja.md](sample/README.ja.md)。
+`sample/` は Playwright、rumdl、声まで入れたフル構成のプロジェクトで、3 つのデッキが入っています。どれも dek 自身が題材で、配布資料としても読める約 12 分の解説 `why-dek`、ターミナルで発表を作ってみせる 3 分のライトニングトーク `lightning`、スライドを AI エージェントに任せる 6 分のトーク `with-agents` です。手順は [sample/README.ja.md](sample/README.ja.md)。
 
 ```bash
 cd sample

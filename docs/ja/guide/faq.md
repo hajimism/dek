@@ -2,7 +2,11 @@
 
 ## どうやって入れますか
 
-dek は npm にありません。`bunx github:hajimism/dek` で GitHub から直接実行するか、プロジェクトの中で `bun add github:hajimism/dek` と固定してから `bunx dek` を使います。手順は[はじめる](./getting-started)にあります。
+dek はまだ npm にありません。`bunx github:hajimism/dek init` で GitHub から直接プロジェクトを作り、その中で `bun add -d github:hajimism/dek` と入れてから `bunx dek` を使います。パッケージ名は `@hajimism/dek` で、公開後は `bun add -d @hajimism/dek` で入ります。手順は[はじめる](./getting-started)にあります。
+
+## `bunx dek` で別のものが動きます
+
+npm の `dek` は無関係の別パッケージです。`bunx dek` はプロジェクトの `node_modules` にある dek を動かし、そこになければその別パッケージをダウンロードして実行します。`bunx dek` は dek を入れたプロジェクトの中で使い、それ以外の場所では `bunx github:hajimism/dek` を使ってください。
 
 ## Slidev を使うべきなのはどんなときですか
 
@@ -14,7 +18,7 @@ dek は npm にありません。`bunx github:hajimism/dek` で GitHub から直
 
 ## 声は必須ですか
 
-いいえ。`voice/` のないデッキの完成の定義はまったく同じで、lint が通れば完成です。声は、オプトインしたデッキにだけ警告（`DEK040` から `DEK043`）を足します。
+いいえ。`voice/` のないデッキの完成の定義はまったく同じで、lint が通れば完成です。声は、オプトインしたデッキにだけ警告（`DEK040`、`DEK042`、`DEK043`）を足します。`duration` との照合である `DEK041` は、`duration` を書いたすべてのデッキに掛かります。
 
 ## スライドのファイル名に番号がないのはなぜですか
 
@@ -22,7 +26,7 @@ dek は npm にありません。`bunx github:hajimism/dek` で GitHub から直
 
 ## `sync` は HTML を上書きしますか
 
-しません。HTML のないスライドに骨格を作り、孤児を警告するだけです。リネームもしません。改名は `dek mv` です。
+一度でも手を入れたファイルは上書きしません。HTML のないスライドに骨格を作り、まだ誰も編集していない骨格はセクションが変われば書き直し、セクションが消えれば削除します。編集したファイルには触れず、セクションが消えていれば lint が孤児として報告します（`DEK002`）。リネームもしません。改名は `dek mv` です。
 
 ## エージェントは何を叩きますか
 

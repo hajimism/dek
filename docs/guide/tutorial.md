@@ -11,11 +11,11 @@ You need [Bun](https://bun.sh) 1.3 or later. Voice, video, and Playwright are no
 ```bash
 bunx github:hajimism/dek init lightning --deck postmortem
 cd lightning
-bun add github:hajimism/dek
+bun add -d github:hajimism/dek
 cd decks/postmortem
 ```
 
-From here on, `dek` means `bunx dek`.
+These are the steps `init` prints when it finishes. From here on, `dek` means `bunx dek`, which runs the dek installed in the project.
 
 ## 2. Write the script
 
@@ -118,7 +118,7 @@ In a second terminal, from the deck directory:
 dek ls
 ```
 
-You see the budget from `duration`, an estimate from the word count, and the per-section split. dek estimates Latin text at 130 words per minute and CJK text at 300 characters per minute. Blockquotes are not counted. If the estimate is far below ten minutes, that is your cue to write more script, not more slides. Anything you plan to say out loud belongs in the file, because only then does it count.
+You see the budget from `duration`, an estimate from the word count, and the per-section split. dek estimates Latin text at 130 words per minute and CJK text at 300 characters per minute. Blockquotes are not counted. The script in this tutorial reads in about a minute, so `dek ls` ends with `1 diagnostic`, and `dek lint` and the dev server show what it is: a DEK041 warning that the script is short of its ten-minute budget. That warning is the point: it is your cue to write more script, not more slides. It is a warning, not an error, so lint still passes. Anything you plan to say out loud belongs in the file, because only then does it count.
 
 ## 5. Write one slide by hand
 

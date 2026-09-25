@@ -30,7 +30,7 @@ Only one server runs per project. A second `dek` finds the first one's lock in `
 
 Open `/presenter`, or press `p` in the player. You see the current slide, a preview of the next beat or slide, and the script for the current section with the current beat highlighted. Line breaks inside a paragraph are joined, so the script wraps to the presenter's width rather than your editor's; Japanese joins without a space. Stage directions, lists, and code keep their lines. A progress bar across the top tracks the whole deck. Along the bottom: the slide count, the budget for the current section, and the time elapsed since your first advance, which turns yellow past 80% of the talk's budget and red past 100%. Press `p` again to return to the audience view in the same window.
 
-Every connected window follows the presenter over WebSocket: a second monitor, another laptop, or a phone.
+Every connected window follows the presenter over WebSocket: a second monitor, another laptop, or a phone. A window whose connection drops, because the server restarted or the Wi-Fi blinked, reconnects on its own and catches up with the slide on screen; a move made on it while it was offline is sent once it is back.
 
 ```bash
 dek goto architecture
@@ -43,12 +43,21 @@ While the server is running, the terminal can drive the browser and ask which sl
 
 | Key | Action |
 | --- | --- |
-| `→` `PageDown` | Next beat, then next slide |
-| `←` | Previous beat, then previous slide |
+| `→` `PageDown` `Space` | Next beat, then next slide |
+| `←` `PageUp` `Backspace` `Shift+Space` | Previous beat, then previous slide |
+| `Home` `End` | The first beat of the talk, the last beat of the last slide |
 | `p` | Toggle the presenter view |
 | `s` | Toggle the slide rail |
+| `f` | Toggle fullscreen |
 | `↑` `↓` | Move within the slide rail |
+| `←` `→` on the rail's edge | Resize the rail |
 | `Space` | Play or pause during `dek rehearse` |
+
+Every press counts. Pressing faster than the transitions play, as a clicker skipping ahead does, cuts each transition short and lands where the presses add up to; a second window follows each press at once. Keys held with `Alt`, `Ctrl`, or `Cmd` belong to the browser, and keys typed into a field on a slide belong to the field.
+
+On a phone or tablet, tap the slide to go forward, tap its left third to go back, or swipe sideways. Taps on links, buttons, and fields are theirs. The slide rail and the key hint stay out of the way on a narrow or touch screen.
+
+The URL follows the deck: `#<slug>` for a slide, `#<slug>/<n>` for its nth beat. Each slide is one history entry, so Back leaves the slide rather than stepping back through its beats. A beat number past the slide's last opens at the last beat and rewrites the URL to say so.
 
 ## The single file
 
@@ -58,9 +67,11 @@ dek build
 
 You get `decks/<deck>/dist/<deck>.html`: every slide, the theme, the images as data URIs, and the player runtime, minified into one file. Open it in a browser and present. Use `--root-dist` to collect every deck's build under the project's `dist/`.
 
-Build does four things: extracts each `<section class="slide">` and tags it with `data-slug`, minifies the theme, inlines `assets/` as data URIs, and embeds the runtime. It uses no external HTML minifier, so the output has one shape regardless of how the input was written. Build fails if any section is missing its HTML; run the dev server or `dek sync` first.
+Build does four things: extracts each `<section class="slide">` and tags it with `data-slug`, minifies the theme, inlines `assets/` as data URIs, and embeds the runtime. It uses no external HTML minifier, so the output has one shape regardless of how the input was written. A section with no HTML yet is built from the skeleton `dek sync` would write, and lint's `DEK001` says so; a build never stops on lint.
 
-Open the file with `?presenter`, or press `p`, for the presenter view. A second window of the same file follows the first through `BroadcastChannel`: the audience view on the projector, the presenter view on your laptop, with no server and no network. The audience view has a slide rail on the left; click a thumbnail to jump, press `s` to hide it, and drag its edge to resize it. When the file opens, a short hint naming `s` and `p` fades in at the bottom and fades out on its own, or at the first key. The dev server does not show it, since it reloads on every save.
+Open the file with `?presenter`, or press `p`, for the presenter view. A second window of the same file follows the first through `BroadcastChannel`: the audience view on the projector, the presenter view on your laptop, with no server and no network. Another deck's file open at the same time does not follow. The audience view has a slide rail on the left; click a thumbnail to jump, press `s` to hide it, and drag its edge to resize it. When the file opens, a short hint naming `s` and `p` fades in at the bottom and fades out on its own, or at the first key. The dev server does not show it, since it reloads on every save.
+
+To print, use the browser's own Print: every slide gets a page of its own at the deck's size and in its own layout, with every beat shown, each slide script drawn at its last beat, and no rail or hint. `dek pdf` writes the same pages without a dialog.
 
 ## Another device
 
@@ -71,7 +82,7 @@ dek --remote
 dek --remote --password s3cret
 ```
 
-This serves on the LAN. The presenter view, `goto`, and `current` are behind HTTP Basic authentication; the audience view is open. If you omit `--password`, dek generates one and prints it with the URLs.
+This serves on the LAN. Everything made from the script is behind HTTP Basic authentication: the presenter view, `goto` and `current`, the voice timeline and audio, and the lint diagnostics the dev server streams. The audience view, the slides, and their assets are open. If you omit `--password`, dek generates one and prints it with the URLs.
 
 The one file on a USB stick is the fallback that always works. Everything else is optional.
 

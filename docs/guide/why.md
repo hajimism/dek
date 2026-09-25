@@ -4,6 +4,8 @@ Slides exist so that you can talk. Every mainstream tool forgets this. PowerPoin
 
 dek starts from the other end. You write what you will say, in what order, and for how long. Only then do you ask what should be on screen at each moment. The script is the parent. Slides are derived from it.
 
+Put another way, dek is a build system for talks. `script.md` is the source. `dek sync` generates skeleton slides from it, the way a build generates code. `dek lint` checks every slide against the theme's vocabulary the way a compiler checks types, and `--visual` renders and measures it the way a test would. `dek build`, `dek pdf`, and `dek video` are the targets, and a deck is done when the build is clean.
+
 ## Three problems dek exists to solve
 
 ### A talk is not a one-off

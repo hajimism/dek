@@ -10,11 +10,11 @@ dek lint --format sarif
 dek check architecture --shot
 ```
 
-`--fix` は HTML のないスライド（`DEK001`）に骨格を作ります。既存ファイルは決して編集しません。
+`--fix` はまず sync し、HTML のないスライド（`DEK001`）に骨格を作ります。手を入れたスライドには決して触れません。書き直したり消したりするのは、誰も編集していない骨格だけです。
 
 ## 層
 
-一般的な Markdown の作法は [rumdl](https://github.com/rvben/rumdl) に委ね、dek は rumdl が原理的に知りえないルールだけを書きます。rumdl は任意です。`PATH`、`node_modules/.bin`、`DEK_RUMDL` の順に探し、見つからなければ黙って飛ばします。`dek init` が書く `.rumdl.toml` は先頭行見出しのルールを無効にしています。台本は frontmatter と `##` で始まるからです。
+一般的な Markdown の作法は [rumdl](https://github.com/rvben/rumdl) に委ね、dek は rumdl が原理的に知りえないルールだけを書きます。rumdl は任意です。`DEK_RUMDL` が設定されていればそれを使い、なければ `PATH`、`node_modules/.bin` の順に探し、見つからなければ飛ばします。テキスト出力には `rumdl: skipped (rumdl is not installed)` と導入方法の `help:` 行が出て、`--json` では同じ理由と hint つきで `"skipped"` に入り、SARIF では tool execution notification になります。`dek init` が書く `.rumdl.toml` は先頭行見出しのルールを無効にしています。台本は frontmatter と `##` で始まるからです。
 
 | 層 | 担当 |
 | --- | --- |
@@ -23,10 +23,10 @@ dek check architecture --shot
 | 整合性 | `script.md` ↔ `slides/*.html`、ビート ↔ `data-step` |
 | テーマの契約 | 未定義クラス、インラインスタイル、トークン、スコープ、スライドごとの CSS |
 | スライドスクリプト | `slides/<id>.ts` をサンドボックスで評価 |
-| 自己完結 | リモート URL、欠けた画像、デッキ外のパス |
+| 自己完結 | リモート URL、欠けたファイル、デッキ外のパス |
 | 描画 | はみ出しとコントラスト。ブラウザで測る |
 | ナレーション | `voice/` のあるデッキだけ |
-| 尺 | Timeline のあるデッキだけ |
+| 尺 | `duration` のあるデッキだけ |
 
 ## `--visual`
 
@@ -47,7 +47,7 @@ slides/objection.html: DEK031 p.note "補足" has contrast 1.5 (#333333 on #1111
 
 Playwright がなければ、それを必要とするコマンドだけがインストール手順の hint 付きで失敗します。CLI の他の部分は動きます。
 
-- `dek lint --visual` は判定です。SARIF を返し、エージェントが自分の出力を確かめる一次手段になります。
+- `dek lint --visual` は判定です。診断を返し（`--format sarif` なら SARIF）、エージェントが自分の出力を確かめる一次手段になります。
 - `dek shot` は判定ではなく観察です。スライドが良く見えるかどうかは、人間の判断に残します。
 
 ## 完成の定義は声で変わらない
@@ -58,11 +58,11 @@ Playwright がなければ、それを必要とするコマンドだけがイン
 
 診断は SARIF 2.1.0 で統一しています。VS Code も CI もエージェントも同じ形式を読めるようにするためで、rumdl の結果は 2 つ目の run として合流します。人間向けの既定は ESLint 風のテキストです。
 
-直し方が決まっている診断には `hint` が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。テキストでは `help:` 行、`--json` では `hint` フィールド、SARIF ではメッセージの末尾に出ます。
+直し方が決まっている診断には `hint` が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。テキストでは `help:` 行、`--json` では `hint` フィールド、SARIF では `slug` や `data` と並んで `properties.hint` に入ります。
 
 すべての診断は `severity`（`error` か `warning`）を持ちます。失敗になるのは error だけです。error が 1 件でも残れば `dek lint` と `dek check` は終了コード 1 と `"ok": false` を返し、warning だけなら終了コード 0 と `"ok": true` を返します。テキストではルール ID の後ろに `warning:` と表示し、SARIF では `level` を設定します。rumdl の診断は error として扱います。
 
-診断は直すべきファイルを指します。`DEK001` は `script.md` の該当する見出し、スライド HTML のルールは問題の属性がある行です。メッセージに含まれる値は `data` フィールドにも入るので、エージェントはメッセージを解析せずに `{ "class": "headline" }` や `{ "edges": { "bottom": 591 }, "steps": ["1"] }` を読めます。
+診断は直すべきファイルを指します。`DEK001` は `script.md` の該当する見出し、スライド HTML のルールは問題の要素・属性・URL がある行と列です。lint は種類ごとの最初の一件ではなく、すべての箇所を報告するので、一度の実行で直すものがすべて並びます。メッセージに含まれる値は `data` フィールドにも入るので、エージェントはメッセージを解析せずに `{ "class": "headline" }` や `{ "edges": { "bottom": 591 }, "steps": ["1"] }` を読めます。
 
 ```json
 {

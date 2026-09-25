@@ -30,7 +30,7 @@ speed   = 1
 pause   = { sentence = 350, beat = 700 }
 ```
 
-`voice`, `rehearse`, and `video` need a running VOICEVOX-compatible engine. If none is found, only that command fails, and the hint tells you how to install one.
+`dek voice` needs a running VOICEVOX-compatible engine; `rehearse` and `video` need only the Timeline it writes. If no engine is found, only the command that needs one fails, and the hint tells you how to install one.
 
 - **VOICEVOX** at port 50021: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/), or `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
 - **AivisSpeech** at port 10101 with `engine = "aivis"`: [aivis-project.com](https://aivis-project.com/), or `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`
@@ -47,7 +47,7 @@ dek voice dict add dek デック
 dek voice pin
 ```
 
-`dek voice` synthesizes only the sentences that changed and writes the audio, the per-sentence cache, and `timeline.json` under `.cache/voice/`. The dev server does the same on save. An ASCII word missing from `voice/dict.toml` is `DEK040`, a warning; add readings with `dict add`. `dek voice pin` copies the master audio and Timeline into `voice/pin/`, a portable snapshot that survives a cleared cache.
+`dek voice` synthesizes only the sentences that changed and writes the audio, the per-sentence cache, and `timeline.json` under `.cache/voice/`. The dev server does the same on save. An ASCII word missing from `voice/dict.toml` is `DEK040`, a warning; add readings with `dict add`. `dek voice pin` copies the master audio and Timeline into `voice/pin/`, a portable snapshot that survives a cleared cache. While the pin exists, `dek voice` and the dev server restore it instead of synthesizing, so edits to the script or to `voice.toml` do not reach the audio; delete `voice/pin/` to synthesize again.
 
 Kana and durations are machine-readable. dek does not default to a cloud TTS.
 
