@@ -4,16 +4,18 @@ import { copyFile, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { startDevServer } from "../../src/server/dev.ts";
+import { POLL_INTERVAL_MS } from "../../src/server/watch.ts";
 import { spawnDekServer } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
 import { waitForEvent, withDevServer } from "../helpers/server.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 async function waitForSseEvent(
   res: Response,
   predicate: (chunk: string) => boolean,
-  timeoutMs = 3000,
+  timeoutMs = WAIT_MS,
 ): Promise<string> {
   if (!res.body) {
     throw new Error("SSE response has no body");
@@ -51,7 +53,7 @@ const leftoverHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">leftover</h2>
 </section>`);
 
-function waitForWsOpen(ws: WebSocket, timeoutMs = 3000): Promise<void> {
+function waitForWsOpen(ws: WebSocket, timeoutMs = WAIT_MS): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("websocket open timed out")), timeoutMs);
     ws.addEventListener("open", () => {
@@ -65,7 +67,7 @@ function waitForWsOpen(ws: WebSocket, timeoutMs = 3000): Promise<void> {
   });
 }
 
-function waitForWsMessage(ws: WebSocket, timeoutMs = 3000): Promise<string> {
+function waitForWsMessage(ws: WebSocket, timeoutMs = WAIT_MS): Promise<string> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("websocket message timed out")), timeoutMs);
     ws.addEventListener("message", (event) => {
@@ -79,7 +81,7 @@ function waitForWsMessage(ws: WebSocket, timeoutMs = 3000): Promise<string> {
   });
 }
 
-async function waitForOk(url: string, timeoutMs = 3000): Promise<void> {
+async function waitForOk(url: string, timeoutMs = WAIT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const res = await fetch(url);
@@ -94,7 +96,7 @@ async function waitForOk(url: string, timeoutMs = 3000): Promise<void> {
 async function waitForPage(
   url: string,
   predicate: (html: string) => boolean,
-  timeoutMs = 3000,
+  timeoutMs = WAIT_MS,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -108,6 +110,26 @@ async function waitForPage(
 }
 
 describe("startDevServer", () => {
+  // setInterval is process-wide; a concurrent test's server would show up in the spy.
+  test.serial("re-scans the project and every deck at pollIntervalMs", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const spy = spyOn(globalThis, "setInterval");
+        try {
+          const server = await startDevServer({ cwd: root, port: 0, pollIntervalMs: 123 });
+          await server.close();
+          const intervals = spy.mock.calls.map((call) => call[1]);
+          // One for the project's decks directory, one for the deck.
+          expect(intervals.filter((ms) => ms === 123)).toHaveLength(2);
+          expect(intervals).not.toContain(POLL_INTERVAL_MS);
+        } finally {
+          spy.mockRestore();
+        }
+      },
+    );
+  });
+
   test("serves the player and presenter from a deck directory", async () => {
     await withTempProject(
       {
@@ -781,7 +803,6 @@ body
           const client = new WebSocket(wsUrl);
           try {
             await waitForWsOpen(client);
-            await waitForWsMessage(client, 200).catch(() => undefined);
             const pending = waitForWsMessage(client);
             const gotoRes = await fetch(new URL("/goto", server.url), {
               method: "POST",
@@ -842,8 +863,6 @@ body
           const sender = new WebSocket(wsUrl);
           try {
             await Promise.all([waitForWsOpen(receiver), waitForWsOpen(sender)]);
-            await waitForWsMessage(receiver, 200).catch(() => undefined);
-            await waitForWsMessage(sender, 200).catch(() => undefined);
             const pending = waitForWsMessage(receiver);
             sender.send("not-json");
             sender.send(JSON.stringify({ slideIndex: 0, beatIndex: 0 }));
@@ -1003,6 +1022,108 @@ describe("startDevServer --remote", () => {
 
           const player = await fetch(server.url);
           expect(player.ok).toBe(true);
+        });
+      },
+    );
+  });
+
+  test("a server scoped to one deck serves none of the project's other decks", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", slides: { intro: introHtml } },
+          {
+            name: "secret",
+            slides: { intro: slideDocument('<section class="slide">SECRET SLIDE</section>') },
+            assets: { "plan.txt": "SECRET ASSET" },
+          },
+        ],
+      },
+      async (root) => {
+        await withDevServer({ cwd: join(root, "decks", "demo"), remote: true }, async (server) => {
+          for (const path of [
+            "/decks/secret/slide/intro",
+            "/decks/secret/theme",
+            "/decks/secret/assets/plan.txt",
+            "/decks/secret/",
+          ]) {
+            const res = await fetch(new URL(path, server.url));
+            expect({ path, status: res.status }).toEqual({ path, status: 404 });
+            expect(await res.text()).not.toContain("SECRET");
+          }
+          expect((await fetch(new URL("/slide/intro", server.url))).status).toBe(200);
+          expect((await fetch(new URL("/decks/demo/slide/intro", server.url))).status).toBe(200);
+        });
+      },
+    );
+  });
+
+  test("lets a phone in as the presenter once with a pairing code, then by cookie", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script: notesScript, slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: join(root, "decks", "demo"), remote: true }, async (server) => {
+          const code = (server.pair as () => string)();
+          const paired = await fetch(new URL(`/presenter?pair=${code}`, server.url), {
+            redirect: "manual",
+          });
+          // The code leaves the address bar and the history at once.
+          expect(paired.status).toBe(303);
+          expect(paired.headers.get("location")).toBe("/presenter");
+          const cookie = paired.headers.get("set-cookie") ?? "";
+          expect(cookie).toContain("HttpOnly");
+          expect(cookie).toContain("SameSite=Lax");
+          const session = cookie.split(";")[0] as string;
+
+          const presenter = await fetch(new URL("/presenter", server.url), {
+            headers: { cookie: session },
+          });
+          expect(presenter.status).toBe(200);
+          expect(await presenter.text()).toContain(speakerNotes);
+          const current = await fetch(new URL("/current", server.url), {
+            headers: { cookie: session },
+          });
+          expect(current.status).toBe(200);
+
+          const again = await fetch(new URL(`/presenter?pair=${code}`, server.url), {
+            redirect: "manual",
+          });
+          expect(again.status).toBe(403);
+          expect(await again.text()).toContain("press Enter");
+          const forged = await fetch(new URL("/presenter", server.url), {
+            headers: { cookie: `${session.split("=")[0]}=guess` },
+          });
+          expect(forged.status).toBe(401);
+        });
+      },
+    );
+  });
+
+  test("refuses a pairing code once it expires", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer(
+          { cwd: join(root, "decks", "demo"), remote: true, pairingTtlMs: 1 },
+          async (server) => {
+            const code = (server.pair as () => string)();
+            await Bun.sleep(5);
+            const res = await fetch(new URL(`/presenter?pair=${code}`, server.url), {
+              redirect: "manual",
+            });
+            expect(res.status).toBe(403);
+          },
+        );
+      },
+    );
+  });
+
+  test("a local server has no pairing", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
+          expect(server.pair).toBeUndefined();
         });
       },
     );
@@ -1206,7 +1327,6 @@ body
             const sender = new WebSocket(senderUrl);
             try {
               await Promise.all([waitForWsOpen(receiver), waitForWsOpen(sender)]);
-              await waitForWsMessage(receiver, 200).catch(() => undefined);
               const pending = waitForWsMessage(receiver);
               sender.send(JSON.stringify({ slideIndex: 1, beatIndex: 0 }));
               expect(JSON.parse(await pending)).toEqual({ slideIndex: 1, beatIndex: 0 });
@@ -1426,20 +1546,19 @@ describe("dek (dev server CLI)", () => {
     );
   });
 
-  test("prints presenter URL and password for --remote --password", async () => {
+  test("prints the presenter URL and the password it made for --remote", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const { url, stdout, stop } = await spawnDekServer(join(root, "decks", "demo"), {
-          args: ["--remote", "--password", "secret"],
-          timeoutMs: 3000,
-          ready: (buf) => buf.includes("password: secret"),
+          args: ["--remote"],
+          ready: (buf) => buf.includes("password: "),
         });
         try {
           expect(url).toContain("127.0.0.1");
           expect(stdout).toContain("127.0.0.1");
           expect(stdout).toContain("/presenter");
-          expect(stdout).toContain("password: secret");
+          expect(stdout).toMatch(/password: [a-km-np-z2-9]{10} \(any user name\)/);
         } finally {
           await stop();
         }

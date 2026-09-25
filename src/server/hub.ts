@@ -1,6 +1,7 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
 
 export type DevEvent =
+  /** Slides by slug: the stream reaches the audience, so it names no path on disk. */
   | { type: "sync"; created: string[]; updated?: string[]; removed?: string[] }
   | { type: "reload-slide"; slug: string }
   | { type: "reload-theme" }

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, utimes, writeFile } from "node:fs/promises";
+import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { createEventHub, type DevEvent } from "../../src/server/hub.ts";
 import { voiceFailureLine, watchDeck, watchTargets } from "../../src/server/watch.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { waitForEvent } from "../helpers/server.ts";
@@ -148,31 +149,36 @@ describe("watchDeck", () => {
             event.diagnostics.some((diagnostic) => diagnostic.id === "DEK016"),
         );
         const watcher = watchDeck(deckDir(root), hub, { pollIntervalMs: 20 });
-        let last = performance.now();
-        let worstGap = 0;
-        const probe = setInterval(() => {
-          const now = performance.now();
-          worstGap = Math.max(worstGap, now - last);
-          last = now;
-        }, 10);
+        // A synchronous evaluation holds the loop for the sandbox's whole 1s timeout, so a
+        // timer due long before that could only fire after the diagnostics are out.
+        let ticked = false;
+        let tickedFirst: boolean | undefined;
+        void diagnostics.then(
+          () => {
+            tickedFirst = ticked;
+          },
+          () => {},
+        );
         try {
           await writeFile(
             join(deckDir(root), "slides", "intro.ts"),
-            "while (true) {}\nexport default {};\n// watch-stall",
+            // A statement, not a comment, keeps it apart in the cache: transpiling drops comments,
+            // and a hit would skip the evaluation this test is about.
+            `const run = "${crypto.randomUUID()}";\nwhile (true) {}\nexport default {};`,
           );
+          const probe = setTimeout(() => {
+            ticked = true;
+          }, 100);
           await diagnostics;
-          // Let the probe run once more so it measures a stall that just ended.
-          await Bun.sleep(30);
-          // A synchronous evaluation would freeze the loop for the sandbox's 1s timeout.
-          expect(worstGap).toBeLessThan(500);
+          clearTimeout(probe);
+          expect(tickedFirst).toBe(true);
         } finally {
-          clearInterval(probe);
           watcher.close();
           hub.close();
         }
       },
     );
-  }, 15_000);
+  });
 
   test("creates skeletons for a script written before the watcher started", async () => {
     // A titled heading, so the skeleton has a title and lint has nothing to say (DEK024).
@@ -191,7 +197,7 @@ describe("watchDeck", () => {
         try {
           await diagnosed;
           expect(events).toEqual([
-            { type: "sync", created: [join(dir, "slides", "two.html")] },
+            { type: "sync", created: ["two"] },
             { type: "diagnostics", diagnostics: [] },
           ]);
         } finally {
@@ -220,7 +226,7 @@ describe("watchDeck", () => {
         try {
           await diagnosed;
           expect(events).toEqual([
-            { type: "sync", created: [join(dir, "slides", "two.html")], removed: ["old"] },
+            { type: "sync", created: ["two"], removed: ["old"] },
             { type: "diagnostics", diagnostics: [] },
           ]);
         } finally {
@@ -347,6 +353,44 @@ describe("watchDeck", () => {
           watcher.close();
           hub.close();
         }
+      },
+    );
+  });
+});
+
+describe("watchDeck scan", () => {
+  // A scan runs from a timer, where a throw would end the dev server.
+  test("reports a slides folder it may not read instead of throwing", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withTempDir(async (outside) => {
+          let scan: (() => void) | undefined;
+          const hub = createEventHub();
+          const watcher = watchDeck(deckDir(root), hub, {
+            pollIntervalMs: 50_000,
+            setInterval: ((handler: () => void) => {
+              scan = handler;
+              return 0;
+            }) as unknown as typeof setInterval,
+            clearInterval: (() => {}) as typeof clearInterval,
+          });
+          try {
+            const reported = waitForEvent(
+              hub,
+              (event) =>
+                event.type === "diagnostics" &&
+                event.diagnostics.some((diagnostic) => diagnostic.message.includes("outside")),
+            );
+            await rm(join(deckDir(root), "slides"), { recursive: true });
+            await symlink(outside, join(deckDir(root), "slides"));
+            expect(() => scan?.()).not.toThrow();
+            await reported;
+          } finally {
+            watcher.close();
+            hub.close();
+          }
+        });
       },
     );
   });

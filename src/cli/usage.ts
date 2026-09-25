@@ -11,8 +11,7 @@ export const FLAG_DOCS: Record<FlagName, { value?: string; text: string }> = {
   agent: { text: "the compact reference for agents" },
   deck: { value: "NAME", text: "target a deck by name from the project root" },
   "theme-from": { value: "DECK", text: "copy that deck's theme.css instead of the project's" },
-  remote: { text: "serve on the LAN; the presenter view needs the password" },
-  password: { value: "PWD", text: "the password for --remote (generated when omitted)" },
+  remote: { text: "serve on the LAN; the presenter view needs the password dek prints" },
   port: { value: "N", text: "listen on this port (the OS picks one when omitted)" },
   fix: { text: "create missing skeleton slides before linting" },
   visual: { text: "add the rendered rules: overflow and contrast (needs Playwright)" },
@@ -35,7 +34,7 @@ type CommandDoc = { usage: string[]; summary: string };
 /** One entry per command: how to call it and what it does. `dek help <command>` prints it. */
 export const COMMAND_DOCS: Record<CommandName, CommandDoc> = {
   serve: {
-    usage: ["dek [deck] [--visual] [--port N] [--remote [--password PWD]]"],
+    usage: ["dek [deck] [--visual] [--port N] [--remote]"],
     summary:
       "Start the dev server: skeleton slides, live reload, lint on save, and the presenter view.\nIt keeps running until Ctrl-C.",
   },
@@ -127,7 +126,7 @@ export const COMMAND_DOCS: Record<CommandName, CommandDoc> = {
     summary: "Bake dist/<deck>.mp4 from the Timeline, or one slide into .cache/video/.",
   },
   rehearse: {
-    usage: ["dek rehearse [slug] [--remote [--password PWD]]"],
+    usage: ["dek rehearse [slug] [--remote]"],
     summary: "Play the deck to its Timeline, advancing on its own. Keeps running until Ctrl-C.",
   },
 };

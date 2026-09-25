@@ -10,7 +10,6 @@ const FLAGS = {
   deck: { type: "string" },
   "theme-from": { type: "string" },
   remote: { type: "boolean" },
-  password: { type: "string" },
   port: { type: "string" },
   fix: { type: "boolean" },
   visual: { type: "boolean" },
@@ -60,8 +59,8 @@ export const COMMAND_FLAGS = {
   cues: ["deck"],
   voice: ["deck", "accent"],
   video: ["deck", "fps", "root-dist"],
-  rehearse: ["deck", "remote", "password"],
-  serve: ["deck", "remote", "password", "visual", "port"],
+  rehearse: ["deck", "remote"],
+  serve: ["deck", "remote", "visual", "port"],
 } as const satisfies Record<string, readonly FlagName[]>;
 
 export type CommandName = keyof typeof COMMAND_FLAGS;

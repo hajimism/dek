@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { hostname } from "node:os";
 import {
   clearance,
   EVENT_EXPOSURE,
@@ -62,8 +63,26 @@ describe("requestGuard", () => {
     expect(requestGuard(request("http://attacker.example:4777/"), local)?.status).toBe(403);
   });
 
-  test("serves --remote under any host, since LAN names vary and the password guards notes", () => {
-    expect(requestGuard(request("http://192.168.1.20:4777/"), { remote: true })).toBeUndefined();
+  test("serves --remote under an address or this machine's name, never another DNS name", () => {
+    const remote = { remote: true };
+    const machine = hostname()
+      .toLowerCase()
+      .replace(/\.local$/, "");
+    expect(requestGuard(request("http://192.168.1.20:4777/"), remote)).toBeUndefined();
+    expect(requestGuard(request("http://[fe80::1]:4777/"), remote)).toBeUndefined();
+    expect(requestGuard(request("http://localhost:4777/"), remote)).toBeUndefined();
+    expect(requestGuard(request(`http://${machine}.local:4777/`), remote)).toBeUndefined();
+    // A page on another site that points its own name at this address reads nothing here.
+    expect(requestGuard(request("http://attacker.example:4777/"), remote)?.status).toBe(403);
+    expect(
+      requestGuard(
+        request("http://attacker.example:4777/ws", {
+          origin: "http://attacker.example:4777",
+          upgrade: "websocket",
+        }),
+        remote,
+      )?.status,
+    ).toBe(403);
   });
 
   test("refuses a move or a socket from another origin", () => {

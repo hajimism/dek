@@ -53,7 +53,8 @@ describe("remoteBanner", () => {
     });
     expect(text).toContain("http://127.0.0.1:5173/");
     expect(text).toContain("presenter: http://192.168.1.20:5173/presenter");
-    expect(text).toContain("password: secret");
+    // The browser asks for a user name too; the password alone unlocks the presenter.
+    expect(text).toContain("password: secret (any user name)");
   });
 
   test("does not advertise a root /presenter from the project root", () => {

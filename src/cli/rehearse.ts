@@ -2,17 +2,17 @@ import { startDevServer } from "../server/dev.ts";
 import { generateRemotePassword, remoteBanner } from "../server/lan.ts";
 import { keepDevServer } from "./keep-alive.ts";
 import { requireDeckFromCwd } from "./scope.ts";
+import { offerPairing } from "./serve.ts";
 
 export async function rehearseCommand(options: {
   cwd: string;
   slug?: string;
   deck?: string;
   remote?: boolean;
-  password?: string;
 }): Promise<void> {
   const { deck } = requireDeckFromCwd(options.cwd, options.deck);
   const remote = options.remote === true;
-  const password = remote ? (options.password ?? generateRemotePassword()) : undefined;
+  const password = remote ? generateRemotePassword() : undefined;
   const server = await startDevServer({ cwd: deck.dir, remote, password });
   const url = new URL(server.url);
   url.searchParams.set("rehearse", "");
@@ -26,5 +26,6 @@ export async function rehearseCommand(options: {
       presenterPaths: ["presenter"],
     })}\n`,
   );
+  offerPairing(server, "presenter");
   await keepDevServer(server);
 }

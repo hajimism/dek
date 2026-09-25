@@ -156,9 +156,12 @@ export function watchDeck(
     }
     // A sync event reloads the whole page, so new and refreshed slides need no reload-slide.
     lastSlides = listSlideMtimes(deckDir);
-    const { created, updated } = result;
-    // Removed slides go by slug, as when the author deletes one (see scan).
-    const removed = result.removed.map((path) => basename(path, ".html"));
+    // Slides go by slug, as when the author deletes one (see scan): the stream reaches the
+    // audience, and a path on disk names the presenter's home and user.
+    const slugs = (paths: string[]) => paths.map((path) => basename(path, ".html"));
+    const created = slugs(result.created);
+    const updated = slugs(result.updated);
+    const removed = slugs(result.removed);
     if (created.length > 0 || updated.length > 0 || removed.length > 0 || options.announceEmpty) {
       hub.emit({
         type: "sync",
@@ -173,7 +176,18 @@ export function watchDeck(
     if (closed) {
       return;
     }
+    // A scan runs from a timer, where a throw would end the server: a folder that turned into a
+    // link out of the project, or one deleted between the listing and the read, is reported.
+    try {
+      scanOnce();
+    } catch (error) {
+      if (!closed && existsSync(deckDir)) {
+        hub.emit({ type: "diagnostics", diagnostics: [watchErrorDiagnostic(error)] });
+      }
+    }
+  };
 
+  const scanOnce = (): void => {
     const scriptNow = mtime(scriptPath);
     if (scriptNow > lastScript) {
       lastScript = scriptNow;

@@ -17,6 +17,7 @@ import {
   EVENT_EXPOSURE,
   type Exposure,
   mayRead,
+  pairingResponse,
   ROUTE_EXPOSURE,
   type Route,
   requestGuard,
@@ -25,6 +26,7 @@ import {
 import { createEventHub, type DevEvent, type EventHub } from "./hub.ts";
 import { generateRemotePassword, lanUrls } from "./lan.ts";
 import { isPidAlive, readDevServerLock, removeDevServerLock, writeDevServerLock } from "./lock.ts";
+import { createPairings } from "./pairing.ts";
 import { POLL_INTERVAL_MS, type Stoppable, watchDeck, watchTargets } from "./watch.ts";
 
 export type { DevEvent };
@@ -37,6 +39,8 @@ export type DevServer = {
   decks: string[];
   close: () => Promise<void>;
   events: AsyncIterable<DevEvent>;
+  /** With --remote: a one-use code for a QR code that lets a phone in as the presenter. */
+  pair?: () => string;
 };
 
 export async function startDevServer(options: {
@@ -46,7 +50,12 @@ export async function startDevServer(options: {
   visual?: boolean;
   visualRunner?: PlaywrightRunner;
   remote?: boolean;
+  /** The --remote password, which dek makes; never taken from the user, so never weak. */
   password?: string;
+  /** How long a pairing code stays good; see PAIRING_TTL_MS. */
+  pairingTtlMs?: number;
+  /** How often the project and each deck are re-scanned for edits fs.watch missed. */
+  pollIntervalMs?: number;
 }): Promise<DevServer> {
   const projectRoot = options.cwd;
   let project = resolveProject(projectRoot);
@@ -72,14 +81,22 @@ export async function startDevServer(options: {
   }
   const deckDir = scopedDeckName ? join(project.root, "decks", scopedDeckName) : fromCwd?.dir;
   const remote = options.remote === true;
-  const password = remote ? (options.password ?? generateRemotePassword()) : options.password;
+  // An empty one would open the presenter to the LAN.
+  const password = remote ? options.password || generateRemotePassword() : options.password;
   const listenHostname = remote ? "0.0.0.0" : "127.0.0.1";
+  const pairings = remote
+    ? createPairings(options.pairingTtlMs !== undefined ? { ttlMs: options.pairingTtlMs } : {})
+    : undefined;
+  // What a paired phone's cookie carries: new on every start, so a restart ends every pairing.
+  const sessionSecret = generateRemotePassword(32);
   const pages = new Map<string, string>();
   const inner = createEventHub();
   const watchers = new Map<string, Stoppable>();
+  const pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
   const watchOptions = {
     visual: options.visual === true,
     visualRunner: options.visualRunner,
+    pollIntervalMs,
   };
   const hub: EventHub = {
     emit(event) {
@@ -101,6 +118,7 @@ export async function startDevServer(options: {
       return inner[Symbol.asyncIterator]();
     },
   };
+  let stopped = false;
   const reconcileWatchers = (): void => {
     const targets = new Set(
       scopedDeckName ? [join(project.root, "decks", scopedDeckName)] : watchTargets(project),
@@ -122,6 +140,10 @@ export async function startDevServer(options: {
    * dropped when that set changes; deck pages are dropped by their own watcher's events.
    */
   const refreshProject = (): void => {
+    // fs.watch can deliver an event after close; a watcher made then would outlive the server.
+    if (stopped) {
+      return;
+    }
     try {
       const fresh = resolveProject(projectRoot);
       const changed = deckNames(fresh) !== deckNames(project);
@@ -173,7 +195,7 @@ export async function startDevServer(options: {
     const decksDir = join(project.root, "decks");
     try {
       const dirWatcher = watch(decksDir, { recursive: true }, refreshProject);
-      const timer = setInterval(refreshProject, POLL_INTERVAL_MS);
+      const timer = setInterval(refreshProject, pollIntervalMs);
       decksDirWatcher = {
         close() {
           dirWatcher.close();
@@ -223,6 +245,7 @@ export async function startDevServer(options: {
   };
 
   const stopWatching = (): void => {
+    stopped = true;
     for (const watcher of watchers.values()) {
       watcher.close();
     }
@@ -380,8 +403,14 @@ export async function startDevServer(options: {
         if (refused) {
           return refused;
         }
+        // Per port: a phone may pair with two dek servers on one machine.
+        const session = { name: `dek-presenter-${bunServer.port}`, secret: sessionSecret };
+        const code = pairings && new URL(req.url).searchParams.get("pair");
+        if (pairings && typeof code === "string") {
+          return pairingResponse(new URL(req.url), pairings.redeem(code), session);
+        }
         const routed = route(req, bunServer);
-        const seen = clearance(req, password);
+        const seen = clearance(req, password, remote ? session : undefined);
         if (!mayRead(seen, ROUTE_EXPOSURE[routed.route])) {
           return unauthorized();
         }
@@ -392,6 +421,8 @@ export async function startDevServer(options: {
         return new Response("Internal Server Error\n", { status: 500 });
       },
       websocket: {
+        // A position is a few dozen bytes; anything near this is not one.
+        maxPayloadLength: 4 * 1024,
         open(ws) {
           const clients = rooms.get(ws.data.room) ?? new Set();
           clients.add(ws);
@@ -415,9 +446,11 @@ export async function startDevServer(options: {
           if (!clients) {
             return;
           }
+          // The position as parsed, not the message as sent: nothing else rides along to the room.
+          const relayed = JSON.stringify(pos);
           for (const client of clients) {
             if (client !== ws) {
-              client.send(payload);
+              client.send(relayed);
             }
           }
         },
@@ -460,6 +493,7 @@ export async function startDevServer(options: {
     ...(deckDir ? { deckDir } : {}),
     decks: project.decks.map((deck) => deck.name),
     events: hub,
+    ...(pairings ? { pair: () => pairings.issue() } : {}),
     async close() {
       removeDevServerLock(project.root);
       // Connections first: Bun never finishes stopping once two or more SSE streams were closed.

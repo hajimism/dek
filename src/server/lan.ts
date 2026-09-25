@@ -45,6 +45,7 @@ export function remoteBanner(
   for (const path of options.presenterPaths ?? []) {
     lines.push(`presenter: ${new URL(path, presenterHost).href}`);
   }
-  lines.push(`password: ${password}`);
+  // The browser asks for a user name too; the password alone unlocks the presenter.
+  lines.push(`password: ${password} (any user name)`);
   return lines.join("\n");
 }

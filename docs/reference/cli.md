@@ -23,8 +23,8 @@ Create a project with `bunx github:hajimism/dek init`, then install dek into it 
 | Command | Purpose |
 | --- | --- |
 | `dek [deck] [--visual] [--port N]` | Start the dev server: sync on start and on every save, live reload, lint on save, presenter view. It answers only at `127.0.0.1` or `localhost`, and refuses a move (a WebSocket, `goto`) from another origin. `--visual` adds overflow and contrast on save. `--port` fixes the port; without it the OS picks a free one. It stops on Ctrl-C, or when the process that started it exits, so no server is left holding a port. |
-| `dek --remote [--password PWD]` | Serve on the LAN. The presenter view, `goto`, `current`, the voice timeline and audio, and the streamed diagnostics require the password; a 10-letter one is generated if omitted. |
-| `dek rehearse [slug] [--remote [--password PWD]]` | Auto-advance from the Timeline. Records nothing. `--remote` serves it on the LAN as `dek --remote` does. |
+| `dek --remote` | Serve on the LAN. The presenter view, `goto`, `current`, the voice timeline and audio, and the streamed diagnostics require the 10-letter password dek makes and prints on each start. On a terminal, a QR code under it opens the presenter view on a phone: once, within five minutes; Enter prints a new one. |
+| `dek rehearse [slug] [--remote]` | Auto-advance from the Timeline. Records nothing. `--remote` serves it on the LAN as `dek --remote` does. |
 
 ## Project
 
@@ -54,7 +54,7 @@ A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. 
 | `dek show <slug>` | Print everything one slide is made of, each part labeled with its file: the section's script, `slides/<slug>.html`, `.css`, and `.ts`, the rules of the deck's `theme.css` the slide uses (with only the tokens and keyframes they reach), and the assets it references. A missing file is `null`. |
 | `dek theme [layout]` | List the layouts, classes, and tokens the deck's own `theme.css` defines. With a layout, print its example markup, ready to paste into `slides/<id>.html`. |
 | `dek check <slug> [--shot] [--voice]` | Lint one slide, including rendering rules when Playwright is available. `--shot` writes a screenshot and returns its path. `--voice` returns kana and durations; on a deck without `voice/` it lists `voice` in `skipped` with how to set it up, and the rest of the check still runs. |
-| `dek shot [slug] [--step <id\|n>]` | Screenshot one slide, or every slide, at the last beat by default. Files are `.cache/shots/<slug>[-<step>].<hash>.png`; the hash is of the rendered content, so a changed theme or slide yields a new path and the stale image is removed. |
+| `dek shot [slug] [--step <id\|n>]` | Screenshot one slide, or every slide, at the last beat by default. Files are `.cache/shots/<slug>[-<step>].<hash>.png`; the hash is of the rendered content, so a changed theme or slide yields a new path and the stale image is removed. An unchanged slide keeps its image and is not shot again. |
 | `dek shot <a> --to <b> [--at 0..1]` | One frame of the View Transition from the last beat of `a` into `b`, frozen at `--at` (default 0.5). Written to `.cache/shots/<a>-to-<b>-<at>.<hash>.png`. Does not combine with `--step`. |
 | `dek mv <old> <new>` | Rename a section id, its HTML file and `data-slug`, its `.css` and `.ts` if present, and its keys in `voice/voice.toml`. Heading text is untouched. Refuses if any destination exists; all files change or none do. |
 | `dek mv <slug> --before\|--after <other>` | Reorder a section in `script.md`. |
@@ -87,7 +87,7 @@ A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. 
 | `DEK_GITHUB_API` | Base URL of the GitHub API that `dek ref` fetches from. |
 | `DEK_PLAYWRIGHT` | Path to an alternative Playwright worker script. |
 | `GITHUB_TOKEN` | Token `dek ref` sends to GitHub, for private repositories and a higher rate limit. |
-| `DEK_RUMDL` | Path to the rumdl binary, ahead of `PATH` and `node_modules/.bin`. |
+| `DEK_RUMDL` | Path to the rumdl binary, ahead of `PATH` and the `node_modules/.bin` beside dek's own install. |
 | `DEK_VIDEO` | Path to an alternative video capture worker, used instead of the Playwright worker. |
 | `DEK_VOICE_PLAY` | Set to `0` to keep `dek voice say` from playing the audio it synthesized. |
 | `DEK_VOICE_URL` | Base URL of the speech engine, overriding `voice.toml`. |

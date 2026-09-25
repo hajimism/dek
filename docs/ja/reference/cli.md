@@ -23,8 +23,8 @@
 | コマンド | 役割 |
 | --- | --- |
 | `dek [deck] [--visual] [--port N]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、プレゼンタービュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出しとコントラストも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
-| `dek --remote [--password PWD]` | LAN に公開。プレゼンタービュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断はパスワード必須。省くと 10 文字のパスワードを生成する |
-| `dek rehearse [slug] [--remote [--password PWD]]` | Timeline に沿って自走。何も録画しない。`--remote` を付けると `dek --remote` と同じく LAN に公開する |
+| `dek --remote` | LAN に公開。プレゼンタービュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断は、起動のたびに dek が作って表示する 10 文字のパスワードが必要。ターミナルではその下の QR コードでスマホからプレゼンタービューを開ける（1 回だけ、5 分以内。Enter で新しいコード） |
+| `dek rehearse [slug] [--remote]` | Timeline に沿って自走。何も録画しない。`--remote` を付けると `dek --remote` と同じく LAN に公開する |
 
 ## プロジェクト
 
@@ -54,7 +54,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dek show <slug>` | 1枚のスライドを作っているものを、ファイルごとに見出しを付けてまとめて出力。セクションの台本、`slides/<slug>.html`・`.css`・`.ts`、デッキの `theme.css` のうちそのスライドが使うルール（たどれるトークンと `@keyframes` だけを含む）、参照している assets。ファイルがなければ `null` |
 | `dek theme [layout]` | デッキ自身の `theme.css` が定義するレイアウト・クラス・トークンを一覧する。レイアウトを指定すると、`slides/<id>.html` にそのまま貼れる HTML 例を出力する |
 | `dek check <slug> [--shot] [--voice]` | 1 枚を lint。Playwright があれば描画系ルールも含む。`--shot` はスクリーンショットを書いてパスを返す。`--voice` はカナと尺を返す。`voice/` のないデッキでは `skipped` に `voice` を設定方法つきで入れ、残りのチェックは実行する |
-| `dek shot [slug] [--step <id\|n>]` | 1 枚、または全枚のスクリーンショット。既定は最終ビート。ファイルは `.cache/shots/<slug>[-<step>].<hash>.png`。hash は描画内容から決まり、テーマや HTML が変われば別パスになり、古い画像は消える |
+| `dek shot [slug] [--step <id\|n>]` | 1 枚、または全枚のスクリーンショット。既定は最終ビート。ファイルは `.cache/shots/<slug>[-<step>].<hash>.png`。hash は描画内容から決まり、テーマや HTML が変われば別パスになり、古い画像は消える。変わっていないスライドは撮り直さない |
 | `dek shot <a> --to <b> [--at 0..1]` | `a` の最終ビートから `b` へ移る View Transition を `--at`（既定 0.5）で止めた 1 フレーム。`.cache/shots/<a>-to-<b>-<at>.<hash>.png` に書く。`--step` とは併用できない |
 | `dek mv <old> <new>` | セクション id、HTML ファイルと `data-slug`、あれば `.css` と `.ts`、`voice/voice.toml` のキーを改名。見出しの文言は触らない。宛先がひとつでもあれば拒否し、すべて変わるかどれも変わらないかのどちらか |
 | `dek mv <slug> --before\|--after <other>` | `script.md` の中でセクションを並べ替える |
@@ -87,7 +87,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `DEK_GITHUB_API` | `dek ref` が取得に使う GitHub API のベース URL |
 | `DEK_PLAYWRIGHT` | 代わりの Playwright ワーカースクリプトのパス |
 | `GITHUB_TOKEN` | `dek ref` が GitHub に送るトークン。非公開リポジトリと、rate limit の引き上げに使う |
-| `DEK_RUMDL` | rumdl バイナリのパス。`PATH` と `node_modules/.bin` より優先 |
+| `DEK_RUMDL` | rumdl バイナリのパス。`PATH` と、dek 本体のインストール先の `node_modules/.bin` より優先 |
 | `DEK_VIDEO` | 代わりの動画キャプチャワーカーのパス。Playwright ワーカーの代わりに使う |
 | `DEK_VOICE_PLAY` | `0` にすると `dek voice say` が合成した音声を再生しない |
 | `DEK_VOICE_URL` | 音声エンジンのベース URL。`voice.toml` より優先 |

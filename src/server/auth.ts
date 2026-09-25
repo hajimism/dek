@@ -1,17 +1,29 @@
 import { timingSafeEqual } from "node:crypto";
+import { hostname } from "node:os";
 import type { DevEvent } from "./hub.ts";
 
 /**
  * Requests the dev server refuses before routing. A local server answers only to a loopback Host,
  * so a page on another site cannot reach it by pointing its own name at 127.0.0.1 (DNS
- * rebinding). Anything that moves the deck, a WebSocket or a POST, must come from the deck's own
+ * rebinding); a --remote one also to an address or this machine's own name, which is what the
+ * audience types, and to no other DNS name, which could be an attacker's. Anything that moves the deck, a WebSocket or a POST, must come from the deck's own
  * origin or from no browser at all: `dek goto` sends no Origin. A path that does not decode names
  * nothing, so no route has to guard its own decodeURIComponent.
  */
 export function requestGuard(req: Request, options: { remote: boolean }): Response | undefined {
-  const url = new URL(req.url);
-  if (!options.remote && !LOOPBACK_HOSTS.has(url.hostname)) {
-    return forbidden("unexpected Host; open the dev server at 127.0.0.1 or localhost");
+  let url: URL;
+  try {
+    url = new URL(req.url);
+  } catch {
+    // An HTTP/1.0 request can come with no Host at all.
+    return new Response("Bad Request: no Host\n", { status: 400 });
+  }
+  if (!servesHost(url.hostname, options.remote)) {
+    return forbidden(
+      options.remote
+        ? "unexpected Host; open the dev server at its address or this machine's name"
+        : "unexpected Host; open the dev server at 127.0.0.1 or localhost",
+    );
   }
   if (!decodes(url.pathname)) {
     return new Response("Bad Request: malformed percent-encoding\n", { status: 400 });
@@ -25,6 +37,24 @@ export function requestGuard(req: Request, options: { remote: boolean }): Respon
 }
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+function servesHost(name: string, remote: boolean): boolean {
+  if (LOOPBACK_HOSTS.has(name)) {
+    return true;
+  }
+  if (!remote) {
+    return false;
+  }
+  const machine = hostname()
+    .toLowerCase()
+    .replace(/\.local$/, "");
+  return (
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(name) ||
+    /^\[[0-9a-f:.]+\]$/i.test(name) ||
+    name === machine ||
+    name === `${machine}.local`
+  );
+}
 
 function sameOrigin(origin: string, url: URL): boolean {
   try {
@@ -93,13 +123,32 @@ export function mayRead(seen: Exposure, exposure: Exposure): boolean {
   return exposure === "audience" || seen === "presenter";
 }
 
+/** The cookie a paired phone holds instead of the password: its name, and the value it carries. */
+export type PresenterSession = { name: string; secret: string };
+
 /**
  * The most a request may read: everything without a password, and with one, only what matching
- * HTTP Basic credentials or a `?token=` (a WebSocket cannot send headers) unlock.
+ * HTTP Basic credentials, a `?token=` (a WebSocket cannot send headers), or the cookie a pairing
+ * code left unlock.
  */
-export function clearance(req: Request, password: string | undefined): Exposure {
+export function clearance(
+  req: Request,
+  password: string | undefined,
+  session?: PresenterSession,
+): Exposure {
   if (!password) {
     return "presenter";
+  }
+  if (session) {
+    const prefix = `${session.name}=`;
+    const value = req.headers
+      .get("cookie")
+      ?.split(/;\s*/)
+      .find((pair) => pair.startsWith(prefix))
+      ?.slice(prefix.length);
+    if (value !== undefined && samePassword(value, session.secret)) {
+      return "presenter";
+    }
   }
   const token = new URL(req.url).searchParams.get("token");
   if (token !== null && samePassword(token, password)) {
@@ -118,6 +167,30 @@ export function clearance(req: Request, password: string | undefined): Exposure 
     }
   }
   return "audience";
+}
+
+/**
+ * The answer to `?pair=<code>`: a good code becomes the presenter cookie and a redirect to the
+ * same page without it, so the code leaves the address bar and the history. Lax, not Strict:
+ * a phone opens the link from its camera, and a Strict cookie would miss the redirect after.
+ */
+export function pairingResponse(url: URL, redeemed: boolean, session: PresenterSession): Response {
+  if (!redeemed) {
+    return new Response(
+      "This QR code was used already or has expired; press Enter in the terminal where dek runs for a new one.\n",
+      { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } },
+    );
+  }
+  const next = new URL(url);
+  next.searchParams.delete("pair");
+  return new Response(null, {
+    status: 303,
+    headers: {
+      location: `${next.pathname}${next.search}`,
+      "set-cookie": `${session.name}=${session.secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200`,
+      "cache-control": "no-store",
+    },
+  });
 }
 
 /** The answer to a request for a presenter route without the password: ask the browser for it. */

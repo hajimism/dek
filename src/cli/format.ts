@@ -75,8 +75,8 @@ Each diagnostic has severity (error | warning) and data; only errors exit 1.
 Scope: project root = all decks; deck dir = that deck; NAME or --deck NAME.
 
 dek [deck] [--visual] [--port N]
-dek --remote [--password PWD]
-dek rehearse [slug] [--remote [--password PWD]]
+dek --remote
+dek rehearse [slug] [--remote]
 dek init [dir] [--deck NAME]
 dek new <name> [--theme-from DECK]
 dek ls [deck]

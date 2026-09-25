@@ -14,12 +14,24 @@ export function splitDeckPath(
 ): { deckName: string; rest: string } | undefined {
   const prefixed = pathname.match(/^\/decks\/([^/]+)(\/.*)?$/);
   if (prefixed?.[1]) {
+    // A server scoped to one deck shares that deck, not the rest of the project.
+    if (scopedDeckName !== undefined && !namesDeck(prefixed[1], scopedDeckName)) {
+      return undefined;
+    }
     return { deckName: prefixed[1], rest: prefixed[2] ?? "/" };
   }
   if (!scopedDeckName) {
     return undefined;
   }
   return { deckName: scopedDeckName, rest: pathname };
+}
+
+function namesDeck(segment: string, deckName: string): boolean {
+  try {
+    return segment === deckName || decodeURIComponent(segment) === deckName;
+  } catch {
+    return false;
+  }
 }
 
 export function isExactPath(pathname: string, base: string): boolean {

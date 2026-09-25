@@ -3,7 +3,7 @@ import { parseCommandLine } from "./cli/flags.ts";
 import { agentHelpText, formatError, formatErrorText, helpText } from "./cli/format.ts";
 import { type CliResult, writeSuccess } from "./cli/result.ts";
 import { peelDeckArg, REF_READERS } from "./cli/scope.ts";
-import { shouldColor } from "./cli/tty.ts";
+import { shouldColor, terminalSafe } from "./cli/tty.ts";
 import { commandHelp, helpRequest, unknownCommandError, versionText } from "./cli/usage.ts";
 import { isRefName } from "./core/ref-name.ts";
 import { resolveProject } from "./core/resolve.ts";
@@ -247,7 +247,6 @@ async function main(): Promise<void> {
         slug: args[0],
         deck,
         remote: values.remote === true,
-        password: stringFlag(values.password),
       });
       return;
     }
@@ -260,7 +259,6 @@ async function main(): Promise<void> {
             cwd,
             deck: command,
             remote: values.remote === true,
-            password: stringFlag(values.password),
             visual: values.visual === true,
             port: parsePort(stringFlag(values.port)),
           });
@@ -274,7 +272,6 @@ async function main(): Promise<void> {
           cwd,
           deck,
           remote: values.remote === true,
-          password: stringFlag(values.password),
           visual: values.visual === true,
           port: parsePort(stringFlag(values.port)),
         });
@@ -294,7 +291,7 @@ try {
   if (json) {
     process.stdout.write(`${JSON.stringify({ ok: false, error: formatError(error, { cwd }) })}\n`);
   } else {
-    process.stderr.write(`${formatErrorText(error, { color, cwd })}\n`);
+    process.stderr.write(`${terminalSafe(formatErrorText(error, { color, cwd }))}\n`);
   }
   process.exitCode = 1;
 }

@@ -33,7 +33,6 @@ describe("parseCommandLine", () => {
     expect(error).toBeInstanceOf(DekError);
     expect((error as DekError).message).toBe("unknown flag --port for dek rehearse");
     expect((error as DekError).hint).toContain("--remote");
-    expect((error as DekError).hint).toContain("--password");
   });
 
   test("rejects a value flag with nothing after it", () => {
@@ -58,10 +57,14 @@ describe("parseCommandLine", () => {
       command: undefined,
       values: { visual: true, port: "3030" },
     });
-    expect(parseCommandLine(["talk", "--remote", "--password", "pw"])).toMatchObject({
+    expect(parseCommandLine(["talk", "--remote"])).toMatchObject({
       command: "talk",
-      values: { remote: true, password: "pw" },
+      values: { remote: true },
     });
+    // dek makes the password, so none is ever too short, empty, or left in shell history.
+    expect(() => parseCommandLine(["--remote", "--password", "pw"])).toThrow(
+      "unknown flag --password",
+    );
     expect(() => parseCommandLine(["talk", "--fix"])).toThrow("unknown flag --fix for dek talk");
   });
 
