@@ -126,3 +126,110 @@ function skipSpace(line: string, i: number): number {
   }
   return j;
 }
+
+/**
+ * Sets one string key directly under a TOML table, or removes it when `value`
+ * is undefined, keeping every other line byte for byte. A missing table is
+ * added at the end; a table left with no keys and nothing but blank lines is
+ * removed.
+ */
+export function setTableKey(
+  source: string,
+  table: string,
+  key: string,
+  value: string | undefined,
+): string {
+  const lines = source.split("\n");
+  let header: number | undefined;
+  let end = lines.length;
+  const keys: number[] = [];
+  let found: number | undefined;
+  let current: string[] = [];
+  let multiline: string | undefined;
+  for (const [index, line] of lines.entries()) {
+    if (multiline) {
+      if (line.includes(multiline)) {
+        multiline = undefined;
+      }
+      continue;
+    }
+    const start = skipSpace(line, 0);
+    const ch = line[start];
+    if (ch === undefined || ch === "#") {
+      continue;
+    }
+    if (ch === "[") {
+      const open = line[start + 1] === "[" ? start + 2 : start + 1;
+      const path = readKeyPath(line, open);
+      current = path ? path.segments.map((segment) => segment.key) : [];
+      if (header !== undefined && end === lines.length) {
+        end = index;
+      }
+      if (open === start + 1 && current.length === 1 && current[0] === table) {
+        header = index;
+      }
+      continue;
+    }
+    const path = readKeyPath(line, start);
+    if (!path || line[path.end] !== "=") {
+      continue;
+    }
+    if (header !== undefined && end === lines.length && current[0] === table) {
+      keys.push(index);
+      if (path.segments.length === 1 && path.segments[0]?.key === key) {
+        found = index;
+      }
+    }
+    multiline = openMultilineString(line, skipSpace(line, path.end + 1));
+  }
+
+  const entry = `${JSON.stringify(key)} = ${JSON.stringify(value)}`;
+  if (value !== undefined) {
+    if (found !== undefined) {
+      lines[found] = replaceStringValue(lines[found] ?? "", entry);
+      return lines.join("\n");
+    }
+    if (header !== undefined) {
+      lines.splice((keys.at(-1) ?? header) + 1, 0, entry);
+      return lines.join("\n");
+    }
+    const body = source.replace(/\n+$/, "");
+    return `${body}${body ? "\n\n" : ""}[${table}]\n${entry}\n`;
+  }
+
+  if (found === undefined || header === undefined) {
+    return source;
+  }
+  const rest = lines.slice(header + 1, end).filter((_, offset) => header + 1 + offset !== found);
+  if (keys.length > 1 || rest.some((line) => line.trim() !== "")) {
+    lines.splice(found, 1);
+    return lines.join("\n");
+  }
+  const last = end === lines.length;
+  lines.splice(header, end - header);
+  const joined = lines.join("\n");
+  return last ? `${joined.replace(/\n+$/, "")}\n` : joined;
+}
+
+/** `line` with its value replaced by the one in `entry`, keeping indent and a trailing comment. */
+function replaceStringValue(line: string, entry: string): string {
+  const eq = line.indexOf("=");
+  const valueStart = skipSpace(line, eq + 1);
+  let valueEnd = valueStart;
+  const quote = line[valueStart];
+  if (quote === '"' || quote === "'") {
+    valueEnd = valueStart + 1;
+    while (valueEnd < line.length && line[valueEnd] !== quote) {
+      valueEnd += quote === '"' && line[valueEnd] === "\\" ? 2 : 1;
+    }
+    valueEnd++;
+  } else {
+    const comment = line.indexOf("#", valueStart);
+    valueEnd = comment === -1 ? line.length : comment;
+    while (valueEnd > valueStart && /\s/.test(line[valueEnd - 1] ?? "")) {
+      valueEnd--;
+    }
+  }
+  const value = entry.slice(entry.indexOf("=") + 1).trim();
+  return `${line.slice(0, valueStart)}${value}${line.slice(valueEnd)}`;
+}

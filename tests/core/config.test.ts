@@ -41,6 +41,24 @@ latin_per_minute = 100
   });
 });
 
+describe("[refs]", () => {
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+
+  test("reads each ref name and the sha it is pinned to", () => {
+    expect(parseDekToml(`[refs]\n"hajimism/dek/why-dek" = "${sha}"\n`).refs).toEqual({
+      "hajimism/dek/why-dek": sha,
+    });
+  });
+
+  test("rejects a key that is not owner/repo/deck", () => {
+    expect(() => parseDekToml(`[refs]\n"why-dek" = "${sha}"\n`)).toThrow("owner/repo/deck");
+  });
+
+  test("rejects a value that is not a full sha", () => {
+    expect(() => parseDekToml(`[refs]\n"hajimism/dek/why-dek" = "main"\n`)).toThrow("40-character");
+  });
+});
+
 describe("loadConfig", () => {
   test("returns defaults when the file is missing", () => {
     expect(loadConfig("/tmp/dek-missing-config.toml")).toEqual(DEFAULT_CONFIG);
@@ -56,5 +74,17 @@ describe("loadConfig", () => {
         latinPerMinute: DEFAULT_CONFIG.latinPerMinute,
       });
     });
+  });
+});
+
+describe("parseDekToml errors", () => {
+  test("names the line of a TOML syntax error, in the parser's words without its class name", () => {
+    try {
+      parseDekToml("max_classes = 40\nlatin_per_minute =\n", "/p/dek.toml");
+      throw new Error("expected parseDekToml to fail");
+    } catch (error) {
+      expect((error as DekError).message).toBe("invalid dek.toml: Unexpected end of file");
+      expect((error as DekError).line).toBe(2);
+    }
   });
 });

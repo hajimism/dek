@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { DekError } from "./error.ts";
-import { causeText, configHint, formatZodIssues } from "./zod.ts";
+import { isPinnedRev, isPlainRefName } from "./ref-name.ts";
+import { configHint, formatZodIssues, parseFailure } from "./zod.ts";
 
 const DekToml = z.object({
   max_classes: z.number().optional(),
@@ -14,7 +15,32 @@ const DekToml = z.object({
       speed: z.number().optional(),
     })
     .optional(),
+  refs: z
+    .record(z.string(), z.string())
+    .superRefine((refs, ctx) => {
+      for (const [name, rev] of Object.entries(refs)) {
+        if (!isPlainRefName(name)) {
+          ctx.addIssue({ code: "custom", path: [name], message: "a ref is named owner/repo/deck" });
+        } else if (!isPinnedRev(rev)) {
+          ctx.addIssue({
+            code: "custom",
+            path: [name],
+            message: `pin a ref to a 40-character commit sha; run \`dek ref ${name}\` to pin one`,
+          });
+        }
+      }
+    })
+    .optional(),
 });
+
+/** Every key dek.toml may hold, as dotted paths; `refs` takes any key below it. */
+export const DEK_TOML_KEYS = {
+  keys: [
+    ...Object.keys(DekToml.shape),
+    ...Object.keys(DekToml.shape.voice.unwrap().shape).map((key) => `voice.${key}`),
+  ],
+  openTables: ["refs"],
+};
 
 export type VoiceDefaults = {
   engine: string;
@@ -27,6 +53,8 @@ export type DekConfig = {
   cjkPerMinute: number;
   latinPerMinute: number;
   voice?: VoiceDefaults;
+  /** `[refs]`: each ref name and the commit it is pinned to. */
+  refs?: Record<string, string>;
 };
 
 export const DEFAULT_CONFIG: DekConfig = {
@@ -40,7 +68,9 @@ export function parseDekToml(source: string, path?: string): DekConfig {
   try {
     parsed = Bun.TOML.parse(source);
   } catch (error) {
-    throw new DekError(`invalid dek.toml: ${causeText(error)}`, {
+    const failure = parseFailure(error);
+    throw new DekError(`invalid dek.toml: ${failure.text}`, {
+      ...(failure.line ? { line: failure.line } : {}),
       path,
       cause: error,
       hint: configHint("dek-toml"),
@@ -65,6 +95,9 @@ export function parseDekToml(source: string, path?: string): DekConfig {
     cjkPerMinute: result.data.cjk_per_minute ?? DEFAULT_CONFIG.cjkPerMinute,
     latinPerMinute: result.data.latin_per_minute ?? DEFAULT_CONFIG.latinPerMinute,
     ...(voice ? { voice } : {}),
+    ...(result.data.refs && Object.keys(result.data.refs).length > 0
+      ? { refs: result.data.refs }
+      : {}),
   };
 }
 
