@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { statSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
@@ -10,6 +11,17 @@ import {
 import { withTempDir } from "../helpers/fs.ts";
 
 describe("writeDevServerLock", () => {
+  test("keeps the file, which may hold the --remote password, readable by its owner only", async () => {
+    await withTempDir(async (root) => {
+      writeDevServerLock(root, "http://127.0.0.1:9999/", "secret");
+      try {
+        expect(statSync(join(root, ".dek", "server.json")).mode & 0o777).toBe(0o600);
+      } finally {
+        removeDevServerLock(root);
+      }
+    });
+  });
+
   test("refuses to overwrite a lock whose pid is still alive", async () => {
     await withTempDir(async (root) => {
       await mkdir(join(root, ".dek"), { recursive: true });

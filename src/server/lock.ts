@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 
@@ -8,7 +8,7 @@ export type DevServerLock = {
   password?: string;
 };
 
-export function serverLockPath(root: string): string {
+function serverLockPath(root: string): string {
   return join(root, ".dek", "server.json");
 }
 
@@ -58,7 +58,11 @@ export function writeDevServerLock(root: string, url: string, password?: string)
     writeFileSync(
       serverLockPath(root),
       `${JSON.stringify({ url, pid: process.pid, ...(password ? { password } : {}) })}\n`,
+      // It may hold the --remote password.
+      { mode: 0o600 },
     );
+    // The mode above applies only to a new file; a stale one keeps whatever it had.
+    chmodSync(serverLockPath(root), 0o600);
   } catch (error) {
     claimedRoots.delete(root);
     throw error;

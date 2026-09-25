@@ -19,7 +19,8 @@ export function lanUrls(
   return urls;
 }
 
-export function generateRemotePassword(length = 6): string {
+/** Ten letters from an alphabet without look-alikes: 50 bits, still easy to read out to a room. */
+export function generateRemotePassword(length = 10): string {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return [...bytes].map((byte) => PASSWORD_ALPHABET[byte % PASSWORD_ALPHABET.length]).join("");

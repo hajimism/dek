@@ -30,4 +30,25 @@ describe("createEventHub", () => {
       hub.close();
     }
   });
+
+  test("sends each SSE client only the events it accepts", async () => {
+    const hub = createEventHub();
+    try {
+      const everyone = hub.subscribe();
+      const some = hub.subscribe((event) => event.type !== "diagnostics");
+      hub.emit({ type: "diagnostics", diagnostics: [] });
+      hub.emit({ type: "reload-theme" });
+      expect(await readChunks(everyone, 3)).toEqual([
+        ": connected\n\n",
+        'data: {"type":"diagnostics","diagnostics":[]}\n\n',
+        'data: {"type":"reload-theme"}\n\n',
+      ]);
+      expect(await readChunks(some, 2)).toEqual([
+        ": connected\n\n",
+        'data: {"type":"reload-theme"}\n\n',
+      ]);
+    } finally {
+      hub.close();
+    }
+  });
 });

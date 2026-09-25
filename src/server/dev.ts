@@ -1,10 +1,10 @@
-import { existsSync, statSync, watch } from "node:fs";
+import { existsSync, watch } from "node:fs";
 import { join } from "node:path";
+import { fileInside } from "../core/assets.ts";
 import { renderDeckHtml } from "../core/document.ts";
 import { escapeHtml } from "../core/escape.ts";
 import { htmlShell, readTheme, renderIndexHtml, slideFragment } from "../core/html.ts";
 import { DekError, type Project, type ProjectDeck, resolveProject } from "../core/index.ts";
-import { isInside } from "../core/path.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { locateDeck } from "../core/resolve.ts";
 import type { Position } from "../core/step.ts";
@@ -12,11 +12,20 @@ import { voiceCacheFile } from "../core/voice.ts";
 import { liveReloadScript, playerScript } from "../runtime/player.ts";
 import { parsePosition } from "../runtime/position.ts";
 import { isExactPath, splitDeckPath } from "../runtime/routes.ts";
-import { controlAuth, presenterAuth, wsHasControl } from "./auth.ts";
+import {
+  clearance,
+  EVENT_EXPOSURE,
+  type Exposure,
+  mayRead,
+  ROUTE_EXPOSURE,
+  type Route,
+  requestGuard,
+  unauthorized,
+} from "./auth.ts";
 import { createEventHub, type DevEvent, type EventHub } from "./hub.ts";
 import { generateRemotePassword, lanUrls } from "./lan.ts";
 import { isPidAlive, readDevServerLock, removeDevServerLock, writeDevServerLock } from "./lock.ts";
-import { type Stoppable, watchDeck, watchTargets } from "./watch.ts";
+import { POLL_INTERVAL_MS, type Stoppable, watchDeck, watchTargets } from "./watch.ts";
 
 export type { DevEvent };
 
@@ -75,12 +84,7 @@ export async function startDevServer(options: {
   const hub: EventHub = {
     emit(event) {
       if (event.type === "sync") {
-        try {
-          project = resolveProject(projectRoot);
-          reconcileWatchers();
-        } catch {
-          // dek.toml may disappear mid-session; keep the last known project.
-        }
+        refreshProject();
       }
       if (event.type !== "diagnostics" && event.type !== "timeline") {
         pages.clear();
@@ -90,8 +94,8 @@ export async function startDevServer(options: {
     close() {
       inner.close();
     },
-    subscribe() {
-      return inner.subscribe();
+    subscribe(accept) {
+      return inner.subscribe(accept);
     },
     [Symbol.asyncIterator]() {
       return inner[Symbol.asyncIterator]();
@@ -113,6 +117,23 @@ export async function startDevServer(options: {
       }
     }
   };
+  /**
+   * Re-read the project after decks come and go. The cached index lists the deck set, so it is
+   * dropped when that set changes; deck pages are dropped by their own watcher's events.
+   */
+  const refreshProject = (): void => {
+    try {
+      const fresh = resolveProject(projectRoot);
+      const changed = deckNames(fresh) !== deckNames(project);
+      project = fresh;
+      if (changed) {
+        pages.clear();
+      }
+      reconcileWatchers();
+    } catch {
+      // dek.toml may disappear mid-write; keep the last known project.
+    }
+  };
   const embed = {
     playerScript: await playerScript(),
     liveReloadScript: liveReloadScript(),
@@ -128,15 +149,7 @@ export async function startDevServer(options: {
     return html;
   };
 
-  const liveDeckResponse = async (
-    req: Request,
-    dir: string,
-    mode: "player" | "presenter",
-  ): Promise<Response> => {
-    const unauthorized = presenterAuth(req, mode, password);
-    if (unauthorized) {
-      return unauthorized;
-    }
+  const liveDeckResponse = async (dir: string, mode: "player" | "presenter"): Promise<Response> => {
     try {
       return htmlResponse(
         await cached(`${dir}:${mode}`, () =>
@@ -145,7 +158,7 @@ export async function startDevServer(options: {
             live: true,
             includeNotes: mode === "presenter" || !remote,
             ...embed,
-            ...(mode === "presenter" && password ? { wsToken: password } : {}),
+            ...(mode === "presenter" && password ? { liveToken: password } : {}),
           }),
         ),
       );
@@ -158,17 +171,9 @@ export async function startDevServer(options: {
   let decksDirWatcher: { close: () => void } | undefined;
   if (!scopedDeckName) {
     const decksDir = join(project.root, "decks");
-    const refresh = (): void => {
-      try {
-        project = resolveProject(projectRoot);
-        reconcileWatchers();
-      } catch {
-        /* project may be mid-write */
-      }
-    };
     try {
-      const dirWatcher = watch(decksDir, { recursive: true }, refresh);
-      const timer = setInterval(refresh, 250);
+      const dirWatcher = watch(decksDir, { recursive: true }, refreshProject);
+      const timer = setInterval(refreshProject, POLL_INTERVAL_MS);
       decksDirWatcher = {
         close() {
           dirWatcher.close();
@@ -225,39 +230,50 @@ export async function startDevServer(options: {
     hub.close();
   };
 
-  const listen = () =>
-    Bun.serve<WsData>({
-      hostname: listenHostname,
-      port: options.port ?? 0,
-      async fetch(req, bunServer) {
-        const url = new URL(req.url);
-        const room = matchWsRoom(url.pathname, scopedDeckName);
-        if (room !== undefined) {
-          if (bunServer.upgrade(req, { data: { room, control: wsHasControl(req, password) } })) {
-            return;
-          }
-          return new Response("Expected WebSocket", { status: 400 });
-        }
-        if (url.pathname === "/events") {
-          return sseResponse(hub);
-        }
-        const fragment = matchSlideFragment(url.pathname, scopedDeckName);
-        if (fragment) {
+  /**
+   * Which route a request names, and how it answers. The server checks the route's exposure
+   * before it answers, so no route guards itself; `seen` is what the request is cleared for.
+   */
+  const route = (
+    req: Request,
+    bunServer: import("bun").Server<WsData>,
+  ): {
+    route: Route;
+    respond: (seen: Exposure) => Response | undefined | Promise<Response | undefined>;
+  } => {
+    const url = new URL(req.url);
+    const room = matchWsRoom(url.pathname, scopedDeckName);
+    if (room !== undefined) {
+      return {
+        route: "socket",
+        respond: (seen) =>
+          bunServer.upgrade(req, { data: { room, control: seen === "presenter" } })
+            ? undefined
+            : new Response("Expected WebSocket", { status: 400 }),
+      };
+    }
+    if (url.pathname === "/events") {
+      return { route: "events", respond: (seen) => sseResponse(hub, seen) };
+    }
+    const fragment = matchSlideFragment(url.pathname, scopedDeckName);
+    if (fragment) {
+      return {
+        route: "slide",
+        respond: () => {
           const deck = deckForName(project, fragment.deckName);
-          if (!deck) {
-            return new Response("Not found", { status: 404 });
-          }
-          const html = slideFragment(deck, fragment.slug, { inline: false });
-          if (!html) {
-            return new Response("Not found", { status: 404 });
-          }
-          return htmlResponse(html);
-        }
-        const themeRoute = matchThemeRoute(url.pathname, scopedDeckName);
-        if (themeRoute) {
+          const html = deck && slideFragment(deck, fragment.slug, { inline: false });
+          return html ? htmlResponse(html) : notFound();
+        },
+      };
+    }
+    const themeRoute = matchThemeRoute(url.pathname, scopedDeckName);
+    if (themeRoute) {
+      return {
+        route: "theme",
+        respond: () => {
           const deck = deckForName(project, themeRoute.deckName);
           if (!deck) {
-            return new Response("Not found", { status: 404 });
+            return notFound();
           }
           return new Response(readTheme(deck.dir, false), {
             headers: {
@@ -265,12 +281,17 @@ export async function startDevServer(options: {
               "cache-control": "no-store",
             },
           });
-        }
-        const voice = matchVoiceRoute(url.pathname, scopedDeckName, project.decks);
-        if (voice) {
+        },
+      };
+    }
+    const voice = matchVoiceRoute(url.pathname, scopedDeckName, project.decks);
+    if (voice) {
+      return {
+        route: "voice",
+        respond: () => {
           const file = voiceCacheFile(voice.deckDir, voice.file);
           if (!existsSync(file)) {
-            return new Response("Not found", { status: 404 });
+            return notFound();
           }
           return new Response(Bun.file(file), {
             headers: {
@@ -279,13 +300,14 @@ export async function startDevServer(options: {
               "cache-control": "no-store",
             },
           });
-        }
-        const nav = matchNavRoute(url.pathname, scopedDeckName);
-        if (nav) {
-          const unauthorized = controlAuth(req, password);
-          if (unauthorized) {
-            return unauthorized;
-          }
+        },
+      };
+    }
+    const nav = matchNavRoute(url.pathname, scopedDeckName);
+    if (nav) {
+      return {
+        route: "control",
+        respond: async () => {
           if (nav.action === "current" && req.method === "GET") {
             return jsonResponse({ ok: true, ...currentFor(nav.room) });
           }
@@ -303,37 +325,71 @@ export async function startDevServer(options: {
             return gotoRoom(nav.room, slug);
           }
           return new Response("Method not allowed", { status: 405 });
+        },
+      };
+    }
+    const asset = matchAssetFile(url.pathname, scopedDeckName, deckDir, project);
+    if (asset) {
+      return {
+        route: "asset",
+        respond: () => new Response(Bun.file(asset), { headers: { "cache-control": "no-store" } }),
+      };
+    }
+    if (deckDir) {
+      if (isExactPath(url.pathname, "/presenter")) {
+        return { route: "presenter", respond: () => liveDeckResponse(deckDir, "presenter") };
+      }
+      if (url.pathname === "/" || url.pathname === "") {
+        return { route: "player", respond: () => liveDeckResponse(deckDir, "player") };
+      }
+      return { route: "missing", respond: notFound };
+    }
+    const deckRoute = matchDeckRoute(url.pathname);
+    if (deckRoute) {
+      const deck = deckForName(project, deckRoute.name);
+      if (!deck) {
+        return { route: "missing", respond: notFound };
+      }
+      return { route: deckRoute.mode, respond: () => liveDeckResponse(deck.dir, deckRoute.mode) };
+    }
+    if (url.pathname !== "/" && url.pathname !== "") {
+      return { route: "missing", respond: notFound };
+    }
+    return {
+      route: "index",
+      respond: async () =>
+        htmlResponse(
+          await cached("index", () =>
+            renderIndexHtml(
+              project.decks.map((deck) => ({ name: deck.name, title: deck.deck.title })),
+              project.failed.map((entry) => ({ name: entry.name })),
+            ),
+          ),
+        ),
+    };
+  };
+
+  const listen = () =>
+    Bun.serve<WsData>({
+      hostname: listenHostname,
+      port: options.port ?? 0,
+      // Never Bun's development error page: it shows the source and absolute paths to anyone.
+      development: false,
+      fetch(req, bunServer) {
+        const refused = requestGuard(req, { remote });
+        if (refused) {
+          return refused;
         }
-        const asset = matchAssetFile(url.pathname, scopedDeckName, deckDir, project);
-        if (asset) {
-          return new Response(Bun.file(asset), {
-            headers: { "cache-control": "no-store" },
-          });
+        const routed = route(req, bunServer);
+        const seen = clearance(req, password);
+        if (!mayRead(seen, ROUTE_EXPOSURE[routed.route])) {
+          return unauthorized();
         }
-        if (deckDir) {
-          const mode = isExactPath(url.pathname, "/presenter") ? "presenter" : "player";
-          return liveDeckResponse(req, deckDir, mode);
-        }
-        const deckRoute = matchDeckRoute(url.pathname);
-        if (deckRoute) {
-          const deck = deckForName(project, deckRoute.name);
-          if (!deck) {
-            return new Response("Not found", { status: 404 });
-          }
-          return liveDeckResponse(req, deck.dir, deckRoute.mode);
-        }
-        if (url.pathname !== "/" && url.pathname !== "") {
-          return new Response("Not found", { status: 404 });
-        }
-        return htmlResponse(
-          await cached("index", () => {
-            const fresh = resolveProject(options.cwd);
-            return renderIndexHtml(
-              fresh.decks.map((deck) => ({ name: deck.name, title: deck.deck.title })),
-              fresh.failed.map((entry) => ({ name: entry.name })),
-            );
-          }),
-        );
+        return routed.respond(seen);
+      },
+      error(error) {
+        console.error(error);
+        return new Response("Internal Server Error\n", { status: 500 });
       },
       websocket: {
         open(ws) {
@@ -405,13 +461,10 @@ export async function startDevServer(options: {
     decks: project.decks.map((deck) => deck.name),
     events: hub,
     async close() {
-      for (const watcher of watchers.values()) {
-        watcher.close();
-      }
-      decksDirWatcher?.close();
-      hub.close();
       removeDevServerLock(project.root);
+      // Connections first: Bun never finishes stopping once two or more SSE streams were closed.
       await server.stop(true);
+      stopWatching();
     },
   };
 }
@@ -453,6 +506,14 @@ function matchThemeRoute(
   });
 }
 
+/** Every deck name the index lists, parsed or not, as one comparable key. */
+function deckNames(project: Project): string {
+  return [...project.decks, ...project.failed]
+    .map((entry) => entry.name)
+    .sort()
+    .join("\n");
+}
+
 function deckForName(project: Project, name: string): ProjectDeck | undefined {
   return project.decks.find((entry) => entry.name === name);
 }
@@ -483,12 +544,9 @@ function matchAssetFile(
 }
 
 function safeDeckAsset(deckDir: string, relative: string): string | undefined {
-  const file = join(deckDir, "assets", decodeURIComponent(relative));
   const root = join(deckDir, "assets");
-  if (!isInside(file, root) || !existsSync(file) || !statSync(file).isFile()) {
-    return undefined;
-  }
-  return file;
+  const found = fileInside(join(root, decodeURIComponent(relative)), root);
+  return found.kind === "file" ? found.path : undefined;
 }
 
 function matchWsRoom(pathname: string, scopedDeckName: string | undefined): string | undefined {
@@ -573,14 +631,22 @@ function errorPage(error: unknown): string {
   });
 }
 
-function sseResponse(hub: EventHub): Response {
-  return new Response(hub.subscribe(), {
-    headers: {
-      "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-store",
-      connection: "keep-alive",
+/** The event stream, carrying only the events the request is cleared to read. */
+function sseResponse(hub: EventHub, seen: Exposure): Response {
+  return new Response(
+    hub.subscribe((event) => mayRead(seen, EVENT_EXPOSURE[event.type])),
+    {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-store",
+        connection: "keep-alive",
+      },
     },
-  });
+  );
+}
+
+function notFound(): Response {
+  return new Response("Not found", { status: 404 });
 }
 
 function listenError(error: unknown, port: number | undefined): unknown {

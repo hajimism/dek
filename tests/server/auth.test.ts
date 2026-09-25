@@ -1,48 +1,107 @@
 import { describe, expect, test } from "bun:test";
-import { presenterAuth, wsHasControl } from "../../src/server/auth.ts";
+import {
+  clearance,
+  EVENT_EXPOSURE,
+  mayRead,
+  ROUTE_EXPOSURE,
+  requestGuard,
+} from "../../src/server/auth.ts";
 
-describe("presenterAuth", () => {
-  test("returns 401 for malformed basic credentials instead of throwing", () => {
-    const response = presenterAuth(
-      new Request("http://127.0.0.1/presenter", {
-        headers: { authorization: "Basic %%%" },
-      }),
-      "presenter",
-      "secret",
-    );
-    expect(response?.status).toBe(401);
+const basic = (password: string) => `Basic ${Buffer.from(`dek:${password}`).toString("base64")}`;
+
+describe("clearance", () => {
+  test("clears every request for the presenter when no password is set", () => {
+    expect(clearance(new Request("http://127.0.0.1/ws"), undefined)).toBe("presenter");
   });
 
-  test("accepts a matching password", () => {
-    const header = `Basic ${Buffer.from("dek:secret").toString("base64")}`;
-    expect(
-      presenterAuth(
-        new Request("http://127.0.0.1/presenter", { headers: { authorization: header } }),
-        "presenter",
-        "secret",
-      ),
-    ).toBeUndefined();
+  test("clears matching basic credentials or a token query, and nothing else", () => {
+    const at = (url: string, headers: Record<string, string> = {}) =>
+      clearance(new Request(url, { headers }), "secret");
+    expect(at("http://127.0.0.1/presenter", { authorization: basic("secret") })).toBe("presenter");
+    expect(at("http://127.0.0.1/ws?token=secret")).toBe("presenter");
+    expect(at("http://127.0.0.1/ws?token=nope")).toBe("audience");
+    expect(at("http://127.0.0.1/presenter", { authorization: basic("nope") })).toBe("audience");
+    expect(at("http://127.0.0.1/presenter", { authorization: "Basic %%%" })).toBe("audience");
+    expect(at("http://127.0.0.1/presenter")).toBe("audience");
   });
 });
 
-describe("wsHasControl", () => {
-  test("allows every socket when no password is set", () => {
-    expect(wsHasControl(new Request("http://127.0.0.1/ws"), undefined)).toBe(true);
+describe("exposure", () => {
+  test("keeps the script, the voice made from it, and control for the presenter", () => {
+    expect(ROUTE_EXPOSURE.presenter).toBe("presenter");
+    expect(ROUTE_EXPOSURE.voice).toBe("presenter");
+    expect(ROUTE_EXPOSURE.control).toBe("presenter");
+    expect(ROUTE_EXPOSURE.player).toBe("audience");
+    expect(EVENT_EXPOSURE.diagnostics).toBe("presenter");
+    expect(EVENT_EXPOSURE["reload-slide"]).toBe("audience");
   });
 
-  test("allows a matching token query when a password is set", () => {
-    expect(wsHasControl(new Request("http://127.0.0.1/ws?token=secret"), "secret")).toBe(true);
-    expect(wsHasControl(new Request("http://127.0.0.1/ws?token=nope"), "secret")).toBe(false);
-    expect(wsHasControl(new Request("http://127.0.0.1/ws"), "secret")).toBe(false);
+  test("lets the presenter read everything and the audience only its share", () => {
+    expect(mayRead("presenter", "presenter")).toBe(true);
+    expect(mayRead("presenter", "audience")).toBe(true);
+    expect(mayRead("audience", "audience")).toBe(true);
+    expect(mayRead("audience", "presenter")).toBe(false);
+  });
+});
+
+describe("requestGuard", () => {
+  const request = (url: string, headers: Record<string, string> = {}, method = "GET") =>
+    new Request(url, { method, headers });
+
+  test("answers 400 to a path whose percent-encoding does not decode", () => {
+    const local = { remote: false };
+    expect(requestGuard(request("http://127.0.0.1:4777/assets/%E0%A4%A"), local)?.status).toBe(400);
+    expect(requestGuard(request("http://127.0.0.1:4777/assets/a%20b.png"), local)).toBeUndefined();
   });
 
-  test("allows matching basic credentials on the upgrade request", () => {
-    const header = `Basic ${Buffer.from("dek:secret").toString("base64")}`;
+  test("serves a local server only under a loopback host name, against DNS rebinding", () => {
+    const local = { remote: false };
+    expect(requestGuard(request("http://127.0.0.1:4777/"), local)).toBeUndefined();
+    expect(requestGuard(request("http://localhost:4777/"), local)).toBeUndefined();
+    expect(requestGuard(request("http://[::1]:4777/"), local)).toBeUndefined();
+    expect(requestGuard(request("http://attacker.example:4777/"), local)?.status).toBe(403);
+  });
+
+  test("serves --remote under any host, since LAN names vary and the password guards notes", () => {
+    expect(requestGuard(request("http://192.168.1.20:4777/"), { remote: true })).toBeUndefined();
+  });
+
+  test("refuses a move or a socket from another origin", () => {
+    const local = { remote: false };
+    const evil = { origin: "https://attacker.example" };
+    expect(requestGuard(request("http://127.0.0.1:4777/goto", evil, "POST"), local)?.status).toBe(
+      403,
+    );
     expect(
-      wsHasControl(
-        new Request("http://127.0.0.1/ws", { headers: { authorization: header } }),
-        "secret",
+      requestGuard(request("http://127.0.0.1:4777/ws", { ...evil, upgrade: "websocket" }), local)
+        ?.status,
+    ).toBe(403);
+    expect(
+      requestGuard(
+        request("http://127.0.0.1:4777/ws", { origin: "null", upgrade: "websocket" }),
+        local,
+      )?.status,
+    ).toBe(403);
+  });
+
+  test("allows the deck's own page, and dek goto, which sends no Origin", () => {
+    const local = { remote: false };
+    expect(
+      requestGuard(
+        request("http://127.0.0.1:4777/ws", {
+          origin: "http://127.0.0.1:4777",
+          upgrade: "websocket",
+        }),
+        local,
       ),
-    ).toBe(true);
+    ).toBeUndefined();
+    expect(requestGuard(request("http://127.0.0.1:4777/goto", {}, "POST"), local)).toBeUndefined();
+    // Reading a page from another origin is harmless; the browser keeps its body from them.
+    expect(
+      requestGuard(
+        request("http://127.0.0.1:4777/", { origin: "https://attacker.example" }),
+        local,
+      ),
+    ).toBeUndefined();
   });
 });

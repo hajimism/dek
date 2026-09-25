@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { startDevServer } from "../../src/server/dev.ts";
@@ -91,6 +91,22 @@ async function waitForOk(url: string, timeoutMs = 3000): Promise<void> {
   throw new Error(`timed out waiting for ${url}`);
 }
 
+async function waitForPage(
+  url: string,
+  predicate: (html: string) => boolean,
+  timeoutMs = 3000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const res = await fetch(url);
+    if (res.ok && predicate(await res.text())) {
+      return;
+    }
+    await Bun.sleep(50);
+  }
+  throw new Error(`timed out waiting for ${url} to change`);
+}
+
 describe("startDevServer", () => {
   test("serves the player and presenter from a deck directory", async () => {
     await withTempProject(
@@ -109,6 +125,24 @@ describe("startDevServer", () => {
           const presenter = await fetch(new URL("/presenter", server.url));
           expect(presenter.ok).toBe(true);
           expect(await presenter.text()).toContain("hello");
+        });
+      },
+    );
+  });
+
+  test("refuses a move from another site and answers 404 for a path it does not serve", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
+          const cross = await fetch(new URL("/goto", server.url), {
+            method: "POST",
+            headers: { origin: "https://attacker.example", "content-type": "text/plain" },
+            body: JSON.stringify({ slug: "intro" }),
+          });
+          expect(cross.status).toBe(403);
+          expect((await fetch(new URL("/nope", server.url))).status).toBe(404);
+          expect((await fetch(new URL("/presenter", server.url))).status).toBe(200);
         });
       },
     );
@@ -273,13 +307,30 @@ more
     );
   });
 
-  test("emits reload-slide and keeps diagnostics visible", async () => {
+  test("lists a deck created after the server starts on the index", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: root }, async (server) => {
+          // Cache the index first so the new deck must invalidate it, not just render fresh.
+          expect(await (await fetch(server.url)).text()).not.toContain("newone");
+          const created = join(root, "decks", "newone");
+          await mkdir(join(created, "slides"), { recursive: true });
+          await writeFile(join(created, "script.md"), defaultScript("New"));
+          await waitForPage(server.url, (html) => html.includes("newone"));
+        });
+      },
+    );
+  });
+
+  test("syncs on start and emits reload-slide when a slide is saved", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await withDevServer({ cwd: deckDir }, async (server) => {
+        // The server synced the script on start, so the slide is a skeleton, not a placeholder.
         const page = await (await fetch(server.url)).text();
         expect(page).toContain('data-slug="intro"');
-        expect(page).toContain("data-missing");
+        expect(page).not.toContain("data-missing");
         expect(page).not.toContain('class="dek-diagnostics"');
 
         const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
@@ -342,7 +393,7 @@ more
           const pending = waitForEvent(server.events, (event) => event.type === "reload-theme");
           await writeFile(join(deckDir, "slides", "intro.css"), ".mark { opacity: 0; }\n");
           expect(await pending).toMatchObject({ type: "reload-theme" });
-          const css = await (await fetch(new URL("/theme.css", server.url))).text();
+          const css = await (await fetch(server.url)).text();
           expect(css).toContain('.slide:where([data-slug="intro"]) .mark');
         });
       },
@@ -1178,7 +1229,7 @@ body
     );
   });
 
-  test("embeds a ws token on the presenter page only", async () => {
+  test("embeds the live token on the presenter page only", async () => {
     await withTempProject(
       {
         decks: [{ name: "demo", script: notesScript, slides: { intro: introHtml } }],
@@ -1191,14 +1242,166 @@ body
               headers: { authorization: basicAuth("secret") },
             });
             const presenterHtml = await presenter.text();
-            expect(presenterHtml).toContain('data-ws-token="secret"');
+            expect(presenterHtml).toContain('data-live-token="secret"');
 
             const player = await fetch(server.url);
             const playerHtml = await player.text();
-            expect(playerHtml).not.toContain("data-ws-token");
+            expect(playerHtml).not.toContain("data-live-token");
             expect(playerHtml).not.toContain("secret");
           },
         );
+      },
+    );
+  });
+
+  test("clears the presenter's event stream by its token, outside the deck's path too", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await withDevServer({ cwd: root, remote: true, password: "secret" }, async (server) => {
+          const page = await fetch(new URL("/decks/demo/presenter", server.url), {
+            headers: { authorization: basicAuth("secret") },
+          });
+          const token = (await page.text()).match(/data-live-token="([^"]*)"/)?.[1];
+          expect(token).toBe("secret");
+          const player = await fetch(new URL("/decks/demo/", server.url));
+          expect(await player.text()).not.toContain("data-live-token");
+
+          // Basic auth covers only /decks/demo/, so the stream at the root carries the token.
+          const stream = await fetch(new URL(`/events?token=${token}`, server.url));
+          const diagnosed = waitForSseEvent(stream, (buf) => buf.includes('"diagnostics"'));
+          await writeFile(join(deckDir, "slides", "intro.html"), introHtml.replace("intro", "x"));
+          await diagnosed;
+        });
+      },
+    );
+  });
+});
+
+describe("startDevServer --remote exposure", () => {
+  test("keeps the voice timeline and audio, made from the script, behind the password", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script: notesScript, slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const voiceDir = join(deckDir, ".cache", "voice");
+        await mkdir(voiceDir, { recursive: true });
+        await writeFile(
+          join(voiceDir, "timeline.json"),
+          `${JSON.stringify({ audio: "audio.wav", durationMs: 0, beats: [{ text: speakerNotes }] })}\n`,
+        );
+        await writeFile(join(voiceDir, "audio.wav"), "RIFF");
+        await withDevServer({ cwd: deckDir, remote: true, password: "secret" }, async (server) => {
+          for (const path of ["/voice/timeline.json", "/voice/audio.wav"]) {
+            const open = await fetch(new URL(path, server.url));
+            expect(open.status).toBe(401);
+            expect(await open.text()).not.toContain(speakerNotes);
+            const authorized = await fetch(new URL(path, server.url), {
+              headers: { authorization: basicAuth("secret") },
+            });
+            expect(authorized.status).toBe(200);
+          }
+        });
+      },
+    );
+  });
+
+  test("streams diagnostics to the presenter only, and reloads to everyone", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await withDevServer({ cwd: deckDir, remote: true, password: "secret" }, async (server) => {
+          const audience = await fetch(new URL("/events", server.url));
+          const presenter = await fetch(new URL("/events", server.url), {
+            headers: { authorization: basicAuth("secret") },
+          });
+          const diagnosed = waitForSseEvent(presenter, (buf) => buf.includes('"diagnostics"'));
+          await writeFile(join(deckDir, "slides", "intro.html"), introHtml.replace("intro", "x"));
+          await diagnosed;
+          // A later event marks the end of what the audience was sent for the save.
+          const heard = waitForSseEvent(audience, (buf) => buf.includes("reload-theme"));
+          await writeFile(join(deckDir, "theme.css"), ":root {}\n");
+          const sent = await heard;
+          expect(sent).toContain("reload-slide");
+          expect(sent).not.toContain('"diagnostics"');
+        });
+      },
+    );
+  });
+});
+
+describe("startDevServer requests", () => {
+  test("closes while more than one browser holds /events open", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const server = await startDevServer({ cwd: join(root, "decks", "demo"), port: 0 });
+      const streams = await Promise.all(
+        [0, 1].map(() => fetch(new URL("/events", server.url)).then((res) => res.body)),
+      );
+      for (const stream of streams) {
+        await stream?.getReader().read();
+      }
+      const closed = await Promise.race([
+        server.close().then(() => true),
+        Bun.sleep(2000).then(() => false),
+      ]);
+      expect(closed).toBe(true);
+    });
+  });
+
+  test("refuses an asset symlink that leads out of the deck", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await writeFile(join(root, "secret.txt"), "top secret\n");
+      await symlink(join(root, "secret.txt"), join(deckDir, "assets", "p.png"));
+      await withDevServer({ cwd: deckDir }, async (server) => {
+        const res = await fetch(new URL("/assets/p.png", server.url));
+        expect(res.status).toBe(404);
+        expect(await res.text()).not.toContain("top secret");
+      });
+    });
+  });
+
+  test("answers 400 to malformed percent-encoding on any route", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: root }, async (server) => {
+          for (const path of [
+            "/decks/demo/assets/%E0%A4%A",
+            "/decks/demo/slide/%E0%A4%A",
+            "/decks/%E0%A4%A/",
+          ]) {
+            const res = await fetch(new URL(path, server.url));
+            expect(res.status).toBe(400);
+            expect(await res.text()).not.toContain(root);
+          }
+        });
+      },
+    );
+  });
+
+  test("answers an unexpected failure with a bare 500 and logs it to stderr", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const logged = spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+          await withDevServer({ cwd: deckDir }, async (server) => {
+            await rm(join(deckDir, "slides", "intro.html"));
+            await mkdir(join(deckDir, "slides", "intro.html"));
+            const res = await fetch(new URL("/slide/intro", server.url));
+            expect(res.status).toBe(500);
+            const body = await res.text();
+            expect(body).not.toContain(root);
+            expect(body).not.toContain("dev.ts");
+            expect(logged).toHaveBeenCalled();
+          });
+        } finally {
+          logged.mockRestore();
+        }
       },
     );
   });

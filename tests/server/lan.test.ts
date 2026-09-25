@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { NetworkInterfaceInfo } from "node:os";
-import { lanUrls, remoteBanner } from "../../src/server/lan.ts";
+import { generateRemotePassword, lanUrls, remoteBanner } from "../../src/server/lan.ts";
 
 const loopback: NetworkInterfaceInfo = {
   address: "127.0.0.1",
@@ -66,5 +66,14 @@ describe("remoteBanner", () => {
     expect(
       text.split("\n").some((line) => line === "presenter: http://192.168.1.20:5173/presenter"),
     ).toBe(false);
+  });
+});
+
+describe("generateRemotePassword", () => {
+  test("is long enough to resist guessing on a LAN, in letters easy to read aloud", () => {
+    const password = generateRemotePassword();
+    // 10 characters of a 32-letter alphabet: 50 bits.
+    expect(password).toMatch(/^[a-km-np-z2-9]{10}$/);
+    expect(generateRemotePassword()).not.toBe(password);
   });
 });
