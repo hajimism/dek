@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createEventHub } from "../../src/server/hub.ts";
-import { watchDeck, watchTargets } from "../../src/server/watch.ts";
+import { DekError } from "../../src/core/error.ts";
+import { createEventHub, type DevEvent } from "../../src/server/hub.ts";
+import { voiceFailureLine, watchDeck, watchTargets } from "../../src/server/watch.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { waitForEvent } from "../helpers/server.ts";
@@ -173,6 +174,85 @@ describe("watchDeck", () => {
     );
   }, 15_000);
 
+  test("creates skeletons for a script written before the watcher started", async () => {
+    // A titled heading, so the skeleton has a title and lint has nothing to say (DEK024).
+    const script = "---\ntitle: Demo\n---\n\n## intro\n\n## Two {#two}\n\nhello\n";
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml } }] },
+      async (root) => {
+        const dir = deckDir(root);
+        const hub = createEventHub();
+        const events: DevEvent[] = [];
+        const diagnosed = waitForEvent(hub, (event) => {
+          events.push(event);
+          return event.type === "diagnostics";
+        });
+        const watcher = watchDeck(dir, hub, { pollIntervalMs: 0 });
+        try {
+          await diagnosed;
+          expect(events).toEqual([
+            { type: "sync", created: [join(dir, "slides", "two.html")] },
+            { type: "diagnostics", diagnostics: [] },
+          ]);
+        } finally {
+          watcher.close();
+          hub.close();
+        }
+      },
+    );
+  });
+
+  test("removes an orphan skeleton on sync and names its slug", async () => {
+    const script = "---\ntitle: Demo\n---\n\n## intro\n\n## Two {#two}\n\nhello\n";
+    const orphan =
+      '<section class="slide" data-layout="title">\n  <h2 class="slide-title">Old</h2>\n</section>\n';
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml, old: orphan } }] },
+      async (root) => {
+        const dir = deckDir(root);
+        const hub = createEventHub();
+        const events: DevEvent[] = [];
+        const diagnosed = waitForEvent(hub, (event) => {
+          events.push(event);
+          return event.type === "diagnostics";
+        });
+        const watcher = watchDeck(dir, hub, { pollIntervalMs: 0 });
+        try {
+          await diagnosed;
+          expect(events).toEqual([
+            { type: "sync", created: [join(dir, "slides", "two.html")], removed: ["old"] },
+            { type: "diagnostics", diagnostics: [] },
+          ]);
+        } finally {
+          watcher.close();
+          hub.close();
+        }
+      },
+    );
+  });
+
+  test("starts quietly when every section already has its slide", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const hub = createEventHub();
+        const events: string[] = [];
+        const diagnosed = waitForEvent(hub, (event) => {
+          events.push(event.type);
+          return event.type === "diagnostics";
+        });
+        const watcher = watchDeck(deckDir(root), hub, { pollIntervalMs: 0 });
+        try {
+          await diagnosed;
+          expect(events).toEqual(["diagnostics"]);
+        } finally {
+          watcher.close();
+          hub.close();
+        }
+      },
+    );
+  });
+
   test("emits a diagnostic when script.md becomes unparsable", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
@@ -224,8 +304,12 @@ describe("watchDeck", () => {
           },
         });
         try {
-          await first;
+          const event = await first;
           expect(calls).toBe(1);
+          // The browser learns that the visual pass crashed instead of seeing a clean list.
+          expect(event.type === "diagnostics" ? event.diagnostics : []).toContainEqual(
+            expect.objectContaining({ id: "error", severity: "error", message: "boom" }),
+          );
           const pending = waitForEvent(hub, (event) => event.type === "diagnostics");
           const slidePath = join(dir, "slides", "intro.html");
           await writeFile(slidePath, `${introHtml}\n`);
@@ -289,3 +373,16 @@ function startWatch(root: string, pollIntervalMs: number) {
 function deckDir(root: string): string {
   return join(root, "decks", "demo");
 }
+
+describe("voiceFailureLine", () => {
+  test("says what failed and what to do in one line, with no stack", () => {
+    expect(
+      voiceFailureLine(
+        new DekError("voicevox is not running at http://127.0.0.1:50021", {
+          hint: "start it with docker",
+        }),
+      ),
+    ).toBe("voice: voicevox is not running at http://127.0.0.1:50021 (start it with docker)");
+    expect(voiceFailureLine(new Error("boom"))).toBe("voice: boom");
+  });
+});

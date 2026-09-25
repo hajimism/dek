@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, statSync, watch } from "node:fs";
-import { join } from "node:path";
-import type { Diagnostic } from "../core/diagnostic.ts";
+import { basename, join } from "node:path";
+import { type Diagnostic, errorDiagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
-import { lintDeck, resolveDeck, syncDeck, warmLintDeck } from "../core/index.ts";
+import { lintDeck, resolveDeck, type SyncResult, syncDeck, warmLintDeck } from "../core/index.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { listSlideFiles, type SlideSidecar } from "../core/resolve.ts";
 import { lintVisualDeck } from "../core/visual.ts";
@@ -10,6 +10,9 @@ import type { EventHub } from "./hub.ts";
 import { createSerialTask } from "./serial.ts";
 
 export type Stoppable = { close: () => void };
+
+/** How often a watcher re-scans for edits fs.watch missed; shared by the deck and project polls. */
+export const POLL_INTERVAL_MS = 2000;
 
 export function watchTargets(project: {
   decks: Array<{ dir: string }>;
@@ -109,7 +112,7 @@ export function watchDeck(
                 diagnostics.push(...visual);
               }
             } catch (error) {
-              console.error(error);
+              diagnostics.push(watchErrorDiagnostic(error));
             }
           }
           hub.emit({ type: "diagnostics", diagnostics });
@@ -135,9 +138,36 @@ export function watchDeck(
       await synthDeck(deckDir);
       hub.emit({ type: "timeline" });
     } catch (error) {
-      console.error(error);
+      // Voice is optional: an engine that is not running is worth a line, not a stack trace.
+      console.error(voiceFailureLine(error));
     }
   });
+
+  /**
+   * Create skeletons for sections without slide HTML. A script the author cannot parse yet is
+   * reported by the diagnostics pass that follows, so the failure itself stays quiet here.
+   */
+  const syncScript = (options: { announceEmpty: boolean }): void => {
+    let result: SyncResult = { created: [], updated: [], removed: [] };
+    try {
+      result = syncDeck(deckDir);
+    } catch {
+      // resolveDeck in emitDiagnostics reports the same error with its path and line.
+    }
+    // A sync event reloads the whole page, so new and refreshed slides need no reload-slide.
+    lastSlides = listSlideMtimes(deckDir);
+    const { created, updated } = result;
+    // Removed slides go by slug, as when the author deletes one (see scan).
+    const removed = result.removed.map((path) => basename(path, ".html"));
+    if (created.length > 0 || updated.length > 0 || removed.length > 0 || options.announceEmpty) {
+      hub.emit({
+        type: "sync",
+        created,
+        ...(updated.length > 0 ? { updated } : {}),
+        ...(removed.length > 0 ? { removed } : {}),
+      });
+    }
+  };
 
   const scan = (): void => {
     if (closed) {
@@ -147,14 +177,7 @@ export function watchDeck(
     const scriptNow = mtime(scriptPath);
     if (scriptNow > lastScript) {
       lastScript = scriptNow;
-      try {
-        const result = syncDeck(deckDir);
-        lastSlides = listSlideMtimes(deckDir);
-        hub.emit({ type: "sync", created: result.created });
-      } catch (error) {
-        console.error(error);
-        hub.emit({ type: "sync", created: [] });
-      }
+      syncScript({ announceEmpty: true });
       emitDiagnostics();
       synthVoice();
     }
@@ -233,12 +256,14 @@ export function watchDeck(
     }
     timer = startInterval(scan, ms);
   };
-  startPoll(options.pollIntervalMs ?? 2000);
+  startPoll(options.pollIntervalMs ?? POLL_INTERVAL_MS);
   if (typeof watcher.on === "function") {
     watcher.on("error", () => {
-      startPoll(options.pollIntervalMs || 2000);
+      startPoll(options.pollIntervalMs || POLL_INTERVAL_MS);
     });
   }
+  // A script written before the server started still gets its skeletons.
+  syncScript({ announceEmpty: false });
   emitDiagnostics();
 
   return {
@@ -304,17 +329,22 @@ function mtime(path: string): number {
   }
 }
 
+/** A failed synthesis as one line on the server's stderr: what failed, then the fix. */
+export function voiceFailureLine(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const hint = error instanceof DekError && error.hint ? ` (${error.hint})` : "";
+  return `voice: ${message}${hint}`;
+}
+
 function watchErrorDiagnostic(error: unknown): Diagnostic {
   if (error instanceof DekError) {
-    return {
-      id: "parse",
+    return errorDiagnostic("parse", {
       message: error.message,
       ...(error.path ? { path: error.path } : {}),
       ...(error.line !== undefined ? { line: error.line } : {}),
-    };
+    });
   }
-  return {
-    id: "error",
+  return errorDiagnostic("error", {
     message: error instanceof Error ? error.message : String(error),
-  };
+  });
 }
