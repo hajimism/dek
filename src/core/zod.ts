@@ -10,12 +10,12 @@ export function configHint(
 }
 
 /**
- * A parser's syntax error in its own words, without the class name Bun puts in front, and the
- * 1-based line it points at when the parser says.
+ * A parser's syntax error in its own words, without the class name or banner Bun puts in front,
+ * and the 1-based line it points at when the parser says. Bun 1.4's TOML parser says no line.
  */
 export function parseFailure(error: unknown): { text: string; line?: number } {
   const text = (error instanceof Error ? error.message : String(error)).replace(
-    /^(?:BuildMessage|SyntaxError): /,
+    /^(?:(?:BuildMessage|SyntaxError): )?(?:TOML Parse error: )?/,
     "",
   );
   const line = (error as { position?: { line?: unknown } } | null)?.position?.line;

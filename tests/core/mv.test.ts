@@ -170,18 +170,15 @@ describe("renameSection and voice.toml", () => {
     );
   });
 
-  test("rewrites dotted keys, under [beats] and from the top level", async () => {
+  // One test per form: TOML forbids a [beats] header after top-level beats.* keys defined the table.
+  test("rewrites dotted keys from the top level", async () => {
     await withIntroDeck(async (deckDir, voiceToml) => {
       await Bun.write(
         voiceToml,
         [
           "beats.intro.lead = 1",
           'beats . "intro/2" . pause = 2',
-          "",
-          "[beats]",
-          "intro.pause = 3",
-          '"intro/3".lead = 4',
-          "intro-two.lead = 5",
+          "beats.intro-two.lead = 5",
           "",
         ].join("\n"),
       );
@@ -190,13 +187,22 @@ describe("renameSection and voice.toml", () => {
         [
           "beats.cover.lead = 1",
           'beats . "cover/2" . pause = 2',
-          "",
-          "[beats]",
-          "cover.pause = 3",
-          '"cover/3".lead = 4',
-          "intro-two.lead = 5",
+          "beats.intro-two.lead = 5",
           "",
         ].join("\n"),
+      );
+    });
+  });
+
+  test("rewrites dotted keys under [beats]", async () => {
+    await withIntroDeck(async (deckDir, voiceToml) => {
+      await Bun.write(
+        voiceToml,
+        ["[beats]", "intro.pause = 3", '"intro/3".lead = 4', "intro-two.lead = 5", ""].join("\n"),
+      );
+      renameSection(deckDir, "intro", "cover");
+      expect(await readFile(voiceToml, "utf8")).toBe(
+        ["[beats]", "cover.pause = 3", '"cover/3".lead = 4', "intro-two.lead = 5", ""].join("\n"),
       );
     });
   });
@@ -234,7 +240,8 @@ describe("renameSection and voice.toml", () => {
 });
 
 describe("renameSection when a write fails", () => {
-  test("puts every file back as it was", async () => {
+  // chmod 444 does not stop root from writing, so the failure cannot be staged there.
+  test.skipIf(process.getuid?.() === 0)("puts every file back as it was", async () => {
     await withIntroDeck(async (deckDir, voiceToml) => {
       const slides = join(deckDir, "slides");
       await Bun.write(join(slides, "intro.css"), ".x { color: var(--c); }\n");

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { formatZodIssues } from "../../src/core/zod.ts";
+import { formatZodIssues, parseFailure } from "../../src/core/zod.ts";
 
 describe("formatZodIssues", () => {
   test("prefixes the message with the dotted path", () => {
@@ -26,5 +26,24 @@ describe("formatZodIssues", () => {
     if (r.success) return;
     expect(formatZodIssues(r.error)).not.toContain(": :");
     expect(formatZodIssues(r.error).startsWith("Invalid input")).toBe(true);
+  });
+});
+
+// Both shapes Bun's TOML parser throws, built by hand so the test holds on any Bun.
+describe("parseFailure", () => {
+  test("Bun 1.3: a BuildMessage with a position", () => {
+    const error = Object.assign(new Error("BuildMessage: Unexpected end of file"), {
+      position: { line: 2 },
+    });
+    expect(parseFailure(error)).toEqual({ text: "Unexpected end of file", line: 2 });
+  });
+
+  test("Bun 1.4: a SyntaxError with a parser banner and no position", () => {
+    // Its own `line` is where the parse was called in JavaScript, not a line of the file.
+    const error = Object.assign(
+      new SyntaxError("TOML Parse error: Cannot redefine table 'beats'"),
+      { line: 1, column: 16 },
+    );
+    expect(parseFailure(error)).toEqual({ text: "Cannot redefine table 'beats'" });
   });
 });

@@ -94,13 +94,17 @@ describe("loadConfig", () => {
 });
 
 describe("parseDekToml errors", () => {
-  test("names the line of a TOML syntax error, in the parser's words without its class name", () => {
+  // The parser's wording and whether it reports a line change between Bun versions, so only
+  // what dek adds is pinned: the prefix, no class name or parser banner, and the line when given.
+  test("names a TOML syntax error in the parser's words, without its class name or banner", () => {
     try {
       parseDekToml("max_classes = 40\nlatin_per_minute =\n", "/p/dek.toml");
       throw new Error("expected parseDekToml to fail");
     } catch (error) {
-      expect((error as DekError).message).toBe("invalid dek.toml: Unexpected end of file");
-      expect((error as DekError).line).toBe(2);
+      const { message, line } = error as DekError;
+      expect(message).toMatch(/^invalid dek\.toml: \S/);
+      expect(message).not.toMatch(/BuildMessage|SyntaxError|TOML Parse error/);
+      expect(line === undefined || line === 2).toBe(true);
     }
   });
 });
