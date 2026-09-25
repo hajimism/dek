@@ -30,6 +30,8 @@ export function jsonStdout<T = unknown>(result: RunResult): T {
   return JSON.parse(result.stdout) as T;
 }
 
+const STOP_GRACE_MS = 3_000;
+
 export async function spawnDekServer(
   cwd: string,
   options: { args?: string[]; timeoutMs?: number; ready?: (buf: string) => boolean } = {},
@@ -47,7 +49,15 @@ export async function spawnDekServer(
     }
     stopped = true;
     proc.kill();
-    await proc.exited;
+    // A server that ignores SIGTERM must still not outlive the test that started it.
+    const exited = await Promise.race([
+      proc.exited.then(() => true),
+      Bun.sleep(STOP_GRACE_MS).then(() => false),
+    ]);
+    if (!exited) {
+      proc.kill("SIGKILL");
+      await proc.exited;
+    }
     await stderr.catch(() => "");
   };
 

@@ -5,12 +5,20 @@ export type FakeVoicevox = {
   url: string;
   close: () => Promise<void>;
   queries: string[];
+  /** Answer this path with this status, as an engine that is up but unwell does. */
+  failWith?: { path: string; status: number };
 };
 
 export async function startFakeVoicevox(): Promise<FakeVoicevox> {
   const queries: string[] = [];
+  const fake: FakeVoicevox = { url: "", queries, close: () => Promise.resolve() };
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    if (fake.failWith && url.pathname === fake.failWith.path) {
+      res.writeHead(fake.failWith.status);
+      res.end();
+      return;
+    }
     if (url.pathname === "/speakers") {
       json(res, [
         {
@@ -68,14 +76,12 @@ export async function startFakeVoicevox(): Promise<FakeVoicevox> {
   if (!addr || typeof addr === "string") {
     throw new Error("fake voicevox has no port");
   }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    queries,
-    close: () =>
-      new Promise((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-      }),
-  };
+  fake.url = `http://127.0.0.1:${addr.port}`;
+  fake.close = () =>
+    new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  return fake;
 }
 
 function json(res: import("node:http").ServerResponse, body: unknown): void {
