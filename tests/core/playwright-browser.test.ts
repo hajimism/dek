@@ -1,16 +1,43 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { defaultPlaywrightRunner, playwrightResolved } from "../../src/core/playwright.ts";
+import type { Browser } from "playwright";
+import {
+  defaultPlaywrightRunner,
+  importPlaywright,
+  playwrightResolved,
+  type VisualRequest,
+} from "../../src/core/playwright.ts";
+import { runVisualRequest } from "../../src/core/playwright-visual.ts";
 
-// These drive a real Chromium through the worker. They live apart from the runner's own tests,
-// which swap DEK_PLAYWRIGHT while tests in one file run at once.
+// What the Playwright worker measures, in a real Chromium. They live apart from the runner's own
+// tests, which swap DEK_PLAYWRIGHT while tests in one file run at once.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-// One browser at a time: a Chromium per concurrent test would crowd the machine past the timeout.
+// One page set at a time: concurrent tests would crowd the machine past the timeout.
 const browserTest = test.serial.skipIf(skip);
+
+let browser: Browser | undefined;
+
+beforeAll(async () => {
+  if (!skip) {
+    browser = await (await importPlaywright()).chromium.launch({ headless: true });
+  }
+});
+
+afterAll(async () => {
+  await browser?.close();
+});
+
+/** The worker's work in one shared browser: all of it but the spawn and the launch. */
+function render(request: VisualRequest) {
+  if (!browser) {
+    throw new Error("no browser");
+  }
+  return runVisualRequest(browser, request);
+}
 
 describe("playwright worker", () => {
   browserTest("reports font size and weight with each contrast sample", async () => {
-    const response = await defaultPlaywrightRunner({
+    const response = await render({
       viewport: { width: 1280, height: 720 },
       actions: ["contrast"],
       pages: [
@@ -34,7 +61,7 @@ describe("playwright worker findings", () => {
     "reports the list that runs off the slide once, and samples only elements with text",
     async () => {
       const items = Array.from({ length: 30 }, (_, i) => `<li>item ${i}</li>`).join("");
-      const response = await defaultPlaywrightRunner({
+      const response = await render({
         viewport: { width: 1280, height: 720 },
         actions: ["overflow", "contrast"],
         pages: [
@@ -66,10 +93,42 @@ describe("playwright worker findings", () => {
   );
 });
 
+describe("playwright worker pages", () => {
+  browserTest(
+    "renders every slide fresh, in order, whatever the one before left behind",
+    async () => {
+      // Through the worker itself, spawn to JSON. Each slide reports whether an earlier slide's
+      // global is still there, then leaves its own.
+      const pages = Array.from({ length: 6 }, (_, index) => ({
+        html: `<html><body style="margin:0;background:#000"><section class="slide" style="background:#000">
+  <p style="color:#fff">slide ${index}</p><p id="seen" style="color:#fff"></p>
+</section><script>
+document.getElementById("seen").textContent = "seen " + typeof window.leftBehind;
+window.leftBehind = ${index};
+</script></body></html>`,
+        slug: `s${index}`,
+        step: "1",
+      }));
+      const response = await defaultPlaywrightRunner({
+        viewport: { width: 1280, height: 720 },
+        actions: ["contrast"],
+        pages,
+      });
+      const texts = (response?.contrasts ?? []).map((sample) => `${sample.slug} ${sample.text}`);
+      expect(texts).toEqual(
+        pages.flatMap((page, index) => [
+          `${page.slug} slide ${index}`,
+          `${page.slug} seen undefined`,
+        ]),
+      );
+    },
+  );
+});
+
 describe("playwright worker text overflow", () => {
   browserTest("reports text that runs past the slide even when its box fits", async () => {
     const url = `https://example.com/${"a".repeat(200)}`;
-    const response = await defaultPlaywrightRunner({
+    const response = await render({
       viewport: { width: 1280, height: 720 },
       actions: ["overflow"],
       pages: [
@@ -141,6 +200,7 @@ second
             to: "architecture",
             at,
             playerScript: player,
+            runner: render,
           });
           frames.push(Buffer.from(await Bun.file(shot?.path ?? "").arrayBuffer()));
         }
@@ -157,7 +217,7 @@ describe("playwright worker still pages", () => {
     "measures every animation at its end, and one that never ends at its first frame",
     async () => {
       const { stillPageScript } = await import("../../src/core/slide-script.ts");
-      const response = await defaultPlaywrightRunner({
+      const response = await render({
         viewport: { width: 1280, height: 720 },
         actions: ["contrast"],
         pages: [
@@ -189,7 +249,7 @@ describe("playwright worker still pages", () => {
 
 describe("playwright worker contrast from pixels", () => {
   const measure = async (body: string, css = "") => {
-    const response = await defaultPlaywrightRunner({
+    const response = await render({
       viewport: { width: 1280, height: 720 },
       actions: ["contrast"],
       pages: [

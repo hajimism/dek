@@ -3,7 +3,7 @@ import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
 import { DekError } from "../../src/core/error.ts";
-import type { VisualRequest } from "../../src/core/playwright.ts";
+import type { VisualRequest, VisualResponse } from "../../src/core/playwright.ts";
 import { VOICE_SETUP_HINT } from "../../src/core/voice.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
@@ -15,6 +15,11 @@ const introHtml = slideDocument(`<section class="slide" data-layout="title">
 </section>`);
 
 const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.ts");
+
+/** Renders nothing wrong, so lint alone decides, without starting Chromium. */
+async function cleanRunner(): Promise<VisualResponse> {
+  return { overflows: [], contrasts: [] };
+}
 
 async function overflowRunner(request: VisualRequest) {
   for (const page of request.pages) {
@@ -35,7 +40,7 @@ describe("dek check", () => {
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const result = await runDek(["check", "--json"], { cwd: join(root, "decks", "demo") });
-        expect(result.exitCode).toBe(1);
+        expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
         expect(json.error.message).toBe("usage: dek check <slug>");
         expect(json.error.hint).toBe("run `dek ls` to see the slugs");
@@ -55,7 +60,7 @@ describe("dek check", () => {
             DEK_PLAYWRIGHT_OVERFLOWS: JSON.stringify([{ slug: "intro", step: "1", box: "h2" }]),
           },
         });
-        expect(result.exitCode).toBe(1);
+        expect(result).toMatchObject({ exitCode: 1 });
         expect(result.stdout.startsWith("{")).toBe(false);
         expect(result.stdout).toContain("DEK030");
         expect(result.stdout).toContain(".cache/shots");
@@ -91,6 +96,7 @@ more
         const result = await checkCommand({
           cwd: join(root, "decks", "demo"),
           slug: "intro",
+          runner: cleanRunner,
         });
         expect(result.slug).toBe("intro");
         expect(result.diagnostics.some((d) => d.id === "DEK001")).toBe(false);
@@ -113,6 +119,7 @@ more
         const result = await checkCommand({
           cwd: join(root, "decks", "demo"),
           slug: "intro",
+          runner: cleanRunner,
         });
         expect(result.diagnostics.some((d) => d.id === "DEK012")).toBe(true);
       },
@@ -134,6 +141,7 @@ more
         const result = await checkCommand({
           cwd: join(root, "decks", "demo"),
           slug: "intro",
+          runner: cleanRunner,
         });
         expect(result.diagnostics.some((d) => d.id === "DEK014")).toBe(true);
         expect(result.diagnostics.some((d) => d.id === "DEK015")).toBe(true);
