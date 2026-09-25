@@ -19,6 +19,14 @@ import { withTempProject } from "../helpers/project.ts";
 
 type Registry = Record<string, { motion?: Record<string, number>; draw?: unknown }>;
 
+/**
+ * A statement no other script has. Evaluations are cached by the transpiled code, which drops
+ * comments, so only code keeps two scripts apart.
+ */
+function uniqueStatement(): string {
+  return `const run = "${crypto.randomUUID()}";`;
+}
+
 function run(snippet: string): Registry {
   const scope = {} as { __dekSlides?: Registry };
   new Function("window", snippet)(scope);
@@ -121,7 +129,7 @@ export default { motion: { base: host.every((t) => t === "undefined") ? 1 : -1 }
     expect(slideScriptProblems("while (true) {}\nexport default {};", steps)).toEqual([
       "top-level code did not finish; touch the slide only inside draw",
     ]);
-  }, 10_000);
+  });
 
   test("a promise that never settles its loop does not hang lint either", () => {
     expect(
@@ -130,7 +138,7 @@ export default { motion: { base: host.every((t) => t === "undefined") ? 1 : -1 }
         steps,
       ),
     ).toEqual([]);
-  }, 10_000);
+  });
 
   test("top-level code that touches the page is reported", () => {
     expect(slideScriptProblems("const el = document.body;\nexport default {};", steps)[0]).toMatch(
@@ -141,22 +149,24 @@ export default { motion: { base: host.every((t) => t === "undefined") ? 1 : -1 }
 
 describe("warmSlideScripts", () => {
   const steps = { steps: ["1"] };
-  const hang = "while (true) {}\nexport default { motion: { 1: 1 } };";
+  // Each test evaluates its own script: a cached one would skip the evaluation under test.
+  const hang = () => `${uniqueStatement()}\nwhile (true) {}\nexport default { motion: { 1: 1 } };`;
 
-  test("evaluates without blocking the event loop", async () => {
+  // Alone: a concurrent test's synchronous evaluation would hold the loop until this one is done.
+  test.serial("evaluates without blocking the event loop", async () => {
     let ticked = false;
     const timer = setTimeout(() => {
       ticked = true;
     }, 20);
-    const warming = warmSlideScripts([{ code: hang, steps: ["1"] }]);
+    const warming = warmSlideScripts([{ code: hang(), steps: ["1"] }]);
     expect(ticked).toBe(false);
     await warming;
     clearTimeout(timer);
     expect(ticked).toBe(true);
-  }, 10_000);
+  });
 
   test("lets the synchronous check answer from the cache without a new evaluation", async () => {
-    const code = `${hang}\n// warm-cache`;
+    const code = hang();
     await warmSlideScripts([{ code, steps: ["1"] }]);
     const started = performance.now();
     expect(slideScriptProblems(code, steps)).toEqual([
@@ -164,7 +174,7 @@ describe("warmSlideScripts", () => {
     ]);
     // A fresh evaluation waits out the sandbox's 1s timeout.
     expect(performance.now() - started).toBeLessThan(500);
-  }, 10_000);
+  });
 });
 
 describe("wrapSlideScript", () => {
@@ -319,7 +329,7 @@ describe("TypeScript slide scripts", () => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(
         join(deckDir, "slides", "chart.ts"),
-        "while (true) {}\nexport default {};\n// warm-lint",
+        `${uniqueStatement()}\nwhile (true) {}\nexport default {};`,
       );
       await warmLintDeck(deckDir);
       const started = performance.now();
@@ -329,7 +339,7 @@ describe("TypeScript slide scripts", () => {
       ]);
       expect(performance.now() - started).toBeLessThan(500);
     });
-  }, 10_000);
+  });
 
   test("dek mv moves a .ts script with its HTML", async () => {
     await withTempProject(chartDeck, async (root) => {

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const SPAWN_BUDGET = 40;
+const SPAWN_BUDGET = 32;
 
 describe("cli test spawn budget", () => {
   test("keeps subprocess CLI runs to wiring checks", () => {

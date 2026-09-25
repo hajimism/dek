@@ -33,25 +33,25 @@ describe("dek lint", () => {
   test("exits 1 and reports DEK001 when a slide is missing", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await runDek(["lint", "--json"], { cwd: join(root, "decks", "demo") });
-      expect(result.exitCode).toBe(1);
+      expect(result).toMatchObject({ exitCode: 1 });
       const json = jsonStdout<LintOk>(result);
       expect(json.ok).toBe(false);
       expect(json.diagnostics.some((d) => d.id === "DEK001")).toBe(true);
     });
   });
 
-  test("writes SARIF 2.1.0 with --format sarif", async () => {
+  test("writes SARIF 2.1.0 with a level for each result with --format sarif", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await runDek(["lint", "--format", "sarif"], {
         cwd: join(root, "decks", "demo"),
       });
-      expect(result.exitCode).toBe(1);
+      expect(result).toMatchObject({ exitCode: 1 });
       const sarif = JSON.parse(result.stdout) as {
         version?: string;
-        runs?: Array<{ results?: Array<{ ruleId?: string }> }>;
+        runs?: Array<{ results?: Array<{ ruleId?: string; level?: string }> }>;
       };
       expect(sarif.version).toBe("2.1.0");
-      expect(sarif.runs?.[0]?.results?.some((r) => r.ruleId === "DEK001")).toBe(true);
+      expect(sarif.runs?.[0]?.results?.find((r) => r.ruleId === "DEK001")?.level).toBe("error");
     });
   });
 
@@ -71,7 +71,7 @@ describe("dek lint", () => {
         await mkdir(join(deck, "voice"), { recursive: true });
         await writeFile(join(deck, "voice", "voice.toml"), 'engine = "voicevox"\nspeaker = "a"\n');
         const result = await runDek(["lint", "--json"], { cwd: deck });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<LintOk>(result);
         expect(json.ok).toBe(true);
         expect(json.diagnostics.map((d) => [d.id, d.severity])).toEqual([["DEK040", "warning"]]);
@@ -94,24 +94,12 @@ describe("dek lint", () => {
         await mkdir(join(deck, "voice"), { recursive: true });
         await writeFile(join(deck, "voice", "voice.toml"), 'engine = "voicevox"\nspeaker = "a"\n');
         const result = await runDek(["lint", "--json"], { cwd: deck });
-        expect(result.exitCode).toBe(1);
+        expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<LintOk>(result);
         expect(json.ok).toBe(false);
         expect(json.diagnostics.find((d) => d.id === "DEK001")?.severity).toBe("error");
       },
     );
-  });
-
-  test("writes a SARIF level for every dek result", async () => {
-    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      const result = await runDek(["lint", "--format", "sarif"], {
-        cwd: join(root, "decks", "demo"),
-      });
-      const sarif = JSON.parse(result.stdout) as {
-        runs: Array<{ results: Array<{ ruleId: string; level?: string }> }>;
-      };
-      expect(sarif.runs[0]?.results.find((r) => r.ruleId === "DEK001")?.level).toBe("error");
-    });
   });
 
   test("scopes lint with a positional deck name", async () => {
@@ -121,7 +109,7 @@ describe("dek lint", () => {
       },
       async (root) => {
         const result = await runDek(["lint", "alpha", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<LintOk>(result);
         expect(json.ok).toBe(true);
         expect(json.diagnostics).toEqual([]);
@@ -137,7 +125,7 @@ describe("dek lint", () => {
           cwd: join(root, "decks", "demo"),
           env: { DEK_PLAYWRIGHT: "/no/such/playwright" },
         });
-        expect(result.exitCode).toBe(1);
+        expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<{ ok: false; error: { hint?: string } }>(result);
         expect(json.ok).toBe(false);
         expect(json.error.hint).toContain("playwright install");
@@ -275,7 +263,7 @@ more
             DEK_PLAYWRIGHT_OVERFLOWS: JSON.stringify([{ slug: "intro", step: "1", box: "h2" }]),
           },
         });
-        expect(result.exitCode).toBe(1);
+        expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<LintOk>(result);
         expect(json.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
       },

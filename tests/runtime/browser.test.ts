@@ -15,6 +15,7 @@ import {
 } from "../helpers/dom.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
+import { waitFor } from "../helpers/wait.ts";
 
 const script = `---
 title: Demo
@@ -220,13 +221,3 @@ describe("player runtime in happy-dom", () => {
     }
   });
 });
-
-async function waitFor(condition: () => boolean, timeoutMs = 2000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!condition()) {
-    if (Date.now() > deadline) {
-      throw new Error("timed out waiting for condition");
-    }
-    await settle();
-  }
-}

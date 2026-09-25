@@ -29,7 +29,7 @@ describe("dek shot", () => {
           cwd: join(root, "decks", "demo"),
           env: { DEK_PLAYWRIGHT: fakePlaywright },
         });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<ShotOk>(result);
         expect(json.ok).toBe(true);
         expect(json.shots).toHaveLength(1);

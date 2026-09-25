@@ -32,7 +32,7 @@ describe("dek show", () => {
         const result = await runDek(["show", "intro", "--json"], {
           cwd: join(root, "decks", "demo"),
         });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<ShowOk>(result);
         expect(json.ok).toBe(true);
         expect(json.slug).toBe("intro");

@@ -418,7 +418,7 @@ describe("writeSuccess", () => {
         { json: true },
       );
       expect(exit).not.toHaveBeenCalled();
-      expect(process.exitCode).toBe(1);
+      expect(process).toMatchObject({ exitCode: 1 });
       expect(JSON.parse(written.join(""))).toEqual({
         ok: false,
         error: {
@@ -428,7 +428,8 @@ describe("writeSuccess", () => {
         diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
       });
     } finally {
-      process.exitCode = previous;
+      // Bun keeps a 1 when handed undefined, which would fail the whole run.
+      process.exitCode = previous ?? 0;
       write.mockRestore();
       exit.mockRestore();
     }
@@ -449,7 +450,8 @@ describe("writeSuccess", () => {
     try {
       run();
     } finally {
-      process.exitCode = previous;
+      // Bun keeps a 1 when handed undefined, which would fail the whole run.
+      process.exitCode = previous ?? 0;
       stdout.mockRestore();
       stderr.mockRestore();
     }
@@ -539,7 +541,8 @@ describe("writeSuccess", () => {
       writeSuccess({ command: "lint", data: { diagnostics: [] } }, { json: true });
       expect(process.exitCode).toBe(previous);
     } finally {
-      process.exitCode = previous;
+      // Bun keeps a 1 when handed undefined, which would fail the whole run.
+      process.exitCode = previous ?? 0;
       write.mockRestore();
     }
   });

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { onOrphaned, stopOnce } from "../../src/cli/keep-alive.ts";
 import { cliPath } from "../helpers/cli.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 function isAlive(pid: number): boolean {
   try {
@@ -92,7 +93,7 @@ await child.exited;`,
         const reader = parent.stdout.getReader();
         const decoder = new TextDecoder();
         let out = "";
-        const ready = until(() => /child \d+/.test(out) && /https?:\/\//.test(out), 5000);
+        const ready = until(() => /child \d+/.test(out) && /https?:\/\//.test(out), WAIT_MS);
         void (async () => {
           for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
             out += decoder.decode(chunk.value, { stream: true });
@@ -110,5 +111,5 @@ await child.exited;`,
         }
       }
     });
-  }, 15_000);
+  });
 });

@@ -56,7 +56,7 @@ more
       async (root) => {
         const deckDir = join(root, "decks", "demo");
         const result = await runDek(["sync", "--json"], { cwd: deckDir });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
 
         const json = jsonStdout<SyncOk>(result);
         expect(json.ok).toBe(true);

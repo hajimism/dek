@@ -42,7 +42,7 @@ describe("dek goto / current", () => {
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const result = await runDek(["current", "--json"], { cwd: join(root, "decks", "demo") });
-        expect(result.exitCode).toBe(1);
+        expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<ErrorJson>(result);
         expect(json.error.hint).toContain("run `dek`");
       },

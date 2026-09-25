@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { playwrightResolved } from "../../src/core/playwright.ts";
 import { DEFAULT_LEAD_MS, type Timeline } from "../../src/core/timeline.ts";
@@ -13,6 +12,7 @@ import {
   planCapture,
 } from "../../src/video/recorder.ts";
 import { encodeWav, parseWav, silentWav, sliceWav } from "../../src/voice/wav.ts";
+import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 const PNG = Buffer.from(
@@ -325,21 +325,20 @@ describe("muxVideo", () => {
       const wav = join(dir, "audio.wav");
       writeFileSync(wav, silentWav(200));
       const out = join(dir, "out.mp4");
-      const before = new Set(readdirSync(tmpdir()).filter((name) => name.startsWith("dek-mux-")));
-      await muxVideo({
-        frames: [
-          { path: a, durationMs: 100 },
-          { path: b, durationMs: 100 },
-        ],
-        audioPath: wav,
-        outPath: out,
-      });
+      const tmp = ownTmpdir(dir);
+      await withEnv({ TMPDIR: tmp }, () =>
+        muxVideo({
+          frames: [
+            { path: a, durationMs: 100 },
+            { path: b, durationMs: 100 },
+          ],
+          audioPath: wav,
+          outPath: out,
+        }),
+      );
       expect(await Bun.file(out).exists()).toBe(true);
       expect((await Bun.file(out).arrayBuffer()).byteLength).toBeGreaterThan(32);
-      const leftover = readdirSync(tmpdir()).filter(
-        (name) => name.startsWith("dek-mux-") && !before.has(name),
-      );
-      expect(leftover).toEqual([]);
+      expect(readdirSync(tmp)).toEqual([]);
     });
   });
 
@@ -381,20 +380,29 @@ describe("muxVideo", () => {
       return;
     }
     await withTempDir(async (dir) => {
-      const before = new Set(readdirSync(tmpdir()).filter((name) => name.startsWith("dek-mux-")));
       const wav = join(dir, "audio.wav");
       writeFileSync(wav, silentWav(200));
+      const tmp = ownTmpdir(dir);
       await expect(
-        muxVideo({
-          frames: [{ path: join(dir, "missing.png"), durationMs: 100 }],
-          audioPath: wav,
-          outPath: join(dir, "out.mp4"),
-        }),
+        withEnv({ TMPDIR: tmp }, () =>
+          muxVideo({
+            frames: [{ path: join(dir, "missing.png"), durationMs: 100 }],
+            audioPath: wav,
+            outPath: join(dir, "out.mp4"),
+          }),
+        ),
       ).rejects.toMatchObject({ name: "DekError" });
-      const leftover = readdirSync(tmpdir()).filter(
-        (name) => name.startsWith("dek-mux-") && !before.has(name),
-      );
-      expect(leftover).toEqual([]);
+      expect(readdirSync(tmp)).toEqual([]);
     });
   });
 });
+
+/**
+ * A temp directory muxVideo's own goes in, so a leftover is this call's: the system one is shared
+ * with every test process, and under --parallel another's mux dir can be there mid-check.
+ */
+function ownTmpdir(dir: string): string {
+  const tmp = join(dir, "tmp");
+  mkdirSync(tmp);
+  return tmp;
+}

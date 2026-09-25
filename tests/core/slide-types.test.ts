@@ -14,7 +14,10 @@ const project = { decks: [{ name: "demo" }] };
 /** Runs the tsconfig `dek init` writes, the way an editor would read it. */
 async function typecheck(root: string): Promise<{ ok: boolean; output: string }> {
   await writeFile(join(root, "tsconfig.json"), defaultTsconfig());
-  const result = Bun.spawnSync([TSC, "-p", join(root, "tsconfig.json")], { cwd: root });
+  // Plain `file(line,col)` output even when the shell forces color, which tsc would follow.
+  const result = Bun.spawnSync([TSC, "--pretty", "false", "-p", join(root, "tsconfig.json")], {
+    cwd: root,
+  });
   return { ok: result.exitCode === 0, output: `${result.stdout}${result.stderr}` };
 }
 

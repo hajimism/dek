@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { currentSlug, mountPlayer, pressKey, settle, unmountPlayer } from "../helpers/dom.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
+import { waitFor } from "../helpers/wait.ts";
 
 /** Stands in for the server's socket: it records what the player sends and can drop the line. */
 class FakeWebSocket {
@@ -79,7 +80,7 @@ afterAll(async () => {
 
 describe("the player's line to the server", () => {
   test.serial("comes back after a drop and sends the move made while it was down", async () => {
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await waitFor(() => FakeWebSocket.made[0]?.readyState === FakeWebSocket.OPEN);
     const first = FakeWebSocket.made[0];
     expect(first?.url).toStartWith("ws://localhost:3000/");
     expect(first?.url).toEndWith("/ws?token=a%20b");
@@ -88,7 +89,7 @@ describe("the player's line to the server", () => {
     await settle();
     expect(currentSlug()).toBe("next");
     // The first retry waits at most half a second.
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await waitFor(() => (FakeWebSocket.made[1]?.sent.length ?? 0) > 0);
     const second = FakeWebSocket.made[1];
     expect(FakeWebSocket.made).toHaveLength(2);
     expect(second?.sent).toEqual([JSON.stringify({ slideIndex: 1, beatIndex: 0 })]);

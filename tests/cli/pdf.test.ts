@@ -31,7 +31,7 @@ describe("dek pdf", () => {
           cwd: join(root, "decks", "demo"),
           env: { DEK_PLAYWRIGHT: fakePlaywright },
         });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<PdfOk>(result);
         expect(json.ok).toBe(true);
         expect(json.outs).toEqual([join(root, "decks", "demo", "dist", "demo.pdf")]);

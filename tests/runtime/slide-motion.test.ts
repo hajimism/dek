@@ -10,8 +10,9 @@ afterAll(async () => {
   await unmountChartDeck();
 });
 
+// Serial: the tests drive one mounted player, and a jump would cut off a running animation.
 describe("slide scripts in the player", () => {
-  test("a forward step animates from t=0 to the declared motion", async () => {
+  test.serial("a forward step animates from t=0 to the declared motion", async () => {
     expect(bar()).toBe("0:base:0");
     const seen: number[] = [];
     const module = (
@@ -44,13 +45,13 @@ describe("slide scripts in the player", () => {
     module.draw = draw;
   });
 
-  test("a jump draws the beat's end state", async () => {
+  test.serial("a jump draws the beat's end state", async () => {
     await dekGo({ slideIndex: 0, beatIndex: 0 });
     await dekGo({ slideIndex: 1, beatIndex: 1 });
     expect(bar()).toBe("1:growth:40");
   });
 
-  test("the rail thumbnail is drawn in its end state too", () => {
+  test.serial("the rail thumbnail is drawn in its end state too", () => {
     expect(
       document.querySelector('#dek-rail [data-slide-index="1"] .slide .bar')?.textContent,
     ).toBe("0:base:0");

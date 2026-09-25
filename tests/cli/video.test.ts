@@ -99,7 +99,7 @@ describe("dek video", () => {
       await mkdir(join(deckDir, "voice"), { recursive: true });
       await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
       const result = await runDek(["video", "--json"], { cwd: deckDir });
-      expect(result.exitCode).toBe(1);
+      expect(result).toMatchObject({ exitCode: 1 });
       expect(result.stdout).toContain("dek voice");
     });
   });
@@ -138,7 +138,7 @@ describe("dek video", () => {
           cwd: deckDir,
           env: { DEK_VIDEO: "" },
         });
-        expect(result.exitCode).toBe(1);
+        expect(result).toMatchObject({ exitCode: 1 });
         expect(`${result.stdout}${result.stderr}`).toContain("Playwright");
       },
     );

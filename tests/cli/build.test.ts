@@ -154,7 +154,7 @@ describe("dek build", () => {
         const result = await runDek(["build", "--json", "--root-dist"], {
           cwd: join(root, "decks", "demo"),
         });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<BuildOk>(result);
         expect(json.ok).toBe(true);
         expect(json.outs).toEqual([join(root, "dist", "demo.html")]);

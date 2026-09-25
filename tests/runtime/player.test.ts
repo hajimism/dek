@@ -21,7 +21,8 @@ describe("liveReloadScript", () => {
     expect(live).not.toMatch(/onmessage = \(\) => location\.reload\(\)/);
   });
 
-  test.each([
+  // Serial: each row registers happy-dom over the same globals.
+  test.serial.each([
     ["the presenter's token", "a b&c", "/events?token=a%20b%26c"],
     ["no token on an audience page", undefined, "/events"],
   ])("opens the stream with %s", async (_, token, url) => {

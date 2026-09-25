@@ -45,7 +45,7 @@ describe("dek mv", () => {
         const result = await runDek(["mv", "demo", "architecture", "--before", "intro", "--json"], {
           cwd: root,
         });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const script = await readFile(join(root, "decks", "demo", "script.md"), "utf8");
         expect(script.indexOf("## architecture")).toBeLessThan(script.indexOf("## intro"));
       },

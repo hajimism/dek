@@ -31,7 +31,7 @@ describe("dek ls", () => {
       },
       async (root) => {
         const result = await runDek(["ls", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<LsListOk>(result);
         expect(json.ok).toBe(true);
         expect(json.root).toBe(root);

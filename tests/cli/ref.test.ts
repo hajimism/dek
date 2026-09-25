@@ -51,7 +51,7 @@ describe("dek ref <source>", () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async (fake) => {
         const result = await runDek(["ref", REF, "--json"], { cwd: root, env: fake.env });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<{ name: string; rev: string; changed: boolean }>(result);
         expect(json).toMatchObject({ name: REF, rev: SHA_A, changed: true });
 

@@ -12,8 +12,11 @@ export async function runDek(
   args: string[],
   options?: { cwd?: string; env?: Record<string, string> },
 ): Promise<RunResult> {
-  const proc = Bun.spawn(["bun", cliPath, ...args], {
+  // The Bun running the tests, not whichever `bun` PATH finds first; stdin closed so no run waits
+  // on the runner's terminal or IPC pipe.
+  const proc = Bun.spawn([process.execPath, cliPath, ...args], {
     cwd: options?.cwd,
+    stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
     env: options?.env ? { ...process.env, ...options.env } : undefined,
@@ -31,13 +34,19 @@ export function jsonStdout<T = unknown>(result: RunResult): T {
 }
 
 const STOP_GRACE_MS = 3_000;
+/**
+ * A cold `bun src/cli.ts` starts in a tenth of a second alone but takes seconds on a loaded
+ * machine. The wait only bounds a failure, so it is generous; a passing test never waits it out.
+ */
+const SERVER_READY_MS = 15_000;
 
 export async function spawnDekServer(
   cwd: string,
   options: { args?: string[]; timeoutMs?: number; ready?: (buf: string) => boolean } = {},
 ): Promise<{ url: string; stdout: string; stop: () => Promise<void> }> {
-  const proc = Bun.spawn(["bun", cliPath, ...(options.args ?? [])], {
+  const proc = Bun.spawn([process.execPath, cliPath, ...(options.args ?? [])], {
     cwd,
+    stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -68,7 +77,7 @@ export async function spawnDekServer(
     const stdout = await readUntilReady(
       proc.stdout,
       options.ready ?? ((buf) => /https?:\/\/\S+/.test(buf)),
-      options.timeoutMs ?? 3000,
+      options.timeoutMs ?? SERVER_READY_MS,
     );
     const match = stdout.match(/https?:\/\/\S+/);
     if (!match?.[0]) {

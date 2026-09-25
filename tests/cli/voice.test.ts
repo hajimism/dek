@@ -47,7 +47,7 @@ describe("dek voice", () => {
         cwd: deckDir,
         env: { DEK_VOICE_URL: "http://127.0.0.1:9" },
       });
-      expect(result.exitCode).toBe(1);
+      expect(result).toMatchObject({ exitCode: 1 });
       const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
       expect(json.error.message).toContain("voicevox");
       expect(json.error.hint).toContain("https://voicevox.hiroshiba.jp/");
@@ -63,7 +63,7 @@ describe("dek voice", () => {
       const result = await runDek(["voice", "dict", "add", "dek", "デック", "--json"], {
         cwd: deckDir,
       });
-      expect(result.exitCode).toBe(0);
+      expect(result).toMatchObject({ exitCode: 0 });
       const json = jsonStdout<{ ok: true; key: string; kana: string }>(result);
       expect(json.key).toBe("dek");
       expect(json.kana).toBe("デック");

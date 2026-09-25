@@ -5,13 +5,13 @@ import { jsonStdout, runDek } from "../helpers/cli.ts";
 describe("dek help", () => {
   test("prints the human help text", async () => {
     const result = await runDek(["help"]);
-    expect(result.exitCode).toBe(0);
+    expect(result).toMatchObject({ exitCode: 0 });
     expect(result.stdout).toBe(`${helpText()}\n`);
   });
 
   test("returns agent help as JSON with --agent --json", async () => {
     const result = await runDek(["help", "--agent", "--json"]);
-    expect(result.exitCode).toBe(0);
+    expect(result).toMatchObject({ exitCode: 0 });
     const json = jsonStdout<{ ok: true; help: string }>(result);
     expect(json.ok).toBe(true);
     expect(json.help).toContain("check");

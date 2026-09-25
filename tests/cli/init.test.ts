@@ -21,7 +21,7 @@ describe("dek init", () => {
     await withTempDir(async (dir) => {
       const target = join(dir, "my-talks");
       const result = await runDek(["init", target, "--json"], { cwd: dir });
-      expect(result.exitCode).toBe(0);
+      expect(result).toMatchObject({ exitCode: 0 });
       const json = jsonStdout<InitOk>(result);
       expect(json.ok).toBe(true);
       expect(json.root).toBe(target);

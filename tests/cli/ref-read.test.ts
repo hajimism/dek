@@ -49,7 +49,7 @@ describe("reading a ref", () => {
   test("dek show takes a ref name as its deck and says where the slide came from", async () => {
     await withTempProject(project, async (root) => {
       const result = await runDek(["show", REF, "timing", "--json"], { cwd: root });
-      expect(result.exitCode).toBe(0);
+      expect(result).toMatchObject({ exitCode: 0 });
       const json = jsonStdout<{
         slug: string;
         html: string;

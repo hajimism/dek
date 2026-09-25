@@ -51,7 +51,7 @@ Use \`dek\`.
         const result = await runDek(["cues", "--json"], {
           cwd: join(root, "decks", "demo"),
         });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<CuesOk>(result);
         expect(json.ok).toBe(true);
         expect(json.name).toBe("demo");

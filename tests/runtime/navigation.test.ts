@@ -13,6 +13,7 @@ import {
 } from "../helpers/dom.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
+import { waitFor } from "../helpers/wait.ts";
 
 const script = `---
 title: Demo
@@ -108,16 +109,6 @@ function runningAnimation(): { finish: () => void; finished: Promise<void>; call
     },
   };
   return Object.assign(animation, { calls: () => calls });
-}
-
-async function waitFor(condition: () => boolean, timeoutMs = 2000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!condition()) {
-    if (Date.now() > deadline) {
-      throw new Error("timed out waiting for condition");
-    }
-    await settle();
-  }
 }
 
 /** A press and release on the slide stage, as a mouse, pen, or finger makes it. */

@@ -109,7 +109,7 @@ describe("unknownCommandError", () => {
 describe("dek help <unknown>", () => {
   test("fails like dek <unknown> instead of printing the overview", async () => {
     const result = await runDek(["help", "bogus"]);
-    expect(result.exitCode).toBe(1);
+    expect(result).toMatchObject({ exitCode: 1 });
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("unknown command: bogus");
   });
