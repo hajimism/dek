@@ -1,0 +1,38 @@
+<section class="slide" data-layout="page" data-folio="14">
+  <p class="numeral">14</p>
+  <h2 class="slide-title">ほかの人の発表からも、学べる</h2>
+  <p class="lede"><span class="chip">dek ref</span> は、GitHub に公開されている dek のデッキを、版を固定して手元に取ってきます。取ってきたデッキは読むだけ。使いたい部分は、自分のテーマで書き直します。</p>
+  <div class="stage">
+    <ol class="chain">
+      <li>
+        <p class="label">1　公開されているデッキ</p>
+        <p class="big">GitHub</p>
+        <p class="chip">hajimism/dek/why-dek</p>
+        <p class="note">owner/repo/deck の名前で指す。</p>
+      </li>
+      <li>
+        <p class="label">2　版を固定する</p>
+        <p class="big">dek.toml</p>
+        <p class="chip">[refs] "…/why-dek" = "&lt;commit&gt;"</p>
+        <p class="note">版はコミットで止まる。動かすときは、もう一度 dek ref。</p>
+      </li>
+      <li class="is-ref">
+        <p class="label">3　読み取り専用で置く</p>
+        <p class="big">refs/</p>
+        <p class="verbs"><span class="chip">ls</span><span class="chip">show</span><span class="chip">theme</span><span class="chip">shot</span></p>
+        <p class="note">gitignore される写し。消しても、次に読むとき取り直す。</p>
+      </li>
+      <li class="is-mine">
+        <p class="label">4　自分のデッキ</p>
+        <p class="big">decks/</p>
+        <p class="note"><strong>自分のテーマで書き直して取り込む。</strong>ref を指す道は、デッキの外なので DEK022。</p>
+      </li>
+    </ol>
+    <div class="rules-row">
+      <p><span class="label">できること</span>構成と尺を見る。一枚の作りを読む。描画して確かめる。</p>
+      <p class="no"><span class="label">しないこと</span>ref を書き換える。自分のデッキから ref を参照する。lint も build も refs/ を見ない。</p>
+    </div>
+    <pre class="code"><span class="code-head"><span>使い方</span><span>docs/guide/structure.md より</span></span>$ bunx dek ref hajimism/dek/why-dek
+$ bunx dek show hajimism/dek/why-dek timing</pre>
+  </div>
+</section>

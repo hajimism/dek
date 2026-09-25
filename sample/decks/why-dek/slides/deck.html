@@ -1,0 +1,30 @@
+<section class="slide" data-layout="split" data-folio="04">
+  <div class="col">
+    <p class="numeral">04</p>
+    <h2 class="slide-title">ひとつの発表は、ひとつのディレクトリ</h2>
+    <p class="lede">dek では、ひとつの発表をデッキと呼び、ひとつのディレクトリにまとめます。</p>
+    <p class="note"><strong>デッキの外にあるものは、何も参照しない。</strong>リモートの URL も、<span class="chip">../</span> で親を指す道も lint が止めます。ディレクトリごとコピーすれば、何年後に開いても同じように描画されます。</p>
+  </div>
+  <div class="stage">
+    <p class="label boundary-label">decks/why-dek/</p>
+    <ul class="tree">
+      <li><span class="name" data-morph="script-md">script.md</span><span class="role">台本</span><span class="detail">喋る言葉、順番、尺。いちばん上。</span></li>
+      <li><span class="name">slides/</span><span class="role">スライド</span><span class="detail" data-count="slides">18 枚ぶんの HTML と、必要な CSS・TS</span></li>
+      <li><span class="name">theme.css</span><span class="role">見た目</span><span class="detail">クラスとトークン。このデッキ専用のコピー</span></li>
+      <li><span class="name">assets/</span><span class="role">画像</span><span class="detail">スライドが読むファイルはすべてここ</span></li>
+      <li class="is-optional"><span class="name">voice/</span><span class="role">音声</span><span class="detail">読み上げを付けるときだけ</span></li>
+    </ul>
+    <dl class="counts">
+      <div><dt>HTML</dt><dd data-real="deck-html">18</dd></div>
+      <div><dt>CSS</dt><dd data-real="deck-css">18</dd></div>
+      <div><dt>TS</dt><dd data-real="deck-ts">3</dd></div>
+      <div><dt>画像</dt><dd data-real="deck-assets">2</dd></div>
+      <div><dt>外への参照</dt><dd>0</dd></div>
+    </dl>
+    <ul class="outside">
+      <li><span class="chip">https://cdn…/logo.png</span><span class="no">DEK020</span></li>
+      <li><span class="chip">../../assets/photo.jpg</span><span class="no">DEK022</span></li>
+    </ul>
+  </div>
+  <p class="source">構成と数は、この資料 sample/decks/why-dek の実物（slides/ と assets/ のファイル数）。</p>
+</section>

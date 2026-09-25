@@ -1,0 +1,69 @@
+/* This deck's own premise.html (long lines elided with …) above the theme tokens it draws from. */
+.slide {
+  --at: 0.4833;
+}
+
+.slide[data-layout="term"] .window {
+  flex: none;
+}
+
+.slide .screen {
+  font-size: var(--size-body);
+  line-height: 1.55;
+}
+
+.slide .tokens {
+  display: grid;
+  grid-template-columns: auto repeat(5, minmax(0, 1fr));
+  align-items: center;
+  gap: calc(var(--gap) * 0.8);
+  margin-top: auto;
+  margin-bottom: calc(var(--gap) * 1.6);
+}
+
+.slide .chrome-less {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  color: var(--muted);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  letter-spacing: var(--tracking);
+}
+
+.slide .token {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: calc(var(--gap) * 0.55);
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  line-height: 1.35;
+}
+
+.slide .token > .chip {
+  grid-row: 1 / 3;
+}
+
+.slide .chip {
+  display: grid;
+  place-items: center;
+  width: calc(var(--gap) * 2.3);
+  height: calc(var(--gap) * 2.3);
+  border-radius: calc(var(--radius) * 0.7);
+  box-shadow: 0 0 1.2em var(--glow);
+}
+
+.slide [data-chip="fg"] { background: var(--fg); }
+.slide [data-chip="hot"] { background: var(--hot); }
+.slide [data-chip="accent"] { background: var(--accent); }
+.slide [data-chip="err"] { background: var(--err); }
+
+.slide .chip-size {
+  border: var(--hairline) solid var(--line-strong);
+  font-family: var(--font-title);
+  font-size: var(--size-lead);
+  font-weight: 800;
+  color: var(--fg);
+}

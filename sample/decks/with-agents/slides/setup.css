@@ -1,0 +1,100 @@
+/* What an agent does not need, the two short texts it does read, and the real AGENTS.md. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: calc(var(--gap) * 1.4);
+  align-items: start;
+}
+
+.grid .col {
+  gap: calc(var(--gap) * 0.8);
+}
+
+.nots {
+  display: grid;
+  gap: calc(var(--gap) * 0.35);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.not {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  padding: 0.55em 0.8em;
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: calc(var(--radius) * 0.75);
+  box-shadow: var(--shadow-sm);
+}
+
+.not-name {
+  flex: 1;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-strong);
+}
+
+/* A small rose disc with a cross, drawn from two gradients. */
+.x {
+  flex: none;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  background:
+    linear-gradient(45deg, var(--clear) 44%, var(--err-ink) 44% 56%, var(--clear) 56%),
+    linear-gradient(-45deg, var(--clear) 44%, var(--err-ink) 44% 56%, var(--clear) 56%),
+    var(--err-soft);
+  background-size: 60% 60%, 60% 60%, auto;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--gap) * 0.6);
+}
+
+.stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 0.25em;
+  padding: calc(var(--gap) * 0.7) calc(var(--gap) * 0.85);
+}
+
+.num {
+  font-family: var(--font-title);
+  font-size: var(--size-hero);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+
+.unit {
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.stat-label {
+  grid-column: 1 / -1;
+  margin-top: calc(var(--gap) * 0.35);
+  font-size: var(--size-caption);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--gap) * 0.3);
+  margin: 0;
+}
+
+.grid .code {
+  font-size: var(--size-caption);
+}

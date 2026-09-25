@@ -1,0 +1,47 @@
+<section class="slide" data-layout="split">
+  <div class="col">
+    <p class="kicker"><span class="badge">07</span>The loop</p>
+    <h2 class="slide-title">一往復で、<br>書いて、見て、直す</h2>
+    <div class="orbit">
+      <svg class="ring" viewBox="0 0 300 300" aria-hidden="true">
+        <circle class="ring-track" cx="150" cy="150" r="118"></circle>
+        <circle class="ring-run" cx="150" cy="150" r="118" pathLength="100" data-run></circle>
+      </svg>
+      <span class="dot" data-dot></span>
+      <p class="node node-write" data-node="0"><span class="node-num">01</span>書く</p>
+      <p class="node node-check" data-node="1"><span class="node-num">02</span>確かめる</p>
+      <p class="node node-fix" data-node="2"><span class="node-num">03</span>直す</p>
+      <p class="hub">
+        <span class="hub-state" data-hub="0"><span class="cmd">dek check</span></span>
+        <span class="hub-state hub-ok" data-hub="1"><span class="pill pill-ok">ok: true</span></span>
+      </p>
+    </div>
+  </div>
+  <div class="col steps">
+    <figure class="window">
+      <div class="window-bar"><p class="window-title">slides/how-it-works.html</p><span class="pill">01 write</span></div>
+<pre class="code"><span class="tok-p">&lt;</span><span class="tok-k">section</span> class=<span class="tok-s">"slide"</span> data-layout=<span class="tok-s">"default"</span><span class="tok-p">&gt;</span>
+  <span class="tok-p">&lt;</span><span class="tok-k">h2</span> class=<span class="tok-s">"slide-title"</span><span class="tok-p">&gt;</span>How this file becomes slides<span class="tok-p">&lt;/</span><span class="tok-k">h2</span><span class="tok-p">&gt;</span>
+  <span class="tok-p">&lt;</span><span class="tok-k">ul</span><span class="tok-p">&gt;</span>
+    <span class="tok-p">&lt;</span><span class="tok-k">li</span> data-step=<span class="tok-s">"slides"</span><span class="tok-p">&gt;</span>One heading, one slide<span class="tok-p">&lt;/</span><span class="tok-k">li</span><span class="tok-p">&gt;</span>
+    <span class="tok-p">… 16 more &lt;li&gt;</span></pre>
+    </figure>
+    <figure class="window" data-step="loop-check">
+      <div class="window-bar"><p class="window-title">terminal</p><span class="pill pill-err">02 check · 1 error</span></div>
+<pre class="code"><span class="tok-c">$ dek check how-it-works --shot --json</span>
+<span class="tok-p">{</span> <span class="tok-k">"ok"</span>: <span class="tok-n">false</span>, <span class="tok-p">…</span>
+  <span class="tok-k">"diagnostics"</span>: [{ <span class="tok-k">"id"</span>: <span class="tok-s">"DEK030"</span>, <span class="tok-p">…</span> <span class="tok-hot">"bottom": 69</span> <span class="tok-p">…</span> }],
+  <span class="tok-k">"shot"</span>: <span class="tok-s">"…/.cache/shots/how-it-works.b8fd120c.png"</span> <span class="tok-p">}</span></pre>
+    </figure>
+    <figure class="window" data-step="loop-fix">
+      <div class="window-bar"><p class="window-title">agent</p><span class="pill pill-ok">03 fix · 0 errors</span></div>
+      <div class="fix">
+        <p class="bubble bubble-agent">hint は “cut it”。リストを 3 項目削って、もう一度確かめます。</p>
+      </div>
+<pre class="code"><span class="tok-c">$ dek check how-it-works --shot --json</span>
+<span class="tok-p">{</span> <span class="tok-k">"ok"</span>: <span class="tok-n">true</span>, <span class="tok-k">"slug"</span>: <span class="tok-s">"how-it-works"</span>, <span class="tok-k">"diagnostics"</span>: [],
+  <span class="tok-k">"shot"</span>: <span class="tok-s">"…/.cache/shots/how-it-works.75435466.png"</span> <span class="tok-p">}</span></pre>
+    </figure>
+  </div>
+  <p class="meta"><span>スライドを、エージェントに任せる</span><span>07 / 12</span></p>
+</section>

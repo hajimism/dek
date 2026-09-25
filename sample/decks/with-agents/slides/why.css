@@ -1,0 +1,130 @@
+/* Three problem cards, one per beat. Each carries a small illustration of what goes wrong. */
+.slide {
+  --mock-h: 196px;
+  --stripe: repeating-linear-gradient(var(--line-strong) 0 3px, var(--clear) 3px 9px);
+}
+
+.problem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--gap) * 0.45);
+}
+
+.card-title {
+  margin: calc(var(--gap) * 0.1) 0 0;
+  font-size: var(--size-lead);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.mock {
+  position: relative;
+  align-self: stretch;
+  height: var(--mock-h);
+  margin-bottom: calc(var(--gap) * 0.3);
+  border-radius: calc(var(--radius) * 0.7);
+  background: var(--err-soft);
+  overflow: hidden;
+}
+
+/* A mini slide whose third line runs out of the frame. */
+.frame {
+  position: absolute;
+  left: 14%;
+  top: 18%;
+  width: 62%;
+  height: 64%;
+  padding: 7% 8%;
+  display: flex;
+  flex-direction: column;
+  gap: 9%;
+  background: var(--surface);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: calc(var(--radius-sm) * 0.75);
+  box-shadow: var(--shadow-sm);
+}
+
+.bar {
+  display: block;
+  height: 8%;
+  width: 70%;
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+}
+
+.bar-title {
+  height: 12%;
+  width: 55%;
+  background: var(--fg);
+}
+
+.bar-long {
+  width: 150%;
+  background: var(--err);
+}
+
+/* A minimap of a very long file, with the one slide to change highlighted. */
+.minimap {
+  position: absolute;
+  left: 16%;
+  right: 22%;
+  top: -10%;
+  bottom: -10%;
+  background: var(--stripe);
+  opacity: 0.9;
+}
+
+.focus {
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  top: 46%;
+  height: 16%;
+  border: calc(var(--hairline) * 2) solid var(--err);
+  border-radius: calc(var(--radius-sm) * 0.5);
+  background: var(--surface);
+}
+
+.track {
+  position: absolute;
+  right: 9%;
+  top: 10%;
+  bottom: 10%;
+  width: var(--scroll);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.thumb {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 48%;
+  height: 7%;
+  border-radius: var(--radius-pill);
+  background: var(--err);
+}
+
+.mock-done {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--gap) * 0.4);
+  padding: 0 calc(var(--gap) * 0.8);
+}
+
+.ask,
+.unsure {
+  padding: 0.45em 0.9em;
+  font-size: var(--size-caption);
+}
+
+.unsure {
+  color: var(--err-ink);
+}
+
+.cards {
+  flex: none;
+  align-items: stretch;
+}

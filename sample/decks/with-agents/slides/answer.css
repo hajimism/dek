@@ -1,0 +1,57 @@
+/* The problem cards arrive here by data-morph and turn into promises: rose becomes mint. */
+.slide {
+  --mock-h: 150px;
+}
+
+.promise {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--gap) * 0.45);
+  border-color: var(--ok-soft);
+}
+
+.card-title {
+  margin: calc(var(--gap) * 0.1) 0 0;
+  font-size: var(--size-lead);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.panel {
+  align-self: stretch;
+  height: var(--mock-h);
+  margin-bottom: calc(var(--gap) * 0.3);
+  padding: calc(var(--gap) * 0.7) calc(var(--gap) * 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--gap) * 0.2);
+  border-radius: calc(var(--radius) * 0.7);
+  background: var(--ok-soft);
+}
+
+.from {
+  margin: 0;
+  font-size: var(--size-caption);
+  color: var(--ok-ink);
+  text-decoration: line-through;
+}
+
+.to {
+  margin: 0;
+  font-size: var(--size-body);
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--ok-ink);
+}
+
+.chip {
+  margin: calc(var(--gap) * 0.25) 0 0;
+  font-size: var(--size-small);
+}
+
+.cards {
+  flex: none;
+  align-items: stretch;
+}

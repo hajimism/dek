@@ -1,0 +1,105 @@
+/* This deck's own estimates, section by section, from `bunx dek ls lightning --json`:
+   they add up to 2:42 against the 3:00 budget. The track is the whole budget. */
+.slide {
+  --at: 0.7778;
+}
+
+.slide[data-layout="statement"] {
+  justify-content: flex-start;
+  padding-left: var(--pad-x);
+  padding-right: var(--pad-x);
+}
+
+.slide .total {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--gap) * 1.4);
+  margin-bottom: calc(var(--gap) * 1.2);
+}
+
+.slide .big {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-mega);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-shadow: var(--bloom);
+  font-variant-numeric: tabular-nums;
+}
+
+.slide .big .dim {
+  font-size: 0.5em;
+  letter-spacing: 0;
+}
+
+.slide .total .note {
+  padding-bottom: 0.3em;
+  font-size: var(--size-small);
+}
+
+.slide .chart {
+  position: relative;
+  display: grid;
+  gap: calc(var(--gap) * 0.36);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+}
+
+.slide .lane,
+.slide .axis {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr) 3.4em;
+  align-items: center;
+  column-gap: calc(var(--gap) * 0.6);
+  color: var(--muted);
+}
+
+.slide .lane.hl {
+  color: var(--hot);
+}
+
+.slide .sec {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.slide .track {
+  position: relative;
+  height: calc(var(--gap) * 0.8);
+  border-right: var(--rule) dashed var(--accent);
+  background: repeating-linear-gradient(90deg, var(--line) 0, var(--line) var(--hairline), var(--clear) var(--hairline), var(--clear) 16.6667%);
+}
+
+.slide .seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: calc(var(--rule) * 1.5);
+  background: var(--fg);
+  box-shadow: 0 0 0.9em var(--glow);
+}
+
+.slide .lane.hl .seg {
+  background: var(--hot);
+}
+
+.slide .axis {
+  margin-top: calc(var(--gap) * 0.1);
+}
+
+.slide .ticks {
+  position: relative;
+  height: 1.4em;
+  font-variant-numeric: tabular-nums;
+}
+
+.slide .ticks > span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.slide .ticks > span:nth-child(2) { left: 33.3333%; }
+.slide .ticks > span:nth-child(3) { left: 66.6667%; }
+.slide .ticks > span:nth-child(4) { left: 100%; }

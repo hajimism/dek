@@ -1,6 +1,7 @@
+<!-- dek:begin (dek rewrites this block; write your own notes outside it) -->
 # dek
 
-Talk-script-first HTML slides.
+A build system for talks. Write what you will say; dek builds, measures, and ships the rest.
 
 ## Principles
 
@@ -14,7 +15,7 @@ Talk-script-first HTML slides.
 - Shared look lives in `theme.css`. Decoration only one slide uses lives in `slides/<id>.css`, which is scoped to that slide.
 - Use only classes defined in `theme.css` or in that slide's own `slides/<id>.css`.
 - Color, type, space, radius, and motion in either stylesheet use token `var()` only.
-- Do not add `<style>`, `style=`, or `<script>` inside slide HTML.
+- Do not add `<style>`, `style=`, `<script>`, event handler attributes (`onclick=` and the like), or `javascript:` URLs inside slide HTML.
 - Motion CSS cannot express lives in `slides/<id>.ts`: `export default { motion: { <step>: ms }, draw(slide, { index, step, t }) {} } satisfies DekSlide`. `DekSlide` is global, from `.dek/slide.d.ts`; do not import it. Draw from `t` alone and set everything you touch on every call, with no timers and no imports, so video and screenshots can seek it. In `draw`, find elements by data-* attributes, not classes.
 - Keep the deck self-contained: no remote URLs and no paths outside the deck.
 
@@ -22,82 +23,78 @@ Talk-script-first HTML slides.
 
 From the project `theme.css`. A deck's own `theme.css` can differ; `dek theme` lists what a deck's theme defines.
 
-- `card`
+- `chip`
 - `code`
-- `code-title`
+- `code-head`
 - `col`
 - `figure`
-- `hue-screen`
-- `hue-script`
 - `is-current`
 - `is-shown`
-- `kicker`
 - `label`
 - `lede`
-- `meta`
+- `mark`
 - `note`
-- `num`
+- `numeral`
+- `panel`
+- `signal`
 - `slide`
 - `slide-title`
+- `source`
 - `stage`
 - `stat`
-- `tag`
 - `tok-c`
 - `tok-h`
-- `tok-k`
 - `tok-s`
+- `unit`
 
 ## Theme tokens
 
 - `--accent`
+- `--accent-tint`
 - `--bg`
-- `--code-bg`
-- `--code-dim`
-- `--code-fg`
-- `--code-screen`
-- `--code-script`
-- `--code-string`
+- `--col`
 - `--fg`
 - `--font-body`
 - `--font-mono`
 - `--font-title`
+- `--foot-rule`
 - `--gap`
-- `--hairline`
+- `--grid-width`
+- `--hair`
+- `--head-rule`
+- `--head-top`
+- `--hi`
 - `--line`
-- `--line-strong`
+- `--line-soft`
+- `--margin`
 - `--muted`
 - `--pad`
-- `--pad-bottom`
-- `--pad-top`
-- `--pad-x`
-- `--pin`
+- `--paper-deep`
 - `--radius`
+- `--rise`
 - `--rule`
-- `--screen`
-- `--screen-soft`
-- `--script`
-- `--script-soft`
-- `--shadow`
 - `--size-body`
 - `--size-caption`
 - `--size-code`
 - `--size-hero`
-- `--size-lead`
+- `--size-lede`
+- `--size-numeral`
 - `--size-small`
 - `--size-stat`
 - `--size-title`
 - `--step-transition`
-- `--surface`
-- `--surface-strong`
-- `--tracking`
+- `--tick`
+- `--track`
 
 ## Layouts
 
-- `close`
+- `cover`
 - `default`
+- `page`
 - `split`
 - `title`
 
 For a layout's markup, run `dek theme <layout>`.
 
 For commands, run `dek help --agent`.
+<!-- dek:end -->

@@ -1,0 +1,39 @@
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="badge">08</span>Errors</p>
+  <h2 class="slide-title">失敗しても、<span class="hl">次の一手</span>を返す</h2>
+  <div class="stage grid">
+    <article class="side">
+      <p class="side-head"><span class="pill pill-err">ok: false</span><span class="side-title">何が起きたかと、次のコマンド</span></p>
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">terminal</p></div>
+<pre class="code"><span class="tok-c">$ dek show nope --json</span>
+<span class="tok-p">{</span>
+  <span class="tok-k">"ok"</span>: <span class="tok-n">false</span>,
+  <span class="tok-k">"error"</span>: {
+    <span class="tok-k">"message"</span>: <span class="tok-s">"section \"nope\" not found"</span>,
+    <span class="tok-k">"path"</span>: <span class="tok-s">"script.md"</span>,
+    <span class="tok-hot">"hint": "run `dek ls`"</span>
+  }
+<span class="tok-p">}</span></pre>
+      </figure>
+      <p class="note">hint はそのまま実行できるコマンド。エージェントは、次に何をすればよいか迷わない。</p>
+    </article>
+    <article class="side">
+      <p class="side-head"><span class="pill pill-skip">skipped</span><span class="side-title">測れなかった検査は、合格にしない</span></p>
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">terminal</p></div>
+<pre class="code"><span class="tok-c">$ dek check how-it-works --voice --json</span>
+<span class="tok-p">{</span>
+  <span class="tok-k">"ok"</span>: <span class="tok-n">true</span>, <span class="tok-k">"slug"</span>: <span class="tok-s">"how-it-works"</span>, <span class="tok-k">"diagnostics"</span>: [],
+  <span class="tok-hot">"skipped"</span>: [{
+    <span class="tok-k">"check"</span>: <span class="tok-s">"voice"</span>,
+    <span class="tok-k">"reason"</span>: <span class="tok-s">"the deck has no voice/voice.toml"</span>,
+    <span class="tok-k">"hint"</span>: <span class="tok-s">"create voice/voice.toml in the deck with a speaker, …"</span>
+  }]
+<span class="tok-p">}</span></pre>
+      </figure>
+      <p class="note">声の検査は飛ばしたと明記される。空の成功と、取り違えることはない。</p>
+    </article>
+  </div>
+  <p class="meta"><span>スライドを、エージェントに任せる</span><span>08 / 12</span></p>
+</section>

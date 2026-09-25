@@ -1,0 +1,49 @@
+<section class="slide" data-layout="page" data-folio="11">
+  <p class="numeral">11</p>
+  <h2 class="slide-title">見た目は、描画して測る</h2>
+  <p class="lede">見た目の確認も、目に頼りません。<span class="chip">dek lint --visual</span> は、スライドを実際のブラウザで描画し、すべてのビートで測って、答えを数字で返します。</p>
+  <div class="stage">
+    <figure class="case" data-step="measure-overflow">
+      <p class="label"><span class="rule-id">DEK030</span>はみ出しは、何ピクセルかまで</p>
+      <svg class="sketch" viewBox="0 0 520 84" aria-hidden="true">
+        <rect class="frame" x="1" y="1" width="420" height="82" />
+        <rect class="line-box" x="24" y="30" width="438" height="14" />
+        <line class="edge" x1="421" y1="14" x2="421" y2="70" />
+        <line class="dim" x1="421" y1="60" x2="462" y2="60" />
+        <line class="dim" x1="462" y1="52" x2="462" y2="68" />
+        <text class="dim-text" x="472" y="65">41px</text>
+      </svg>
+      <pre class="code">{
+  "id": "DEK030",
+  "data": {
+    "box": "p.lede[data-step=\"slow\"]",
+    "text": "https://example.com/docs/…",
+    <span class="mark">"edges": { "right": 41 }</span>,
+    "steps": ["slow", "vague"]
+  },
+  "hint": "shorten it, or let it wrap …"
+}</pre>
+    </figure>
+    <figure class="case" data-step="measure-contrast">
+      <p class="label"><span class="rule-id">DEK031</span>読みにくい色は、比で返す</p>
+      <div class="sketch swatches">
+        <p class="sample"></p>
+        <p class="ratio"><span class="stat">1.5</span><span class="unit">: 1</span></p>
+        <p class="note">基準 4.5 : 1<br>24px 以上なら 3 : 1</p>
+      </div>
+      <pre class="code">{
+  "id": "DEK031",
+  "data": {
+    "box": "p.faint[data-step=\"vague\"]",
+    "text": "補足：この注釈は薄すぎて読めません",
+    <span class="mark">"ratio": 1.5</span>,
+    "threshold": 4.5,
+    "fg": "#c8c4ba",
+    "bg": "#f3f1ec",
+    "steps": ["vague"]
+  }
+}</pre>
+    </figure>
+  </div>
+  <p class="source">捨てデッキに dek lint --visual --json をかけた実際の出力から、id と data を抜粋（severity・message・path は省略）。</p>
+</section>

@@ -49,3 +49,30 @@ kana = "エルエス"
 
 ["script.md"]
 kana = "スクリプトエムディー"
+
+[GitHub]
+kana = "ギットハブ"
+
+[JSON]
+kana = "ジェイソン"
+
+[assets]
+kana = "アセッツ"
+
+[check]
+kana = "チェック"
+
+[ref]
+kana = "レフ"
+
+[show]
+kana = "ショー"
+
+[slides]
+kana = "スライズ"
+
+["theme.css"]
+kana = "テーマシーエスエス"
+
+[voice]
+kana = "ボイス"

@@ -1,0 +1,60 @@
+/* The one decision left to the human, set large, with the split of work under it. */
+.slide {
+  --roles: 860px;
+}
+
+.slide[data-layout="statement"] .slide-title {
+  margin-top: calc(var(--gap) * 0.2);
+  font-size: calc(var(--size-hero) * 1.5);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.kicker {
+  align-self: center;
+}
+
+.pre {
+  margin: calc(var(--gap) * 0.2) 0 0;
+  font-size: var(--size-lead);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.split-roles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: calc(var(--gap) * 0.8);
+  width: 100%;
+  max-width: var(--roles);
+  margin-top: calc(var(--gap) * 1.4);
+  text-align: left;
+}
+
+.role .code {
+  min-height: 7.4em;
+}
+
+/* A plus sign between the two roles. */
+.plus {
+  position: relative;
+  align-self: center;
+  width: calc(var(--gap) * 1.4);
+  height: calc(var(--gap) * 1.4);
+  margin: 0;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--on-accent), var(--on-accent)) center / 50% calc(var(--hairline) * 3) no-repeat,
+    linear-gradient(var(--on-accent), var(--on-accent)) center / calc(var(--hairline) * 3) 50% no-repeat,
+    var(--accent);
+  box-shadow: var(--shadow);
+}
+
+.thanks {
+  margin: calc(var(--gap) * 1.2) 0 0;
+  font-size: var(--size-small);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}

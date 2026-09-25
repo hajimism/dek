@@ -1,6 +1,6 @@
 # dek sample
 
-A twelve-minute deck about dek itself, built to double as a handout: every slide states its point in a full sentence and carries its own figure, so the PDF reads without the talk. Open `script.md` and you will find the order, the spoken words, and the timing all in one place. Every slide started as the skeleton `dek` generated from it. The project is set up the way a real talk project would be, with Playwright, rumdl, and voice included.
+Three decks about dek itself. `why-dek` is a twelve-minute talk built to double as a handout: every slide states its point in a full sentence and carries its own figure, so the PDF reads without the talk. `lightning` is a three-minute lightning talk that builds a talk in a terminal, and `with-agents` a six-minute talk about handing slides to an AI agent. Open any `script.md` and you will find the order, the spoken words, and the timing all in one place. Every slide started as the skeleton `dek` generated from it. The project is set up the way a real talk project would be, with Playwright, rumdl, and voice included.
 
 [日本語](./README.ja.md)
 
@@ -41,20 +41,24 @@ The scripts do not pin a deck. From the project root they apply to every deck; f
 
 ## Layout
 
-`dek` resolves to `file:..`, this repository itself. Playwright and rumdl are `devDependencies` of the sample.
+dek is installed as `@hajimism/dek` from `file:..`, this repository itself, next to Playwright and rumdl in the sample's `devDependencies`. A project of your own installs it with `bun add -d github:hajimism/dek` instead.
 
-The `[voice]` table in `dek.toml` is the default that `dek new` copies into new decks. The why-dek deck's actual settings live in `decks/why-dek/voice/`: `voice.toml`, and a `dict.toml` with readings for ASCII words. When the engine is down the dev server keeps running; only synthesis fails.
+The `[voice]` table in `dek.toml` is the default that `dek new` copies into new decks. Each deck's actual settings live in its own `voice/`: `voice.toml`, and a `dict.toml` with readings for ASCII words. When the engine is down the dev server keeps running; only synthesis fails.
 
-`voice.toml` also shows the timing knobs: `lead` for the whole deck, a longer lead into the annotated script on `anatomy`, and a longer pause after the last beat of `recap`.
+`decks/why-dek/voice/voice.toml` also shows the timing knobs: `lead` for the whole deck, a longer lead into the annotated script on `script`, and a longer pause after the last beat of `recap`.
 
-The shared look comes from `decks/why-dek/theme.css`: a light, print-friendly theme where vermilion always means the script and indigo always means the screen. Each slide's figure, such as the tracks on `night-before`, the lanes on `beats`, and the rule table on `rules`, lives in that slide's own `slides/<id>.css`, so the theme keeps a small vocabulary. `slides/timing.ts` and `slides/one-file.ts` grow their charts as the slide enters, from numbers written into `data-*` attributes: the output of `dek ls` and the line counts of `slides/`. They draw from `t` alone, so the video, screenshots, and PDF show the same motion or its end state.
+The three decks share nothing but the project. Each has its own `theme.css`, and decoration that only one slide uses lives in that slide's `slides/<id>.css`, so every theme keeps a small vocabulary. Motion that CSS cannot express is drawn from `t` alone in `slides/<id>.ts`, so the video, screenshots, and PDF show the same motion or its end state. Whatever looks like a measurement or a command's output is real: it was measured or run, and a caption on the slide says where it came from. Those numbers go stale when a script or a slide changes, so refresh them with the deck.
 
-The images in `assets/` are screenshots taken with `dek shot`: `night-before` as the raw skeleton and as finished, and a slide that overflows, whose real `DEK030` diagnostic appears on `blind`.
+## why-dek
 
-## A second deck
+`decks/why-dek/` is a twelve-minute explainer built to double as a handout. Every slide states its point as a full-sentence heading and carries its own figure, so the PDF reads without the talk. It runs from what today's slide making leaves for later, through the script, skeletons, small files, beats, and motion, to measuring, lint, agents, refs, and the single file you take to the venue.
 
-`decks/say-it-first/` pitches dek in four minutes instead of explaining it: tension, the shift, a point of view, the reveal, proof, and a call to action. It shares nothing with why-dek but the project. Its own `theme.css` is a black stage with one electric violet, heavy display type, and pages that wipe in from the right; glows and grids live on pseudo-elements, so `lint --visual` measures only the words. Every entrance, from the typed heading on the cover to the counters and the dial, is drawn from `t` in `slides/<id>.ts`, so screenshots, the PDF, and video show the same motion or its end state. The dial on `clock` holds the deck's own `dek ls` estimates, and the build card on `moves` holds its real built size.
+Its theme is Swiss editorial on print-friendly paper: near-black ink, one cobalt signal color, a yellow highlighter for emphasis, a visible twelve-column grid, and a running head with the page number. The three problem cards on `later` carry into `order` with `data-morph`, and `script.md` in the tree on `deck` carries into `script`. `timing` charts the deck's own `dek ls` estimate against its budget from `data-*` attributes, `files` holds the line counts of its own `slides/`, `lint` lays out all 31 rules in five layers, `measure` shows a real `DEK030` and `DEK031`, and `outputs` the built file's real size. `skeleton` shows `dek shot` of the raw skeleton of `later` next to the finished slide, from `assets/`.
 
-## A third deck
+## lightning
 
-`decks/dek-ref/` is a six-minute startup-style pitch for a feature dek does not have yet: `dek ref`, which fetches a public dek deck into `refs/` so you can read, render, and borrow from it. It runs problem, insight, product, how it works, trust, roadmap, and the ask. Its `theme.css` looks like neither of the other decks: cream paper, thick ink outlines, hard offset shadows, and loud fills (lime, pink, sky, sun) behind ink text, with a blue page for statements and an ink page to close. The cover fans out real screenshots of the other two decks, `readonly` and `take` show why-dek's real `timing` slide and its `dek ls` numbers, and `reskin` draws one slide's markup twice under two sets of the same token names, which is the point the pitch makes about borrowing. Entrances are drawn from `t` in `slides/<id>.ts`; the ticker on `close` is pseudo-element text, since it is meant to run past both edges.
+`decks/lightning/` is a three-minute lightning talk that builds a talk in a terminal as it goes: init, write the script, save, check the length, style, measure, build. Its theme is an amber CRT: warm black, phosphor type, and scanlines, vignette, and bloom drawn on pseudo-elements, so `lint --visual` measures only the words. Commands type themselves from `t`, the terminal window carries from slide to slide with `data-morph`, and a clock in the footer grows toward 3:00 from the deck's own `dek ls` estimates. Every command's output is a real run of dek in a throwaway project; `write` shows this deck's own `script.md`, and `elapsed` its own section estimates.
+
+## with-agents
+
+`decks/with-agents/` is a six-minute talk for developers who hand slides to an AI coding agent: why agents stumble on slides, and the three promises that let them run the loop alone (measured verdicts, small files, lint as the finish line). Its theme looks like a product page: a light gray canvas, white cards and windows with soft shadows, pastel status pills, dark syntax-colored panels, and chat bubbles between you and the agent. The problem cards on `why` morph into the promise cards on `answer`, and the dot on the ring in `loop` advances with each beat. Every JSON panel and terminal is real output from a throwaway project: a `DEK030` from `dek check --shot`, an error envelope with its hint, a `skipped` entry, `dek show`, and a real `dek ref hajimism/dek/why-dek` pin with a shot of the ref's `timing` slide.

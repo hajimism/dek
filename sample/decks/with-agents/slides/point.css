@@ -1,0 +1,134 @@
+/* The presenter's browser and the agent's terminal, with the two commands that point between them. */
+.slide {
+  --lane: 118px;
+  --size-code-point: 0.8125rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--lane) minmax(0, 1fr);
+  gap: calc(var(--gap) * 0.6);
+  align-items: center;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.5);
+  min-width: 0;
+}
+
+.screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--gap) * 0.6);
+  aspect-ratio: 16 / 9;
+  margin: calc(var(--gap) * 0.6);
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+}
+
+.mini {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--size-title);
+  font-weight: 700;
+  color: var(--code-fg);
+}
+
+/* A small bar chart: the figure the human wants smaller, ringed as it is pointed at. */
+.fig {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--gap) * 0.35);
+  height: calc(var(--gap) * 3.2);
+  margin: 0;
+  padding: calc(var(--gap) * 0.35) calc(var(--gap) * 0.5);
+  border: calc(var(--hairline) * 2) dashed var(--code-prompt);
+  border-radius: var(--radius-sm);
+}
+
+.fig span {
+  display: block;
+  width: calc(var(--gap) * 1.1);
+  border-radius: calc(var(--radius-sm) * 0.4);
+  background: var(--code-key);
+}
+
+.b1 {
+  height: 45%;
+}
+
+.b2 {
+  height: 100%;
+}
+
+.b3 {
+  height: 70%;
+}
+
+/* A mouse pointer drawn with a clip-path, resting on the slide. */
+.pointer {
+  position: absolute;
+  right: 30%;
+  bottom: 12%;
+  width: calc(var(--gap) * 1.1);
+  height: calc(var(--gap) * 1.5);
+  background: var(--on-accent);
+  clip-path: polygon(0 0, 100% 66%, 58% 70%, 80% 100%, 62% 100%, 42% 74%, 0 94%);
+  filter: drop-shadow(0 0 calc(var(--hairline) * 2) var(--fg));
+}
+
+.arrows {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 1.6);
+}
+
+.arrow {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding-bottom: calc(var(--gap) * 0.55);
+  font-size: var(--size-small);
+}
+
+/* A shaft with an arrowhead, drawn under the command. */
+.arrow::before {
+  content: "";
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 0;
+  height: calc(var(--hairline) * 3);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.arrow::after {
+  content: "";
+  position: absolute;
+  bottom: calc(var(--hairline) * -5);
+  width: calc(var(--hairline) * 13);
+  height: calc(var(--hairline) * 13);
+  background: var(--accent);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.arrow-right::after {
+  right: 0;
+}
+
+.arrow-left::after {
+  left: 0;
+  transform: scaleX(-1);
+}
+
+.side .code {
+  font-size: var(--size-code-point);
+  line-height: 1.6;
+}

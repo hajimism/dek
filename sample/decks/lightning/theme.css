@@ -1,0 +1,505 @@
+/*
+ * Phosphor theme. The talk is one terminal session on an amber CRT:
+ * amber is the ink, green marks the prompt and anything that passed,
+ * red marks what failed. Scanlines, vignette, and bloom live on pseudo-elements,
+ * so lint measures only the words. Every window carries data-morph="window"
+ * and every slide the same HUD, so the session never cuts away.
+ */
+.slide {
+  --fg: #ffb648;
+  --bg: #0b0805;
+  --accent: #86f5a6;
+  --muted: #c49356;
+  --hot: #ffe2a8;
+  --err: #ff8a70;
+  --surface: #120d07;
+  --surface-strong: #1c140a;
+  --line: #4a3418;
+  --line-strong: #7a5526;
+  --glow: #ffb64833;
+  --glow-soft: #ffb64814;
+  --glow-green: #86f5a626;
+  --glow-red: #ff8a702e;
+  --scan: #00000038;
+  --clear: #0b080500;
+  --shade: #000000cc;
+  --font-title: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  --font-body: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Hiragino Sans", monospace;
+  --size-mega: 5.6rem;
+  --size-display: 4.5rem;
+  --size-title: 1.25rem;
+  --size-lead: 1.75rem;
+  --size-body: 1.3rem;
+  --size-code: 1.3rem;
+  --size-small: 1.1rem;
+  --size-caption: 0.95rem;
+  --gap: 24px;
+  --pad-x: 64px;
+  --pad-top: 40px;
+  --pad-bottom: 76px;
+  --pad: var(--pad-top) var(--pad-x) var(--pad-bottom);
+  --radius: 10px;
+  --hairline: 1px;
+  --rule: 2px;
+  --bloom: 0 0 0.5em var(--glow);
+  --tracking: 0.12em;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --step-transition: 0.45s var(--ease);
+  --at: 0;
+  --scanline: var(--clear) 0, var(--clear) 2px, var(--scan) 3px, var(--clear) 4px;
+  --blink: blink 1.06s steps(1, end) infinite;
+  --power-on: brightness(2.2) blur(2px);
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--pad);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: 1.55;
+  font-feature-settings: "palt";
+  word-break: auto-phrase;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Behind: a soft bloom in the middle of the tube, darkening toward the corners. */
+.slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 45%, var(--glow-soft), var(--clear) 70%),
+    radial-gradient(ellipse 120% 120% at 50% 50%, var(--clear) 55%, var(--shade) 100%);
+}
+
+/* On top: scanlines, faint enough that every glyph keeps its contrast. */
+.slide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, var(--scanline));
+}
+
+/* The section heading, printed like a shell comment above the window. */
+.slide .slide-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9em;
+  margin: 0 0 calc(var(--gap) * 0.7);
+  font-family: var(--font-mono);
+  font-size: var(--size-title);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  text-shadow: var(--bloom);
+}
+
+.slide .num {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.slide .num::before {
+  content: "# ";
+}
+
+.slide .display {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--size-display);
+  font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  text-shadow: var(--bloom);
+  text-wrap: balance;
+}
+
+.slide .lede {
+  margin: calc(var(--gap) * 1.1) 0 0;
+  font-size: var(--size-lead);
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.slide .hl {
+  color: var(--hot);
+}
+
+.slide .ok {
+  color: var(--accent);
+}
+
+.slide .err {
+  color: var(--err);
+}
+
+.slide .dim {
+  color: var(--muted);
+}
+
+/* A terminal or editor window. The frame morphs from slide to slide. */
+.slide .window {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 var(--hairline) var(--bg),
+    0 0 calc(var(--gap) * 2.5) var(--glow);
+}
+
+.slide .chrome {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: calc(var(--gap) * 1.6);
+  border-bottom: var(--hairline) solid var(--line);
+  background: var(--surface-strong);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* Three lamps, drawn so they never count as text. */
+.slide .chrome::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--gap) * 0.75);
+  top: 50%;
+  width: calc(var(--gap) * 0.45);
+  height: calc(var(--gap) * 0.45);
+  border-radius: 50%;
+  background: var(--err);
+  box-shadow:
+    calc(var(--gap) * 0.8) 0 0 var(--fg),
+    calc(var(--gap) * 1.6) 0 0 var(--accent);
+  transform: translateY(-50%);
+  opacity: 0.8;
+}
+
+.slide .screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: calc(var(--gap) * 0.8) calc(var(--gap) * 1.1);
+  font-family: var(--font-mono);
+  font-size: var(--size-code);
+  line-height: 1.5;
+  color: var(--fg);
+  text-shadow: var(--bloom);
+  font-feature-settings: normal;
+}
+
+/* One line of a terminal: it wraps like a terminal does, never past the edge. */
+.slide .line {
+  display: block;
+  min-height: 1.5em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.slide .prompt {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.slide .prompt::after {
+  content: " $ ";
+  color: var(--muted);
+}
+
+/* A block cursor. Stills hold an infinite animation at its first frame, so that frame is lit. */
+.slide .cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.15em;
+  margin-left: 0.08em;
+  vertical-align: -0.2em;
+  background: var(--fg);
+  box-shadow: 0 0 0.6em var(--glow);
+  animation: var(--blink);
+}
+
+@keyframes blink {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.slide .gutter {
+  display: inline-block;
+  width: 2.4em;
+  margin-right: 0.9em;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.slide .note {
+  margin: 0;
+  font-size: var(--size-small);
+  line-height: 1.6;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.slide .tag {
+  display: inline-block;
+  padding: 0.05em 0.55em;
+  border: var(--hairline) solid currentColor;
+  border-radius: calc(var(--radius) * 0.4);
+  font-family: var(--font-body);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: none;
+}
+
+/* The HUD: the talk's clock, carried across every slide. The fill is this slide's
+   start as a share of the three-minute budget, from `dek ls lightning --json`. */
+.slide .hud {
+  position: absolute;
+  left: var(--pad-x);
+  right: var(--pad-x);
+  bottom: calc(var(--gap) * 1.05);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--gap) * 0.8);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.slide .hud-track {
+  position: relative;
+  flex: 1;
+  height: calc(var(--rule) * 2);
+  border-radius: var(--rule);
+  background: var(--line);
+}
+
+.slide .hud-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--at) * 100%);
+  border-radius: var(--rule);
+  background: var(--fg);
+  box-shadow: 0 0 0.8em var(--glow);
+}
+
+.slide .hud-clock {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* @layout boot
+<section class="slide" data-layout="boot">
+  <p class="line"><span class="prompt">~</span><span class="cursor"></span></p>
+  <h1 class="display">三分で、発表をひとつ作る</h1>
+  <p class="lede">dek sample · 3:00</p>
+</section>
+*/
+.slide[data-layout="boot"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: calc(var(--pad-x) * 1.6);
+  padding-right: calc(var(--pad-x) * 1.6);
+}
+
+/* @layout statement
+<section class="slide" data-layout="statement">
+  <h2 class="slide-title"><span class="num">02</span>premise</h2>
+  <p class="display">最初に書くのは、<span class="hl">喋る言葉</span>。</p>
+</section>
+*/
+.slide[data-layout="statement"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: calc(var(--pad-x) * 1.6);
+  padding-right: calc(var(--pad-x) * 1.6);
+}
+
+/* @layout term
+<section class="slide" data-layout="term">
+  <h2 class="slide-title"><span class="num">03</span>プロジェクトを作る</h2>
+  <figure class="window" data-morph="window">
+    <figcaption class="chrome">zsh — ~/</figcaption>
+    <div class="screen"><span class="line"><span class="prompt">~</span>bunx dek ls</span></div>
+  </figure>
+</section>
+*/
+.slide[data-layout="term"] {
+  display: flex;
+  flex-direction: column;
+}
+
+.slide[data-layout="term"] .window {
+  flex: 1;
+}
+
+/* @layout split
+<section class="slide" data-layout="split">
+  <h2 class="slide-title"><span class="num">04</span>台本を書く</h2>
+  <figure class="window" data-morph="window">
+    <figcaption class="chrome">script.md</figcaption>
+    <div class="screen"><span class="line"><span class="gutter">1</span>## 見出し</span></div>
+  </figure>
+  <aside><p class="note">## = スライド一枚</p></aside>
+</section>
+*/
+.slide[data-layout="split"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.42fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: calc(var(--gap) * 1.4);
+}
+
+.slide[data-layout="split"] .slide-title {
+  grid-column: 1 / -1;
+}
+
+.slide[data-layout="split"] .window {
+  grid-column: 1;
+}
+
+.slide[data-layout="split"] > aside {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--gap) * 1.2);
+  min-height: 0;
+}
+
+/* Beats: a line powers on in place, so layout is the same at every beat. */
+.slide.is-current [data-step] {
+  opacity: 0;
+  filter: var(--power-on);
+  transition:
+    opacity var(--step-transition),
+    filter var(--step-transition);
+}
+
+.slide.is-current [data-step].is-shown {
+  opacity: 1;
+  filter: none;
+}
+
+/* Slides change like a CRT refresh: the new frame is swept in by the beam. */
+@keyframes tube-out {
+  to {
+    opacity: 0;
+    filter: brightness(0.4);
+  }
+}
+
+@keyframes tube-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+    filter: brightness(1.8);
+  }
+  60% {
+    filter: brightness(1.15);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    filter: none;
+  }
+}
+
+::view-transition-old(slide),
+::view-transition-new(slide),
+::view-transition-group(*) {
+  --tube-out: tube-out 0.42s ease-in both;
+  --tube-in: tube-in 0.5s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+  --morph: 0.55s;
+  --screen-off: 0.18s ease-in both;
+  --screen-on: 0.3s ease-out 0.25s both;
+}
+
+::view-transition-old(slide) {
+  animation: var(--tube-out);
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(slide) {
+  animation: var(--tube-in);
+  mix-blend-mode: normal;
+}
+
+::view-transition-group(*) {
+  animation-duration: var(--morph);
+  animation-timing-function: cubic-bezier(0.6, 0, 0.2, 1);
+}
+
+/* The window frame glides; what is on its screen blinks over instead of stretching. */
+@keyframes screen-off {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes screen-on {
+  from {
+    opacity: 0;
+  }
+}
+
+::view-transition-old(window) {
+  animation: screen-off var(--screen-off);
+}
+
+::view-transition-new(window) {
+  animation: screen-on var(--screen-on);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide.is-current [data-step] {
+    transition: none;
+  }
+
+  .slide .cursor {
+    animation: none;
+  }
+
+  ::view-transition-old(slide),
+  ::view-transition-new(slide),
+  ::view-transition-old(window),
+  ::view-transition-new(window),
+  ::view-transition-group(*) {
+    animation: none;
+  }
+}

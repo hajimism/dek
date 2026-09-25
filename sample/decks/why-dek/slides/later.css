@@ -1,0 +1,106 @@
+/* The usual order as a ruled axis; three problems hang from its last step. */
+.slide {
+  --dot: 10px;
+  --leader-h: 64px;
+  --card-h: 260px;
+}
+
+.axis-label {
+  grid-column: 1 / -1;
+  margin-bottom: calc(var(--gap) * 0.4);
+  color: var(--muted);
+}
+
+.axis {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  border-top: var(--rule) solid var(--line);
+}
+
+.axis li {
+  grid-column: span 3;
+  position: relative;
+  padding-top: calc(var(--gap) * 0.45);
+  font-size: var(--size-body);
+  font-weight: 700;
+}
+
+.axis li::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--dot) / -2 - var(--rule) / 2);
+  left: 0;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--fg);
+}
+
+.axis .is-end {
+  color: var(--accent);
+}
+
+.axis .is-end::before {
+  left: auto;
+  right: 0;
+  width: calc(var(--dot) * 1.6);
+  height: calc(var(--dot) * 1.6);
+  top: calc(var(--dot) * -0.8 - var(--rule) / 2);
+  background: var(--accent);
+}
+
+.step-n {
+  margin-right: 0.6em;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.is-end .step-n {
+  color: var(--accent);
+}
+
+.leaders {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: var(--leader-h);
+  overflow: visible;
+}
+
+.leaders path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: var(--hair);
+  vector-effect: non-scaling-stroke;
+}
+
+.problem {
+  grid-column: span 4;
+  min-height: var(--card-h);
+  padding: calc(var(--gap) * 0.6) calc(var(--gap) * 0.7) calc(var(--gap) * 0.7);
+  background: var(--paper-deep);
+  border-top: var(--rule) solid var(--accent);
+}
+
+.problem-n {
+  font-size: var(--size-caption);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.problem h3 {
+  margin: calc(var(--gap) * 0.1) 0 calc(var(--gap) * 0.25);
+  font-size: calc(var(--size-title) * 0.8);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.cost {
+  margin-top: calc(var(--gap) * 0.5);
+  padding-top: calc(var(--gap) * 0.4);
+  border-top: var(--hair) solid var(--line-soft);
+  font-size: var(--size-body);
+  font-weight: 700;
+  line-height: 1.55;
+}

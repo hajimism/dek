@@ -1,0 +1,25 @@
+/* Pin another deck on the left; on the right, its real slide read as a model and rewritten. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: calc(var(--gap) * 1.2);
+  align-items: start;
+}
+
+.grid .col {
+  gap: calc(var(--gap) * 0.55);
+}
+
+.grid .code {
+  font-size: var(--size-caption);
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.model {
+  transform: rotate(-0.8deg);
+}

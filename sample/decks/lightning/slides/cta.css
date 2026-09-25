@@ -1,0 +1,47 @@
+/* The ask, then the one command, left on screen with its cursor blinking. */
+.slide {
+  --at: 0.8222;
+}
+
+.slide .window {
+  align-self: flex-start;
+  margin-top: calc(var(--gap) * 1.6);
+  box-shadow:
+    0 0 0 var(--hairline) var(--bg),
+    0 0 calc(var(--gap) * 3.5) var(--glow);
+}
+
+.slide .screen {
+  padding: calc(var(--gap) * 0.9) calc(var(--gap) * 1.4) calc(var(--gap) * 0.9) calc(var(--gap) * 1.2);
+  font-size: var(--size-lead);
+  font-weight: 600;
+}
+
+.slide .thanks {
+  margin: calc(var(--gap) * 1.6) 0 0;
+  font-size: var(--size-lead);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.slide .ghost {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.slide .ghost::before {
+  content: "$_";
+  position: absolute;
+  right: calc(var(--pad-x) * 0.6);
+  bottom: calc(var(--pad-bottom) * 1.5);
+  font-family: var(--font-mono);
+  font-size: calc(var(--size-mega) * 3);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--clear);
+  -webkit-text-stroke: var(--hairline) var(--line-strong);
+  opacity: 0.55;
+}

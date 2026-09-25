@@ -1,0 +1,71 @@
+<section class="slide" data-layout="page" data-folio="12">
+  <p class="numeral">12</p>
+  <h2 class="slide-title">規約は、すべて lint が確かめる</h2>
+  <p class="lede">使ってよいクラス、トークン経由の値、デッキの中の画像。書いておくだけでは守られない規約を、dek はすべてルールにしました。<span class="mark">エラーがひとつもなければ完成</span>です。</p>
+  <div class="stage">
+    <p class="total"><span class="stat">31</span><span class="unit">ルール　五つの層</span></p>
+      <div class="layer">
+        <p class="layer-head"><span class="layer-name">構造</span><span class="layer-count">11</span></p>
+        <p class="note">台本と slides/ の対応</p>
+        <ol>
+          <li><span class="rid">DEK001</span>節に HTML がない</li>
+          <li><span class="rid">DEK002</span>HTML に節がない</li>
+          <li><span class="rid">DEK003</span>data-step の迷子</li>
+          <li><span class="rid">DEK004</span>id の重複</li>
+          <li><span class="rid">DEK005</span>data-morph の重複</li>
+          <li><span class="rid">DEK006</span>data-slug の不一致</li>
+          <li><span class="rid">DEK007</span>section がない</li>
+          <li class="is-warn"><span class="rid">DEK008</span>読まれないキー</li>
+          <li><span class="rid">DEK009</span>section が二つ</li>
+          <li class="is-warn"><span class="rid">DEK024</span>読めない見出し</li>
+          <li class="is-warn"><span class="rid">DEK044</span># と #### の見出し</li>
+        </ol>
+      </div>
+      <div class="layer">
+        <p class="layer-head"><span class="layer-name">語彙</span><span class="layer-count">10</span></p>
+        <p class="note">テーマの言葉だけで書いているか</p>
+        <ol>
+          <li><span class="rid">DEK010</span>未定義のクラス</li>
+          <li><span class="rid">DEK011</span>style・script の直書き</li>
+          <li><span class="rid">DEK012</span>外へ届くセレクタ</li>
+          <li><span class="rid">DEK013</span>クラスが多すぎる</li>
+          <li><span class="rid">DEK014</span>トークン外の生の値</li>
+          <li><span class="rid">DEK015</span>必須トークンがない</li>
+          <li><span class="rid">DEK016</span>動かないスクリプト</li>
+          <li><span class="rid">DEK017</span>t 以外に依存する描画</li>
+          <li><span class="rid">DEK018</span>theme.css がない</li>
+          <li><span class="rid">DEK019</span>未定義のレイアウト</li>
+        </ol>
+      </div>
+      <div class="layer">
+        <p class="layer-head"><span class="layer-name">素材</span><span class="layer-count">4</span></p>
+        <p class="note">デッキの中で閉じているか</p>
+        <ol>
+          <li><span class="rid">DEK020</span>リモート URL</li>
+          <li><span class="rid">DEK021</span>ファイルがない</li>
+          <li><span class="rid">DEK022</span>デッキの外を指す道</li>
+          <li><span class="rid">DEK023</span>assets/ 外の参照</li>
+        </ol>
+      </div>
+      <div class="layer">
+        <p class="layer-head"><span class="layer-name">描画</span><span class="layer-count">2</span></p>
+        <p class="note">ブラウザで描いて測る</p>
+        <ol>
+          <li><span class="rid">DEK030</span>はみ出し</li>
+          <li><span class="rid">DEK031</span>コントラスト</li>
+        </ol>
+      </div>
+      <div class="layer">
+        <p class="layer-head"><span class="layer-name">音声</span><span class="layer-count">4</span></p>
+        <p class="note">読み上げと尺</p>
+        <ol>
+          <li class="is-warn"><span class="rid">DEK040</span>辞書にない英単語</li>
+          <li class="is-warn"><span class="rid">DEK041</span>持ち時間から外れた尺</li>
+          <li class="is-warn"><span class="rid">DEK042</span>喋らないビート</li>
+          <li class="is-warn"><span class="rid">DEK043</span>行き先のない [beats]</li>
+        </ol>
+      </div>
+    <p class="legend"><span class="key"></span>エラー：完成を止める<span class="key is-warn"></span>警告：報告するが、止めない</p>
+  </div>
+  <p class="source">src/core/diagnostic.ts の RULES 表（31 件）を、docs/reference/lint.md の条件で五つの層に分けたもの。</p>
+</section>

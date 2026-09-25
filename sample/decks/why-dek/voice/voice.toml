@@ -5,7 +5,7 @@ pause   = { sentence = 350, beat = 700 }
 lead    = 300
 
 # Give the reader a moment with the annotated script before the first word.
-[beats.anatomy]
+[beats.script]
 lead = 600
 
 # Hold the last point a little longer before the video ends.

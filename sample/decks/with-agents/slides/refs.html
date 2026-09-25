@@ -1,0 +1,37 @@
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="badge">10</span>Refs</p>
+  <h2 class="slide-title">お手本は、<span class="hl">よその発表</span>から</h2>
+  <div class="stage grid">
+    <div class="col">
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">terminal</p><span class="pill pill-ok">pinned</span></div>
+<pre class="code"><span class="tok-c">$ dek ref hajimism/dek/why-dek</span>
+pinned hajimism/dek/why-dek at <span class="tok-n">bcf1db9</span>
+<span class="tok-p">read it with `dek ls hajimism/dek/why-dek` and `dek show hajimism/dek/why-dek &lt;slug&gt;`</span>
+
+<span class="tok-c">$ dek ref --json</span>
+<span class="tok-p">{</span> <span class="tok-k">"ok"</span>: <span class="tok-n">true</span>, <span class="tok-k">"action"</span>: <span class="tok-s">"list"</span>, <span class="tok-k">"refs"</span>: [{
+  <span class="tok-k">"name"</span>: <span class="tok-s">"hajimism/dek/why-dek"</span>,
+  <span class="tok-k">"rev"</span>: <span class="tok-s">"bcf1db9d7c42e52bad9126dc3b6633372383792d"</span>,
+  <span class="tok-k">"fetched"</span>: <span class="tok-n">true</span>,
+  <span class="tok-k">"title"</span>: <span class="tok-s">"喋る順に、スライドを組み立てる"</span>,
+  <span class="tok-k">"slides"</span>: <span class="tok-n">14</span>
+}] <span class="tok-p">}</span></pre>
+      </figure>
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">dek.toml</p></div>
+<pre class="code"><span class="tok-k">[refs]</span>
+<span class="tok-s">"hajimism/dek/why-dek"</span> = <span class="tok-s">"bcf1db9d7c42e52bad9126dc3b6633372383792d"</span></pre>
+      </figure>
+    </div>
+    <div class="col">
+      <p class="bubble bubble-human">あの発表の、尺のグラフみたいに作って</p>
+      <figure class="window model">
+        <div class="window-bar"><p class="window-title">dek show hajimism/dek/why-dek timing</p><span class="pill pill-skip">read-only</span></div>
+        <img class="thumb" src="assets/ref-timing.jpg" alt="why-dek の timing スライド。尺の見積もりを棒グラフで示している">
+      </figure>
+      <p class="bubble bubble-agent">timing を読みました。このデッキのテーマで書き直します。</p>
+    </div>
+  </div>
+  <p class="meta"><span>スライドを、エージェントに任せる</span><span>10 / 12</span></p>
+</section>

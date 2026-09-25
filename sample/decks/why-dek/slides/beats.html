@@ -1,46 +1,42 @@
-<section class="slide" data-layout="default">
-  <p class="kicker">Ⅱ　仕組み</p>
-  <h2 class="slide-title">喋りが画面を進める</h2>
-  <p class="lede">矢印キーを押すと、まず台本のビートが進み、使い切ると次のスライドへ移る。<br>いつ出すかは台本が、どう出すかはテーマが決める。この図も、そのとおりに出てくる。</p>
+<section class="slide" data-layout="page" data-folio="08">
+  <p class="numeral">08</p>
+  <h2 class="slide-title">いつ出すかは台本、どう出すかはテーマ</h2>
+  <p class="lede">段階的に見せる仕組みも、役割を分けています。スライドの HTML は、要素がどのビートで出るかを <span class="chip">data-step</span> で書くだけです。</p>
   <div class="stage">
-    <div class="lanes">
-      <div class="lane-names"><span></span><span class="hue-script">台本</span><span class="hue-screen">画面</span><span>HTML</span></div>
-      <div class="state">
-        <span class="press">スライドに入る</span>
-        <span class="line"><b>##</b> 喋りが画面を進める</span>
-        <span class="screen"><span class="w-title"></span><span class="w-block"></span><span class="w-block"></span></span>
-        <span class="html">ビートの要素は、まだ隠れている</span>
-      </div>
-      <div class="state" data-step="when">
-        <span class="press"><span class="key">→</span> 1 回目</span>
-        <span class="line"><b>###</b> いつ出すかは台本</span>
-        <span class="screen"><span class="w-title"></span><span class="w-block is-on"></span><span class="w-block"></span></span>
-        <span class="html">data-step="when" に is-shown</span>
-      </div>
-      <div class="state" data-step="how">
-        <span class="press"><span class="key">→</span> 2 回目</span>
-        <span class="line"><b>###</b> どう出すかはテーマ</span>
-        <span class="screen"><span class="w-title"></span><span class="w-block is-on"></span><span class="w-block is-on"></span></span>
-        <span class="html">data-step="how" に is-shown</span>
-      </div>
-      <div class="state is-next" data-step="how">
-        <span class="press"><span class="key">→</span> 3 回目</span>
-        <span class="line"><b>##</b> 尺は、書いた時点でわかる</span>
-        <span class="screen" data-morph="chart"><span class="w-title"></span><span class="w-chart"></span></span>
-        <span class="html">ビートを使い切り、次の 1 枚へ</span>
-      </div>
-    </div>
-    <div class="owners">
-      <div class="card" data-step="when">
-        <p class="label hue-script">いつ出すか ── 台本が決める</p>
-        <p class="note"><strong>### をひとつ足すと、矢印キーの 1 回がひとつ増える。</strong>画面に何も出さず、喋りの間だけを作るビートがあってもよい。</p>
-      </div>
-      <div class="card" data-step="how">
-        <p class="label hue-screen">どう出すか ── テーマが決める</p>
-        <pre class="code"><span class="tok-k">.slide.is-current</span> [data-step]          { <span class="tok-s">opacity: 0</span> }
-<span class="tok-k">.slide.is-current</span> [data-step].is-shown { <span class="tok-s">opacity: 1</span> }</pre>
-      </div>
-    </div>
+    <figure class="part">
+      <p class="label">script.md　いつ</p>
+      <pre class="code"><span class="tok-h">### いつは、台本のビート {#beats-when}</span>
+いつ出すかは、喋りの都合です。…
+
+<span class="tok-h">### どうは、テーマの CSS {#beats-how}</span>
+どう出すかは、見せ方の都合です。…</pre>
+    </figure>
+    <figure class="part">
+      <p class="label">slides/beats.html　結ぶ</p>
+      <pre class="code">&lt;span class="bracket is-when"
+  <span class="tok-s">data-step="beats-when"</span>&gt;
+  &lt;strong&gt;いつ：台本が決める&lt;/strong&gt;…
+&lt;/span&gt;
+
+&lt;span class="bracket is-how"
+  <span class="tok-s">data-step="beats-how"</span>&gt;
+  &lt;strong&gt;どう：テーマが決める&lt;/strong&gt;…
+&lt;/span&gt;</pre>
+    </figure>
+    <figure class="part">
+      <p class="label">theme.css　どう</p>
+      <pre class="code">.slide.is-current [data-step] {
+  opacity: 0;
+  transform: translateY(var(--rise));
+  transition: … var(--step-transition);
+}
+.slide.is-current [data-step]<span class="tok-s">.is-shown</span> {
+  opacity: 1;
+  transform: none;
+}</pre>
+    </figure>
+    <span class="bracket is-when" data-step="beats-when"><strong>いつ：台本が決める</strong>ビートの id で結ぶ。喋りの都合で順番を変えても、HTML はそのまま。</span>
+    <span class="bracket is-how" data-step="beats-how"><strong>どう：テーマが決める</strong>ランタイムは <span class="chip">is-shown</span> を付けるだけ。アニメーションの独自記法はない。</span>
   </div>
-  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
+  <p class="source">三つの抜粋は、このスライドとこの資料の theme.css の実物。</p>
 </section>

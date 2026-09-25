@@ -1,0 +1,48 @@
+/* `dek ls` on a draft of this very script, run for real: the lint section had grown to 0:55.
+   Columns are laid out as a grid, since CJK glyphs are not two monospace cells wide. */
+.slide {
+  --at: 0.3778;
+}
+
+.slide .screen {
+  font-size: var(--size-small);
+  line-height: 1.36;
+}
+
+.slide .line,
+.slide .row {
+  position: relative;
+  isolation: isolate;
+  min-height: 1.36em;
+}
+
+.slide .table {
+  display: grid;
+}
+
+.slide .row {
+  display: grid;
+  grid-template-columns: 6.2em 19em 6em 5.4em auto;
+  column-gap: 1.2em;
+  white-space: pre;
+}
+
+.slide .row > span:nth-child(n + 3 of span):not(.call) {
+  text-align: right;
+}
+
+.slide .mark {
+  position: absolute;
+  inset: 0 calc(var(--gap) * -0.5);
+  z-index: -1;
+  border-radius: calc(var(--radius) * 0.4);
+  background: var(--glow);
+  box-shadow: inset calc(var(--rule) * 2) 0 0 var(--hot);
+}
+
+.slide .call {
+  margin-left: 1.6em;
+  font-family: var(--font-body);
+  font-weight: 700;
+  color: var(--hot);
+}

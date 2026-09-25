@@ -1,0 +1,158 @@
+/* Write, check, fix: a dot runs the ring one stop per beat, and each stop's output stacks on the right. */
+.slide[data-layout="split"] {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: stretch;
+}
+
+.slide {
+  --orbit: 280px;
+  --ring-width: 2px;
+  --run-width: 5px;
+  --dot-size: 18px;
+}
+
+.orbit {
+  position: relative;
+  align-self: center;
+  width: var(--orbit);
+  height: var(--orbit);
+  margin-top: calc(var(--gap) * 1.9);
+}
+
+.ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring circle {
+  fill: none;
+}
+
+.ring-track {
+  stroke: var(--line-strong);
+  stroke-width: var(--ring-width);
+  stroke-dasharray: 2 6;
+}
+
+.ring-run {
+  stroke: var(--accent);
+  stroke-width: var(--run-width);
+  stroke-linecap: round;
+  stroke-dasharray: 0 100;
+}
+
+.dot {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 10.7%;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  margin: calc(var(--dot-size) * -0.5) 0 0 calc(var(--dot-size) * -0.5);
+  border-radius: 50%;
+  background: var(--surface);
+  border: calc(var(--hairline) * 5) solid var(--accent);
+  box-shadow: 0 0 0 calc(var(--hairline) * 6) var(--accent-soft);
+}
+
+.node {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  margin: 0;
+  padding: 0.45em 0.9em 0.45em 0.45em;
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow);
+  font-size: var(--size-small);
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--muted);
+  transition:
+    background var(--step-transition),
+    color var(--step-transition);
+}
+
+.node-num {
+  display: inline-grid;
+  place-items: center;
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: var(--hairline) solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+}
+
+.node.is-lit {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.node.is-lit .node-num {
+  background: var(--on-accent);
+  border-color: var(--on-accent);
+  color: var(--accent-ink);
+}
+
+/* Stops at 12, 4, and 8 o'clock, just outside the ring. */
+.node-write {
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -60%);
+}
+
+.node-check {
+  left: 76%;
+  top: 74%;
+}
+
+.node-fix {
+  right: 76%;
+  top: 74%;
+}
+
+.hub {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+
+.hub-state {
+  grid-area: 1 / 1;
+  font-size: var(--size-small);
+}
+
+.hub-ok {
+  visibility: hidden;
+}
+
+.steps {
+  justify-content: center;
+  gap: calc(var(--gap) * 0.55);
+}
+
+.steps .code {
+  padding: calc(var(--gap) * 0.5) calc(var(--gap) * 0.7);
+}
+
+.fix {
+  display: flex;
+  padding: calc(var(--gap) * 0.5) calc(var(--gap) * 0.7);
+  background: var(--surface-2);
+}
+
+.fix .bubble {
+  max-width: 100%;
+  padding: 0.5em 0.9em;
+}

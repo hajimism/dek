@@ -1,0 +1,50 @@
+/* A real overflowing slide on the left, the real diagnostic for it on the right. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: calc(var(--gap) * 1.2);
+  align-items: start;
+}
+
+.viewport {
+  position: relative;
+  line-height: 0;
+}
+
+.capture {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* What lies past the slide's bottom edge: 69 of 720px, hatched in rose under a dashed edge. */
+.spill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  aspect-ratio: 1280 / 69;
+  padding: 0 calc(var(--gap) * 0.5);
+  border-top: calc(var(--hairline) * 2) dashed var(--err);
+  background: repeating-linear-gradient(135deg, var(--err-soft) 0 var(--hatch), var(--surface) var(--hatch) calc(var(--hatch) * 2));
+}
+
+.spill .pill {
+  margin: 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.caption {
+  margin: 0;
+  padding: calc(var(--gap) * 0.55) calc(var(--gap) * 0.7);
+  border-top: var(--hairline) solid var(--line);
+  font-size: var(--size-small);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.diag .code {
+  padding-top: calc(var(--gap) * 0.55);
+  padding-bottom: calc(var(--gap) * 0.55);
+}

@@ -1,0 +1,112 @@
+/* Thirty-one rules in five columns, one per layer; warnings are outlined, errors are solid. */
+.slide {
+  --rid-w: 58px;
+}
+
+.stage {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.total {
+  grid-column: 1 / 3;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  padding-top: calc(var(--gap) * 0.3);
+  border-top: var(--rule) solid var(--accent);
+}
+
+.total .stat {
+  font-size: var(--size-numeral);
+  color: var(--accent);
+}
+
+.total .unit {
+  margin: calc(var(--gap) * 0.3) 0 0;
+  font-size: var(--size-small);
+}
+
+.layer {
+  grid-column: span 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: calc(var(--gap) * 0.3);
+  border-top: var(--rule) solid var(--line);
+}
+
+.layer-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.layer-name {
+  font-size: var(--size-lede);
+  font-weight: 800;
+}
+
+.layer-count {
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.layer .note {
+  margin: calc(var(--gap) * 0.1) 0 calc(var(--gap) * 0.35);
+  font-size: var(--size-caption);
+  line-height: 1.5;
+}
+
+.layer li {
+  display: grid;
+  grid-template-columns: var(--rid-w) minmax(0, 1fr);
+  align-items: baseline;
+  padding: calc(var(--gap) * 0.12) 0;
+  border-top: var(--hair) solid var(--line-soft);
+  font-size: var(--size-caption);
+  line-height: 1.45;
+}
+
+.rid {
+  justify-self: start;
+  padding: 0 0.3em;
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  font-weight: 700;
+}
+
+.is-warn .rid {
+  background: transparent;
+  color: var(--fg);
+  outline: var(--hair) solid var(--fg);
+  outline-offset: calc(var(--hair) * -1);
+}
+
+.legend {
+  grid-column: 3 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin-top: calc(var(--gap) * 0.6);
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.key {
+  display: inline-block;
+  width: 2.4em;
+  height: 1.1em;
+  background: var(--fg);
+}
+
+.key.is-warn {
+  margin-left: 1.4em;
+  background: transparent;
+  outline: var(--hair) solid var(--fg);
+}

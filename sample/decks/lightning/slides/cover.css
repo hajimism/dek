@@ -1,0 +1,51 @@
+/* A tube warming up: the prompt, then the title typed in, and a big 3:00 burned into the glass. */
+.slide {
+  --at: 0;
+}
+
+.slide .ghost {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.slide .ghost::before {
+  content: "3:00";
+  position: absolute;
+  right: calc(var(--pad-x) * 0.6);
+  bottom: calc(var(--pad-bottom) * 0.7);
+  font-family: var(--font-mono);
+  font-size: calc(var(--size-mega) * 3.4);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  color: var(--clear);
+  -webkit-text-stroke: var(--hairline) var(--line-strong);
+  opacity: 0.55;
+}
+
+.slide .boot {
+  margin: 0 0 calc(var(--gap) * 1.4);
+  font-family: var(--font-mono);
+  font-size: var(--size-lead);
+  color: var(--fg);
+  text-shadow: var(--bloom);
+}
+
+.slide .display {
+  font-size: var(--size-mega);
+  line-height: 1.16;
+}
+
+.slide .lede {
+  margin-top: calc(var(--gap) * 1.4);
+}
+
+.slide .meta {
+  margin: calc(var(--gap) * 0.6) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}

@@ -1,0 +1,122 @@
+/* The slide's own files on the left, and what dek show hands an agent on the right. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: calc(var(--gap) * 1.2);
+  align-items: start;
+}
+
+.files {
+  margin: 0;
+  padding: calc(var(--gap) * 0.4) 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+}
+
+.files li {
+  display: grid;
+  grid-template-columns: 3.4em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.3em calc(var(--gap) * 0.7);
+  line-height: 1.5;
+}
+
+.ext {
+  padding: 0.15em 0;
+  border-radius: calc(var(--radius-sm) * 0.6);
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  text-align: center;
+}
+
+.ext-css {
+  background: var(--sky-soft);
+  color: var(--sky-ink);
+}
+
+.ext-ts {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.lines {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.here {
+  background: var(--accent-soft);
+  box-shadow: inset calc(var(--hairline) * 3) 0 0 var(--accent);
+}
+
+.here .name,
+.here .lines {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.sub {
+  padding-left: calc(var(--gap) * 1.4);
+  background: var(--surface-2);
+}
+
+.more .name,
+.more .lines {
+  grid-column: span 1;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: var(--size-caption);
+}
+
+.more .name {
+  grid-column: 1 / 3;
+}
+
+.show .code {
+  padding-top: calc(var(--gap) * 0.55);
+  padding-bottom: calc(var(--gap) * 0.55);
+}
+
+.ratio {
+  display: grid;
+  gap: calc(var(--gap) * 0.25);
+  padding: calc(var(--gap) * 0.6) calc(var(--gap) * 0.75) calc(var(--gap) * 0.7);
+}
+
+.ratio-label {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: var(--size-small);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.count {
+  font-family: var(--font-mono);
+}
+
+.meter {
+  height: calc(var(--dot) * 0.9);
+  margin: 0 0 calc(var(--gap) * 0.25);
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.fill-all {
+  width: 100%;
+  background: var(--line-strong);
+}

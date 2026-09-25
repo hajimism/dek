@@ -1,0 +1,55 @@
+<section class="slide" data-layout="split" data-folio="13">
+  <div class="col">
+    <p class="numeral">13</p>
+    <h2 class="slide-title">エージェントとも、同じループを回す</h2>
+    <p class="lede">完成の基準がはっきりしているので、AI エージェントも人と同じ手順で、一枚ずつ仕上げられます。</p>
+    <svg class="loop" viewBox="0 0 480 200" aria-hidden="true">
+      <path class="track" d="M 40 70 H 440" />
+      <path class="arrow" d="M 99 64 l 10 6 l -10 6 M 229 64 l 10 6 l -10 6 M 359 64 l 10 6 l -10 6" />
+      <path class="track is-hot" d="M 440 84 C 440 150, 300 150, 300 84" />
+      <path class="arrow is-hot" d="M 294 94 l 6 -10 l 6 10" />
+      <circle class="node" cx="40" cy="70" r="8" />
+      <circle class="node" cx="170" cy="70" r="8" />
+      <circle class="node is-hot" cx="300" cy="70" r="8" />
+      <circle class="node is-hot" cx="440" cy="70" r="8" />
+      <text x="40" y="40" text-anchor="middle">読む</text>
+      <text x="170" y="40" text-anchor="middle">書く</text>
+      <text x="300" y="40" text-anchor="middle">測る</text>
+      <text x="440" y="40" text-anchor="middle">直す</text>
+      <text class="cmd" x="40" y="104" text-anchor="middle">dek show</text>
+      <text class="cmd" x="170" y="104" text-anchor="middle">HTML・CSS</text>
+      <text class="cmd" x="300" y="170" text-anchor="middle">dek check</text>
+      <text class="cmd" x="440" y="170" text-anchor="middle">もう一度測る</text>
+    </svg>
+    <p class="note">測ると直すの往復は、人が画面を確かめる前に片付く。</p>
+  </div>
+  <div class="stage">
+    <figure class="step" data-step="agents-read">
+      <p class="label"><span class="signal">1</span>一枚ぶんを、まとめて読む</p>
+      <p class="cmdline">$ dek show why-dek timing</p>
+      <table class="bundle">
+        <tbody>
+          <tr><th>script</th><td>台本のその節</td><td class="lines" data-real="show-script">6 行</td></tr>
+          <tr><th>html</th><td>slides/timing.html</td><td class="lines" data-real="show-html">42 行</td></tr>
+          <tr><th>css</th><td>slides/timing.css</td><td class="lines" data-real="show-css">165 行</td></tr>
+          <tr><th>ts</th><td>slides/timing.ts</td><td class="lines" data-real="show-ts">32 行</td></tr>
+          <tr class="is-theme"><th>theme</th><td>このスライドが使う規則だけ</td><td class="lines"><span data-real="show-theme">214 行</span><span class="of" data-real="theme-lines"> / 全体 509 行</span></td></tr>
+        </tbody>
+      </table>
+    </figure>
+    <figure class="step" data-step="agents-check">
+      <p class="label"><span class="signal">2</span>描いて、測って、直す</p>
+      <pre class="code"><span class="code-head"><span>$ dek check objection --shot --json</span><span>捨てデッキ</span></span>{
+  "ok": false,
+  "diagnostics": [{
+    "id": "DEK030",
+    <span class="mark">"hint": "shorten it, or let it wrap with overflow-wrap: …"</span>,
+    "data": { "edges": { "right": 41 }, "steps": ["slow", "vague"] }
+  }, { "id": "DEK031", … }],
+  "shot": ".cache/shots/objection.b5ae5c96.png"
+}</pre>
+      <p class="after"><span class="label">直して、もう一度</span><span class="chip">{ "ok": true, "diagnostics": [] }</span></p>
+    </figure>
+  </div>
+  <p class="source">行数は dek show why-dek timing --json の各部の行数。JSON は dek check の実際の出力の抜粋。</p>
+</section>

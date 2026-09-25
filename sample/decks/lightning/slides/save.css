@@ -1,0 +1,42 @@
+/* Saving script.md makes one skeleton per heading: the real `dek sync` file list,
+   and the real skeleton it wrote for ls.html (wrapped to fit). */
+.slide {
+  --at: 0.3056;
+}
+
+.slide[data-layout="split"] {
+  grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr);
+}
+
+.slide .screen {
+  font-size: var(--size-body);
+  line-height: 1.62;
+}
+
+.slide .peek .screen {
+  font-size: var(--size-small);
+}
+
+.slide .line {
+  min-height: 1.62em;
+}
+
+.slide .peek .screen {
+  line-height: 1.42;
+}
+
+.slide[data-layout="split"] > aside {
+  justify-content: space-between;
+  gap: calc(var(--gap) * 0.9);
+}
+
+.slide .peek {
+  box-shadow: none;
+}
+
+.slide .note {
+  font-size: var(--size-lead);
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--fg);
+}

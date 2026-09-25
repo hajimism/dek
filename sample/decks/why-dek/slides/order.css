@@ -1,0 +1,107 @@
+/* The new order: script first, then the two checks that used to wait for the end. */
+.slide {
+  --arrow: 14px;
+}
+
+.flow-label {
+  grid-column: 1 / -1;
+  margin-bottom: calc(var(--gap) * 0.4);
+  color: var(--accent);
+}
+
+.flow {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.flow li {
+  grid-column: span 3;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--gap) * 0.2);
+  padding: calc(var(--gap) * 0.6) calc(var(--gap) * 0.7) calc(var(--gap) * 0.7);
+  background: var(--paper-deep);
+  border-top: var(--rule) solid var(--accent);
+}
+
+.flow li + li::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--gap) * -0.5 - var(--arrow) / 2);
+  width: 0;
+  height: 0;
+  border-top: calc(var(--arrow) / 2) solid transparent;
+  border-bottom: calc(var(--arrow) / 2) solid transparent;
+  border-left: var(--arrow) solid var(--fg);
+  transform: translate(25%, -50%);
+}
+
+.flow .first {
+  background: var(--fg);
+  color: var(--bg);
+  border-top-color: var(--fg);
+}
+
+.flow .first .problem-n {
+  color: var(--bg);
+}
+
+.flow .first .chip {
+  border-color: var(--bg);
+}
+
+.problem-n {
+  font-size: var(--size-caption);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.flow h3 {
+  font-size: calc(var(--size-title) * 0.8);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.flow .chip {
+  margin-top: calc(var(--gap) * 0.3);
+}
+
+.derive {
+  grid-column: 1 / 4;
+  margin-top: calc(var(--gap) * 1.6);
+  padding-top: calc(var(--gap) * 0.45);
+  border-top: var(--hair) solid var(--line);
+}
+
+.derive .note {
+  margin-top: calc(var(--gap) * 0.3);
+}
+
+.facts {
+  grid-column: 4 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--gap);
+  margin-top: calc(var(--gap) * 1.6);
+}
+
+.facts div {
+  padding-top: calc(var(--gap) * 0.45);
+  border-top: var(--hair) solid var(--line);
+}
+
+.facts dt {
+  display: flex;
+  align-items: baseline;
+}
+
+.facts dd {
+  margin-top: calc(var(--gap) * 0.35);
+  font-size: var(--size-small);
+  font-weight: 700;
+}

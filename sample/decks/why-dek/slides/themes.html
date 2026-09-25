@@ -1,36 +1,28 @@
-<section class="slide" data-layout="default">
-  <p class="kicker">Ⅲ　運用</p>
-  <h2 class="slide-title">テーマは、コピーして引き継ぐ</h2>
-  <p class="lede">新しいデッキには、プロジェクトのテーマがコピーされる。共有ではないので、9 月にテーマを直しても<br>4 月に話したデッキの見た目は変わらない。過去のデッキが、そのままテーマの見本帳になる。</p>
+<section class="slide" data-layout="page" data-folio="15">
+  <p class="numeral">15</p>
+  <h2 class="slide-title">テーマはコピーして、そのまま凍らせる</h2>
+  <p class="lede">新しいデッキを作ると、プロジェクトのテーマがそのデッキにコピーされます。共有ではなくコピーなので、秋にテーマを直しても、春に話したデッキの見た目は変わりません。</p>
   <div class="stage">
-    <div class="proj">
-      <span class="tag">my-talks/theme.css</span>
-      <span class="note"><strong>プロジェクトのひな形。</strong>dek new のたびに、ここからデッキへコピーされる。</span>
-    </div>
-    <div class="links">
-      <span>dek new でコピー</span>
-      <span>dek new でコピー</span>
-      <span class="up">cp で書き戻す</span>
-    </div>
-    <div class="decks">
-      <div class="deck">
-        <p class="deck-name"><span class="tag">decks/2026-04-vite/</span><span class="when">4 月</span></p>
-        <span class="mock"><span class="mock-bar"></span><span class="mock-line"></span><span class="mock-line"></span></span>
-        <p class="note">話し終えたデッキ。ひな形をあとで直しても、このままの見た目で残る。</p>
-      </div>
-      <div class="deck is-jun">
-        <p class="deck-name"><span class="tag">decks/2026-06-react/</span><span class="when">6 月</span></p>
-        <span class="mock"><span class="mock-bar"></span><span class="mock-line"></span><span class="mock-line"></span></span>
-        <p class="note"><span class="tag">--theme-from</span> で、4 月のデッキのテーマを引き継いで作った。</p>
-      </div>
-      <div class="deck is-sep">
-        <p class="deck-name"><span class="tag">decks/2026-09-dek/</span><span class="when">9 月</span></p>
-        <span class="mock"><span class="mock-bar"></span><span class="mock-line"></span><span class="mock-line"></span></span>
-        <p class="note">いちばん新しいデッキ。気に入った変更は、ひな形に書き戻す。</p>
-      </div>
-    </div>
-    <pre class="code"><span class="tok-c">$</span> dek new 2026-06-react <span class="tok-k">--theme-from</span> 2026-04-vite   <span class="tok-c"># 前回のデッキから引き継ぐ</span>
-<span class="tok-c">$</span> cp decks/2026-09-dek/theme.css theme.css        <span class="tok-c"># 気に入ったらひな形に戻す</span></pre>
+    <svg class="timeline" viewBox="0 0 1168 300" aria-hidden="true">
+      <line class="month" x1="0" y1="20" x2="1168" y2="20" />
+      <text class="m" x="0" y="12">2026.04</text>
+      <text class="m" x="584" y="12" text-anchor="middle">06</text>
+      <text class="m" x="1168" y="12" text-anchor="end">09</text>
+      <line class="proj" x1="0" y1="70" x2="700" y2="70" />
+      <line class="proj is-new" x1="700" y1="70" x2="1168" y2="70" />
+      <rect class="edit" x="692" y="62" width="16" height="16" />
+      <text class="lab" x="0" y="54">プロジェクトの theme.css</text>
+      <text class="lab is-accent" x="716" y="54">9 月、テーマを直す</text>
+      <path class="deck" d="M 120 70 V 160 H 1168" />
+      <circle class="dot" cx="120" cy="70" r="6" />
+      <text class="cmd" x="132" y="116">dek new 2026-04-vite</text>
+      <text class="lab" x="132" y="150">decks/2026-04-vite/theme.css　4 月のまま、凍結</text>
+      <path class="deck is-new" d="M 900 70 V 250 H 1168" />
+      <circle class="dot is-new" cx="900" cy="70" r="6" />
+      <text class="cmd is-accent" x="912" y="206">dek new 2026-09-dek</text>
+      <text class="lab is-accent" x="912" y="240">decks/2026-09-dek/theme.css</text>
+    </svg>
+    <p class="caption-a"><span class="label">変わらない</span>終わった発表は、終わったときの姿のまま残る。</p>
+    <p class="caption-b"><span class="label">戻すときは手で</span><span class="chip">cp decks/2026-09-dek/theme.css theme.css</span></p>
   </div>
-  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
 </section>

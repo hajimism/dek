@@ -1,0 +1,569 @@
+/*
+ * Product theme. A cool-gray canvas, white cards on soft layered shadows, crisp UI chrome,
+ * pastel fills with dark ink, and one indigo that marks what matters.
+ * Terminals are dark panels inside light windows; every command output on them is real.
+ */
+.slide {
+  --fg: #0f172a;
+  --bg: #f2f4f8;
+  --accent: #4f46e5;
+  --muted: #475569;
+  --accent-ink: #3730a3;
+  --accent-soft: #e0e7ff;
+  --accent-glow: #c7d2fe;
+  --on-accent: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --ok: #16a34a;
+  --ok-soft: #dcfce7;
+  --ok-ink: #166534;
+  --err: #e11d48;
+  --err-soft: #ffe4e6;
+  --err-ink: #9f1239;
+  --warn: #f59e0b;
+  --warn-soft: #fef3c7;
+  --warn-ink: #92400e;
+  --skip-soft: #e2e8f0;
+  --skip-ink: #334155;
+  --sky-soft: #e0f2fe;
+  --sky-ink: #075985;
+  --code-bg: #0b1220;
+  --code-bar: #111a2e;
+  --code-fg: #e2e8f0;
+  --code-dim: #94a3b8;
+  --code-key: #93c5fd;
+  --code-str: #86efac;
+  --code-num: #fdba74;
+  --code-hot: #fda4af;
+  --code-hot-bg: #4c1d2b;
+  --code-prompt: #a5b4fc;
+  --clear: #f2f4f800;
+  --shadow-sm: 0 1px 2px #0f172a0f, 0 1px 3px #0f172a14;
+  --shadow: 0 1px 2px #0f172a0d, 0 8px 24px -8px #0f172a1f, 0 24px 48px -16px #0f172a1a;
+  --shadow-lg: 0 2px 4px #0f172a0d, 0 16px 40px -12px #0f172a29, 0 40px 80px -24px #312e8129;
+  --font-title: "Helvetica Neue", "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+  --font-body: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Hiragino Sans", monospace;
+  --size-hero: 3.4rem;
+  --size-title: 2.2rem;
+  --size-lead: 1.1rem;
+  --size-body: 1rem;
+  --size-small: 0.875rem;
+  --size-caption: 0.75rem;
+  --size-code: 0.75rem;
+  --gap: 24px;
+  --pad-x: 72px;
+  --pad-top: 52px;
+  --pad-bottom: 72px;
+  --pad: var(--pad-top) var(--pad-x) var(--pad-bottom);
+  --radius: 16px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+  --hairline: 1px;
+  --bar: 36px;
+  --dot: 10px;
+  --scroll: 6px;
+  --hatch: 6px;
+  --rise: 14px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --step-transition: 0.5s var(--ease);
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--pad);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: 1.6;
+  font-feature-settings: "palt";
+  word-break: auto-phrase;
+  -webkit-font-smoothing: antialiased;
+}
+
+.slide *,
+.slide *::before,
+.slide *::after {
+  box-sizing: border-box;
+}
+
+/* A faint dot grid in the top-right corner and an indigo glow behind it, like a launch page hero. */
+.slide::before,
+.slide::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.slide::before {
+  inset: 0;
+  background-image: radial-gradient(var(--line-strong) var(--hairline), var(--clear) calc(var(--hairline) * 1.5));
+  background-size: calc(var(--gap) * 1) calc(var(--gap) * 1);
+  mask-image: radial-gradient(ellipse 55% 60% at 100% 0%, var(--fg) 0%, var(--clear) 75%);
+  opacity: 0.7;
+}
+
+.slide::after {
+  top: -40%;
+  right: -20%;
+  width: 60%;
+  height: 90%;
+  background: radial-gradient(closest-side, var(--accent-glow), var(--clear));
+  opacity: 0.55;
+}
+
+/* Section eyebrow: a white pill with a numbered badge. */
+.slide .kicker {
+  display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
+  align-items: center;
+  gap: 0.6em;
+  margin: 0 0 calc(var(--gap) * 0.6);
+  padding: 0.25em 0.9em 0.25em 0.3em;
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--size-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: var(--accent-ink);
+}
+
+.slide .badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2em;
+  height: 2em;
+  padding: 0 0.5em;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.slide .slide-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--size-title);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.slide .lede {
+  margin: calc(var(--gap) * 0.5) 0 0;
+  max-width: 38em;
+  font-size: var(--size-lead);
+  line-height: 1.75;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.slide .note {
+  margin: 0;
+  font-size: var(--size-small);
+  line-height: 1.7;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.slide .hl {
+  color: var(--accent);
+}
+
+.slide .stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin-top: calc(var(--gap) * 1.1);
+}
+
+.slide .col {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.6);
+  min-width: 0;
+}
+
+.slide .cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+}
+
+.slide .card {
+  position: relative;
+  margin: 0;
+  padding: calc(var(--gap) * 0.85);
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* An application window: a light title bar with traffic lights, then its body. */
+.slide .window {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.slide .window-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  flex: none;
+  height: var(--bar);
+  padding: 0 calc(var(--gap) * 0.6) 0 calc(var(--gap) * 0.6 + var(--dot) * 4.6);
+  background: var(--surface-2);
+  border-bottom: var(--hairline) solid var(--line);
+}
+
+.slide .window-bar::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--gap) * 0.6);
+  top: 50%;
+  width: calc(var(--dot) * 3.8);
+  height: var(--dot);
+  transform: translateY(-50%);
+  background:
+    radial-gradient(circle at calc(var(--dot) * 0.5) 50%, var(--err) calc(var(--dot) * 0.45), var(--clear) calc(var(--dot) * 0.5)),
+    radial-gradient(circle at calc(var(--dot) * 1.9) 50%, var(--warn) calc(var(--dot) * 0.45), var(--clear) calc(var(--dot) * 0.5)),
+    radial-gradient(circle at calc(var(--dot) * 3.3) 50%, var(--ok) calc(var(--dot) * 0.45), var(--clear) calc(var(--dot) * 0.5));
+}
+
+.slide .window-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+/* A terminal or code panel. Output wraps anywhere, so a long path or hint never runs off. */
+.slide .code {
+  flex: 1;
+  margin: 0;
+  padding: calc(var(--gap) * 0.65) calc(var(--gap) * 0.75);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+  font-size: var(--size-code);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  tab-size: 2;
+}
+
+.slide .tok-k {
+  color: var(--code-key);
+}
+
+.slide .tok-s {
+  color: var(--code-str);
+}
+
+.slide .tok-n {
+  color: var(--code-num);
+}
+
+.slide .tok-p {
+  color: var(--code-dim);
+}
+
+.slide .tok-c {
+  color: var(--code-prompt);
+  font-weight: 600;
+}
+
+.slide .tok-hot {
+  padding: 0.1em 0.3em;
+  margin: 0 -0.3em;
+  border-radius: calc(var(--radius-sm) * 0.5);
+  background: var(--code-hot-bg);
+  color: var(--code-hot);
+  font-weight: 700;
+}
+
+/* Status pills. Each fill is pastel and its ink dark, so it reads at caption size. */
+.slide .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.3em 0.8em;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--size-caption);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.slide .pill::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.slide .pill-ok {
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+
+.slide .pill-err {
+  background: var(--err-soft);
+  color: var(--err-ink);
+}
+
+.slide .pill-warn {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.slide .pill-skip {
+  background: var(--skip-soft);
+  color: var(--skip-ink);
+}
+
+/* Chat between a human and an agent. The human is indigo on the right, the agent white on the left. */
+.slide .bubble {
+  margin: 0;
+  padding: 0.7em 1em;
+  max-width: 88%;
+  border-radius: var(--radius);
+  font-size: var(--size-small);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.slide .bubble-human {
+  align-self: flex-end;
+  border-bottom-right-radius: calc(var(--radius-sm) * 0.5);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.slide .bubble-agent {
+  align-self: flex-start;
+  border-bottom-left-radius: calc(var(--radius-sm) * 0.5);
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  box-shadow: var(--shadow-sm);
+  color: var(--fg);
+}
+
+.slide .who {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin: 0;
+  font-size: var(--size-caption);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.slide .who::before {
+  content: "";
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-glow));
+}
+
+.slide .cmd {
+  padding: 0.1em 0.45em;
+  border: var(--hairline) solid var(--line);
+  border-radius: calc(var(--radius-sm) * 0.75);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+.slide .meta {
+  position: absolute;
+  left: var(--pad-x);
+  right: var(--pad-x);
+  bottom: calc(var(--gap) * 1.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  font-size: var(--size-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* @layout title
+<section class="slide" data-layout="title">
+  <div class="col">
+    <p class="kicker"><span class="badge">01</span>dek sample</p>
+    <h2 class="slide-title">The talk in one line</h2>
+    <p class="lede">One sentence on what the audience leaves with.</p>
+  </div>
+  <figure class="window">
+    <div class="window-bar"><p class="window-title">agent session</p></div>
+    <pre class="code">$ dek lint</pre>
+  </figure>
+</section>
+*/
+.slide[data-layout="title"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: calc(var(--gap) * 2.4);
+  align-items: center;
+}
+
+.slide[data-layout="title"] .slide-title {
+  font-size: var(--size-hero);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+
+/* @layout default
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="badge">02</span>Problem</p>
+  <h2 class="slide-title">A heading that stays put</h2>
+  <div class="stage cards">
+    <article class="card" data-step="1">First</article>
+    <article class="card" data-step="2">Second</article>
+    <article class="card" data-step="3">Third</article>
+  </div>
+</section>
+*/
+.slide[data-layout="default"] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.slide[data-layout="default"] .stage {
+  align-self: stretch;
+}
+
+/* @layout split
+<section class="slide" data-layout="split">
+  <div class="col">
+    <p class="kicker"><span class="badge">04</span>Measure</p>
+    <h2 class="slide-title">The claim on the left</h2>
+    <p class="lede">A sentence that explains it.</p>
+  </div>
+  <figure class="window" data-step="1">
+    <div class="window-bar"><p class="window-title">terminal</p></div>
+    <pre class="code">$ dek check intro --json</pre>
+  </figure>
+</section>
+*/
+.slide[data-layout="split"] {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: calc(var(--gap) * 2);
+  align-items: center;
+}
+
+/* @layout statement
+<section class="slide" data-layout="statement">
+  <p class="kicker"><span class="badge">12</span>Close</p>
+  <h2 class="slide-title">One line to remember.</h2>
+  <p class="lede">What follows from it.</p>
+</section>
+*/
+.slide[data-layout="statement"] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Beats: hidden elements keep their box, so every beat measures the same layout. */
+.slide.is-current [data-step] {
+  opacity: 0;
+  transform: translateY(var(--rise));
+  transition:
+    opacity var(--step-transition),
+    transform var(--step-transition);
+}
+
+.slide.is-current [data-step].is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes slide-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+
+/* Morphs glide a little slower than the slide fades, so a carried card reads as the same card. */
+::view-transition-group(*) {
+  --morph: 0.6s;
+  --morph-ease: cubic-bezier(0.3, 0.7, 0.2, 1);
+  animation-duration: var(--morph);
+  animation-timing-function: var(--morph-ease);
+}
+
+::view-transition-old(slide) {
+  --leave: 0.3s cubic-bezier(0.4, 0, 1, 1);
+  animation: slide-out var(--leave) both;
+}
+
+::view-transition-new(slide) {
+  --enter: 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: slide-in var(--enter) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide.is-current [data-step] {
+    transform: none;
+    transition: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}

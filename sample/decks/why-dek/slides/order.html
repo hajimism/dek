@@ -1,0 +1,40 @@
+<section class="slide" data-layout="page" data-folio="03">
+  <p class="numeral">03</p>
+  <h2 class="slide-title">dek は、台本を最初に書く</h2>
+  <p class="lede">順番を入れ替えます。台本を書いた時点で尺がわかり、画面はそのあとに組み立て、見た目は機械が測ります。</p>
+  <div class="stage">
+    <p class="label flow-label">dek の順番</p>
+    <ol class="flow">
+      <li class="first">
+        <p class="problem-n">1</p>
+        <h3>台本を書く</h3>
+        <p class="chip">script.md</p>
+      </li>
+      <li data-morph="p-time">
+        <p class="problem-n">2　もう後回しにしない</p>
+        <h3>尺がわかる</h3>
+        <p class="chip">dek ls</p>
+      </li>
+      <li>
+        <p class="problem-n">3</p>
+        <h3>画面を組み立てる</h3>
+        <p class="chip">slides/*.html</p>
+      </li>
+      <li data-morph="p-look">
+        <p class="problem-n">4　もう後回しにしない</p>
+        <h3>見た目を測る</h3>
+        <p class="chip">dek lint --visual</p>
+      </li>
+    </ol>
+    <div class="derive">
+      <p class="label">台本から決まるもの</p>
+      <p class="note">台本がいちばん上にいる。スライド側で決めることは、見た目だけ。</p>
+    </div>
+    <dl class="facts">
+      <div><dt><span class="stat">18</span><span class="unit">枚</span></dt><dd>スライドの枚数　<span class="chip">##</span> の数</dd></div>
+      <div><dt><span class="stat">01–18</span></dt><dd>並び順　見出しが並ぶ順</dd></div>
+      <div><dt><span class="stat">17</span><span class="unit">ビート</span></dt><dd>画面を進める位置　<span class="chip">###</span> の数</dd></div>
+    </dl>
+  </div>
+  <p class="source">数字はこの資料の script.md から（dek ls why-dek）。</p>
+</section>

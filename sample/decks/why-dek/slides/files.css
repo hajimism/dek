@@ -1,0 +1,170 @@
+/* Eighteen slides as eighteen small specimens: lines of HTML, CSS, and TS on one scale. */
+.slide {
+  --k-w: 30px;
+  --n-w: 28px;
+  --bar-h: 7px;
+}
+
+.trio {
+  margin-top: calc(var(--gap) * 0.2);
+  border-top: var(--rule) solid var(--line);
+}
+
+.trio li {
+  display: grid;
+  grid-template-columns: 7.5em 3em minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: calc(var(--gap) * 0.4);
+  padding: calc(var(--gap) * 0.35) 0;
+  border-bottom: var(--hair) solid var(--line-soft);
+}
+
+.trio .chip {
+  justify-self: start;
+}
+
+.role {
+  font-size: var(--size-small);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.trio .note {
+  font-size: var(--size-caption);
+  line-height: 1.5;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--gap);
+  margin-top: auto;
+}
+
+.facts div {
+  padding-top: calc(var(--gap) * 0.35);
+  border-top: var(--rule) solid var(--line);
+}
+
+.facts dt {
+  font-size: var(--size-caption);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.facts dd {
+  display: flex;
+  align-items: baseline;
+  margin-top: calc(var(--gap) * 0.25);
+}
+
+.facts .stat {
+  font-size: calc(var(--size-stat) * 0.75);
+}
+
+.facts .unit {
+  font-size: var(--size-caption);
+}
+
+.slide[data-layout="split"] > .col {
+  align-self: stretch;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: calc(var(--gap) * 0.3);
+  border-bottom: var(--rule) solid var(--line);
+}
+
+.keys {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+.key {
+  display: inline-block;
+  width: 1.4em;
+  height: var(--bar-h);
+  margin-left: 0.8em;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--gap);
+}
+
+.tiles li {
+  display: grid;
+  grid-template-columns: var(--k-w) minmax(0, 1fr) var(--n-w);
+  align-items: center;
+  column-gap: calc(var(--gap) * 0.3);
+  padding: calc(var(--gap) * 0.3) 0 calc(var(--gap) * 0.35);
+  border-bottom: var(--hair) solid var(--line-soft);
+  font-size: var(--size-caption);
+  line-height: 1.4;
+}
+
+.tiles .slug {
+  grid-column: 1 / -1;
+  margin-bottom: calc(var(--gap) * 0.1);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  font-weight: 700;
+}
+
+.no {
+  margin-right: 0.6em;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.k {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+.track {
+  display: flex;
+  align-items: center;
+  height: var(--bar-h);
+}
+
+.bar {
+  display: block;
+  height: var(--bar-h);
+}
+
+.is-html {
+  background: var(--fg);
+}
+
+.is-css {
+  background: var(--accent);
+}
+
+.is-ts {
+  background: var(--hi);
+  outline: var(--hair) solid var(--fg);
+  outline-offset: calc(var(--hair) * -1);
+}
+
+.n {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tiles .is-here {
+  background: var(--accent-tint);
+}
+
+.facts .sub {
+  margin-top: calc(var(--gap) * 0.1);
+  font-size: var(--size-caption);
+  font-weight: 700;
+}

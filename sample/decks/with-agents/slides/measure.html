@@ -1,0 +1,33 @@
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="badge">04</span>Promise 1 · measured verdicts</p>
+  <h2 class="slide-title">画面は、<span class="hl">数字</span>で返す</h2>
+  <div class="stage grid">
+    <figure class="window">
+      <div class="window-bar"><p class="window-title">slides/how-it-works.html · 1280 × 720</p><span class="pill">rendered</span></div>
+      <div class="viewport">
+        <img class="capture" src="assets/overflow-shot.jpg" alt="はみ出したリストのスライド">
+      </div>
+      <div class="spill"><p class="pill pill-err">枠の外 · bottom 69px</p></div>
+      <p class="caption">ブラウザで描画して、枠の外に出た量を測る。スクリーンショットでは、この 69px は写らない。</p>
+    </figure>
+    <figure class="window diag" data-step="measure-json">
+      <div class="window-bar"><p class="window-title">terminal</p><span class="pill pill-err">1 error</span></div>
+<pre class="code"><span class="tok-c">$ dek lint --visual --json</span>
+<span class="tok-p">{ "ok": false, "error": { … }, "diagnostics": [ {</span>
+  <span class="tok-k">"id"</span>: <span class="tok-s">"DEK030"</span>,
+  <span class="tok-k">"severity"</span>: <span class="tok-s">"error"</span>,
+  <span class="tok-k">"message"</span>: <span class="tok-s">"ul \"One heading, one slide O…\" overflows the bottom edge by 69px at steps slides, beats"</span>,
+  <span class="tok-k">"path"</span>: <span class="tok-s">"slides/how-it-works.html"</span>,
+  <span class="tok-k">"slug"</span>: <span class="tok-s">"how-it-works"</span>,
+  <span class="tok-k">"hint"</span>: <span class="tok-s">"cut it, split it across beats or slides, or give it a smaller size in slides/how-it-works.css"</span>,
+  <span class="tok-k">"data"</span>: {
+    <span class="tok-k">"box"</span>: <span class="tok-s">"ul"</span>,
+    <span class="tok-k">"text"</span>: <span class="tok-s">"One heading, one slide One beat, one pause …"</span>,
+    <span class="tok-k">"edges"</span>: { <span class="tok-hot">"bottom": 69</span> },
+    <span class="tok-k">"steps"</span>: [<span class="tok-s">"slides"</span>, <span class="tok-s">"beats"</span>]
+  }
+<span class="tok-p">} ] }</span></pre>
+    </figure>
+  </div>
+  <p class="meta"><span>スライドを、エージェントに任せる</span><span>04 / 12</span></p>
+</section>

@@ -1,0 +1,29 @@
+/* Three lines of display type; the beam strikes out the word nobody should start with. */
+.slide {
+  --at: 0.0778;
+}
+
+.slide .display {
+  font-size: var(--size-mega);
+  line-height: 1.24;
+}
+
+.slide .row {
+  display: block;
+}
+
+.slide .struck {
+  position: relative;
+  color: var(--muted);
+}
+
+.slide [data-strike] {
+  position: absolute;
+  left: -0.05em;
+  right: -0.05em;
+  top: 54%;
+  height: 0.09em;
+  background: var(--err);
+  box-shadow: 0 0 0.4em var(--glow-red);
+  transform-origin: left center;
+}

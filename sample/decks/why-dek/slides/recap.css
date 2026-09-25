@@ -1,61 +1,53 @@
-/* Three cards, each pointing back to the pages that made the point. */
-.slide-title {
-  margin-bottom: calc(var(--gap) * 1.2);
+/* Three takeaways in three columns, each arriving on its beat, with pointers back into the handout. */
+.slide[data-layout="page"] > .stage {
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
-.card {
+.takeaways li {
+  grid-column: span 4;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--gap) * 0.5);
-  padding: var(--gap);
-  border-top: calc(var(--rule) * 2) solid var(--accent);
+  gap: calc(var(--gap) * 0.45);
+  padding-top: calc(var(--gap) * 0.5);
+  border-top: var(--rule) solid var(--line);
 }
 
-.stat {
+.big-n {
+  font-size: var(--size-hero);
+  font-weight: 800;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
   color: var(--accent);
 }
 
-.claim {
-  margin: calc(var(--gap) * 0.3) 0 0;
-  font-family: var(--font-title);
-  font-size: calc(var(--size-title) * 0.8);
-  font-weight: 600;
-  line-height: 1.3;
+.takeaways h3 {
+  font-size: var(--size-title);
+  font-weight: 800;
+  line-height: 1.2;
 }
 
-.card .note {
-  flex: 1;
+.takeaways .note {
   font-size: var(--size-body);
-  line-height: 1.75;
-}
-
-.card .code {
-  padding: calc(var(--gap) * 0.45) calc(var(--gap) * 0.7);
 }
 
 .see {
-  margin: 0;
-  padding-top: calc(var(--gap) * 0.5);
-  border-top: var(--hairline) solid var(--line);
+  margin-top: calc(var(--gap) * 0.3);
+  padding-top: calc(var(--gap) * 0.3);
+  border-top: var(--hair) solid var(--line-soft);
   font-size: var(--size-caption);
-  color: var(--muted);
-}
-
-.see::before {
-  content: "→ ";
+  font-weight: 700;
   color: var(--accent);
 }
 
-.links {
-  display: flex;
-  gap: calc(var(--gap) * 2);
-  margin: calc(var(--gap) * 0.9) 0 0;
-  font-size: var(--size-small);
-  color: var(--muted);
-}
-
-.links b {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--fg);
+.takeaways .closing {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  align-self: end;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: calc(var(--gap) * 0.5);
+  border-top: var(--hair) solid var(--line);
+  font-size: var(--size-lede);
+  font-weight: 800;
 }

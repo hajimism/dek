@@ -1,129 +1,92 @@
-/* One template above, three decks below, each with its own copy of the look. */
+/* A project theme that changes over a year, and two decks that each keep the copy they were born with. */
 .slide {
-  --apr: #1f4f8f;
-  --jun: #2d6a3e;
-  --sep: #b3321c;
-  --arrow: 0.32rem;
+  --timeline-h: 300px;
 }
 
-.stage {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--gap) * 0.45);
+.timeline {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  height: var(--timeline-h);
+  overflow: visible;
+}
+
+.timeline .month {
+  stroke: var(--line-soft);
+  stroke-width: var(--hair);
+}
+
+.timeline .m {
+  fill: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
 }
 
 .proj {
-  display: flex;
-  align-items: center;
-  gap: var(--gap);
-  padding: calc(var(--gap) * 0.55) calc(var(--gap) * 0.85);
-  background: var(--surface-strong);
-  border-radius: var(--radius);
+  stroke: var(--fg);
+  stroke-width: calc(var(--rule) * 2);
 }
 
-.proj .tag {
-  font-size: var(--size-small);
-  font-weight: 600;
-  background: var(--surface);
+.proj.is-new {
+  stroke: var(--accent);
 }
 
-.links,
-.decks {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: var(--gap);
-}
-
-.links span {
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
-  padding-left: calc(var(--gap) * 0.85);
-  font-family: var(--font-mono);
-  font-size: var(--size-caption);
-  color: var(--muted);
-}
-
-.links span::before {
-  content: "↓";
-  font-family: var(--font-body);
-  font-size: var(--size-lead);
-  color: var(--line-strong);
-}
-
-.links .up {
-  color: var(--script);
-}
-
-.links .up::before {
-  content: "↑";
-  color: var(--script);
+.edit {
+  fill: var(--hi);
+  stroke: var(--fg);
+  stroke-width: var(--hair);
 }
 
 .deck {
-  --deck-accent: var(--apr);
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--gap) * 0.45);
-  padding: calc(var(--gap) * 0.7) calc(var(--gap) * 0.85);
-  background: var(--surface);
-  border: var(--hairline) solid var(--line);
-  border-top: calc(var(--rule) * 2) solid var(--deck-accent);
-  border-radius: var(--radius);
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: var(--rule);
 }
 
-.is-jun {
-  --deck-accent: var(--jun);
+.deck.is-new {
+  stroke: var(--accent);
 }
 
-.is-sep {
-  --deck-accent: var(--sep);
+.dot {
+  fill: var(--fg);
 }
 
-.deck-name {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin: 0;
+.dot.is-new {
+  fill: var(--accent);
 }
 
-.deck-name .when {
-  font-family: var(--font-title);
-  font-size: var(--size-lead);
-  font-weight: 600;
-  color: var(--fg);
+.timeline .lab {
+  fill: var(--fg);
+  font-size: var(--size-small);
+  font-weight: 700;
 }
 
-.mock {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45em;
-  aspect-ratio: 16 / 2.6;
-  padding: 0.8em 1em;
-  background: var(--bg);
-  border: var(--hairline) solid var(--line);
-  border-radius: calc(var(--radius) * 0.6);
+.timeline .cmd {
+  fill: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
 }
 
-.mock-bar {
-  width: 55%;
-  height: 0.8em;
-  background: var(--deck-accent);
-  border-radius: calc(var(--radius) * 0.4);
+.timeline .is-accent {
+  fill: var(--accent);
 }
 
-.mock-line {
-  width: 85%;
-  height: 0.4em;
-  background: var(--line);
-  border-radius: calc(var(--radius) * 0.4);
+.caption-a,
+.caption-b {
+  padding-top: calc(var(--gap) * 0.35);
+  border-top: var(--hair) solid var(--line);
+  font-size: var(--size-small);
 }
 
-.mock-line + .mock-line {
-  width: 65%;
+.caption-a {
+  grid-column: 1 / 6;
 }
 
-.code {
-  margin-top: calc(var(--gap) * 0.3);
-  padding: calc(var(--gap) * 0.5) calc(var(--gap) * 0.85);
+.caption-b {
+  grid-column: 7 / -1;
+}
+
+.caption-a .label,
+.caption-b .label {
+  margin-bottom: calc(var(--gap) * 0.2);
 }

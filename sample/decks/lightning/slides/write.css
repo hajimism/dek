@@ -1,0 +1,54 @@
+/* The editor shows this deck's own script.md, lines 36–46; the legend names the three parts. */
+.slide {
+  --at: 0.2222;
+}
+
+.slide[data-layout="split"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.34fr);
+}
+
+.slide .screen {
+  font-size: var(--size-body);
+  line-height: 1.6;
+}
+
+.slide .line {
+  position: relative;
+  word-break: auto-phrase;
+}
+
+/* The line under the legend being explained glows. */
+.slide .line[data-lit]::before {
+  content: "";
+  position: absolute;
+  inset: 0 calc(var(--gap) * -1.1);
+  z-index: -1;
+  background: var(--glow-soft);
+  box-shadow: inset var(--rule) 0 0 var(--fg);
+}
+
+.slide .legend {
+  display: grid;
+  grid-template-columns: calc(var(--gap) * 3) 1fr;
+  align-items: center;
+  gap: calc(var(--gap) * 0.6);
+}
+
+.slide .key {
+  font-family: var(--font-mono);
+  font-size: var(--size-lead);
+  font-weight: 700;
+  text-align: right;
+  text-shadow: var(--bloom);
+}
+
+.slide .note {
+  font-size: var(--size-small);
+}
+
+.slide .note strong {
+  display: block;
+  font-size: var(--size-body);
+  font-weight: 700;
+  color: var(--fg);
+}

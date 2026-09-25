@@ -1,32 +1,36 @@
-<section class="slide" data-layout="split">
+<section class="slide" data-layout="split" data-folio="17">
   <div class="col">
-    <p class="kicker">Ⅲ　運用</p>
-    <h2 class="slide-title">始めかた</h2>
-    <p class="lede">要るのは Bun だけ。プロジェクトを作り、台本を書き、開発サーバを立ち上げる。最初の 1 枚は骨格のままでいい。通しで喋れるようになってから、必要なスライドだけを仕上げる。</p>
-    <div class="needs">
-      <p class="label">必要なもの</p>
-      <p class="need"><span class="tag">Bun 1.3+</span><span class="note"><strong>必須。</strong>dek は GitHub から直接動かす</span></p>
-      <p class="need"><span class="tag">Playwright</span><span class="note">描画の lint、スクリーンショット、PDF、動画</span></p>
-      <p class="need"><span class="tag">ffmpeg</span><span class="note">動画の書き出し</span></p>
-      <p class="need"><span class="tag">VOICEVOX</span><span class="note">音声合成。互換エンジンでもよい</span></p>
-      <p class="note">足りないものがあっても、それを使うコマンドだけが止まり、入れ方を教えてくれる。</p>
-    </div>
+    <p class="numeral">17</p>
+    <h2 class="slide-title">始めるのに要るのは、Bun だけ</h2>
+    <p class="lede">プロジェクトを作り、台本を書き、開発サーバを立ち上げる。配るときは build。</p>
+    <p class="note"><strong>最初は骨格のままで構わない。</strong>通しで喋れるようになってから、必要なスライドだけを仕上げる。</p>
+    <p class="req"><span class="label">必要なもの</span><span class="stat">Bun</span><span class="note">1.3 以降。ほかは dek が入れる。</span></p>
   </div>
-  <div class="col">
-    <pre class="code"><span class="code-title"><span>terminal</span><span>ドキュメント hajimism.github.io/dek</span></span><span class="tok-c"># 1. プロジェクトと最初のデッキを作る</span>
-<span class="tok-c">$</span> bunx github:hajimism/dek init my-talks <span class="tok-k">--deck</span> 2026-10-meetup
-<span class="tok-c">$</span> cd my-talks &amp;&amp; bun add github:hajimism/dek
-<span class="tok-c">$</span> cd decks/2026-10-meetup
-
-<span class="tok-h"># 2. 台本を書く ── 時間はここに使う</span>
-<span class="tok-c">$</span> $EDITOR script.md
-
-<span class="tok-c"># 3. 開発サーバ。保存のたびに骨格・再描画・lint</span>
-<span class="tok-c">$</span> bunx dek
-
-<span class="tok-c"># 4. 配る</span>
-<span class="tok-c">$</span> bunx dek build     <span class="tok-s"># dist/2026-10-meetup.html</span>
-<span class="tok-c">$</span> bunx dek pdf       <span class="tok-s"># dist/2026-10-meetup.pdf</span></pre>
-  </div>
-  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
+  <ol class="stage cmds">
+    <li>
+      <span class="numeral">1</span>
+      <span class="what">プロジェクトを作る</span>
+      <span class="line">bunx github:hajimism/dek init my-talks</span>
+      <span class="note">最初のデッキと theme.css、AGENTS.md ができる。</span>
+    </li>
+    <li>
+      <span class="numeral">2</span>
+      <span class="what">dek の版を固定する</span>
+      <span class="line">cd my-talks<br>bun add -d github:hajimism/dek</span>
+      <span class="note">以後 bunx dek は、このプロジェクトの dek を動かす。</span>
+    </li>
+    <li>
+      <span class="numeral">3</span>
+      <span class="what">台本を書き、開発サーバで見る</span>
+      <span class="line">bunx dek</span>
+      <span class="note">保存するたびに骨格ができ、lint が走る。</span>
+    </li>
+    <li>
+      <span class="numeral">4</span>
+      <span class="what">配る</span>
+      <span class="line">bunx dek build</span>
+      <span class="note">dist/ に、ひとつの HTML。</span>
+    </li>
+  </ol>
+  <p class="source">コマンドは docs/guide/getting-started.md のとおり。</p>
 </section>

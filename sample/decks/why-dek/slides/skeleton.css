@@ -1,39 +1,23 @@
-/* Before and after, at the same size, so the only difference is the work. */
-.stage {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: calc(var(--gap) * 0.9);
-}
-
+/* The same section twice: as sync writes it, and as finished. */
 .shot {
-  margin: 0;
-}
-
-.shot figcaption {
+  grid-column: span 6;
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: calc(var(--gap) * 0.4);
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.45);
 }
 
 .shot .label {
-  margin: 0;
+  display: flex;
+  gap: 1em;
+  padding-bottom: calc(var(--gap) * 0.3);
+  border-bottom: var(--rule) solid var(--line);
+  font-size: var(--size-small);
+  letter-spacing: 0.04em;
 }
 
-.shot .figure {
+.shot img {
+  display: block;
   width: 100%;
-  border: var(--hairline) solid var(--line-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-.shot .note {
-  margin-top: calc(var(--gap) * 0.5);
-}
-
-.arrow {
-  margin: 0;
-  font-size: var(--size-title);
-  color: var(--accent);
+  height: auto;
+  outline: var(--hair) solid var(--line);
 }

@@ -1,0 +1,42 @@
+/* Cover: the title on the left, an agent session on the right whose reply types itself. */
+.col {
+  align-items: flex-start;
+}
+
+.promises {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--gap) * 0.35);
+  margin: calc(var(--gap) * 1.1) 0 0;
+}
+
+.chat {
+  transform: rotate(0.6deg);
+}
+
+.live {
+  margin-left: auto;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.45);
+  padding: calc(var(--gap) * 0.9);
+  background: linear-gradient(var(--surface), var(--surface-2));
+}
+
+.who.agent {
+  margin-top: calc(var(--gap) * 0.3);
+}
+
+.bubble-agent {
+  min-height: 3.6em;
+}
+
+.tool {
+  flex: none;
+  align-self: stretch;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--step-transition);
+}

@@ -1,0 +1,78 @@
+# voice dictionary
+[AI]
+kana = "エーアイ"
+
+[Bun]
+kana = "バン"
+
+[CSS]
+kana = "シーエスエス"
+
+[HTML]
+kana = "エイチティーエムエル"
+
+[LAN]
+kana = "ラン"
+
+[Markdown]
+kana = "マークダウン"
+
+[PDF]
+kana = "ピーディーエフ"
+
+[TypeScript]
+kana = "タイプスクリプト"
+
+[USB]
+kana = "ユーエスビー"
+
+[build]
+kana = "ビルド"
+
+[data-step]
+kana = "データステップ"
+
+[dek]
+kana = "デック"
+
+[duration]
+kana = "デュレーション"
+
+[id]
+kana = "アイディー"
+
+[lint]
+kana = "リント"
+
+[ls]
+kana = "エルエス"
+
+["script.md"]
+kana = "スクリプトエムディー"
+
+[JSON]
+kana = "ジェイソン"
+
+[show]
+kana = "ショウ"
+
+[check]
+kana = "チェック"
+
+[current]
+kana = "カレント"
+
+[goto]
+kana = "ゴートゥー"
+
+[ref]
+kana = "レフ"
+
+[init]
+kana = "イニット"
+
+["AGENTS.md"]
+kana = "エージェンツエムディー"
+
+[help]
+kana = "ヘルプ"

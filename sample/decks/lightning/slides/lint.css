@@ -1,0 +1,93 @@
+/* Real `dek lint --visual` output from the scratch project: premise.html's title set
+   five times too large, then two. The preview on the right redraws that slide in miniature. */
+.slide {
+  --at: 0.5556;
+  --preview-w: 330px;
+  --preview-h: 186px;
+}
+
+.slide[data-layout="split"] {
+  grid-template-columns: minmax(0, 1fr) var(--preview-w);
+  column-gap: calc(var(--gap) * 2);
+}
+
+.slide .screen {
+  font-size: var(--size-body);
+  line-height: 1.5;
+}
+
+.slide .line strong {
+  font-weight: 700;
+  color: var(--hot);
+}
+
+.slide[data-layout="split"] > aside {
+  gap: calc(var(--gap) * 2.4);
+}
+
+.slide .stack {
+  display: grid;
+}
+
+.slide .stack > * {
+  grid-area: 1 / 1;
+}
+
+.slide .preview {
+  position: relative;
+  width: var(--preview-w);
+  height: var(--preview-h);
+  border: var(--rule) dashed var(--err);
+  border-radius: calc(var(--radius) * 0.4);
+  background: var(--surface);
+  transition: opacity var(--step-transition);
+}
+
+/* The overflowing title, as pixels the audience sees but lint here does not measure. */
+.slide .preview::before {
+  content: "最初に書くのは、スライドではない";
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-title);
+  font-size: calc(var(--size-title) * 2.8);
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--fg);
+  opacity: 0.85;
+}
+
+.slide .preview.fit {
+  border-style: solid;
+  border-color: var(--accent);
+  box-shadow: 0 0 1.6em var(--glow-green);
+}
+
+.slide .preview.fit::before {
+  font-size: calc(var(--size-title) * 1.1);
+  opacity: 1;
+}
+
+.slide .edge {
+  margin: 0 0 calc(var(--gap) * -0.6);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  color: var(--muted);
+}
+
+.slide .verdict {
+  margin: 0;
+  font-size: var(--size-lead);
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: pre-line;
+  color: var(--err);
+  text-shadow: var(--bloom);
+}
+
+.slide .verdict[data-verdict="pass"] {
+  color: var(--accent);
+}

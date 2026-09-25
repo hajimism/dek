@@ -1,0 +1,31 @@
+<section class="slide" data-layout="split" data-folio="05">
+  <div class="col">
+    <p class="numeral">05</p>
+    <h2 class="slide-title">台本は、普通の Markdown で書く</h2>
+    <p class="lede">覚える書き方は三つだけです。</p>
+    <ol class="rules">
+      <li data-step="script-slide"><span class="glyph">##</span><span><strong>スライド一枚</strong>波かっこの id が、ファイル名 <span class="chip">slides/later.html</span> になる。</span></li>
+      <li data-step="script-beat"><span class="glyph">###</span><span><strong>ビート</strong>喋りの区切り。矢印キーはまずビートを進め、使い切ると次のスライドへ。</span></li>
+      <li data-step="script-words"><span class="glyph">¶ &gt;</span><span><strong>段落は喋る言葉、引用はト書き</strong>段落だけが尺と読み上げに数えられる。持ち時間は先頭の <span class="chip">duration</span> に。</span></li>
+    </ol>
+  </div>
+  <div class="stage">
+    <pre class="code"><span class="code-head"><span data-morph="script-md">script.md</span><span>この資料の冒頭から抜粋</span></span>---
+title: 台本から、発表まで
+<span class="tok-c">…</span>
+<span class="tok-s">duration: 12m</span> <span class="ann" data-step="script-words">持ち時間</span>
+---
+
+<span class="tok-h">## 台本から、発表まで {#cover}</span> <span class="ann" data-step="script-slide">スライド　cover</span>
+
+こんにちは。今日は、dek というスライドの道具を紹介します。… <span class="ann" data-step="script-words">喋る言葉</span>
+
+<span class="tok-c">&gt; 落ち着いて始める。目次は読み上げない。</span> <span class="ann" data-step="script-words">ト書き</span>
+
+<span class="tok-h">## いまのスライド作りでは、三つのことが後回しになる {#later}</span> <span class="ann" data-step="script-slide">スライド　later</span>
+…
+<span class="tok-h">### 尺 {#later-time}</span> <span class="ann" data-step="script-beat">ビート　later-time</span>
+
+ひとつめは尺です。喋って初めて長さがわかるので、…</pre>
+  </div>
+</section>

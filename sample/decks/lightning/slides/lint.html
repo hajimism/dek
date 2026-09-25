@@ -1,0 +1,30 @@
+<section class="slide" data-layout="split">
+  <h2 class="slide-title"><span class="num">08</span>測る</h2>
+  <figure class="window" data-morph="window">
+    <figcaption class="chrome">zsh — ~/my-talks</figcaption>
+    <div class="screen">
+      <div data-scene="lint-fail">
+        <span class="line"><span class="prompt">~/my-talks</span><span data-type>bunx dek lint lightning --visual</span><span class="cursor" data-caret></span></span>
+        <span class="line err" data-out="900">decks/lightning/slides/premise.html: <strong>DEK030</strong> h2.slide-title "最初に書くのは、スライドではない" overflows the top edge by <strong>132px</strong> and the bottom edge by <strong>108px</strong> at step 1</span>
+        <span class="line dim" data-out>  help: cut it, split it across beats or slides, or give it a smaller size in slides/premise.css</span>
+      </div>
+      <div data-scene="lint-pass" data-step="lint-pass">
+        <span class="line"> </span>
+        <span class="line dim"># premise.css: calc(var(--size-title) * <span class="err">5</span>) → <span class="ok">2</span></span>
+        <span class="line"><span class="prompt">~/my-talks</span><span data-type>bunx dek lint lightning --visual</span><span class="cursor" data-caret></span></span>
+        <span class="line ok" data-out="900">no diagnostics</span>
+        <span class="line" data-out="200"><span class="prompt">~/my-talks</span><span class="cursor"></span></span>
+      </div>
+    </div>
+  </figure>
+  <aside>
+    <p class="edge">slides/premise.html · 1280 × 720</p>
+    <div class="stack">
+      <div class="preview" data-bad></div>
+      <div class="preview fit" data-step="lint-pass"></div>
+    </div>
+    <p class="verdict" data-verdict="fail">上に 132px
+下に 108px</p>
+  </aside>
+  <footer class="hud"><span>dek · lightning</span><span class="hud-track"><span class="hud-fill" data-morph="clock"></span></span><span class="hud-clock">est 01:40 / 03:00</span></footer>
+</section>

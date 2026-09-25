@@ -1,0 +1,94 @@
+/* Two measured findings, each drawn as a sketch above its JSON. */
+.slide {
+  --faint: #c8c4ba;
+  --sketch-h: 84px;
+}
+
+.case {
+  grid-column: span 6;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.5);
+}
+
+.case .label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8em;
+  padding-bottom: calc(var(--gap) * 0.3);
+  border-bottom: var(--rule) solid var(--line);
+  font-size: var(--size-small);
+  letter-spacing: 0.04em;
+}
+
+.rule-id {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.sketch {
+  display: block;
+  width: 100%;
+  height: var(--sketch-h);
+}
+
+.frame {
+  fill: var(--bg);
+  stroke: var(--fg);
+  stroke-width: var(--hair);
+}
+
+.line-box {
+  fill: var(--fg);
+}
+
+.edge {
+  stroke: var(--accent);
+  stroke-width: var(--rule);
+}
+
+.dim {
+  stroke: var(--accent);
+  stroke-width: var(--hair);
+}
+
+.dim-text {
+  fill: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  font-weight: 700;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--gap);
+}
+
+/* The failing text itself is drawn as decoration, so this page does not fail the rule it explains. */
+.sample {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 calc(var(--gap) * 0.6);
+  border: var(--hair) solid var(--fg);
+}
+
+.sample::before {
+  content: "補足：この注釈は薄すぎて読めません";
+  color: var(--faint);
+  font-size: var(--size-small);
+}
+
+.ratio {
+  display: flex;
+  align-items: baseline;
+  color: var(--accent);
+}
+
+.case .code {
+  flex: 1;
+  font-size: var(--size-caption);
+  line-height: 1.55;
+}

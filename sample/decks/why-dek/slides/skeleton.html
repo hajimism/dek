@@ -1,19 +1,18 @@
-<section class="slide" data-layout="default">
-  <p class="kicker">Ⅱ　仕組み</p>
-  <h2 class="slide-title">保存すると、骨格ができる</h2>
-  <p class="lede">見出しがタイトルに、ビートが箇条書きになった 1 枚が、保存した瞬間にできる。<br>順番と尺はもう本番と同じなので、通しの練習はここから始められる。</p>
+<section class="slide" data-layout="page" data-folio="06">
+  <p class="numeral">06</p>
+  <h2 class="slide-title">保存すると、骨格のスライドができる</h2>
+  <p class="lede">台本を保存すると、見出しごとに骨格ができます。見出しがタイトルに、ビートが箇条書きになり、どの行がどのビートで出るかも最初から結び付いています。</p>
   <div class="stage">
-    <figure class="shot">
-      <figcaption><span class="label">保存した直後 ── dek が生成</span><span class="tag">slides/night-before.html</span></figcaption>
-      <img class="figure" src="assets/skeleton.jpg" alt="見出しと 2 行の箇条書きだけの骨格スライド">
-      <p class="note">ビートの行には <span class="tag">data-step</span> が付いていて、矢印キーで 1 行ずつ出る。</p>
+    <figure class="shot" data-step="skeleton-raw">
+      <p class="label"><span class="signal">保存した直後</span>骨格のまま、通しで練習できる</p>
+      <img src="assets/skeleton-later.jpg" alt="02 の骨格。見出しと、尺・見た目の確認・次の発表の三行だけ">
+      <p class="note"><span class="chip">slides/later.html</span>　dek sync が書いた <strong data-real="skel-lines">8 行</strong>。枚数、順番、尺は本番と同じ。</p>
     </figure>
-    <p class="arrow" data-step="not-the-end">→</p>
-    <figure class="shot" data-step="not-the-end">
-      <figcaption><span class="label">仕上げたあと ── 人とエージェントが編集</span><span class="tag">+ night-before.css</span></figcaption>
-      <img class="figure" src="assets/finished.jpg" alt="2 本の工程を時間軸に並べた、仕上げ済みのスライド">
-      <p class="note">台本は 1 文字も変えていない。変えたのは、この 1 枚の HTML と CSS だけ。</p>
+    <figure class="shot" data-step="skeleton-done">
+      <p class="label"><span class="signal">仕上げた後</span>仕上げても、台本は変わらない</p>
+      <img src="assets/finished-later.jpg" alt="同じ 02 を仕上げた一枚。いつもの順番の軸と、三つの問題のカード">
+      <p class="note">HTML <strong data-real="done-html">37 行</strong> と CSS <strong data-real="done-css">106 行</strong> を書いた。<span class="mark">script.md は一文字も変えていない。</span></p>
     </figure>
   </div>
-  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
+  <p class="source">左はこの資料の写しから later.html を消して dek sync、右はこの資料の 02 を、どちらも dek shot で撮影。</p>
 </section>

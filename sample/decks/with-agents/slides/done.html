@@ -1,0 +1,36 @@
+<section class="slide" data-layout="split">
+  <div class="col">
+    <p class="kicker"><span class="badge">06</span>Promise 3 · lint = done</p>
+    <h2 class="slide-title">完成は、<span class="hl">lint</span> が決める</h2>
+    <p class="lede">dek の規約は、すべて lint のルール。エラーがひとつもなければ完成。人とエージェントで、同じ基準を見る。</p>
+    <ul class="rules">
+      <li class="rule">
+        <span class="what">使ってよいクラス</span>
+        <code class="bad">class="headline"</code>
+        <span class="pill pill-err">DEK010</span>
+      </li>
+      <li class="rule">
+        <span class="what">色の指定のしかた</span>
+        <code class="bad">color: #333</code>
+        <span class="pill pill-err">DEK014</span>
+      </li>
+      <li class="rule">
+        <span class="what">画像の置き場所</span>
+        <code class="bad">src="https://…"</code>
+        <span class="pill pill-err">DEK020</span>
+      </li>
+    </ul>
+  </div>
+  <figure class="window verdict">
+    <div class="window-bar"><p class="window-title">terminal</p><span class="pill pill-ok">exit 0</span></div>
+    <pre class="code"><span class="tok-c">$ dek lint with-agents --visual</span>
+<span class="tok-s">no diagnostics</span></pre>
+    <div class="done">
+      <p class="check" aria-hidden="true"></p>
+      <p class="done-title">完成</p>
+      <p class="note">同じコマンドが、CI でも、エージェントでも、人の手元でも同じ答えを返す。</p>
+      <p class="who-row"><span class="pill">human</span><span class="eq">=</span><span class="pill">agent</span><span class="eq">=</span><span class="pill">CI</span></p>
+    </div>
+  </figure>
+  <p class="meta"><span>スライドを、エージェントに任せる</span><span>06 / 12</span></p>
+</section>

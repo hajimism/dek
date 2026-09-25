@@ -1,0 +1,82 @@
+/* Real `dek build` in the scratch project; the byte count is `wc -c` of that file. */
+.slide {
+  --at: 0.7111;
+  --fold: 44px;
+}
+
+.slide[data-layout="split"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.5fr);
+  column-gap: calc(var(--gap) * 2);
+}
+
+.slide[data-layout="split"] > aside {
+  align-items: center;
+  text-align: center;
+}
+
+/* A document with a folded corner, lit from inside. */
+.slide .file {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  width: calc(var(--gap) * 11);
+  height: calc(var(--gap) * 13);
+  padding: calc(var(--gap) * 1.1);
+  border: var(--rule) solid var(--fg);
+  border-radius: calc(var(--radius) * 0.6);
+  clip-path: polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%);
+  background: linear-gradient(to bottom, var(--surface-strong), var(--surface));
+  box-shadow: inset 0 0 3em var(--glow);
+  text-align: left;
+}
+
+.slide .file::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--fold);
+  height: var(--fold);
+  background: linear-gradient(225deg, var(--bg) 50%, var(--fg) 50%);
+}
+
+.slide .file p {
+  margin: 0;
+}
+
+.slide .file-kind {
+  font-family: var(--font-mono);
+  font-size: var(--size-display);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--fg);
+  text-shadow: var(--bloom);
+  margin-bottom: auto;
+}
+
+.slide .file-name {
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  font-weight: 700;
+  color: var(--hot);
+}
+
+.slide .file-size {
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  color: var(--muted);
+}
+
+.slide .note {
+  font-size: var(--size-body);
+}
+
+.slide .note strong {
+  display: inline-block;
+  margin-top: 0.4em;
+  font-size: var(--size-lead);
+  color: var(--fg);
+}

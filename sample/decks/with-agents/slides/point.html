@@ -1,0 +1,39 @@
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="badge">09</span>Pointing</p>
+  <h2 class="slide-title">指さしは、<span class="hl">両方向</span></h2>
+  <div class="stage grid">
+    <div class="side">
+      <p class="who">you · ブラウザで発表中</p>
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">127.0.0.1:4987 · demo</p><span class="pill">3 / 4</span></div>
+        <div class="screen">
+          <p class="mini">The clock</p>
+          <p class="fig" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></p>
+          <span class="pointer" aria-hidden="true"></span>
+        </div>
+      </figure>
+      <p class="bubble bubble-human">このスライドの図を、小さくして</p>
+    </div>
+    <div class="arrows" aria-hidden="true">
+      <p class="arrow arrow-right"><span class="cmd">dek current</span></p>
+      <p class="arrow arrow-left"><span class="cmd">dek goto</span></p>
+    </div>
+    <div class="side">
+      <p class="who">agent · 同じプロジェクトで</p>
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">terminal</p></div>
+<pre class="code"><span class="tok-c">$ dek current</span>
+timing
+<span class="tok-c">$ dek current --json</span>
+<span class="tok-p">{</span><span class="tok-k">"ok"</span>:<span class="tok-n">true</span>,<span class="tok-k">"slug"</span>:<span class="tok-s">"timing"</span>,<span class="tok-k">"slideIndex"</span>:<span class="tok-n">2</span>,<span class="tok-k">"beatIndex"</span>:<span class="tok-n">0</span><span class="tok-p">}</span>
+
+<span class="tok-p"># slides/timing.html を直す</span>
+
+<span class="tok-c">$ dek goto timing</span>
+timing</pre>
+      </figure>
+      <p class="bubble bubble-agent">直しました。いま、そのスライドを開いています。</p>
+    </div>
+  </div>
+  <p class="meta"><span>スライドを、エージェントに任せる</span><span>09 / 12</span></p>
+</section>

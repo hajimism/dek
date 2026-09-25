@@ -1,0 +1,43 @@
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="badge">05</span>Promise 2 · small files</p>
+  <h2 class="slide-title">一枚は、<span class="hl">小さなファイル</span></h2>
+  <div class="stage grid">
+    <figure class="window">
+      <div class="window-bar"><p class="window-title">decks/with-agents/slides/</p><span class="pill">wc -l</span></div>
+      <ul class="files" data-files>
+        <li><span class="ext">html</span><span class="name">cover.html</span><span class="lines">24</span></li>
+        <li><span class="ext">html</span><span class="name">why.html</span><span class="lines">40</span></li>
+        <li><span class="ext">html</span><span class="name">answer.html</span><span class="lines">38</span></li>
+        <li><span class="ext">html</span><span class="name">measure.html</span><span class="lines">33</span></li>
+        <li class="here"><span class="ext">html</span><span class="name">small.html</span><span class="lines">43</span></li>
+        <li class="sub"><span class="ext ext-css">css</span><span class="name">small.css</span><span class="lines">122</span></li>
+        <li class="sub"><span class="ext ext-ts">ts</span><span class="name">small.ts</span><span class="lines">25</span></li>
+        <li><span class="ext">html</span><span class="name">done.html</span><span class="lines">36</span></li>
+        <li><span class="ext">html</span><span class="name">loop.html</span><span class="lines">47</span></li>
+        <li class="more"><span class="name">… ほか 5 枚</span><span class="lines">最長 47 行</span></li>
+      </ul>
+    </figure>
+    <figure class="window show" data-show>
+      <div class="window-bar"><p class="window-title">terminal</p><span class="pill pill-ok">ok</span></div>
+<pre class="code"><span class="tok-c">$ dek show small --json</span>
+<span class="tok-p">{</span>
+  <span class="tok-k">"ok"</span>: <span class="tok-n">true</span>,
+  <span class="tok-k">"slug"</span>: <span class="tok-s">"small"</span>,
+  <span class="tok-k">"title"</span>: <span class="tok-s">"一枚は、小さなファイル"</span>,
+  <span class="tok-k">"script"</span>: <span class="tok-s">"スライドは一枚ずつ、HTML の…"</span>,
+  <span class="tok-k">"html"</span>: <span class="tok-s">"&lt;section class=\"slide\" data-layout…"</span>,
+  <span class="tok-k">"css"</span>: <span class="tok-s">"/* The slide's own files on the left…"</span>,
+  <span class="tok-k">"ts"</span>: <span class="tok-s">"// The dek show panel slides in…"</span>,
+  <span class="tok-k">"theme"</span>: <span class="tok-s">".slide {\n  --fg: #0f172a;…"</span>,
+  <span class="tok-k">"assets"</span>: <span class="tok-p">[]</span>
+<span class="tok-p">}</span></pre>
+      <div class="ratio">
+        <p class="ratio-label"><span>theme.css 全体</span><span class="count">569 行</span></p>
+        <p class="meter"><span class="fill fill-all"></span></p>
+        <p class="ratio-label"><span>show が返す規則</span><span class="count hl">282 行</span></p>
+        <p class="meter"><span class="fill" data-used="49.6"></span></p>
+      </div>
+    </figure>
+  </div>
+  <p class="meta"><span>スライドを、エージェントに任せる</span><span>05 / 12</span></p>
+</section>

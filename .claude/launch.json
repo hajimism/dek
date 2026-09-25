@@ -2,25 +2,43 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dek-ref",
+      "name": "why-dek",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd sample && bunx dek dek-ref --port 4777"
+        "cd sample && bunx dek why-dek --port 4777"
       ],
       "port": 4777
     },
     {
-      "name": "dek-ref-dist",
-      "runtimeExecutable": "python3",
+      "name": "lightning",
+      "runtimeExecutable": "bash",
       "runtimeArgs": [
-        "-m",
-        "http.server",
-        "4778",
-        "-d",
-        "sample/decks/dek-ref/dist"
+        "-c",
+        "cd sample && bunx dek lightning --port 4778"
       ],
       "port": 4778
+    },
+    {
+      "name": "with-agents",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd sample && bunx dek with-agents --port 4779"
+      ],
+      "port": 4779
+    },
+    {
+      "name": "docs-preview",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": [
+        "vitepress",
+        "preview",
+        "docs",
+        "--port",
+        "4173"
+      ],
+      "port": 4173
     }
   ]
 }

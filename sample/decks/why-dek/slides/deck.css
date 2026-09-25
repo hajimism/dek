@@ -1,0 +1,128 @@
+/* The deck as a bounded tree: everything it needs inside, and what lint turns away outside. */
+.slide {
+  --name-w: 128px;
+  --role-w: 84px;
+  --dash: 6px;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  padding-top: calc(var(--gap) * 0.2);
+}
+
+.boundary-label {
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  letter-spacing: 0;
+  padding: 0 0 calc(var(--gap) * 0.4);
+  border-bottom: var(--rule) solid var(--line);
+}
+
+.tree {
+  padding: 0 calc(var(--gap) * 0.8) calc(var(--gap) * 0.6);
+  border: var(--hair) dashed var(--accent);
+  border-top: 0;
+}
+
+.tree li {
+  display: grid;
+  grid-template-columns: var(--name-w) var(--role-w) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: calc(var(--gap) * 0.6);
+  padding: calc(var(--gap) * 0.55) 0;
+  border-bottom: var(--hair) solid var(--line-soft);
+}
+
+.tree li:last-child {
+  border-bottom: 0;
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: var(--size-body);
+  font-weight: 700;
+  justify-self: start;
+}
+
+.tree li:first-child .name {
+  background: var(--hi);
+  padding: 0 0.2em;
+  margin-left: -0.2em;
+}
+
+.role {
+  font-size: var(--size-small);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.detail {
+  font-size: var(--size-small);
+  color: var(--muted);
+}
+
+.is-optional .name,
+.is-optional .role {
+  color: var(--muted);
+}
+
+.outside {
+  display: flex;
+  gap: var(--gap);
+  margin-top: calc(var(--gap) * 1.2);
+}
+
+.outside li {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.outside .chip {
+  color: var(--muted);
+  border-color: var(--line-soft);
+  text-decoration: line-through;
+}
+
+.no {
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.outside li::before {
+  content: "×";
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: calc(var(--gap) * 0.6);
+  margin-top: calc(var(--gap) * 1.2);
+}
+
+.counts div {
+  padding-top: calc(var(--gap) * 0.3);
+  border-top: var(--rule) solid var(--line);
+}
+
+.counts dt {
+  font-size: var(--size-caption);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.counts dd {
+  font-size: calc(var(--size-stat) * 0.7);
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.counts div:last-child dd {
+  color: var(--accent);
+}

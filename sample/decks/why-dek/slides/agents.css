@@ -1,0 +1,126 @@
+/* The loop on the left; what an agent reads and what it gets back on the right. */
+.loop {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: calc(var(--gap) * 0.4);
+}
+
+.loop .track {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: var(--rule);
+}
+
+.loop .arrow {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: var(--rule);
+}
+
+.loop .node {
+  fill: var(--bg);
+  stroke: var(--fg);
+  stroke-width: var(--rule);
+}
+
+.loop .node.is-hot {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.loop .track.is-hot,
+.loop .arrow.is-hot {
+  stroke: var(--accent);
+}
+
+.loop text {
+  fill: var(--fg);
+  font-size: var(--size-body);
+  font-weight: 800;
+}
+
+.loop .cmd {
+  fill: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
+  font-weight: 700;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 1.1);
+}
+
+.step .label {
+  display: flex;
+  gap: 0.8em;
+  padding-bottom: calc(var(--gap) * 0.3);
+  border-bottom: var(--rule) solid var(--line);
+  font-size: var(--size-small);
+  letter-spacing: 0.04em;
+}
+
+.cmdline {
+  margin: calc(var(--gap) * 0.4) 0 calc(var(--gap) * 0.2);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  font-weight: 700;
+}
+
+.bundle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--size-small);
+}
+
+.bundle th,
+.bundle td {
+  padding: calc(var(--gap) * 0.18) 0;
+  border-bottom: var(--hair) solid var(--line-soft);
+  text-align: left;
+  font-weight: 400;
+}
+
+.bundle th {
+  width: 5em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.bundle .lines {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.bundle .of {
+  color: var(--muted);
+}
+
+.is-theme th,
+.is-theme td {
+  background: var(--hi);
+  font-weight: 700;
+}
+
+.step .code {
+  margin-top: calc(var(--gap) * 0.5);
+  font-size: var(--size-caption);
+  line-height: 1.6;
+}
+
+.after {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  margin-top: calc(var(--gap) * 0.45);
+}
+
+.step .after .label {
+  padding: 0;
+  border: 0;
+  font-size: var(--size-caption);
+  color: var(--accent);
+}

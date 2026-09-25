@@ -1,0 +1,97 @@
+<section class="slide" data-layout="page" data-folio="09">
+  <p class="numeral">09</p>
+  <h2 class="slide-title">動きは、時間の関数として書く</h2>
+  <p class="lede">CSS で書けない動きは <span class="chip">slides/&lt;id&gt;.ts</span> に書きます。約束はひとつ。経過時間 t を受け取って、その瞬間の画面を描くこと。</p>
+  <div class="stage">
+    <pre class="code"><span class="code-head"><span>slides/motion.ts</span><span>抜粋</span></span>const MS = 1200;
+
+<span class="tok-h">function paint</span>(frame: Element, <span class="tok-s">t</span>: number) {
+<span class="tok-c">  // t だけから棒の高さを決める</span>
+  …
+}
+
+<span class="tok-h">export default</span> {
+  motion: { <span class="tok-s">"1": MS</span> },
+  <span class="tok-h">draw</span>(slide, { <span class="tok-s">t</span> }) {
+    for (const frame of frames(slide)) {
+      paint(frame, Number(frame.dataset.t));
+    }
+    const live = slide.querySelector("[data-live]");
+    if (live) paint(live, <span class="tok-s">t</span>);
+  },
+} satisfies DekSlide;</pre>
+    <div class="frames">
+      <p class="label frames-label">同じ t を渡せば、必ず同じ画面になる</p>
+      <figure class="frame" data-t="0">
+        <svg viewBox="0 0 150 140" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="ghost" x="12" y="75" width="18" height="55" />
+          <rect class="ghost" x="40" y="42" width="18" height="88" />
+          <rect class="ghost" x="68" y="64" width="18" height="66" />
+          <rect class="ghost" x="96" y="20" width="18" height="110" />
+          <rect class="ghost" x="124" y="53" width="18" height="77" />
+          <line x1="0" y1="130" x2="150" y2="130" />
+          <rect data-bar x="12" y="130" width="18" height="0" />
+          <rect data-bar x="40" y="130" width="18" height="0" />
+          <rect data-bar x="68" y="130" width="18" height="0" />
+          <rect data-bar x="96" y="130" width="18" height="0" />
+          <rect data-bar x="124" y="130" width="18" height="0" />
+        </svg>
+        <figcaption><span class="readout" data-readout>t = 0</span><span class="note">始まり</span></figcaption>
+      </figure>
+      <figure class="frame" data-t="600">
+        <svg viewBox="0 0 150 140" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="ghost" x="12" y="75" width="18" height="55" />
+          <rect class="ghost" x="40" y="42" width="18" height="88" />
+          <rect class="ghost" x="68" y="64" width="18" height="66" />
+          <rect class="ghost" x="96" y="20" width="18" height="110" />
+          <rect class="ghost" x="124" y="53" width="18" height="77" />
+          <line x1="0" y1="130" x2="150" y2="130" />
+          <rect data-bar x="12" y="130" width="18" height="0" />
+          <rect data-bar x="40" y="130" width="18" height="0" />
+          <rect data-bar x="68" y="130" width="18" height="0" />
+          <rect data-bar x="96" y="130" width="18" height="0" />
+          <rect data-bar x="124" y="130" width="18" height="0" />
+        </svg>
+        <figcaption><span class="readout" data-readout>t = 0</span><span class="note">半分</span></figcaption>
+      </figure>
+      <figure class="frame" data-t="1200">
+        <svg viewBox="0 0 150 140" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="ghost" x="12" y="75" width="18" height="55" />
+          <rect class="ghost" x="40" y="42" width="18" height="88" />
+          <rect class="ghost" x="68" y="64" width="18" height="66" />
+          <rect class="ghost" x="96" y="20" width="18" height="110" />
+          <rect class="ghost" x="124" y="53" width="18" height="77" />
+          <line x1="0" y1="130" x2="150" y2="130" />
+          <rect data-bar x="12" y="130" width="18" height="0" />
+          <rect data-bar x="40" y="130" width="18" height="0" />
+          <rect data-bar x="68" y="130" width="18" height="0" />
+          <rect data-bar x="96" y="130" width="18" height="0" />
+          <rect data-bar x="124" y="130" width="18" height="0" />
+        </svg>
+        <figcaption><span class="readout" data-readout>t = 0</span><span class="note">動き終わり</span></figcaption>
+      </figure>
+      <figure class="frame" data-live>
+        <svg viewBox="0 0 150 140" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="ghost" x="12" y="75" width="18" height="55" />
+          <rect class="ghost" x="40" y="42" width="18" height="88" />
+          <rect class="ghost" x="68" y="64" width="18" height="66" />
+          <rect class="ghost" x="96" y="20" width="18" height="110" />
+          <rect class="ghost" x="124" y="53" width="18" height="77" />
+          <line x1="0" y1="130" x2="150" y2="130" />
+          <rect data-bar x="12" y="130" width="18" height="0" />
+          <rect data-bar x="40" y="130" width="18" height="0" />
+          <rect data-bar x="68" y="130" width="18" height="0" />
+          <rect data-bar x="96" y="130" width="18" height="0" />
+          <rect data-bar x="124" y="130" width="18" height="0" />
+        </svg>
+        <figcaption><span class="readout" data-readout>t = 0</span><span class="note">ライブ：発表中はここが動く</span></figcaption>
+      </figure>
+    </div>
+    <dl class="outs">
+      <div><dt>発表</dt><dd>t を 0 から 1200 まで、画面の更新ごとに進める。滑らかに動く。</dd></div>
+      <div><dt>PDF・スクリーンショット</dt><dd>最後の t で一度だけ描く。動き終わった姿が写る。</dd></div>
+      <div><dt>動画</dt><dd>t をコマごとに送る。実時間を待たず、正確に記録される。</dd></div>
+    </dl>
+  </div>
+  <p class="source">左の三枚は data-t の値で、右端は再生中の t で、同じ paint() が描いている。</p>
+</section>

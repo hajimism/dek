@@ -1,40 +1,43 @@
-<section class="slide" data-layout="default">
-  <p class="kicker">Ⅲ　運用</p>
-  <h2 class="slide-title">1 ファイルで持っていく</h2>
-  <p class="lede">dek build が、テーマも画像も動きも含めて、トークをひとつの HTML に固める。<br>会場にサーバもネットワークも要らない。同じ台本から、配布用の PDF と動画も書き出せる。</p>
+<section class="slide" data-layout="page" data-folio="16">
+  <p class="numeral">16</p>
+  <h2 class="slide-title">本番に持っていくのは、HTML がひとつ</h2>
+  <p class="lede"><span class="chip">dek build</span> が、テーマも画像も動きも含めて、発表をひとつの HTML ファイルにまとめます。会場にサーバもネットワークも要りません。</p>
   <div class="stage">
-    <div class="source">
-      <p class="label">デッキ</p>
-      <pre class="tree">decks/why-dek/
-├─ <span class="hue-script">script.md</span>
-├─ theme.css
-├─ slides/
-└─ assets/</pre>
-    </div>
-    <div class="outs">
-      <div class="out is-main">
-        <p class="cmd"><span class="tag">dek build</span></p>
-        <p class="file">dist/why-dek.html</p>
-        <p class="note">発表に使う 1 ファイル。USB メモリに入れて、ブラウザで開くだけ。</p>
-        <p class="size"><span class="stat">461</span> KB <span class="note">この資料の場合</span></p>
-      </div>
-      <div class="out">
-        <p class="cmd"><span class="tag">?presenter</span></p>
-        <p class="file">発表者ビュー</p>
-        <p class="note">同じファイルを別ウィンドウで開き p キー。台本と次の 1 枚が見え、客席側の画面はそれに付いてくる。</p>
-      </div>
-      <div class="out">
-        <p class="cmd"><span class="tag">dek pdf</span></p>
-        <p class="file">dist/why-dek.pdf</p>
-        <p class="note">配布用。1 枚 1 ページで、各スライドは最後のビートまで出た状態で、手元で読み返せる。</p>
-      </div>
-      <div class="out">
-        <p class="cmd"><span class="tag">dek video</span></p>
-        <p class="file">dist/why-dek.mp4</p>
-        <p class="note">台本を読み上げた動画。字幕の .vtt と、チャプターの一覧も一緒に書き出す。</p>
-      </div>
-    </div>
+    <figure class="file">
+      <p class="label">dist/why-dek.html</p>
+      <p class="size"><span class="stat" data-real="build-kib">305</span><span class="unit">KiB</span></p>
+      <ul class="inside">
+        <li><span>スライド</span><span data-real="build-slides">18 枚</span></li>
+        <li><span>テーマ</span><span>theme.css と各スライドの CSS</span></li>
+        <li><span>画像</span><span data-real="build-assets">2 枚を data URI で埋め込み</span></li>
+        <li><span>動き</span><span data-real="build-ts">slides/*.ts の 3 本</span></li>
+        <li><span>プレイヤー</span><span>ビート送り、スライド一覧、発表者ビュー</span></li>
+      </ul>
+    </figure>
+    <ol class="outs">
+      <li>
+        <p class="out-n">同じファイルから</p>
+        <h3>発表</h3>
+        <p class="note">ブラウザで開けば、そのまま発表できる。</p>
+        <p class="chip">open dist/why-dek.html</p>
+      </li>
+      <li>
+        <h3>発表者ビュー</h3>
+        <p class="note">台本、次のビート、経過時間。二つ目の窓がついてくる。</p>
+        <p class="chip">?presenter　または　p キー</p>
+      </li>
+      <li>
+        <p class="out-n">同じ台本から</p>
+        <h3>配布用 PDF</h3>
+        <p class="note">一枚一ページ、すべてのビートを出した姿で。</p>
+        <p class="chip">dek pdf</p>
+      </li>
+      <li>
+        <h3>動画 MP4 + 字幕 VTT</h3>
+        <p class="note">音声合成で台本を読み上げ、ビートに合わせて記録する。</p>
+        <p class="chip">dek video</p>
+      </li>
+    </ol>
   </div>
-  <p class="aside">スマホをリモコンにしたいときだけ <span class="tag">dek --remote</span> で開発サーバを LAN に出す。発表者ビューにはパスワードがかかる。</p>
-  <p class="meta"><span>喋る順に、スライドを組み立てる</span><span>dek sample · 2026.09.24</span></p>
+  <p class="source" data-real="build-source">bunx dek build why-dek が書いた dist/why-dek.html の実測 312,554 バイト（2026-09-25）。</p>
 </section>

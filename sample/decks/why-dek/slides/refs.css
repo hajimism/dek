@@ -1,0 +1,104 @@
+/* A chain from someone else's repository to your own deck; the last link is a rewrite, not a reference. */
+.slide {
+  --arrow: 14px;
+}
+
+.chain {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.chain li {
+  grid-column: span 3;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--gap) * 0.4);
+  min-height: calc(var(--gap) * 9.5);
+  padding: calc(var(--gap) * 0.6) calc(var(--gap) * 0.7);
+  background: var(--paper-deep);
+  border-top: var(--rule) solid var(--line);
+}
+
+.chain li + li::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--arrow) / -2 - var(--rule) / 2);
+  left: calc(var(--gap) * -0.5 - var(--arrow) / 2);
+  border-top: calc(var(--arrow) / 2) solid transparent;
+  border-bottom: calc(var(--arrow) / 2) solid transparent;
+  border-left: var(--arrow) solid var(--fg);
+}
+
+.big {
+  font-size: calc(var(--size-title) * 0.8);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.chain .is-ref {
+  background:
+    repeating-linear-gradient(135deg, var(--line-soft) 0 var(--hair), transparent var(--hair) calc(var(--hair) * 9)),
+    var(--paper-deep);
+}
+
+.chain .is-mine {
+  background: var(--accent-tint);
+}
+
+.is-ref .big::after {
+  content: "\3000 読み取り専用";
+  font-size: var(--size-caption);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.chain .is-mine {
+  border-top-color: var(--accent);
+}
+
+.chain .is-mine::before {
+  border-left-color: var(--accent);
+}
+
+.is-mine .big {
+  color: var(--accent);
+}
+
+.verbs {
+  display: flex;
+  gap: 0.4em;
+}
+
+.rules-row {
+  grid-column: 1 / 9;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--gap);
+  margin-top: calc(var(--gap) * 1.2);
+}
+
+.rules-row p {
+  padding-top: calc(var(--gap) * 0.35);
+  border-top: var(--hair) solid var(--line);
+  font-size: var(--size-small);
+  line-height: 1.7;
+}
+
+.rules-row .label {
+  margin-bottom: calc(var(--gap) * 0.2);
+}
+
+.rules-row .no .label {
+  color: var(--accent);
+}
+
+.stage > .code {
+  grid-column: 9 / -1;
+  margin-top: calc(var(--gap) * 1.4);
+  font-size: var(--size-caption);
+}
