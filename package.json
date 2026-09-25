@@ -1,12 +1,18 @@
 {
-  "name": "dek",
+  "name": "@hajimism/dek",
   "version": "0.0.0",
-  "description": "Talk-script-first HTML slides.",
+  "description": "A build system for talks.",
   "license": "MIT",
   "type": "module",
   "bin": {
     "dek": "src/cli.ts"
   },
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "README.ja.md"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/hajimism/dek.git"
@@ -15,14 +21,19 @@
     "url": "https://github.com/hajimism/dek/issues"
   },
   "homepage": "https://hajimism.github.io/dek/",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "bun": ">=1.3.0"
   },
   "keywords": [
     "slides",
+    "presentation",
+    "talk",
+    "build",
     "cli",
-    "html",
-    "talk-script"
+    "html"
   ],
   "scripts": {
     "test": "bun test",
@@ -32,7 +43,8 @@
     "lint": "biome lint .",
     "check": "biome check --write .",
     "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
+    "docs:samples": "cd sample && bun ../src/cli.ts build --root-dist && mkdir -p ../docs/public/samples && cp dist/*.html ../docs/public/samples/",
+    "docs:build": "bun run docs:samples && vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {

@@ -15,10 +15,8 @@
     "rehearse": "dek rehearse",
     "video": "dek video"
   },
-  "dependencies": {
-    "dek": "file:.."
-  },
   "devDependencies": {
+    "@hajimism/dek": "file:..",
     "playwright": "^1.63.0",
     "rumdl": "^0.2.73"
   }
