@@ -6,7 +6,8 @@ import {
   playwrightMissingError,
 } from "../core/playwright.ts";
 import { runVisualDeck } from "../core/visual.ts";
-import { hasVoice, loadCachedTimeline } from "../core/voice.ts";
+import { hasVoice, loadCachedTimeline, VOICE_SETUP_HINT } from "../core/voice.ts";
+import { type SkippedCheck, skippedChecks } from "./result.ts";
 import { requireDeckFromCwd, requireSection } from "./scope.ts";
 
 export type VoiceCheckBeat = {
@@ -19,9 +20,8 @@ export type VoiceCheckBeat = {
 export type CheckCliResult = {
   slug: string;
   diagnostics: Diagnostic[];
-  visual: "ok" | "skipped";
-  /** Set when visual is skipped: how to get overflow and contrast checked. */
-  hint?: string;
+  /** Checks that did not run, each with why and how to run it, so an empty list is not a pass. */
+  skipped?: SkippedCheck[];
   shot?: string;
   voice?: { beats: VoiceCheckBeat[] };
 };
@@ -59,14 +59,26 @@ export async function checkCommand(options: {
 
   const shot = visual?.screenshotPath;
 
+  const skipped: SkippedCheck[] = visual
+    ? []
+    : [
+        {
+          check: "visual",
+          reason: "Playwright is not installed",
+          hint: `${PLAYWRIGHT_INSTALL} to also check overflow and contrast`,
+        },
+      ];
+
+  // A live-only deck is done without voice, so asking for it skips the check rather than failing,
+  // the way a missing Playwright skips visual.
   let voice: CheckCliResult["voice"];
-  if (options.voice) {
-    if (!hasVoice(deck.dir)) {
-      throw new DekError("voice.toml not found", {
-        path: `${deck.dir}/voice/voice.toml`,
-        hint: "add voice/voice.toml or run `dek voice` after copying from dek.toml [voice]",
-      });
-    }
+  if (options.voice && !hasVoice(deck.dir)) {
+    skipped.push({
+      check: "voice",
+      reason: "the deck has no voice/voice.toml",
+      hint: VOICE_SETUP_HINT,
+    });
+  } else if (options.voice) {
     const { synthDeck } = await import("../voice/synth.ts");
     await synthDeck({ project, deck });
     const timeline = loadCachedTimeline(deck.dir);
@@ -91,9 +103,7 @@ export async function checkCommand(options: {
   return {
     slug,
     diagnostics,
-    ...(visual === null
-      ? { visual: "skipped", hint: `${PLAYWRIGHT_INSTALL} to also check overflow and contrast` }
-      : { visual: "ok" }),
+    ...skippedChecks(skipped),
     ...(shot ? { shot } : {}),
     ...(voice ? { voice } : {}),
   };

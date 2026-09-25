@@ -6,10 +6,12 @@ import {
   type Project,
   type ProjectDeck,
 } from "../core/index.ts";
+import { isRefName } from "../core/ref.ts";
 import { slideVideoSeconds, timelineSeconds } from "../core/timeline.ts";
 import { sectionTiming } from "../core/timing.ts";
 import { tryLoadCachedTimeline } from "../core/voice.ts";
-import { requireDeck, resolveScope } from "./scope.ts";
+import { type SkippedCheck, skippedChecks } from "./result.ts";
+import { type RefInfo, requireDeck, requireReadableDeck, resolveScope } from "./scope.ts";
 
 export type LsListResult = {
   kind: "list";
@@ -44,6 +46,10 @@ export type LsDeckResult = {
   videoSeconds?: number;
   sections: LsSectionRow[];
   diagnostics: Diagnostic[];
+  /** Lint is skipped for a ref: it is not yours to fix, so an empty list is not a pass. */
+  skipped?: SkippedCheck[];
+  /** Set when the deck is a ref. */
+  ref?: RefInfo;
 };
 
 export function lsCommand(options: {
@@ -51,6 +57,17 @@ export function lsCommand(options: {
   deck?: string;
   positionalDeck?: string;
 }): LsListResult | LsDeckResult {
+  const named = options.deck ?? options.positionalDeck;
+  if (named !== undefined && isRefName(named)) {
+    const { project, deck, ref } = requireReadableDeck(options.cwd, named);
+    return {
+      ...formatDeck(deck, loadConfig(project.configPath), project, { lint: false }),
+      ...skippedChecks([
+        { check: "lint", reason: "a ref is read-only; its problems are not yours to fix" },
+      ]),
+      ...(ref ? { ref } : {}),
+    };
+  }
   const scope = resolveScope(options.cwd, {
     deck: options.deck,
     positionalDeck: options.positionalDeck,
@@ -82,7 +99,12 @@ function summarizeDeck(deck: ProjectDeck, project: Project): LsListResult["decks
   };
 }
 
-function formatDeck(deck: ProjectDeck, config: DekConfig, project: Project): LsDeckResult {
+function formatDeck(
+  deck: ProjectDeck,
+  config: DekConfig,
+  project: Project,
+  options: { lint: boolean } = { lint: true },
+): LsDeckResult {
   const timing = sectionTiming(deck.deck.sections, deck.deck.duration, config);
   const estimateTotal = timing.reduce((sum, row) => sum + row.estimateSeconds, 0);
   const timeline = tryLoadCachedTimeline(deck.dir);
@@ -108,6 +130,6 @@ function formatDeck(deck: ProjectDeck, config: DekConfig, project: Project): LsD
         ...(videoSeconds !== undefined ? { videoSeconds } : {}),
       };
     }),
-    diagnostics: lintDeck({ project, deck }),
+    diagnostics: options.lint ? lintDeck({ project, deck }) : [],
   };
 }

@@ -1,5 +1,14 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DekError, type Project, type ProjectDeck, resolveProject } from "../core/index.ts";
+import {
+  isRefName,
+  parseRefSource,
+  REF_MARKER,
+  readRefMeta,
+  refLicense,
+  refState,
+} from "../core/ref.ts";
 import { locateDeck, requireSection } from "../core/resolve.ts";
 
 export { requireSection };
@@ -9,25 +18,23 @@ export type Scope = {
   deck?: ProjectDeck;
 };
 
-export const VOICE_SUBCOMMANDS = new Set(["speakers", "say", "dict", "pin"]);
+const VOICE_SUBCOMMANDS = new Set(["speakers", "say", "dict", "pin"]);
 
 const DECK_ONLY_COMMANDS = new Set(["ls", "lint", "sync", "build", "pdf", "cues", "current"]);
 
-const SLUG_COMMANDS = new Set(["show", "check", "goto", "shot", "video", "rehearse"]);
+/** Commands whose one positional names something inside the deck, so it is not a deck name from inside one. */
+const SLUG_COMMANDS = new Set(["show", "check", "goto", "shot", "video", "rehearse", "theme"]);
 
 export function requireProject(cwd: string): Project {
-  try {
-    return resolveProject(cwd);
-  } catch (error) {
-    if (error instanceof DekError && error.message.includes("dek.toml not found")) {
-      throw new DekError("not a dek project", {
-        path: cwd,
-        hint: "run `dek init` first",
-        cause: error,
-      });
-    }
-    throw error;
+  const project = resolveProject(cwd);
+  if (existsSync(join(project.root, REF_MARKER))) {
+    const name = readRefMeta(project.root)?.name ?? "<ref>";
+    throw new DekError("this directory is inside a ref; refs are read-only", {
+      path: project.root,
+      hint: `run dek from your own project instead: \`dek show ${name} <slug>\``,
+    });
   }
+  return project;
 }
 
 export function inferDeckName(project: Project, cwd: string): string | undefined {
@@ -41,7 +48,7 @@ export function inferDeckName(project: Project, cwd: string): string | undefined
   return located.name;
 }
 
-export function isKnownDeckName(project: Project, name: string): boolean {
+function isKnownDeckName(project: Project, name: string): boolean {
   return (
     project.decks.some((deck) => deck.name === name) ||
     project.failed.some((entry) => entry.name === name)
@@ -61,7 +68,7 @@ export function peelDeckArg(
   if (options.deck) {
     return { deck: options.deck, rest: options.args };
   }
-  if (options.command === "init" || options.command === "new") {
+  if (options.command === "init" || options.command === "new" || options.command === "ref") {
     return { rest: options.args };
   }
 
@@ -71,6 +78,9 @@ export function peelDeckArg(
   }
   if (options.command === "voice" && VOICE_SUBCOMMANDS.has(first)) {
     return { rest: options.args };
+  }
+  if (isRefName(first)) {
+    return { deck: first, rest: options.args.slice(1) };
   }
 
   const deckOnly = options.command !== undefined && DECK_ONLY_COMMANDS.has(options.command);
@@ -119,6 +129,11 @@ export function resolveScope(
   if (name === undefined) {
     return { project };
   }
+  if (isRefName(name)) {
+    throw new DekError(`"${name}" is a ref; refs are read-only`, {
+      hint: `read it with \`dek show ${name} <slug>\`, then copy what you need into your own deck and rewrite it in your theme`,
+    });
+  }
   const deck = project.decks.find((entry) => entry.name === name);
   if (!deck) {
     const failed = project.failed.find((entry) => entry.name === name);
@@ -160,4 +175,79 @@ export function requireDeckFromCwd(
 ): { project: Project; deck: ProjectDeck } {
   const scope = resolveScope(cwd, { deck });
   return { project: scope.project, deck: requireDeck(scope, cwd) };
+}
+
+/** Where a ref came from, returned by the commands that read one. */
+export type RefInfo = {
+  name: string;
+  rev: string;
+  /** The snapshot directory. */
+  dir: string;
+  /** The snapshot's license file, or null when the source had none. */
+  license: string | null;
+};
+
+export type ReadableDeck = {
+  project: Project;
+  deck: ProjectDeck;
+  ref?: RefInfo;
+};
+
+/**
+ * The commands that read through `requireReadableDeck`, so a ref may be their
+ * deck; the CLI fetches a pinned ref's missing snapshot before running one.
+ */
+export const REF_READERS: ReadonlySet<string> = new Set(["ls", "show", "theme", "shot"]);
+
+/**
+ * One deck to read: the project's own, or a ref. Only commands that never
+ * write call this, so a ref cannot reach a command that would change it;
+ * everything else goes through resolveScope, which refuses refs.
+ */
+export function requireReadableDeck(cwd: string, deck?: string): ReadableDeck {
+  if (deck !== undefined && isRefName(deck)) {
+    return resolveRef(cwd, deck);
+  }
+  return requireDeckFromCwd(cwd, deck);
+}
+
+function resolveRef(cwd: string, arg: string): ReadableDeck {
+  const source = parseRefSource(arg);
+  const project = requireProject(cwd);
+  const { pinned, dir, fetched } = refState(project, source.name);
+  if (pinned === undefined) {
+    throw new DekError(`ref "${source.name}" is not added`, {
+      path: project.configPath,
+      hint: `run \`dek ref ${arg}\``,
+    });
+  }
+  if (source.rev !== undefined && source.rev !== pinned) {
+    throw new DekError(`"${arg}" is not the pinned version, ${pinned.slice(0, 7)}`, {
+      path: project.configPath,
+      hint: `run \`dek ref ${arg}\` to pin that version, or drop @${source.rev}`,
+    });
+  }
+  if (!fetched) {
+    throw new DekError(`ref "${source.name}" is not fetched`, {
+      path: dir,
+      hint: `run \`dek ref ${source.name}@${pinned}\``,
+    });
+  }
+  const snapshot = resolveProject(dir);
+  const found = snapshot.decks.find((entry) => entry.name === source.deck);
+  if (!found) {
+    const failed = snapshot.failed.find((entry) => entry.name === source.deck);
+    if (failed) {
+      throw failed.error;
+    }
+    throw new DekError(`ref "${source.name}" has no deck "${source.deck}"`, {
+      path: dir,
+      hint: `run \`dek ref ${source.name}@${pinned}\` to fetch it again`,
+    });
+  }
+  return {
+    project: snapshot,
+    deck: found,
+    ref: { name: source.name, rev: pinned, dir, license: refLicense(dir) },
+  };
 }

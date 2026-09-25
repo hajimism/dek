@@ -158,6 +158,18 @@ describe("peelDeckArg", () => {
     });
   });
 
+  test("keeps a layout name for theme when cwd is already a deck", async () => {
+    await withTempProject({ decks: [{ name: "cover" }, { name: "demo" }] }, async (root) => {
+      expect(
+        peelDeckArg(join(root, "decks", "demo"), { command: "theme", args: ["cover"] }),
+      ).toEqual({ rest: ["cover"] });
+      expect(peelDeckArg(root, { command: "theme", args: ["cover", "title"] })).toEqual({
+        deck: "cover",
+        rest: ["title"],
+      });
+    });
+  });
+
   test("does not treat voice subcommands as deck names", async () => {
     await withTempProject({ decks: [{ name: "demo" }, { name: "speakers" }] }, async (root) => {
       expect(peelDeckArg(root, { command: "voice", args: ["speakers"] })).toEqual({

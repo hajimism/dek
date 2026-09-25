@@ -25,7 +25,8 @@ type LintOk = {
     severity?: string;
     data?: Record<string, unknown>;
   }>;
-  rumdl?: "ok" | "skipped";
+  error?: { message: string; hint?: string };
+  skipped?: Array<{ check: string; reason: string; hint?: string }>;
 };
 
 describe("dek lint", () => {
@@ -165,7 +166,7 @@ describe("lintCommand", () => {
       },
       async (root) => {
         const result = await lintCommand({ cwd: join(root, "decks", "demo") });
-        expect(result.rumdl).toBe("ok");
+        expect(result.skipped).toBeUndefined();
         expect(result.diagnostics).toEqual([]);
       },
     );
@@ -288,7 +289,13 @@ more
         await withEnv({ DEK_RUMDL: "/no/such/rumdl" }, async () => {
           const result = await lintCommand({ cwd: join(root, "decks", "demo") });
           expect(result.diagnostics).toEqual([]);
-          expect(result.rumdl).toBe("skipped");
+          expect(result.skipped).toEqual([
+            {
+              check: "rumdl",
+              reason: "rumdl is not installed",
+              hint: "bun add -d rumdl; or put rumdl on PATH, or set DEK_RUMDL to its path",
+            },
+          ]);
         });
       },
     );

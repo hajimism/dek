@@ -5,9 +5,11 @@ import {
   formatDiagnostics,
   formatError,
   formatErrorText,
+  formatInit,
   helpText,
   writeDevEvent,
 } from "../../src/cli/format.ts";
+import type { Diagnostic } from "../../src/core/diagnostic.ts";
 import { DekError } from "../../src/core/error.ts";
 
 describe("helpText", () => {
@@ -87,6 +89,7 @@ describe("formatDiagnostics", () => {
       formatDiagnostics([
         {
           id: "DEK001",
+          severity: "error",
           message: 'missing slide HTML for "intro"',
           path: "script.md",
           line: 3,
@@ -95,11 +98,27 @@ describe("formatDiagnostics", () => {
     ).toBe('script.md:3: DEK001 missing slide HTML for "intro"');
   });
 
+  test("adds the column after the line, the way editors jump to it", () => {
+    expect(
+      formatDiagnostics([
+        {
+          id: "DEK011",
+          severity: "error",
+          message: "slide contains a style attribute",
+          path: "slides/intro.html",
+          line: 3,
+          column: 27,
+        },
+      ]),
+    ).toBe("slides/intro.html:3:27: DEK011 slide contains a style attribute");
+  });
+
   test("formats path without a line", () => {
     expect(
       formatDiagnostics([
         {
           id: "DEK002",
+          severity: "error",
           message: 'slide HTML has no section "orphan"',
           path: "slides/orphan.html",
         },
@@ -108,16 +127,22 @@ describe("formatDiagnostics", () => {
   });
 
   test("formats a line without a path", () => {
-    expect(formatDiagnostics([{ id: "DEK004", message: "duplicate id", line: 4 }])).toBe(
-      "4: DEK004 duplicate id",
-    );
+    expect(
+      formatDiagnostics([{ id: "DEK004", severity: "error", message: "duplicate id", line: 4 }]),
+    ).toBe("4: DEK004 duplicate id");
   });
 
   test("prints a diagnostic hint under its line", () => {
     expect(
       formatDiagnostics([
-        { id: "DEK003", message: 'data-step "3"', path: "slides/intro.html", hint: "use hook" },
-        { id: "DEK011", message: "style attribute", path: "slides/intro.html" },
+        {
+          id: "DEK003",
+          severity: "error",
+          message: 'data-step "3"',
+          path: "slides/intro.html",
+          hint: "use hook",
+        },
+        { id: "DEK011", severity: "error", message: "style attribute", path: "slides/intro.html" },
       ]),
     ).toBe(
       'slides/intro.html: DEK003 data-step "3"\n  help: use hook\nslides/intro.html: DEK011 style attribute',
@@ -129,6 +154,7 @@ describe("formatDiagnostics", () => {
       formatDiagnostics([
         {
           id: "DEK040",
+          severity: "warning",
           message: "dictionary is missing English word: AI",
           path: "script.md",
           line: 9,
@@ -144,8 +170,19 @@ describe("formatDiagnostics", () => {
   test("prints only the hints the diagnostics carry", () => {
     expect(
       formatDiagnostics([
-        { id: "DEK001", message: 'missing slide HTML for "intro"', path: "script.md", line: 5 },
-        { id: "DEK002", message: 'slide HTML has no section "orphan"', path: "slides/orphan.html" },
+        {
+          id: "DEK001",
+          severity: "error",
+          message: 'missing slide HTML for "intro"',
+          path: "script.md",
+          line: 5,
+        },
+        {
+          id: "DEK002",
+          severity: "error",
+          message: 'slide HTML has no section "orphan"',
+          path: "slides/orphan.html",
+        },
       ]),
     ).toBe(`script.md:5: DEK001 missing slide HTML for "intro"
 slides/orphan.html: DEK002 slide HTML has no section "orphan"`);
@@ -205,14 +242,27 @@ describe("formatDevEvent", () => {
     );
   });
 
+  test("marks skeletons the dev server refreshed", () => {
+    expect(
+      formatDevEvent({ type: "sync", created: [], updated: ["/tmp/decks/demo/slides/intro.html"] }),
+    ).toBe("synced 1 file\n  /tmp/decks/demo/slides/intro.html (updated)");
+  });
+
+  test("names the skeletons a sync removed next to the ones it created", () => {
+    expect(
+      formatDevEvent({ type: "sync", created: ["/d/slides/mine.html"], removed: ["next"] }),
+    ).toBe("synced 2 files\n  /d/slides/mine.html\n  next (removed)");
+  });
+
   test("stays silent when diagnostics are clean", () => {
     expect(formatDevEvent({ type: "diagnostics", diagnostics: [] })).toBeNull();
   });
 
   test("formats diagnostics the same way as formatDiagnostics", () => {
-    const diagnostics = [
+    const diagnostics: Diagnostic[] = [
       {
         id: "DEK001",
+        severity: "error",
         message: 'missing slide HTML for "architecture"',
         path: "slides/architecture.html",
         line: 12,
@@ -236,7 +286,14 @@ describe("writeDevEvent", () => {
     writeDevEvent(
       {
         type: "diagnostics",
-        diagnostics: [{ id: "DEK010", message: 'class "x"', path: "/p/decks/demo/slides/a.html" }],
+        diagnostics: [
+          {
+            id: "DEK010",
+            severity: "error",
+            message: 'class "x"',
+            path: "/p/decks/demo/slides/a.html",
+          },
+        ],
       },
       { write: (s) => chunks.push(s) },
       { cwd: "/p/decks/demo" },
@@ -256,5 +313,19 @@ describe("formatError paths", () => {
     const error = new DekError("section not found", { path: "/p/decks/demo/script.md" });
     expect(formatError(error, { cwd: "/p/decks/demo" }).path).toBe("script.md");
     expect(formatError(error).path).toBe("/p/decks/demo/script.md");
+  });
+});
+
+describe("formatInit", () => {
+  test("lists each file init wrote, and each it kept as it was", () => {
+    expect(formatInit({ root: "/tmp/talks", created: ["dek.toml"], kept: ["AGENTS.md"] })).toBe(
+      "created project at /tmp/talks\n  dek.toml\n  AGENTS.md (kept)",
+    );
+  });
+
+  test("says so when every file was already there", () => {
+    expect(formatInit({ root: "/tmp/talks", created: [], kept: ["AGENTS.md"] })).toBe(
+      "project at /tmp/talks is already set up\n  AGENTS.md (kept)",
+    );
   });
 });

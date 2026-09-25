@@ -1,15 +1,18 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { DekError } from "../core/index.ts";
 import { isDeckName } from "../core/path.ts";
-import { createDeck } from "./files.ts";
+import { syncDeck } from "../core/sync.ts";
+import { applyPlan, deckPlan, nextSteps } from "./files.ts";
 import { requireDeckFromCwd, requireProject } from "./scope.ts";
 
 export type NewResult = {
   name: string;
   dir: string;
   created: string[];
+  /** The commands to run next, from the directory new ran in. */
+  next: string[];
 };
 
 export function newCommand(options: { cwd: string; name?: string; themeFrom?: string }): NewResult {
@@ -44,6 +47,10 @@ export function newCommand(options: { cwd: string; name?: string; themeFrom?: st
     });
   }
 
-  const created = createDeck(project.root, name, themeSource, loadConfig(project.configPath).voice);
-  return { name, dir, created };
+  const theme = readFileSync(themeSource, "utf8");
+  const voice = loadConfig(project.configPath).voice;
+  const { created } = applyPlan(deckPlan(project.root, name, theme, voice));
+  // As sync would: AGENTS.md and .dek/ follow the project, now one deck larger.
+  created.push(...syncDeck(dir).created);
+  return { name, dir, created, next: nextSteps(options.cwd, project.root, dir) };
 }

@@ -43,6 +43,12 @@ describe("resolveProject", () => {
   test("errors when dek.toml is not found", async () => {
     await withTempDir(async (dir) => {
       expect(() => resolveProject(dir)).toThrow(DekError);
+      expect(() => resolveProject(dir)).toThrow(
+        expect.objectContaining({
+          message: "not a dek project",
+          hint: "run `dek init` to create one here, or cd into a project",
+        }),
+      );
     });
   });
 

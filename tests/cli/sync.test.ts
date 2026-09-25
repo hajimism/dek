@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { initCommand } from "../../src/cli/init.ts";
 import { syncCommand } from "../../src/cli/sync.ts";
+import { lintDeck } from "../../src/core/index.ts";
+import { listSlides } from "../../src/core/resolve.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { extractSlide } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -103,5 +107,19 @@ more
         );
       },
     );
+  });
+
+  test("clears the example skeletons once the author writes their own script", async () => {
+    await withTempDir(async (dir) => {
+      initCommand({ cwd: dir, deck: "demo" });
+      const deckDir = join(dir, "decks", "demo");
+      await writeFile(join(deckDir, "script.md"), "---\ntitle: Mine\n---\n\n## hello\n");
+
+      const result = syncCommand({ cwd: deckDir });
+      expect(result.created).toEqual([join(deckDir, "slides", "hello.html")]);
+      expect(result.removed.length).toBeGreaterThan(0);
+      expect(listSlides(deckDir).map((slide) => slide.slug)).toEqual(["hello"]);
+      expect(lintDeck(deckDir)).toEqual([]);
+    });
   });
 });

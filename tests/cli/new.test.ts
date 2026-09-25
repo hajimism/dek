@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { newCommand } from "../../src/cli/new.ts";
@@ -26,6 +26,12 @@ describe("dek new", () => {
       },
       async (root) => {
         const result = newCommand({ cwd: root, name: "talk" });
+        expect(result.next).toEqual([
+          "bun add -d github:hajimism/dek",
+          "cd decks/talk",
+          "$EDITOR script.md",
+          "bunx dek",
+        ]);
         expect(result.created).toContain(join(root, "decks", "talk", "slides", "intro.html"));
         expect(existsSync(join(root, "decks", "talk", "voice", "voice.toml"))).toBe(true);
         expect(lintDeck(join(root, "decks", "talk"))).toEqual([]);
@@ -83,6 +89,26 @@ describe("newCommand", () => {
         expect(error).toBeInstanceOf(DekError);
         expect((error as DekError).message).toContain("invalid deck name");
       }
+    });
+  });
+
+  test("names next commands that paste as printed, from wherever new ran", async () => {
+    await withTempProject({ theme: defaultTheme(), decks: [{ name: "demo" }] }, async (root) => {
+      const inDeck = join(root, "decks", "demo");
+      expect(newCommand({ cwd: inDeck, name: "My Talk" }).next).toEqual([
+        "cd ../..",
+        "bun add -d github:hajimism/dek",
+        "cd 'decks/My Talk'",
+        "$EDITOR script.md",
+        "bunx dek",
+      ]);
+      await mkdir(join(root, "node_modules", ".bin"), { recursive: true });
+      await writeFile(join(root, "node_modules", ".bin", "dek"), "");
+      expect(newCommand({ cwd: inDeck, name: "other" }).next).toEqual([
+        "cd ../other",
+        "$EDITOR script.md",
+        "bunx dek",
+      ]);
     });
   });
 

@@ -1,15 +1,16 @@
-import { syncDeck } from "../core/index.ts";
+import { type SyncResult, syncDeck } from "../core/index.ts";
 import { resolveDecks } from "./scope.ts";
 
-export type SyncCliResult = {
-  created: string[];
-};
+export type SyncCliResult = SyncResult;
 
 export function syncCommand(options: { cwd: string; deck?: string }): SyncCliResult {
   const { project, decks } = resolveDecks(options.cwd, { deck: options.deck });
-  const created: string[] = [];
+  const result: SyncCliResult = { created: [], updated: [], removed: [] };
   for (const deck of decks) {
-    created.push(...syncDeck({ project, deck }).created);
+    const synced = syncDeck({ project, deck });
+    result.created.push(...synced.created);
+    result.updated.push(...synced.updated);
+    result.removed.push(...synced.removed);
   }
-  return { created };
+  return result;
 }

@@ -16,7 +16,7 @@ const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.t
 
 type PdfOk = {
   ok: true;
-  out: string;
+  outs: string[];
 };
 
 describe("dek pdf", () => {
@@ -34,8 +34,8 @@ describe("dek pdf", () => {
         expect(result.exitCode).toBe(0);
         const json = jsonStdout<PdfOk>(result);
         expect(json.ok).toBe(true);
-        expect(json.out).toBe(join(root, "decks", "demo", "dist", "demo.pdf"));
-        expect(await Bun.file(json.out).exists()).toBe(true);
+        expect(json.outs).toEqual([join(root, "decks", "demo", "dist", "demo.pdf")]);
+        expect(await Bun.file(json.outs[0] ?? "").exists()).toBe(true);
       },
     );
   });

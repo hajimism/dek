@@ -24,6 +24,11 @@ export type ResolvedDeck = {
   deck: ProjectDeck;
 };
 
+/** The file's text, or nothing when there is no such file. */
+export function readTextIfExists(path: string): string | undefined {
+  return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+}
+
 export function resolveProject(startDir: string): Project {
   const { root, configPath } = findRoot(resolve(startDir));
   const { decks, failed } = loadDecks(root);
@@ -112,7 +117,10 @@ function findRoot(startDir: string): { root: string; configPath: string } {
     }
   });
   if (!hit) {
-    throw new DekError("dek.toml not found", { path: startDir });
+    throw new DekError("not a dek project", {
+      path: startDir,
+      hint: "run `dek init` to create one here, or cd into a project",
+    });
   }
   return hit;
 }

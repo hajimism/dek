@@ -1,7 +1,7 @@
 import { DekError } from "../core/error.ts";
 import { parseMorphAt, type ShotFile, shotDeck, shotMorph } from "../core/shot.ts";
 import { playerScript } from "../runtime/player.ts";
-import { requireDeckFromCwd } from "./scope.ts";
+import { requireReadableDeck } from "./scope.ts";
 
 export type ShotCliResult = {
   shots: ShotFile[];
@@ -15,7 +15,7 @@ export async function shotCommand(options: {
   at?: string;
   deck?: string;
 }): Promise<ShotCliResult> {
-  const { project, deck } = requireDeckFromCwd(options.cwd, options.deck);
+  const { project, deck } = requireReadableDeck(options.cwd, options.deck);
   if (options.to !== undefined) {
     if (!options.slug) {
       throw new DekError("usage: dek shot <slug> --to <slug> [--at 0..1]", {

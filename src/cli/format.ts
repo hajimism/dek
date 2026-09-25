@@ -1,25 +1,36 @@
 import { isAbsolute, relative } from "node:path";
-import { type Diagnostic, severityOf } from "../core/diagnostic.ts";
+import type { Diagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
 import type { DevEvent } from "../server/dev.ts";
+import type { InitResult } from "./init.ts";
 import { ansi, displayWidth, padEndWidth, padStartWidth } from "./tty.ts";
 
 export function helpText(): string {
-  return `dek — talk-script-first HTML slides
+  return `dek — a build system for talks
 
 Dev
   dek [deck] [--visual] [--port N]
                       start the dev server; --visual lints overflow/contrast on save
   dek --remote        share on LAN; presenter notes are password-protected
-  dek rehearse [slug] auto-advance from a Timeline (no video)
+  dek rehearse [slug] auto-advance from a Timeline (no video); --remote shares it
 
 Project
-  dek init [dir]      create a project
-  dek new <name>      add a deck
+  dek init [dir] [--deck NAME]
+                      create a project, optionally with a first deck
+  dek new <name> [--theme-from DECK]
+                      add a deck
   dek ls [deck]       list decks or show one
 
+Refs (other people's decks to read as models; read-only)
+  dek ref owner/repo/deck[@rev]
+                      pin and fetch one (a GitHub link works too); again moves the pin
+  dek ref             list pinned refs
+  dek ref rm <ref>    drop one
+  dek ls|show|theme|shot <ref> ...
+                      read a ref as you would a deck
+
 Slide
-  dek show <slug>     print a section's script and HTML
+  dek show <slug>     print a slide's script, HTML, CSS, TS, theme rules, assets
   dek theme [layout]  list the deck theme's layouts, classes, and tokens; print a layout's markup
   dek check <slug>    lint one slide; --shot adds a screenshot; --voice adds readings
   dek shot [slug]     write screenshots; --step <id|n> picks a beat
@@ -30,10 +41,10 @@ Slide
                       reorder a section
   dek goto <slug>     jump the open browser
   dek current         print the slide on screen
-  dek sync            create missing skeleton slides
+  dek sync            create missing skeletons; refresh or drop the ones nobody edited
 
 CI
-  dek lint            check script.md against slides
+  dek lint [--fix]    check script.md against slides; --fix syncs first
   dek lint --visual   add overflow and contrast rules
   dek cues            print spoken paragraphs as Cue[]
   dek voice           synthesize changed sentences
@@ -43,14 +54,16 @@ CI
   dek voice pin       pin TTS master.wav + timeline.json
   dek build [--root-dist]
                       write a single HTML file
-  dek video [slug] [--root-dist]
+  dek video [slug] [--fps N] [--root-dist]
                       bake dist/<deck>.mp4 (or one slide under .cache/video/)
   dek pdf [--root-dist]
                       write a PDF
-  dek help            show this help
+  dek help [command]  show this help, or one command's usage and flags
 
 Commands that print a result accept --json. dek and dek rehearse stay running.
 Pass a deck name or --deck <name> to target a deck from the project root.
+Flags are checked per command: an unknown flag is an error, not ignored.
+dek <command> --help  one command's usage and flags; dek --version prints the version
 dek help --agent      compact command reference for agents
 `;
 }
@@ -63,14 +76,16 @@ Scope: project root = all decks; deck dir = that deck; NAME or --deck NAME.
 
 dek [deck] [--visual] [--port N]
 dek --remote [--password PWD]
-dek rehearse [slug]
+dek rehearse [slug] [--remote [--password PWD]]
 dek init [dir] [--deck NAME]
 dek new <name> [--theme-from DECK]
 dek ls [deck]
-dek show <slug>
+dek show <slug>     script, HTML, CSS, TS, the theme rules it uses, assets
+dek ref [owner/repo/deck[@rev] | github-link]   pin + fetch; no args lists; dek ref rm REF
+Refs are read-only decks to learn from: ls, show, theme, shot take owner/repo/deck as the deck.
 dek theme [layout]  deck theme: layouts, classes, tokens; with a layout, its example markup
 dek mv <old> <new> | dek mv <slug> --before|--after <slug>
-dek sync            create missing skeleton slides; never overwrites
+dek sync            create missing skeletons; refresh or drop untouched ones; never edits your slides
 dek lint [--fix] [--visual] [--format sarif]
 dek cues
 dek voice [speakers | say TEXT | dict add WORD KANA | pin]
@@ -82,15 +97,16 @@ dek current         requires running dek
 dek build [--root-dist]
 dek video [slug] [--fps N] [--root-dist]
 dek pdf [--root-dist]
-dek help --agent
+dek help [command] | dek <command> --help | dek --version
 
 Errors include hint with the next command to run.
 `;
 }
 
-export function formatLocation(location: { path?: string; line?: number }): string {
+function formatLocation(location: { path?: string; line?: number; column?: number }): string {
   if (location.path !== undefined && location.line !== undefined) {
-    return `${location.path}:${location.line}`;
+    const column = location.column === undefined ? "" : `:${location.column}`;
+    return `${location.path}:${location.line}${column}`;
   }
   if (location.path !== undefined) {
     return location.path;
@@ -115,7 +131,7 @@ export function formatDiagnostics(
       ...(diagnostic.path !== undefined ? { path: displayPath(diagnostic.path, opts?.cwd) } : {}),
     });
     const prefix = where ? `${c.cyan(where)}: ` : "";
-    const label = severityOf(diagnostic) === "warning" ? ` ${c.yellow("warning:")}` : "";
+    const label = diagnostic.severity === "warning" ? ` ${c.yellow("warning:")}` : "";
     const line = `${prefix}${c.yellow(diagnostic.id)}${label} ${diagnostic.message}`;
     return diagnostic.hint ? [line, `  ${c.yellow("help:")} ${diagnostic.hint}`] : [line];
   });
@@ -182,13 +198,29 @@ export function formatTable(
   return [line(headers), ...rows.map((row) => line(row))].join("\n");
 }
 
-export function formatCreated(created: string[]): string {
-  const noun = created.length === 1 ? "file" : "files";
-  const header = `synced ${created.length} ${noun}`;
-  if (created.length === 0) {
-    return header;
-  }
-  return `${header}\n${created.map((path) => `  ${path}`).join("\n")}`;
+/** What init wrote, then each file it found already there and left as it was. */
+export function formatInit(data: Pick<InitResult, "root" | "created" | "kept">): string {
+  const header =
+    data.created.length > 0
+      ? `created project at ${data.root}`
+      : `project at ${data.root} is already set up`;
+  const lines = [...data.created, ...data.kept.map((path) => `${path} (kept)`)];
+  return [header, ...lines.map((line) => `  ${line}`)].join("\n");
+}
+
+export function formatCreated(
+  created: string[],
+  updated: string[] = [],
+  removed: string[] = [],
+): string {
+  const count = created.length + updated.length + removed.length;
+  const header = `synced ${count} ${count === 1 ? "file" : "files"}`;
+  const lines = [
+    ...created,
+    ...updated.map((path) => `${path} (updated)`),
+    ...removed.map((path) => `${path} (removed)`),
+  ];
+  return [header, ...lines.map((line) => `  ${line}`)].join("\n");
 }
 
 export function formatDevEvent(event: DevEvent, opts?: { cwd?: string }): string | null {
@@ -204,7 +236,7 @@ export function formatDevEvent(event: DevEvent, opts?: { cwd?: string }): string
         const count = event.removed?.length ?? 0;
         return `removed ${count} ${count === 1 ? "file" : "files"}`;
       }
-      return formatCreated(event.created);
+      return formatCreated(event.created, event.updated, event.removed);
     case "diagnostics":
       return event.diagnostics.length === 0
         ? null

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
 import { DekError } from "../../src/core/error.ts";
 import type { VisualRequest } from "../../src/core/playwright.ts";
+import { VOICE_SETUP_HINT } from "../../src/core/voice.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
@@ -187,10 +188,13 @@ more
             slug: "intro",
           });
           expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(false);
-          expect(result.visual).toBe("skipped");
-          expect(result.hint).toBe(
-            "bun add -d playwright && bunx playwright install chromium to also check overflow and contrast",
-          );
+          expect(result.skipped).toEqual([
+            {
+              check: "visual",
+              reason: "Playwright is not installed",
+              hint: "bun add -d playwright && bunx playwright install chromium to also check overflow and contrast",
+            },
+          ]);
         });
       },
     );
@@ -213,4 +217,28 @@ more
       },
     );
   });
+
+  test.serial(
+    "--voice on a deck without voice skips the voice check and says how to set it up",
+    async () => {
+      await withTempProject(
+        { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+        async (root) => {
+          await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+            const result = await checkCommand({
+              cwd: join(root, "decks", "demo"),
+              slug: "intro",
+              voice: true,
+            });
+            expect(result.voice).toBeUndefined();
+            expect(result.skipped?.find((entry) => entry.check === "voice")).toEqual({
+              check: "voice",
+              reason: "the deck has no voice/voice.toml",
+              hint: VOICE_SETUP_HINT,
+            });
+          });
+        },
+      );
+    },
+  );
 });

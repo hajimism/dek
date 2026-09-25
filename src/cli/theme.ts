@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cssClassNames, cssTokenValues, type ThemeLayout, themeLayouts } from "../core/css.ts";
 import { DekError } from "../core/error.ts";
-import { requireDeckFromCwd } from "./scope.ts";
+import { type RefInfo, requireReadableDeck } from "./scope.ts";
 
 export type ThemeResult = {
   /** The deck's theme.css: the one lint and the slides use. */
@@ -12,6 +12,8 @@ export type ThemeResult = {
   layouts: ThemeLayout[];
   /** Set when one layout was asked for; text output prints its example alone. */
   layout?: { name: string; example: string };
+  /** Set when the deck is a ref. */
+  ref?: RefInfo;
 };
 
 export function themeCommand(options: {
@@ -19,7 +21,7 @@ export function themeCommand(options: {
   deck?: string;
   layout?: string;
 }): ThemeResult {
-  const { deck } = requireDeckFromCwd(options.cwd, options.deck);
+  const { deck, ref } = requireReadableDeck(options.cwd, options.deck);
   const path = join(deck.dir, "theme.css");
   if (!existsSync(path)) {
     throw new DekError("theme.css not found", {
@@ -34,6 +36,7 @@ export function themeCommand(options: {
     classes: [...cssClassNames(css)].sort(),
     tokens: cssTokenValues(css),
     layouts,
+    ...(ref ? { ref } : {}),
   };
   const name = options.layout?.trim();
   if (!name) {

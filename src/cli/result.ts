@@ -1,10 +1,17 @@
-import { type Diagnostic, hasErrors, severityOf, withSeverity } from "../core/diagnostic.ts";
+import { type Diagnostic, hasErrors, type SkippedCheck } from "../core/diagnostic.ts";
 import { mergeSarif, toSarif } from "../core/sarif.ts";
 import { formatClock } from "../core/timing.ts";
 import type { BuildCliResult } from "./build.ts";
 import type { CheckCliResult } from "./check.ts";
 import type { CuesResult } from "./cues.ts";
-import { displayPath, formatCreated, formatDiagnostics, formatTable } from "./format.ts";
+import {
+  displayPath,
+  type FormattedError,
+  formatCreated,
+  formatDiagnostics,
+  formatInit,
+  formatTable,
+} from "./format.ts";
 import type { NavResult } from "./goto.ts";
 import type { InitResult } from "./init.ts";
 import type { LintCliResult } from "./lint.ts";
@@ -12,6 +19,7 @@ import type { LsDeckResult, LsListResult } from "./ls.ts";
 import type { MvResult } from "./mv.ts";
 import type { NewResult } from "./new.ts";
 import type { PdfCliResult } from "./pdf.ts";
+import type { RefCliResult } from "./ref.ts";
 import type { ShotCliResult } from "./shot.ts";
 import type { ShowResult } from "./show.ts";
 import type { SyncCliResult } from "./sync.ts";
@@ -25,6 +33,7 @@ export type CliResult =
   | { command: "new"; data: NewResult }
   | { command: "ls"; data: LsListResult | LsDeckResult }
   | { command: "show"; data: ShowResult }
+  | { command: "ref"; data: RefCliResult }
   | { command: "sync"; data: SyncCliResult }
   | { command: "theme"; data: ThemeResult }
   | { command: "lint"; data: LintCliResult }
@@ -39,6 +48,13 @@ export type CliResult =
   | { command: "voice"; data: VoiceCliResult }
   | { command: "video"; data: VideoCliResult };
 
+export type { SkippedCheck };
+
+/** `{ skipped }` when any check was skipped, nothing otherwise: the field is present only when it matters. */
+export function skippedChecks(skipped: SkippedCheck[]): { skipped?: SkippedCheck[] } {
+  return skipped.length > 0 ? { skipped } : {};
+}
+
 export type WriteSuccessOptions = {
   json: boolean;
   format?: string;
@@ -47,33 +63,73 @@ export type WriteSuccessOptions = {
 };
 
 export function writeSuccess(original: CliResult, options: WriteSuccessOptions): void {
-  const labeled = mapDiagnostics(original, withSeverity);
-  const result = options.cwd === undefined ? labeled : displayPaths(labeled, options.cwd);
+  const result = options.cwd === undefined ? original : displayPaths(original, options.cwd);
+  const failure = failureOf(result);
   if (original.command === "lint" && options.format === "sarif") {
     const dek = original.data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEK"));
-    process.stdout.write(`${JSON.stringify(mergeSarif(toSarif(dek), original.data.rumdlSarif))}\n`);
+    const sarif = toSarif(dek, { skipped: original.data.skipped ?? [] });
+    process.stdout.write(`${JSON.stringify(mergeSarif(sarif, original.data.rumdlSarif))}\n`);
   } else if (options.json) {
-    const failed =
-      (result.command === "lint" || result.command === "check") &&
-      hasErrors(result.data.diagnostics);
-    process.stdout.write(`${JSON.stringify({ ok: !failed, ...jsonData(result) })}\n`);
+    const envelope = failure ? { ok: false, error: failure } : { ok: true };
+    process.stdout.write(`${JSON.stringify({ ...envelope, ...jsonData(result) })}\n`);
   } else if (result.command === "lint") {
-    process.stdout.write(
-      `${formatDiagnostics(result.data.diagnostics, { color: shouldColor(process.stdout) })}\n`,
-    );
-    if (result.data.rumdl === "skipped") {
-      process.stderr.write("rumdl: skipped\n");
+    const color = shouldColor(process.stdout);
+    process.stdout.write(`${formatDiagnostics(result.data.diagnostics, { color })}\n`);
+    const skipped = formatSkipped(result.data.skipped, shouldColor(process.stderr));
+    if (skipped) {
+      process.stderr.write(`${skipped}\n`);
     }
   } else {
     process.stdout.write(`${formatText(result)}\n`);
   }
 
-  if (
-    (result.command === "lint" || result.command === "check") &&
-    hasErrors(result.data.diagnostics)
-  ) {
-    process.exit(1);
+  if (failure) {
+    // Not process.exit: a pipe still holds the output, and exit would cut it at 64 KB.
+    process.exitCode = 1;
   }
+}
+
+/**
+ * The `error` of a failed run. Only lint and check fail on an error diagnostic;
+ * a build or a listing reports what lint would say but still did its job: at
+ * the venue, a deck that shows is better than none. The error has the shape a
+ * thrown one has, so `--json` readers branch on `ok` and read `error` alike.
+ */
+function failureOf(result: CliResult): FormattedError | undefined {
+  if (result.command !== "lint" && result.command !== "check") {
+    return undefined;
+  }
+  const { diagnostics } = result.data;
+  if (!hasErrors(diagnostics)) {
+    return undefined;
+  }
+  const rerun = result.command === "lint" ? "dek lint" : `dek check ${result.data.slug}`;
+  return {
+    message: `${result.command} found ${countSummary(diagnostics)}`,
+    hint: `fix each error in diagnostics, then run \`${rerun}\` again`,
+  };
+}
+
+/** "2 errors and 1 warning"; empty when there are none. */
+function countSummary(diagnostics: Diagnostic[]): string {
+  const errors = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
+  const warnings = diagnostics.length - errors;
+  const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
+  return [
+    ...(errors > 0 ? [count(errors, "error")] : []),
+    ...(warnings > 0 ? [count(warnings, "warning")] : []),
+  ].join(" and ");
+}
+
+/** One `<check>: skipped (<reason>)` line per skipped check, each followed by its hint. */
+function formatSkipped(skipped: SkippedCheck[] | undefined, color = false): string {
+  const c = ansi(color);
+  return (skipped ?? [])
+    .flatMap((entry) => [
+      `${entry.check}: skipped (${entry.reason})`,
+      ...(entry.hint ? [`  ${c.yellow("help:")} ${entry.hint}`] : []),
+    ])
+    .join("\n");
 }
 
 /**
@@ -86,11 +142,25 @@ export function displayPaths(result: CliResult, cwd: string): CliResult {
   const files = (paths: string[]): string[] => paths.map((path) => displayPath(path, cwd));
   switch (result.command) {
     case "init":
-      return { ...result, data: { ...result.data, created: files(result.data.created) } };
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          created: files(result.data.created),
+          kept: files(result.data.kept),
+        },
+      };
     case "new":
       return { ...result, data: { ...result.data, created: files(result.data.created) } };
     case "sync":
-      return { ...result, data: { ...result.data, created: files(result.data.created) } };
+      return {
+        ...result,
+        data: {
+          created: files(result.data.created),
+          updated: files(result.data.updated),
+          removed: files(result.data.removed),
+        },
+      };
     case "theme":
       return { ...result, data: { ...result.data, path: displayPath(result.data.path, cwd) } };
     default:
@@ -134,20 +204,26 @@ function mapDiagnostics(
   }
 }
 
+function withNext(done: string, next: string[]): string {
+  return next.length === 0
+    ? done
+    : `${done}\n\nnext:\n${next.map((step) => `  ${step}`).join("\n")}`;
+}
+
 export function formatText(result: CliResult): string {
   switch (result.command) {
     case "init":
-      return `created project at ${result.data.root}`;
+      return withNext(formatInit(result.data), result.data.next);
     case "new":
-      return `created deck ${result.data.name}`;
+      return withNext(`created deck ${result.data.name}`, result.data.next);
     case "ls":
       return formatLs(result.data);
-    case "show": {
-      const html = result.data.html ? `\n\n${result.data.html}` : "";
-      return `${result.data.script}${html}`;
-    }
+    case "show":
+      return formatShow(result.data);
+    case "ref":
+      return formatRef(result.data);
     case "sync":
-      return formatCreated(result.data.created);
+      return formatCreated(result.data.created, result.data.updated, result.data.removed);
     case "theme":
       return formatTheme(result.data);
     case "lint":
@@ -164,24 +240,20 @@ export function formatText(result: CliResult): string {
       }
       return `moved ${result.data.from}`;
     case "build": {
-      const paths = "outs" in result.data ? result.data.outs : [result.data.out];
       const summary = lintSummary(result.data.diagnostics);
-      return [...paths.map((path) => `wrote ${path}`), ...(summary ? [summary] : [])].join("\n");
+      const wrote = result.data.outs.map((path) => `wrote ${path}`);
+      return [...wrote, ...(summary ? [summary] : [])].join("\n");
     }
-    case "pdf": {
-      const paths = "outs" in result.data ? result.data.outs : [result.data.out];
-      return paths.map((path) => `wrote ${path}`).join("\n");
-    }
+    case "pdf":
+      return result.data.outs.map((path) => `wrote ${path}`).join("\n");
     case "shot":
       return result.data.shots.map((shot) => shot.path).join("\n");
     case "check": {
       const color = shouldColor(process.stdout);
       const lines = [formatDiagnostics(result.data.diagnostics, { color })];
-      if (result.data.visual === "skipped") {
-        lines.push("visual: skipped");
-        if (result.data.hint) {
-          lines.push(`  ${ansi(color).yellow("help:")} ${result.data.hint}`);
-        }
+      const skipped = formatSkipped(result.data.skipped, color);
+      if (skipped) {
+        lines.push(skipped);
       }
       if (result.data.shot) {
         lines.push(result.data.shot);
@@ -240,6 +312,9 @@ function formatLs(data: LsListResult | LsDeckResult): string {
     }
     case "deck": {
       const meta: Array<[string, string]> = [];
+      if (data.ref) {
+        meta.push(["rev", data.ref.rev.slice(0, 7)]);
+      }
       if (data.event) {
         meta.push(["event", data.event]);
       }
@@ -281,9 +356,10 @@ function formatLs(data: LsListResult | LsDeckResult): string {
         ...(hasBudget ? (["right"] as const) : []),
       ];
       const count = data.diagnostics.length;
-      const countLabel = count === 1 ? "1 diagnostic" : `${count} diagnostics`;
+      const countLabel =
+        formatSkipped(data.skipped) || (count === 1 ? "1 diagnostic" : `${count} diagnostics`);
       return [
-        `${data.name}  ${data.title}`,
+        `${data.ref?.name ?? data.name}  ${data.title}`,
         ...meta.map(([key, value]) => `${padEndWidth(key, keyWidth)}  ${value}`),
         "",
         formatTable(headers, rows, [...align]),
@@ -296,18 +372,11 @@ function formatLs(data: LsListResult | LsDeckResult): string {
 
 /** "lint: 1 error and 2 warnings; run `dek lint` to see them", or nothing when clean. */
 function lintSummary(diagnostics: Diagnostic[]): string | undefined {
-  const errors = diagnostics.filter((diagnostic) => severityOf(diagnostic) === "error").length;
-  const warnings = diagnostics.length - errors;
-  const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
-  const parts = [
-    ...(errors > 0 ? [count(errors, "error")] : []),
-    ...(warnings > 0 ? [count(warnings, "warning")] : []),
-  ];
-  if (parts.length === 0) {
+  if (diagnostics.length === 0) {
     return undefined;
   }
   const them = diagnostics.length === 1 ? "it" : "them";
-  return `lint: ${parts.join(" and ")}; run \`dek lint\` to see ${them}`;
+  return `lint: ${countSummary(diagnostics)}; run \`dek lint\` to see ${them}`;
 }
 
 function formatTheme(data: ThemeResult): string {
@@ -379,4 +448,53 @@ function jsonData(result: CliResult): object {
     return data;
   }
   return result.data;
+}
+
+/** One labeled part per file, so a reader never confuses where a line came from. */
+function formatShow(data: ShowResult): string {
+  const parts: Array<[string, string | null]> = [
+    ["script.md", data.script],
+    [`slides/${data.slug}.html`, data.html],
+    [`slides/${data.slug}.css`, data.css],
+    [`slides/${data.slug}.ts`, data.ts],
+    ["theme.css (the rules this slide uses)", data.theme || null],
+    ["assets", data.assets.length > 0 ? data.assets.join("\n") : null],
+  ];
+  return parts
+    .flatMap(([label, body]) => (body === null ? [] : [`--- ${label}\n${body.replace(/\n$/, "")}`]))
+    .join("\n\n");
+}
+
+function formatRef(data: RefCliResult): string {
+  const short = (rev: string) => rev.slice(0, 7);
+  switch (data.action) {
+    case "add": {
+      const head = !data.changed
+        ? `${data.name} is already at ${short(data.rev)}`
+        : data.from
+          ? `pinned ${data.name} at ${short(data.rev)} (was ${short(data.from)})`
+          : `pinned ${data.name} at ${short(data.rev)}`;
+      return [
+        head,
+        ...data.warnings.map((warning) => `warning: ${warning}`),
+        `read it with \`dek ls ${data.name}\` and \`dek show ${data.name} <slug>\``,
+      ].join("\n");
+    }
+    case "list":
+      if (data.refs.length === 0) {
+        return "no refs; add one with `dek ref owner/repo/deck`";
+      }
+      return formatTable(
+        ["NAME", "REV", "TITLE", "SLIDES"],
+        data.refs.map((ref) => [
+          ref.name,
+          short(ref.rev),
+          ref.fetched ? (ref.title ?? "") : "(not fetched; a read fetches it)",
+          ref.slides === undefined ? "" : String(ref.slides),
+        ]),
+        ["left", "left", "left", "right"],
+      );
+    case "rm":
+      return `removed ${data.name}`;
+  }
 }
