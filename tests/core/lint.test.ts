@@ -76,6 +76,260 @@ describe("lintDeck", () => {
     });
   });
 
+  test('DEK007: a slide file with no <section class="slide"> is an error, not a DEK001', async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: "<div>intro</div>\n" } }] },
+      async (root) => {
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        expect(diagnostics.map((d) => d.id)).toEqual(["DEK007"]);
+        expect(diagnostics[0]).toMatchObject({
+          severity: "error",
+          message: 'slides/intro.html has no <section class="slide">',
+          path: join(root, "decks", "demo", "slides", "intro.html"),
+          slug: "intro",
+          hint: expect.stringContaining('<section class="slide">'),
+        });
+      },
+    );
+  });
+
+  test('DEK009: a second <section class="slide"> in one file is an error; only the first shows', async () => {
+    const twoSections = slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">one</h2>
+</section>
+<section class="slide" data-layout="title">
+  <h2 class="slide-title">two</h2>
+</section>`);
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: twoSections } }] },
+      async (root) => {
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        expect(diagnostics).toEqual([
+          {
+            id: "DEK009",
+            severity: "error",
+            message: 'slides/intro.html has 2 <section class="slide">; only the first is shown',
+            path: join(root, "decks", "demo", "slides", "intro.html"),
+            line: 11,
+            column: 1,
+            slug: "intro",
+            hint: "one file is one slide: add a ## section to script.md and move the rest into its file",
+            data: { sections: 2 },
+          },
+        ]);
+      },
+    );
+  });
+
+  test("DEK019: a data-layout the theme does not define is an error that lists the layouts", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="titel">
+  <h2 class="slide-title">intro</h2>
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK019");
+        expect(found).toEqual([
+          {
+            id: "DEK019",
+            severity: "error",
+            message: 'data-layout "titel" is not a layout of the theme',
+            path: join(root, "decks", "demo", "slides", "intro.html"),
+            line: 8,
+            column: 26,
+            slug: "intro",
+            hint: "did you mean title? run `dek theme` to see the layouts",
+            data: {
+              layout: "titel",
+              layouts: ["default", "full-bleed", "quote", "title", "two-col"],
+            },
+          },
+        ]);
+      },
+    );
+  });
+
+  test("DEK019: a layout the slide's own stylesheet defines is fine", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="poster">
+  <h2 class="slide-title">intro</h2>
+</section>`),
+            },
+            styles: { intro: '.slide[data-layout="poster"] { display: grid; }\n' },
+          },
+        ],
+      },
+      async (root) => {
+        expect(lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK019")).toEqual([]);
+      },
+    );
+  });
+
+  test("DEK044: a # or #### heading in the script is spoken as text; a warning says so", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script:
+              "---\ntitle: Demo\n---\n\n# Part one\n\n## intro\n\nhello\n\n#### aside\n\nmore\n",
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const script = join(root, "decks", "demo", "script.md");
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK044");
+        expect(found).toEqual([
+          {
+            id: "DEK044",
+            severity: "warning",
+            message: "# heading is not a slide or a beat; it is read as spoken text",
+            path: script,
+            line: 5,
+            hint: "use ## for a slide and ### for a beat, or drop the #",
+            data: { level: 1 },
+          },
+          {
+            id: "DEK044",
+            severity: "warning",
+            message: "#### heading is not a slide or a beat; it is read as spoken text",
+            path: script,
+            line: 11,
+            slug: "intro",
+            hint: "use ## for a slide and ### for a beat, or drop the #",
+            data: { level: 4 },
+          },
+        ]);
+      },
+    );
+  });
+
+  test("DEK021: a missing image that the project has names the copy to make", async () => {
+    await withTempProject(
+      {
+        assets: { "logo.png": "png" },
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <img src="assets/logo.png" alt="logo">
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK021");
+        expect(found?.hint).toBe(
+          "the project has it: copy ../../assets/logo.png into the deck's assets/",
+        );
+      },
+    );
+  });
+
+  test("DEK008: a misspelled dek.toml key is a warning that names the key it meant", async () => {
+    await withTempProject(
+      {
+        toml: '# project\nlatin_per_minut = 150\n\n[voice]\nspeaker = "a"\nsped = 1.2\n',
+        decks: [{ name: "demo", slides: { intro: titleSlide } }],
+      },
+      async (root) => {
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        expect(diagnostics).toEqual([
+          {
+            id: "DEK008",
+            severity: "warning",
+            message: "unknown key latin_per_minut in dek.toml; dek ignores it",
+            path: join(root, "dek.toml"),
+            line: 2,
+            hint: "did you mean latin_per_minute?",
+            data: { file: "dek.toml", key: "latin_per_minut", suggestion: "latin_per_minute" },
+          },
+          {
+            id: "DEK008",
+            severity: "warning",
+            message: "unknown key voice.sped in dek.toml; dek ignores it",
+            path: join(root, "dek.toml"),
+            line: 6,
+            hint: "did you mean voice.speed?",
+            data: { file: "dek.toml", key: "voice.sped", suggestion: "voice.speed" },
+          },
+        ]);
+      },
+    );
+  });
+
+  test("DEK008: an unknown frontmatter key is a warning; a close one names the key it meant", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\ndurration: 5m\nvenue: Tokyo\n---\n\n## intro\n\nhello\n",
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const script = join(root, "decks", "demo", "script.md");
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK008");
+        expect(found).toEqual([
+          {
+            id: "DEK008",
+            severity: "warning",
+            message: "unknown key durration in the frontmatter; dek ignores it",
+            path: script,
+            line: 3,
+            hint: "did you mean duration?",
+            data: { file: "frontmatter", key: "durration", suggestion: "duration" },
+          },
+          {
+            id: "DEK008",
+            severity: "warning",
+            message: "unknown key venue in the frontmatter; dek ignores it",
+            path: script,
+            line: 4,
+            hint: "the keys are title, event, date, duration, ratio, lang; see https://hajimism.github.io/dek/reference/config.html#frontmatter",
+            data: { file: "frontmatter", key: "venue" },
+          },
+        ]);
+      },
+    );
+  });
+
+  test("DEK018: a deck with no theme.css is an error, not a silently unstyled pass", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", theme: null, slides: { intro: titleSlide } }] },
+      async (root) => {
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        expect(diagnostics).toEqual([
+          {
+            id: "DEK018",
+            severity: "error",
+            message: "theme.css not found",
+            path: join(root, "decks", "demo", "theme.css"),
+            hint: expect.stringContaining("copy theme.css"),
+          },
+        ]);
+      },
+    );
+  });
+
   test("DEK002: slides/ has HTML with no section", async () => {
     await withTempProject(
       {
@@ -982,8 +1236,8 @@ hello
             ],
           }),
         );
-        const diagnostics = lintDeck(join(root, "decks", "demo"));
-        expect(diagnostics.some((d) => d.id === "DEK041")).toBe(true);
+        const dek041 = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK041");
+        expect(dek041?.data).toEqual({ actualSeconds: 1, budgetSeconds: 600, source: "timeline" });
       },
     );
   });
@@ -1003,7 +1257,7 @@ hello
         const dek041 = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK041");
         expect(dek041).toMatchObject({
           message: "the script reads in about 0:01, budget 5m; more than 35% apart",
-          data: { estimateSeconds: 1, budgetSeconds: 300 },
+          data: { actualSeconds: 1, budgetSeconds: 300, source: "estimate" },
           hint: "write more for the slot, or shorten duration in the frontmatter",
         });
       },
@@ -1457,5 +1711,291 @@ describe("DEK014 hints", () => {
     expect(await hintFor(".x { width: 100px; }\n")).toBe(
       "add a token for it to theme.css and use var() here",
     );
+  });
+});
+
+describe("asset references resolve the same way lint, show, and build resolve them", () => {
+  test("a query string on an existing asset is not a missing image", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/pixel.png?v=2" alt="">
+</section>`),
+            },
+            assets: { "pixel.png": "png" },
+          },
+        ],
+      },
+      async (root) => {
+        const ids = lintDeck(join(root, "decks", "demo")).map((d) => d.id);
+        expect(ids).not.toContain("DEK021");
+        expect(ids).not.toContain("DEK023");
+      },
+    );
+  });
+
+  test("a remote url() in a slide stylesheet gets the same hint as a remote src", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: { intro: titleSlide },
+            styles: { intro: '.slide .x { background: url("https://cdn.example.com/bg.png"); }\n' },
+          },
+        ],
+      },
+      async (root) => {
+        const remote = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK020");
+        expect(remote).toHaveLength(1);
+        expect(remote[0]?.hint).toBe("download it into assets/ and use assets/bg.png");
+      },
+    );
+  });
+});
+
+describe("every diagnostic that names a value carries it in data", () => {
+  test("structure, theme, and script rules expose what their messages say", async () => {
+    await withTempProject(
+      {
+        toml: "max_classes = 1\n",
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## intro
+
+again
+
+## other
+
+more
+`,
+            slides: {
+              intro: slideDocument(
+                `<section class="slide" data-slug="wrong"><h2 class="slide-title">i</h2></section>`,
+              ),
+              other: titleSlide,
+              orphan: titleSlide,
+            },
+            theme: `h1 { color: red; }\n.slide { color: red; }\n.slide .a {}\n.slide .b {}\n`,
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await writeFile(join(deckDir, "slides", "other.js"), "export function draw() {}\n");
+        const diagnostics = lintDeck(deckDir);
+        const dataOf = (id: string) => diagnostics.find((d) => d.id === id)?.data;
+        expect(dataOf("DEK004")).toEqual({ id: "intro" });
+        expect(dataOf("DEK002")).toEqual({ slug: "orphan", file: "slides/orphan.html" });
+        expect(dataOf("DEK006")).toEqual({ slug: "wrong", expected: "intro" });
+        expect(dataOf("DEK012")).toEqual({ selector: "h1" });
+        expect(dataOf("DEK013")).toEqual({ classes: 3, limit: 1 });
+        expect(dataOf("DEK015")).toMatchObject({ token: expect.stringMatching(/^--/) });
+        expect(dataOf("DEK016")).toEqual({ file: "slides/other.js" });
+      },
+    );
+  });
+});
+
+describe("markup rules report every occurrence where it is written", () => {
+  async function lintMarkup(
+    html: string,
+    options: { script?: string; assets?: Record<string, string> } = {},
+  ) {
+    return withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            ...(options.script === undefined ? {} : { script: options.script }),
+            ...(options.assets === undefined ? {} : { assets: options.assets }),
+            slides: { intro: html },
+          },
+        ],
+      },
+      async (root) => lintDeck(join(root, "decks", "demo")),
+    );
+  }
+  const only = (diagnostics: ReturnType<typeof lintDeck>, id: string) =>
+    diagnostics
+      .filter((d) => d.id === id)
+      .map(({ line, column, data }) => ({ line, column, data }));
+
+  test("DEK011: every inline style and script, event handler, and javascript: URL", async () => {
+    const diagnostics = await lintMarkup(`<section class="slide" data-layout="title">
+  <h2 class="slide-title" style="color: red">intro</h2>
+  <p style="margin: 0">a</p>
+  <style>.a {}</style><style>.b {}</style>
+  <script>1</script>
+  <button onclick="go()" onmouseover="x()">b</button>
+  <a href="javascript:void(0)">c</a>
+</section>
+`);
+    expect(only(diagnostics, "DEK011")).toEqual([
+      { line: 2, column: 27, data: { kind: "attribute", name: "style", value: "color: red" } },
+      { line: 3, column: 6, data: { kind: "attribute", name: "style", value: "margin: 0" } },
+      { line: 4, column: 3, data: { kind: "element", name: "style" } },
+      { line: 4, column: 23, data: { kind: "element", name: "style" } },
+      { line: 5, column: 3, data: { kind: "element", name: "script" } },
+      { line: 6, column: 11, data: { kind: "attribute", name: "onclick", value: "go()" } },
+      { line: 6, column: 26, data: { kind: "attribute", name: "onmouseover", value: "x()" } },
+      {
+        line: 7,
+        column: 6,
+        data: { kind: "attribute", name: "href", value: "javascript:void(0)" },
+      },
+    ]);
+    const handler = diagnostics.find((d) => d.data?.name === "onclick");
+    expect(handler?.message).toBe("slide contains an onclick attribute");
+    expect(handler?.hint).toBe(
+      "remove it; a slide takes no input, and motion goes in slides/intro.ts as a draw(t) function",
+    );
+  });
+
+  test("DEK020: a remote URL in srcset, poster, or a media source", async () => {
+    const diagnostics = await lintMarkup(
+      `<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/a.png" srcset="assets/a.png 1x, https://cdn.example.com/a@2x.png 2x" alt="">
+  <video poster="https://cdn.example.com/p.png"><source src="https://cdn.example.com/v.mp4"></video>
+</section>
+`,
+      { assets: { "a.png": "png" } },
+    );
+    expect(only(diagnostics, "DEK020")).toEqual([
+      { line: 3, column: 52, data: { url: "https://cdn.example.com/a@2x.png" } },
+      { line: 4, column: 18, data: { url: "https://cdn.example.com/p.png" } },
+      { line: 4, column: 62, data: { url: "https://cdn.example.com/v.mp4" } },
+    ]);
+  });
+
+  test("DEK021: a missing file for any element that loads one, not only <img>", async () => {
+    const diagnostics = await lintMarkup(
+      `<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/a.png" srcset="assets/a@2x.png 2x" alt="">
+  <video src="assets/v.mp4" poster="assets/p.png"><track src="assets/v.vtt"></video>
+  <audio><source src="assets/a.mp3"></audio>
+  <iframe src="assets/demo.html"></iframe>
+  <a href="assets/notes.pdf">notes</a>
+</section>
+`,
+      { assets: { "a.png": "png" } },
+    );
+    expect(only(diagnostics, "DEK021").map((d) => d.data?.src)).toEqual([
+      "assets/a@2x.png",
+      "assets/v.mp4",
+      "assets/p.png",
+      "assets/v.vtt",
+      "assets/a.mp3",
+      "assets/demo.html",
+    ]);
+    const messages = diagnostics.filter((d) => d.id === "DEK021").map((d) => d.message);
+    expect(messages[0]).toBe('missing image "assets/a@2x.png"');
+    expect(messages[1]).toBe('missing file "assets/v.mp4"');
+  });
+
+  test("DEK023: a srcset candidate outside assets/ is flagged like a src", async () => {
+    const diagnostics = await lintMarkup(
+      `<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/a.png" srcset="../assets/a.png 2x" alt="">
+</section>
+`,
+      { assets: { "a.png": "png" } },
+    );
+    expect(only(diagnostics, "DEK023")).toEqual([
+      { line: 3, column: 35, data: { src: "../assets/a.png" } },
+    ]);
+  });
+
+  test("every data-step that resolves to nothing is reported at its own line", async () => {
+    const diagnostics = await lintMarkup(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <p data-step="nope">a</p>
+  <p data-step="nope">b</p>
+</section>
+`);
+    expect(only(diagnostics, "DEK003").map((d) => d.line)).toEqual([3, 4]);
+  });
+});
+
+describe("DEK024: a heading with nothing to read", () => {
+  const script = `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## architecture
+
+how it fits
+`;
+
+  async function lintTwo(slides: Record<string, string>) {
+    return withTempProject({ decks: [{ name: "demo", script, slides }] }, async (root) =>
+      lintDeck(join(root, "decks", "demo")),
+    );
+  }
+
+  test("an id-only heading's skeleton says to title it in script.md, and sync fixes it", async () => {
+    const skeleton = `<section class="slide" data-layout="title">
+  <h2 class="slide-title"></h2>
+</section>
+`;
+    const diagnostics = await lintTwo({ intro: titleSlide, architecture: skeleton });
+    const found = diagnostics.filter((d) => d.id === "DEK024");
+    expect(found).toEqual([
+      {
+        id: "DEK024",
+        severity: "warning",
+        message: "<h2> is empty, so the slide shows no heading",
+        path: expect.stringContaining("slides/architecture.html"),
+        line: 2,
+        column: 3,
+        slug: "architecture",
+        hint: "give the slide a title in script.md, like `## Your title {#architecture}`, then run `dek sync`",
+        data: { tag: "h2" },
+      },
+    ]);
+  });
+
+  test("an edited slide is told to fill the heading in or drop it", async () => {
+    const edited = `<section class="slide" data-layout="title">
+  <h2 class="slide-title"></h2>
+  <p>body</p>
+</section>
+`;
+    const found = (await lintTwo({ intro: titleSlide, architecture: edited })).find(
+      (d) => d.id === "DEK024",
+    );
+    expect(found?.hint).toBe(
+      "write the heading's text in slides/architecture.html, or remove the element",
+    );
+  });
+
+  test("the first id-only heading takes the deck title, so it passes", async () => {
+    const withTitle = `<section class="slide" data-layout="title">
+  <h2 class="slide-title">architecture</h2>
+</section>
+`;
+    const diagnostics = await lintTwo({ intro: titleSlide, architecture: withTitle });
+    expect(diagnostics.filter((d) => d.id === "DEK024")).toEqual([]);
   });
 });

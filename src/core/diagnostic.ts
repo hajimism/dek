@@ -1,39 +1,56 @@
-export type RuleId =
-  | "DEK001"
-  | "DEK002"
-  | "DEK003"
-  | "DEK004"
-  | "DEK005"
-  | "DEK006"
-  | "DEK010"
-  | "DEK011"
-  | "DEK012"
-  | "DEK013"
-  | "DEK014"
-  | "DEK015"
-  | "DEK016"
-  | "DEK017"
-  | "DEK020"
-  | "DEK021"
-  | "DEK022"
-  | "DEK023"
-  | "DEK030"
-  | "DEK031"
-  | "DEK040"
-  | "DEK041"
-  | "DEK042"
-  | "DEK043";
-
 /** An error means the deck is not done; a warning is worth a look but does not fail lint. */
 export type Severity = "error" | "warning";
 
+/**
+ * The rule table: every diagnostic dek itself emits, with its severity. Voice
+ * and timing rules are warnings: a live-only deck is done without them. So are the
+ * findings about input dek ignores (DEK008) or reads another way (DEK044), and an empty
+ * heading (DEK024), which a slide script may fill.
+ */
+export const RULES = {
+  DEK001: { severity: "error" },
+  DEK002: { severity: "error" },
+  DEK003: { severity: "error" },
+  DEK004: { severity: "error" },
+  DEK005: { severity: "error" },
+  DEK006: { severity: "error" },
+  DEK007: { severity: "error" },
+  DEK008: { severity: "warning" },
+  DEK009: { severity: "error" },
+  DEK010: { severity: "error" },
+  DEK011: { severity: "error" },
+  DEK012: { severity: "error" },
+  DEK013: { severity: "error" },
+  DEK014: { severity: "error" },
+  DEK015: { severity: "error" },
+  DEK016: { severity: "error" },
+  DEK017: { severity: "error" },
+  DEK018: { severity: "error" },
+  DEK019: { severity: "error" },
+  DEK020: { severity: "error" },
+  DEK021: { severity: "error" },
+  DEK022: { severity: "error" },
+  DEK023: { severity: "error" },
+  DEK024: { severity: "warning" },
+  DEK030: { severity: "error" },
+  DEK031: { severity: "error" },
+  DEK040: { severity: "warning" },
+  DEK041: { severity: "warning" },
+  DEK042: { severity: "warning" },
+  DEK043: { severity: "warning" },
+  DEK044: { severity: "warning" },
+} as const satisfies Record<string, { severity: Severity }>;
+
+export type RuleId = keyof typeof RULES;
+
 export type Diagnostic = {
   id: string;
-  /** Omitted by rules; filled in from the rule table by `withSeverity`. */
-  severity?: Severity;
+  severity: Severity;
   message: string;
   path?: string;
   line?: number;
+  /** 1-based, in UTF-16 units as editors count; set when the rule knows where on the line. */
+  column?: number;
   slug?: string;
   /** The fix, phrased as what to do next. */
   hint?: string;
@@ -48,28 +65,48 @@ export type DiagnosticValue =
   | DiagnosticValue[]
   | { [key: string]: DiagnosticValue };
 
-/** Voice and timing rules: a live-only deck is done without them. */
-const WARNING_RULES: ReadonlySet<string> = new Set<RuleId>([
-  "DEK040",
-  "DEK041",
-  "DEK042",
-  "DEK043",
-]);
+export type DiagnosticFields = Omit<Diagnostic, "id" | "severity">;
 
-/** The diagnostic's own severity, or the rule's. Anything outside the table, such as rumdl, is an error. */
-export function severityOf(diagnostic: Diagnostic): Severity {
-  return diagnostic.severity ?? (WARNING_RULES.has(diagnostic.id) ? "warning" : "error");
+/** A diagnostic of one dek rule; its severity comes from the rule table. */
+export function diag(id: RuleId, fields: DiagnosticFields): Diagnostic {
+  // Severity right after the id, so it reads first in --json.
+  return { id, severity: RULES[id].severity, ...fields };
+}
+
+/** A diagnostic from outside the rule table, such as rumdl's or a crash: always an error. */
+export function errorDiagnostic(id: string, fields: DiagnosticFields): Diagnostic {
+  return { id, severity: "error", ...fields };
 }
 
 export function hasErrors(diagnostics: Diagnostic[]): boolean {
-  return diagnostics.some((diagnostic) => severityOf(diagnostic) === "error");
+  return diagnostics.some((diagnostic) => diagnostic.severity === "error");
 }
 
-export function withSeverity(diagnostics: Diagnostic[]): Diagnostic[] {
-  // Severity right after the id, so it reads first in --json.
-  return diagnostics.map(({ id, ...rest }) => ({
-    id,
-    severity: severityOf({ id, ...rest }),
-    ...rest,
-  }));
+/** The diagnostics without repeats, in order: dek.toml findings come back from every deck. */
+export function uniqueDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
+  const seen = new Set<string>();
+  return diagnostics.filter((diagnostic) => {
+    const key = JSON.stringify([
+      diagnostic.id,
+      diagnostic.path,
+      diagnostic.line,
+      diagnostic.column,
+      diagnostic.message,
+    ]);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
+
+/**
+ * A check a command did not run, so its empty diagnostics are not a pass for it: why it did not
+ * run, and what to do so that it does.
+ */
+export type SkippedCheck = {
+  check: "lint" | "rumdl" | "visual" | "voice";
+  reason: string;
+  hint?: string;
+};
