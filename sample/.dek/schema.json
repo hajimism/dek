@@ -26,15 +26,13 @@
       ]
     },
     "lang": {
-      "default": "ja",
+      "description": "BCP 47 tag for the page. Omit it to follow the script: kana → ja, Hangul → ko, Han → zh, else en.",
       "type": "string",
       "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
     }
   },
   "required": [
-    "title",
-    "ratio",
-    "lang"
+    "title"
   ],
   "additionalProperties": false
 }
