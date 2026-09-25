@@ -2,8 +2,8 @@
 layout: home
 hero:
   name: dek
-  text: 台本から組み立てる HTML スライド
-  tagline: 喋ることを書く。スライドはそこから生える。
+  text: 発表のビルドシステム
+  tagline: 喋ることを書けば、あとは dek が組み立て、測り、届ける。
   actions:
     - theme: brand
       text: はじめる
@@ -11,6 +11,9 @@ hero:
     - theme: alt
       text: 設計思想
       link: /ja/guide/why
+    - theme: alt
+      text: サンプル
+      link: /ja/samples
     - theme: alt
       text: GitHub
       link: https://github.com/hajimism/dek
@@ -27,11 +30,13 @@ features:
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite
-cd my-talks && bun add github:hajimism/dek
+cd my-talks && bun add -d github:hajimism/dek
 cd decks/2026-04-vite
 $EDITOR script.md   # 喋ることを書く
 bunx dek            # 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
 bunx dek build      # dist/2026-04-vite.html — トーク全体がこの 1 ファイル
 ```
+
+`bunx dek` はプロジェクトの中で実行してください。npm の `dek` は無関係の別パッケージで、dek を入れていない場所ではそちらが動きます。
 
 HTML はまだ一行も書いていません。それでもう発表できます。まずは[はじめる](/ja/guide/getting-started)から。台本から単一ファイルのビルドまでを通しで体験するなら[チュートリアル](/ja/guide/tutorial)へ。

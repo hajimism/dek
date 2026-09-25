@@ -126,11 +126,12 @@ export default defineConfig({
     root: {
       label: "English",
       lang: "en-US",
-      description: "Talk-script-first HTML slides. Write what you will say; the slides follow.",
+      description: "A build system for talks. Write what you will say; dek builds, measures, and ships the rest.",
       themeConfig: {
         nav: [
           { text: "Guide", link: "/guide/why", activeMatch: "/guide/" },
           { text: "Reference", link: "/reference/cli", activeMatch: "/reference/" },
+          { text: "Samples", link: "/samples" },
         ],
         sidebar: {
           "/guide/": guide("", en),
@@ -149,11 +150,12 @@ export default defineConfig({
     ja: {
       label: "日本語",
       lang: "ja",
-      description: "台本から組み立てる HTML スライド。喋ることを書けば、スライドはそこから生える。",
+      description: "発表のビルドシステム。喋ることを書けば、あとは dek が組み立て、測り、届ける。",
       themeConfig: {
         nav: [
           { text: "ガイド", link: "/ja/guide/why", activeMatch: "/ja/guide/" },
           { text: "リファレンス", link: "/ja/reference/cli", activeMatch: "/ja/reference/" },
+          { text: "サンプル", link: "/ja/samples" },
         ],
         sidebar: {
           "/ja/guide/": guide("/ja", ja),

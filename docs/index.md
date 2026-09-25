@@ -2,8 +2,8 @@
 layout: home
 hero:
   name: dek
-  text: Talk-script-first HTML slides
-  tagline: Write what you will say. The slides follow.
+  text: A build system for talks
+  tagline: Write what you will say; dek builds, measures, and ships the rest.
   actions:
     - theme: brand
       text: Get Started
@@ -11,6 +11,9 @@ hero:
     - theme: alt
       text: Why dek
       link: /guide/why
+    - theme: alt
+      text: Samples
+      link: /samples
     - theme: alt
       text: GitHub
       link: https://github.com/hajimism/dek
@@ -27,11 +30,13 @@ features:
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite
-cd my-talks && bun add github:hajimism/dek
+cd my-talks && bun add -d github:hajimism/dek
 cd decks/2026-04-vite
 $EDITOR script.md   # write what you will say
 bunx dek            # dev server: skeleton slides, live reload, lint on save
 bunx dek build      # dist/2026-04-vite.html — the whole talk in one file
 ```
+
+Run `bunx dek` inside the project: the `dek` package on npm is unrelated, and `bunx dek` runs it anywhere dek is not installed.
 
 You have not written a line of HTML yet, and you can already give the talk. Start with the [Getting Started](/guide/getting-started) guide, or read the [Tutorial](/guide/tutorial) to build a real deck from script to single-file build.
