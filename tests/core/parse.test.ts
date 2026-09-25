@@ -190,3 +190,65 @@ body
     expect(parseScript("---\ntitle: Meetup #42 # ok\n---\n\n## intro\n").title).toBe("Meetup #42");
   });
 });
+
+describe("parseScript lang", () => {
+  const script = (body: string, lang?: string): string =>
+    `---\ntitle: Talk\n${lang ? `lang: ${lang}\n` : ""}---\n\n## intro\n\n${body}\n`;
+
+  test.each([
+    ["What you will say comes first.", "en"],
+    ["喋る順に、スライドを組み立てる。", "ja"],
+    ["漢字だけでもかなが一つあれば日本語", "ja"],
+    ["먼저 말할 것을 쓴다", "ko"],
+    ["先写你要说的话", "zh"],
+  ])("infers lang from the script when frontmatter has none: %j", (body, lang) => {
+    expect(parseScript(script(body)).lang).toBe(lang);
+  });
+
+  test("keeps the lang frontmatter declares", () => {
+    expect(parseScript(script("喋る順に", "en")).lang).toBe("en");
+  });
+});
+
+describe("parseScript errors", () => {
+  const failure = (source: string): { message: string; hint?: string; line?: number } => {
+    try {
+      parseScript(source, "script.md");
+    } catch (error) {
+      const { message, hint, line } = error as DekError;
+      return { message, ...(hint ? { hint } : {}), ...(line ? { line } : {}) };
+    }
+    throw new Error("expected parseScript to fail");
+  };
+
+  test("shows the frontmatter to write when script.md has none", () => {
+    expect(failure("")).toEqual({
+      message: "script.md must start with YAML frontmatter",
+      hint: "start it with three lines: ---, title: Your talk, ---",
+      line: 1,
+    });
+  });
+
+  test("says a deck needs a ## heading instead of an array size", () => {
+    expect(failure("---\ntitle: Talk\n---\n\njust prose\n").message).toBe(
+      "sections: add a ## heading; each one becomes a slide",
+    );
+  });
+
+  test("gives examples for duration, date, and lang", () => {
+    expect(failure("---\ntitle: T\nduration: 10\n---\n\n## a\n").message).toContain(
+      "duration: write minutes, like 10m",
+    );
+    expect(failure("---\ntitle: T\ndate: 18/4\n---\n\n## a\n").message).toContain(
+      "date: write a date, like 2026-04-18",
+    );
+    expect(failure("---\ntitle: T\nlang: en_US\n---\n\n## a\n").message).toContain(
+      "lang: write a BCP 47 tag, like en or ja",
+    );
+  });
+
+  test("keeps YAML's own words for a syntax error, without its class name", () => {
+    const { message } = failure("---\ntitle: T\nevent: [open\n---\n\n## a\n");
+    expect(message).toBe("invalid YAML frontmatter: YAML Parse error: Unexpected token");
+  });
+});

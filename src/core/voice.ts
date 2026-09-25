@@ -15,7 +15,7 @@ import {
   type Timeline,
   type Utterance,
 } from "./timeline.ts";
-import { causeText, configHint, formatZodIssues } from "./zod.ts";
+import { configHint, formatZodIssues, parseFailure } from "./zod.ts";
 
 export type VoiceSettings = {
   engine: string;
@@ -65,6 +65,20 @@ export function hasVoice(deckDir: string): boolean {
   return existsSync(join(voiceDir(deckDir), "voice.toml"));
 }
 
+/**
+ * How to give an existing deck a voice; every command that needs one and finds none says this.
+ * `dek new` copies dek.toml `[voice]` only into decks it creates, so it is not the fix here.
+ */
+export const VOICE_SETUP_HINT =
+  'create voice/voice.toml in the deck with a speaker, like speaker = "ずんだもん/ノーマル" (engine defaults to voicevox); see https://hajimism.github.io/dek/guide/voice.html#setup';
+
+export function voiceMissingError(deckDir: string): DekError {
+  return new DekError("voice.toml not found", {
+    path: join(voiceDir(deckDir), "voice.toml"),
+    hint: VOICE_SETUP_HINT,
+  });
+}
+
 export function voiceCacheDir(deckDir: string): string {
   return cacheDir(deckDir, "voice");
 }
@@ -76,16 +90,15 @@ export function voiceCacheFile(deckDir: string, file: string): string {
 export function loadVoiceSettings(deckDir: string): VoiceSettings {
   const path = join(voiceDir(deckDir), "voice.toml");
   if (!existsSync(path)) {
-    throw new DekError("voice.toml not found", {
-      path,
-      hint: "add decks/<name>/voice/voice.toml or [voice] in dek.toml and run `dek new`",
-    });
+    throw voiceMissingError(deckDir);
   }
   let parsed: unknown;
   try {
     parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
   } catch (error) {
-    throw new DekError(`invalid voice.toml: ${causeText(error)}`, {
+    const failure = parseFailure(error);
+    throw new DekError(`invalid voice.toml: ${failure.text}`, {
+      ...(failure.line ? { line: failure.line } : {}),
       path,
       cause: error,
       hint: configHint("voice-voice-toml"),
@@ -175,7 +188,9 @@ export function loadVoiceDict(deckDir: string): VoiceDict {
   try {
     parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
   } catch (error) {
-    throw new DekError(`invalid dict.toml: ${causeText(error)}`, {
+    const failure = parseFailure(error);
+    throw new DekError(`invalid dict.toml: ${failure.text}`, {
+      ...(failure.line ? { line: failure.line } : {}),
       path,
       cause: error,
       hint: configHint("voice-dict-toml"),

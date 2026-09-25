@@ -1,7 +1,7 @@
 import { DekError } from "./error.ts";
 import { splitLines } from "./lines.ts";
-import { type Beat, Deck, Frontmatter, Id, type Section } from "./schema.ts";
-import { causeText, configHint, formatZodIssues } from "./zod.ts";
+import { type Beat, Deck, Frontmatter, Id, inferLang, type Section } from "./schema.ts";
+import { configHint, formatZodIssues, parseFailure } from "./zod.ts";
 
 const HEADING_RE = /^(#{2,3})(?!#)\s+(.*)$/;
 const TRAILING_ATTR_RE = /^(.*?)\s*\{([^}]*)\}\s*$/;
@@ -13,7 +13,8 @@ export function parseScript(source: string, filename?: string): Deck {
   const frontmatter = parseFrontmatter(yaml, filename);
   const sections = parseSections(body, bodyStartLine, filename);
 
-  const result = Deck.safeParse({ ...frontmatter, sections });
+  const lang = frontmatter.lang ?? inferLang(`${frontmatter.title}\n${body}`);
+  const result = Deck.safeParse({ ...frontmatter, lang, sections });
   if (!result.success) {
     throw new DekError(formatZodIssues(result.error), { path: filename });
   }
@@ -29,6 +30,7 @@ function splitFrontmatter(
     throw new DekError("script.md must start with YAML frontmatter", {
       line: 1,
       path: filename,
+      hint: "start it with three lines: ---, title: Your talk, ---",
     });
   }
 
@@ -50,7 +52,10 @@ function parseFrontmatter(yaml: string, filename?: string): Frontmatter {
   try {
     parsed = Bun.YAML.parse(quoteUnquotedHashes(yaml));
   } catch (error) {
-    throw new DekError(`invalid YAML frontmatter: ${causeText(error)}`, {
+    const failure = parseFailure(error);
+    throw new DekError(`invalid YAML frontmatter: ${failure.text}`, {
+      // The frontmatter starts on line 2, after the opening ---.
+      ...(failure.line ? { line: failure.line + 1 } : {}),
       path: filename,
       cause: error,
       hint: configHint("frontmatter"),

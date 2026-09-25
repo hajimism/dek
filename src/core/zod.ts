@@ -9,9 +9,17 @@ export function configHint(
   return `see ${REFERENCE}#${anchor}`;
 }
 
-/** The parser's own words for a syntax error, so the message says where it is. */
-export function causeText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+/**
+ * A parser's syntax error in its own words, without the class name Bun puts in front, and the
+ * 1-based line it points at when the parser says.
+ */
+export function parseFailure(error: unknown): { text: string; line?: number } {
+  const text = (error instanceof Error ? error.message : String(error)).replace(
+    /^(?:BuildMessage|SyntaxError): /,
+    "",
+  );
+  const line = (error as { position?: { line?: unknown } } | null)?.position?.line;
+  return typeof line === "number" && line > 0 ? { text, line } : { text };
 }
 
 export function formatZodIssues(error: z.ZodError): string {
