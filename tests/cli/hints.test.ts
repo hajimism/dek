@@ -28,11 +28,11 @@ describe("dek error hints", () => {
     });
   });
 
-  test("points unknown commands at help --agent", async () => {
-    const result = await runDek(["nope", "--json"]);
+  test("suggests the command a typo was probably meant to be", async () => {
+    const result = await runDek(["biuld", "--json"]);
     expect(result.exitCode).toBe(1);
     const json = jsonStdout<ErrorJson>(result);
-    expect(json.error.hint).toContain("dek help --agent");
+    expect(json.error.hint).toBe("did you mean `dek build`?");
   });
 
   test("points at dek ls when show has no slug", async () => {
