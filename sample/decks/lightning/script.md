@@ -1,6 +1,7 @@
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
 title: 三分で、発表をひとつ作る
+description: ターミナルとテキストエディタと dek だけで、三分で発表をひとつ作ってみせるライトニングトーク。
 event: dek sample
 date: 2026-09-25
 duration: 3m

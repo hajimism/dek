@@ -43,7 +43,7 @@
     "lint": "biome lint .",
     "check": "biome check --write .",
     "docs:dev": "vitepress dev docs",
-    "docs:samples": "cd sample && bun ../src/cli.ts build --root-dist && mkdir -p ../docs/public/samples && cp dist/*.html ../docs/public/samples/",
+    "docs:samples": "cd sample && bun ../src/cli.ts build --root-dist && mkdir -p ../docs/public/samples && cp dist/*.html dist/*.png ../docs/public/samples/",
     "docs:build": "bun run docs:samples && vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },

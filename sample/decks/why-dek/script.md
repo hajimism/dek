@@ -1,6 +1,7 @@
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
 title: 台本から、発表まで
+description: 喋る台本を先に書き、そこからスライドを組み立てる道具、dek の紹介。発表のスライドであり、そのまま読める配布資料でもあります。
 event: dek sample
 date: 2026-09-25
 duration: 12m

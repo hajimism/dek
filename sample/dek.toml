@@ -1,4 +1,6 @@
 # dek project
+# Where dist/ is published; the docs site serves these decks from samples/.
+url = "https://hajimism.github.io/dek/samples/"
 max_classes = 40
 cjk_per_minute = 300
 latin_per_minute = 130

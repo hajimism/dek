@@ -5,6 +5,10 @@
     "title": {
       "type": "string"
     },
+    "description": {
+      "description": "One or two sentences a shared link shows under the title.",
+      "type": "string"
+    },
     "event": {
       "type": "string"
     },

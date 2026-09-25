@@ -1,6 +1,7 @@
 ---
 # yaml-language-server: $schema=../../.dek/schema.json
 title: スライドを、エージェントに任せる
+description: スライド作りを AI コーディングエージェントに任せる話。数字で返す、小さなファイル、lint が通れば完成。
 event: dek sample
 date: 2026-09-25
 duration: 6m
