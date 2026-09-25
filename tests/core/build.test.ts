@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { buildDeck } from "../../src/core/build.ts";
+import { type BuildOptions, buildDeck } from "../../src/core/build.ts";
+import type { VisualRequest } from "../../src/core/playwright.ts";
 import { playerEmbed } from "../helpers/embed.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
@@ -17,10 +18,45 @@ const extraSource = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">extra</h2>
 </section>`);
 
-async function build(dir: string) {
+async function build(dir: string, options: Omit<BuildOptions, "playerScript"> = {}) {
   const { playerScript } = await playerEmbed();
-  return buildDeck(dir, { playerScript });
+  return buildDeck(dir, { playerScript, ...options });
 }
+
+/** Stands in for Chromium: writes a fake PNG where each screenshot goes, and counts the calls. */
+function fakeRunner() {
+  const requests: VisualRequest[] = [];
+  const runner = async (request: VisualRequest) => {
+    requests.push(request);
+    for (const page of request.pages) {
+      if (page.screenshotPath) {
+        await Bun.write(page.screenshotPath, `png of ${page.slug}`);
+      }
+    }
+    return { overflows: [], contrasts: [] };
+  };
+  return { runner, requests };
+}
+
+const previewScript = `---
+title: Why dek
+description: Slides as a build.
+---
+
+## intro
+
+### one
+
+first
+
+### two
+
+second
+
+## extra
+
+more
+`;
 
 describe("buildDeck", () => {
   test("inlines the deck-root asset when slides/ holds one with the same path", async () => {
@@ -224,5 +260,117 @@ more
         expect(html).not.toContain("data-missing");
       },
     );
+  });
+});
+
+describe("buildDeck link preview", () => {
+  const spec = (toml?: string) => ({
+    ...(toml ? { toml } : {}),
+    decks: [
+      {
+        name: "demo",
+        script: previewScript,
+        slides: { intro: introSource, extra: extraSource },
+      },
+    ],
+  });
+
+  test("writes the first slide as dist/<deck>.png and points og:image at it", async () => {
+    await withTempProject(spec('url = "https://example.com/talks"\n'), async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+      const { runner, requests } = fakeRunner();
+      const result = await build(deckDir, { runner });
+
+      expect(result.image).toBe(join(deckDir, "dist", "demo.png"));
+      expect(await readFile(join(deckDir, "dist", "demo.png"), "utf8")).toBe("png of intro");
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.actions).toEqual(["screenshot"]);
+      expect(requests[0]?.viewport).toEqual({ width: 1280, height: 720 });
+      expect(requests[0]?.pages.map((page) => [page.slug, page.step])).toEqual([["intro", "two"]]);
+
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain('<meta property="og:title" content="Why dek">');
+      expect(html).toContain('<meta property="og:description" content="Slides as a build.">');
+      expect(html).toContain(
+        '<meta property="og:url" content="https://example.com/talks/demo.html">',
+      );
+      expect(html).toContain(
+        '<meta property="og:image" content="https://example.com/talks/demo.png">',
+      );
+      expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+    });
+  });
+
+  test("takes the URL from the build over dek.toml", async () => {
+    await withTempProject(spec('url = "https://example.com/talks/"\n'), async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+      const result = await build(deckDir, {
+        url: "https://preview-123.example.dev/",
+        runner: fakeRunner().runner,
+      });
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain('content="https://preview-123.example.dev/demo.png"');
+    });
+  });
+
+  test("reuses the cached shot while the first slide is unchanged", async () => {
+    await withTempProject(spec('url = "https://example.com/"\n'), async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+      const { runner, requests } = fakeRunner();
+      await build(deckDir, { runner });
+      await build(deckDir, { runner });
+      expect(requests).toHaveLength(1);
+
+      await writeFile(join(deckDir, "slides", "intro.html"), extraSource);
+      await build(deckDir, { runner });
+      expect(requests).toHaveLength(2);
+    });
+  });
+
+  test("without a URL, writes the text tags and no image", async () => {
+    await withTempProject(spec(), async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+      const { runner, requests } = fakeRunner();
+      const result = await build(deckDir, { runner });
+
+      expect(requests).toHaveLength(0);
+      expect(result.image).toBeUndefined();
+      expect(result.imageSkipped).toBe("no-url");
+      expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(false);
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain('<meta property="og:title" content="Why dek">');
+      expect(html).not.toContain("og:image");
+      expect(html).not.toContain("og:url");
+    });
+  });
+
+  test("without Playwright, builds the page and says why there is no image", async () => {
+    await withTempProject(spec('url = "https://example.com/"\n'), async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+      const result = await build(deckDir, { runner: async () => null });
+
+      expect(result.image).toBeUndefined();
+      expect(result.imageSkipped).toBe("no-playwright");
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain('<meta property="og:url" content="https://example.com/demo.html">');
+      expect(html).not.toContain("og:image");
+    });
+  });
+
+  test("drops a preview image left from an earlier build that can no longer take one", async () => {
+    await withTempProject(spec('url = "https://example.com/"\n'), async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+      await build(deckDir, { runner: fakeRunner().runner });
+      expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(true);
+      await writeFile(join(root, "dek.toml"), "# no url\n");
+      await build(deckDir, { runner: fakeRunner().runner });
+      expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(false);
+    });
   });
 });

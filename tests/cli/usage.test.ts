@@ -26,14 +26,16 @@ describe("command help", () => {
   });
 
   test("shows a command's usage, what it does, and its flags", () => {
-    expect(commandHelp("build")).toBe(`usage: dek build [deck] [--root-dist]
+    expect(commandHelp("build")).toBe(`usage: dek build [deck] [--root-dist] [--url <url>]
 
 Write the whole talk into one HTML file, dist/<deck>.html. Lint never stops a build;
-the output says what lint found.
+the output says what lint found. Given the URL dist/ is served from, the first slide
+also becomes dist/<deck>.png, the picture a shared link shows.
 
 flags
   --deck NAME   target a deck by name from the project root
   --root-dist   write to <root>/dist/ instead of the deck's dist/
+  --url <url>   the URL dist/ is served from, over url in dek.toml
   --json        print the result, or the error, as JSON
   --help, -h    show help; dek help <command> for one command
 

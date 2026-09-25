@@ -1,10 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { DekError } from "./error.ts";
+import { parsePublicUrl } from "./ogp.ts";
 import { isPinnedRev, isPlainRefName } from "./ref-name.ts";
 import { configHint, formatZodIssues, parseFailure } from "./zod.ts";
 
 const DekToml = z.object({
+  url: z
+    .string()
+    .refine((value) => parsePublicUrl(value) !== undefined, {
+      message:
+        "write the absolute http(s) URL dist/ is served from, like https://example.com/talks/",
+    })
+    .optional(),
   max_classes: z.number().optional(),
   cjk_per_minute: z.number().optional(),
   latin_per_minute: z.number().optional(),
@@ -49,6 +57,8 @@ export type VoiceDefaults = {
 };
 
 export type DekConfig = {
+  /** Where dist/ is served from, ending in a slash; link previews need it for og:image. */
+  url?: string;
   maxClasses: number;
   cjkPerMinute: number;
   latinPerMinute: number;
@@ -90,7 +100,10 @@ export function parseDekToml(source: string, path?: string): DekConfig {
       }
     : undefined;
 
+  const url = result.data.url === undefined ? undefined : parsePublicUrl(result.data.url);
+
   return {
+    ...(url ? { url } : {}),
     maxClasses: result.data.max_classes ?? DEFAULT_CONFIG.maxClasses,
     cjkPerMinute: result.data.cjk_per_minute ?? DEFAULT_CONFIG.cjkPerMinute,
     latinPerMinute: result.data.latin_per_minute ?? DEFAULT_CONFIG.latinPerMinute,

@@ -25,6 +25,7 @@ const FLAGS = {
   accent: { type: "string" },
   fps: { type: "string" },
   "root-dist": { type: "boolean" },
+  url: { type: "string" },
 } as const satisfies Record<string, { type: "boolean" | "string"; short?: string }>;
 
 export type FlagName = keyof typeof FLAGS;
@@ -50,7 +51,7 @@ export const COMMAND_FLAGS = {
   sync: ["deck"],
   lint: ["deck", "fix", "visual", "format"],
   mv: ["deck", "before", "after"],
-  build: ["deck", "root-dist"],
+  build: ["deck", "root-dist", "url"],
   check: ["deck", "shot", "voice"],
   goto: ["deck"],
   current: ["deck"],

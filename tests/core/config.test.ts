@@ -59,6 +59,22 @@ describe("[refs]", () => {
   });
 });
 
+describe("url", () => {
+  test("reads the URL dist/ is served from, ending it with a slash", () => {
+    expect(parseDekToml('url = "https://example.com/talks"\n').url).toBe(
+      "https://example.com/talks/",
+    );
+    expect(parseDekToml('url = "https://example.com/talks/"\n').url).toBe(
+      "https://example.com/talks/",
+    );
+  });
+
+  test("rejects a URL that is not absolute http(s)", () => {
+    expect(() => parseDekToml('url = "/talks/"\n')).toThrow(/^url: /);
+    expect(() => parseDekToml('url = "ftp://example.com/"\n')).toThrow(/^url: /);
+  });
+});
+
 describe("loadConfig", () => {
   test("returns defaults when the file is missing", () => {
     expect(loadConfig("/tmp/dek-missing-config.toml")).toEqual(DEFAULT_CONFIG);

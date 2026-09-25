@@ -2,6 +2,7 @@ import { playerChromeCss } from "./chrome.ts";
 import { type DekConfig, loadConfig } from "./config.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { collectSlidesHtml, htmlShell, type PageMode, readTheme } from "./html.ts";
+import { type OgpImage, ogpHead } from "./ogp.ts";
 import { nextPresenterTitle, presenterSlides, presenterState } from "./presenter.ts";
 import { RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN } from "./rail-width.ts";
 import { type ProjectDeck, resolveDeck } from "./resolve.ts";
@@ -51,6 +52,10 @@ export async function renderDeckDocument(
     config: DekConfig;
     playerScript: string;
     liveReloadScript?: string;
+    /** The built page's absolute URL, for og:url. */
+    publicUrl?: string;
+    /** The first slide's picture, for og:image. */
+    previewImage?: OgpImage;
   },
 ): Promise<string> {
   const includeNotes = options.mode === "video" ? false : options.includeNotes !== false;
@@ -104,10 +109,24 @@ export async function renderDeckDocument(
     ? `<div id="dek-rail-resize" role="separator" aria-orientation="vertical" aria-label="Resize slide list" aria-valuemin="${RAIL_WIDTH_MIN}" aria-valuemax="${RAIL_WIDTH_MAX}" aria-valuenow="${RAIL_WIDTH_DEFAULT}" tabindex="0"></div>`
     : "";
 
+  const ogp =
+    options.mode === "player"
+      ? `${ogpHead({
+          title: deck.deck.title,
+          description: deck.deck.description,
+          event: deck.deck.event,
+          date: deck.deck.date,
+          lang: deck.deck.lang,
+          url: options.publicUrl,
+          image: options.previewImage,
+        })}
+  `
+      : "";
+
   return htmlShell({
     lang: deck.deck.lang,
     title: deck.deck.title,
-    head: `<style>${playerChromeCss({ presenter: includeNotes, ...size })}</style>
+    head: `${ogp}<style>${playerChromeCss({ presenter: includeNotes, ...size })}</style>
   <style data-dek-theme>${themeCss}</style>`,
     bodyAttrs: `${presenterOpen ? ' class="is-presenter"' : ""} data-mode="${options.mode}" data-deck="${escapeAttr(deck.name)}"${includeNotes ? ` data-presenter="dek-presenter"` : ""}${options.live ? ` data-live="true"` : ""}${options.liveToken ? ` data-live-token="${escapeAttr(options.liveToken)}"` : ""}`,
     body: `${progress}

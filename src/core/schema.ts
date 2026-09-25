@@ -55,6 +55,10 @@ export function inferLang(text: string): string {
 /** Frontmatter fields written to `.dek/schema.json` for yaml-language-server. */
 export const Frontmatter = z.object({
   title: z.string(),
+  description: z
+    .string()
+    .optional()
+    .describe("One or two sentences a shared link shows under the title."),
   event: z.string().optional(),
   date: z.string().date("write a date, like 2026-04-18").optional(),
   duration: z

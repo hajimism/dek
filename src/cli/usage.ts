@@ -27,6 +27,7 @@ export const FLAG_DOCS: Record<FlagName, { value?: string; text: string }> = {
   accent: { value: "N", text: "the accent position of the reading" },
   fps: { value: "N", text: "frames per second" },
   "root-dist": { text: "write to <root>/dist/ instead of the deck's dist/" },
+  url: { value: "<url>", text: "the URL dist/ is served from, over url in dek.toml" },
 };
 
 type CommandDoc = { usage: string[]; summary: string };
@@ -82,9 +83,9 @@ export const COMMAND_DOCS: Record<CommandName, CommandDoc> = {
     summary: "Rename a section and every file named after it, or move it in the script.",
   },
   build: {
-    usage: ["dek build [deck] [--root-dist]"],
+    usage: ["dek build [deck] [--root-dist] [--url <url>]"],
     summary:
-      "Write the whole talk into one HTML file, dist/<deck>.html. Lint never stops a build;\nthe output says what lint found.",
+      "Write the whole talk into one HTML file, dist/<deck>.html. Lint never stops a build;\nthe output says what lint found. Given the URL dist/ is served from, the first slide\nalso becomes dist/<deck>.png, the picture a shared link shows.",
   },
   check: {
     usage: ["dek check [deck] <slug> [--shot] [--voice]"],

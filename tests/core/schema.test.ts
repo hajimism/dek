@@ -41,6 +41,12 @@ describe("Frontmatter", () => {
   test("rejects non-ISO dates", () => {
     expect(() => Frontmatter.parse({ title: "Talk", date: "April 18" })).toThrow();
   });
+
+  test("accepts a description for link previews", () => {
+    expect(Frontmatter.parse({ title: "Talk", description: "Why slides." }).description).toBe(
+      "Why slides.",
+    );
+  });
 });
 
 describe("Deck", () => {

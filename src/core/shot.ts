@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "./config.ts";
 import { renderDeckDocument } from "./document.ts";
@@ -81,6 +81,40 @@ export async function shotDeck(
     step: page.step,
     path: page.screenshotPath,
   }));
+}
+
+/**
+ * The first slide at its last beat, as a link preview shows the talk. The shot is cached by
+ * the rendered HTML, so a build only starts Chromium when the first slide changed. Returns
+ * undefined when Playwright is not installed.
+ */
+export async function coverShot(
+  deck: ResolvedDeck["deck"],
+  runner: PlaywrightRunner = defaultPlaywrightRunner,
+): Promise<string | undefined> {
+  const [section] = deck.deck.sections;
+  if (!section) {
+    return undefined;
+  }
+  const beat = resolveBeat(section);
+  const html = renderSlideHtml(deck, section.slug, beat.index, loadSlideSources(deck));
+  const outDir = cacheDir(deck.dir, "shots");
+  const filename = shotFileName(section.slug, beat.label, html);
+  const screenshotPath = join(outDir, filename);
+  if (existsSync(screenshotPath)) {
+    return screenshotPath;
+  }
+  mkdirSync(outDir, { recursive: true });
+  const response = await runner({
+    viewport: logicalSize(deck.deck.ratio),
+    actions: ["screenshot"],
+    pages: [{ html, slug: section.slug, step: beat.label, screenshotPath }],
+  });
+  if (response === null) {
+    return undefined;
+  }
+  pruneStaleShots(outDir, section.slug, beat.label, filename);
+  return screenshotPath;
 }
 
 export type ShotMorphOptions = {

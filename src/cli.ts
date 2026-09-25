@@ -155,7 +155,12 @@ async function main(): Promise<void> {
       const { buildCommand } = await import("./cli/build.ts");
       result = {
         command: "build",
-        data: await buildCommand({ cwd, deck, rootDist: values["root-dist"] === true }),
+        data: await buildCommand({
+          cwd,
+          deck,
+          rootDist: values["root-dist"] === true,
+          ...(typeof values.url === "string" ? { url: values.url } : {}),
+        }),
       };
       break;
     }

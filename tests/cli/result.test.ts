@@ -199,12 +199,25 @@ architecture  architecture      0:11   0:05
 
   test("formats build as a wrote line", () => {
     expect(
-      formatText({ command: "build", data: { outs: ["/tmp/dist/demo.html"], diagnostics: [] } }),
-    ).toBe("wrote /tmp/dist/demo.html");
+      formatText({
+        command: "build",
+        data: {
+          outs: ["/tmp/dist/demo.html"],
+          images: ["/tmp/dist/demo.png"],
+          notes: [],
+          diagnostics: [],
+        },
+      }),
+    ).toBe("wrote /tmp/dist/demo.html\nwrote /tmp/dist/demo.png");
     expect(
       formatText({
         command: "build",
-        data: { outs: ["/tmp/dist/a.html", "/tmp/dist/b.html"], diagnostics: [] },
+        data: {
+          outs: ["/tmp/dist/a.html", "/tmp/dist/b.html"],
+          images: [],
+          notes: [],
+          diagnostics: [],
+        },
       }),
     ).toBe("wrote /tmp/dist/a.html\nwrote /tmp/dist/b.html");
   });

@@ -241,8 +241,8 @@ export function formatText(result: CliResult): string {
       return `moved ${result.data.from}`;
     case "build": {
       const summary = lintSummary(result.data.diagnostics);
-      const wrote = result.data.outs.map((path) => `wrote ${path}`);
-      return [...wrote, ...(summary ? [summary] : [])].join("\n");
+      const wrote = [...result.data.outs, ...result.data.images].map((path) => `wrote ${path}`);
+      return [...wrote, ...result.data.notes, ...(summary ? [summary] : [])].join("\n");
     }
     case "pdf":
       return result.data.outs.map((path) => `wrote ${path}`).join("\n");

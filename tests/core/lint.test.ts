@@ -304,7 +304,7 @@ describe("lintDeck", () => {
             message: "unknown key venue in the frontmatter; dek ignores it",
             path: script,
             line: 4,
-            hint: "the keys are title, event, date, duration, ratio, lang; see https://hajimism.github.io/dek/reference/config.html#frontmatter",
+            hint: "the keys are title, description, event, date, duration, ratio, lang; see https://hajimism.github.io/dek/reference/config.html#frontmatter",
             data: { file: "frontmatter", key: "venue" },
           },
         ]);
