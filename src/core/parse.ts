@@ -52,10 +52,7 @@ function parseFrontmatter(yaml: string, filename?: string): Frontmatter {
   try {
     parsed = Bun.YAML.parse(quoteUnquotedHashes(yaml));
   } catch (error) {
-    const failure = parseFailure(error);
-    throw new DekError(`invalid YAML frontmatter: ${failure.text}`, {
-      // The frontmatter starts on line 2, after the opening ---.
-      ...(failure.line ? { line: failure.line + 1 } : {}),
+    throw new DekError(`invalid YAML frontmatter: ${parseFailure(error)}`, {
       path: filename,
       cause: error,
       hint: configHint("frontmatter"),

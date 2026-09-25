@@ -10,7 +10,7 @@ HTML は書きません。声も動画も触りません。ゴールは、同梱
 
 ## 前提
 
-[Bun](https://bun.sh) 1.3 以上。dek はまだ npm になく、最初のコマンドは GitHub から直接実行します。
+[Bun](https://bun.sh) 1.4 以上。dek はまだ npm になく、最初のコマンドは GitHub から直接実行します。
 
 ::: tip なぜ「dek」か
 *dek* は *deck* から一文字落とした綴りです。npm の `deck` は Kong の decK が使っています。

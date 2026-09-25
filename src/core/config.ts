@@ -78,9 +78,7 @@ export function parseDekToml(source: string, path?: string): DekConfig {
   try {
     parsed = Bun.TOML.parse(source);
   } catch (error) {
-    const failure = parseFailure(error);
-    throw new DekError(`invalid dek.toml: ${failure.text}`, {
-      ...(failure.line ? { line: failure.line } : {}),
+    throw new DekError(`invalid dek.toml: ${parseFailure(error)}`, {
       path,
       cause: error,
       hint: configHint("dek-toml"),

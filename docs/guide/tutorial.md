@@ -4,7 +4,7 @@ In this tutorial you build a short talk from scratch: a ten-minute lightning tal
 
 Every step ends in a state you could stop at and still give the talk. That is deliberate. dek is designed so that the script alone is enough, and everything after it is optional polish.
 
-You need [Bun](https://bun.sh) 1.3 or later. Voice, video, and Playwright are not used here.
+You need [Bun](https://bun.sh) 1.4 or later. Voice, video, and Playwright are not used here.
 
 ## 1. Create the project
 

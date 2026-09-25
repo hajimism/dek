@@ -22,7 +22,7 @@ dek は、ビルドシステムがコードを扱うように発表を扱う CLI
 
 ## クイックスタート
 
-[Bun](https://bun.sh) 1.3 以上。dek はまだ npm になく、GitHub から入れます。
+[Bun](https://bun.sh) 1.4 以上。dek はまだ npm になく、GitHub から入れます。
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite

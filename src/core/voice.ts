@@ -96,9 +96,7 @@ export function loadVoiceSettings(deckDir: string): VoiceSettings {
   try {
     parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
   } catch (error) {
-    const failure = parseFailure(error);
-    throw new DekError(`invalid voice.toml: ${failure.text}`, {
-      ...(failure.line ? { line: failure.line } : {}),
+    throw new DekError(`invalid voice.toml: ${parseFailure(error)}`, {
       path,
       cause: error,
       hint: configHint("voice-voice-toml"),
@@ -188,9 +186,7 @@ export function loadVoiceDict(deckDir: string): VoiceDict {
   try {
     parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
   } catch (error) {
-    const failure = parseFailure(error);
-    throw new DekError(`invalid dict.toml: ${failure.text}`, {
-      ...(failure.line ? { line: failure.line } : {}),
+    throw new DekError(`invalid dict.toml: ${parseFailure(error)}`, {
       path,
       cause: error,
       hint: configHint("voice-dict-toml"),

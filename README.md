@@ -22,7 +22,7 @@ The three principles and the comparison with Slidev are in [Why dek](https://haj
 
 ## Quick start
 
-[Bun](https://bun.sh) 1.3 or later. dek is not on npm yet; it installs from GitHub.
+[Bun](https://bun.sh) 1.4 or later. dek is not on npm yet; it installs from GitHub.
 
 ```bash
 bunx github:hajimism/dek init my-talks --deck 2026-04-vite

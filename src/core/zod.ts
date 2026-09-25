@@ -10,16 +10,14 @@ export function configHint(
 }
 
 /**
- * A parser's syntax error in its own words, without the class name or banner Bun puts in front,
- * and the 1-based line it points at when the parser says. Bun 1.4's TOML parser says no line.
+ * A parser's syntax error in its own words, without the class name or banner Bun puts in front.
+ * Bun's parsers say no line of the file: the error's own `line` is where JavaScript called them.
  */
-export function parseFailure(error: unknown): { text: string; line?: number } {
-  const text = (error instanceof Error ? error.message : String(error)).replace(
-    /^(?:(?:BuildMessage|SyntaxError): )?(?:TOML Parse error: )?/,
+export function parseFailure(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).replace(
+    /^(?:SyntaxError: )?(?:TOML Parse error: )?/,
     "",
   );
-  const line = (error as { position?: { line?: unknown } } | null)?.position?.line;
-  return typeof line === "number" && line > 0 ? { text, line } : { text };
 }
 
 export function formatZodIssues(error: z.ZodError): string {
