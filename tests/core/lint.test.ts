@@ -1502,6 +1502,57 @@ two
     expect(hint).toBe('add a ### beat under "## intro" in script.md, or drop data-step');
   });
 
+  test("DEK025: a numeric data-step that points at a beat with an id", async () => {
+    const diagnostics = await lintIntro(
+      `<section class="slide" data-layout="default">
+  <h2 class="slide-title">intro</h2>
+  <p data-step="hook">by id</p>
+  <p data-step="2">by position</p>
+</section>`,
+      { script: beatScript },
+    );
+    const found = diagnostics.filter((d) => d.id === "DEK025");
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({
+      severity: "warning",
+      slug: "intro",
+      message: 'data-step "2" is beat "turn" by position; it moves if a beat is inserted before it',
+      hint: 'use data-step="turn"',
+      data: { step: "2", id: "turn" },
+    });
+  });
+
+  test("DEK025 stays quiet for a beat with no id, where the position is the only name", async () => {
+    const diagnostics = await lintIntro(
+      `<section class="slide" data-layout="default">
+  <h2 class="slide-title">intro</h2>
+  <p data-step="2">by position</p>
+</section>`,
+      { script: beatScript.replace("### turn {#turn}", "### The turn") },
+    );
+    expect(diagnostics.filter((d) => d.id === "DEK025")).toEqual([]);
+  });
+
+  test("DEK010 suggests the defined class a typo most likely meant", async () => {
+    const diagnostics = await lintIntro(
+      `<section class="slide" data-layout="title">
+  <h2 class="slide-titel">intro</h2>
+  <p class="mystery">x</p>
+</section>`,
+      { theme: ".slide {}\n.slide .slide-title {}\n.slide .node {}\n" },
+    );
+    const typo = diagnostics.find((d) => d.id === "DEK010" && d.data?.class === "slide-titel");
+    expect(typo?.hint).toBe(
+      "did you mean slide-title? define it in slides/intro.css, or use one of: node, slide, slide-title",
+    );
+    expect(typo?.data).toEqual({ class: "slide-titel", suggestion: "slide-title" });
+    const unknown = diagnostics.find((d) => d.id === "DEK010" && d.data?.class === "mystery");
+    expect(unknown?.hint).toBe(
+      "define it in slides/intro.css, or use one of: node, slide, slide-title",
+    );
+    expect(unknown?.data).toEqual({ class: "mystery" });
+  });
+
   test("DEK010 names the slide stylesheet and the known classes", async () => {
     const diagnostics = await lintIntro(
       `<section class="slide" data-layout="title">

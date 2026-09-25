@@ -852,20 +852,40 @@ function slugDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
   ];
 }
 
-/** DEK003: a data-step that is neither a beat id nor a beat index. */
+/**
+ * DEK003: a data-step that is neither a beat id nor a beat index. DEK025: a beat index where
+ * that beat has an id, which silently binds the next beat over once one is inserted before it.
+ */
 function stepDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
-  return attributesNamed(scan, "data-step")
-    .filter((attribute) => !resolvesStep(attribute.value, section.beats))
-    .map((attribute) =>
-      diag("DEK003", {
-        message: `data-step "${attribute.value}" is not a beat id or index in "${section.slug}"`,
+  return attributesNamed(scan, "data-step").flatMap((attribute) => {
+    const step = attribute.value;
+    if (!resolvesStep(step, section.beats)) {
+      return [
+        diag("DEK003", {
+          message: `data-step "${step}" is not a beat id or index in "${section.slug}"`,
+          path,
+          ...spotOf(attribute),
+          slug: section.slug,
+          hint: stepHint(section),
+          data: { step, choices: stepChoices(section.beats) },
+        }),
+      ];
+    }
+    const id = POSITIVE_INT_RE.test(step) ? section.beats[Number(step) - 1]?.id : undefined;
+    if (id === undefined) {
+      return [];
+    }
+    return [
+      diag("DEK025", {
+        message: `data-step "${step}" is beat "${id}" by position; it moves if a beat is inserted before it`,
         path,
         ...spotOf(attribute),
         slug: section.slug,
-        hint: stepHint(section),
-        data: { step: attribute.value, choices: stepChoices(section.beats) },
+        hint: `use data-step="${id}"`,
+        data: { step, id },
       }),
-    );
+    ];
+  });
 }
 
 /** DEK005: a data-morph used twice, or one the player or CSS already means something by. */
@@ -1040,16 +1060,17 @@ function unknownClassDiagnostics(
       }
     }
   }
-  return [...unknown].map(([name, attribute]) =>
-    diag("DEK010", {
+  return [...unknown].map(([name, attribute]) => {
+    const suggestion = suggest(name, known);
+    return diag("DEK010", {
       message: `class "${name}" is not defined in theme.css`,
       path,
       ...spotOf(attribute),
       slug: section.slug,
-      hint,
-      data: { class: name },
-    }),
-  );
+      hint: suggestion ? `did you mean ${suggestion}? ${hint}` : hint,
+      data: { class: name, ...(suggestion ? { suggestion } : {}) },
+    });
+  });
 }
 
 /**

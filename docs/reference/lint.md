@@ -28,6 +28,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 | `DEK022` | A path that leaves the deck directory | — |
 | `DEK023` | A local file the slide loads (`src`, `srcset`, `poster`, …, or a `url()` in a slide stylesheet) that does not start with `assets/` | — |
 | `DEK024` | A heading with nothing to read: no text, no image, no `aria-label`. An id-only `##` heading after the first slide makes one. Warning | — |
+| `DEK025` | A numeric `data-step` that points at a beat with an id. Warning | — |
 | `DEK030` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
 | `DEK031` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK040` | An ASCII word missing from the pronunciation dictionary. Warning | — |
@@ -41,7 +42,7 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 - `DEK030` and `DEK031` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
 - `DEK040`, `DEK042`, and `DEK043` apply only to decks with `voice/`; `DEK044` applies to every deck. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin). `data` carries `actualSeconds`, `budgetSeconds`, and `source` (`timeline` or `estimate`).
-- `DEK008`, `DEK024`, and `DEK040` through `DEK044` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. A live-only deck's definition of done is unchanged.
+- `DEK008`, `DEK024`, `DEK025`, and `DEK040` through `DEK044` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. A live-only deck's definition of done is unchanged.
 - `DEK008` for `dek.toml` is a project finding; `dek lint` and `dek build` report it once, however many decks they cover.
 
 ## Notes
@@ -62,7 +63,7 @@ Some names are taken. The player names the slide box `slide`, and the browser na
 
 ### DEK010
 
-Clear it by defining the class in `theme.css`, or in `slides/<id>.css` when only that slide uses it. Growing the shared vocabulary is a design decision; lint makes it one visible step. `DEK013` caps how often that step can be repeated, and slide stylesheets do not count toward it. The hint lists the classes already defined. If the class is only there for `slides/<id>.ts` to find an element, use a `data-*` attribute instead.
+Clear it by defining the class in `theme.css`, or in `slides/<id>.css` when only that slide uses it. Growing the shared vocabulary is a design decision; lint makes it one visible step. `DEK013` caps how often that step can be repeated, and slide stylesheets do not count toward it. The hint lists the classes already defined, and when the class is a typo of one of them (two edits or fewer) it starts with `did you mean slide-title?`; `data.suggestion` carries that name. If the class is only there for `slides/<id>.ts` to find an element, use a `data-*` attribute instead.
 
 ### DEK014 / DEK015
 
@@ -87,6 +88,10 @@ One table decides which attributes name a URL and what the page does with it. A 
 ### DEK024
 
 `dek sync` never puts a section id on a slide, so a `##` heading that is only an id (`## architecture`) gets an empty `<h2 class="slide-title">` in its skeleton, unless it is the first slide, which takes the deck title. While the file is still that skeleton, the hint says to give the heading a title in `script.md`, like `## Architecture {#architecture}`, and run `dek sync`, which rewrites the skeleton; the id and file name stay. Once the slide is edited, the hint says to write the heading's text or remove the element. It is a warning because a slide script may fill the heading as the slide draws.
+
+### DEK025
+
+A number in `data-step` means "the k-th beat of this slide", so a beat inserted above it moves the binding to a different beat without any error. When the beat at that position has an id, the id says the same thing and does not move, so the hint names it: `use data-step="turn"`. Lint only sees the script as it is now: after an insertion, the id it names is the beat that now holds the position, so check that it is the one you meant. A beat with no id has no other name, so its position raises nothing; give it a `{#id}` to make it stable. `data` carries `step` and `id`.
 
 ### DEK030
 

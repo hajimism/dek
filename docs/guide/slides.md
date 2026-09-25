@@ -52,7 +52,7 @@ A section without beats gets `data-layout="title"`; with beats, `default`. Beats
 
 A heading that is only an id, such as `## recap`, has no display text, so its skeleton `<h2>` is empty. The first section is the exception: it takes the deck `title`. This keeps an English slug from ending up on a projected slide by accident. Lint warns about the empty heading as `DEK024`. If you want words there, write `## Recap {#recap}`.
 
-Sync never touches a slide you have edited. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide.
+Sync never touches a slide you have edited. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide. A number you write by hand for a beat that has an id is `DEK025`, a warning whose hint names the id.
 
 A skeleton nobody has edited yet is different: it is still sync's output, so sync rewrites it when the script moves on. Change the deck `title` or add a beat, and the untouched skeleton follows; the first edit you make to the file ends that. `dek sync` lists such files as `(updated)`.
 

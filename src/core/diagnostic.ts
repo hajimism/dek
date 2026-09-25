@@ -4,8 +4,9 @@ export type Severity = "error" | "warning";
 /**
  * The rule table: every diagnostic dek itself emits, with its severity. Voice
  * and timing rules are warnings: a live-only deck is done without them. So are the
- * findings about input dek ignores (DEK008) or reads another way (DEK044), and an empty
- * heading (DEK024), which a slide script may fill.
+ * findings about input dek ignores (DEK008) or reads another way (DEK044), an empty
+ * heading (DEK024), which a slide script may fill, and a step bound by position where the
+ * beat has an id (DEK025), which is right until a beat is inserted.
  */
 export const RULES = {
   DEK001: { severity: "error" },
@@ -32,6 +33,7 @@ export const RULES = {
   DEK022: { severity: "error" },
   DEK023: { severity: "error" },
   DEK024: { severity: "warning" },
+  DEK025: { severity: "warning" },
   DEK030: { severity: "error" },
   DEK031: { severity: "error" },
   DEK040: { severity: "warning" },
