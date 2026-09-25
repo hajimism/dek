@@ -119,14 +119,19 @@ export function isLetterKey(
 export type PointerStroke = { x: number; y: number; dx: number; dy: number };
 
 /**
- * The move a touch asks for. A swipe turns the page as a book does (leftward goes forward);
- * a tap goes forward, except on the left third, which goes back. Anything between, such as a
- * vertical scroll or a short drag, is not a move.
+ * The move a touch or a click asks for. A tap or click goes forward, except on the left third,
+ * which goes back. A swipe turns the page as a book does (leftward goes forward), but only by
+ * touch or pen: a mouse drag is selecting text. Anything between, such as a vertical scroll or
+ * a short drag, is not a move.
  */
-export function pointerMove(stroke: PointerStroke, stage: { width: number }): Move | null {
+export function pointerMove(
+  stroke: PointerStroke,
+  stage: { width: number },
+  pointerType = "touch",
+): Move | null {
   const ax = Math.abs(stroke.dx);
   const ay = Math.abs(stroke.dy);
-  if (ax >= SWIPE_MIN_PX && ax > ay * 2) {
+  if (pointerType !== "mouse" && ax >= SWIPE_MIN_PX && ax > ay * 2) {
     return stroke.dx < 0 ? "advance" : "retreat";
   }
   if (ax < TAP_MAX_PX && ay < TAP_MAX_PX) {

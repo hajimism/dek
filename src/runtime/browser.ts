@@ -660,8 +660,10 @@ if (dataEl?.textContent) {
   if (stageEl) {
     let start: { x: number; y: number; id: number } | undefined;
     stageEl.addEventListener("pointerdown", (event) => {
-      // A mouse has the keyboard beside it; touch and pen have only the screen.
-      if (event.pointerType === "mouse" || isInteractive(event.target)) {
+      // A right click, or one held with a modifier (Shift extends a selection), is the browser's.
+      const modified = event.altKey || event.ctrlKey || event.metaKey || event.shiftKey;
+      const theirs = event.pointerType === "mouse" && (event.button !== 0 || modified);
+      if (theirs || isInteractive(event.target)) {
         start = undefined;
         return;
       }
@@ -669,6 +671,11 @@ if (dataEl?.textContent) {
     });
     stageEl.addEventListener("pointerup", (event) => {
       if (!start || start.id !== event.pointerId) {
+        return;
+      }
+      // A click that ends a text selection, such as a double click on a word, keeps the slide.
+      if (event.pointerType === "mouse" && getSelection()?.isCollapsed === false) {
+        start = undefined;
         return;
       }
       const rect = stageEl.getBoundingClientRect();
@@ -680,6 +687,7 @@ if (dataEl?.textContent) {
           dy: event.clientY - start.y,
         },
         rect,
+        event.pointerType,
       );
       start = undefined;
       if (move) {

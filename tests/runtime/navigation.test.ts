@@ -120,6 +120,75 @@ async function waitFor(condition: () => boolean, timeoutMs = 2000): Promise<void
   }
 }
 
+/** A press and release on the slide stage, as a mouse, pen, or finger makes it. */
+function click(x: number, init: PointerEventInit & { pointerType?: string } = {}): void {
+  const stage = document.getElementById("dek-current-stage");
+  if (!stage) {
+    throw new Error("no stage");
+  }
+  stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 900, height: 500 }) as DOMRect;
+  const options = { clientX: x, clientY: 200, bubbles: true, pointerType: "mouse", ...init };
+  stage.dispatchEvent(new PointerEvent("pointerdown", options));
+  stage.dispatchEvent(new PointerEvent("pointerup", options));
+}
+
+describe("clicking the slide", () => {
+  test.serial("a click on the right goes forward and on the left third goes back", async () => {
+    await mount("#steps");
+    click(700);
+    await waitFor(() => shownSteps().includes("two"));
+    click(100);
+    await waitFor(() => !shownSteps().includes("two"));
+    expect(shownSteps()).toEqual(["one"]);
+  });
+
+  for (const [name, init] of [
+    ["a right click", { button: 2 }],
+    ["a click with Cmd held", { metaKey: true }],
+    ["a Shift click, which extends a selection", { shiftKey: true }],
+  ] as const) {
+    test.serial(`${name} stays on the beat`, async () => {
+      await mount("#steps");
+      click(700, init);
+      await settle();
+      expect(shownSteps()).toEqual(["one"]);
+    });
+  }
+
+  test.serial("a click that ends a text selection stays on the beat", async () => {
+    await mount("#steps");
+    const item = document.querySelector("#deck .slide.is-current [data-step]");
+    if (item) {
+      getSelection()?.selectAllChildren(item);
+    }
+    click(700);
+    await settle();
+    expect(shownSteps()).toEqual(["one"]);
+  });
+
+  test.serial("a touch still swipes, where a mouse drag would select", async () => {
+    await mount("#steps");
+    const stage = document.getElementById("dek-current-stage");
+    if (!stage) {
+      throw new Error("no stage");
+    }
+    stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 900, height: 500 }) as DOMRect;
+    const at = (clientX: number) => ({
+      clientX,
+      clientY: 200,
+      bubbles: true,
+      pointerType: "mouse",
+    });
+    stage.dispatchEvent(new PointerEvent("pointerdown", at(500)));
+    stage.dispatchEvent(new PointerEvent("pointerup", at(380)));
+    await settle();
+    expect(shownSteps()).toEqual(["one"]);
+    stage.dispatchEvent(new PointerEvent("pointerdown", { ...at(500), pointerType: "touch" }));
+    stage.dispatchEvent(new PointerEvent("pointerup", { ...at(380), pointerType: "touch" }));
+    await waitFor(() => shownSteps().includes("two"));
+  });
+});
+
 describe("navigation", () => {
   test.serial("counts every press made while a move is still animating", async () => {
     await mount("#intro");

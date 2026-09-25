@@ -252,6 +252,16 @@ describe("pointerMove", () => {
     expect(pointerMove({ x: 300, y: 200, dx: 20, dy: 140 }, stage)).toBeNull();
     expect(pointerMove({ x: 300, y: 200, dx: 30, dy: 0 }, stage)).toBeNull();
   });
+
+  test("a mouse click turns the page like a tap: the left third back, the rest forward", () => {
+    expect(pointerMove({ x: 700, y: 200, dx: 0, dy: 0 }, stage, "mouse")).toBe("advance");
+    expect(pointerMove({ x: 100, y: 200, dx: 2, dy: 1 }, stage, "mouse")).toBe("retreat");
+  });
+
+  test("a mouse drag selects text rather than swiping", () => {
+    expect(pointerMove({ x: 300, y: 200, dx: -120, dy: 0 }, stage, "mouse")).toBeNull();
+    expect(pointerMove({ x: 300, y: 200, dx: 120, dy: 0 }, stage, "mouse")).toBeNull();
+  });
 });
 
 describe("isInteractive", () => {

@@ -55,7 +55,7 @@ While the server is running, the terminal can drive the browser and ask which sl
 
 Every press counts. Pressing faster than the transitions play, as a clicker skipping ahead does, cuts each transition short and lands where the presses add up to; a second window follows each press at once. Keys held with `Alt`, `Ctrl`, or `Cmd` belong to the browser, and keys typed into a field on a slide belong to the field.
 
-On a phone or tablet, tap the slide to go forward, tap its left third to go back, or swipe sideways. Taps on links, buttons, and fields are theirs. The slide rail and the key hint stay out of the way on a narrow or touch screen.
+Tap or click the slide to go forward, and its left third to go back. On a phone or tablet you can also swipe sideways; a mouse drag selects text instead, and a click that ends a selection, a right click, or a click held with a modifier key stays where it is. Taps and clicks on links, buttons, and fields are theirs. The slide rail and the key hint stay out of the way on a narrow or touch screen.
 
 The URL follows the deck: `#<slug>` for a slide, `#<slug>/<n>` for its nth beat. Each slide is one history entry, so Back leaves the slide rather than stepping back through its beats. A beat number past the slide's last opens at the last beat and rewrites the URL to say so.
 
