@@ -144,25 +144,29 @@ describe("slide stylesheet lint", () => {
     );
   });
 
-  test("DEK020 / DEK023: url() in a slide stylesheet follows the slide HTML's asset rules", async () => {
+  test("DEK020 / DEK021 / DEK023: url() in a slide stylesheet follows the slide HTML's asset rules", async () => {
     await withTempProject(
-      deck({
-        styles: {
-          usb: [
-            ".a { background: url(assets/ok.svg); }",
-            ".b { background: url(../assets/up.svg); }",
-            '.c { background: url("https://cdn.example.com/x.png"); }',
-            '.d { background: url("data:image/png;base64,AAAA"); }',
-          ].join("\n"),
-        },
-      }),
+      {
+        decks: deck({
+          styles: {
+            usb: [
+              ".a { background: url(assets/ok.svg); }",
+              ".b { background: url(../assets/up.svg); }",
+              '.c { background: url("https://cdn.example.com/x.png"); }',
+              '.d { background: url("data:image/png;base64,AAAA"); }',
+              ".e { background: url(assets/gone.svg); }",
+            ].join("\n"),
+          },
+        }).decks.map((entry) => ({ ...entry, assets: { "ok.svg": "<svg/>", "up.svg": "<svg/>" } })),
+      },
       async (root) => {
         const found = lintDeck(join(root, "decks", "demo")).filter(
-          (d) => d.id === "DEK020" || d.id === "DEK023",
+          (d) => d.id === "DEK020" || d.id === "DEK021" || d.id === "DEK023",
         );
         expect(found.map((d) => [d.id, d.message, d.line])).toEqual([
           ["DEK023", 'asset "../assets/up.svg" must be referenced as assets/up.svg', 2],
           ["DEK020", 'remote URL "https://cdn.example.com/x.png"', 3],
+          ["DEK021", 'missing file "assets/gone.svg"', 5],
         ]);
         expect(found[0]?.path).toBe(join(root, "decks", "demo", "slides", "usb.css"));
       },

@@ -3,6 +3,8 @@ export type CssDeclaration = {
   property: string;
   value: string;
   line: number;
+  /** Where the value starts in the stylesheet, which comments do not shift. */
+  valueStart: number;
 };
 
 type CssRule = {
@@ -14,8 +16,57 @@ type CssRule = {
   depth: number;
 };
 
-export function stripCssComments(css: string): string {
+const KEYFRAMES_RE = /^@(-\w+-)?keyframes\b/;
+
+function stripCssComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+/** Whitespace as CSS defines it. U+3000 and NBSP are content, not whitespace. */
+const CSS_WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
+
+/**
+ * Drops comments and collapses whitespace to one space, leaving strings byte for byte, so
+ * `content: "a　b"` or `"  "` renders in the build as it does on the dev server.
+ */
+export function minifyCss(css: string): string {
+  let out = "";
+  let space = false;
+  let i = 0;
+  while (i < css.length) {
+    const ch = css[i] ?? "";
+    if (ch === "/" && css[i + 1] === "*") {
+      const end = css.indexOf("*/", i + 2);
+      i = end === -1 ? css.length : end + 2;
+      continue;
+    }
+    if (CSS_WHITESPACE.has(ch)) {
+      space = true;
+      i++;
+      continue;
+    }
+    if (space && out !== "") {
+      out += " ";
+    }
+    space = false;
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      while (j < css.length && css[j] !== ch && css[j] !== "\n") {
+        j += css[j] === "\\" ? 2 : 1;
+      }
+      out += css.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    if (ch === "\\") {
+      out += css.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
 }
 
 function stripCssCommentsPreserveLines(css: string): string {
@@ -55,35 +106,109 @@ function cssSelectors(css: string): string[] {
 /** Style rule selectors at any depth, skipping keyframe stops. */
 export function cssStyleSelectors(css: string): string[] {
   return [...walkRules(stripCssComments(css))]
-    .filter((rule) => !rule.atPath.some((at) => /^@(-\w+-)?keyframes\b/.test(at)))
+    .filter((rule) => !rule.atPath.some((at) => KEYFRAMES_RE.test(at)))
     .map((rule) => rule.selector);
 }
 
-/** Every at-rule name in the stylesheet, such as `font-face` or `media`, in source order. */
+/** Every at-rule name in the stylesheet, such as `font-face` or `media`, in source order; strings are skipped. */
 export function cssAtRuleNames(css: string): string[] {
-  return [...stripCssComments(css).matchAll(/@([-a-zA-Z]+)/g)].map((match) => match[1] ?? "");
+  const source = stripCssComments(css);
+  const names: string[] = [];
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === '"' || ch === "'") {
+      i = consumeString(source, i);
+      continue;
+    }
+    if (ch === "@") {
+      const match = /^[-a-zA-Z]+/.exec(source.slice(i + 1));
+      if (match) {
+        names.push(match[0]);
+        i += match[0].length;
+      }
+    }
+    i++;
+  }
+  return names;
 }
 
-/** Each `url()` reference with the line it sits on. */
+/**
+ * Each `url()` a declaration or an `@font-face`-like descriptor references, with its line; a
+ * `url(` inside a string is text.
+ */
 export function cssUrls(css: string): Array<{ value: string; line: number }> {
-  const source = stripCssCommentsPreserveLines(css);
-  return [...source.matchAll(/url\(\s*(["']?)([^"')]*)\1\s*\)/gi)].map((match) => ({
-    value: (match[2] ?? "").trim(),
-    line: lineAt(source, match.index ?? 0),
-  }));
+  return cssUrlTokens(css).map(({ value, line }) => ({ value, line }));
 }
 
+/**
+ * The stylesheet with each `url()` that `cssUrls` reports rewritten to `url("<replacement>")`,
+ * or left as written when `replace` has none for it.
+ */
+export function replaceCssUrls(
+  css: string,
+  replace: (value: string) => string | undefined,
+): string {
+  let out = css;
+  for (const token of cssUrlTokens(css).reverse()) {
+    const url = replace(token.value);
+    if (url !== undefined) {
+      out = `${out.slice(0, token.start)}url("${url}")${out.slice(token.end)}`;
+    }
+  }
+  return out;
+}
+
+/** The `url()` tokens of every declaration and descriptor value, with the span each covers in the stylesheet. */
+function cssUrlTokens(
+  css: string,
+): Array<{ value: string; line: number; start: number; end: number }> {
+  const decls = collectDeclarations(stripCssCommentsPreserveLines(css), true, true);
+  return decls.flatMap((decl) =>
+    urlsInValue(decl.value).map((url) => ({
+      value: url.value,
+      line: decl.line + (decl.value.slice(0, url.index).match(/\n/g)?.length ?? 0),
+      start: decl.valueStart + url.index,
+      end: decl.valueStart + url.index + url.length,
+    })),
+  );
+}
+
+/** The `url()` tokens of one declaration value, quoted or bare, with where each starts and its length. */
+function urlsInValue(value: string): Array<{ value: string; index: number; length: number }> {
+  const urls: Array<{ value: string; index: number; length: number }> = [];
+  let i = 0;
+  while (i < value.length) {
+    const ch = value[i];
+    if (ch === '"' || ch === "'") {
+      i = consumeString(value, i);
+      continue;
+    }
+    const match = /^url\(\s*(["']?)([^"')]*)\1\s*\)/i.exec(value.slice(i));
+    if (match) {
+      urls.push({ value: (match[2] ?? "").trim(), index: i, length: match[0].length });
+      i += match[0].length;
+      continue;
+    }
+    i++;
+  }
+  return urls;
+}
+
+/** The layouts the theme's selectors name through `[data-layout=...]`. */
 export function cssLayoutNames(css: string): Set<string> {
   const names = new Set<string>();
-  for (const match of stripCssComments(css).matchAll(
-    /\[data-layout\s*=\s*(["']?)([^\]"'\s]+)\1\]/g,
-  )) {
-    if (match[2]) {
-      names.add(match[2]);
+  for (const selector of cssSelectors(css)) {
+    for (const match of selector.matchAll(LAYOUT_ATTR_RE)) {
+      if (match[2]) {
+        names.add(match[2]);
+      }
     }
   }
   return names;
 }
+
+const LAYOUT_ATTR_RE = /\[data-layout\s*=\s*(["']?)([^\]"'\s]+)\1\]/g;
 
 export function topLevelSelectors(css: string): string[] {
   return [...walkRules(stripCssComments(css))]
@@ -117,7 +242,7 @@ export function scopeSlideCss(css: string, slug: string): string {
   const source = stripCssCommentsPreserveLines(css);
   const edits: Array<{ start: number; end: number; text: string }> = [];
   for (const rule of walkRules(source)) {
-    if (rule.atPath.some((at) => /^@(-\w+-)?keyframes\b/.test(at))) {
+    if (rule.atPath.some((at) => KEYFRAMES_RE.test(at))) {
       continue;
     }
     const scoped = splitSelectorList(rule.selector)
@@ -185,12 +310,21 @@ export function splitSelectorList(selector: string): string[] {
 
 const LEADING_SLIDE_RE = /^\.slide(?=$|[\s[.:#>+~])/;
 
-function escapeRegExp(text: string): string {
+export function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** At-rules whose block holds descriptors, written like declarations, instead of rules. */
+const DESCRIPTOR_AT_RULE_RE = /^@(font-face|page|property|counter-style|font-palette-values)\b/i;
+
+/**
+ * Every style rule, at any depth. With `descriptors`, an at-rule whose block holds descriptors,
+ * such as `@font-face`, comes too, named by its prelude, since its `src` loads a file like a
+ * declaration's `url()` does.
+ */
 function* walkRules(
   source: string,
+  options: { descriptors?: boolean } = {},
   start = 0,
   end = source.length,
   atPath: string[] = [],
@@ -214,7 +348,18 @@ function* walkRules(
       if (source[i] === "{") {
         const atName = source.slice(atStart, i).trim();
         const blockEnd = skipBlock(source, i);
-        yield* walkRules(source, i + 1, blockEnd - 1, [...atPath, atName], depth + 1);
+        if (options.descriptors && DESCRIPTOR_AT_RULE_RE.test(atName)) {
+          yield {
+            selector: atName,
+            selectorStart: atStart,
+            atPath,
+            bodyStart: i + 1,
+            bodyEnd: blockEnd - 1,
+            depth,
+          };
+        } else {
+          yield* walkRules(source, options, i + 1, blockEnd - 1, [...atPath, atName], depth + 1);
+        }
         i = blockEnd;
       } else if (source[i] === ";") {
         i++;
@@ -244,13 +389,20 @@ function* walkRules(
   }
 }
 
-function collectDeclarations(source: string, recurseAt: boolean): CssDeclaration[] {
+function collectDeclarations(
+  source: string,
+  recurseAt: boolean,
+  descriptors = false,
+): CssDeclaration[] {
   const decls: CssDeclaration[] = [];
-  for (const rule of walkRules(source)) {
+  const lineOf = lineLocator(source);
+  for (const rule of walkRules(source, { descriptors })) {
     if (!recurseAt && rule.atPath.length > 0) {
       continue;
     }
-    decls.push(...parseRuleDeclarations(source, rule.selector, rule.bodyStart, rule.bodyEnd));
+    decls.push(
+      ...parseRuleDeclarations(source, rule.selector, rule.bodyStart, rule.bodyEnd, lineOf),
+    );
   }
   return decls;
 }
@@ -260,6 +412,7 @@ function parseRuleDeclarations(
   selector: string,
   start: number,
   end: number,
+  lineOf: (index: number) => number,
 ): CssDeclaration[] {
   const decls: CssDeclaration[] = [];
   let i = start;
@@ -312,9 +465,16 @@ function parseRuleDeclarations(
       }
       i++;
     }
-    const value = source.slice(valueStart, i).trim();
+    const raw = source.slice(valueStart, i);
+    const value = raw.trim();
     if (property) {
-      decls.push({ selector, property, value, line: lineAt(source, propStart) });
+      decls.push({
+        selector,
+        property,
+        value,
+        line: lineOf(propStart),
+        valueStart: valueStart + raw.length - raw.trimStart().length,
+      });
     }
     if (source[i] === ";") {
       i++;
@@ -323,14 +483,25 @@ function parseRuleDeclarations(
   return decls;
 }
 
-function lineAt(source: string, index: number): number {
-  let line = 1;
-  for (let i = 0; i < index; i++) {
-    if (source[i] === "\n") {
-      line++;
-    }
+/** 1-based line of an index, from one pass over the newlines instead of one per lookup. */
+function lineLocator(source: string): (index: number) => number {
+  const newlines: number[] = [];
+  for (let i = source.indexOf("\n"); i !== -1; i = source.indexOf("\n", i + 1)) {
+    newlines.push(i);
   }
-  return line;
+  return (index) => {
+    let low = 0;
+    let high = newlines.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if ((newlines[mid] ?? Number.POSITIVE_INFINITY) < index) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low + 1;
+  };
 }
 
 function consumeString(source: string, start: number, end = source.length): number {
@@ -427,4 +598,193 @@ export function themeLayouts(css: string): ThemeLayout[] {
     const example = examples.get(name);
     return example === undefined ? { name } : { name, example };
   });
+}
+
+/** Classes the player adds at runtime, so a slide's markup never names them. */
+const RUNTIME_CLASSES = ["is-current", "is-shown"];
+
+export type SlideUsage = {
+  /** Classes the slide's markup uses. */
+  classes: Iterable<string>;
+  /** The slide's `data-layout`. */
+  layout?: string;
+  /** The slide's own stylesheet, whose `var()` and animations reach into the theme too. */
+  css?: string;
+};
+
+type ExcerptEntry = {
+  atPath: string[];
+  selector: string;
+  decls: CssDeclaration[];
+  keyframes?: string;
+};
+
+/**
+ * The part of a theme one slide depends on, as CSS that reads on its own: the
+ * rules its classes and layout select, element and state rules under `.slide`,
+ * the keyframes those rules animate with, and only the tokens they reach
+ * through `var()`. It errs toward keeping a rule, since a rule left out misleads
+ * a reader silently while an extra one only costs a line.
+ */
+export function themeExcerpt(css: string, usage: SlideUsage): string {
+  const entries = excerptEntries(css, usage);
+  const own = usage.css === undefined ? [] : cssDeclarations(usage.css);
+  const styled = [
+    ...entries.filter((entry) => !entry.keyframes).flatMap((entry) => entry.decls),
+    ...own,
+  ].filter((decl) => !decl.property.startsWith("--"));
+  const keyframes = animatedKeyframes(styled, entries);
+  const kept = entries.filter((entry) => !entry.keyframes || keyframes.has(entry.keyframes));
+  const tokens = reachedTokens(
+    [...styled, ...kept.filter((entry) => entry.keyframes).flatMap((entry) => entry.decls)],
+    cssDeclarations(css),
+  );
+
+  return renderExcerpt(
+    kept
+      .map((entry) => ({
+        ...entry,
+        decls: entry.decls.filter(
+          (decl) => !decl.property.startsWith("--") || tokens.has(decl.property),
+        ),
+      }))
+      .filter((entry) => entry.decls.length > 0),
+  );
+}
+
+/** Every keyframes block, and every style rule with at least one selector part the slide selects. */
+function excerptEntries(css: string, usage: SlideUsage): ExcerptEntry[] {
+  const source = stripCssComments(css);
+  const lineOf = lineLocator(source);
+  const used = new Set([...usage.classes, "slide", ...RUNTIME_CLASSES]);
+  const entries: ExcerptEntry[] = [];
+  for (const rule of walkRules(source)) {
+    const decls = parseRuleDeclarations(
+      source,
+      rule.selector,
+      rule.bodyStart,
+      rule.bodyEnd,
+      lineOf,
+    );
+    const keyframes = rule.atPath.find((at) => KEYFRAMES_RE.test(at));
+    if (keyframes) {
+      entries.push({
+        atPath: rule.atPath,
+        selector: rule.selector,
+        decls,
+        keyframes: keyframesName(keyframes),
+      });
+      continue;
+    }
+    const parts = splitSelectorList(rule.selector)
+      .map((part) => part.trim())
+      .filter((part) => part && selectorPartApplies(part, used, usage.layout));
+    if (parts.length > 0) {
+      entries.push({ atPath: rule.atPath, selector: parts.join(", "), decls });
+    }
+  }
+  return entries;
+}
+
+/** The names of the keyframes the kept declarations animate with. */
+function animatedKeyframes(styled: CssDeclaration[], entries: ExcerptEntry[]): Set<string> {
+  const animations = styled
+    .filter((decl) => /^animation(-name)?$/.test(decl.property))
+    .map((decl) => decl.value);
+  return new Set(
+    entries.flatMap((entry) =>
+      entry.keyframes && animations.some((value) => mentionsName(value, entry.keyframes ?? ""))
+        ? [entry.keyframes]
+        : [],
+    ),
+  );
+}
+
+function selectorPartApplies(part: string, used: Set<string>, layout?: string): boolean {
+  if (part.startsWith("::view-transition")) {
+    return false;
+  }
+  for (const match of part.matchAll(/\.(-?[_a-zA-Z]+[_a-zA-Z0-9-]*)/g)) {
+    if (match[1] && !used.has(match[1])) {
+      return false;
+    }
+  }
+  for (const match of part.matchAll(LAYOUT_ATTR_RE)) {
+    if (match[2] !== layout) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function keyframesName(at: string): string {
+  return at
+    .replace(KEYFRAMES_RE, "")
+    .trim()
+    .replace(/^(["'])(.*)\1$/, "$2");
+}
+
+function mentionsName(value: string, name: string): boolean {
+  return new RegExp(`(^|[\\s,])${escapeRegExp(name)}($|[\\s,])`).test(value);
+}
+
+function varNames(value: string): string[] {
+  return [...value.matchAll(/var\(\s*(--[-\w]+)/g)].map((match) => match[1] ?? "");
+}
+
+/** The tokens `decls` use, following each token's own `var()` to the ones it is built from. */
+function reachedTokens(decls: CssDeclaration[], all: CssDeclaration[]): Set<string> {
+  const definitions = new Map<string, string[]>();
+  for (const decl of all) {
+    if (decl.property.startsWith("--")) {
+      definitions.set(decl.property, [...(definitions.get(decl.property) ?? []), decl.value]);
+    }
+  }
+  const reached = new Set<string>();
+  const queue = decls.flatMap((decl) => varNames(decl.value));
+  for (let name = queue.pop(); name !== undefined; name = queue.pop()) {
+    if (reached.has(name)) {
+      continue;
+    }
+    reached.add(name);
+    for (const value of definitions.get(name) ?? []) {
+      queue.push(...varNames(value));
+    }
+  }
+  return reached;
+}
+
+function renderExcerpt(entries: ExcerptEntry[]): string {
+  const lines: string[] = [];
+  const open: string[] = [];
+  const pad = (depth: number) => "  ".repeat(depth);
+  for (const entry of entries) {
+    let common = 0;
+    while (
+      common < open.length &&
+      common < entry.atPath.length &&
+      open[common] === entry.atPath[common]
+    ) {
+      common++;
+    }
+    while (open.length > common) {
+      open.pop();
+      lines.push(`${pad(open.length)}}`);
+    }
+    for (const at of entry.atPath.slice(open.length)) {
+      lines.push(`${pad(open.length)}${at} {`);
+      open.push(at);
+    }
+    const indent = pad(open.length);
+    lines.push(
+      `${indent}${entry.selector} {`,
+      ...entry.decls.map((decl) => `${indent}  ${decl.property}: ${decl.value};`),
+      `${indent}}`,
+    );
+  }
+  while (open.length > 0) {
+    open.pop();
+    lines.push(`${pad(open.length)}}`);
+  }
+  return lines.length > 0 ? `${lines.join("\n")}\n` : "";
 }

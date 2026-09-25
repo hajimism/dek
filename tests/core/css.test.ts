@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import {
+  cssAtRuleNames,
   cssClassNames,
   cssCustomProperties,
   cssDeclarations,
+  cssLayoutNames,
+  cssUrls,
+  minifyCss,
   scopeSlideCss,
+  themeExcerpt,
   topLevelSelectors,
 } from "../../src/core/css.ts";
 import { lintDeck } from "../../src/core/index.ts";
@@ -14,6 +19,26 @@ import { withTempProject } from "../helpers/project.ts";
 const titleSlide = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
 </section>`);
+
+describe("minifyCss", () => {
+  test("drops comments and collapses whitespace outside strings", () => {
+    expect(minifyCss("/* theme */\n.slide {\n  color:  var(--fg);\n}\n")).toBe(
+      ".slide { color: var(--fg); }",
+    );
+  });
+
+  test("keeps strings byte for byte, U+3000 and comment markers included", () => {
+    const css =
+      ".a::before { content: \"x\u3000\u3000y  /* z */\"; } .b::after { content: 'it\\'s  '; }";
+    expect(minifyCss(css)).toBe(css);
+  });
+
+  test("treats U+3000 and NBSP outside strings as content, not whitespace", () => {
+    expect(minifyCss(".a { --gap: \u3000; --nb:\u00a0; }")).toBe(
+      ".a { --gap: \u3000; --nb:\u00a0; }",
+    );
+  });
+});
 
 describe("cssClassNames", () => {
   test("collects classes from selectors including compound names", () => {
@@ -112,7 +137,7 @@ describe("cssDeclarations", () => {
   from { opacity: 0; }
 }
 `);
-    expect(decls).toEqual([
+    expect(decls).toMatchObject([
       { selector: ".slide", property: "--fg", value: "#fff", line: 2 },
       { selector: ".slide", property: "color", value: "var(--fg)", line: 2 },
       { selector: ".slide", property: "transition", value: "none", line: 4 },
@@ -218,5 +243,125 @@ describe("scopeSlideCss", () => {
     expect(out).toContain("@keyframes usb--pop { from { opacity: 0; } to { opacity: 1; } }");
     expect(out).toContain(`${scope} .bar { animation: usb--pop var(--step-transition); }`);
     expect(out).toContain(`${scope} .baz { animation-name: usb--pop, fade; }`);
+  });
+});
+
+describe("themeExcerpt", () => {
+  const theme = `
+.slide {
+  --fg: #111;
+  --bg: #fff;
+  --accent: var(--fg);
+  --unused: 4px;
+  color: var(--fg);
+}
+.slide::before { content: ""; }
+.slide .card { border-color: var(--accent); }
+.slide .tag { color: red; }
+.slide ol { margin: 0; }
+.slide[data-layout="title"] { place-items: center; }
+.slide[data-layout="split"] { display: grid; }
+.slide.is-current [data-step].is-shown { opacity: 1; }
+.slide .card, .slide .tag { padding: 0; }
+.slide .card:hover { animation: pop 1s; }
+@keyframes pop { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spin { to { rotate: 1turn; } }
+@media (prefers-color-scheme: dark) {
+  .slide { --fg: #eee; --unused: 8px; }
+  .slide .tag { color: blue; }
+}
+::view-transition-old(root) { animation: none; }
+`;
+  const excerpt = themeExcerpt(theme, { classes: ["slide", "card"], layout: "title" });
+
+  test("keeps the rules for the classes and layout the slide uses", () => {
+    expect(excerpt).toContain(".slide .card {");
+    expect(excerpt).toContain('.slide[data-layout="title"] {');
+    expect(excerpt).not.toContain(".slide .tag {");
+    expect(excerpt).not.toContain('data-layout="split"');
+  });
+
+  test("keeps element, pseudo-element, and runtime state rules", () => {
+    expect(excerpt).toContain(".slide ol {");
+    expect(excerpt).toContain(".slide::before {");
+    expect(excerpt).toContain(".slide.is-current [data-step].is-shown {");
+  });
+
+  test("keeps only the matching parts of a selector list", () => {
+    expect(excerpt).toContain(".slide .card {\n  padding: 0;");
+    expect(excerpt).not.toContain(".slide .card, .slide .tag");
+  });
+
+  test("keeps only the tokens the kept rules reach through var()", () => {
+    expect(excerpt).toContain("--accent: var(--fg);");
+    expect(excerpt).toContain("--fg: #111;");
+    expect(excerpt).not.toContain("--bg");
+    expect(excerpt).not.toContain("--unused");
+  });
+
+  test("keeps referenced keyframes and the at-rules around kept rules", () => {
+    expect(excerpt).toContain("@keyframes pop {");
+    expect(excerpt).not.toContain("@keyframes spin");
+    expect(excerpt).toContain(
+      "@media (prefers-color-scheme: dark) {\n  .slide {\n    --fg: #eee;\n  }\n}",
+    );
+  });
+
+  test("leaves out deck-level view transitions", () => {
+    expect(excerpt).not.toContain("view-transition");
+  });
+
+  test("follows tokens and keyframes the slide's own stylesheet uses", () => {
+    const own = themeExcerpt(theme, {
+      classes: ["slide"],
+      css: ".slide .mine { color: var(--bg); animation: spin 1s; }",
+    });
+    expect(own).toContain("--bg: #fff;");
+    expect(own).toContain("@keyframes spin {");
+  });
+});
+
+describe("scanners share the string-aware rule walker", () => {
+  test("cssAtRuleNames lists block and statement at-rules, not an @ inside a string", () => {
+    const css = `@import "x.css";
+.a::before { content: "@ not a rule"; }
+@media (min-width: 1px) { .b { color: red; } }
+@font-face { font-family: "F"; }
+`;
+    expect(cssAtRuleNames(css)).toEqual(["import", "media", "font-face"]);
+  });
+
+  test("cssUrls reads url() from declaration values, with lines, not from strings", () => {
+    const css = `.a::before { content: "url(not-a-ref.png)"; }
+.b {
+  background: url("assets/bg.png");
+  mask: url(assets/m.svg) no-repeat;
+}
+`;
+    expect(cssUrls(css)).toEqual([
+      { value: "assets/bg.png", line: 3 },
+      { value: "assets/m.svg", line: 4 },
+    ]);
+  });
+
+  test("cssUrls reads the files an @font-face or another descriptor block loads", () => {
+    const css = `@font-face {
+  font-family: F;
+  src: url(assets/f.woff2) format("woff2"), url("assets/f.woff");
+}
+@media print { @font-face { src: url(assets/p.woff2); } }
+`;
+    expect(cssUrls(css)).toEqual([
+      { value: "assets/f.woff2", line: 3 },
+      { value: "assets/f.woff", line: 3 },
+      { value: "assets/p.woff2", line: 5 },
+    ]);
+  });
+
+  test("cssLayoutNames reads data-layout from selectors, not from values", () => {
+    const css = `.slide[data-layout="title"] { --x: '[data-layout=fake]'; }
+.slide[data-layout=split] .a { color: red; }
+`;
+    expect([...cssLayoutNames(css)].sort()).toEqual(["split", "title"]);
   });
 });

@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { copyFile, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildDeck } from "../../src/core/build.ts";
-import { DekError } from "../../src/core/error.ts";
 import { playerEmbed } from "../helpers/embed.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
@@ -24,6 +23,38 @@ async function build(dir: string) {
 }
 
 describe("buildDeck", () => {
+  test("inlines the deck-root asset when slides/ holds one with the same path", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: ".slide { width: 1280px; }\n",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+`,
+            slides: { intro: introSource },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+        await mkdir(join(deckDir, "slides", "assets"), { recursive: true });
+        await writeFile(join(deckDir, "slides", "assets", "pixel.png"), "not a png");
+        const { outPath } = await build(deckDir);
+        const html = await readFile(outPath, "utf8");
+        expect(html).toContain("data:image/png;base64,iVBOR");
+        expect(html).not.toContain(Buffer.from("not a png").toString("base64"));
+      },
+    );
+  });
+
   test("writes a single inlined HTML file without touching source slides", async () => {
     await withTempProject(
       {
@@ -65,7 +96,7 @@ more
         expect(html).toContain("startViewTransition");
         expect(html).toContain("BroadcastChannel");
         expect(html.toLowerCase()).toContain("presenter");
-        expect(html).toContain("</h2> <img");
+        expect(html).toContain("</h2>\n  <img");
         expect(html).not.toContain("EventSource");
         expect(html).toContain("ArrowLeft");
 
@@ -163,7 +194,7 @@ more
     );
   });
 
-  test("fails when a section has no slide HTML", async () => {
+  test("builds a section with no slide HTML from its skeleton", async () => {
     await withTempProject(
       {
         decks: [
@@ -186,14 +217,11 @@ more
         ],
       },
       async (root) => {
-        try {
-          await build(join(root, "decks", "demo"));
-          throw new Error("expected buildDeck to fail");
-        } catch (error) {
-          expect(error).toBeInstanceOf(DekError);
-          expect((error as DekError).message).toContain('missing slide HTML for "extra"');
-          expect((error as DekError).hint).toContain("dek sync");
-        }
+        // A deck that shows beats none: the section falls back to the skeleton sync would write,
+        // and lint's DEK001 still tells the author the file is missing.
+        const html = await readFile((await build(join(root, "decks", "demo"))).outPath, "utf8");
+        expect(html).toContain('data-slug="extra"');
+        expect(html).not.toContain("data-missing");
       },
     );
   });

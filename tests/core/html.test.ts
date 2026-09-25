@@ -6,9 +6,9 @@ import { renderDeckDocument, renderDeckHtml, renderRailHtml } from "../../src/co
 import {
   applyShownClasses,
   extractSlideSection,
+  htmlShell,
   injectSlug,
   loadSlideSources,
-  minifyFragments,
   renderIndexHtml,
   renderSlideHtml,
 } from "../../src/core/html.ts";
@@ -194,9 +194,17 @@ hello
     );
   });
 
-  test("defaults the document shell to ja", async () => {
+  test("takes the document shell's lang from the script when frontmatter has none", async () => {
     await withTempProject(
-      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: デモ\n---\n\n## intro\n\nこんにちは\n",
+            slides: { intro: introHtml },
+          },
+        ],
+      },
       async (root) => {
         const { project, deck } = resolveDeck(join(root, "decks", "demo"));
         const html = await renderDeckDocument(deck, {
@@ -347,6 +355,7 @@ hello
       async (root) => {
         const html = await renderPage(join(root, "decks", "demo"), { mode: "video" });
         expect(html).toContain('data-mode="video"');
+        expect(html).toContain('data-deck="demo"');
         expect(html).not.toContain('id="dek-presenter"');
         expect(html).not.toContain('id="dek-rail"');
         expect(html).not.toContain('id="dek-rail-resize"');
@@ -368,7 +377,15 @@ hello
 
   test("a built player names the rail and presenter keys in the deck's language", async () => {
     await withTempProject(
-      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: デモ\n---\n\n## intro\n\nこんにちは\n",
+            slides: { intro: introHtml },
+          },
+        ],
+      },
       async (root) => {
         const html = await renderPage(join(root, "decks", "demo"));
         expect(html).toContain('id="dek-hint"');
@@ -427,7 +444,7 @@ describe("renderIndexHtml", () => {
     const html = renderIndexHtml([{ name: "demo", title: "Demo" }]);
     expect(html).toContain('href="/decks/demo/"');
     expect(html).toContain("demo");
-    expect(html).toContain('<html lang="ja">');
+    expect(html).toContain('<html lang="en">');
   });
 
   test("lists failed decks", () => {
@@ -483,7 +500,7 @@ second
         expect(html).not.toMatch(
           /data-step="slides-hang"[^>]*is-shown|is-shown[^>]*data-step="slides-hang"/,
         );
-        expect(html).toContain('<html lang="ja">');
+        expect(html).toContain('<html lang="en">');
       },
     );
   });
@@ -634,7 +651,7 @@ describe("renderDeckHtml live", () => {
     );
   });
 
-  test("keeps a placeholder for missing slides so indexes stay aligned", async () => {
+  test("renders a missing slide from its skeleton so indexes stay aligned", async () => {
     await withTempProject(
       {
         decks: [
@@ -661,7 +678,10 @@ more
         expect(html).not.toContain('class="dek-diagnostics"');
         expect(html).toContain('data-slug="intro"');
         expect(html).toContain('data-slug="extra"');
-        expect(html).toContain("data-missing");
+        expect(html).not.toContain("data-missing");
+        expect(html).toMatch(
+          /data-slug="extra"[^>]*data-layout="title"|data-layout="title"[^>]*data-slug="extra"/,
+        );
         const data = JSON.parse(html.match(/id="dek-data">([^<]+)/)?.[1] ?? "[]") as Array<{
           slug: string;
         }>;
@@ -671,20 +691,10 @@ more
   });
 });
 
-describe("minifyFragments", () => {
-  test("drops indentation between tags but keeps one space, as the browser renders it", () => {
-    expect(
-      minifyFragments(
-        '<section class="slide">\n  <h2>a</h2>\n  <p><b>x</b> <i>y</i></p>\n</section>',
-      ),
-    ).toBe('<section class="slide"> <h2>a</h2> <p><b>x</b> <i>y</i></p> </section>');
-  });
-
-  test("leaves the inside of pre and textarea untouched", () => {
-    const pre = '<pre class="code"><span>one</span>\n<span>two</span>\n  <b>three</b></pre>';
-    const textarea = "<textarea>\n  <kept>\n</textarea>";
-    expect(minifyFragments(`<section>\n  ${pre}\n  ${textarea}\n</section>`)).toBe(
-      `<section> ${pre} ${textarea} </section>`,
+describe("htmlShell", () => {
+  test("sizes the page to the device, so a phone does not lay it out at desktop width", () => {
+    expect(htmlShell({ body: "" })).toContain(
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
     );
   });
 });
