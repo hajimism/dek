@@ -47,6 +47,39 @@ describe("freezeTransition", () => {
     expect(seeks).toEqual([900, 200]);
   });
 
+  test("stops every animation at one moment of the transition, not at its own midpoint", async () => {
+    const animation = (endTime: number, pseudoElement?: string) => ({
+      currentTime: null as number | null,
+      finish() {},
+      pause() {},
+      effect: {
+        pseudoElement,
+        getComputedTiming: () => ({ delay: 0, duration: endTime, endTime }),
+      },
+    });
+    const morph = animation(600, "::view-transition-group(window)");
+    const fade = animation(300, "::view-transition-new(slide)");
+    const entrance = animation(2000);
+    document.startViewTransition = ((update: () => void) => {
+      update();
+      return { ready: Promise.resolve(), finished: Promise.resolve() };
+    }) as unknown as typeof document.startViewTransition;
+    (document as { getAnimations: () => unknown[] }).getAnimations = () => [morph, fade, entrance];
+    window.dekGo = async (next) => {
+      if (next?.slideIndex === 1) {
+        document.startViewTransition(() => {});
+      }
+    };
+    const seeks: number[] = [];
+    window.dekMotion = { duration: () => 900, seek: (t) => seeks.push(t) };
+
+    await freezeTransition(page, { from, to, at: 0.5 });
+
+    // Half of the 600ms transition: the 300ms fade is over, the slide's entrance is 300ms in.
+    expect([morph.currentTime, fade.currentTime, entrance.currentTime]).toEqual([300, 300, 300]);
+    expect(seeks).toEqual([900, 300]);
+  });
+
   test("leaves the page it transitions from at the end of its beat", async () => {
     const order: string[] = [];
     const entrance = {

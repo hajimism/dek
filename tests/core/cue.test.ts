@@ -89,6 +89,10 @@ describe("unknownAsciiWords", () => {
   test("is deterministic and case-sensitive against dict keys", () => {
     expect(unknownAsciiWords("vite dek", dict)).toEqual(["vite"]);
   });
+
+  test("a word that names an Object prototype member is still unknown", () => {
+    expect(unknownAsciiWords("constructor toString", {})).toEqual(["constructor", "toString"]);
+  });
 });
 
 describe("cuesFromDeck", () => {

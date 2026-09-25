@@ -72,7 +72,7 @@ export function unknownAsciiWords(text: string, dict: VoiceDict): string[] {
   const seen = new Set<string>();
   for (const match of text.matchAll(ASCII_WORD_RE)) {
     const word = match[0];
-    if (word.length < 2 || word in dict || seen.has(word)) {
+    if (word.length < 2 || Object.hasOwn(dict, word) || seen.has(word)) {
       continue;
     }
     seen.add(word);
@@ -89,7 +89,7 @@ export type CueSource = {
 };
 
 /** One entry per cue: the markdown that feeds it. Beat 0 also carries the section body. */
-export function cueSources(deck: Deck): CueSource[] {
+function cueSources(deck: Deck): CueSource[] {
   const sources: CueSource[] = [];
   for (const [slideIndex, section] of deck.sections.entries()) {
     if (section.beats.length === 0) {

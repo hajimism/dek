@@ -20,19 +20,35 @@ export async function freezeTransition(page: EvaluatingPage, morph: MorphRequest
     await page.evaluate(() => window.__dekPendingGo);
     return;
   }
-  await page.evaluate((at) => {
-    let morphMs = 0;
-    for (const animation of document.getAnimations()) {
-      animation.pause();
-      const timing = animation.effect?.getComputedTiming();
-      const duration = typeof timing?.duration === "number" ? timing.duration : 0;
-      const total = (timing?.delay ?? 0) + duration;
-      animation.currentTime = at * total;
-      morphMs = Math.max(morphMs, at * total);
-    }
-    // The script started with the same go, so it is as many ms in as the morph.
-    window.dekMotion?.seek(morphMs);
-  }, morph.at);
+  await page.evaluate(freezeAt, morph.at);
+}
+
+/**
+ * Runs in the page, shipped by `page.evaluate`, so it references nothing outside itself.
+ * Every animation `go` started runs on one clock, so all of them stop at the same moment:
+ * `at` of the view transition's span, the longest end among its pseudo-elements (or among
+ * every animation, when the transition animates nothing). A short fade is then over at
+ * `at` of a long morph, as it is when the talk plays.
+ */
+export function freezeAt(at: number): void {
+  const animations = document.getAnimations();
+  const endOf = (animation: Animation): number => {
+    const end = animation.effect?.getComputedTiming().endTime;
+    return typeof end === "number" && Number.isFinite(end) ? end : 0;
+  };
+  const isTransition = (animation: Animation): boolean => {
+    const effect = animation.effect as { pseudoElement?: string | null } | null;
+    return (effect?.pseudoElement ?? "").startsWith("::view-transition");
+  };
+  const transition = animations.filter(isTransition);
+  const span = Math.max(0, ...(transition.length > 0 ? transition : animations).map(endOf));
+  const moment = at * span;
+  for (const animation of animations) {
+    animation.pause();
+    animation.currentTime = moment;
+  }
+  // The script started with the same go, so it is as many ms in as the morph.
+  window.dekMotion?.seek(moment);
 }
 
 /**

@@ -84,6 +84,10 @@ export function measureTextContrast(
   // One step of an 8-bit channel.
   const COVERAGE_SLACK = 1 / 255;
   const WORST_SHARE = 0.02;
+  // Fully transparent text draws nothing; any glyph pixel under it belongs to another text.
+  if (opacity <= 0) {
+    return undefined;
+  }
   const { shown, bare, white, black } = layers;
   const at = (image: Pixels, i: number): Rgb => [
     image.data[i] ?? 0,
@@ -150,7 +154,7 @@ export function textLayerCss(layer: TextLayer): string {
  * Runs in the page: marks text whose background is clipped to its glyphs, so
  * the bare layer can take that background away with the glyphs.
  */
-export function markClippedText(): void {
+function markClippedText(): void {
   for (const el of document.querySelectorAll("*")) {
     if (getComputedStyle(el).backgroundClip === "text") {
       el.setAttribute("data-dek-clip-text", "");
@@ -230,12 +234,18 @@ export async function measurePageTextContrasts(
   }
   const shot = async (): Promise<string> =>
     Buffer.from(await page.screenshot({ type: "png" })).toString("base64");
-  // null takes the layer away again.
+  // null takes the layer away again. The glyphs go back first, with transitions still off,
+  // so they do not fade back from the last layer's fill in whatever is drawn next.
   const setLayer = (css: string | null): Promise<void> =>
     page.evaluate((text) => {
       let style = document.getElementById("dek-text-layer");
       if (text === null) {
-        style?.remove();
+        if (style) {
+          style.textContent = "*, *::before, *::after { transition: none !important; }";
+          // Reading layout applies the change now, while transitions are still off.
+          void document.body.offsetWidth;
+          style.remove();
+        }
         return;
       }
       if (!style) {

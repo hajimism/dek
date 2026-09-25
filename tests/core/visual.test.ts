@@ -162,14 +162,22 @@ describe("lintVisualDeck", () => {
     );
   });
 
-  test("reports a diagnostic when slide HTML is missing", async () => {
-    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
-        runner: async () => ({ overflows: [], contrasts: [] }),
-      });
-      expect(diagnostics?.some((d) => d.message.includes("missing slide HTML"))).toBe(true);
-      expect(diagnostics?.some((d) => d.path?.includes("intro.html"))).toBe(true);
-    });
+  test("leaves a missing slide HTML to lint (DEK001) and still checks the other slides", async () => {
+    const twoSections = "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n## missing\n\nbye\n";
+    await withTempProject(
+      { decks: [{ name: "demo", script: twoSections, slides: { intro: introHtml } }] },
+      async (root) => {
+        const seen: string[] = [];
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async (request: VisualRequest) => {
+            seen.push(...request.pages.map((page) => page.slug ?? ""));
+            return { overflows: [], contrasts: [] };
+          },
+        });
+        expect(diagnostics).toEqual([]);
+        expect(seen).toEqual(["intro"]);
+      },
+    );
   });
 
   test("a broken slide script is left to DEK016 and every beat is still checked", async () => {
@@ -335,6 +343,7 @@ describe("lintVisualDeck messages", () => {
     expect(diagnostics.filter((d) => d.id === "DEK030")).toEqual([
       {
         id: "DEK030",
+        severity: "error",
         message:
           'li[data-step="vague"] "https://example.com/very…" overflows the right edge by 412px at steps slow, vague',
         path: expect.stringContaining("slides/intro.html"),
@@ -388,6 +397,7 @@ describe("lintVisualDeck messages", () => {
     expect(diagnostics.filter((d) => d.id === "DEK031")).toEqual([
       {
         id: "DEK031",
+        severity: "error",
         message:
           'p.stat-label "手戻りの減少" has contrast 1.9 (#444444 on #111111), below 4.5:1 at steps 1, 2',
         path: expect.stringContaining("slides/intro.html"),

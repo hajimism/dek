@@ -142,6 +142,19 @@ describe("measureTextContrast", () => {
     expect(measureTextContrast(layers, { rects: theirs, overlaps: line })?.fg).toEqual(VIOLET);
   });
 
+  test("returns nothing for fully transparent text stacked on another text", () => {
+    // A hidden beat's text in the same cell as the shown one: the glyphs under it are the other's.
+    const layers = {
+      shown: pixels(fill(WHITE)),
+      bare: pixels(fill(DARK)),
+      ...glyphs(fill(WHITE).map(() => true)),
+    };
+    expect(
+      measureTextContrast(layers, { rects: line, overlaps: line, opacity: 0 }),
+    ).toBeUndefined();
+    expect(measureTextContrast(layers, { rects: line, overlaps: line })?.fg).toEqual(WHITE);
+  });
+
   test("returns nothing when no glyph is drawn", () => {
     const measured = measureTextContrast(
       {

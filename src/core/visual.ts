@@ -1,8 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Diagnostic } from "./diagnostic.ts";
-import { DekError } from "./error.ts";
-import { loadSlideSources, renderSlideHtml } from "./html.ts";
+import { type Diagnostic, diag } from "./diagnostic.ts";
+import { loadSlideSources, renderSlideHtml, slideFragment } from "./html.ts";
 import { cacheDir } from "./path.ts";
 import {
   defaultPlaywrightRunner,
@@ -87,7 +86,7 @@ export const LARGE_TEXT_PX = 24;
 export const LARGE_BOLD_TEXT_PX = 18.66;
 export const BOLD_WEIGHT = 700;
 
-export function isLargeText(sample: TextSample): boolean {
+function isLargeText(sample: TextSample): boolean {
   if (sample.fontSize === undefined) {
     return false;
   }
@@ -176,36 +175,28 @@ async function visualDeck(
     if (options.slug && section.slug !== options.slug) {
       continue;
     }
+    // A missing file or section is lint's to report (DEK001, DEK007); there is nothing to render.
+    if (slideFragment(deck, section.slug) === undefined) {
+      continue;
+    }
     const slidePath = join(deck.dir, "slides", `${section.slug}.html`);
     const beatCount = Math.max(section.beats.length, 1);
     const last = beatCount - 1;
     for (let beatIndex = 0; beatIndex < beatCount; beatIndex++) {
-      try {
-        const html = renderSlideHtml(deck, section.slug, beatIndex, sources);
-        let screenshotPath: string | undefined;
-        if (shotDir && beatIndex === last) {
-          const filename = shotFileName(section.slug, undefined, html);
-          pruneStaleShots(shotDir, section.slug, undefined, filename);
-          screenshotPath = join(shotDir, filename);
-        }
-        pages.push({
-          html,
-          slug: section.slug,
-          step: stepKey(section.beats, beatIndex),
-          path: slidePath,
-          ...(screenshotPath ? { screenshotPath } : {}),
-        });
-      } catch (error) {
-        if (error instanceof DekError) {
-          diagnostics.push({
-            id: "DEK001",
-            message: error.message,
-            path: error.path ?? slidePath,
-          });
-          continue;
-        }
-        throw error;
+      const html = renderSlideHtml(deck, section.slug, beatIndex, sources);
+      let screenshotPath: string | undefined;
+      if (shotDir && beatIndex === last) {
+        const filename = shotFileName(section.slug, undefined, html);
+        pruneStaleShots(shotDir, section.slug, undefined, filename);
+        screenshotPath = join(shotDir, filename);
       }
+      pages.push({
+        html,
+        slug: section.slug,
+        step: stepKey(section.beats, beatIndex),
+        path: slidePath,
+        ...(screenshotPath ? { screenshotPath } : {}),
+      });
     }
   }
 
@@ -320,19 +311,20 @@ function visualDiagnostics(response: VisualResponse, fallbackPath: string): Diag
     const amounts = Object.fromEntries(
       edges.map((edge) => [edge, Math.max(...items.map((item) => item.by?.[edge] ?? 0))]),
     );
-    diagnostics.push({
-      id: "DEK030",
-      message: `${target}${where} ${atSteps(steps)}`,
-      path: pathOf(first.slug),
-      ...(first.slug ? { slug: first.slug } : {}),
-      ...(hints.length > 0 ? { hint: hints.join("; ") } : {}),
-      data: {
-        ...(first.box ? { box: first.box } : {}),
-        ...(first.text ? { text: first.text } : {}),
-        edges: amounts,
-        steps,
-      },
-    });
+    diagnostics.push(
+      diag("DEK030", {
+        message: `${target}${where} ${atSteps(steps)}`,
+        path: pathOf(first.slug),
+        ...(first.slug ? { slug: first.slug } : {}),
+        ...(hints.length > 0 ? { hint: hints.join("; ") } : {}),
+        data: {
+          ...(first.box ? { box: first.box } : {}),
+          ...(first.text ? { text: first.text } : {}),
+          edges: amounts,
+          steps,
+        },
+      }),
+    );
   }
 
   const failing = response.contrasts.filter((sample) => sample.ratio < contrastThreshold(sample));
@@ -358,21 +350,22 @@ function visualDiagnostics(response: VisualResponse, fallbackPath: string): Diag
     const message = first.box
       ? `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`
       : `contrast ${ratio} is below ${threshold}:1${size} ${atSteps(steps)}`;
-    diagnostics.push({
-      id: "DEK031",
-      message,
-      path: pathOf(first.slug),
-      ...(first.slug ? { slug: first.slug } : {}),
-      hint: `raise the contrast of its color against the background to ${threshold}:1`,
-      data: {
-        ...(first.box ? { box: first.box } : {}),
-        ...(first.text ? { text: first.text } : {}),
-        ratio,
-        threshold,
-        ...(fg && bg ? { fg, bg } : {}),
-        steps,
-      },
-    });
+    diagnostics.push(
+      diag("DEK031", {
+        message,
+        path: pathOf(first.slug),
+        ...(first.slug ? { slug: first.slug } : {}),
+        hint: `raise the contrast of its color against the background to ${threshold}:1`,
+        data: {
+          ...(first.box ? { box: first.box } : {}),
+          ...(first.text ? { text: first.text } : {}),
+          ratio,
+          threshold,
+          ...(fg && bg ? { fg, bg } : {}),
+          steps,
+        },
+      }),
+    );
   }
   return diagnostics;
 }
