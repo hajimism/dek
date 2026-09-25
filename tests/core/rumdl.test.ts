@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defaultRumdlRunner, resolveRumdlBin, rumdlDiagnostics } from "../../src/core/rumdl.ts";
+import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 const sample = JSON.stringify({
@@ -31,7 +32,7 @@ describe("rumdlDiagnostics", () => {
   test("maps rumdl SARIF to diagnostics", async () => {
     const diagnostics = await rumdlDiagnostics("script.md", async () => sample);
     expect(diagnostics).toEqual([
-      { id: "MD013", message: "line too long", path: "script.md", line: 8 },
+      { id: "MD013", severity: "error", message: "line too long", path: "script.md", line: 8 },
     ]);
   });
 
@@ -45,21 +46,13 @@ describe("rumdlDiagnostics", () => {
 });
 
 describe("resolveRumdlBin", () => {
-  test("prefers DEK_RUMDL over PATH and local bins", () => {
-    const previous = process.env.DEK_RUMDL;
-    process.env.DEK_RUMDL = "/tmp/custom-rumdl";
-    try {
+  test.serial("prefers DEK_RUMDL over PATH and local bins", async () => {
+    await withEnv({ DEK_RUMDL: "/tmp/custom-rumdl" }, async () => {
       expect(resolveRumdlBin()).toBe("/tmp/custom-rumdl");
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DEK_RUMDL;
-      } else {
-        process.env.DEK_RUMDL = previous;
-      }
-    }
+    });
   });
 
-  test("finds node_modules/.bin/rumdl from cwd when rumdl is not on PATH", async () => {
+  test.serial("finds node_modules/.bin/rumdl from cwd when rumdl is not on PATH", async () => {
     await withTempDir(async (dir) => {
       const binDir = join(dir, "node_modules", ".bin");
       await mkdir(binDir, { recursive: true });
@@ -68,37 +61,31 @@ describe("resolveRumdlBin", () => {
       await chmod(rumdl, 0o755);
       const nested = join(dir, "decks", "why-dek");
       await mkdir(nested, { recursive: true });
-      const previous = process.env.DEK_RUMDL;
+      // An empty PATH entry keeps Bun.which from finding a machine-wide rumdl,
+      // so the node_modules/.bin walk is what resolves it.
+      const emptyPath = join(dir, "empty-path");
+      await mkdir(emptyPath, { recursive: true });
       const cwd = process.cwd();
-      delete process.env.DEK_RUMDL;
-      try {
-        process.chdir(nested);
-        if (Bun.which("rumdl")) {
-          expect(resolveRumdlBin()).toBeTruthy();
-        } else {
+      await withEnv({ DEK_RUMDL: undefined, PATH: emptyPath }, async () => {
+        try {
+          process.chdir(nested);
+          expect(Bun.which("rumdl")).toBeNull();
           expect(resolveRumdlBin()).toBe(rumdl);
+        } finally {
+          process.chdir(cwd);
         }
-      } finally {
-        process.chdir(cwd);
-        if (previous === undefined) {
-          delete process.env.DEK_RUMDL;
-        } else {
-          process.env.DEK_RUMDL = previous;
-        }
-      }
+      });
     });
   });
 });
 
 describe("defaultRumdlRunner", () => {
-  test("returns stdout when rumdl writes a megabyte of stderr", async () => {
+  test.serial("returns stdout when rumdl writes a megabyte of stderr", async () => {
     const noisy = join(import.meta.dir, "..", "helpers", "fake-noisy.ts");
     await withTempDir(async (dir) => {
       const scriptPath = join(dir, "script.md");
       await writeFile(scriptPath, "# demo\n");
-      const previous = process.env.DEK_RUMDL;
-      process.env.DEK_RUMDL = noisy;
-      try {
+      await withEnv({ DEK_RUMDL: noisy }, async () => {
         const started = Date.now();
         const stdout = await Promise.race([
           defaultRumdlRunner(scriptPath),
@@ -108,13 +95,7 @@ describe("defaultRumdlRunner", () => {
         ]);
         expect(Date.now() - started).toBeLessThan(2000);
         expect(stdout).toContain("ok");
-      } finally {
-        if (previous === undefined) {
-          delete process.env.DEK_RUMDL;
-        } else {
-          process.env.DEK_RUMDL = previous;
-        }
-      }
+      });
     });
   });
 });

@@ -18,8 +18,11 @@ declare module "playwright" {
           printBackground?: boolean;
           margin?: { top?: string; right?: string; bottom?: string; left?: string };
         }): Promise<Buffer>;
+        close(): Promise<void>;
       }>;
       close(): Promise<void>;
     }>;
   };
+  export type Browser = Awaited<ReturnType<typeof chromium.launch>>;
+  export type Page = Awaited<ReturnType<Browser["newPage"]>>;
 }

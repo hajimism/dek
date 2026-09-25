@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { DekError } from "./error.ts";
 import { resolvePackageFromAncestors } from "./optional.ts";
 import { moduleFilePath } from "./path.ts";
-import { awaitPiped } from "./spawn.ts";
+import { runJsonWorker, workerCommand } from "./spawn.ts";
 import type { Position } from "./step.ts";
 
 export type VisualPage = {
@@ -61,11 +61,11 @@ export type VisualResponse = {
 export type PlaywrightRunner = (request: VisualRequest) => Promise<VisualResponse | null>;
 
 export type SpawnTimeoutOptions = {
+  /** Covers the whole worker run; see `runJsonWorker`. */
   timeoutMs?: number;
 };
 
 const requirePlaywright = createRequire(import.meta.url);
-const SPAWN_TIMEOUT_MS = 15_000;
 
 export function resolvePlaywrightModule(): string | undefined {
   try {
@@ -105,59 +105,23 @@ export async function defaultPlaywrightRunner(
   if (!playwrightResolved()) {
     return null;
   }
-  const bin = process.env.DEK_PLAYWRIGHT;
-  if (bin) {
-    const cmd = bin.endsWith(".ts") ? ["bun", "--no-install", bin] : [bin];
-    return spawnRunner(cmd, request, options);
-  }
-  return spawnRunner(["bun", "--no-install", workerPath()], request, options);
+  return spawnRunner(workerCommand(process.env.DEK_PLAYWRIGHT || workerPath()), request, options);
 }
 
 function workerPath(): string {
   return moduleFilePath(new URL("./playwright-worker.ts", import.meta.url));
 }
 
-async function spawnRunner(
+function spawnRunner(
   cmd: string[],
   request: VisualRequest,
-  options: SpawnTimeoutOptions = {},
-): Promise<VisualResponse | null> {
-  try {
-    const proc = Bun.spawn(cmd, {
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const piped = awaitPiped(proc);
-    const timeout = setTimeout(() => proc.kill(), options.timeoutMs ?? SPAWN_TIMEOUT_MS);
-    try {
-      proc.stdin.write(JSON.stringify(request));
-      await proc.stdin.end();
-    } finally {
-      clearTimeout(timeout);
-    }
-    const { stdout: out, stderr: err, exitCode } = await piped;
-    if (exitCode !== 0) {
-      throw new DekError("Playwright worker failed", {
-        hint: err.trim().slice(0, 200) || "bunx playwright install or check DEK_PLAYWRIGHT",
-      });
-    }
-    const parsed = parseVisualResponse(out);
-    if (!parsed) {
-      throw new DekError("Playwright worker failed", {
-        hint: "worker returned invalid JSON",
-      });
-    }
-    return parsed;
-  } catch (error) {
-    if (error instanceof DekError) {
-      throw error;
-    }
-    throw new DekError("Playwright worker failed", {
-      hint: "bunx playwright install or check DEK_PLAYWRIGHT",
-      cause: error,
-    });
-  }
+  options: SpawnTimeoutOptions,
+): Promise<VisualResponse> {
+  return runJsonWorker(cmd, request, parseVisualResponse, {
+    label: "Playwright worker failed",
+    hint: `${PLAYWRIGHT_INSTALL} or check DEK_PLAYWRIGHT`,
+    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+  });
 }
 
 export function parseVisualResponse(text: string | null): VisualResponse | null {

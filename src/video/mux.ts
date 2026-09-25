@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
-import { awaitPiped } from "../core/spawn.ts";
+import { awaitPiped, workerCommand } from "../core/spawn.ts";
 import type { VideoFrame } from "./recorder.ts";
 
 export function ffmpegResolved(): boolean {
@@ -20,7 +20,7 @@ export function ffmpegResolved(): boolean {
 function ffmpegCommand(args: string[]): string[] {
   const bin = process.env.DEK_FFMPEG;
   if (bin) {
-    return bin.endsWith(".ts") ? ["bun", "--no-install", bin, ...args] : [bin, ...args];
+    return workerCommand(bin, args);
   }
   return ["ffmpeg", ...args];
 }

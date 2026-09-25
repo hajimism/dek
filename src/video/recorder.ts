@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import { moduleFilePath } from "../core/path.ts";
 import { playwrightResolved } from "../core/playwright.ts";
-import { awaitPiped } from "../core/spawn.ts";
+import { runJsonWorker, workerCommand } from "../core/spawn.ts";
 import type { Position } from "../core/step.ts";
 import { playbackSchedule, type Timeline } from "../core/timeline.ts";
 import { VIDEO_CAPTURE_STRATEGY } from "./strategy.ts";
@@ -46,8 +46,6 @@ const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
 );
-
-const SPAWN_TIMEOUT_MS = 15_000;
 
 export function frameStops(animationMs: number, fps: number): number[] {
   if (animationMs <= 0) {
@@ -98,43 +96,24 @@ function workerPath(): string {
   return moduleFilePath(new URL("./worker.ts", import.meta.url));
 }
 
-async function spawnVideoRunner(
+function spawnVideoRunner(
   bin: string,
   request: VideoCaptureRequest,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number },
 ): Promise<VideoCaptureResponse> {
-  const cmd = bin.endsWith(".ts") ? ["bun", "--no-install", bin] : [bin];
+  return runJsonWorker(workerCommand(bin), request, parseVideoResponse, {
+    label: "video capture failed",
+    hint: "install Playwright or set DEK_VIDEO",
+    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+  });
+}
+
+function parseVideoResponse(text: string): VideoCaptureResponse | null {
   try {
-    const proc = Bun.spawn(cmd, { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
-    const piped = awaitPiped(proc);
-    const timeout = setTimeout(() => proc.kill(), options.timeoutMs ?? SPAWN_TIMEOUT_MS);
-    try {
-      proc.stdin.write(JSON.stringify(request));
-      await proc.stdin.end();
-    } finally {
-      clearTimeout(timeout);
-    }
-    const { stdout: out, stderr: err, exitCode: code } = await piped;
-    if (code !== 0) {
-      throw new DekError("video capture failed", {
-        hint: err.trim().slice(0, 200) || "check Playwright / DEK_VIDEO",
-      });
-    }
-    const parsed = JSON.parse(out) as VideoCaptureResponse;
-    if (!parsed || !Array.isArray(parsed.frames)) {
-      throw new DekError("video capture failed", {
-        hint: "worker returned invalid JSON",
-      });
-    }
-    return parsed;
-  } catch (error) {
-    if (error instanceof DekError) {
-      throw error;
-    }
-    throw new DekError("video capture failed", {
-      hint: "install Playwright or set DEK_VIDEO",
-      cause: error,
-    });
+    const parsed = JSON.parse(text) as VideoCaptureResponse;
+    return parsed && Array.isArray(parsed.frames) ? parsed : null;
+  } catch {
+    return null;
   }
 }
 

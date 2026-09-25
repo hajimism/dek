@@ -1,8 +1,8 @@
 import { dirname } from "node:path";
-import type { Diagnostic } from "./diagnostic.ts";
+import { type Diagnostic, errorDiagnostic } from "./diagnostic.ts";
 import { resolveBinFromAncestors } from "./optional.ts";
 import type { SarifLog } from "./sarif.ts";
-import { awaitPiped } from "./spawn.ts";
+import { awaitPiped, workerCommand } from "./spawn.ts";
 
 export type RumdlRunner = (scriptPath: string) => Promise<string | null>;
 
@@ -21,7 +21,7 @@ export async function defaultRumdlRunner(scriptPath: string): Promise<string | n
 
   try {
     const args = ["check", scriptPath, "--output-format", "sarif"];
-    const cmd = bin.endsWith(".ts") ? ["bun", bin, ...args] : [bin, ...args];
+    const cmd = workerCommand(bin, args);
     const proc = Bun.spawn(cmd, {
       cwd: dirname(scriptPath),
       stdout: "pipe",
@@ -55,7 +55,7 @@ export async function runRumdl(
   return parseRumdlSarif(text);
 }
 
-export function parseRumdlSarif(text: string | null): {
+function parseRumdlSarif(text: string | null): {
   diagnostics: Diagnostic[];
   sarif?: SarifLog;
 } {
@@ -79,12 +79,13 @@ export function parseRumdlSarif(text: string | null): {
   for (const run of sarif.runs) {
     for (const result of run.results ?? []) {
       const loc = result.locations?.[0]?.physicalLocation;
-      diagnostics.push({
-        id: result.ruleId,
-        message: result.message.text,
-        ...(loc?.artifactLocation.uri ? { path: loc.artifactLocation.uri } : {}),
-        ...(loc?.region?.startLine !== undefined ? { line: loc.region.startLine } : {}),
-      });
+      diagnostics.push(
+        errorDiagnostic(result.ruleId, {
+          message: result.message.text,
+          ...(loc?.artifactLocation.uri ? { path: loc.artifactLocation.uri } : {}),
+          ...(loc?.region?.startLine !== undefined ? { line: loc.region.startLine } : {}),
+        }),
+      );
     }
   }
   return { diagnostics, sarif };

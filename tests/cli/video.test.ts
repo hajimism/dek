@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { videoCommand } from "../../src/cli/video.ts";
 import { DekError } from "../../src/core/error.ts";
 import type { Timeline } from "../../src/core/timeline.ts";
+import { VOICE_SETUP_HINT } from "../../src/core/voice.ts";
 import { writeVideoSidecars } from "../../src/video/sidecar.ts";
 import { silentWav } from "../../src/voice/wav.ts";
 import { runDek } from "../helpers/cli.ts";
@@ -145,6 +146,17 @@ describe("dek video", () => {
 });
 
 describe("videoCommand", () => {
+  test("a deck without voice gets the shared setup hint", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await expect(videoCommand({ cwd: deckDir })).rejects.toMatchObject({
+        message: "voice.toml not found",
+        path: join(deckDir, "voice", "voice.toml"),
+        hint: VOICE_SETUP_HINT,
+      });
+    });
+  });
+
   test("errors when Timeline JSON is invalid", async () => {
     await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");

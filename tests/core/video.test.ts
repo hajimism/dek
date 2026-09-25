@@ -171,6 +171,38 @@ describe("fake video worker", () => {
   });
 });
 
+describe("video worker", () => {
+  test("reports a failure as one line on stderr and exits 2, like the Playwright worker", async () => {
+    if (!playwrightResolved()) {
+      return;
+    }
+    await withTempDir(async (dir) => {
+      const file = join(dir, "not-a-dir");
+      writeFileSync(file, "");
+      const worker = join(import.meta.dir, "../../src/video/worker.ts");
+      const proc = Bun.spawn(["bun", "--no-install", worker], {
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      proc.stdin.write(
+        JSON.stringify({
+          html: "<html></html>",
+          timeline,
+          fps: 10,
+          viewport: { width: 1, height: 1 },
+          outDir: join(file, "frames"),
+        }),
+      );
+      await proc.stdin.end();
+      const [err, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
+      expect(code).toBe(2);
+      expect(err.trim().split("\n")).toHaveLength(1);
+      expect(err).toContain("ENOTDIR");
+    });
+  });
+});
+
 describe("sliceWav", () => {
   test("keeps only the requested PCM window", () => {
     const pcm = Buffer.alloc(20);
@@ -218,31 +250,39 @@ describe("defaultVideoRunner", () => {
     });
   });
 
-  test.serial("returns frames when the worker is slower than timeoutMs", async () => {
-    await withTempDir(async (dir) => {
-      const previous = process.env.DEK_VIDEO;
-      process.env.DEK_VIDEO = join(import.meta.dir, "../helpers/fake-video-slow.ts");
-      try {
-        const captured = await defaultVideoRunner(
-          {
-            html: "<html></html>",
-            timeline,
-            fps: 30,
-            viewport: { width: 1, height: 1 },
-            outDir: dir,
-          },
-          { timeoutMs: 30 },
-        );
-        expect(captured.frames.length).toBeGreaterThan(0);
-      } finally {
-        if (previous === undefined) {
-          delete process.env.DEK_VIDEO;
-        } else {
-          process.env.DEK_VIDEO = previous;
+  test.serial(
+    "fails when the worker runs past timeoutMs, so a hung browser cannot hang dek",
+    async () => {
+      await withTempDir(async (dir) => {
+        const previous = process.env.DEK_VIDEO;
+        process.env.DEK_VIDEO = join(import.meta.dir, "../helpers/fake-video-slow.ts");
+        try {
+          await expect(
+            defaultVideoRunner(
+              {
+                html: "<html></html>",
+                timeline,
+                fps: 30,
+                viewport: { width: 1, height: 1 },
+                outDir: dir,
+              },
+              { timeoutMs: 20 },
+            ),
+          ).rejects.toMatchObject({
+            name: "DekError",
+            message: "video capture failed",
+            hint: expect.stringContaining("did not finish"),
+          });
+        } finally {
+          if (previous === undefined) {
+            delete process.env.DEK_VIDEO;
+          } else {
+            process.env.DEK_VIDEO = previous;
+          }
         }
-      }
-    });
-  });
+      });
+    },
+  );
 
   test.serial("throws when the worker exits non-zero", async () => {
     await withTempDir(async (dir) => {

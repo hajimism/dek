@@ -95,21 +95,27 @@ describe("defaultPlaywrightRunner", () => {
     });
   });
 
-  test.serial("returns JSON when the worker is slower than timeoutMs", async () => {
-    const slow = join(import.meta.dir, "..", "helpers", "fake-playwright-slow.ts");
-    const previous = process.env.DEK_PLAYWRIGHT;
-    process.env.DEK_PLAYWRIGHT = slow;
-    try {
-      const response = await defaultPlaywrightRunner(request, { timeoutMs: 30 });
-      expect(response).toEqual({ overflows: [], contrasts: [] });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DEK_PLAYWRIGHT;
-      } else {
-        process.env.DEK_PLAYWRIGHT = previous;
+  test.serial(
+    "fails when the worker runs past timeoutMs, so a hung browser cannot hang dek",
+    async () => {
+      const slow = join(import.meta.dir, "..", "helpers", "fake-playwright-slow.ts");
+      const previous = process.env.DEK_PLAYWRIGHT;
+      process.env.DEK_PLAYWRIGHT = slow;
+      try {
+        await expect(defaultPlaywrightRunner(request, { timeoutMs: 20 })).rejects.toMatchObject({
+          name: "DekError",
+          message: "Playwright worker failed",
+          hint: expect.stringContaining("did not finish"),
+        });
+      } finally {
+        if (previous === undefined) {
+          delete process.env.DEK_PLAYWRIGHT;
+        } else {
+          process.env.DEK_PLAYWRIGHT = previous;
+        }
       }
-    }
-  });
+    },
+  );
 
   test.serial("throws when an installed worker exits non-zero", async () => {
     const fail = join(import.meta.dir, "..", "helpers", "fake-playwright-fail.ts");

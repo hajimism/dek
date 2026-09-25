@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import type { Browser } from "playwright";
 import { finishBeat } from "../core/finish-beat.ts";
 import { startGoPaused } from "../core/freeze-transition.ts";
-import { importPlaywright } from "../core/playwright.ts";
+import { importPlaywright, PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
+import { exitWorker, readWorkerRequest } from "../core/spawn.ts";
 import type { Position } from "../core/step.ts";
 import {
   frameStops,
@@ -19,25 +21,30 @@ let playwright: Awaited<ReturnType<typeof importPlaywright>>;
 try {
   playwright = await importPlaywright();
 } catch {
-  process.exit(2);
+  exitWorker(`playwright not found; ${PLAYWRIGHT_INSTALL}`);
 }
 
-const stdin = await new Response(Bun.stdin).text();
-let request: VideoCaptureRequest;
+const request = await readWorkerRequest<VideoCaptureRequest>();
 try {
-  request = JSON.parse(stdin) as VideoCaptureRequest;
-} catch {
-  process.exit(2);
+  mkdirSync(request.outDir, { recursive: true });
+  const browser = await playwright.chromium.launch({ headless: true });
+  try {
+    await capture(browser);
+  } finally {
+    await browser.close();
+  }
+} catch (error) {
+  exitWorker(error);
 }
-const browser = await playwright.chromium.launch({ headless: true });
-try {
+
+/** Records every beat of the request into `outDir` and answers on stdout. */
+async function capture(browser: Browser): Promise<void> {
   const page = await browser.newPage({
     viewport: { width: request.viewport.width, height: request.viewport.height },
   });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setContent(request.html, { waitUntil: "load" });
 
-  mkdirSync(request.outDir, { recursive: true });
   const plan = planCapture(request.timeline, request.fps);
   const frames: VideoFrame[] = [];
   const gos: Position[] = [];
@@ -88,6 +95,4 @@ try {
     gos,
   };
   process.stdout.write(`${JSON.stringify(response)}\n`);
-} finally {
-  await browser.close();
 }

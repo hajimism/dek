@@ -19,6 +19,7 @@ import {
   loadVoiceSettings,
   resolveTimelineAudio,
   voiceCacheFile,
+  voiceMissingError,
 } from "../core/voice.ts";
 import { playerScript } from "../runtime/player.ts";
 import { sliceWav } from "../voice/wav.ts";
@@ -52,16 +53,13 @@ export async function bakeVideo(
   return bakeProjectDeck(project, deck, options);
 }
 
-export async function bakeProjectDeck(
+async function bakeProjectDeck(
   project: Project,
   deck: ProjectDeck,
   options: BakeVideoOptions = {},
 ): Promise<BakeVideoResult> {
   if (!hasVoice(deck.dir)) {
-    throw new DekError("voice.toml not found", {
-      path: join(deck.dir, "voice", "voice.toml"),
-      hint: "add voice/ then run `dek voice`",
-    });
+    throw voiceMissingError(deck.dir);
   }
   const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
   if (!existsSync(timelinePath)) {
