@@ -50,4 +50,24 @@ describe("slide copies outside the stage", () => {
   test("the presenter's next preview is drawn once it is in the document", () => {
     expect(document.querySelector("#dek-next-stage [data-seen]")?.textContent).toBe("true");
   });
+
+  test("keeps both copies out of focus and the accessibility tree", () => {
+    const copies = [
+      ...document.querySelectorAll<HTMLElement>("#dek-rail .slide, #dek-next-stage .slide"),
+    ];
+    expect(copies.length).toBe(3);
+    for (const copy of copies) {
+      expect(copy.hasAttribute("inert")).toBe(true);
+      expect(copy.getAttribute("aria-hidden")).toBe("true");
+    }
+    // The rail's links name their slide themselves.
+    expect(
+      document.querySelector('#dek-rail [data-slide-index="1"]')?.getAttribute("aria-label"),
+    ).toBe("2. chart");
+  });
+
+  test("puts the stage in the page's main landmark", () => {
+    expect(document.querySelector("main #deck")).not.toBeNull();
+    expect(document.querySelectorAll("main")).toHaveLength(1);
+  });
 });

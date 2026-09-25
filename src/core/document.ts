@@ -3,6 +3,7 @@ import { type DekConfig, loadConfig } from "./config.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { collectSlidesHtml, htmlShell, type PageMode, readTheme } from "./html.ts";
 import { nextPresenterTitle, presenterSlides, presenterState } from "./presenter.ts";
+import { RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN } from "./rail-width.ts";
 import { type ProjectDeck, resolveDeck } from "./resolve.ts";
 import { logicalSize } from "./size.ts";
 import { readSlideScripts, slideScriptTags } from "./slide-script.ts";
@@ -15,7 +16,12 @@ export async function renderDeckHtml(
     inlineAssets?: boolean;
     live?: boolean;
     includeNotes?: boolean;
-    wsToken?: string;
+    /**
+     * What a presenter page sends as `?token=` on every live channel, the event stream and the
+     * socket alike: the browser's Basic credentials reach only the page's own directory, and
+     * `/events` sits outside `/decks/<name>/`. An audience page never carries one.
+     */
+    liveToken?: string;
     playerScript: string;
     liveReloadScript?: string;
   },
@@ -30,7 +36,7 @@ export async function renderDeckHtml(
     config: loadConfig(project.configPath),
     playerScript: options.playerScript,
     ...(options.liveReloadScript ? { liveReloadScript: options.liveReloadScript } : {}),
-    ...(options.wsToken ? { wsToken: options.wsToken } : {}),
+    ...(options.liveToken ? { liveToken: options.liveToken } : {}),
   });
 }
 
@@ -41,7 +47,7 @@ export async function renderDeckDocument(
     inlineAssets: boolean;
     live?: boolean;
     includeNotes?: boolean;
-    wsToken?: string;
+    liveToken?: string;
     config: DekConfig;
     playerScript: string;
     liveReloadScript?: string;
@@ -51,10 +57,7 @@ export async function renderDeckDocument(
   const data = presenterSlides(deck, options.config).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
-  const slidesHtml = collectSlidesHtml(deck, {
-    inline: options.inlineAssets,
-    requireAll: !options.live,
-  });
+  const slidesHtml = collectSlidesHtml(deck, { inline: options.inlineAssets });
   const themeCss = readTheme(deck.dir, options.inlineAssets && !options.live);
   const slideScripts = readSlideScripts(deck.dir, { strict: !options.live });
   const state = data[0] ? presenterState(data, { slideIndex: 0, beatIndex: 0 }) : undefined;
@@ -98,7 +101,7 @@ export async function renderDeckDocument(
       ? renderKeyHintHtml(deck.deck.lang, { rail: rail !== "", presenter: includeNotes })
       : "";
   const railResize = rail
-    ? `<div id="dek-rail-resize" role="separator" aria-orientation="vertical" aria-label="Resize slide list" tabindex="0"></div>`
+    ? `<div id="dek-rail-resize" role="separator" aria-orientation="vertical" aria-label="Resize slide list" aria-valuemin="${RAIL_WIDTH_MIN}" aria-valuemax="${RAIL_WIDTH_MAX}" aria-valuenow="${RAIL_WIDTH_DEFAULT}" tabindex="0"></div>`
     : "";
 
   return htmlShell({
@@ -106,18 +109,19 @@ export async function renderDeckDocument(
     title: deck.deck.title,
     head: `<style>${playerChromeCss({ presenter: includeNotes, ...size })}</style>
   <style data-dek-theme>${themeCss}</style>`,
-    bodyAttrs: `${presenterOpen ? ' class="is-presenter"' : ""} data-mode="${options.mode}"${includeNotes ? ` data-presenter="dek-presenter"` : ""}${options.live ? ` data-live="true"` : ""}${options.wsToken ? ` data-ws-token="${escapeAttr(options.wsToken)}"` : ""}`,
+    bodyAttrs: `${presenterOpen ? ' class="is-presenter"' : ""} data-mode="${options.mode}" data-deck="${escapeAttr(deck.name)}"${includeNotes ? ` data-presenter="dek-presenter"` : ""}${options.live ? ` data-live="true"` : ""}${options.liveToken ? ` data-live-token="${escapeAttr(options.liveToken)}"` : ""}`,
     body: `${progress}
   <div id="dek-shell">
     ${rail}
-    <section id="dek-current">
+    <main id="dek-current">
       ${currentLabel}
       <div id="dek-current-stage"><div id="deck">${slidesHtml}</div></div>
-    </section>
+    </main>
     ${presenter}
   </div>
   ${railResize}
   ${hint}
+  <div id="dek-announce" aria-live="polite"></div>
   <script type="application/json" id="dek-data">${jsonForScript(data)}</script>
   ${slideScriptTags(slideScripts)}
   <script>${options.playerScript}</script>
@@ -145,10 +149,7 @@ const KEY_HINT_LABELS = {
  * The keys a viewer of a built file cannot discover by looking: `s` and `p`. Shown once as
  * the file opens, it fades on its own and goes away at the first key or move.
  */
-export function renderKeyHintHtml(
-  lang: string,
-  keys: { rail: boolean; presenter: boolean },
-): string {
+function renderKeyHintHtml(lang: string, keys: { rail: boolean; presenter: boolean }): string {
   const labels = lang.toLowerCase().startsWith("ja") ? KEY_HINT_LABELS.ja : KEY_HINT_LABELS.en;
   const items = [
     keys.rail ? `<span><kbd>s</kbd>${labels.rail}</span>` : "",

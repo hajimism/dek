@@ -1,4 +1,4 @@
-import { type Diagnostic, severityOf } from "../core/diagnostic.ts";
+import type { Diagnostic } from "../core/diagnostic.ts";
 import { withDeckPrefix } from "./routes.ts";
 import { applyIsShown, type StepElement } from "./step.ts";
 
@@ -83,7 +83,7 @@ export function formatLiveDiagnostics(diagnostics: Diagnostic[]): string | null 
   }
   return diagnostics
     .map((diagnostic) =>
-      severityOf(diagnostic) === "warning"
+      diagnostic.severity === "warning"
         ? `${diagnostic.id} warning: ${diagnostic.message}`
         : `${diagnostic.id}: ${diagnostic.message}`,
     )

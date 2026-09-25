@@ -3,8 +3,10 @@ import {
   clampPosition,
   formatHash,
   hashChangeTarget,
+  historyMode,
   parseHash,
   parsePosition,
+  positionFromHash,
   positionsEqual,
 } from "../../src/runtime/position.ts";
 
@@ -84,14 +86,49 @@ describe("positionsEqual", () => {
 });
 
 describe("hashChangeTarget", () => {
+  const slides = [
+    { slug: "intro", beats: 0 },
+    { slug: "arch", beats: 2 },
+  ];
+
   test("returns the parsed position when the hash moved", () => {
-    expect(hashChangeTarget({ slideIndex: 0, beatIndex: 0 }, "#arch/2", slugs)).toEqual({
+    expect(hashChangeTarget({ slideIndex: 0, beatIndex: 0 }, "#arch/2", slides)).toEqual({
       slideIndex: 1,
       beatIndex: 1,
     });
   });
 
   test("returns undefined when the hash already matches", () => {
-    expect(hashChangeTarget({ slideIndex: 1, beatIndex: 0 }, "#arch", slugs)).toBeUndefined();
+    expect(hashChangeTarget({ slideIndex: 1, beatIndex: 0 }, "#arch", slides)).toBeUndefined();
+  });
+
+  test("clamps a beat past the slide's last", () => {
+    expect(hashChangeTarget({ slideIndex: 0, beatIndex: 0 }, "#arch/99", slides)).toEqual({
+      slideIndex: 1,
+      beatIndex: 1,
+    });
+  });
+});
+
+describe("positionFromHash", () => {
+  test("clamps the beat to the slide it names", () => {
+    const slides = [
+      { slug: "intro", beats: 0 },
+      { slug: "arch", beats: 3 },
+    ];
+    expect(positionFromHash("#arch/99", slides)).toEqual({ slideIndex: 1, beatIndex: 2 });
+    expect(positionFromHash("#intro/4", slides)).toEqual({ slideIndex: 0, beatIndex: 0 });
+    expect(positionFromHash("#nope", slides)).toEqual({ slideIndex: 0, beatIndex: 0 });
+  });
+});
+
+describe("historyMode", () => {
+  test("adds a history entry per slide and replaces it for each beat within one", () => {
+    expect(historyMode({ slideIndex: 1, beatIndex: 0 }, { slideIndex: 1, beatIndex: 2 })).toBe(
+      "replace",
+    );
+    expect(historyMode({ slideIndex: 1, beatIndex: 2 }, { slideIndex: 2, beatIndex: 0 })).toBe(
+      "push",
+    );
   });
 });

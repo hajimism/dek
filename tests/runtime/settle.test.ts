@@ -44,4 +44,27 @@ describe("waitForPlaybackSettle", () => {
       viewTransition: { finished: Promise.reject(new Error("aborted")) },
     });
   });
+
+  // Bun fails the run on an unhandled rejection, so waiting is the assertion.
+  test("handles the rejection of a skipped transition's ready", async () => {
+    const skipped = new DOMException("Transition was skipped", "AbortError");
+    await waitForPlaybackSettle({
+      viewTransition: { ready: Promise.reject(skipped), finished: Promise.resolve() },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  test("passes on an error thrown by the transition's update, as a move without one would", async () => {
+    const error = new Error("render failed");
+    const updateCallbackDone = Promise.reject(error);
+    await expect(
+      waitForPlaybackSettle({
+        viewTransition: {
+          ready: Promise.reject(error).catch(() => undefined),
+          updateCallbackDone,
+          finished: Promise.reject(error).catch(() => undefined),
+        },
+      }),
+    ).rejects.toBe(error);
+  });
 });

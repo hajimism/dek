@@ -8,6 +8,7 @@ import {
 import { type Position, stepKey, stepValuesForBeat } from "../core/step.ts";
 import { playbackSchedule, type Timeline } from "../core/timeline.ts";
 import { formatClock } from "../core/timing.ts";
+import { visualClone } from "./clone.ts";
 import { deckFitTransform } from "./fit.ts";
 import { applyIncomingPosition, createGuardedGo } from "./go.ts";
 import { applyLiveEvent, hydrateLiveEvent, slideSelector } from "./live.ts";
@@ -17,8 +18,9 @@ import {
   clampPosition,
   formatHash,
   hashChangeTarget,
-  parseHash,
+  historyMode,
   parsePosition,
+  positionFromHash,
   positionsEqual,
 } from "./position.ts";
 import {
@@ -31,21 +33,28 @@ import {
 import {
   clampRailWidth,
   isRailToggleKey,
+  pageStorage,
   RAIL_VISIBLE_KEY,
   RAIL_WIDTH_KEY,
+  RAIL_WIDTH_STEP,
   readStoredRailVisible,
   readStoredRailWidth,
 } from "./rail.ts";
 import { createRehearseDriver, type RehearseDriver } from "./rehearse.ts";
-import { withDeckPrefix } from "./routes.ts";
-import { waitForPlaybackSettle } from "./settle.ts";
+import { deckChannelName, liveTokenQuery, withDeckPrefix } from "./routes.ts";
+import { type ViewTransitionLike, waitForPlaybackSettle } from "./settle.ts";
+import { createPositionSocket, type PositionSocket } from "./socket.ts";
 import {
   advance,
   applyIsShown,
   applyMorphNames,
   clearMorphNames,
+  isInteractive,
+  isLetterKey,
+  isTextEntry,
   keyToMove,
-  retreat,
+  moveTarget,
+  pointerMove,
   shouldUseViewTransition,
 } from "./step.ts";
 
@@ -53,6 +62,8 @@ const dataEl = document.getElementById("dek-data");
 if (dataEl?.textContent) {
   const slides = JSON.parse(dataEl.textContent) as PresenterSlide[];
   const slugs = slides.map((slide) => slide.slug);
+  const beatCounts = slides.map((slide) => slide.beats.length);
+  const hashSlides = slides.map((slide) => ({ slug: slide.slug, beats: slide.beats.length }));
   let slideEls = [...document.querySelectorAll("#deck > .slide")];
   const presenterRoot = document.body.dataset.presenter
     ? document.getElementById(document.body.dataset.presenter)
@@ -78,29 +89,38 @@ if (dataEl?.textContent) {
     setTimer: (fn, ms) => window.setTimeout(fn, ms),
     clearTimer: (id) => window.clearTimeout(id),
   });
-  const channel = new BroadcastChannel("dek");
-  let pos = parseHash(location.hash, slugs);
+  // One channel per deck: two decks' built files open side by side must not drive each other.
+  const channel = new BroadcastChannel(deckChannelName(document.body.dataset.deck, slugs));
+  /** What is on screen. */
+  let pos = positionFromHash(location.hash, hashSlides);
+  /**
+   * Where the deck is headed: `pos` once the moves asked for have run. Keys step from here, so
+   * every press counts even while a transition is still playing.
+   */
+  let target = pos;
   let startedAt: number | undefined;
   const elapsedEl = document.getElementById("dek-elapsed");
   const budgetEl = document.getElementById("dek-budget");
   const talkBudget = totalBudgetSeconds(slides);
-  const sockets: WebSocket[] = [];
+  let remote: PositionSocket | undefined;
   const rehearseMode = new URLSearchParams(location.search).has("rehearse");
   let rehearseDriver: RehearseDriver | undefined;
-  if (location.protocol === "http:" || location.protocol === "https:") {
+  // Only the dev server has a socket to follow; a built file on a static host must not dial one.
+  if (document.body.dataset.live === "true") {
     const wsPath = withDeckPrefix(location.pathname, "/ws");
-    const token = document.body.dataset.wsToken;
-    const wsQuery = token ? `?token=${encodeURIComponent(token)}` : "";
-    const ws = new WebSocket(
-      `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${wsPath}${wsQuery}`,
-    );
-    ws.addEventListener("message", (event) => {
-      const next = parsePosition(String(event.data));
-      if (next) {
-        applyRemotePosition(next);
+    const wsUrl = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${wsPath}${liveTokenQuery(document.body.dataset.liveToken)}`;
+    remote = createPositionSocket({
+      connect: () => new WebSocket(wsUrl),
+      onPosition: (next) => applyRemotePosition(next),
+      setTimer: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimer: (id) => window.clearTimeout(id),
+    });
+    // A page that is really going away must not dial back in; one kept for Back reconnects.
+    window.addEventListener("pagehide", (event) => {
+      if (!event.persisted) {
+        remote?.close();
       }
     });
-    sockets.push(ws);
   }
 
   function presenterOpen(): boolean {
@@ -130,7 +150,7 @@ if (dataEl?.textContent) {
 
   function persistRail(key: string, value: string): void {
     try {
-      localStorage.setItem(key, value);
+      pageStorage()?.setItem(key, value);
     } catch {
       // file:// or private mode may reject storage
     }
@@ -139,7 +159,29 @@ if (dataEl?.textContent) {
   function setRailWidth(px: number): number {
     const width = clampRailWidth(px);
     document.documentElement.style.setProperty("--dek-rail-w", `${width}px`);
+    document.getElementById("dek-rail-resize")?.setAttribute("aria-valuenow", String(width));
     return width;
+  }
+
+  function toggleFullscreen(): void {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.().catch(() => undefined);
+    } else {
+      void document.documentElement.requestFullscreen?.().catch(() => undefined);
+    }
+  }
+
+  function prefersReducedMotion(): boolean {
+    return matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /** Tell a screen reader the slide changed; beats within a slide pass quietly. */
+  function announceSlide(): void {
+    const el = document.getElementById("dek-announce");
+    const slide = slides[pos.slideIndex];
+    if (el && slide) {
+      el.textContent = `Slide ${pos.slideIndex + 1} of ${slides.length}: ${slide.title}`;
+    }
   }
 
   function setRailOpen(open: boolean, persist = true): void {
@@ -177,15 +219,6 @@ if (dataEl?.textContent) {
     return document.querySelector<HTMLElement>(slideSelector(slug)) ?? undefined;
   }
 
-  function stripPreviewClone(root: HTMLElement): void {
-    root.removeAttribute("id");
-    root.style.removeProperty("view-transition-name");
-    for (const el of root.querySelectorAll<HTMLElement>("[id], [data-morph]")) {
-      el.removeAttribute("id");
-      el.style.removeProperty("view-transition-name");
-    }
-  }
-
   /** Draw the current slide's script. Only the live element animates; clones get `drawStill`. */
   function showMotion(mode: MotionMode): void {
     const current = slides[pos.slideIndex];
@@ -201,7 +234,7 @@ if (dataEl?.textContent) {
     if (videoMode) {
       return "hold";
     }
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (prefersReducedMotion()) {
       return "final";
     }
     const counts = slides.map((slide) => slide.beats.length);
@@ -213,11 +246,32 @@ if (dataEl?.textContent) {
     drawAtEnd(slideModules()[slide.slug], clone, index, stepKey(slide.beats, index));
   }
 
-  function neuterRailMedia(root: HTMLElement): void {
-    for (const el of root.querySelectorAll("video, audio, iframe, object, embed")) {
-      el.removeAttribute("src");
-      el.removeAttribute("srcdoc");
-      el.replaceChildren();
+  let printing = false;
+
+  /**
+   * Print gives each slide a page at its last beat, as `dek pdf` does, so each slide's script
+   * draws that beat's end the way the PDF page draws it. Once printed, the stage draws its own
+   * beat again. The browser tells of a print twice (beforeprint and the print media query), and
+   * a PDF export only the second way; each change is drawn once.
+   */
+  function setPrinting(on: boolean): void {
+    if (on === printing) {
+      return;
+    }
+    printing = on;
+    if (!on) {
+      render();
+      showMotion("final");
+      return;
+    }
+    motion.stop();
+    for (const slide of slides) {
+      const el = slideEl(slide.slug);
+      if (el) {
+        const last = Math.max(slide.beats.length - 1, 0);
+        applyIsShown([...el.querySelectorAll("[data-step]")], stepValuesForBeat(slide.beats, last));
+        drawStill(el, slide, last);
+      }
     }
   }
 
@@ -235,18 +289,11 @@ if (dataEl?.textContent) {
         continue;
       }
       const source = slideEl(slide.slug);
-      if (!(source instanceof HTMLElement)) {
+      const clone = source ? visualClone(source) : undefined;
+      if (!clone) {
         frame.replaceChildren();
         continue;
       }
-      const clone = source.cloneNode(true);
-      if (!(clone instanceof HTMLElement)) {
-        frame.replaceChildren();
-        continue;
-      }
-      clone.classList.add("is-current");
-      stripPreviewClone(clone);
-      neuterRailMedia(clone);
       const stage = document.createElement("div");
       stage.className = "dek-thumb-stage";
       stage.style.width = `${width}px`;
@@ -306,18 +353,11 @@ if (dataEl?.textContent) {
     }
     const source = slideEl(nextSlide.slug);
     const deckEl = document.getElementById("deck");
-    if (!(source instanceof HTMLElement) || !deckEl) {
+    const clone = source ? visualClone(source) : undefined;
+    if (!clone || !deckEl) {
       stage.replaceChildren();
       return;
     }
-    const clone = source.cloneNode(true);
-    if (!(clone instanceof HTMLElement)) {
-      stage.replaceChildren();
-      return;
-    }
-    // Theme CSS hides unrevealed [data-step] only on .is-current.
-    clone.classList.add("is-current");
-    stripPreviewClone(clone);
     applyIsShown(
       [...clone.querySelectorAll("[data-step]")],
       stepValuesForBeat(nextSlide.beats, nextPos.beatIndex),
@@ -418,8 +458,21 @@ if (dataEl?.textContent) {
     }
     renderNextPreview(nextPos, nextSlide);
     syncRailCurrent();
+  }
+
+  /**
+   * Write `pos` to the URL without a hashchange, so the handler only ever hears the reader:
+   * a typed hash, Back, or Forward.
+   */
+  function writeHash(mode: "push" | "replace"): void {
     const hash = formatHash(pos, slugs);
-    if (hash && location.hash !== hash) {
+    if (!hash || location.hash === hash) {
+      return;
+    }
+    try {
+      history[mode === "push" ? "pushState" : "replaceState"](null, "", hash);
+    } catch {
+      // A browser that refuses history on this URL still takes a hash; its echo matches `target`.
       location.hash = hash;
     }
   }
@@ -432,43 +485,95 @@ if (dataEl?.textContent) {
     document.getElementById("dek-hint")?.remove();
   }
 
-  const go = createGuardedGo(async (next: Position) => {
-    dismissKeyHint();
-    const apply = (): void => {
-      const from = pos;
-      pos = next;
-      render();
-      // A hashchange echoing this same position must not cut a running animation short.
-      if (!positionsEqual(from, next)) {
-        showMotion(motionModeFor(from, next));
-      }
-    };
-    let viewTransition: { finished: Promise<unknown> } | undefined;
-    if (
-      shouldUseViewTransition(pos.slideIndex, next.slideIndex) &&
-      "startViewTransition" in document
-    ) {
-      const fromEl = slideEl(slides[pos.slideIndex]?.slug);
-      if (fromEl) {
-        applyMorphNames([...fromEl.querySelectorAll<HTMLElement>("[data-morph]")]);
-      }
-      viewTransition = document.startViewTransition(apply);
-    } else {
-      apply();
+  /**
+   * Where a move came from. Local moves are published to peers; remote ones arrived from one;
+   * a hash move came from the URL, which already holds its history entry.
+   */
+  type GoOrigin = "local" | "remote" | "hash";
+  type GoRequest = { position: Position; origin: GoOrigin };
+
+  /** Tell the other windows and the server where the deck is headed. */
+  function publishPosition(position: Position): void {
+    channel.postMessage(position);
+    remote?.publish(position);
+  }
+
+  let inFlight: { skipTransition(): void } | undefined;
+
+  /** Cut the running move short: a newer one is waiting, and the presenter should not. */
+  function hurry(): void {
+    if (videoMode) {
+      return;
     }
-    await waitForPlaybackSettle({
-      animations: [...document.getAnimations()],
-      viewTransition,
-    });
-    channel.postMessage(pos);
-    ensureTimer();
-    const payload = JSON.stringify(pos);
-    for (const socket of sockets) {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(payload);
+    inFlight?.skipTransition();
+    for (const animation of document.getAnimations()) {
+      const end = animation.effect?.getComputedTiming().endTime;
+      if (animation.playState === "running" && typeof end === "number" && Number.isFinite(end)) {
+        animation.finish();
       }
     }
-  });
+  }
+
+  const runGo = createGuardedGo(
+    async ({ position: next, origin }: GoRequest) => {
+      dismissKeyHint();
+      const apply = (): void => {
+        const from = pos;
+        pos = next;
+        render();
+        writeHash(origin === "hash" ? "replace" : historyMode(from, next));
+        if (from.slideIndex !== next.slideIndex) {
+          announceSlide();
+        }
+        // A hashchange echoing this same position must not cut a running animation short.
+        if (!positionsEqual(from, next)) {
+          showMotion(motionModeFor(from, next));
+        }
+      };
+      let viewTransition: ViewTransitionLike | undefined;
+      if (
+        shouldUseViewTransition(pos.slideIndex, next.slideIndex) &&
+        "startViewTransition" in document &&
+        !prefersReducedMotion()
+      ) {
+        const fromEl = slideEl(slides[pos.slideIndex]?.slug);
+        if (fromEl) {
+          applyMorphNames([...fromEl.querySelectorAll<HTMLElement>("[data-morph]")]);
+        }
+        const started = document.startViewTransition(apply);
+        viewTransition = started;
+        inFlight = started;
+      } else {
+        apply();
+      }
+      try {
+        await waitForPlaybackSettle({
+          animations: [...document.getAnimations()],
+          viewTransition,
+        });
+      } finally {
+        inFlight = undefined;
+      }
+      ensureTimer();
+    },
+    { onQueue: hurry },
+  );
+
+  /**
+   * Move to `next`. A local move is published at once, so a second window follows the key press
+   * rather than the end of this window's animation. A remote one came from a peer and is not
+   * sent back: a peer that had moved on would be rewound by the echo.
+   */
+  function go(next: Position | null | undefined, origin: GoOrigin = "local"): Promise<void> {
+    if (next == null) {
+      return runGo(undefined);
+    }
+    target = next;
+    if (origin === "local") {
+      publishPosition(next);
+    }
+    return runGo({ position: next, origin });
+  }
 
   function applyRemotePosition(next: Position): void {
     const clamped = clampPosition(
@@ -478,9 +583,9 @@ if (dataEl?.textContent) {
     if (!clamped) {
       return;
     }
-    applyIncomingPosition(go, clamped, {
+    applyIncomingPosition((incoming: Position) => go(incoming, "remote"), clamped, {
       equal: positionsEqual,
-      current: () => pos,
+      current: () => target,
       ...(rehearseDriver
         ? {
             seek: (target: Position) => {
@@ -499,12 +604,21 @@ if (dataEl?.textContent) {
     }
   });
   document.addEventListener("keydown", (event) => {
+    // Keys typed into a field on a slide are the field's.
+    if (isTextEntry(event.target)) {
+      return;
+    }
     dismissKeyHint();
     if (isPresenterToggleKey(event)) {
       if (presenterRoot) {
         event.preventDefault();
         setPresenterOpen(!presenterOpen());
       }
+      return;
+    }
+    if (isLetterKey(event, "f")) {
+      event.preventDefault();
+      toggleFullscreen();
       return;
     }
     if (isRailToggleKey(event)) {
@@ -514,7 +628,6 @@ if (dataEl?.textContent) {
       }
       return;
     }
-    const counts = slides.map((slide) => slide.beats.length);
     if (rehearseDriver) {
       if (event.key === " ") {
         event.preventDefault();
@@ -525,26 +638,60 @@ if (dataEl?.textContent) {
         }
         return;
       }
-      const rehearseMove = keyToMove(event.key);
+      const rehearseMove = keyToMove(event);
       if (!rehearseMove) {
         return;
       }
       event.preventDefault();
-      const next = rehearseMove === "advance" ? advance(pos, counts) : retreat(pos, counts);
+      const next = moveTarget(rehearseMove, pos, beatCounts);
       if (next) {
         rehearseDriver.seek(next);
       }
       return;
     }
-    const move = keyToMove(event.key);
+    const move = keyToMove(event);
     if (!move) {
       return;
     }
     event.preventDefault();
-    void go(move === "advance" ? advance(pos, counts) : retreat(pos, counts));
+    void go(moveTarget(move, target, beatCounts));
   });
+  const stageEl = document.getElementById("dek-current-stage");
+  if (stageEl) {
+    let start: { x: number; y: number; id: number } | undefined;
+    stageEl.addEventListener("pointerdown", (event) => {
+      // A mouse has the keyboard beside it; touch and pen have only the screen.
+      if (event.pointerType === "mouse" || isInteractive(event.target)) {
+        start = undefined;
+        return;
+      }
+      start = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    });
+    stageEl.addEventListener("pointerup", (event) => {
+      if (!start || start.id !== event.pointerId) {
+        return;
+      }
+      const rect = stageEl.getBoundingClientRect();
+      const move = pointerMove(
+        {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+          dx: event.clientX - start.x,
+          dy: event.clientY - start.y,
+        },
+        rect,
+      );
+      start = undefined;
+      if (move) {
+        void go(moveTarget(move, target, beatCounts));
+      }
+    });
+    stageEl.addEventListener("pointercancel", () => {
+      start = undefined;
+    });
+  }
   window.addEventListener("hashchange", () => {
-    void go(hashChangeTarget(pos, location.hash, slugs));
+    void go(hashChangeTarget(target, location.hash, hashSlides), "hash");
   });
 
   function fitDeck(): void {
@@ -561,11 +708,14 @@ if (dataEl?.textContent) {
     fitRailThumbs();
   }
   window.addEventListener("resize", fitDeck);
+  window.addEventListener("beforeprint", () => setPrinting(true));
+  window.addEventListener("afterprint", () => setPrinting(false));
+  matchMedia("print").addEventListener?.("change", (event) => setPrinting(event.matches));
   const railEl = document.getElementById("dek-rail");
   const railResize = document.getElementById("dek-rail-resize");
   if (railEl) {
-    setRailWidth(readStoredRailWidth(localStorage));
-    setRailOpen(readStoredRailVisible(localStorage), false);
+    setRailWidth(readStoredRailWidth(pageStorage()));
+    setRailOpen(readStoredRailVisible(pageStorage()), false);
     railEl.addEventListener("keydown", (event) => {
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
         return;
@@ -588,6 +738,18 @@ if (dataEl?.textContent) {
       }
     });
     if (railResize) {
+      railResize.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+          return;
+        }
+        // The arrows resize the rail here; they must not also move the deck.
+        event.preventDefault();
+        event.stopPropagation();
+        const now = Number(railResize.getAttribute("aria-valuenow"));
+        const step = event.key === "ArrowRight" ? RAIL_WIDTH_STEP : -RAIL_WIDTH_STEP;
+        persistRail(RAIL_WIDTH_KEY, String(setRailWidth(now + step)));
+        fitDeck();
+      });
       railResize.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         try {
@@ -617,6 +779,8 @@ if (dataEl?.textContent) {
   fillRailThumbs();
   fitDeck();
   render();
+  // A hash that named a beat past the slide's last now says where the deck opened.
+  writeHash("replace");
   showMotion(videoMode ? "hold" : "final");
   // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekGo"]
   window["dekGo"] = go;

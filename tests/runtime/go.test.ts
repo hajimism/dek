@@ -45,6 +45,38 @@ describe("createGuardedGo", () => {
   });
 });
 
+describe("createGuardedGo onQueue", () => {
+  test("calls onQueue when a move waits behind one in flight, so that one can hurry", async () => {
+    let release: (() => void) | undefined;
+    let hurried = 0;
+    const seen: number[] = [];
+    const go = createGuardedGo(
+      async (next: number) => {
+        seen.push(next);
+        if (next === 1) {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+      },
+      {
+        onQueue: () => {
+          hurried += 1;
+          release?.();
+        },
+      },
+    );
+
+    const first = go(1);
+    expect(hurried).toBe(0);
+    await go(2);
+    await first;
+
+    expect(hurried).toBe(1);
+    expect(seen).toEqual([1, 2]);
+  });
+});
+
 describe("applyIncomingPosition", () => {
   test("does not call go when the incoming position equals current", async () => {
     const seen: number[] = [];

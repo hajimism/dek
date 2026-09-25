@@ -4,8 +4,12 @@ import {
   applyIsShown,
   applyMorphNames,
   clearMorphNames,
+  isInteractive,
+  isTextEntry,
   keyToMove,
   type MorphElement,
+  moveTarget,
+  pointerMove,
   retreat,
   type StepElement,
   shouldUseViewTransition,
@@ -126,20 +130,73 @@ describe("retreat", () => {
 
 describe("keyToMove", () => {
   test("maps forward keys to advance", () => {
-    expect(keyToMove("ArrowRight")).toBe("advance");
-    expect(keyToMove(" ")).toBe("advance");
-    expect(keyToMove("PageDown")).toBe("advance");
+    expect(keyToMove({ key: "ArrowRight" })).toBe("advance");
+    expect(keyToMove({ key: " " })).toBe("advance");
+    expect(keyToMove({ key: "PageDown" })).toBe("advance");
   });
 
-  test("maps backward keys to retreat", () => {
-    expect(keyToMove("ArrowLeft")).toBe("retreat");
-    expect(keyToMove("PageUp")).toBe("retreat");
-    expect(keyToMove("Backspace")).toBe("retreat");
+  test("maps backward keys to retreat, Shift+Space included", () => {
+    expect(keyToMove({ key: "ArrowLeft" })).toBe("retreat");
+    expect(keyToMove({ key: "PageUp" })).toBe("retreat");
+    expect(keyToMove({ key: "Backspace" })).toBe("retreat");
+    expect(keyToMove({ key: " ", shiftKey: true })).toBe("retreat");
+  });
+
+  test("maps Home and End to the ends of the talk", () => {
+    expect(keyToMove({ key: "Home" })).toBe("first");
+    expect(keyToMove({ key: "End" })).toBe("last");
+  });
+
+  test("leaves Alt, Ctrl, and Cmd chords to the browser", () => {
+    expect(keyToMove({ key: "ArrowLeft", altKey: true })).toBeNull();
+    expect(keyToMove({ key: "ArrowRight", ctrlKey: true })).toBeNull();
+    expect(keyToMove({ key: "ArrowRight", metaKey: true })).toBeNull();
   });
 
   test("ignores other keys", () => {
-    expect(keyToMove("ArrowUp")).toBeNull();
-    expect(keyToMove("Enter")).toBeNull();
+    expect(keyToMove({ key: "ArrowUp" })).toBeNull();
+    expect(keyToMove({ key: "Enter" })).toBeNull();
+  });
+});
+
+describe("moveTarget", () => {
+  const beats = [0, 3, 0];
+
+  test("steps one beat either way", () => {
+    expect(moveTarget("advance", { slideIndex: 1, beatIndex: 0 }, beats)).toEqual({
+      slideIndex: 1,
+      beatIndex: 1,
+    });
+    expect(moveTarget("retreat", { slideIndex: 1, beatIndex: 0 }, beats)).toEqual({
+      slideIndex: 0,
+      beatIndex: 0,
+    });
+  });
+
+  test("jumps to the first beat of the talk and to the last beat of the last slide", () => {
+    expect(moveTarget("first", { slideIndex: 1, beatIndex: 2 }, beats)).toEqual({
+      slideIndex: 0,
+      beatIndex: 0,
+    });
+    expect(moveTarget("last", { slideIndex: 0, beatIndex: 0 }, [0, 3, 2])).toEqual({
+      slideIndex: 2,
+      beatIndex: 1,
+    });
+  });
+});
+
+describe("isTextEntry", () => {
+  test("is true for fields and editable text, where keys are typing", () => {
+    expect(isTextEntry({ tagName: "INPUT" })).toBe(true);
+    expect(isTextEntry({ tagName: "TEXTAREA" })).toBe(true);
+    expect(isTextEntry({ tagName: "SELECT" })).toBe(true);
+    expect(isTextEntry({ tagName: "DIV", isContentEditable: true })).toBe(true);
+  });
+
+  test("is false for the page, links, and buttons", () => {
+    expect(isTextEntry({ tagName: "A" })).toBe(false);
+    expect(isTextEntry({ tagName: "BUTTON" })).toBe(false);
+    expect(isTextEntry(null)).toBe(false);
   });
 });
 
@@ -174,5 +231,38 @@ describe("clearMorphNames", () => {
     clearMorphNames([other]);
     expect(current.props["view-transition-name"]).toBe("pipeline");
     expect(other.props["view-transition-name"]).toBeUndefined();
+  });
+});
+
+describe("pointerMove", () => {
+  const stage = { width: 900, height: 500 };
+
+  test("a tap on the right two thirds goes forward, on the left third back", () => {
+    expect(pointerMove({ x: 700, y: 200, dx: 0, dy: 0 }, stage)).toBe("advance");
+    expect(pointerMove({ x: 400, y: 200, dx: 0, dy: 0 }, stage)).toBe("advance");
+    expect(pointerMove({ x: 100, y: 200, dx: 0, dy: 0 }, stage)).toBe("retreat");
+  });
+
+  test("a sideways swipe turns the page the way a book does", () => {
+    expect(pointerMove({ x: 300, y: 200, dx: -120, dy: 10 }, stage)).toBe("advance");
+    expect(pointerMove({ x: 300, y: 200, dx: 120, dy: -10 }, stage)).toBe("retreat");
+  });
+
+  test("a drag that is mostly vertical, or too short to be a swipe or a tap, does nothing", () => {
+    expect(pointerMove({ x: 300, y: 200, dx: 20, dy: 140 }, stage)).toBeNull();
+    expect(pointerMove({ x: 300, y: 200, dx: 30, dy: 0 }, stage)).toBeNull();
+  });
+});
+
+describe("isInteractive", () => {
+  const within = (match: boolean) => ({ closest: () => (match ? {} : null) });
+
+  test("is true inside a link, a control, or media, whose touches are their own", () => {
+    expect(isInteractive(within(true))).toBe(true);
+  });
+
+  test("is false on plain slide content and on anything that is not an element", () => {
+    expect(isInteractive(within(false))).toBe(false);
+    expect(isInteractive(null)).toBe(false);
   });
 });

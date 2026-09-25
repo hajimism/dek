@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { printPageCss } from "./chrome.ts";
 import { collectPrintSlidesHtml, htmlShell, readTheme } from "./html.ts";
 import { type DistOptions, distFile } from "./path.ts";
 import {
@@ -51,15 +52,8 @@ export function renderPdfHtml(deck: ProjectDeck): string {
     lang: deck.deck.lang,
     title: deck.deck.title,
     head: `<style>${themeCss}</style>
-  <style>${printCss(size)}</style>`,
+  <style>${printPageCss(size)}</style>`,
     body: `<div id="deck">${slidesHtml}</div>
   ${stillPageScript(readSlideScripts(deck.dir, { strict: true }))}`,
   });
-}
-
-function printCss(size: { width: number; height: number }): string {
-  return `@page { size: ${size.width}px ${size.height}px; margin: 0 }
-html, body, #deck { width: ${size.width}px; background: #000 }
-#deck { height: auto }
-#deck > .slide { display: block; width: ${size.width}px; height: ${size.height}px; break-after: page }`;
 }

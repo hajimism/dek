@@ -8,6 +8,7 @@ import {
   dekGo,
   dekLive,
   mountPlayer,
+  playerChannelName,
   pressKey,
   settle,
   unmountPlayer,
@@ -174,9 +175,58 @@ describe("player runtime in happy-dom", () => {
   });
 
   test.serial("dekLive diagnostics shows the banner and clears it when empty", async () => {
-    await dekLive({ type: "diagnostics", diagnostics: [{ id: "DEK001", message: "missing" }] });
+    await dekLive({
+      type: "diagnostics",
+      diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
+    });
     expect(document.querySelector(".dek-diagnostics")?.textContent).toContain("DEK001");
     await dekLive({ type: "diagnostics", diagnostics: [] });
     expect(document.querySelector(".dek-diagnostics")).toBeNull();
   });
+
+  test.serial("a position from a peer moves the deck without being echoed back", async () => {
+    // Bun shares BroadcastChannel across the process, so this peer hears what the player posts.
+    const peer = new BroadcastChannel(playerChannelName());
+    const heard: unknown[] = [];
+    peer.addEventListener("message", (event: MessageEvent) => {
+      heard.push(event.data);
+    });
+    try {
+      peer.postMessage({ slideIndex: 2, beatIndex: 0 });
+      await waitFor(() => currentSlug() === "last");
+      // A local move follows; go serialises posts, so any echo of the remote move lands first.
+      pressKey("ArrowLeft");
+      await waitFor(() => heard.length > 0);
+      expect(heard).toEqual([{ slideIndex: 1, beatIndex: 1 }]);
+      expect(location.hash).toBe("#steps/2");
+    } finally {
+      peer.close();
+    }
+  });
+
+  test.serial("a window of another deck on the same origin does not move this one", async () => {
+    const before = location.hash;
+    const other = new BroadcastChannel(`${playerChannelName()}-other`);
+    const legacy = new BroadcastChannel("dek");
+    try {
+      other.postMessage({ slideIndex: 0, beatIndex: 0 });
+      legacy.postMessage({ slideIndex: 0, beatIndex: 0 });
+      await settle();
+      await settle();
+      expect(location.hash).toBe(before);
+    } finally {
+      other.close();
+      legacy.close();
+    }
+  });
 });
+
+async function waitFor(condition: () => boolean, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) {
+      throw new Error("timed out waiting for condition");
+    }
+    await settle();
+  }
+}

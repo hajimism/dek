@@ -7,10 +7,10 @@ export function playerChromeCss(
 #dek-shell { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "current"; }
 body:not(.is-presenter):not(.is-rail-hidden) #dek-shell:has(> #dek-rail) { grid-template-columns: var(--dek-rail-w, 188px) minmax(0, 1fr); grid-template-areas: "rail current"; }
 #dek-current { grid-area: current; height: 100%; display: flex; flex-direction: column; min-height: 0; }
-#dek-current-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+#dek-current-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: pan-y pinch-zoom; }
 #dek-current-stage #deck { position: absolute; top: 0; left: 0; margin: 0; transform-origin: top left; }
 #deck { position: relative; width: ${width}px; height: ${height}px; margin: 0 auto; transform-origin: top center; }
-#deck > .slide:not(.is-current) { display: none; }
+@media not print { #deck > .slide:not(.is-current) { display: none; } }
 #deck { view-transition-name: slide; }
 ::view-transition-group(slide) { overflow: clip; }
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
@@ -34,22 +34,31 @@ body.is-rail-hidden #dek-rail, body.is-rail-hidden #dek-rail-resize, body[data-m
   body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: 50%; }
 }
 .dek-panel-label { display: none; }
+#dek-announce { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 #dek-hint { position: fixed; left: 50%; bottom: 28px; z-index: 20; display: flex; gap: 18px; padding: 10px 18px; background: rgba(18,18,18,0.86); color: #fff; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; box-shadow: 0 8px 28px rgba(0,0,0,0.35); font: 500 13px/1.4 system-ui, sans-serif; white-space: nowrap; pointer-events: none; opacity: 0; transform: translate(-50%, 12px); animation: dek-hint 5s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards; }
 body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: calc(50% + var(--dek-rail-w, 188px) / 2); }
 #dek-hint > span { display: inline-flex; align-items: center; gap: 8px; }
 #dek-hint kbd { min-width: 1.6em; padding: 1px 6px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.35); border-bottom-width: 2px; border-radius: 5px; font: 600 12px/1.4 ui-monospace, monospace; text-align: center; }
 @keyframes dek-hint { 12% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { #dek-hint { transform: translate(-50%, 0); animation-name: dek-hint-fade; } @keyframes dek-hint-fade { 12%, 80% { opacity: 1; } } }
+@media (pointer: coarse) { #dek-hint { display: none; } }
 .dek-diagnostics { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 12px; background: #900; color: #fff; font: 12px/1.4 monospace; white-space: pre-wrap; z-index: 10; }
-body[data-mode="video"] .dek-diagnostics { display: none !important; }`;
+body[data-mode="video"] .dek-diagnostics { display: none !important; }
+@media print {
+${indent(printPageCss({ width, height }))}
+  body, #dek-shell, #dek-current, #dek-current-stage { display: block; height: auto; overflow: visible; position: static; padding: 0; }
+  #deck [data-step] { opacity: 1 !important; transform: none !important; transition: none !important; }
+  #dek-rail, #dek-rail-resize, #dek-hint, .dek-panel-label, .dek-diagnostics { display: none !important; }
+}`;
   if (options.presenter === false) {
     return base;
   }
   return `${base}
+@media print { #dek-presenter, #dek-progress { display: none !important; } }
 body[data-mode="video"] #dek-presenter, body[data-mode="video"] #dek-progress { display: none !important; }
 #dek-presenter[hidden], #dek-progress[hidden], #dek-next-end[hidden] { display: none; }
 body.is-presenter { background: #121212; color: #ddd; font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
-body.is-presenter .dek-panel-label { display: block; font: 12px/1.4 system-ui, sans-serif; opacity: 0.5; padding: 4px 8px; }
+body.is-presenter .dek-panel-label { display: block; font: 12px/1.4 system-ui, sans-serif; opacity: 0.65; padding: 4px 8px; }
 body.is-presenter #dek-progress:not([hidden]) { display: flex; height: 4px; flex: none; background: #121212; gap: 1px; }
 #dek-progress > span { flex: 1; background: rgba(255,255,255,0.12); position: relative; }
 #dek-progress > span.is-done { background: #3ab9d5; }
@@ -83,4 +92,25 @@ body.is-presenter #dek-presenter:not([hidden]) { display: contents; }
 @media (max-aspect-ratio: 1/1) {
   body.is-presenter #dek-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.4fr) minmax(7rem, 0.55fr) minmax(0, 1fr) auto; grid-template-areas: "current" "next" "notes" "bar"; }
 }`;
+}
+
+/**
+ * One slide per page at the deck's logical size. A slide's display is its layout, which the
+ * theme owns, so neither this nor the player's chrome ever sets it: the player hides the
+ * slides it is not showing on screen only. `dek pdf` prints with it, and the player wraps
+ * it in `@media print` so the browser's own Print gives the same pages.
+ */
+export function printPageCss(size: { width: number; height: number }): string {
+  return `@page { size: ${size.width}px ${size.height}px; margin: 0 }
+html, body { margin: 0; padding: 0; background: #000; }
+#deck { position: static; width: ${size.width}px; height: auto; margin: 0; transform: none !important; }
+#deck > .slide { width: ${size.width}px; height: ${size.height}px; break-inside: avoid; }
+#deck > .slide:not(:last-child) { break-after: page; }`;
+}
+
+function indent(css: string): string {
+  return css
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
 }

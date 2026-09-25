@@ -1,20 +1,27 @@
-export const RAIL_WIDTH_DEFAULT = 188;
-export const RAIL_WIDTH_MIN = 120;
-export const RAIL_WIDTH_MAX = 360;
+import { RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN } from "../core/rail-width.ts";
+import { isLetterKey } from "./step.ts";
+
+export { RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN };
 export const RAIL_WIDTH_KEY = "dek.railWidth";
 export const RAIL_VISIBLE_KEY = "dek.railVisible";
 
-export function isRailToggleKey(event: {
-  key: string;
-  altKey: boolean;
-  ctrlKey: boolean;
-  metaKey: boolean;
-  repeat?: boolean;
-}): boolean {
-  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) {
-    return false;
+export function isRailToggleKey(event: Parameters<typeof isLetterKey>[0]): boolean {
+  return isLetterKey(event, "s");
+}
+
+/** How far one arrow key press moves the rail's resize handle. */
+export const RAIL_WIDTH_STEP = 16;
+
+/**
+ * The page's localStorage, or undefined where reading it throws: a file opened with storage
+ * blocked, or a sandboxed frame. The rail remembers less there; the deck still runs.
+ */
+export function pageStorage(): Storage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
   }
-  return event.key === "s" || event.key === "S";
 }
 
 export function clampRailWidth(px: number): number {

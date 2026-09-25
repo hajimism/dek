@@ -1,14 +1,7 @@
-export function isPresenterToggleKey(event: {
-  key: string;
-  altKey: boolean;
-  ctrlKey: boolean;
-  metaKey: boolean;
-  repeat?: boolean;
-}): boolean {
-  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) {
-    return false;
-  }
-  return event.key === "p" || event.key === "P";
+import { isLetterKey } from "./step.ts";
+
+export function isPresenterToggleKey(event: Parameters<typeof isLetterKey>[0]): boolean {
+  return isLetterKey(event, "p");
 }
 
 export function presenterSearch(search: string, open: boolean): string {

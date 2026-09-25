@@ -6,6 +6,10 @@ export type AnimationLike = {
 
 export type ViewTransitionLike = {
   finished: Promise<unknown>;
+  /** Rejects when the transition is skipped, which a hurried move does on purpose. */
+  ready?: Promise<unknown>;
+  /** Rejects when the update itself threw. */
+  updateCallbackDone?: Promise<unknown>;
 };
 
 export async function waitForPlaybackSettle(options: {
@@ -13,8 +17,15 @@ export async function waitForPlaybackSettle(options: {
   viewTransition?: ViewTransitionLike | null;
 }): Promise<void> {
   const tasks: Array<Promise<unknown>> = [];
-  if (options.viewTransition) {
-    tasks.push(options.viewTransition.finished.catch(() => undefined));
+  const transition = options.viewTransition;
+  if (transition) {
+    // A skipped transition still ran its update; only the animation was dropped.
+    transition.ready?.catch(() => undefined);
+    tasks.push(transition.finished.catch(() => undefined));
+    // The update's own error is the move's, as it is when no transition wraps it.
+    if (transition.updateCallbackDone) {
+      tasks.push(transition.updateCallbackDone);
+    }
   }
   for (const animation of options.animations ?? []) {
     if (animation.playState === "idle" || animation.playState === "finished") {

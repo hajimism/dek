@@ -25,3 +25,20 @@ export function splitDeckPath(
 export function isExactPath(pathname: string, base: string): boolean {
   return pathname === base || pathname === `${base}/`;
 }
+
+/**
+ * The query a live channel carries for the presenter's token, or nothing on an audience page.
+ * `liveReloadScript` embeds this function's source, so it must stay self-contained.
+ */
+export function liveTokenQuery(token: string | undefined): string {
+  return token ? `?token=${encodeURIComponent(token)}` : "";
+}
+
+/**
+ * The BroadcastChannel a deck's windows share. Built files share one origin under `file://`,
+ * so the name carries the deck and its slides: an audience view and a presenter view of one
+ * deck follow each other, and two decks open side by side do not.
+ */
+export function deckChannelName(deck: string | undefined, slugs: readonly string[]): string {
+  return `dek:${deck ?? ""}:${slugs.join(",")}`;
+}

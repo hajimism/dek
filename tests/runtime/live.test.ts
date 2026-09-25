@@ -120,8 +120,8 @@ describe("applyLiveEvent", () => {
       {
         type: "diagnostics",
         diagnostics: [
-          { id: "DEK040", message: "dictionary is missing English word: AI" },
-          { id: "DEK010", message: 'class "x"' },
+          { id: "DEK040", severity: "warning", message: "dictionary is missing English word: AI" },
+          { id: "DEK010", severity: "error", message: 'class "x"' },
         ],
       },
       fakeHost(doc),
@@ -136,7 +136,10 @@ describe("applyLiveEvent", () => {
     const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: "DEK001: missing" };
     const host = fakeHost(doc);
     applyLiveEvent(
-      { type: "diagnostics", diagnostics: [{ id: "DEK003", message: "bad step" }] },
+      {
+        type: "diagnostics",
+        diagnostics: [{ id: "DEK003", severity: "error", message: "bad step" }],
+      },
       host,
       { shown: new Set() },
     );

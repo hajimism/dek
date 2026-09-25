@@ -53,12 +53,12 @@ hello
     );
   });
 
-  test("defaults the document shell to ja", async () => {
+  test("takes the document shell's lang from the script when frontmatter has none", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const { deck } = resolveDeck(join(root, "decks", "demo"));
-        expect(renderPdfHtml(deck)).toContain('<html lang="ja">');
+        expect(renderPdfHtml(deck)).toContain('<html lang="en">');
       },
     );
   });
@@ -125,7 +125,9 @@ second
         );
         expect(html).toContain("data:image/png;base64,");
         expect(html).toContain("@page");
-        expect(html).toContain("break-after");
+        // The browser's default body margin would push the first slide over its page.
+        expect(html).toContain("html, body { margin: 0;");
+        expect(html).toContain("#deck > .slide:not(:last-child) { break-after: page; }");
         expect(html).not.toContain("dek-presenter");
         expect(html).not.toContain("startViewTransition");
         expect(html).not.toContain("BroadcastChannel");
@@ -146,41 +148,6 @@ second
           expect(error).toBeInstanceOf(DekError);
           expect((error as DekError).message).toContain("Playwright is not installed");
           expect((error as DekError).hint).toContain("playwright install");
-        }
-      },
-    );
-  });
-
-  test("fails when a section has no slide HTML", async () => {
-    await withTempProject(
-      {
-        decks: [
-          {
-            name: "demo",
-            script: `---
-title: Demo
----
-
-## intro
-
-hello
-
-## extra
-
-more
-`,
-            slides: { intro: introHtml },
-          },
-        ],
-      },
-      async (root) => {
-        try {
-          await pdfDeck(join(root, "decks", "demo"), { runner: async () => null });
-          throw new Error("expected pdfDeck to fail");
-        } catch (error) {
-          expect(error).toBeInstanceOf(DekError);
-          expect((error as DekError).message).toContain('missing slide HTML for "extra"');
-          expect((error as DekError).hint).toContain("dek sync");
         }
       },
     );

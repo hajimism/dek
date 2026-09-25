@@ -1,5 +1,11 @@
+/**
+ * Run one move at a time. A move asked for while another runs waits, and only the latest waiting
+ * move runs next. `onQueue` fires as one starts waiting, so the move in flight can cut its
+ * animation short instead of making the presenter wait it out.
+ */
 export function createGuardedGo<T>(
   run: (next: T) => Promise<void>,
+  options: { onQueue?: () => void } = {},
 ): (next: T | null | undefined) => Promise<void> {
   let busy = false;
   let queued: T | undefined;
@@ -9,6 +15,7 @@ export function createGuardedGo<T>(
     }
     if (busy) {
       queued = next;
+      options.onQueue?.();
       return;
     }
     busy = true;
