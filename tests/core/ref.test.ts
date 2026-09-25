@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
@@ -282,6 +282,33 @@ describe("installSnapshot", () => {
       expect((await listFiles(dir)).filter((path) => path.endsWith(REF_MARKER))).toEqual([
         REF_MARKER,
       ]);
+    });
+  });
+
+  test("never swaps out a file that a linked folder under refs/ points at", async () => {
+    await withTempDir(async (home) => {
+      await withTempDir(async (root) => {
+        await mkdir(join(home, ".ssh"));
+        await writeFile(join(home, ".ssh", "why-dek"), "ssh-ed25519 AAAA mine");
+        await mkdir(join(root, "refs", "o"), { recursive: true });
+        await symlink(join(home, ".ssh"), join(root, "refs", "o", "r"));
+        await expect(
+          installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek"))),
+        ).rejects.toThrow("leads outside the project");
+        expect(await readFile(join(home, ".ssh", "why-dek"), "utf8")).toBe("ssh-ed25519 AAAA mine");
+      });
+    });
+  });
+
+  test("replaces a snapshot that is a link with a real one, leaving what it pointed at", async () => {
+    await withTempDir(async (root) => {
+      await mkdir(join(root, "elsewhere"));
+      await writeFile(join(root, "elsewhere", "keep.txt"), "mine");
+      await mkdir(join(root, "refs", "o", "r"), { recursive: true });
+      await symlink(join(root, "elsewhere"), join(root, "refs", "o", "r", "why-dek"));
+      await installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek")));
+      expect(readRefMeta(refDir(root, "o/r/why-dek"))?.rev).toBe(SHA_A);
+      expect(await readFile(join(root, "elsewhere", "keep.txt"), "utf8")).toBe("mine");
     });
   });
 

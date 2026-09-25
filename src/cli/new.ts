@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { DekError } from "../core/index.ts";
-import { isDeckName } from "../core/path.ts";
+import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { syncDeck } from "../core/sync.ts";
 import { applyPlan, deckPlan, nextSteps } from "./files.ts";
 import { requireDeckFromCwd, requireProject } from "./scope.ts";
@@ -22,7 +22,7 @@ export function newCommand(options: { cwd: string; name?: string; themeFrom?: st
   }
   if (!isDeckName(name)) {
     throw new DekError(`invalid deck name "${name}"`, {
-      hint: "use a name without path separators",
+      hint: DECK_NAME_HINT,
     });
   }
 

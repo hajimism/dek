@@ -61,6 +61,35 @@ describe("loadVoiceSettings", () => {
     });
   });
 
+  test.each(["voicevox:80@attacker.example", "aivis:1@attacker.example:8080", "voicevox:x"])(
+    "refuses engine %s, which reads as local but names another host",
+    async (engine) => {
+      await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await mkdir(join(deckDir, "voice"), { recursive: true });
+        await writeFile(
+          join(deckDir, "voice", "voice.toml"),
+          `engine = ${JSON.stringify(engine)}\nspeaker = "a/b"\n`,
+        );
+        expect(() => loadVoiceSettings(deckDir)).toThrow(/^engine: /);
+      });
+    },
+  );
+
+  test("takes an engine name, a name with a port, or a URL", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, "voice"), { recursive: true });
+      for (const engine of ["aivis", "voicevox:50021", "https://tts.example.com/"]) {
+        await writeFile(
+          join(deckDir, "voice", "voice.toml"),
+          `engine = ${JSON.stringify(engine)}\nspeaker = "a/b"\n`,
+        );
+        expect(loadVoiceSettings(deckDir).engine).toBe(engine);
+      }
+    });
+  });
+
   test("reads the deck lead and per-beat timing", async () => {
     await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");

@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { DekError } from "./error.ts";
-import { resolvePackageFromAncestors } from "./optional.ts";
 import { moduleFilePath } from "./path.ts";
 import { runJsonWorker, workerCommand } from "./spawn.ts";
 import type { Position } from "./step.ts";
@@ -68,10 +67,11 @@ export type SpawnTimeoutOptions = {
 const requirePlaywright = createRequire(import.meta.url);
 
 export function resolvePlaywrightModule(): string | undefined {
+  // From dek's own install only: a repository someone else wrote can commit a node_modules.
   try {
     return requirePlaywright.resolve("playwright");
   } catch {
-    return resolvePackageFromAncestors("playwright", process.cwd());
+    return undefined;
   }
 }
 

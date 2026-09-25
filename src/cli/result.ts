@@ -24,7 +24,7 @@ import type { ShotCliResult } from "./shot.ts";
 import type { ShowResult } from "./show.ts";
 import type { SyncCliResult } from "./sync.ts";
 import type { ThemeResult } from "./theme.ts";
-import { ansi, padEndWidth, shouldColor } from "./tty.ts";
+import { ansi, padEndWidth, shouldColor, terminalSafe } from "./tty.ts";
 import type { VideoCliResult } from "./video.ts";
 import type { VoiceCliResult } from "./voice.ts";
 
@@ -74,13 +74,15 @@ export function writeSuccess(original: CliResult, options: WriteSuccessOptions):
     process.stdout.write(`${JSON.stringify({ ...envelope, ...jsonData(result) })}\n`);
   } else if (result.command === "lint") {
     const color = shouldColor(process.stdout);
-    process.stdout.write(`${formatDiagnostics(result.data.diagnostics, { color })}\n`);
+    process.stdout.write(
+      `${terminalSafe(formatDiagnostics(result.data.diagnostics, { color }))}\n`,
+    );
     const skipped = formatSkipped(result.data.skipped, shouldColor(process.stderr));
     if (skipped) {
-      process.stderr.write(`${skipped}\n`);
+      process.stderr.write(`${terminalSafe(skipped)}\n`);
     }
   } else {
-    process.stdout.write(`${formatText(result)}\n`);
+    process.stdout.write(`${terminalSafe(formatText(result))}\n`);
   }
 
   if (failure) {

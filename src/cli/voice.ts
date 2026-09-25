@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { DekError } from "../core/error.ts";
+import { deckProjectRoot } from "../core/path.ts";
+import { isCachedFile, writeInside } from "../core/safe-fs.ts";
 import { loadVoiceDict, loadVoiceSettings, voiceCacheFile, writeVoiceDict } from "../core/voice.ts";
 import {
   engineBaseUrl,
@@ -67,8 +69,7 @@ export async function voiceCommand(options: {
     query.speedScale = settings.speed;
     const wav = await fetchSynthesis(baseUrl, query, styleId);
     const path = voiceCacheFile(deck.dir, "say.wav");
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, wav);
+    writeInside(path, wav, deckProjectRoot(deck.dir));
     await playWav(path);
     return { action: "say", text, path };
   }
@@ -89,18 +90,19 @@ export async function voiceCommand(options: {
   if (sub === "pin") {
     const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
     const audioPath = voiceCacheFile(deck.dir, "audio.wav");
-    if (!existsSync(timelinePath) || !existsSync(audioPath)) {
+    // What is pinned is committed; only what `dek voice` wrote, never a link planted in the cache.
+    if (!isCachedFile(timelinePath) || !isCachedFile(audioPath)) {
       throw new DekError("Timeline not found", {
         path: timelinePath,
         hint: "run `dek voice`",
       });
     }
+    const root = deckProjectRoot(deck.dir);
     const pinDir = join(deck.dir, "voice", "pin");
-    mkdirSync(pinDir, { recursive: true });
     const pinTimeline = join(pinDir, "timeline.json");
     const pinAudio = join(pinDir, "master.wav");
-    copyFileSync(timelinePath, pinTimeline);
-    copyFileSync(audioPath, pinAudio);
+    writeInside(pinTimeline, readFileSync(timelinePath), root);
+    writeInside(pinAudio, readFileSync(audioPath), root);
     return { action: "pin", timelinePath: pinTimeline, audioPath: pinAudio };
   }
   throw new DekError(`unknown voice command: ${sub}`, {

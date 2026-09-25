@@ -33,7 +33,7 @@ Video capture does not replay the talk at wall-clock speed. The worker starts ea
 
 Playwright, ffmpeg, and the speech engine are optional. When one is missing, only the command that needs it fails, and its hint says what to install. The CLI itself always starts.
 
-Playwright runs in a separate worker process, resolved from `node_modules` at run time, because Bun's Node compatibility is partial. `DEK_PLAYWRIGHT` can point at an alternative worker, which is also how the tests run without a browser. rumdl is found on `PATH`, in `node_modules/.bin`, or at `DEK_RUMDL`.
+Playwright runs in a separate worker process, resolved from `node_modules` at run time, because Bun's Node compatibility is partial. `DEK_PLAYWRIGHT` can point at an alternative worker, which is also how the tests run without a browser. rumdl is found on `PATH`, in the `node_modules/.bin` beside dek's install, or at `DEK_RUMDL`. Neither is looked up from the current directory, which a cloned repository controls.
 
 ## Where agents plug in
 

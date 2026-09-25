@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { renderDeckDocument } from "../core/document.ts";
 import { DekError } from "../core/error.ts";
@@ -11,6 +11,7 @@ import {
   type ResolvedDeck,
   requireSection,
 } from "../core/resolve.ts";
+import { dropLinks, outputDir, outputPath, replaceFile } from "../core/safe-fs.ts";
 import { logicalSize } from "../core/size.ts";
 import { sliceTimeline, slideTimeRange, type Timeline } from "../core/timeline.ts";
 import {
@@ -88,7 +89,8 @@ async function bakeProjectDeck(
 
   const videoCache = cacheDir(deck.dir, "video");
   const outDir = options.slug ? videoCache : join(videoCache, "_full");
-  mkdirSync(outDir, { recursive: true });
+  // Chromium writes frames here by name; a link planted at one would take the frame elsewhere.
+  dropLinks(outputDir(outDir, project.root));
 
   if (options.slug) {
     const slideIndex = deck.deck.sections.findIndex((section) => section.slug === options.slug);
@@ -116,8 +118,11 @@ async function bakeProjectDeck(
   const out = options.slug
     ? join(videoCache, `${options.slug}.mp4`)
     : distFile(project, deck, "mp4", options);
-  mkdirSync(dirname(out), { recursive: true });
-  await muxVideo({ frames: captured.frames, audioPath: timeline.audio, outPath: out });
+  await muxVideo({
+    frames: captured.frames,
+    audioPath: timeline.audio,
+    outPath: outputPath(out, project.root),
+  });
 
   if (options.slug) {
     return { out };
@@ -157,7 +162,7 @@ export function sliceTimelineAudio(
     });
   }
   const sliced = sliceTimeline(timeline, slideIndex);
-  writeFileSync(
+  replaceFile(
     slicedAudioPath,
     sliceWav(readFileSync(timeline.audio), range.start, sliced.durationMs),
   );

@@ -443,6 +443,8 @@ describe("renderIndexHtml", () => {
   test("links each deck", () => {
     const html = renderIndexHtml([{ name: "demo", title: "Demo" }]);
     expect(html).toContain('href="/decks/demo/"');
+    // A phone paired from the deck list opens a presenter view from here.
+    expect(html).toContain('href="/decks/demo/presenter"');
     expect(html).toContain("demo");
     expect(html).toContain('<html lang="en">');
   });

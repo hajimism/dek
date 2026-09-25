@@ -1,7 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cuesFromDeck, splitSentences } from "../core/cue.ts";
-import { asResolvedDeck, type ResolvedDeck } from "../core/resolve.ts";
+import { deckProjectRoot } from "../core/path.ts";
+import { asResolvedDeck, type ResolvedDeck, readDeckFile } from "../core/resolve.ts";
+import { isCachedFile, outputDir, replaceFile, requireInside } from "../core/safe-fs.ts";
 import { scheduleVoice, type Utterance } from "../core/timeline.ts";
 import {
   loadVoiceDict,
@@ -36,16 +38,16 @@ export async function synthDeck(dir: string): Promise<SynthResult>;
 export async function synthDeck(source: ResolvedDeck): Promise<SynthResult>;
 export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResult> {
   const { deck } = asResolvedDeck(input);
-  const cacheDir = voiceCacheDir(deck.dir);
-  mkdirSync(cacheDir, { recursive: true });
+  const root = deckProjectRoot(deck.dir);
+  const cacheDir = outputDir(voiceCacheDir(deck.dir), root);
   const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
   const audioPath = voiceCacheFile(deck.dir, "audio.wav");
   const pinTimeline = join(deck.dir, "voice", "pin", "timeline.json");
   const pinAudio = join(deck.dir, "voice", "pin", "master.wav");
   if (existsSync(pinTimeline) && existsSync(pinAudio)) {
-    const parsed = parseTimelineJson(readFileSync(pinTimeline, "utf8"), pinTimeline);
-    copyFileSync(pinAudio, audioPath);
-    writeFileSync(timelinePath, `${JSON.stringify({ ...parsed, audio: "audio.wav" }, null, 2)}\n`);
+    const parsed = parseTimelineJson(readDeckFile(deck.dir, pinTimeline) ?? "", pinTimeline);
+    replaceFile(audioPath, readFileSync(requireInside(pinAudio, root)));
+    replaceFile(timelinePath, `${JSON.stringify({ ...parsed, audio: "audio.wav" }, null, 2)}\n`);
     return { timelinePath, audioPath, synthesized: 0, cached: 0 };
   }
 
@@ -82,7 +84,7 @@ export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResu
     const metaPath = join(cacheDir, `${hash}.json`);
     let utterance: Utterance | undefined;
     let wav: Buffer | undefined;
-    if (existsSync(clipPath) && existsSync(metaPath)) {
+    if (isCachedFile(clipPath) && isCachedFile(metaPath)) {
       utterance = parseUtteranceJson(readFileSync(metaPath, "utf8"));
       if (utterance) {
         wav = readFileSync(clipPath);
@@ -98,11 +100,11 @@ export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResu
         kana: query.kana ?? "",
         durationMs: 0,
       };
-      writeFileSync(clipPath, wav);
+      replaceFile(clipPath, wav);
       synthesized += 1;
     }
     utterance = { ...utterance, text, durationMs: wavDurationMs(wav) };
-    writeFileSync(metaPath, `${JSON.stringify(utterance)}\n`);
+    replaceFile(metaPath, `${JSON.stringify(utterance)}\n`);
     utterances.push(utterance);
     clips.push(wav);
   }
@@ -118,8 +120,8 @@ export async function synthDeck(input: string | ResolvedDeck): Promise<SynthResu
     clips.length > 0
       ? concatWavs(clips, scheduled.pauseAfterMs, scheduled.leadingMs)
       : silentWav(scheduled.timeline.durationMs);
-  writeFileSync(audioPath, audio);
-  writeFileSync(timelinePath, `${JSON.stringify(scheduled.timeline, null, 2)}\n`);
+  replaceFile(audioPath, audio);
+  replaceFile(timelinePath, `${JSON.stringify(scheduled.timeline, null, 2)}\n`);
 
   return { timelinePath, audioPath, synthesized, cached };
 }

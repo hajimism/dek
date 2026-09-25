@@ -10,6 +10,18 @@ const codes = {
   bold: "\x1b[1m",
 } as const;
 
+/**
+ * Text for a terminal: dek's own colors, newlines, and tabs pass, and every other control
+ * character shows as U+FFFD. A deck title, a file name, or a ref's title fetched from GitHub
+ * could otherwise set the window title, draw a fake link (OSC 8), or clear the screen.
+ */
+export function terminalSafe(text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+  return text.replace(/\x1b\[[0-9;]*m|[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, (match) =>
+    match.length > 1 ? match : "\uFFFD",
+  );
+}
+
 export function shouldColor(stream: ColorStream): boolean {
   if (process.env.NO_COLOR) {
     return false;

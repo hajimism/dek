@@ -1,10 +1,11 @@
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname } from "node:path";
+import { copyFileSync } from "node:fs";
+import { basename } from "node:path";
 import { loadConfig } from "./config.ts";
 import { renderDeckDocument } from "./document.ts";
 import { type DistOptions, distFile } from "./path.ts";
 import type { PlaywrightRunner } from "./playwright.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
+import { outputPath, removeInside, writeInside } from "./safe-fs.ts";
 import { coverShot } from "./shot.ts";
 import { logicalSize } from "./size.ts";
 
@@ -36,12 +37,11 @@ export async function buildDeck(
   const baseUrl = options.url ?? config.url;
   const shot = baseUrl ? await coverShot(deck, options.runner) : undefined;
 
-  mkdirSync(dirname(outPath), { recursive: true });
   if (shot) {
-    copyFileSync(shot, imagePath);
+    copyFileSync(shot, outputPath(imagePath, project.root));
   } else {
     // An image from an earlier build would outlive the tag that pointed at it.
-    rmSync(imagePath, { force: true });
+    removeInside(imagePath, project.root);
   }
   const html = await renderDeckDocument(deck, {
     mode: "player",
@@ -50,11 +50,11 @@ export async function buildDeck(
     playerScript: options.playerScript,
     ...(baseUrl
       ? {
-          publicUrl: new URL(basename(outPath), baseUrl).href,
+          publicUrl: new URL(encodeURIComponent(basename(outPath)), baseUrl).href,
           ...(shot
             ? {
                 previewImage: {
-                  url: new URL(basename(imagePath), baseUrl).href,
+                  url: new URL(encodeURIComponent(basename(imagePath)), baseUrl).href,
                   ...logicalSize(deck.deck.ratio),
                 },
               }
@@ -62,7 +62,7 @@ export async function buildDeck(
         }
       : {}),
   });
-  writeFileSync(outPath, html);
+  writeInside(outPath, html, project.root);
   if (shot) {
     return { outPath, image: imagePath };
   }

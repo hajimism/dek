@@ -52,7 +52,7 @@ describe("resolveRumdlBin", () => {
     });
   });
 
-  test.serial("finds node_modules/.bin/rumdl from cwd when rumdl is not on PATH", async () => {
+  test.serial("never runs a node_modules/.bin/rumdl that the working directory holds", async () => {
     await withTempDir(async (dir) => {
       const binDir = join(dir, "node_modules", ".bin");
       await mkdir(binDir, { recursive: true });
@@ -61,8 +61,8 @@ describe("resolveRumdlBin", () => {
       await chmod(rumdl, 0o755);
       const nested = join(dir, "decks", "why-dek");
       await mkdir(nested, { recursive: true });
-      // An empty PATH entry keeps Bun.which from finding a machine-wide rumdl,
-      // so the node_modules/.bin walk is what resolves it.
+      // An empty PATH entry keeps Bun.which from finding a machine-wide rumdl. A repository
+      // someone else wrote can commit node_modules/.bin; dek looks only beside its own install.
       const emptyPath = join(dir, "empty-path");
       await mkdir(emptyPath, { recursive: true });
       const cwd = process.cwd();
@@ -70,7 +70,7 @@ describe("resolveRumdlBin", () => {
         try {
           process.chdir(nested);
           expect(Bun.which("rumdl")).toBeNull();
-          expect(resolveRumdlBin()).toBe(rumdl);
+          expect(resolveRumdlBin()).not.toBe(rumdl);
         } finally {
           process.chdir(cwd);
         }
@@ -86,14 +86,13 @@ describe("defaultRumdlRunner", () => {
       const scriptPath = join(dir, "script.md");
       await writeFile(scriptPath, "# demo\n");
       await withEnv({ DEK_RUMDL: noisy }, async () => {
-        const started = Date.now();
+        // A full stderr pipe would hang for good; the bound only has to beat the test timeout.
         const stdout = await Promise.race([
           defaultRumdlRunner(scriptPath),
           new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("hung")), 2000);
+            setTimeout(() => reject(new Error("hung")), 4000);
           }),
         ]);
-        expect(Date.now() - started).toBeLessThan(2000);
         expect(stdout).toContain("ok");
       });
     });

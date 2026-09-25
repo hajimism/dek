@@ -42,6 +42,14 @@ export async function muxVideo(options: {
   try {
     const listPath = join(dir, "frames.txt");
     const lines: string[] = [];
+    // ffmpeg reads the list line by line; a path with a line break in it would add directives.
+    const broken = options.frames.find((frame) => /[\r\n]/.test(frame.path));
+    if (broken) {
+      throw new DekError("a frame path holds a line break", {
+        path: broken.path,
+        hint: "rename the folder so its name has no line break",
+      });
+    }
     for (const frame of options.frames) {
       lines.push(`file '${frame.path.replace(/'/g, "'\\''")}'`);
       lines.push(`duration ${(frame.durationMs / 1000).toFixed(3)}`);

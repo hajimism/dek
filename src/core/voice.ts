@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
 import { DekError } from "./error.ts";
-import { cacheDir } from "./path.ts";
+import { cacheDir, deckProjectRoot } from "./path.ts";
+import { writeInside } from "./safe-fs.ts";
 import type { Deck } from "./schema.ts";
 import type { Position } from "./step.ts";
 import {
@@ -34,7 +35,13 @@ export type VoiceResolved = {
 };
 
 const VoiceToml = z.object({
-  engine: z.string().default("voicevox"),
+  // A name, with a port on this machine, or a URL: "voicevox:80@host" must not pass for local.
+  engine: z
+    .string()
+    .regex(/^(?:https?:\/\/\S+|[a-z][a-z0-9-]*(?::\d{1,5})?)$/i, {
+      message: 'an engine name like "voicevox", a name and port like "voicevox:50021", or a URL',
+    })
+    .default("voicevox"),
   speaker: z.string(),
   speed: z.number().default(1),
   pause: z
@@ -210,9 +217,7 @@ export function loadVoiceDict(deckDir: string): VoiceDict {
 }
 
 export function writeVoiceDict(deckDir: string, dict: VoiceDict): string {
-  const dir = voiceDir(deckDir);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, "dict.toml");
+  const path = join(voiceDir(deckDir), "dict.toml");
   const body = Object.entries(dict)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, entry]) => {
@@ -220,7 +225,7 @@ export function writeVoiceDict(deckDir: string, dict: VoiceDict): string {
       return `[${escapeTomlKey(key)}]\nkana = ${JSON.stringify(entry.kana)}${accent}\n`;
     })
     .join("\n");
-  writeFileSync(path, body || "# voice dictionary\n");
+  writeInside(path, body || "# voice dictionary\n", deckProjectRoot(deckDir));
   return path;
 }
 
@@ -320,23 +325,14 @@ export function resolveTimelineAudio(
   timeline: Pick<Timeline, "audio">,
   timelinePath: string,
 ): string {
-  const audio = timeline.audio;
-  if (audio && isAbsolute(audio) && existsSync(audio)) {
-    return audio;
-  }
-  const relativeName = !audio || isAbsolute(audio) ? "audio.wav" : audio;
-  const beside = join(dirname(timelinePath), relativeName);
-  if (existsSync(beside)) {
-    return beside;
-  }
-  return audio || beside;
+  // Only a name: the audio sits beside its timeline, and a path in the file, which a repository
+  // can commit, never sends ffmpeg to read something elsewhere.
+  return join(dirname(timelinePath), basename(timeline.audio || "audio.wav"));
 }
 
 export function writeResolved(deckDir: string, resolved: VoiceResolved): string {
-  const dir = voiceCacheDir(deckDir);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, "resolved.json");
-  writeFileSync(path, `${JSON.stringify(resolved, null, 2)}\n`);
+  const path = join(voiceCacheDir(deckDir), "resolved.json");
+  writeInside(path, `${JSON.stringify(resolved, null, 2)}\n`, deckProjectRoot(deckDir));
   return path;
 }
 

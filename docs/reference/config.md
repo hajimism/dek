@@ -69,7 +69,7 @@ speed = 1.0
 | `max_classes` | `40` | Upper bound for `DEK013` |
 | `cjk_per_minute` | `300` | Speaking rate for CJK text, in characters |
 | `latin_per_minute` | `130` | Speaking rate for other text, in words |
-| `voice.engine` | `"voicevox"` | Engine name (`voicevox`, `aivis`, `coeiroink`, `sharevox`) or a base URL |
+| `voice.engine` | `"voicevox"` | Engine name (`voicevox`, `aivis`, `coeiroink`, `sharevox`), a name and a local port (`voicevox:50021`), or a base URL |
 | `voice.speaker` | required when `[voice]` is present | Speaker, as `name/style` |
 | `voice.speed` | `1.0` | Speaking speed |
 | `refs` | none | Each ref (`owner/repo/deck`) and the 40-character commit it is pinned to. `dek ref` writes it; see [Refs](/reference/cli#refs) |

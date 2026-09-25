@@ -1,10 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { inlineAssets, inlineCssUrls, readTheme } from "./assets.ts";
 import { playerChromeCss } from "./chrome.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { isInside } from "./path.ts";
-import { type ProjectDeck, requireSection } from "./resolve.ts";
+import { type ProjectDeck, readDeckFile, requireSection } from "./resolve.ts";
 import { FALLBACK_LANG } from "./schema.ts";
 import { logicalSize } from "./size.ts";
 import {
@@ -133,10 +132,11 @@ export function slideFragment(
     return undefined;
   }
   const path = slideHtmlPath(deck, slug);
-  if (!isInside(path, join(deck.dir, "slides")) || !existsSync(path)) {
+  if (!isInside(path, join(deck.dir, "slides"))) {
     return undefined;
   }
-  const extracted = extractSlideSection(readFileSync(path, "utf8"));
+  const source = readDeckFile(deck.dir, path);
+  const extracted = source === undefined ? undefined : extractSlideSection(source);
   if (!extracted) {
     return undefined;
   }
@@ -184,7 +184,8 @@ function slideHtmlPath(deck: ProjectDeck, slug: string): string {
  */
 function slideSection(deck: ProjectDeck, slug: string): string {
   const path = slideHtmlPath(deck, slug);
-  const extracted = existsSync(path) ? extractSlideSection(readFileSync(path, "utf8")) : undefined;
+  const source = readDeckFile(deck.dir, path);
+  const extracted = source === undefined ? undefined : extractSlideSection(source);
   return extracted ?? extractSlideSection(skeletonHtml(deck.deck, slug) ?? "") ?? "";
 }
 
@@ -337,7 +338,7 @@ export function renderIndexHtml(
   const items = decks
     .map(
       (deck) =>
-        `<li><a href="/decks/${escapeAttr(deck.name)}/">${escapeHtml(deck.name)} — ${escapeHtml(deck.title)}</a></li>`,
+        `<li><a href="/decks/${escapeAttr(deck.name)}/">${escapeHtml(deck.name)} — ${escapeHtml(deck.title)}</a> · <a href="/decks/${escapeAttr(deck.name)}/presenter">presenter</a></li>`,
     )
     .join("");
   const failedItems = failed.map((entry) => `<li>${escapeHtml(entry.name)}</li>`).join("");

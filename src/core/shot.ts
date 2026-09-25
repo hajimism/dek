@@ -1,17 +1,18 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "./config.ts";
 import { renderDeckDocument } from "./document.ts";
 import { DekError } from "./error.ts";
 import { loadSlideSources, renderSlideHtml } from "./html.ts";
-import { cacheDir } from "./path.ts";
+import { cacheDir, deckProjectRoot } from "./path.ts";
 import {
   defaultPlaywrightRunner,
   type PlaywrightRunner,
   playwrightMissingError,
 } from "./playwright.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection } from "./resolve.ts";
+import { isCachedFile, outputDir } from "./safe-fs.ts";
 import type { Section } from "./schema.ts";
 import { logicalSize } from "./size.ts";
 import { formatStepChoices, stepChoices, stepKey } from "./step.ts";
@@ -50,8 +51,7 @@ export async function shotDeck(
     requireSection(deck, options.slug);
   }
 
-  const outDir = cacheDir(deck.dir, "shots");
-  mkdirSync(outDir, { recursive: true });
+  const outDir = shotsDir(deck.dir);
   const sources = loadSlideSources(deck);
 
   const pages = sections.map((section) => {
@@ -68,13 +68,17 @@ export async function shotDeck(
     };
   });
 
-  const response = await runner({
-    viewport: logicalSize(deck.deck.ratio),
-    actions: ["screenshot"],
-    pages,
-  });
-  if (response === null) {
-    throw playwrightMissingError();
+  // The name hashes the rendered HTML, assets inlined, so a shot on disk is still this slide.
+  const stale = pages.filter((page) => !isCachedFile(page.screenshotPath));
+  if (stale.length > 0) {
+    const response = await runner({
+      viewport: logicalSize(deck.deck.ratio),
+      actions: ["screenshot"],
+      pages: stale,
+    });
+    if (response === null) {
+      throw playwrightMissingError();
+    }
   }
   return pages.map((page) => ({
     slug: page.slug,
@@ -98,13 +102,12 @@ export async function coverShot(
   }
   const beat = resolveBeat(section);
   const html = renderSlideHtml(deck, section.slug, beat.index, loadSlideSources(deck));
-  const outDir = cacheDir(deck.dir, "shots");
+  const outDir = shotsDir(deck.dir);
   const filename = shotFileName(section.slug, beat.label, html);
   const screenshotPath = join(outDir, filename);
-  if (existsSync(screenshotPath)) {
+  if (isCachedFile(screenshotPath)) {
     return screenshotPath;
   }
-  mkdirSync(outDir, { recursive: true });
   const response = await runner({
     viewport: logicalSize(deck.deck.ratio),
     actions: ["screenshot"],
@@ -172,21 +175,22 @@ export async function shotMorph(
     playerScript: options.playerScript,
   });
 
-  const outDir = cacheDir(deck.dir, "shots");
-  mkdirSync(outDir, { recursive: true });
+  const outDir = shotsDir(deck.dir);
   const base = `${options.from}-to-${options.to}`;
   const filename = shotFileName(base, String(at), `${at}\0${html}`);
   pruneStaleShots(outDir, base, String(at), filename);
   const screenshotPath = join(outDir, filename);
 
-  const response = await runner({
-    viewport: logicalSize(deck.deck.ratio),
-    actions: ["morph"],
-    pages: [{ html, slug: options.from, step: String(from.beatIndex + 1), screenshotPath }],
-    morph: { from, to, at },
-  });
-  if (response === null) {
-    throw playwrightMissingError();
+  if (!isCachedFile(screenshotPath)) {
+    const response = await runner({
+      viewport: logicalSize(deck.deck.ratio),
+      actions: ["morph"],
+      pages: [{ html, slug: options.from, step: String(from.beatIndex + 1), screenshotPath }],
+      morph: { from, to, at },
+    });
+    if (response === null) {
+      throw playwrightMissingError();
+    }
   }
   return [
     {
@@ -197,6 +201,11 @@ export async function shotMorph(
       at,
     },
   ];
+}
+
+/** `.cache/shots`, made if missing, where it really is; a link out of the project is an error. */
+function shotsDir(deckDir: string): string {
+  return outputDir(cacheDir(deckDir, "shots"), deckProjectRoot(deckDir));
 }
 
 /**

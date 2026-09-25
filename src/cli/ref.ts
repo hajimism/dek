@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { DekError } from "../core/error.ts";
@@ -14,6 +14,7 @@ import {
   refTitle,
 } from "../core/ref.ts";
 import { readTextIfExists } from "../core/resolve.ts";
+import { readSourceIfExists, removeInside, writeInside } from "../core/safe-fs.ts";
 import { writeAgentsMd } from "../core/sync.ts";
 import { setTableKey } from "../core/toml-keys.ts";
 import { requireProject } from "./scope.ts";
@@ -97,7 +98,7 @@ async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
   }
   if (from !== rev) {
     const toml = readTextIfExists(project.configPath) ?? "";
-    writeFileSync(project.configPath, setTableKey(toml, "refs", source.name, rev));
+    writeInside(project.configPath, setTableKey(toml, "refs", source.name, rev), project.root);
     changed = true;
   }
   ignoreRefs(project.root);
@@ -143,9 +144,13 @@ function removeRef(cwd: string, arg: string): RefRmResult {
   }
   if (pinned !== undefined) {
     const toml = readFileSync(project.configPath, "utf8");
-    writeFileSync(project.configPath, setTableKey(toml, "refs", source.name, undefined));
+    writeInside(
+      project.configPath,
+      setTableKey(toml, "refs", source.name, undefined),
+      project.root,
+    );
   }
-  rmSync(dir, { recursive: true, force: true });
+  removeInside(dir, project.root, { recursive: true });
   removeEmptyParents(dirname(dir), project.root);
   writeAgentsMd(project.root);
   return { action: "rm", name: source.name };
@@ -154,7 +159,11 @@ function removeRef(cwd: string, arg: string): RefRmResult {
 /** refs/owner/repo, refs/owner, and refs itself, while each is left empty. */
 function removeEmptyParents(dir: string, root: string): void {
   let current = dir;
-  while (current.startsWith(join(root, "refs")) && existsSync(current)) {
+  while (
+    current.startsWith(join(root, "refs")) &&
+    existsSync(current) &&
+    !lstatSync(current).isSymbolicLink()
+  ) {
     if (readdirSync(current).length > 0) {
       return;
     }
@@ -166,10 +175,10 @@ function removeEmptyParents(dir: string, root: string): void {
 /** Snapshots are fetched again from dek.toml, so git never needs them. */
 function ignoreRefs(root: string): void {
   const path = join(root, ".gitignore");
-  const current = readTextIfExists(path) ?? "";
+  const current = readSourceIfExists(path, root) ?? "";
   if (/^\/?refs\/?$/m.test(current)) {
     return;
   }
   const separator = current === "" || current.endsWith("\n") ? "" : "\n";
-  writeFileSync(path, `${current}${separator}refs/\n`);
+  writeInside(path, `${current}${separator}refs/\n`, root);
 }

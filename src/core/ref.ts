@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
@@ -6,6 +6,7 @@ import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
 import { parseRefSource, type RefSource } from "./ref-name.ts";
 import { listSlides, resolveProject } from "./resolve.ts";
+import { outputDir } from "./safe-fs.ts";
 
 export {
   isPinnedRev,
@@ -15,6 +16,14 @@ export {
   REF_HINT,
   type RefSource,
 } from "./ref-name.ts";
+
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
 
 /** Written into each snapshot; its presence is what makes a directory a ref. */
 export const REF_MARKER = ".ref.json";
@@ -184,8 +193,13 @@ export async function installSnapshot(
     });
   }
 
+  // refs/ is dek's; a link on the way would aim the swap below, and its delete, elsewhere.
   const refsDir = join(root, "refs");
   const dir = refDir(root, source.name);
+  outputDir(dirname(dir), root);
+  if (isLink(dir)) {
+    await rm(dir);
+  }
   const suffix = `${process.pid}-${Date.now().toString(36)}`;
   const temp = join(refsDir, `.tmp-${suffix}`);
   const old = join(refsDir, `.old-${suffix}`);
@@ -196,7 +210,6 @@ export async function installSnapshot(
       await writeFile(join(temp, path), new Uint8Array(await blob.arrayBuffer()));
     }
     await writeFile(join(temp, REF_MARKER), `${JSON.stringify(meta, null, 2)}\n`);
-    await mkdir(dirname(dir), { recursive: true });
     if (existsSync(dir)) {
       await rename(dir, old);
     }

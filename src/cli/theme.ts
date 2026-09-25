@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { cssClassNames, cssTokenValues, type ThemeLayout, themeLayouts } from "../core/css.ts";
 import { DekError } from "../core/error.ts";
+import { readDeckFile } from "../core/resolve.ts";
 import { type RefInfo, requireReadableDeck } from "./scope.ts";
 
 export type ThemeResult = {
@@ -29,7 +30,7 @@ export function themeCommand(options: {
       hint: "copy the project theme.css into the deck, or run `dek new <name>` for a fresh deck",
     });
   }
-  const css = readFileSync(path, "utf8");
+  const css = readDeckFile(deck.dir, path) ?? "";
   const layouts = themeLayouts(css);
   const result: ThemeResult = {
     path,

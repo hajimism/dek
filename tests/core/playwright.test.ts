@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
-import { resolvePackageFromAncestors } from "../../src/core/optional.ts";
 import {
   defaultPlaywrightRunner,
   parseVisualResponse,
@@ -10,6 +9,7 @@ import {
   playwrightResolved,
   resolvePlaywrightModule,
 } from "../../src/core/playwright.ts";
+import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.ts");
@@ -22,61 +22,35 @@ const request = {
 
 describe("defaultPlaywrightRunner", () => {
   test("returns null when the runner is missing", async () => {
-    const previous = process.env.DEK_PLAYWRIGHT;
-    process.env.DEK_PLAYWRIGHT = "/no/such/playwright";
-    try {
+    await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
       expect(playwrightResolved()).toBe(false);
       expect(await defaultPlaywrightRunner(request)).toBeNull();
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DEK_PLAYWRIGHT;
-      } else {
-        process.env.DEK_PLAYWRIGHT = previous;
-      }
-    }
+    });
   });
 
   test("returns null quickly when the playwright package is not installed", async () => {
-    const previous = process.env.DEK_PLAYWRIGHT;
-    delete process.env.DEK_PLAYWRIGHT;
-    try {
+    await withEnv({ DEK_PLAYWRIGHT: undefined }, async () => {
       if (!playwrightResolved()) {
         const started = Date.now();
         expect(await defaultPlaywrightRunner(request)).toBeNull();
         expect(Date.now() - started).toBeLessThan(1000);
       }
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DEK_PLAYWRIGHT;
-      } else {
-        process.env.DEK_PLAYWRIGHT = previous;
-      }
-    }
+    });
   });
 
   test("returns JSON from DEK_PLAYWRIGHT stdin/stdout", async () => {
     await chmod(fakePlaywright, 0o755);
-    const previous = process.env.DEK_PLAYWRIGHT;
-    process.env.DEK_PLAYWRIGHT = fakePlaywright;
-    try {
+    await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
       const response = await defaultPlaywrightRunner(request);
       expect(response).toEqual({ overflows: [], contrasts: [] });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DEK_PLAYWRIGHT;
-      } else {
-        process.env.DEK_PLAYWRIGHT = previous;
-      }
-    }
+    });
   });
 
   test("writes a pdfPath from DEK_PLAYWRIGHT and returns it", async () => {
     await chmod(fakePlaywright, 0o755);
     await withTempDir(async (dir) => {
       const pdfPath = join(dir, "demo.pdf");
-      const previous = process.env.DEK_PLAYWRIGHT;
-      process.env.DEK_PLAYWRIGHT = fakePlaywright;
-      try {
+      await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
         const response = await defaultPlaywrightRunner({
           viewport: { width: 1280, height: 720 },
           actions: ["pdf"],
@@ -85,13 +59,7 @@ describe("defaultPlaywrightRunner", () => {
         });
         expect(await Bun.file(pdfPath).exists()).toBe(true);
         expect(response).toMatchObject({ pdfPath });
-      } finally {
-        if (previous === undefined) {
-          delete process.env.DEK_PLAYWRIGHT;
-        } else {
-          process.env.DEK_PLAYWRIGHT = previous;
-        }
-      }
+      });
     });
   });
 
@@ -99,60 +67,40 @@ describe("defaultPlaywrightRunner", () => {
     "fails when the worker runs past timeoutMs, so a hung browser cannot hang dek",
     async () => {
       const slow = join(import.meta.dir, "..", "helpers", "fake-playwright-slow.ts");
-      const previous = process.env.DEK_PLAYWRIGHT;
-      process.env.DEK_PLAYWRIGHT = slow;
-      try {
+      await withEnv({ DEK_PLAYWRIGHT: slow }, async () => {
         await expect(defaultPlaywrightRunner(request, { timeoutMs: 20 })).rejects.toMatchObject({
           name: "DekError",
           message: "Playwright worker failed",
           hint: expect.stringContaining("did not finish"),
         });
-      } finally {
-        if (previous === undefined) {
-          delete process.env.DEK_PLAYWRIGHT;
-        } else {
-          process.env.DEK_PLAYWRIGHT = previous;
-        }
-      }
+      });
     },
   );
 
   test.serial("throws when an installed worker exits non-zero", async () => {
     const fail = join(import.meta.dir, "..", "helpers", "fake-playwright-fail.ts");
-    const previous = process.env.DEK_PLAYWRIGHT;
-    process.env.DEK_PLAYWRIGHT = fail;
-    try {
+    await withEnv({ DEK_PLAYWRIGHT: fail }, async () => {
       await expect(defaultPlaywrightRunner(request)).rejects.toMatchObject({
         name: "DekError",
         message: "Playwright worker failed",
       });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DEK_PLAYWRIGHT;
-      } else {
-        process.env.DEK_PLAYWRIGHT = previous;
-      }
-    }
+    });
   });
 
   test.serial("throws when spawn fails for a resolved runner", async () => {
-    const previous = process.env.DEK_PLAYWRIGHT;
-    process.env.DEK_PLAYWRIGHT = join(import.meta.dir, "missing-playwright-worker.ts");
-    try {
-      expect(playwrightResolved()).toBe(true);
-      await expect(defaultPlaywrightRunner(request)).rejects.toBeInstanceOf(DekError);
-    } finally {
-      if (previous === undefined) {
-        delete process.env.DEK_PLAYWRIGHT;
-      } else {
-        process.env.DEK_PLAYWRIGHT = previous;
-      }
-    }
+    await withEnv(
+      { DEK_PLAYWRIGHT: join(import.meta.dir, "missing-playwright-worker.ts") },
+      async () => {
+        expect(playwrightResolved()).toBe(true);
+        await expect(defaultPlaywrightRunner(request)).rejects.toBeInstanceOf(DekError);
+      },
+    );
   });
 });
 
 describe("resolvePlaywrightModule", () => {
-  test("finds playwright in an ancestor node_modules from a nested cwd", async () => {
+  // The working directory is process-wide too.
+  test.serial("never imports a playwright that the working directory holds", async () => {
     await withTempDir(async (dir) => {
       const pkg = join(dir, "node_modules", "playwright");
       await mkdir(pkg, { recursive: true });
@@ -163,22 +111,16 @@ describe("resolvePlaywrightModule", () => {
       await writeFile(join(pkg, "index.js"), "module.exports = {}\n");
       const nested = join(dir, "decks", "why-dek");
       await mkdir(nested, { recursive: true });
-      const previous = process.env.DEK_PLAYWRIGHT;
       const cwd = process.cwd();
-      delete process.env.DEK_PLAYWRIGHT;
-      try {
-        process.chdir(nested);
-        expect(resolvePackageFromAncestors("playwright", nested)).toBe(join(pkg, "index.js"));
-        expect(resolvePlaywrightModule()).toContain("playwright");
-        expect(playwrightResolved()).toBe(true);
-      } finally {
-        process.chdir(cwd);
-        if (previous === undefined) {
-          delete process.env.DEK_PLAYWRIGHT;
-        } else {
-          process.env.DEK_PLAYWRIGHT = previous;
+      await withEnv({ DEK_PLAYWRIGHT: undefined }, async () => {
+        try {
+          process.chdir(nested);
+          // It resolves from dek's own install, as `bun add -d playwright` beside dek puts it.
+          expect(resolvePlaywrightModule()).not.toBe(join(pkg, "index.js"));
+        } finally {
+          process.chdir(cwd);
         }
-      }
+      });
     });
   });
 });

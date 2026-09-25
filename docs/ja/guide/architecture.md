@@ -33,7 +33,7 @@ script.md → Deck → Cue → Synth → Timeline → schedule
 
 Playwright、ffmpeg、音声エンジンは任意です。欠けているときは、それを必要とするコマンドだけが失敗し、hint が何を入れるべきかを伝えます。CLI 自体は常に起動します。
 
-Bun の Node 互換は部分的なので、Playwright は実行時に `node_modules` から解決し、別のワーカープロセスで動かします。`DEK_PLAYWRIGHT` で代わりのワーカーを指定でき、テストはこれでブラウザなしに動いています。rumdl は `PATH`、`node_modules/.bin`、`DEK_RUMDL` の順に探します。
+Bun の Node 互換は部分的なので、Playwright は実行時に `node_modules` から解決し、別のワーカープロセスで動かします。`DEK_PLAYWRIGHT` で代わりのワーカーを指定でき、テストはこれでブラウザなしに動いています。rumdl は `DEK_RUMDL`、`PATH`、dek 本体のインストール先の `node_modules/.bin` の順に探します。どちらもカレントディレクトリからは探しません。clone したリポジトリが中身を決められるからです。
 
 ## エージェントの接点
 

@@ -181,6 +181,64 @@ describe("shotDeck", () => {
     );
   });
 
+  test("shoots only the slides whose rendering changed since their last shot", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: twoSlideScript,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const shotSlugs: string[][] = [];
+        const runner = async (request: VisualRequest) => {
+          shotSlugs.push(request.pages.map((page) => page.slug ?? ""));
+          for (const page of request.pages) {
+            if (page.screenshotPath) {
+              await Bun.write(page.screenshotPath, "");
+            }
+          }
+          return { overflows: [], contrasts: [] };
+        };
+        const first = await shotDeck(deckDir, { runner });
+        await writeFile(
+          join(deckDir, "slides", "architecture.html"),
+          architectureHtml.replace("architecture</h2>", "the architecture</h2>"),
+        );
+        const second = await shotDeck(deckDir, { runner });
+        expect(shotSlugs).toEqual([["intro", "architecture"], ["architecture"]]);
+        expect(second.map((shot) => shot.slug)).toEqual(["intro", "architecture"]);
+        expect(second[0]?.path).toBe(first[0]?.path);
+      },
+    );
+  });
+
+  test("needs no browser when every shot is already on disk", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const [shot] = await shotDeck(deckDir, {
+          runner: async (request) => {
+            for (const page of request.pages) {
+              if (page.screenshotPath) {
+                await Bun.write(page.screenshotPath, "");
+              }
+            }
+            return { overflows: [], contrasts: [] };
+          },
+        });
+        // A runner that answers null is one without Playwright.
+        const again = await shotDeck(deckDir, { runner: async () => null });
+        expect(again).toEqual([{ slug: "intro", step: "1", path: shot?.path ?? "" }]);
+      },
+    );
+  });
+
   test("removes a legacy intro.png when it shoots the same slide", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
@@ -291,6 +349,44 @@ body
           /\/\.cache\/shots\/problem-to-architecture-0\.5\.[0-9a-f]{8}\.png$/,
         );
         expect(await Bun.file(shots[0]?.path ?? "").exists()).toBe(true);
+      },
+    );
+  });
+
+  test("takes a frame once, and again only at another --at", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: morphScript,
+            slides: { problem: problemHtml, architecture: morphedHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const taken: number[] = [];
+        const shoot = (at: number) =>
+          shotMorph(join(root, "decks", "demo"), {
+            from: "problem",
+            to: "architecture",
+            at,
+            playerScript: "/* player */",
+            runner: async (request) => {
+              taken.push(request.morph?.at ?? -1);
+              for (const page of request.pages) {
+                if (page.screenshotPath) {
+                  await Bun.write(page.screenshotPath, "");
+                }
+              }
+              return { overflows: [], contrasts: [] };
+            },
+          });
+        const [first] = await shoot(0.5);
+        const [again] = await shoot(0.5);
+        await shoot(0.25);
+        expect(taken).toEqual([0.5, 0.25]);
+        expect(again?.path).toBe(first?.path ?? "");
       },
     );
   });

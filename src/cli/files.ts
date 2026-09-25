@@ -149,7 +149,8 @@ export function applyPlan(plan: PlannedPath[]): Applied {
       mkdirSync(entry.path, { recursive: true });
     } else {
       mkdirSync(dirname(entry.path), { recursive: true });
-      writeFileSync(entry.path, entry.contents);
+      // Exclusive: a file, or a dangling link a repository planted, is never written through.
+      writeFileSync(entry.path, entry.contents, { flag: "wx" });
     }
     created.push(entry.path);
   }

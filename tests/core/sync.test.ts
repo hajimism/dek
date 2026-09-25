@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { lstat, mkdir, readFile, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 import { DekError, lintDeck, resolveDeck, syncDeck } from "../../src/core/index.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { extractSlide } from "../helpers/html.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
 
@@ -543,5 +544,35 @@ more
         expect(result.created.some((path) => path.endsWith("slides/extra.html"))).toBe(true);
       },
     );
+  });
+});
+
+describe("syncDeck on a repository with hostile links", () => {
+  test.each([".dek/schema.json", "AGENTS.md"])(
+    "refuses a %s linked out of the project, leaving the file it points at",
+    async (file) => {
+      await withTempDir(async (outside) => {
+        const victim = join(outside, `victim${extname(file)}`);
+        await writeFile(victim, "mine");
+        await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+          await mkdir(join(root, ".dek"), { recursive: true });
+          await rm(join(root, file), { force: true });
+          await symlink(victim, join(root, file));
+          expect(() => syncDeck(join(root, "decks", "demo"))).toThrow("leads outside the project");
+          expect(await readFile(victim, "utf8")).toBe("mine");
+        });
+      });
+    },
+  );
+
+  test("writes through AGENTS.md linked to CLAUDE.md in the project", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      await writeFile(join(root, "CLAUDE.md"), "# notes\n");
+      await rm(join(root, "AGENTS.md"), { force: true });
+      await symlink("CLAUDE.md", join(root, "AGENTS.md"));
+      syncDeck(join(root, "decks", "demo"));
+      expect(await readFile(join(root, "CLAUDE.md"), "utf8")).toContain("<!-- dek:begin");
+      expect((await lstat(join(root, "AGENTS.md"))).isSymbolicLink()).toBe(true);
+    });
   });
 });

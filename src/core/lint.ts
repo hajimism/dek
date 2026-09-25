@@ -38,6 +38,7 @@ import {
   listSlides,
   type Project,
   type ProjectDeck,
+  readDeckFile,
   readTextIfExists,
   SLIDE_SIDECARS,
 } from "./resolve.ts";
@@ -205,7 +206,7 @@ type ThemeToken = { name: string; value: string };
 
 function lintContext(project: Project, deck: ProjectDeck, only?: string): LintContext {
   const themePath = join(deck.dir, "theme.css");
-  const themeCss = readTextIfExists(themePath);
+  const themeCss = readDeckFile(deck.dir, themePath);
   const sectionsBySlug = new Map<string, Section>();
   for (const section of deck.deck.sections) {
     if (!sectionsBySlug.has(section.slug)) {

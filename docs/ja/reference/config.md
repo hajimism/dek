@@ -69,7 +69,7 @@ speed = 1.0
 | `max_classes` | `40` | `DEK013` の上限 |
 | `cjk_per_minute` | `300` | CJK テキストの話速（字/分） |
 | `latin_per_minute` | `130` | それ以外のテキストの話速（語/分） |
-| `voice.engine` | `"voicevox"` | エンジン名（`voicevox`、`aivis`、`coeiroink`、`sharevox`）またはベース URL |
+| `voice.engine` | `"voicevox"` | エンジン名（`voicevox`、`aivis`、`coeiroink`、`sharevox`）、エンジン名とローカルのポート（`voicevox:50021`）、またはベース URL |
 | `voice.speaker` | `[voice]` があるとき必須 | 話者。`名前/スタイル` の形 |
 | `voice.speed` | `1.0` | 話速 |
 | `refs` | なし | ref（`owner/repo/deck`）ごとに、固定したコミットの40桁の sha。`dek ref` が書く。[ref](/ja/reference/cli#ref) を参照 |

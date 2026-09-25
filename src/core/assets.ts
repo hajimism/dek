@@ -2,7 +2,7 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
 import { minifyCss, replaceCssUrls, scopeSlideCss } from "./css.ts";
 import { isInside } from "./path.ts";
-import { listSlideFiles, readTextIfExists } from "./resolve.ts";
+import { listSlideFiles, readDeckFile } from "./resolve.ts";
 import { attributeUrls } from "./url-attributes.ts";
 
 /** Where one reference from a slide or a stylesheet points. */
@@ -141,7 +141,7 @@ function inlinedUri(url: string, deckDir: string, from: string): string | undefi
 /** The deck's stylesheet: theme.css, then each slide's own CSS scoped to that slide. */
 export function readTheme(deckDir: string, minify: boolean): string {
   const path = join(deckDir, "theme.css");
-  const theme = readTextIfExists(path) ?? "";
+  const theme = readDeckFile(deckDir, path) ?? "";
   const slidesDir = join(deckDir, "slides");
   const pieces = [
     minify ? inlineCssUrls(theme, deckDir) : theme,

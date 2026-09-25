@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  resolveBinFromAncestors,
-  resolvePackageFromAncestors,
-  walkUp,
-} from "../../src/core/optional.ts";
+import { resolveBinFromAncestors, walkUp } from "../../src/core/optional.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 describe("walkUp", () => {
@@ -26,37 +22,6 @@ describe("walkUp", () => {
   test("returns undefined when nothing matches", async () => {
     await withTempDir(async (dir) => {
       expect(walkUp(join(dir, "nested"), () => undefined)).toBeUndefined();
-    });
-  });
-});
-
-describe("resolvePackageFromAncestors", () => {
-  test("resolves a package from a parent node_modules when cwd is nested", async () => {
-    await withTempDir(async (dir) => {
-      const pkg = join(dir, "node_modules", "playwright");
-      await mkdir(pkg, { recursive: true });
-      await writeFile(
-        join(pkg, "package.json"),
-        `${JSON.stringify({ name: "playwright", main: "index.js" })}\n`,
-      );
-      await writeFile(join(pkg, "index.js"), "module.exports = {}\n");
-      const nested = join(dir, "decks", "why-dek");
-      await mkdir(nested, { recursive: true });
-      expect(resolvePackageFromAncestors("playwright", nested)).toBe(join(pkg, "index.js"));
-    });
-  });
-
-  test("returns undefined when the package is missing", async () => {
-    await withTempDir(async (dir) => {
-      expect(resolvePackageFromAncestors("playwright", dir)).toBeUndefined();
-    });
-  });
-
-  test("does not resolve from the bun cache when node_modules is absent", async () => {
-    await withTempDir(async (dir) => {
-      const nested = join(dir, "decks", "why-dek");
-      await mkdir(nested, { recursive: true });
-      expect(resolvePackageFromAncestors("playwright", nested)).toBeUndefined();
     });
   });
 });

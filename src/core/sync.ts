@@ -1,16 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "./config.ts";
 import { cssClassNames, cssCustomProperties, cssLayoutNames } from "./css.ts";
 import { escapeHtml } from "./escape.ts";
 import { parseRefSource, refDir, refTitle } from "./ref.ts";
-import {
-  asResolvedDeck,
-  listSlides,
-  type ResolvedDeck,
-  readTextIfExists,
-  SLIDE_SIDECARS,
-} from "./resolve.ts";
+import { asResolvedDeck, listSlides, type ResolvedDeck, SLIDE_SIDECARS } from "./resolve.ts";
+import { outputDir, readSourceIfExists, removeInside, writeInside } from "./safe-fs.ts";
 import { type Deck, frontmatterJsonSchema, type Section } from "./schema.ts";
 import { stepKey } from "./step.ts";
 
@@ -49,21 +44,17 @@ export function defaultTsconfig(): string {
  * `tsconfig.json` is the project's; only `dek init` writes one.
  */
 export function writeSlideTypes(root: string): string {
-  const dir = join(root, ".dek");
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, "slide.d.ts");
+  const path = join(root, ".dek", "slide.d.ts");
   const types = readFileSync(slideTypesPath, "utf8");
-  if (!existsSync(path) || readFileSync(path, "utf8") !== types) {
-    writeFileSync(path, types);
+  if (readSourceIfExists(path, root) !== types) {
+    writeInside(path, types, root);
   }
   return path;
 }
 
 export function writeFrontmatterSchema(root: string): string {
-  const dir = join(root, ".dek");
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, "schema.json");
-  writeFileSync(path, `${JSON.stringify(frontmatterJsonSchema(), null, 2)}\n`);
+  const path = join(root, ".dek", "schema.json");
+  writeInside(path, `${JSON.stringify(frontmatterJsonSchema(), null, 2)}\n`, root);
   return path;
 }
 
@@ -72,12 +63,13 @@ export function syncDeck(source: ResolvedDeck): SyncResult;
 export function syncDeck(input: string | ResolvedDeck): SyncResult {
   const { project, deck } = asResolvedDeck(input);
   const slidesDir = join(deck.dir, "slides");
-  mkdirSync(slidesDir, { recursive: true });
+  outputDir(slidesDir, project.root);
 
   const existing = new Map(listSlides(deck.dir).map((slide) => [slide.slug, slide.path]));
   const created: string[] = [];
   const updated: string[] = [];
   const removed = removeOrphanSkeletons(
+    project.root,
     slidesDir,
     [...existing].filter(([slug]) => !deck.deck.sections.some((section) => section.slug === slug)),
   );
@@ -88,7 +80,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
     if (current) {
       const html = readFileSync(current, "utf8");
       if (html !== skeleton && isSkeleton(html)) {
-        writeFileSync(current, skeleton);
+        writeInside(current, skeleton, project.root);
         updated.push(current);
       }
       continue;
@@ -97,7 +89,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
     if (existsSync(path)) {
       continue;
     }
-    writeFileSync(path, skeleton);
+    writeInside(path, skeleton, project.root);
     created.push(path);
   }
 
@@ -114,14 +106,18 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
  * A section renamed in the script gets a fresh skeleton under its new id, so nothing is lost there
  * either; the same holds for an id that flickers while a heading is being typed.
  */
-function removeOrphanSkeletons(slidesDir: string, orphans: [string, string][]): string[] {
+function removeOrphanSkeletons(
+  root: string,
+  slidesDir: string,
+  orphans: [string, string][],
+): string[] {
   const removed: string[] = [];
   for (const [slug, path] of orphans) {
     const beside = [...SLIDE_SIDECARS, ".js"].some((ext) =>
       existsSync(join(slidesDir, slug + ext)),
     );
     if (!beside && isSkeleton(readFileSync(path, "utf8"))) {
-      rmSync(path);
+      removeInside(path, root);
       removed.push(path);
     }
   }
@@ -142,10 +138,10 @@ const AGENTS_END = "<!-- dek:end -->";
  */
 export function writeAgentsMd(root: string, themePath = join(root, "theme.css")): string {
   const path = join(root, "AGENTS.md");
-  const current = readTextIfExists(path);
-  const next = withAgentsBlock(current, agentsMd(root, readTextIfExists(themePath) ?? ""));
+  const current = readSourceIfExists(path, root);
+  const next = withAgentsBlock(current, agentsMd(root, readSourceIfExists(themePath, root) ?? ""));
   if (next !== current) {
-    writeFileSync(path, next);
+    writeInside(path, next, root);
   }
   return path;
 }

@@ -1,5 +1,3 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 import { printPageCss } from "./chrome.ts";
 import { collectPrintSlidesHtml, htmlShell, readTheme } from "./html.ts";
 import { type DistOptions, distFile } from "./path.ts";
@@ -9,6 +7,7 @@ import {
   playwrightMissingError,
 } from "./playwright.ts";
 import { asResolvedDeck, type ProjectDeck, type ResolvedDeck } from "./resolve.ts";
+import { outputPath } from "./safe-fs.ts";
 import { logicalSize } from "./size.ts";
 import { readSlideScripts, stillPageScript } from "./slide-script.ts";
 
@@ -29,14 +28,14 @@ export async function pdfDeck(
   const { project, deck } = asResolvedDeck(input);
   const runner = options.runner ?? defaultPlaywrightRunner;
   const outPath = distFile(project, deck, "pdf", options);
-  mkdirSync(dirname(outPath), { recursive: true });
 
   const size = logicalSize(deck.deck.ratio);
   const response = await runner({
     viewport: size,
     actions: ["pdf"],
     pages: [{ html: renderPdfHtml(deck) }],
-    pdfPath: outPath,
+    // Chromium opens the path itself, so what is there must not be a link it would write through.
+    pdfPath: outputPath(outPath, project.root),
   });
   if (response === null) {
     throw playwrightMissingError();

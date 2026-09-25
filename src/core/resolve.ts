@@ -3,6 +3,8 @@ import { join, relative, resolve, sep } from "node:path";
 import { DekError } from "./error.ts";
 import { walkUp } from "./optional.ts";
 import { parseScript } from "./parse.ts";
+import { deckProjectRoot } from "./path.ts";
+import { readSourceIfExists, requireInside } from "./safe-fs.ts";
 import type { Deck, Section } from "./schema.ts";
 
 export type ProjectDeck = {
@@ -27,6 +29,14 @@ export type ResolvedDeck = {
 /** The file's text, or nothing when there is no such file. */
 export function readTextIfExists(path: string): string | undefined {
   return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+}
+
+/**
+ * A file of the deck's, or nothing when there is none. It may be a symlink to elsewhere in the
+ * project, but not out of it: what a deck reads, a build publishes.
+ */
+export function readDeckFile(deckDir: string, path: string): string | undefined {
+  return readSourceIfExists(path, deckProjectRoot(deckDir));
 }
 
 export function resolveProject(startDir: string): Project {
@@ -91,7 +101,8 @@ export function listSlideFiles(
   ext: ".html" | ".js" | SlideSidecar,
 ): { slug: string; path: string }[] {
   const dir = join(deckDir, "slides");
-  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+  const root = deckProjectRoot(deckDir);
+  if (!existsSync(dir) || !statSync(requireInside(dir, root)).isDirectory()) {
     return [];
   }
   return (
@@ -101,7 +112,7 @@ export function listSlideFiles(
       .sort((a, b) => a.localeCompare(b))
       .flatMap((name) => {
         const path = join(dir, name);
-        if (!statSync(path).isFile()) {
+        if (!statSync(requireInside(path, root)).isFile()) {
           return [];
         }
         return [{ slug: name.slice(0, -ext.length), path }];
@@ -169,7 +180,13 @@ function readDeck(
 ): { ok: true; deck: ProjectDeck } | { ok: false; error: Project["failed"][number] } {
   const dir = join(root, "decks", name);
   const scriptPath = join(dir, "script.md");
-  if (!existsSync(scriptPath) || !statSync(scriptPath).isFile()) {
+  let source: string | undefined;
+  try {
+    source = readDeckFile(dir, scriptPath);
+  } catch (error) {
+    return { ok: false, error: { name, dir, scriptPath, error: error as DekError } };
+  }
+  if (source === undefined) {
     return {
       ok: false,
       error: {
@@ -187,7 +204,7 @@ function readDeck(
         name,
         dir,
         scriptPath,
-        deck: parseScript(readFileSync(scriptPath, "utf8"), scriptPath),
+        deck: parseScript(source, scriptPath),
       },
     };
   } catch (error) {

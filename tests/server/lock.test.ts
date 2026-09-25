@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { statSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
@@ -19,6 +19,22 @@ describe("writeDevServerLock", () => {
       } finally {
         removeDevServerLock(root);
       }
+    });
+  });
+
+  test("never writes through a server.json a repository linked to a file elsewhere", async () => {
+    await withTempDir(async (outside) => {
+      await withTempDir(async (root) => {
+        const victim = join(outside, "victim.json");
+        await writeFile(victim, "mine", { mode: 0o644 });
+        await mkdir(join(root, ".dek"));
+        await symlink(victim, join(root, ".dek", "server.json"));
+        expect(() => writeDevServerLock(root, "http://127.0.0.1:9999/", "secret")).toThrow(
+          "leads outside the project",
+        );
+        expect(await readFile(victim, "utf8")).toBe("mine");
+        expect(statSync(victim).mode & 0o777).toBe(0o644);
+      });
     });
   });
 

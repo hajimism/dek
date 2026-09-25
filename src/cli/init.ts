@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { DekError, writeFrontmatterSchema } from "../core/index.ts";
 import { walkUp } from "../core/optional.ts";
-import { isDeckName } from "../core/path.ts";
+import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { readTextIfExists } from "../core/resolve.ts";
 import { defaultTsconfig, writeAgentsMd, writeSlideTypes } from "../core/sync.ts";
 import {
@@ -36,7 +36,7 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
   const root = resolve(options.cwd, options.dir ?? ".");
   if (options.deck !== undefined && !isDeckName(options.deck)) {
     throw new DekError(`invalid deck name "${options.deck}"`, {
-      hint: "use a name without path separators",
+      hint: DECK_NAME_HINT,
     });
   }
   checkTarget(root);

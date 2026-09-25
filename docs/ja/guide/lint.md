@@ -14,7 +14,7 @@ dek check architecture --shot
 
 ## 層
 
-一般的な Markdown の作法は [rumdl](https://github.com/rvben/rumdl) に委ね、dek は rumdl が原理的に知りえないルールだけを書きます。rumdl は任意です。`DEK_RUMDL` が設定されていればそれを使い、なければ `PATH`、`node_modules/.bin` の順に探し、見つからなければ飛ばします。テキスト出力には `rumdl: skipped (rumdl is not installed)` と導入方法の `help:` 行が出て、`--json` では同じ理由と hint つきで `"skipped"` に入り、SARIF では tool execution notification になります。`dek init` が書く `.rumdl.toml` は先頭行見出しのルールを無効にしています。台本は frontmatter と `##` で始まるからです。
+一般的な Markdown の作法は [rumdl](https://github.com/rvben/rumdl) に委ね、dek は rumdl が原理的に知りえないルールだけを書きます。rumdl は任意です。`DEK_RUMDL` が設定されていればそれを使い、なければ `PATH`、dek 本体がインストールされている `node_modules/.bin` の順に探し（カレントディレクトリのものは使いません。clone したリポジトリが仕込めるからです）、見つからなければ飛ばします。テキスト出力には `rumdl: skipped (rumdl is not installed)` と導入方法の `help:` 行が出て、`--json` では同じ理由と hint つきで `"skipped"` に入り、SARIF では tool execution notification になります。`dek init` が書く `.rumdl.toml` は先頭行見出しのルールを無効にしています。台本は frontmatter と `##` で始まるからです。
 
 | 層 | 担当 |
 | --- | --- |

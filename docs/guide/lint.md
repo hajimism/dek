@@ -14,7 +14,7 @@ dek check architecture --shot
 
 ## Layers
 
-dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl) and writes only the rules rumdl cannot know about. rumdl is optional: dek uses `DEK_RUMDL` when it is set, else looks for it on `PATH` and then in `node_modules/.bin`, and skips it when absent: the text output says `rumdl: skipped (rumdl is not installed)` with a `help:` line on how to install it, `--json` lists it in `"skipped"` with the same reason and hint, and SARIF reports it as a tool execution notification. `dek init` writes a `.rumdl.toml` that disables the first-line-heading rule, since a script starts with frontmatter and `##`.
+dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl) and writes only the rules rumdl cannot know about. rumdl is optional: dek uses `DEK_RUMDL` when it is set, else looks for it on `PATH` and then in the `node_modules/.bin` dek itself is installed in (never the current directory's, which a cloned repository could fill), and skips it when absent: the text output says `rumdl: skipped (rumdl is not installed)` with a `help:` line on how to install it, `--json` lists it in `"skipped"` with the same reason and hint, and SARIF reports it as a tool execution notification. `dek init` writes a `.rumdl.toml` that disables the first-line-heading rule, since a script starts with frontmatter and `##`.
 
 | Layer | Covers |
 | --- | --- |

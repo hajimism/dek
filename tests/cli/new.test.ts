@@ -47,7 +47,7 @@ describe("dek new", () => {
       },
       async (root) => {
         const result = await runDek(["new", "2026-09-dek", "--json"], { cwd: root });
-        expect(result.exitCode).toBe(0);
+        expect(result).toMatchObject({ exitCode: 0 });
 
         const json = jsonStdout<NewOk>(result);
         expect(json.ok).toBe(true);
@@ -91,6 +91,15 @@ describe("newCommand", () => {
       }
     });
   });
+
+  test.each(["-rf", "a\nb", "tab\there"])(
+    "fails on %j, which a tool would read as a flag or a new line",
+    async (name) => {
+      await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+        expect(() => newCommand({ cwd: root, name })).toThrow("invalid deck name");
+      });
+    },
+  );
 
   test("names next commands that paste as printed, from wherever new ran", async () => {
     await withTempProject({ theme: defaultTheme(), decks: [{ name: "demo" }] }, async (root) => {

@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { copyFile, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { type BuildOptions, buildDeck } from "../../src/core/build.ts";
+import { DekError } from "../../src/core/error.ts";
 import type { VisualRequest } from "../../src/core/playwright.ts";
 import { playerEmbed } from "../helpers/embed.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -373,4 +375,126 @@ describe("buildDeck link preview", () => {
       expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(false);
     });
   });
+});
+
+/**
+ * A build of a repository someone else wrote, as in CI on a pull request: whatever its links
+ * point at, the published files hold only what the deck holds, and nothing outside is touched.
+ */
+describe("buildDeck on a repository with hostile links", () => {
+  const spec = (toml?: string) => ({
+    ...(toml ? { toml } : {}),
+    decks: [{ name: "demo", slides: { intro: extraSource } }],
+  });
+
+  /** A project, and beside it a secret that no link out of the project may reach. */
+  async function withSecret(
+    toml: string | undefined,
+    fn: (root: string, secret: string) => Promise<void>,
+  ): Promise<void> {
+    await withTempDir(async (outside) => {
+      const secret = join(outside, "secret.css");
+      await writeFile(secret, "SECRET_TOKEN=ghp_1234");
+      await withTempProject(spec(toml), (root) => fn(root, secret));
+    });
+  }
+
+  test.each(["theme.css", "slides/intro.css", "slides/intro.ts", "slides/intro.html", "script.md"])(
+    "refuses a %s that links out of the project",
+    async (file) => {
+      await withSecret(undefined, async (root, secret) => {
+        const deckDir = join(root, "decks", "demo");
+        await rm(join(deckDir, file), { force: true });
+        await symlink(secret, join(deckDir, file));
+        const error = await build(deckDir).catch((caught: unknown) => caught);
+        expect(error).toBeInstanceOf(DekError);
+        expect(existsSync(join(deckDir, "dist", "demo.html"))).toBe(false);
+      });
+    },
+  );
+
+  test("refuses a theme.css that links into a hidden folder of the project", async () => {
+    await withSecret(undefined, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(root, ".git"));
+      await writeFile(join(root, ".git", "config.css"), "extraheader = AUTHORIZATION: basic x");
+      await rm(join(deckDir, "theme.css"));
+      await symlink("../../.git/config.css", join(deckDir, "theme.css"));
+      await expect(build(deckDir)).rejects.toThrow("leads outside the project");
+    });
+  });
+
+  test("still follows a theme.css linked to the project's own", async () => {
+    await withSecret(undefined, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await writeFile(join(root, "theme.css"), ".shared-theme { color: red; }");
+      await rm(join(deckDir, "theme.css"));
+      await symlink("../../theme.css", join(deckDir, "theme.css"));
+      const html = await readFile((await build(deckDir)).outPath, "utf8");
+      expect(html).toContain(".shared-theme");
+    });
+  });
+
+  test("takes a new shot over a cached one that is a link, and publishes only the shot", async () => {
+    await withSecret('url = "https://example.com/"\n', async (root, secret) => {
+      const deckDir = join(root, "decks", "demo");
+      const { runner, requests } = fakeRunner();
+      await build(deckDir, { runner });
+      const shots = join(deckDir, ".cache", "shots");
+      const [cached] = await readdir(shots);
+      await rm(join(shots, cached as string));
+      await symlink(secret, join(shots, cached as string));
+
+      await build(deckDir, { runner });
+      expect(requests).toHaveLength(2);
+      expect(await readFile(join(deckDir, "dist", "demo.png"), "utf8")).toBe("png of intro");
+      expect(await readFile(secret, "utf8")).toBe("SECRET_TOKEN=ghp_1234");
+    });
+  });
+
+  test("refuses a shot cache that links out of the project", async () => {
+    await withSecret('url = "https://example.com/"\n', async (root, secret) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, ".cache"), { recursive: true });
+      await symlink(dirname(secret), join(deckDir, ".cache", "shots"));
+      await expect(build(deckDir, { runner: fakeRunner().runner })).rejects.toThrow(DekError);
+    });
+  });
+
+  test("refuses a dist file that is a link out, leaving its target alone", async () => {
+    await withSecret(undefined, async (root, secret) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(deckDir, "dist"));
+      const victim = join(dirname(secret), "victim.html");
+      await writeFile(victim, "mine");
+      await symlink(victim, join(deckDir, "dist", "demo.html"));
+      await expect(build(deckDir)).rejects.toThrow("leads outside the project");
+      expect(await readFile(victim, "utf8")).toBe("mine");
+    });
+  });
+
+  test("refuses a dist folder that links out of the project", async () => {
+    await withSecret(undefined, async (root, secret) => {
+      const deckDir = join(root, "decks", "demo");
+      await symlink(dirname(secret), join(deckDir, "dist"));
+      await expect(build(deckDir)).rejects.toThrow("leads outside the project");
+      expect(existsSync(join(dirname(secret), "demo.html"))).toBe(false);
+    });
+  });
+});
+
+test("keeps og:url on the served origin whatever the deck is called", async () => {
+  await withTempProject(
+    {
+      toml: 'url = "https://example.com/talks/"\n',
+      decks: [{ name: "javascript:alert(1)", slides: { intro: extraSource } }],
+    },
+    async (root) => {
+      const deckDir = join(root, "decks", "javascript:alert(1)");
+      const html = await readFile((await build(deckDir)).outPath, "utf8");
+      expect(html).toContain(
+        '<meta property="og:url" content="https://example.com/talks/javascript%3Aalert(1).html">',
+      );
+    },
+  );
 });

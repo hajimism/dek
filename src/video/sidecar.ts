@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { replaceFile } from "../core/safe-fs.ts";
 import type { Timeline } from "../core/timeline.ts";
 
 export function writeVideoSidecars(options: {
@@ -11,9 +11,9 @@ export function writeVideoSidecars(options: {
   const vtt = `${options.stem}.vtt`;
   const chapters = `${options.stem}.chapters.txt`;
   const credits = `${options.stem}.credits.txt`;
-  writeFileSync(vtt, renderVtt(options.timeline));
-  writeFileSync(chapters, renderChapters(options.titles));
-  writeFileSync(credits, `${options.engine}:${options.speaker}\n`);
+  replaceFile(vtt, renderVtt(options.timeline));
+  replaceFile(chapters, renderChapters(options.titles));
+  replaceFile(credits, `${options.engine}:${options.speaker}\n`);
   return { vtt, chapters, credits };
 }
 
