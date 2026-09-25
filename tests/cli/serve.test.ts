@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parsePort } from "../../src/cli/serve.ts";
+import { devBanner, parsePort } from "../../src/cli/serve.ts";
 import { DekError } from "../../src/core/error.ts";
 
 describe("parsePort", () => {
@@ -18,5 +18,13 @@ describe("parsePort", () => {
     } catch (error) {
       expect((error as DekError).hint).toBe("pass a port from 1 to 65535, e.g. `dek --port 3030`");
     }
+  });
+});
+
+describe("devBanner", () => {
+  test("names the keys a viewer cannot discover and how to stop", () => {
+    expect(devBanner("http://127.0.0.1:5173/", [], {})).toBe(
+      "http://127.0.0.1:5173/\n\np presenter view · s slide rail · Ctrl-C stops the server",
+    );
   });
 });

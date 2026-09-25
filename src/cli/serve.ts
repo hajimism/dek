@@ -22,7 +22,7 @@ export async function serveCommand(options: {
     ...(options.port !== undefined ? { port: options.port } : {}),
   });
   process.stdout.write(
-    `${remoteBanner(server.url, server.remoteUrls, {
+    `${devBanner(server.url, server.remoteUrls, {
       password,
       presenterPaths: server.deckDir
         ? ["presenter"]
@@ -30,6 +30,15 @@ export async function serveCommand(options: {
     })}\n`,
   );
   await keepDevServer(server);
+}
+
+/** What the dev server prints on start: where to open it, then the keys nobody can see. */
+export function devBanner(
+  url: string,
+  remoteUrls: string[],
+  options: Parameters<typeof remoteBanner>[2],
+): string {
+  return `${remoteBanner(url, remoteUrls, options)}\n\np presenter view · s slide rail · Ctrl-C stops the server`;
 }
 
 /** `--port`: absent leaves the choice to the OS. */
