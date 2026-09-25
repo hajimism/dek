@@ -1,57 +1,50 @@
 #!/usr/bin/env bun
-import { parseArgs } from "node:util";
+import { parseCommandLine } from "./cli/flags.ts";
 import { agentHelpText, formatError, formatErrorText, helpText } from "./cli/format.ts";
 import { type CliResult, writeSuccess } from "./cli/result.ts";
-import { peelDeckArg } from "./cli/scope.ts";
+import { peelDeckArg, REF_READERS } from "./cli/scope.ts";
 import { shouldColor } from "./cli/tty.ts";
-import { DekError } from "./core/error.ts";
+import { commandHelp, helpRequest, unknownCommandError, versionText } from "./cli/usage.ts";
+import { isRefName } from "./core/ref-name.ts";
+import { resolveProject } from "./core/resolve.ts";
 
 function stringFlag(value: string | boolean | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-async function main(): Promise<void> {
-  const { values, positionals } = parseArgs({
-    args: Bun.argv.slice(2),
-    allowPositionals: true,
-    strict: false,
-    options: {
-      json: { type: "boolean", default: false },
-      deck: { type: "string" },
-      "theme-from": { type: "string" },
-      remote: { type: "boolean", default: false },
-      password: { type: "string" },
-      port: { type: "string" },
-      help: { type: "boolean", default: false },
-      agent: { type: "boolean", default: false },
-      fix: { type: "boolean", default: false },
-      visual: { type: "boolean", default: false },
-      shot: { type: "boolean", default: false },
-      voice: { type: "boolean", default: false },
-      format: { type: "string" },
-      before: { type: "string" },
-      after: { type: "string" },
-      step: { type: "string" },
-      to: { type: "string" },
-      at: { type: "string" },
-      accent: { type: "string" },
-      fps: { type: "string" },
-      "root-dist": { type: "boolean", default: false },
-    },
-  });
+/** The decks a mistyped word may have meant; none outside a project. */
+function knownDeckNames(cwd: string): string[] {
+  try {
+    return resolveProject(cwd).decks.map((deck) => deck.name);
+  } catch {
+    return [];
+  }
+}
 
-  if (values.help || positionals[0] === "help") {
-    const help = values.agent === true ? agentHelpText() : helpText();
-    if (values.json === true && values.agent === true) {
-      process.stdout.write(`${JSON.stringify({ ok: true, help })}\n`);
+async function main(): Promise<void> {
+  const line = parseCommandLine(Bun.argv.slice(2));
+  const { command, values, positionals } = line;
+
+  const request = helpRequest(line);
+  if (request) {
+    const text =
+      request.kind === "version"
+        ? versionText()
+        : request.topic
+          ? commandHelp(request.topic)
+          : request.agent
+            ? agentHelpText()
+            : helpText();
+    if (values.json === true) {
+      const key = request.kind === "version" ? "version" : "help";
+      process.stdout.write(`${JSON.stringify({ ok: true, [key]: text })}\n`);
       return;
     }
-    process.stdout.write(`${help}\n`);
+    process.stdout.write(`${text}\n`);
     return;
   }
 
   const cwd = process.cwd();
-  const command = positionals[0];
   let result: CliResult;
 
   const peeled = peelDeckArg(cwd, {
@@ -72,6 +65,11 @@ async function main(): Promise<void> {
   const at = stringFlag(values.at);
   const accent = stringFlag(values.accent);
   const fps = stringFlag(values.fps);
+
+  if (deck !== undefined && isRefName(deck) && REF_READERS.has(command ?? "")) {
+    const { restoreRef } = await import("./cli/ref.ts");
+    await restoreRef(cwd, deck);
+  }
 
   switch (command) {
     case "init": {
@@ -103,6 +101,11 @@ async function main(): Promise<void> {
           deck,
         }),
       };
+      break;
+    }
+    case "ref": {
+      const { refCommand } = await import("./cli/ref.ts");
+      result = { command: "ref", data: await refCommand({ cwd, args: positionals.slice(1) }) };
       break;
     }
     case "show": {
@@ -258,7 +261,7 @@ async function main(): Promise<void> {
           });
           return;
         }
-        throw new DekError(`unknown command: ${command}`, { hint: `run \`dek help --agent\`` });
+        throw unknownCommandError(command, knownDeckNames(cwd));
       }
       {
         const { parsePort, serveCommand } = await import("./cli/serve.ts");
@@ -285,10 +288,8 @@ try {
   const cwd = process.cwd();
   if (json) {
     process.stdout.write(`${JSON.stringify({ ok: false, error: formatError(error, { cwd }) })}\n`);
-  } else if (error instanceof DekError && error.message.startsWith("unknown command:")) {
-    process.stderr.write(`${formatErrorText(error, { color, cwd })}\n\n${helpText()}\n`);
   } else {
     process.stderr.write(`${formatErrorText(error, { color, cwd })}\n`);
   }
-  process.exit(1);
+  process.exitCode = 1;
 }
