@@ -6,8 +6,6 @@
 
 dek treats a talk the way a build system treats code. The source is your talk script, in Markdown; every `##` heading becomes one HTML slide, and from the same source dek estimates the timing, lints and measures every slide, and builds a single HTML file, a PDF, and a narrated video. A project holds many decks, so the theme and conventions carry forward from one talk to the next. It is designed from the start to be worked on together with AI agents.
 
-> *dek* is *deck* with one letter dropped; the `deck` name belongs to Kong's decK.
-
 ## Why
 
 **Slides exist so that you can talk.** Every mainstream tool starts with an empty box and asks you to fill it, and the deck grows more polished as the talk grows harder to deliver. dek starts from the other end: what you will say, in what order, for how long, and only then what should be on screen. The script is the parent. Slides are derived from it.

@@ -12,10 +12,6 @@ You will not write HTML, and you will not touch voice or video. The goal is a pr
 
 [Bun](https://bun.sh) 1.4 or later. dek is not on npm yet; the first command runs it straight from GitHub.
 
-::: tip Why "dek"?
-*dek* is *deck* with one letter dropped. The `deck` name on npm belongs to Kong's decK.
-:::
-
 ## Create a project
 
 Create the project somewhere outside the dek repository.
