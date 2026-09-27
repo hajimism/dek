@@ -360,37 +360,4 @@ hello
       },
     );
   });
-
-  test("rejects both --before and --after", async () => {
-    await withTempProject(
-      {
-        decks: [
-          {
-            name: "demo",
-            script: `---
-title: Demo
----
-
-## intro
-
-hello
-
-## architecture
-
-body
-`,
-            slides: { intro: introHtml, architecture: architectureHtml },
-          },
-        ],
-      },
-      async (root) => {
-        expect(() =>
-          reorderSection(join(root, "decks", "demo"), "architecture", {
-            before: "intro",
-            after: "intro",
-          }),
-        ).toThrow(DekError);
-      },
-    );
-  });
 });

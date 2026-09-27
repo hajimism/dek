@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { walkUp } from "./optional.ts";
 import { parseScript } from "./parse.ts";
@@ -100,7 +101,7 @@ export function listSlideFiles(
   deckDir: string,
   ext: ".html" | ".js" | SlideSidecar,
 ): { slug: string; path: string }[] {
-  const dir = join(deckDir, "slides");
+  const dir = deckPaths(deckDir).slides;
   const root = deckProjectRoot(deckDir);
   if (!existsSync(dir) || !statSync(requireInside(dir, root)).isDirectory()) {
     return [];
@@ -179,7 +180,7 @@ function readDeck(
   name: string,
 ): { ok: true; deck: ProjectDeck } | { ok: false; error: Project["failed"][number] } {
   const dir = join(root, "decks", name);
-  const scriptPath = join(dir, "script.md");
+  const scriptPath = deckPaths(dir).script;
   let source: string | undefined;
   try {
     source = readDeckFile(dir, scriptPath);

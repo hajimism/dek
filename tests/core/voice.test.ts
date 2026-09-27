@@ -136,15 +136,21 @@ first
 second
 `);
 
-  test("addresses a slide by slug, a beat by id or by 1-based position", () => {
+  test("addresses a slide by slug, a beat by id or by 1-based position, its arrival by 0", () => {
     const { timing, unknown } = resolveBeatTiming(deck, {
       lead: 250,
-      beats: { intro: { lead: 0 }, "order/sequence": { pause: 1500 }, "order/1": { lead: 700 } },
+      beats: {
+        intro: { lead: 0 },
+        "order/sequence": { pause: 1500 },
+        "order/1": { lead: 700 },
+        "order/0": { lead: 50 },
+      },
     });
     expect(unknown).toEqual([]);
     expect(timing({ slideIndex: 0, beatIndex: 0 })).toEqual({ lead: 0 });
-    expect(timing({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 700 });
-    expect(timing({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 250, pause: 1500 });
+    expect(timing({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 50 });
+    expect(timing({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 700 });
+    expect(timing({ slideIndex: 1, beatIndex: 2 })).toEqual({ lead: 250, pause: 1500 });
   });
 
   test("a slide key leads into the slide and pauses after it; a beat key wins", () => {
@@ -153,7 +159,8 @@ second
       beats: { order: { lead: 100, pause: 900 } },
     });
     expect(timing({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 100 });
-    expect(timing({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 300, pause: 900 });
+    expect(timing({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 300 });
+    expect(timing({ slideIndex: 1, beatIndex: 2 })).toEqual({ lead: 300, pause: 900 });
 
     const refined = resolveBeatTiming(deck, {
       lead: 300,
@@ -163,11 +170,12 @@ second
         "order/sequence": { pause: 1200 },
       },
     }).timing;
-    expect(refined({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 500 });
-    expect(refined({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 300, pause: 1200 });
+    expect(refined({ slideIndex: 1, beatIndex: 0 })).toEqual({ lead: 100 });
+    expect(refined({ slideIndex: 1, beatIndex: 1 })).toEqual({ lead: 500 });
+    expect(refined({ slideIndex: 1, beatIndex: 2 })).toEqual({ lead: 300, pause: 1200 });
   });
 
-  test("on a one-beat slide, the slide key's lead and pause land on the same beat", () => {
+  test("on a slide without beats, the slide key's lead and pause land on its arrival", () => {
     const { timing } = resolveBeatTiming(deck, {
       lead: 300,
       beats: { intro: { lead: 0, pause: 2000 } },

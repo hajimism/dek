@@ -1,6 +1,15 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
-import { extname, join, relative, resolve, sep } from "node:path";
-import { minifyCss, replaceCssUrls, scopeSlideCss } from "./css.ts";
+import { extname, relative, resolve, sep } from "node:path";
+import { parseCss } from "./css.ts";
+import {
+  type CssEditor,
+  minifyCss,
+  replaceUrls,
+  rewriteCss,
+  scopeToSlide,
+  shareTokensWithTransitions,
+} from "./css-transform.ts";
+import { deckPaths } from "./deck-paths.ts";
 import { isInside } from "./path.ts";
 import { listSlideFiles, readDeckFile } from "./resolve.ts";
 import { attributeUrls } from "./url-attributes.ts";
@@ -87,45 +96,54 @@ export function isCanonicalAssetPath(raw: string): boolean {
 
 /**
  * Slide markup with each local resource replaced by a data: URI, so the build stands alone; `from`
- * is the directory the markup lives in. The URLs are the ones lint checks, read by the same
- * parser: every candidate of a `srcset` keeps its descriptors, links and text stay as written.
+ * is the directory the markup lives in.
  */
 export function inlineAssets(
   html: string,
   deckDir: string,
-  from = join(deckDir, "slides"),
+  from = deckPaths(deckDir).slides,
 ): string {
-  const output = new HTMLRewriter()
-    .on("*", {
-      element(el) {
-        const tag = el.tagName.toLowerCase();
-        for (const [name, value] of [...el.attributes]) {
-          const named = attributeUrls(tag, name.toLowerCase(), value);
-          if (named?.use !== "resource") {
-            continue;
-          }
-          const inlined = named.urls.reduceRight((rewritten, { url, offset }) => {
-            const uri = inlinedUri(url, deckDir, from);
-            return uri === undefined
-              ? rewritten
-              : rewritten.slice(0, offset) + uri + rewritten.slice(offset + url.length);
-          }, value);
-          if (inlined !== value) {
-            el.setAttribute(name, inlined);
-          }
-        }
-      },
-    })
-    .transform(html);
+  const output = new HTMLRewriter().on("*", assetInliner(deckDir, from)).transform(html);
   if (typeof output !== "string") {
     throw new Error("HTMLRewriter.transform expected a string");
   }
   return output;
 }
 
-/** A stylesheet with each local `url()` replaced by a data: URI; `from` is the directory the stylesheet lives in. */
-export function inlineCssUrls(css: string, deckDir: string, from = deckDir): string {
-  return replaceCssUrls(css, (url) => inlinedUri(url, deckDir, from));
+/**
+ * The rewriter handler `inlineAssets` runs, for a pass that rewrites more than URLs. The URLs are
+ * the ones lint checks, read by the same parser: every candidate of a `srcset` keeps its
+ * descriptors, links and text stay as written.
+ */
+export function assetInliner(
+  deckDir: string,
+  from = deckPaths(deckDir).slides,
+): HTMLRewriterTypes.HTMLRewriterElementContentHandlers {
+  return {
+    element(el) {
+      const tag = el.tagName.toLowerCase();
+      for (const [name, value] of [...el.attributes]) {
+        const named = attributeUrls(tag, name.toLowerCase(), value);
+        if (named?.use !== "resource") {
+          continue;
+        }
+        const inlined = named.urls.reduceRight((rewritten, { url, offset }) => {
+          const uri = inlinedUri(url, deckDir, from);
+          return uri === undefined
+            ? rewritten
+            : rewritten.slice(0, offset) + uri + rewritten.slice(offset + url.length);
+        }, value);
+        if (inlined !== value) {
+          el.setAttribute(name, inlined);
+        }
+      }
+    },
+  };
+}
+
+/** Each local `url()` replaced by a data: URI; `from` is the directory the stylesheet lives in. */
+export function inlineCssUrls(deckDir: string, from = deckDir): CssEditor {
+  return replaceUrls((url) => inlinedUri(url, deckDir, from));
 }
 
 /** The data: URI a local reference inlines to, keeping its fragment; none when it names no deck file. */
@@ -138,23 +156,28 @@ function inlinedUri(url: string, deckDir: string, from: string): string | undefi
   return `data:${mimeOf(ref.path)};base64,${readFileSync(ref.path).toString("base64")}${hash === -1 ? "" : url.slice(hash)}`;
 }
 
-/** The deck's stylesheet: theme.css, then each slide's own CSS scoped to that slide. */
-export function readTheme(deckDir: string, minify: boolean): string {
-  const path = join(deckDir, "theme.css");
-  const theme = readDeckFile(deckDir, path) ?? "";
-  const slidesDir = join(deckDir, "slides");
+/**
+ * The deck's stylesheet: theme.css, then each slide's own CSS scoped to that slide. Each is read
+ * once and rewritten in one pass. A standalone page also gets its files as data: URIs, minified.
+ */
+export function readTheme(deckDir: string, standalone: boolean): string {
+  const paths = deckPaths(deckDir);
   const pieces = [
-    minify ? inlineCssUrls(theme, deckDir) : theme,
-    ...listSlideFiles(deckDir, ".css").map((slide) => {
-      const scoped = scopeSlideCss(readFileSync(slide.path, "utf8"), slide.slug);
-      return minify ? inlineCssUrls(scoped, deckDir, slidesDir) : scoped;
-    }),
+    rewriteCss(
+      parseCss(readDeckFile(deckDir, paths.theme) ?? ""),
+      shareTokensWithTransitions,
+      ...(standalone ? [inlineCssUrls(deckDir)] : []),
+    ),
+    ...listSlideFiles(deckDir, ".css").map((slide) =>
+      rewriteCss(
+        parseCss(readDeckFile(deckDir, slide.path) ?? ""),
+        scopeToSlide(slide.slug),
+        ...(standalone ? [inlineCssUrls(deckDir, paths.slides)] : []),
+      ),
+    ),
   ];
   const css = pieces.filter(Boolean).join("\n");
-  if (!minify) {
-    return css;
-  }
-  return minifyCss(css);
+  return standalone ? minifyCss(css) : css;
 }
 
 /** Media types by extension, for what a slide or a stylesheet commonly embeds. */

@@ -32,12 +32,17 @@ describe("presenterState", () => {
   });
 
   test("highlights the current beat on the last slide", () => {
-    const state = presenterState(slides, { slideIndex: 1, beatIndex: 0 });
+    const state = presenterState(slides, { slideIndex: 1, beatIndex: 1 });
     expect(state.current.slug).toBe("architecture");
     expect(state.next).toBeNull();
     expect(state.script).toContain("body text");
     expect(state.currentBeat).toEqual({ id: "hook", title: "script.md が親" });
-    expect(state.currentBeatIndex).toBe(0);
+    expect(state.currentBeatIndex).toBe(1);
+  });
+
+  test("highlights no beat as the slide arrives", () => {
+    const state = presenterState(slides, { slideIndex: 1, beatIndex: 0 });
+    expect(state.currentBeat).toBeNull();
   });
 });
 
@@ -60,8 +65,13 @@ describe("nextPresenterTitle", () => {
     expect(nextPresenterTitle(state)).toBe("intro");
   });
 
-  test("is empty on the last beat of the last slide", () => {
+  test("keeps the current title as a slide with beats arrives", () => {
     const state = presenterState(slides, { slideIndex: 1, beatIndex: 0 });
+    expect(nextPresenterTitle(state)).toBe("architecture");
+  });
+
+  test("is empty on the last beat of the last slide", () => {
+    const state = presenterState(slides, { slideIndex: 1, beatIndex: 1 });
     expect(nextPresenterTitle(state)).toBe("");
   });
 });

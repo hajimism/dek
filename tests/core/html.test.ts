@@ -3,17 +3,10 @@ import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadConfig } from "../../src/core/config.ts";
 import { renderDeckDocument, renderDeckHtml, renderRailHtml } from "../../src/core/document.ts";
-import {
-  applyShownClasses,
-  extractSlideSection,
-  htmlShell,
-  injectSlug,
-  loadSlideSources,
-  renderIndexHtml,
-  renderSlideHtml,
-} from "../../src/core/html.ts";
+import { extractSlideSection, htmlShell, stampSlide } from "../../src/core/html.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { stepValuesForBeat } from "../../src/core/step.ts";
+import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
 import { playerEmbed } from "../helpers/embed.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
@@ -30,15 +23,23 @@ const architectureHtml = slideDocument(`<section class="slide" data-layout="defa
   </ul>
 </section>`);
 
+/** The page for a build, for video, or the dev server's player or presenter page. */
 async function renderPage(
   dir: string,
-  options: { mode?: "player" | "presenter" | "video"; live?: boolean } = {},
+  target: { kind?: "build" | "video" } | { kind: "dev"; mode?: "player" | "presenter" } = {},
 ) {
   const embed = await playerEmbed();
   return renderDeckHtml(dir, {
     playerScript: embed.playerScript,
-    ...(options.live ? { liveReloadScript: embed.liveReloadScript, live: true } : {}),
-    ...options,
+    target:
+      target.kind === "dev"
+        ? {
+            kind: "dev",
+            mode: target.mode ?? "player",
+            includeNotes: true,
+            liveReloadScript: embed.liveReloadScript,
+          }
+        : { kind: target.kind ?? "build" },
   });
 }
 
@@ -88,40 +89,38 @@ describe("extractSlideSection", () => {
   });
 });
 
-describe("injectSlug", () => {
+describe("stampSlide", () => {
   test("does not overwrite an existing data-slug", () => {
     const html = `<section class="slide" data-slug="kept"><h2>intro</h2></section>`;
-    expect(injectSlug(html, "intro")).toContain('data-slug="kept"');
-    expect(injectSlug(html, "intro")).not.toContain('data-slug="intro"');
+    expect(stampSlide(html, { slug: "intro" })).toContain('data-slug="kept"');
+    expect(stampSlide(html, { slug: "intro" })).not.toContain('data-slug="intro"');
   });
 
   test("adds data-slug to an unquoted slide section", () => {
     const html = `<section class=slide data-layout="title"><h2>intro</h2></section>`;
-    expect(injectSlug(html, "intro")).toContain('data-slug="intro"');
+    expect(stampSlide(html, { slug: "intro" })).toContain('data-slug="intro"');
   });
-});
 
-describe("applyShownClasses", () => {
   test("marks the current slide and shown data-step values", () => {
     const html = `<section class="slide"><li data-step="hook">a</li><li data-step="2">b</li></section>`;
-    const shown = stepValuesForBeat([{ id: "hook" }, {}], 0);
-    const next = applyShownClasses(html, shown);
+    const shown = stepValuesForBeat([{ id: "hook" }, {}], 1);
+    const next = stampSlide(html, { slug: "s", shown });
     expect(next).toContain("is-current");
     expect(next).toMatch(/data-step="hook"[^>]*is-shown|is-shown[^>]*data-step="hook"/);
     expect(next).not.toMatch(/data-step="2"[^>]*is-shown|is-shown[^>]*data-step="2"/);
   });
 
   test("keeps existing classes on quoted and unquoted tags", () => {
-    const quoted = applyShownClasses(
+    const quoted = stampSlide(
       `<section class="slide title"><p class="node" data-step="hook">a</p></section>`,
-      new Set(["hook"]),
+      { slug: "s", shown: new Set(["hook"]) },
     );
     expect(quoted).toMatch(/class="[^"]*slide[^"]*is-current|class="[^"]*is-current[^"]*slide/);
     expect(quoted).toMatch(/class="[^"]*node[^"]*is-shown|class="[^"]*is-shown[^"]*node/);
 
-    const unquoted = applyShownClasses(
+    const unquoted = stampSlide(
       `<section class=slide><p class=node data-step="hook">a</p></section>`,
-      new Set(["hook"]),
+      { slug: "s", shown: new Set(["hook"]) },
     );
     expect(unquoted).toContain("is-current");
     expect(unquoted).toContain("is-shown");
@@ -150,11 +149,10 @@ describe("renderDeckDocument", () => {
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const { project, deck } = resolveDeck(join(root, "decks", "demo"));
-        const html = await renderDeckDocument(deck, {
-          mode: "player",
-          inlineAssets: false,
+        const html = renderDeckDocument(deck, {
           config: loadConfig(project.configPath),
           playerScript: "/* injected-player */",
+          target: { kind: "build" },
         });
         expect(html).toContain("/* injected-player */");
       },
@@ -182,11 +180,10 @@ hello
       },
       async (root) => {
         const { project, deck } = resolveDeck(join(root, "decks", "demo"));
-        const html = await renderDeckDocument(deck, {
-          mode: "player",
-          inlineAssets: false,
+        const html = renderDeckDocument(deck, {
           config: loadConfig(project.configPath),
           playerScript: "",
+          target: { kind: "build" },
         });
         expect(html).toContain('<html lang="en">');
         expect(html).not.toContain('<html lang="ja">');
@@ -207,11 +204,10 @@ hello
       },
       async (root) => {
         const { project, deck } = resolveDeck(join(root, "decks", "demo"));
-        const html = await renderDeckDocument(deck, {
-          mode: "player",
-          inlineAssets: false,
+        const html = renderDeckDocument(deck, {
           config: loadConfig(project.configPath),
           playerScript: "",
+          target: { kind: "build" },
         });
         expect(html).toContain('<html lang="ja">');
       },
@@ -279,7 +275,10 @@ body
         ],
       },
       async (root) => {
-        const html = await renderPage(join(root, "decks", "demo"), { mode: "presenter" });
+        const html = await renderPage(join(root, "decks", "demo"), {
+          kind: "dev",
+          mode: "presenter",
+        });
         expect(html).toContain('class="is-presenter"');
         expect(html).toContain('id="dek-shell"');
         expect(html).toContain('id="dek-current-stage"');
@@ -288,7 +287,7 @@ body
         expect(html).toContain('id="dek-page"');
         expect(html).toContain('id="dek-next"');
         expect(html).toMatch(/id="dek-next"[^>]*>[\s\S]*architecture/);
-        expect(html).toContain('data-beat-index="0"');
+        expect(html).toContain('data-beat-index="1"');
         expect(html).not.toMatch(/id="dek-presenter" hidden/);
         expect(html).toContain('id="dek-rail"');
         expect(html).toContain('href="#intro"');
@@ -317,7 +316,10 @@ hello
         ],
       },
       async (root) => {
-        const html = await renderPage(join(root, "decks", "demo"), { mode: "presenter" });
+        const html = await renderPage(join(root, "decks", "demo"), {
+          kind: "dev",
+          mode: "presenter",
+        });
         expect(html).toContain('id="dek-elapsed"');
         expect(html).toMatch(/id="dek-budget"[^>]*>20:00/);
         const data = JSON.parse(html.match(/id="dek-data">([^<]+)/)?.[1] ?? "[]") as Array<{
@@ -335,7 +337,10 @@ hello
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const html = await renderPage(join(root, "decks", "demo"), { mode: "presenter" });
+        const html = await renderPage(join(root, "decks", "demo"), {
+          kind: "dev",
+          mode: "presenter",
+        });
         expect(html).toMatch(/id="dek-budget"><\/p>/);
         const data = JSON.parse(html.match(/id="dek-data">([^<]+)/)?.[1] ?? "[]") as Array<{
           slug: string;
@@ -353,7 +358,7 @@ hello
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const html = await renderPage(join(root, "decks", "demo"), { mode: "video" });
+        const html = await renderPage(join(root, "decks", "demo"), { kind: "video" });
         expect(html).toContain('data-mode="video"');
         expect(html).toContain('data-deck="demo"');
         expect(html).not.toContain('id="dek-presenter"');
@@ -410,49 +415,14 @@ hello
       async (root) => {
         const dir = join(root, "decks", "demo");
         for (const options of [
-          { live: true },
-          { mode: "presenter" as const },
-          { mode: "video" as const },
+          { kind: "dev" as const },
+          { kind: "dev" as const, mode: "presenter" as const },
+          { kind: "video" as const },
         ]) {
           expect(await renderPage(dir, options)).not.toContain('id="dek-hint"');
         }
       },
     );
-  });
-
-  test("names only the rail when the build has no presenter view", async () => {
-    await withTempProject(
-      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
-      async (root) => {
-        const { project, deck } = resolveDeck(join(root, "decks", "demo"));
-        const html = await renderDeckDocument(deck, {
-          mode: "player",
-          inlineAssets: false,
-          includeNotes: false,
-          config: loadConfig(project.configPath),
-          playerScript: "",
-        });
-        expect(html).toContain("<kbd>s</kbd>");
-        expect(html).not.toContain("<kbd>p</kbd>");
-      },
-    );
-  });
-});
-
-describe("renderIndexHtml", () => {
-  test("links each deck", () => {
-    const html = renderIndexHtml([{ name: "demo", title: "Demo" }]);
-    expect(html).toContain('href="/decks/demo/"');
-    // A phone paired from the deck list opens a presenter view from here.
-    expect(html).toContain('href="/decks/demo/presenter"');
-    expect(html).toContain("demo");
-    expect(html).toContain('<html lang="en">');
-  });
-
-  test("lists failed decks", () => {
-    const html = renderIndexHtml([{ name: "demo", title: "Demo" }], [{ name: "orphan" }]);
-    expect(html).toContain("orphan");
-    expect(html).toContain("failed");
   });
 });
 
@@ -492,7 +462,7 @@ second
       },
       async (root) => {
         const { deck } = resolveDeck(join(root, "decks", "demo"));
-        const html = renderSlideHtml(deck, "architecture", 0);
+        const html = renderSlideHtml(loadSlideSources(deck), "architecture", 1);
         expect(html).toContain("1280px");
         expect(html).toContain("720px");
         expect(html).toContain("is-current");
@@ -536,9 +506,9 @@ b
         const { unlink } = await import("node:fs/promises");
         const { deck } = resolveDeck(join(root, "decks", "demo"));
         const sources = loadSlideSources(deck);
-        const first = renderSlideHtml(deck, "architecture", 0, sources);
+        const first = renderSlideHtml(sources, "architecture", 0);
         await unlink(join(deck.dir, "theme.css"));
-        const second = renderSlideHtml(deck, "architecture", 1, sources);
+        const second = renderSlideHtml(sources, "architecture", 1);
         expect(first).toContain("navy");
         expect(second).toContain("navy");
       },
@@ -566,7 +536,7 @@ hello
       },
       async (root) => {
         const { deck } = resolveDeck(join(root, "decks", "demo"));
-        const html = renderSlideHtml(deck, "intro", 0);
+        const html = renderSlideHtml(loadSlideSources(deck), "intro", 0);
         expect(html).toContain('<html lang="en">');
         expect(html).not.toContain('<html lang="ja">');
       },
@@ -594,7 +564,7 @@ hello
       },
       async (root) => {
         const { deck } = resolveDeck(join(root, "decks", "demo"));
-        const html = renderSlideHtml(deck, "intro", 0);
+        const html = renderSlideHtml(loadSlideSources(deck), "intro", 0);
         expect(html).toContain("1024px");
         expect(html).toContain("768px");
         const page = await renderPage(join(root, "decks", "demo"));
@@ -615,7 +585,7 @@ hello
         const deckDir = join(root, "decks", "demo");
         await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
         const { deck } = resolveDeck(deckDir);
-        const html = renderSlideHtml(deck, "intro", 0);
+        const html = renderSlideHtml(loadSlideSources(deck), "intro", 0);
         expect(html).toContain("data:image/png;base64,");
         expect(html).not.toContain('src="assets/pixel.png"');
       },
@@ -624,6 +594,16 @@ hello
 });
 
 describe("renderDeckHtml live", () => {
+  test("carries no link preview tags; only a build is shared as a link", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const html = await renderPage(join(root, "decks", "demo"), { kind: "dev" });
+        expect(html).not.toContain("og:title");
+      },
+    );
+  });
+
   test("keeps asset URLs and leaves theme CSS unminified", async () => {
     const withImage = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -644,7 +624,7 @@ describe("renderDeckHtml live", () => {
       async (root) => {
         const deckDir = join(root, "decks", "demo");
         await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
-        const html = await renderPage(deckDir, { live: true });
+        const html = await renderPage(deckDir, { kind: "dev" });
         expect(html).not.toContain("data:image/png;base64,");
         expect(html).toContain('src="assets/pixel.png"');
         expect(html).toContain("/* keep me */");
@@ -676,7 +656,7 @@ more
         ],
       },
       async (root) => {
-        const html = await renderPage(join(root, "decks", "demo"), { live: true });
+        const html = await renderPage(join(root, "decks", "demo"), { kind: "dev" });
         expect(html).not.toContain('class="dek-diagnostics"');
         expect(html).toContain('data-slug="intro"');
         expect(html).toContain('data-slug="extra"');
@@ -698,5 +678,21 @@ describe("htmlShell", () => {
     expect(htmlShell({ body: "" })).toContain(
       '<meta name="viewport" content="width=device-width, initial-scale=1">',
     );
+  });
+});
+
+describe("extractSlideSection reads markup the way the browser does", () => {
+  test("skips a slide written inside a comment", () => {
+    const html = `<!-- <section class="slide">old</section> --><section class="slide">new</section>`;
+    expect(extractSlideSection(html)).toBe(`<section class="slide">new</section>`);
+  });
+
+  test("does not take data-class for class", () => {
+    const html = `<section data-class="slide">no</section><section class="slide">yes</section>`;
+    expect(extractSlideSection(html)).toBe(`<section class="slide">yes</section>`);
+  });
+
+  test("finds none when no section is a slide", () => {
+    expect(extractSlideSection(`<section data-class="slide">no</section>`)).toBeUndefined();
   });
 });

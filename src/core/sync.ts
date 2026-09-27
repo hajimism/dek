@@ -1,13 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "./config.ts";
-import { cssClassNames, cssCustomProperties, cssLayoutNames } from "./css.ts";
-import { escapeHtml } from "./escape.ts";
+import { parseCss } from "./css.ts";
+import { type DeckPaths, deckPaths } from "./deck-paths.ts";
 import { parseRefSource, refDir, refTitle } from "./ref.ts";
 import { asResolvedDeck, listSlides, type ResolvedDeck, SLIDE_SIDECARS } from "./resolve.ts";
 import { outputDir, readSourceIfExists, removeInside, writeInside } from "./safe-fs.ts";
-import { type Deck, frontmatterJsonSchema, type Section } from "./schema.ts";
-import { stepKey } from "./step.ts";
+import { frontmatterJsonSchema } from "./schema.ts";
+import { isSkeleton, sectionSkeleton } from "./skeleton.ts";
+import { type ThemeFacts, themeFacts } from "./theme-facts.ts";
 
 /**
  * `updated` lists skeletons nobody edited, rewritten because the script moved on; `removed`, the
@@ -62,20 +63,20 @@ export function syncDeck(dir: string): SyncResult;
 export function syncDeck(source: ResolvedDeck): SyncResult;
 export function syncDeck(input: string | ResolvedDeck): SyncResult {
   const { project, deck } = asResolvedDeck(input);
-  const slidesDir = join(deck.dir, "slides");
-  outputDir(slidesDir, project.root);
+  const paths = deckPaths(deck.dir);
+  outputDir(paths.slides, project.root);
 
   const existing = new Map(listSlides(deck.dir).map((slide) => [slide.slug, slide.path]));
   const created: string[] = [];
   const updated: string[] = [];
   const removed = removeOrphanSkeletons(
     project.root,
-    slidesDir,
+    paths,
     [...existing].filter(([slug]) => !deck.deck.sections.some((section) => section.slug === slug)),
   );
 
   for (const [index, section] of deck.deck.sections.entries()) {
-    const skeleton = renderSkeleton(section, skeletonHeading(section, index, deck.deck.title));
+    const skeleton = sectionSkeleton(deck.deck, index);
     const current = existing.get(section.slug);
     if (current) {
       const html = readFileSync(current, "utf8");
@@ -85,7 +86,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
       }
       continue;
     }
-    const path = join(slidesDir, `${section.slug}.html`);
+    const path = paths.slide(section.slug, ".html");
     if (existsSync(path)) {
       continue;
     }
@@ -108,13 +109,13 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
  */
 function removeOrphanSkeletons(
   root: string,
-  slidesDir: string,
+  paths: DeckPaths,
   orphans: [string, string][],
 ): string[] {
   const removed: string[] = [];
   for (const [slug, path] of orphans) {
-    const beside = [...SLIDE_SIDECARS, ".js"].some((ext) =>
-      existsSync(join(slidesDir, slug + ext)),
+    const beside = ([...SLIDE_SIDECARS, ".js"] as const).some((ext) =>
+      existsSync(paths.slide(slug, ext)),
     );
     if (!beside && isSkeleton(readFileSync(path, "utf8"))) {
       removeInside(path, root);
@@ -139,7 +140,8 @@ const AGENTS_END = "<!-- dek:end -->";
 export function writeAgentsMd(root: string, themePath = join(root, "theme.css")): string {
   const path = join(root, "AGENTS.md");
   const current = readSourceIfExists(path, root);
-  const next = withAgentsBlock(current, agentsMd(root, readSourceIfExists(themePath, root) ?? ""));
+  const theme = themeFacts(parseCss(readSourceIfExists(themePath, root) ?? ""));
+  const next = withAgentsBlock(current, agentsMd(root, theme));
   if (next !== current) {
     writeInside(path, next, root);
   }
@@ -170,10 +172,10 @@ function withAgentsBlock(current: string | undefined, body: string): string {
 }
 
 /** What dek's block in AGENTS.md says for a project whose theme is `theme`. */
-export function agentsMd(root: string, theme: string): string {
-  const classes = [...cssClassNames(theme)].sort();
-  const layouts = [...cssLayoutNames(theme)].sort();
-  const tokens = [...cssCustomProperties(theme)].sort();
+function agentsMd(root: string, theme: ThemeFacts): string {
+  const classes = [...theme.classes].sort();
+  const layouts = theme.layouts.map((layout) => layout.name);
+  const tokens = theme.tokens.map((token) => token.name).sort();
   const classList = classes.map((name) => `- \`${name}\``).join("\n") || "- (none)";
   const layoutList = layouts.map((name) => `- \`${name}\``).join("\n") || "- (none)";
   const tokenList = tokens.map((name) => `- \`${name}\``).join("\n") || "- (none)";
@@ -192,10 +194,16 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - One \`##\` heading is one slide. HTML lives in \`slides/<id>.html\`.
 - Shared look lives in \`theme.css\`. Decoration only one slide uses lives in \`slides/<id>.css\`, which is scoped to that slide.
 - Use only classes defined in \`theme.css\` or in that slide's own \`slides/<id>.css\`.
-- Color, type, space, radius, and motion in either stylesheet use token \`var()\` only.
+- Color, type, space, radius, and motion in either stylesheet use token \`var()\` only. A value only one slide uses can be a token of its own on that slide's \`.slide\` rule in \`slides/<id>.css\`.
 - Do not add \`<style>\`, \`style=\`, \`<script>\`, event handler attributes (\`onclick=\` and the like), or \`javascript:\` URLs inside slide HTML.
-- Motion CSS cannot express lives in \`slides/<id>.ts\`: \`export default { motion: { <step>: ms }, draw(slide, { index, step, t }) {} } satisfies DekSlide\`. \`DekSlide\` is global, from \`.dek/slide.d.ts\`; do not import it. Draw from \`t\` alone and set everything you touch on every call, with no timers and no imports, so video and screenshots can seek it. In \`draw\`, find elements by data-* attributes, not classes.
+- Motion CSS cannot express lives in \`slides/<id>.ts\`: \`export default { motion: { <step>: ms }, draw(slide, { index, step, t }) {} } satisfies DekSlide\`. \`DekSlide\` is global, from \`.dek/slide.d.ts\`; do not import it. Key the slide's arrival, before its first beat, as \`"0"\`: every \`data-step\` element is hidden there, so draw what the slide shows before anything happens. Draw from \`t\` alone and set everything you touch on every call, with no timers and no imports, so video and screenshots can seek it. In \`draw\`, find elements by data-* attributes, not classes.
 - Keep the deck self-contained: no remote URLs and no paths outside the deck.
+
+## Checking a slide
+
+- \`dek check <slug> --shot\` lints one slide and screenshots it at its last beat.
+- \`dek shot --sheet\` tiles every slide on one image: read it to judge the deck's balance in one look, then open a slide's own shot for detail.
+- One shot shows no motion. \`dek shot <slug> --motion\` lays the slide's beats out as rows, each held at moments through everything it moves and ending as the shot does. \`dek shot <a> --to <b> --at 0.5\` freezes the view transition between any two slides.
 
 ## Theme classes
 
@@ -245,68 +253,4 @@ Other people's decks, pinned in \`dek.toml\` \`[refs]\`, to read as models. They
 
 ${lines.join("\n")}
 `;
-}
-
-/**
- * A heading that is only an id (`## intro`) has no display text. The first
- * section takes the deck title; later ones stay empty so the slug never ends
- * up on a published slide. Lint reports the empty heading (DEK024) with the
- * fix: a title in script.md, which the next sync writes here.
- */
-function skeletonHeading(
-  section: Pick<Section, "slug" | "title">,
-  index: number,
-  deckTitle: string,
-): string {
-  if (section.title !== section.slug) {
-    return section.title;
-  }
-  return index === 0 ? deckTitle : "";
-}
-
-/** The HTML `dek sync` would generate for `slug`, or undefined when the deck has no such section. */
-export function skeletonHtml(deck: Deck, slug: string): string | undefined {
-  const index = deck.sections.findIndex((section) => section.slug === slug);
-  const section = deck.sections[index];
-  return section && renderSkeleton(section, skeletonHeading(section, index, deck.title));
-}
-
-function renderSkeleton(section: Section, heading: string): string {
-  const inner =
-    section.beats.length === 0 ? renderTitleSlide(heading) : renderBeatSlide(section, heading);
-  return `${inner}\n`;
-}
-
-/**
- * Whether `html` is still exactly what a skeleton renderer wrote, for some heading and beats. The
- * patterns mirror the renderers below byte for byte, so any edit by the author makes it false.
- */
-function isSkeleton(html: string): boolean {
-  return TITLE_SKELETON.test(html) || BEAT_SKELETON.test(html);
-}
-
-const TITLE_SKELETON =
-  /^<section class="slide" data-layout="title">\n {2}<h2 class="slide-title">[^<]*<\/h2>\n<\/section>\n$/;
-const BEAT_SKELETON =
-  /^<section class="slide" data-layout="default">\n {2}<h2 class="slide-title">[^<]*<\/h2>\n {2}<ul>\n(?: {4}<li data-step="[^"<]*">[^<]*<\/li>\n)+ {2}<\/ul>\n<\/section>\n$/;
-
-function renderTitleSlide(heading: string): string {
-  return `<section class="slide" data-layout="title">
-  <h2 class="slide-title">${escapeHtml(heading)}</h2>
-</section>`;
-}
-
-function renderBeatSlide(section: Section, heading: string): string {
-  const items = section.beats
-    .map(
-      (beat, index) =>
-        `    <li data-step="${stepKey(section.beats, index)}">${escapeHtml(beat.title)}</li>`,
-    )
-    .join("\n");
-  return `<section class="slide" data-layout="default">
-  <h2 class="slide-title">${escapeHtml(heading)}</h2>
-  <ul>
-${items}
-  </ul>
-</section>`;
 }

@@ -7,8 +7,10 @@ import {
   inlineCssUrls,
   isCanonicalAssetPath,
 } from "../../src/core/assets.ts";
-import { scanSlideHtml } from "../../src/core/html.ts";
-import { lintDeck } from "../../src/core/index.ts";
+import { parseCss } from "../../src/core/css.ts";
+import { rewriteCss } from "../../src/core/css-transform.ts";
+import { scanSlideHtml } from "../../src/core/html-scan.ts";
+import { lintDeck } from "../../src/core/lint.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -104,7 +106,8 @@ describe("a symlink in the deck", () => {
     await withEscapingLink(async ({ deckDir }) => {
       const secret = Buffer.from("top secret\n").toString("base64");
       expect(inlineAssets('<img src="assets/p.png">', deckDir)).toBe('<img src="assets/p.png">');
-      expect(inlineCssUrls("a{background:url(assets/p.png)}", deckDir)).not.toContain(secret);
+      const css = parseCss("a{background:url(assets/p.png)}");
+      expect(rewriteCss(css, inlineCssUrls(deckDir))).not.toContain(secret);
     });
   });
 
@@ -267,7 +270,7 @@ describe("inlineCssUrls", () => {
       const css = `.slide::before { content: "url(assets/a.png)"; background: url( 'assets/a.png' ) no-repeat; }
 @font-face { font-family: f; src: url(assets/f.woff2) format("woff2"); }`;
       expect(
-        inlineCssUrls(css, deckDir),
+        rewriteCss(parseCss(css), inlineCssUrls(deckDir)),
       ).toBe(`.slide::before { content: "url(assets/a.png)"; background: url("${data("image/png")}") no-repeat; }
 @font-face { font-family: f; src: url("${data("font/woff2")}") format("woff2"); }`);
     });

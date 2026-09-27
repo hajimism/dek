@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { readTheme } from "../../src/core/assets.ts";
 import { buildDeck } from "../../src/core/build.ts";
-import { readTheme } from "../../src/core/html.ts";
-import { lintDeck } from "../../src/core/index.ts";
+import { lintDeck } from "../../src/core/lint.ts";
 import { renameSection } from "../../src/core/mv.ts";
 import { playerEmbed } from "../helpers/embed.ts";
 import { slideDocument } from "../helpers/html.ts";
@@ -53,12 +53,32 @@ describe("slide stylesheets in the page", () => {
       deck({ styles: { usb: ".usb-mark { color: var(--accent); }\n" } }),
       async (root) => {
         const css = readTheme(join(root, "decks", "demo"), false);
-        expect(css.startsWith(theme)).toBe(true);
+        expect(css.startsWith(".slide { --fg: #fff; }\n::view-transition { --fg: #fff; }\n")).toBe(
+          true,
+        );
         expect(css).toContain(
           '.slide:where([data-slug="usb"]) .usb-mark { color: var(--accent); }',
         );
       },
     );
+  });
+
+  test("readTheme inlines a url() token once, not again for the transition", async () => {
+    const [demo] = deck().decks;
+    const project = {
+      decks: [
+        {
+          ...demo,
+          name: "demo",
+          theme: ".slide { --bg-image: url(assets/bg.png); }\n",
+          assets: { "bg.png": "png" },
+        },
+      ],
+    };
+    await withTempProject(project, async (root) => {
+      const css = readTheme(join(root, "decks", "demo"), true);
+      expect(css.match(/data:image\/png/g)).toHaveLength(1);
+    });
   });
 
   test("dek build carries slide stylesheets into the single file", async () => {

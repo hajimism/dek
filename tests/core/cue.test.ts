@@ -96,7 +96,7 @@ describe("unknownAsciiWords", () => {
 });
 
 describe("cuesFromDeck", () => {
-  test("speaks section body at beat 0 and keeps later beats separate", () => {
+  test("speaks the section body as the slide arrives and each beat as its own cue", () => {
     const deck = parseScript(`---
 title: Talk
 ---
@@ -121,17 +121,23 @@ title: Talk
       {
         position: { slideIndex: 0, beatIndex: 0 },
         slug: "architecture",
-        line: 11,
-        paragraphs: ["さて、ここがいちばん大事です。", "まず script.md がいて、"],
+        line: 5,
+        paragraphs: ["さて、ここがいちばん大事です。"],
       },
       {
         position: { slideIndex: 0, beatIndex: 1 },
+        slug: "architecture",
+        line: 11,
+        paragraphs: ["まず script.md がいて、"],
+      },
+      {
+        position: { slideIndex: 0, beatIndex: 2 },
         slug: "architecture",
         line: 15,
         paragraphs: [],
       },
       {
-        position: { slideIndex: 0, beatIndex: 2 },
+        position: { slideIndex: 0, beatIndex: 3 },
         slug: "architecture",
         line: 17,
         paragraphs: ["その下にスライドがぶら下がっている。"],
@@ -216,7 +222,8 @@ section paragraph is spoken
     const silent = silentCues(deck);
     expect(silent.map((cue) => `${cue.slug}#${cue.position.beatIndex}`)).toEqual([
       "list-only#0",
-      "architecture#3",
+      "architecture#4",
+      "joined#1",
     ]);
   });
 
@@ -226,9 +233,10 @@ section paragraph is spoken
     expect(silent[1]?.line).toBe(26);
   });
 
-  test("ignores empty beats and blockquote-only beats", () => {
-    const ids = silentCues(deck).map((cue) => cue.position.beatIndex);
-    expect(ids).not.toContain(1);
-    expect(ids).not.toContain(2);
+  test("ignores empty beats, blockquote-only beats, and an arrival with nothing to say", () => {
+    const keys = silentCues(deck).map((cue) => `${cue.slug}#${cue.position.beatIndex}`);
+    expect(keys).not.toContain("architecture#0");
+    expect(keys).not.toContain("architecture#2");
+    expect(keys).not.toContain("architecture#3");
   });
 });

@@ -3,11 +3,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
+import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { cacheDir, deckProjectRoot } from "./path.ts";
+import { readDeckFile } from "./resolve.ts";
 import { writeInside } from "./safe-fs.ts";
 import type { Deck } from "./schema.ts";
-import type { Position } from "./step.ts";
+import { lastStop, type Position, resolveStop } from "./step.ts";
 import {
   type BeatTiming,
   DEFAULT_LEAD_MS,
@@ -16,7 +18,7 @@ import {
   type Timeline,
   type Utterance,
 } from "./timeline.ts";
-import { configHint, formatZodIssues, parseFailure } from "./zod.ts";
+import { parseTomlWith } from "./zod.ts";
 
 export type VoiceSettings = {
   engine: string;
@@ -59,17 +61,21 @@ const VoiceToml = z.object({
     .default({}),
 });
 
-const DictEntry = z.object({
-  kana: z.string(),
-  accent: z.number().optional(),
-});
+/** Each word, a table of its reading. */
+const DictToml = z.record(
+  z.string(),
+  z.object({
+    kana: z.string(),
+    accent: z.number().optional(),
+  }),
+);
 
 export function voiceDir(deckDir: string): string {
-  return join(deckDir, "voice");
+  return deckPaths(deckDir).voice;
 }
 
 export function hasVoice(deckDir: string): boolean {
-  return existsSync(join(voiceDir(deckDir), "voice.toml"));
+  return existsSync(deckPaths(deckDir).voiceToml);
 }
 
 /**
@@ -81,7 +87,7 @@ export const VOICE_SETUP_HINT =
 
 export function voiceMissingError(deckDir: string): DekError {
   return new DekError("voice.toml not found", {
-    path: join(voiceDir(deckDir), "voice.toml"),
+    path: deckPaths(deckDir).voiceToml,
     hint: VOICE_SETUP_HINT,
   });
 }
@@ -95,43 +101,32 @@ export function voiceCacheFile(deckDir: string, file: string): string {
 }
 
 export function loadVoiceSettings(deckDir: string): VoiceSettings {
-  const path = join(voiceDir(deckDir), "voice.toml");
-  if (!existsSync(path)) {
+  const path = deckPaths(deckDir).voiceToml;
+  const source = readDeckFile(deckDir, path);
+  if (source === undefined) {
     throw voiceMissingError(deckDir);
   }
-  let parsed: unknown;
-  try {
-    parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    throw new DekError(`invalid voice.toml: ${parseFailure(error)}`, {
-      path,
-      cause: error,
-      hint: configHint("voice-voice-toml"),
-    });
-  }
-  const result = VoiceToml.safeParse(parsed ?? {});
-  if (!result.success) {
-    throw new DekError(formatZodIssues(result.error), {
-      path,
-      hint: configHint("voice-voice-toml"),
-    });
-  }
+  const data = parseTomlWith(VoiceToml, source, {
+    label: "voice.toml",
+    anchor: "voice-voice-toml",
+    path,
+  });
   return {
-    engine: result.data.engine,
-    speaker: result.data.speaker,
-    speed: result.data.speed,
+    engine: data.engine,
+    speaker: data.speaker,
+    speed: data.speed,
     pause: {
-      sentence: result.data.pause?.sentence ?? DEFAULT_PAUSE.sentence,
-      beat: result.data.pause?.beat ?? DEFAULT_PAUSE.beat,
+      sentence: data.pause?.sentence ?? DEFAULT_PAUSE.sentence,
+      beat: data.pause?.beat ?? DEFAULT_PAUSE.beat,
     },
-    lead: result.data.lead,
-    beats: result.data.beats,
+    lead: data.lead,
+    beats: data.beats,
   };
 }
 
 /**
  * Maps voice.toml beat keys onto cue positions. A slide key frames the slide:
- * its `lead` runs into the first beat and its `pause` follows the last one.
+ * its `lead` runs into the slide's arrival and its `pause` follows the last beat.
  * A beat key refines its own beat. Keys that match nothing are returned in
  * `unknown` so lint can report them.
  */
@@ -155,10 +150,10 @@ export function resolveBeatTiming(
   return {
     timing: (position) => {
       const slide = bySlide.get(position.slideIndex);
-      const count = Math.max(1, deck.sections[position.slideIndex]?.beats.length ?? 0);
+      const last = lastStop(deck.sections[position.slideIndex]?.beats ?? []);
       const merged = {
         lead: position.beatIndex === 0 ? (slide?.lead ?? settings.lead) : settings.lead,
-        pause: position.beatIndex === count - 1 ? slide?.pause : undefined,
+        pause: position.beatIndex === last ? slide?.pause : undefined,
         ...byBeat.get(`${position.slideIndex}/${position.beatIndex}`),
       };
       return Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== undefined));
@@ -177,47 +172,21 @@ function beatKeyPosition(deck: Deck, key: string): Position | undefined {
   if (beat === undefined) {
     return { slideIndex, beatIndex: 0 };
   }
-  const count = Math.max(1, section.beats.length);
-  const beatIndex = /^\d+$/.test(beat)
-    ? Number(beat) - 1
-    : section.beats.findIndex((entry) => entry.id === beat);
-  return beatIndex >= 0 && beatIndex < count ? { slideIndex, beatIndex } : undefined;
+  const beatIndex = resolveStop(section.beats, beat);
+  return beatIndex === undefined ? undefined : { slideIndex, beatIndex };
 }
 
 export function loadVoiceDict(deckDir: string): VoiceDict {
-  const path = join(voiceDir(deckDir), "dict.toml");
-  if (!existsSync(path)) {
+  const path = deckPaths(deckDir).voiceDict;
+  const source = readDeckFile(deckDir, path);
+  if (source === undefined) {
     return {};
   }
-  let parsed: unknown;
-  try {
-    parsed = Bun.TOML.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    throw new DekError(`invalid dict.toml: ${parseFailure(error)}`, {
-      path,
-      cause: error,
-      hint: configHint("voice-dict-toml"),
-    });
-  }
-  if (!parsed || typeof parsed !== "object") {
-    return {};
-  }
-  const dict: VoiceDict = {};
-  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-    const entry = DictEntry.safeParse(value);
-    if (!entry.success) {
-      throw new DekError(`invalid dict entry "${key}": ${formatZodIssues(entry.error)}`, {
-        path,
-        hint: configHint("voice-dict-toml"),
-      });
-    }
-    dict[key] = entry.data;
-  }
-  return dict;
+  return parseTomlWith(DictToml, source, { label: "dict.toml", anchor: "voice-dict-toml", path });
 }
 
 export function writeVoiceDict(deckDir: string, dict: VoiceDict): string {
-  const path = join(voiceDir(deckDir), "dict.toml");
+  const path = deckPaths(deckDir).voiceDict;
   const body = Object.entries(dict)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, entry]) => {

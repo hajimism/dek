@@ -1,8 +1,10 @@
+import { readTheme } from "./assets.ts";
 import { playerChromeCss } from "./chrome.ts";
 import { type DekConfig, loadConfig } from "./config.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
-import { collectSlidesHtml, htmlShell, type PageMode, readTheme } from "./html.ts";
+import { collectSlidesHtml, htmlShell } from "./html.ts";
 import { type OgpImage, ogpHead } from "./ogp.ts";
+import { PAGE_ID, type PageMode, pageConfigAttrs } from "./page.ts";
 import { nextPresenterTitle, presenterSlides, presenterState } from "./presenter.ts";
 import { RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN } from "./rail-width.ts";
 import { type ProjectDeck, resolveDeck } from "./resolve.ts";
@@ -10,141 +12,142 @@ import { logicalSize } from "./size.ts";
 import { readSlideScripts, slideScriptTags } from "./slide-script.ts";
 import { formatClock } from "./timing.ts";
 
-export async function renderDeckHtml(
+/** Who the page is for; each decides what else the page carries. */
+export type PageTarget =
+  /** The dev server's page: assets by URL, live reload, and the presenter's notes when allowed. */
+  | {
+      kind: "dev";
+      mode: "player" | "presenter";
+      includeNotes: boolean;
+      liveReloadScript: string;
+      /**
+       * What a presenter page sends as `?token=` on its live channels at `/decks/<name>/events`
+       * and `/decks/<name>/ws`: neither an EventSource nor a WebSocket can set a header of its
+       * own. An audience page never carries one.
+       */
+      liveToken?: string;
+    }
+  /** `dek build`: one file that stands alone, shared as a link. */
+  | {
+      kind: "build";
+      /** The built page's absolute URL, for og:url. */
+      publicUrl?: string;
+      /** The first slide's picture, for og:image. */
+      previewImage?: OgpImage;
+    }
+  /** `dek video`: one file that stands alone, every slide and nothing around them. */
+  | { kind: "video" };
+
+/** The deck at `dir`, rendered for `target`. */
+export function renderDeckHtml(
   dir: string,
-  options: {
-    mode?: PageMode;
-    inlineAssets?: boolean;
-    live?: boolean;
-    includeNotes?: boolean;
-    /**
-     * What a presenter page sends as `?token=` on every live channel, the event stream and the
-     * socket alike: the browser's Basic credentials reach only the page's own directory, and
-     * `/events` sits outside `/decks/<name>/`. An audience page never carries one.
-     */
-    liveToken?: string;
-    playerScript: string;
-    liveReloadScript?: string;
-  },
-): Promise<string> {
+  options: { playerScript: string; target: PageTarget },
+): string {
   const { project, deck } = resolveDeck(dir);
-  const live = options.live ?? false;
-  return renderDeckDocument(deck, {
-    mode: options.mode ?? "player",
-    inlineAssets: options.inlineAssets ?? false,
-    live,
-    includeNotes: options.includeNotes,
-    config: loadConfig(project.configPath),
-    playerScript: options.playerScript,
-    ...(options.liveReloadScript ? { liveReloadScript: options.liveReloadScript } : {}),
-    ...(options.liveToken ? { liveToken: options.liveToken } : {}),
-  });
+  return renderDeckDocument(deck, { ...options, config: loadConfig(project.configPath) });
 }
 
-export async function renderDeckDocument(
+export function renderDeckDocument(
   deck: ProjectDeck,
-  options: {
-    mode: PageMode;
-    inlineAssets: boolean;
-    live?: boolean;
-    includeNotes?: boolean;
-    liveToken?: string;
-    config: DekConfig;
-    playerScript: string;
-    liveReloadScript?: string;
-    /** The built page's absolute URL, for og:url. */
-    publicUrl?: string;
-    /** The first slide's picture, for og:image. */
-    previewImage?: OgpImage;
-  },
-): Promise<string> {
-  const includeNotes = options.mode === "video" ? false : options.includeNotes !== false;
+  options: { config: DekConfig; playerScript: string; target: PageTarget },
+): string {
+  const { target } = options;
+  const mode: PageMode =
+    target.kind === "dev" ? target.mode : target.kind === "build" ? "player" : "video";
+  const live = target.kind === "dev";
+  // A file that stands alone carries its assets and a minified theme, and a broken slide
+  // script stops it; the dev server serves assets by URL and skips a broken script.
+  const standalone = !live;
+  const includeNotes = target.kind === "dev" ? target.includeNotes : target.kind === "build";
   const data = presenterSlides(deck, options.config).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
-  const slidesHtml = collectSlidesHtml(deck, { inline: options.inlineAssets });
-  const themeCss = readTheme(deck.dir, options.inlineAssets && !options.live);
-  const slideScripts = readSlideScripts(deck.dir, { strict: !options.live });
+  const slidesHtml = collectSlidesHtml(deck, { inline: standalone });
+  const themeCss = readTheme(deck.dir, standalone);
+  const slideScripts = readSlideScripts(deck.dir, { strict: standalone });
   const state = data[0] ? presenterState(data, { slideIndex: 0, beatIndex: 0 }) : undefined;
   const budget = data[0]?.budgetSeconds !== undefined ? formatClock(data[0].budgetSeconds) : "";
   const size = logicalSize(deck.deck.ratio);
-  const presenterOpen = options.mode === "presenter";
+  const presenterOpen = mode === "presenter";
   const hidden = presenterOpen ? "" : " hidden";
   const nextTitle = state ? nextPresenterTitle(state) : "";
   const atEnd = Boolean(state) && nextTitle === "" && !state?.next;
   const page = data.length > 0 ? `1 <span class="dek-page-total">/ ${data.length}</span>` : "";
-  const progress = includeNotes ? `<div id="dek-progress"${hidden}></div>` : "";
+  const progress = includeNotes ? `<div id="${PAGE_ID.progress}"${hidden}></div>` : "";
   const presenter = includeNotes
-    ? `<aside id="dek-presenter"${hidden}>
-    <section id="dek-next-panel">
+    ? `<aside id="${PAGE_ID.presenter}"${hidden}>
+    <section id="${PAGE_ID.nextPanel}">
       <div class="dek-panel-label">Next</div>
       <div class="dek-next-body">
-        <div id="dek-next-stage"></div>
-        <p id="dek-next-end"${atEnd ? "" : " hidden"}>End</p>
+        <div id="${PAGE_ID.nextStage}"></div>
+        <p id="${PAGE_ID.nextEnd}"${atEnd ? "" : " hidden"}>End</p>
       </div>
-      <p id="dek-next">${escapeHtml(nextTitle)}</p>
+      <p id="${PAGE_ID.next}">${escapeHtml(nextTitle)}</p>
     </section>
-    <section id="dek-notes-panel">
-      <ol id="dek-beats">
+    <section id="${PAGE_ID.notesPanel}">
+      <ol id="${PAGE_ID.beats}">
       ${(state?.current.beats ?? [])
-        .map((beat, index) => `<li data-beat-index="${index}">${escapeHtml(beat.title)}</li>`)
+        .map((beat, index) => `<li data-beat-index="${index + 1}">${escapeHtml(beat.title)}</li>`)
         .join("")}
     </ol>
-      <pre id="dek-script">${escapeHtml(state?.script ?? "")}</pre>
+      <pre id="${PAGE_ID.script}">${escapeHtml(state?.script ?? "")}</pre>
     </section>
-    <footer id="dek-presenter-bar">
-      <span id="dek-page">${page}</span>
-      <p id="dek-elapsed">0:00</p>
-      <p id="dek-budget">${budget}</p>
+    <footer id="${PAGE_ID.presenterBar}">
+      <span id="${PAGE_ID.page}">${page}</span>
+      <p id="${PAGE_ID.elapsed}">0:00</p>
+      <p id="${PAGE_ID.budget}">${budget}</p>
     </footer>
   </aside>`
     : "";
   const currentLabel = includeNotes ? `<div class="dek-panel-label">Current</div>` : "";
-  const rail = options.mode === "video" ? "" : renderRailHtml(data);
-  const hint =
-    options.mode === "player" && !options.live
-      ? renderKeyHintHtml(deck.deck.lang, { rail: rail !== "", presenter: includeNotes })
-      : "";
+  const rail = target.kind === "video" ? "" : renderRailHtml(data);
+  const hint = target.kind === "build" ? renderKeyHintHtml(deck.deck.lang) : "";
   const railResize = rail
-    ? `<div id="dek-rail-resize" role="separator" aria-orientation="vertical" aria-label="Resize slide list" aria-valuemin="${RAIL_WIDTH_MIN}" aria-valuemax="${RAIL_WIDTH_MAX}" aria-valuenow="${RAIL_WIDTH_DEFAULT}" tabindex="0"></div>`
+    ? `<div id="${PAGE_ID.railResize}" role="separator" aria-orientation="vertical" aria-label="Resize slide list" aria-valuemin="${RAIL_WIDTH_MIN}" aria-valuemax="${RAIL_WIDTH_MAX}" aria-valuenow="${RAIL_WIDTH_DEFAULT}" tabindex="0"></div>`
     : "";
 
   const ogp =
-    options.mode === "player"
+    target.kind === "build"
       ? `${ogpHead({
           title: deck.deck.title,
           description: deck.deck.description,
           event: deck.deck.event,
           date: deck.deck.date,
           lang: deck.deck.lang,
-          url: options.publicUrl,
-          image: options.previewImage,
+          url: target.publicUrl,
+          image: target.previewImage,
         })}
   `
       : "";
+  const liveToken = target.kind === "dev" ? target.liveToken : undefined;
 
   return htmlShell({
     lang: deck.deck.lang,
     title: deck.deck.title,
     head: `${ogp}<style>${playerChromeCss({ presenter: includeNotes, ...size })}</style>
   <style data-dek-theme>${themeCss}</style>`,
-    bodyAttrs: `${presenterOpen ? ' class="is-presenter"' : ""} data-mode="${options.mode}" data-deck="${escapeAttr(deck.name)}"${includeNotes ? ` data-presenter="dek-presenter"` : ""}${options.live ? ` data-live="true"` : ""}${options.liveToken ? ` data-live-token="${escapeAttr(options.liveToken)}"` : ""}`,
+    bodyAttrs: `${presenterOpen ? ' class="is-presenter"' : ""}${pageConfigAttrs({
+      mode,
+      deck: deck.name,
+      live,
+      ...(liveToken ? { liveToken } : {}),
+    })}`,
     body: `${progress}
-  <div id="dek-shell">
+  <div id="${PAGE_ID.shell}">
     ${rail}
-    <main id="dek-current">
+    <main id="${PAGE_ID.current}">
       ${currentLabel}
-      <div id="dek-current-stage"><div id="deck">${slidesHtml}</div></div>
+      <div id="${PAGE_ID.currentStage}"><div id="${PAGE_ID.deck}">${slidesHtml}</div></div>
     </main>
     ${presenter}
   </div>
   ${railResize}
   ${hint}
-  <div id="dek-announce" aria-live="polite"></div>
-  <script type="application/json" id="dek-data">${jsonForScript(data)}</script>
+  <div id="${PAGE_ID.announce}" aria-live="polite"></div>
+  <script type="application/json" id="${PAGE_ID.data}">${jsonForScript(data)}</script>
   ${slideScriptTags(slideScripts)}
   <script>${options.playerScript}</script>
-  ${options.live && options.liveReloadScript ? `<script>${options.liveReloadScript}</script>` : ""}`,
+  ${target.kind === "dev" ? `<script>${target.liveReloadScript}</script>` : ""}`,
   });
 }
 
@@ -156,7 +159,7 @@ export function renderRailHtml(slides: Array<{ slug: string; title: string }>): 
       return `<a class="dek-thumb" href="#${escapeAttr(slide.slug)}" data-slide-index="${index}" aria-label="${escapeAttr(label)}"><span class="dek-thumb-num">${n}</span><span class="dek-thumb-frame"></span></a>`;
     })
     .join("");
-  return `<nav id="dek-rail" aria-label="Slides">${items}</nav>`;
+  return `<nav id="${PAGE_ID.rail}" aria-label="Slides">${items}</nav>`;
 }
 
 const KEY_HINT_LABELS = {
@@ -168,13 +171,9 @@ const KEY_HINT_LABELS = {
  * The keys a viewer of a built file cannot discover by looking: `s` and `p`. Shown once as
  * the file opens, it fades on its own and goes away at the first key or move.
  */
-function renderKeyHintHtml(lang: string, keys: { rail: boolean; presenter: boolean }): string {
+function renderKeyHintHtml(lang: string): string {
   const labels = lang.toLowerCase().startsWith("ja") ? KEY_HINT_LABELS.ja : KEY_HINT_LABELS.en;
-  const items = [
-    keys.rail ? `<span><kbd>s</kbd>${labels.rail}</span>` : "",
-    keys.presenter ? `<span><kbd>p</kbd>${labels.presenter}</span>` : "",
-  ].join("");
-  return items ? `<div id="dek-hint" role="status">${items}</div>` : "";
+  return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span><span><kbd>p</kbd>${labels.presenter}</span></div>`;
 }
 
 function jsonForScript(value: unknown): string {

@@ -1,12 +1,12 @@
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
+import { escapeRegExp } from "./escape.ts";
 import { joinLines, splitLines } from "./lines.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
 import { Id } from "./schema.ts";
-import { skeletonHtml } from "./sync.ts";
+import { skeletonHtml } from "./skeleton.ts";
 import { renameTableKeys } from "./toml-keys.ts";
-import { voiceDir } from "./voice.ts";
 
 export function renameSection(dir: string, from: string, to: string): void;
 export function renameSection(source: ResolvedDeck, from: string, to: string): void;
@@ -59,8 +59,9 @@ function slideFileSteps(
   to: string,
   options: { replaceSkeleton: boolean },
 ): FileStep[] {
-  const fromPath = join(deck.dir, "slides", `${from}.html`);
-  const toPath = join(deck.dir, "slides", `${to}.html`);
+  const paths = deckPaths(deck.dir);
+  const fromPath = paths.slide(from, ".html");
+  const toPath = paths.slide(to, ".html");
   if (options.replaceSkeleton && !existsSync(fromPath)) {
     throw new DekError(`slide "${from}" not found`, {
       path: fromPath,
@@ -74,7 +75,7 @@ function slideFileSteps(
       : undefined;
   for (const target of [
     ...(replaced === undefined ? [toPath] : []),
-    ...SLIDE_SIDECARS.map((ext) => join(deck.dir, "slides", `${to}${ext}`)),
+    ...SLIDE_SIDECARS.map((ext) => paths.slide(to, ext)),
   ]) {
     if (existsSync(target)) {
       throw new DekError(`slide "${to}" already exists`, {
@@ -99,9 +100,9 @@ function slideFileSteps(
     }
   }
   for (const ext of SLIDE_SIDECARS) {
-    const sidecar = join(deck.dir, "slides", `${from}${ext}`);
+    const sidecar = paths.slide(from, ext);
     if (existsSync(sidecar)) {
-      steps.push(renameStep(sidecar, join(deck.dir, "slides", `${to}${ext}`)));
+      steps.push(renameStep(sidecar, paths.slide(to, ext)));
     }
   }
   if (voice) {
@@ -166,7 +167,7 @@ function planVoiceBeatKeys(
   from: string,
   to: string,
 ): { path: string; source: string; next: string } | undefined {
-  const path = join(voiceDir(deckDir), "voice.toml");
+  const path = deckPaths(deckDir).voiceToml;
   if (!existsSync(path)) {
     return undefined;
   }
@@ -212,33 +213,17 @@ function renameBeatKey(key: string, from: string, to: string): string | undefine
   return slug === from ? `${to}${slash < 0 ? "" : key.slice(slash)}` : undefined;
 }
 
-export function reorderSection(
-  dir: string,
-  slug: string,
-  options: { before?: string; after?: string },
-): void;
-export function reorderSection(
-  source: ResolvedDeck,
-  slug: string,
-  options: { before?: string; after?: string },
-): void;
+/** Where a moved section lands: right before one section, or right after it. */
+export type SectionPlace = { before: string } | { after: string };
+
+export function reorderSection(dir: string, slug: string, place: SectionPlace): void;
+export function reorderSection(source: ResolvedDeck, slug: string, place: SectionPlace): void;
 export function reorderSection(
   input: string | ResolvedDeck,
   slug: string,
-  options: { before?: string; after?: string },
+  place: SectionPlace,
 ): void {
-  const target = options.before ?? options.after;
-  if (!target) {
-    throw new DekError("use --before or --after", {
-      hint: "usage: dek mv <slug> --before|--after <slug>",
-    });
-  }
-  if (options.before && options.after) {
-    throw new DekError("use only one of --before or --after", {
-      hint: "usage: dek mv <slug> --before|--after <slug>",
-    });
-  }
-
+  const target = "before" in place ? place.before : place.after;
   const { deck } = asResolvedDeck(input);
   const sections = deck.deck.sections;
   const fromIndex = sections.findIndex((entry) => entry.slug === slug);
@@ -273,19 +258,15 @@ export function reorderSection(
     const original = index < fromIndex ? index : index + 1;
     return original === targetIndex;
   });
-  const insertAt = options.before ? remainingTarget : remainingTarget + 1;
+  const insertAt = "before" in place ? remainingTarget : remainingTarget + 1;
   chunks.splice(insertAt, 0, moved);
   writeFileSync(deck.scriptPath, joinLines(source, [...head, ...chunks.flat()]));
 }
 
 function rewriteHeadingId(heading: string, from: string, to: string): string {
-  const attr = new RegExp(`\\{#${escapeRegex(from)}\\}`);
+  const attr = new RegExp(`\\{#${escapeRegExp(from)}\\}`);
   if (attr.test(heading)) {
     return heading.replace(attr, `{#${to}}`);
   }
   return `${heading} {#${to}}`;
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

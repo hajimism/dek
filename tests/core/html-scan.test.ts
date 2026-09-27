@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { scanSlideHtml, srcsetUrls } from "../../src/core/html.ts";
+import { scanSlideHtml } from "../../src/core/html-scan.ts";
+import { srcsetUrls } from "../../src/core/url-attributes.ts";
 
 describe("scanSlideHtml locates what it finds", () => {
   test("every element and attribute carries its line and column", () => {

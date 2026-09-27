@@ -155,12 +155,10 @@
 }
 
 ::view-transition-old(slide) {
-  --step-transition: 0.3s ease;
   animation: fade-out var(--step-transition);
 }
 
 ::view-transition-new(slide) {
-  --step-transition: 0.3s ease;
   animation: fade-in var(--step-transition);
 }
 

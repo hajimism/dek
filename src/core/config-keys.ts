@@ -1,104 +1,82 @@
-import { DEK_TOML_KEYS } from "./config.ts";
+import { DekToml, Voice } from "./config.ts";
 import { splitLines } from "./lines.ts";
+import { readFrontmatterYaml } from "./parse.ts";
 import { Frontmatter } from "./schema.ts";
 import { suggest } from "./suggest.ts";
+import { scanTomlKeys } from "./toml-keys.ts";
+import { unrecognizedKeys } from "./zod.ts";
 
 /** A key dek does not read, where it is, and the known key it most likely meant. */
 export type UnknownKey = { key: string; line: number; suggestion?: string };
 
-/**
- * Keys in dek.toml that dek ignores. Parsing drops unknown keys without a word, so a typo such
- * as `latin_per_minut` would silently leave the default in place.
- */
-export function unknownTomlKeys(source: string): UnknownKey[] {
-  const { keys, openTables } = DEK_TOML_KEYS;
-  const tables = new Set(keys.map((key) => key.split(".")[0] ?? key));
-  const found: UnknownKey[] = [];
-  const seen = new Set<string>();
-  for (const { path, line } of tomlKeyLines(source)) {
-    const [head = ""] = path;
-    if (openTables.includes(head)) {
-      continue;
-    }
-    // A table header names a table; only an unknown table is worth a word.
-    const key = path.join(".");
-    const known = path.length === 1 ? tables.has(head) || keys.includes(key) : keys.includes(key);
-    if (known || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    found.push(withSuggestion({ key, line }, keys));
-  }
-  return found;
-}
+/** dek.toml's schema, but a key it does not read is an issue; `refs` still takes any key. */
+const StrictDekToml = DekToml.extend({ voice: Voice.strict().optional() }).strict();
 
-/** Top-level frontmatter keys dek ignores, with 1-based lines in script.md. */
-export function unknownFrontmatterKeys(source: string): UnknownKey[] {
-  const known = Object.keys(Frontmatter.shape);
-  const lines = splitLines(source);
-  if (lines[0]?.trim() !== "---") {
-    return [];
-  }
-  const found: UnknownKey[] = [];
-  for (let index = 1; index < lines.length; index++) {
-    const text = lines[index] ?? "";
-    if (text.trim() === "---") {
-      break;
-    }
-    const key = text.match(/^([A-Za-z_][\w-]*)\s*:/)?.[1];
-    if (key && !known.includes(key)) {
-      found.push(withSuggestion({ key, line: index + 1 }, known));
-    }
-  }
-  return found;
-}
+/** Every key dek.toml may hold, as dotted paths. */
+const DEK_TOML_KEYS: readonly string[] = [
+  ...Object.keys(DekToml.shape),
+  ...Object.keys(Voice.shape).map((key) => `voice.${key}`),
+];
 
 export const FRONTMATTER_KEYS: readonly string[] = Object.keys(Frontmatter.shape);
 
-function withSuggestion(entry: UnknownKey, known: string[]): UnknownKey {
-  const suggestion = suggest(entry.key, known);
-  return suggestion ? { ...entry, suggestion } : entry;
+/**
+ * Keys in dek.toml that dek ignores. Parsing drops unknown keys without a word, so a typo such
+ * as `latin_per_minut` would silently leave the default in place. The schema decides what is
+ * unknown, inline tables such as `voice = { sped = 1 }` included; the scan only says where. A
+ * file that does not parse has none: loading it reports that.
+ */
+export function unknownTomlKeys(source: string): UnknownKey[] {
+  let parsed: unknown;
+  try {
+    parsed = Bun.TOML.parse(source);
+  } catch {
+    return [];
+  }
+  const unread = unrecognizedKeys(StrictDekToml, parsed ?? {});
+  if (unread.length === 0) {
+    return [];
+  }
+  const scanned = scanTomlKeys(source);
+  return unread
+    .map((path) => {
+      const key = path.join(".");
+      const written =
+        scanned.find((entry) => entry.path.join(".") === key) ??
+        scanned.find((entry) => entry.path.join(".").startsWith(`${key}.`));
+      return withSuggestion({ key, line: written?.line ?? 1 }, DEK_TOML_KEYS);
+    })
+    .sort((a, b) => a.line - b.line);
 }
 
 /**
- * Each key or table header in a TOML file as a dotted path, with its 1-based line. It reads
- * `[table]`, `key =`, and `a.b =` lines and skips comments and multi-line strings; that is all
- * dek.toml holds.
+ * Top-level frontmatter keys dek ignores, with 1-based lines in script.md; `firstLine` is the line
+ * the YAML starts on, right after the opening `---`. The schema decides what is unknown, as it
+ * does for dek.toml; YAML that does not parse has none, since the deck then fails to load.
  */
-function tomlKeyLines(source: string): Array<{ path: string[]; line: number }> {
-  const out: Array<{ path: string[]; line: number }> = [];
-  let table: string[] = [];
-  let multiline: string | undefined;
-  for (const [index, text] of splitLines(source).entries()) {
-    if (multiline) {
-      if (text.includes(multiline)) {
-        multiline = undefined;
-      }
-      continue;
-    }
-    const header = text.match(/^\s*\[{1,2}\s*([^\]]+?)\s*\]{1,2}\s*(?:#.*)?$/);
-    if (header?.[1]) {
-      table = splitDotted(header[1]);
-      out.push({ path: table, line: index + 1 });
-      continue;
-    }
-    const pair = text.match(
-      /^\s*((?:"[^"]*"|'[^']*'|[\w-]+)(?:\s*\.\s*(?:"[^"]*"|'[^']*'|[\w-]+))*)\s*=\s*(.*)$/,
-    );
-    if (pair?.[1]) {
-      out.push({ path: [...table, ...splitDotted(pair[1])], line: index + 1 });
-      const value = pair[2] ?? "";
-      const quote = value.startsWith('"""') ? '"""' : value.startsWith("'''") ? "'''" : undefined;
-      if (quote && !value.slice(3).includes(quote)) {
-        multiline = quote;
-      }
-    }
+export function unknownFrontmatterKeys(yaml: string, firstLine: number): UnknownKey[] {
+  let parsed: unknown;
+  try {
+    parsed = readFrontmatterYaml(yaml);
+  } catch {
+    return [];
   }
-  return out;
+  const lines = splitLines(yaml);
+  return unrecognizedKeys(Frontmatter.strict(), parsed ?? {})
+    .map(([key = ""]) => {
+      const index = lines.findIndex((text) => topLevelKey(text) === key);
+      return withSuggestion({ key, line: firstLine + Math.max(0, index) }, FRONTMATTER_KEYS);
+    })
+    .sort((a, b) => a.line - b.line);
 }
 
-function splitDotted(path: string): string[] {
-  return (path.match(/"[^"]*"|'[^']*'|[^.\s]+/g) ?? []).map((part) =>
-    part.replace(/^["']|["']$/g, ""),
-  );
+/** The key a top-level YAML line writes, quoted or not. */
+function topLevelKey(text: string): string | undefined {
+  const match = text.match(/^(?:"([^"]*)"|'([^']*)'|([A-Za-z_][\w-]*))\s*:/);
+  return match?.[1] ?? match?.[2] ?? match?.[3];
+}
+
+function withSuggestion(entry: UnknownKey, known: readonly string[]): UnknownKey {
+  const suggestion = suggest(entry.key, [...known]);
+  return suggestion ? { ...entry, suggestion } : entry;
 }

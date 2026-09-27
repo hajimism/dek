@@ -88,25 +88,25 @@ export type CueSource = {
   markdown: string;
 };
 
-/** One entry per cue: the markdown that feeds it. Beat 0 also carries the section body. */
+/**
+ * One entry per cue: the slide's arrival, spoken from the paragraphs before its first `###`,
+ * then each beat.
+ */
 function cueSources(deck: Deck): CueSource[] {
   const sources: CueSource[] = [];
   for (const [slideIndex, section] of deck.sections.entries()) {
-    if (section.beats.length === 0) {
+    sources.push({
+      position: { slideIndex, beatIndex: 0 },
+      slug: section.slug,
+      line: section.line,
+      markdown: section.body,
+    });
+    for (const [index, beat] of section.beats.entries()) {
       sources.push({
-        position: { slideIndex, beatIndex: 0 },
-        slug: section.slug,
-        line: section.line,
-        markdown: section.body,
-      });
-      continue;
-    }
-    for (const [beatIndex, beat] of section.beats.entries()) {
-      sources.push({
-        position: { slideIndex, beatIndex },
+        position: { slideIndex, beatIndex: index + 1 },
         slug: section.slug,
         line: beat.line,
-        markdown: beatIndex === 0 ? joinBodies(section.body, beat.body) : beat.body,
+        markdown: beat.body,
       });
     }
   }
@@ -138,10 +138,6 @@ export function silentCues(deck: Deck): SilentCue[] {
 
 function hasVisibleBody(markdown: string): boolean {
   return markdown.split(/\r?\n/).some((line) => line.trim() !== "" && !BLOCKQUOTE_RE.test(line));
-}
-
-function joinBodies(a: string, b: string): string {
-  return [a, b].filter((part) => part.trim()).join("\n\n");
 }
 
 function unwrapInline(text: string): string {

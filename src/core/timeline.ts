@@ -60,15 +60,6 @@ export type VoiceSchedule = {
   leadingMs: number;
 };
 
-export function buildTimeline(
-  cues: Cue[],
-  utterances: Iterable<Utterance>,
-  pause: PauseConfig = DEFAULT_PAUSE,
-  audio = "",
-): Timeline {
-  return scheduleVoice(cues, utterances, pause, audio).timeline;
-}
-
 export function scheduleVoice(
   cues: Cue[],
   utterances: Iterable<Utterance>,
@@ -94,6 +85,7 @@ export function scheduleVoice(
   let leadingMs = 0;
   let t = 0;
   let previousEnd = 0;
+  let previousSlide = -1;
   let lastClipIndex = -1;
 
   for (const cue of cues) {
@@ -101,8 +93,11 @@ export function scheduleVoice(
     const override = timing(cue.position);
     const lead = override.lead ?? DEFAULT_LEAD_MS;
     const beatPause = override.pause ?? pause.beat;
+    const sameSlide = cue.position.slideIndex === previousSlide;
+    previousSlide = cue.position.slideIndex;
     if (texts.length === 0) {
-      const start = previousEnd;
+      // Silence after speech belongs to its slide: a silent beat fills it, a silent arrival waits it out.
+      const start = sameSlide ? previousEnd : t;
       const end = start + beatPause;
       if (end > t) {
         const extra = end - t;

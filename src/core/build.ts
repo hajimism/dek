@@ -6,16 +6,19 @@ import { type DistOptions, distFile } from "./path.ts";
 import type { PlaywrightRunner } from "./playwright.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { outputPath, removeInside, writeInside } from "./safe-fs.ts";
-import { coverShot } from "./shot.ts";
+import { coverShot } from "./shot/still.ts";
 import { logicalSize } from "./size.ts";
 
-export type BuildResult = {
-  outPath: string;
-  /** dist/<deck>.png, the link preview image, when the build could take one. */
-  image?: string;
-  /** Why there is no preview image: no public URL to point og:image at, or no Playwright. */
-  imageSkipped?: "no-url" | "no-playwright";
-};
+export type BuildResult = { outPath: string } & (
+  | {
+      /** dist/<deck>.png, the link preview image. */
+      image: string;
+    }
+  | {
+      /** Why there is no preview image: no public URL to point og:image at, or no Playwright. */
+      imageSkipped: "no-url" | "no-playwright";
+    }
+);
 
 export type BuildOptions = DistOptions & {
   playerScript: string;
@@ -43,24 +46,25 @@ export async function buildDeck(
     // An image from an earlier build would outlive the tag that pointed at it.
     removeInside(imagePath, project.root);
   }
-  const html = await renderDeckDocument(deck, {
-    mode: "player",
-    inlineAssets: true,
+  const html = renderDeckDocument(deck, {
     config,
     playerScript: options.playerScript,
-    ...(baseUrl
-      ? {
-          publicUrl: new URL(encodeURIComponent(basename(outPath)), baseUrl).href,
-          ...(shot
-            ? {
-                previewImage: {
-                  url: new URL(encodeURIComponent(basename(imagePath)), baseUrl).href,
-                  ...logicalSize(deck.deck.ratio),
-                },
-              }
-            : {}),
-        }
-      : {}),
+    target: {
+      kind: "build",
+      ...(baseUrl
+        ? {
+            publicUrl: new URL(encodeURIComponent(basename(outPath)), baseUrl).href,
+            ...(shot
+              ? {
+                  previewImage: {
+                    url: new URL(encodeURIComponent(basename(imagePath)), baseUrl).href,
+                    ...logicalSize(deck.deck.ratio),
+                  },
+                }
+              : {}),
+          }
+        : {}),
+    },
   });
   writeInside(outPath, html, project.root);
   if (shot) {

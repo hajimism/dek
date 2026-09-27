@@ -3,18 +3,29 @@ import { join } from "node:path";
 import {
   cssAtRuleNames,
   cssClassNames,
-  cssCustomProperties,
-  cssDeclarations,
   cssLayoutNames,
   cssUrls,
-  minifyCss,
-  scopeSlideCss,
-  themeExcerpt,
-  topLevelSelectors,
+  isScopedThemeSelector,
+  outermostSelectors,
+  parseCss,
+  publishedTokens,
+  type Stylesheet,
 } from "../../src/core/css.ts";
-import { lintDeck } from "../../src/core/index.ts";
+import {
+  minifyCss,
+  replaceUrls,
+  rewriteCss,
+  scopeToSlide,
+  shareTokensWithTransitions,
+} from "../../src/core/css-transform.ts";
+import { lintDeck } from "../../src/core/lint.ts";
+import { themeExcerpt } from "../../src/core/theme-excerpt.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+
+const tokenNames = (sheet: Stylesheet) => publishedTokens(sheet).map((token) => token.name);
+const scopeSlideCss = (css: string, slug: string) => rewriteCss(parseCss(css), scopeToSlide(slug));
+const shareTokens = (css: string) => rewriteCss(parseCss(css), shareTokensWithTransitions);
 
 const titleSlide = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -42,33 +53,39 @@ describe("minifyCss", () => {
 
 describe("cssClassNames", () => {
   test("collects classes from selectors including compound names", () => {
-    const names = cssClassNames(`
+    const names = cssClassNames(
+      parseCss(`
 .slide { width: 1280px; }
 .slide-title, .is-shown { opacity: 1; }
 .slide.foo { color: red; }
-`);
+`),
+    );
     expect(names).toEqual(new Set(["slide", "slide-title", "is-shown", "foo"]));
   });
 
   test("ignores dots inside url() and numeric literals", () => {
-    const names = cssClassNames(`
+    const names = cssClassNames(
+      parseCss(`
 .slide {
   background: url("fonts/Inter.woff2");
   background-image: url(foo.bar.png);
   opacity: 0.4;
 }
-`);
+`),
+    );
     expect(names).toEqual(new Set(["slide"]));
     expect(names.has("woff2")).toBe(false);
     expect(names.has("bar")).toBe(false);
   });
 
   test("collects classes inside @media", () => {
-    const names = cssClassNames(`
+    const names = cssClassNames(
+      parseCss(`
 @media (min-width: 800px) {
   .slide .extra { display: block; }
 }
-`);
+`),
+    );
     expect(names).toEqual(new Set(["slide", "extra"]));
   });
 });
@@ -94,41 +111,47 @@ describe("DEK013", () => {
   });
 });
 
-describe("cssCustomProperties", () => {
+describe("publishedTokens", () => {
   test("collects custom properties from the .slide rule", () => {
-    const names = cssCustomProperties(`
+    const names = tokenNames(
+      parseCss(`
 .slide {
   --fg: #fff;
   --bg: #111;
   color: var(--fg);
 }
 .slide .node { --fg: #000; }
-`);
-    expect(names).toEqual(new Set(["--fg", "--bg"]));
+`),
+    );
+    expect(names).toEqual(["--fg", "--bg"]);
   });
 
   test("ignores custom properties on descendant and layout selectors", () => {
-    const names = cssCustomProperties(`
+    const names = tokenNames(
+      parseCss(`
 .slide .node { --fg: #000; }
 .slide[data-layout="title"] { --pad: 0; }
-`);
-    expect(names.size).toBe(0);
+`),
+    );
+    expect(names).toEqual([]);
   });
 
   test("ignores custom properties inside comments", () => {
-    const names = cssCustomProperties(`
+    const names = tokenNames(
+      parseCss(`
 .slide {
   /* --fg: #fff; */
   --bg: #111;
 }
-`);
-    expect(names).toEqual(new Set(["--bg"]));
+`),
+    );
+    expect(names).toEqual(["--bg"]);
   });
 });
 
-describe("cssDeclarations", () => {
+describe("declarations", () => {
   test("walks declarations including nested at-rules and reports lines", () => {
-    const decls = cssDeclarations(`
+    const decls = parseCss(`
 .slide { --fg: #fff; color: var(--fg); }
 @media (prefers-reduced-motion: reduce) {
   .slide { transition: none; }
@@ -136,12 +159,24 @@ describe("cssDeclarations", () => {
 @keyframes fade-in {
   from { opacity: 0; }
 }
-`);
+`).decls;
     expect(decls).toMatchObject([
       { selector: ".slide", property: "--fg", value: "#fff", line: 2 },
       { selector: ".slide", property: "color", value: "var(--fg)", line: 2 },
       { selector: ".slide", property: "transition", value: "none", line: 4 },
       { selector: "from", property: "opacity", value: "0", line: 7 },
+    ]);
+  });
+
+  test("keeps the declarations around and inside a nested at-rule with a colon in its prelude", () => {
+    const decls = parseCss(
+      ".card { padding: var(--gap); @media (min-width: 600px) { padding: var(--pad); } color: #fff; @layer x; margin: 0; }",
+    ).decls;
+    expect(decls.map((d) => [d.selector, d.property, d.value, d.atPath])).toEqual([
+      [".card", "padding", "var(--gap)", []],
+      [".card", "padding", "var(--pad)", ["@media (min-width: 600px)"]],
+      [".card", "color", "#fff", []],
+      [".card", "margin", "0", []],
     ]);
   });
 });
@@ -153,11 +188,11 @@ body { color: red; }`;
 
 describe("string-aware scanning", () => {
   test("cssClassNames sees every class when a value contains a brace", () => {
-    expect([...cssClassNames(braceInString)].sort()).toEqual(["a", "b", "c", "slide"]);
+    expect([...cssClassNames(parseCss(braceInString))].sort()).toEqual(["a", "b", "c", "slide"]);
   });
 
-  test("topLevelSelectors reports only the real top-level rules", () => {
-    expect(topLevelSelectors(braceInString)).toEqual([
+  test("outermostSelectors reports only the real outermost rules", () => {
+    expect(outermostSelectors(parseCss(braceInString))).toEqual([
       ".slide .a::before",
       ".slide .b",
       ".slide .c",
@@ -166,7 +201,7 @@ describe("string-aware scanning", () => {
   });
 
   test("cssDeclarations keeps selector, property, value, and line intact", () => {
-    const decls = cssDeclarations(braceInString);
+    const decls = parseCss(braceInString).decls;
     expect(decls.map((d) => `${d.selector}|${d.property}|${d.line}`)).toEqual([
       ".slide .a::before|content|1",
       ".slide .a::before|color|1",
@@ -180,19 +215,19 @@ describe("string-aware scanning", () => {
 
   test("escaped quotes inside a string do not end it", () => {
     const css = `.slide .q::after { content: "\\"}"; color: var(--fg); }\n.slide .r { color: var(--fg); }`;
-    expect([...cssClassNames(css)].sort()).toEqual(["q", "r", "slide"]);
-    expect(topLevelSelectors(css)).toEqual([".slide .q::after", ".slide .r"]);
+    expect([...cssClassNames(parseCss(css))].sort()).toEqual(["q", "r", "slide"]);
+    expect(outermostSelectors(parseCss(css))).toEqual([".slide .q::after", ".slide .r"]);
   });
 
-  test("a brace in a string inside @media does not leak rules to the top level", () => {
+  test("a brace in a string inside @media does not leak a rule out of it", () => {
     const css = `@media (min-width: 1px) { .slide .m::before { content: "}"; } }\n.slide .n { color: var(--fg); }`;
-    expect(topLevelSelectors(css)).toEqual([".slide .n"]);
-    expect([...cssClassNames(css)].sort()).toEqual(["m", "n", "slide"]);
+    expect(outermostSelectors(parseCss(css))).toEqual([".slide .m::before", ".slide .n"]);
+    expect([...cssClassNames(parseCss(css))].sort()).toEqual(["m", "n", "slide"]);
   });
 
-  test("cssCustomProperties reads tokens after a string-bearing rule", () => {
+  test("publishedTokens reads tokens after a string-bearing rule", () => {
     const css = `.slide .x::before { content: "{"; }\n.slide { --fg: #fff; }`;
-    expect([...cssCustomProperties(css)]).toEqual(["--fg"]);
+    expect(tokenNames(parseCss(css))).toEqual(["--fg"]);
   });
 });
 
@@ -246,6 +281,62 @@ describe("scopeSlideCss", () => {
   });
 });
 
+describe("shareTokensWithTransitions", () => {
+  test("gives ::view-transition the tokens a bare .slide sets, and nothing else", () => {
+    expect(shareTokens(".slide { --step-transition: 0.3s ease; padding: var(--pad); }")).toBe(
+      ".slide { --step-transition: 0.3s ease; padding: var(--pad); }\n::view-transition { --step-transition: 0.3s ease; }",
+    );
+  });
+
+  test("keeps the twin inside the at-rule, so a media query reaches the transition too", () => {
+    expect(
+      shareTokens("@media (prefers-reduced-motion: reduce) { .slide { --step-transition: 0s; } }"),
+    ).toBe(
+      "@media (prefers-reduced-motion: reduce) { .slide { --step-transition: 0s; }\n::view-transition { --step-transition: 0s; } }",
+    );
+  });
+
+  test("shares a selector list that names .slide on its own", () => {
+    expect(shareTokens(".slide, .print { --gap: 2rem; }")).toContain(
+      "::view-transition { --gap: 2rem; }",
+    );
+  });
+
+  test("leaves tokens that only some slides get where they are", () => {
+    const css =
+      '.slide.is-current { --a: 1; }\n.slide[data-layout="title"] { --b: 2; }\n.slide .card { --c: 3; }';
+    expect(shareTokens(css)).toBe(css);
+  });
+
+  test("leaves a .slide rule without tokens, and a commented-out token, alone", () => {
+    expect(shareTokens(".slide { color: var(--fg); }")).toBe(".slide { color: var(--fg); }");
+    expect(shareTokens(".slide { /* --old: 1; */ --new: 2; }")).toBe(
+      ".slide { /* --old: 1; */ --new: 2; }\n::view-transition { --new: 2; }",
+    );
+  });
+
+  test("leaves a nested rule's tokens with it, and still shares the ones after it", () => {
+    const css = ".slide { --a: 1; &.dark { --bg: #000; --fg: #fff } &:hover { --h: 1 } --z: 2; }";
+    expect(shareTokens(css)).toBe(`${css}\n::view-transition { --a: 1; --z: 2; }`);
+  });
+
+  test("leaves out a token that holds a url(), which the transition never draws", () => {
+    const css = ".slide { --bg-image: url(bg.png); --fg: #fff; }";
+    expect(shareTokens(css)).toBe(`${css}\n::view-transition { --fg: #fff; }`);
+  });
+
+  test("steps over a nested at-rule whose prelude has a colon", () => {
+    const css = ".slide { --a: 1; @media (min-width: 600px) { --a: 2; } --b: 3; }";
+    expect(shareTokens(css)).toBe(`${css}\n::view-transition { --a: 1; --b: 3; }`);
+  });
+
+  test("copies a value that looks like a comment inside a string as written", () => {
+    expect(shareTokens('.slide { --label: "a /* b */ c"; }')).toContain(
+      '::view-transition { --label: "a /* b */ c"; }',
+    );
+  });
+});
+
 describe("themeExcerpt", () => {
   const theme = `
 .slide {
@@ -272,7 +363,7 @@ describe("themeExcerpt", () => {
 }
 ::view-transition-old(root) { animation: none; }
 `;
-  const excerpt = themeExcerpt(theme, { classes: ["slide", "card"], layout: "title" });
+  const excerpt = themeExcerpt(parseCss(theme), { classes: ["slide", "card"], layout: "title" });
 
   test("keeps the rules for the classes and layout the slide uses", () => {
     expect(excerpt).toContain(".slide .card {");
@@ -312,9 +403,9 @@ describe("themeExcerpt", () => {
   });
 
   test("follows tokens and keyframes the slide's own stylesheet uses", () => {
-    const own = themeExcerpt(theme, {
+    const own = themeExcerpt(parseCss(theme), {
       classes: ["slide"],
-      css: ".slide .mine { color: var(--bg); animation: spin 1s; }",
+      css: parseCss(".slide .mine { color: var(--bg); animation: spin 1s; }"),
     });
     expect(own).toContain("--bg: #fff;");
     expect(own).toContain("@keyframes spin {");
@@ -328,7 +419,7 @@ describe("scanners share the string-aware rule walker", () => {
 @media (min-width: 1px) { .b { color: red; } }
 @font-face { font-family: "F"; }
 `;
-    expect(cssAtRuleNames(css)).toEqual(["import", "media", "font-face"]);
+    expect(cssAtRuleNames(parseCss(css))).toEqual(["import", "media", "font-face"]);
   });
 
   test("cssUrls reads url() from declaration values, with lines, not from strings", () => {
@@ -338,7 +429,7 @@ describe("scanners share the string-aware rule walker", () => {
   mask: url(assets/m.svg) no-repeat;
 }
 `;
-    expect(cssUrls(css)).toEqual([
+    expect(cssUrls(parseCss(css))).toEqual([
       { value: "assets/bg.png", line: 3 },
       { value: "assets/m.svg", line: 4 },
     ]);
@@ -351,7 +442,7 @@ describe("scanners share the string-aware rule walker", () => {
 }
 @media print { @font-face { src: url(assets/p.woff2); } }
 `;
-    expect(cssUrls(css)).toEqual([
+    expect(cssUrls(parseCss(css))).toEqual([
       { value: "assets/f.woff2", line: 3 },
       { value: "assets/f.woff", line: 3 },
       { value: "assets/p.woff2", line: 5 },
@@ -362,6 +453,117 @@ describe("scanners share the string-aware rule walker", () => {
     const css = `.slide[data-layout="title"] { --x: '[data-layout=fake]'; }
 .slide[data-layout=split] .a { color: red; }
 `;
-    expect([...cssLayoutNames(css)].sort()).toEqual(["split", "title"]);
+    expect([...cssLayoutNames(parseCss(css))].sort()).toEqual(["split", "title"]);
+  });
+});
+
+describe("nested rules", () => {
+  const nested = `.slide {
+  --fg: #111;
+  .hero { background: url(assets/a.png); color: red; }
+  &:hover { border-color: #f00; }
+  @media (min-width: 600px) { padding: 10px; }
+}`;
+
+  test("cssUrls finds a url() in a nested rule", () => {
+    expect(cssUrls(parseCss(".slide { .hero { background: url(a.png) } }"))).toEqual([
+      { value: "a.png", line: 1 },
+    ]);
+  });
+
+  test("cssDeclarations reads nested rules with their selector resolved", () => {
+    expect(parseCss(nested).decls.map((d) => [d.selector, d.property, d.value, d.line])).toEqual([
+      [".slide", "--fg", "#111", 2],
+      [".slide .hero", "background", "url(assets/a.png)", 3],
+      [".slide .hero", "color", "red", 3],
+      [".slide:hover", "border-color", "#f00", 4],
+      [".slide", "padding", "10px", 5],
+    ]);
+  });
+
+  test("cssClassNames sees the classes of nested selectors", () => {
+    expect([...cssClassNames(parseCss(".slide { .hero { .deep {} } &.dark {} }"))].sort()).toEqual([
+      "dark",
+      "deep",
+      "hero",
+      "slide",
+    ]);
+  });
+
+  test("a nested rule is not an outermost selector", () => {
+    expect(outermostSelectors(parseCss(nested))).toEqual([".slide"]);
+  });
+
+  test("replaceUrls rewrites a nested url()", () => {
+    const css = ".slide { .hero { background: url(a.png) } }";
+    expect(
+      rewriteCss(
+        parseCss(css),
+        replaceUrls(() => "b.png"),
+      ),
+    ).toBe('.slide { .hero { background: url("b.png") } }');
+  });
+});
+
+describe("isScopedThemeSelector", () => {
+  test("keeps a list inside :is() whole", () => {
+    expect(isScopedThemeSelector(".slide :is(.a, .b)")).toBe(true);
+  });
+
+  test("accepts .slide followed by a sibling combinator", () => {
+    expect(isScopedThemeSelector(".slide+.x")).toBe(true);
+    expect(isScopedThemeSelector(".slide~.x")).toBe(true);
+  });
+
+  test("still rejects a part that is not under .slide", () => {
+    expect(isScopedThemeSelector(".slide .a, body")).toBe(false);
+    expect(isScopedThemeSelector(".slides")).toBe(false);
+  });
+});
+
+describe("scopeSlideCss keyframes", () => {
+  test("leaves a keyframes name written in a string alone", () => {
+    const out = scopeSlideCss(
+      '@keyframes pop { to { opacity: 1; } }\n.a::before { content: "@keyframes pop"; animation: pop 1s; }',
+      "usb",
+    );
+    expect(out).toContain('content: "@keyframes pop"');
+    expect(out).toContain("animation: usb--pop 1s");
+    expect(out).toContain("@keyframes usb--pop {");
+  });
+
+  test("renames an animation in a nested rule, not a name inside a string", () => {
+    const out = scopeSlideCss(
+      '@keyframes pop { to { opacity: 1; } }\n.a { &:hover { animation-name: pop; } --label: "pop"; }',
+      "usb",
+    );
+    expect(out).toContain("animation-name: usb--pop;");
+    expect(out).toContain('--label: "pop"');
+  });
+});
+
+describe("minifyCss and the scanner agree on strings", () => {
+  test("an unclosed string ends at the newline, as CSS reads it", () => {
+    expect(minifyCss('.a { content: "x\n; color: red; }')).toBe('.a { content: "x ; color: red; }');
+  });
+});
+
+describe("nesting in the rewrites", () => {
+  test("scopeSlideCss scopes the outer rule only; nested ones follow it", () => {
+    expect(scopeSlideCss(".card { .hero { opacity: 0; } &:hover { opacity: 1; } }", "usb")).toBe(
+      '.slide:where([data-slug="usb"]) .card { .hero { opacity: 0; } &:hover { opacity: 1; } }',
+    );
+  });
+
+  test("themeExcerpt keeps a nested rule the slide selects, written out in full", () => {
+    const excerpt = themeExcerpt(
+      parseCss(
+        ".slide { .card { color: var(--fg); } .tag { color: var(--fg); } }\n.slide { --fg: #111; }",
+      ),
+      { classes: ["card"] },
+    );
+    expect(excerpt).toContain(".slide .card {\n  color: var(--fg);\n}");
+    expect(excerpt).not.toContain(".tag");
+    expect(excerpt).toContain("--fg: #111;");
   });
 });

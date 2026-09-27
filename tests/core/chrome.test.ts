@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { playerChromeCss, printPageCss } from "../../src/core/chrome.ts";
+import { PAGE_ID } from "../../src/core/page.ts";
 
 describe("playerChromeCss", () => {
   test("uses the given width and height", () => {
@@ -117,5 +118,15 @@ describe("playerChromeCss", () => {
     const player = playerChromeCss({ presenter: false });
     expect(player).not.toContain("body.is-presenter #dek-rail");
     expect(player).not.toContain("body.is-presenter #dek-shell");
+  });
+});
+
+describe("the page's ids", () => {
+  // The CSS names the page's parts by id as text; each must be one the page is built with.
+  test("every id the chrome styles is one the page has", () => {
+    const css = playerChromeCss({ presenter: true }) + printPageCss({ width: 1280, height: 720 });
+    const styled = new Set([...css.matchAll(/#(deck|dek-[\w-]+)\b/g)].map((match) => match[1]));
+    const ids = new Set<string>(Object.values(PAGE_ID));
+    expect([...styled].filter((id) => id && !ids.has(id))).toEqual([]);
   });
 });

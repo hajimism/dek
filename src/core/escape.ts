@@ -9,3 +9,8 @@ export function escapeHtml(text: string): string {
 export function escapeAttr(text: string): string {
   return escapeHtml(text);
 }
+
+/** `text` matched literally inside a regular expression. */
+export function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

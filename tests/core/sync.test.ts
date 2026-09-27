@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { lstat, mkdir, readFile, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { DekError, lintDeck, resolveDeck, syncDeck } from "../../src/core/index.ts";
+import { DekError } from "../../src/core/error.ts";
+import { lintDeck } from "../../src/core/lint.ts";
+import { resolveDeck } from "../../src/core/resolve.ts";
+import { syncDeck } from "../../src/core/sync.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { extractSlide } from "../helpers/html.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
@@ -383,6 +386,10 @@ c
         expect(agents).toContain("A deck's own `theme.css` can differ");
         expect(agents).toContain("`onclick=`");
         expect(agents).toContain("`javascript:` URLs");
+        expect(agents).toContain("a token of its own on that slide's `.slide`");
+        expect(agents).toContain("dek shot --sheet");
+        expect(agents).toContain("dek shot <slug> --motion");
+        expect(agents).toContain("dek shot <a> --to <b> --at 0.5");
       },
     );
   });

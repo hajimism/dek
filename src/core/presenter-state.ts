@@ -1,4 +1,4 @@
-import type { Position } from "./step.ts";
+import { beatAt, lastStop, type Position } from "./step.ts";
 
 export type PresenterBeat = {
   id?: string;
@@ -31,12 +31,12 @@ export function presenterState(slides: PresenterSlide[], pos: Position): Present
     next: slides[pos.slideIndex + 1] ?? null,
     script: current.script,
     currentBeatIndex: pos.beatIndex,
-    currentBeat: current.beats[pos.beatIndex] ?? null,
+    currentBeat: beatAt(current.beats, pos.beatIndex) ?? null,
   };
 }
 
 export function nextPresenterTitle(state: PresenterState): string {
-  if (state.currentBeatIndex + 1 < state.current.beats.length) {
+  if (state.currentBeatIndex < lastStop(state.current.beats)) {
     return state.current.title;
   }
   return state.next?.title ?? "";

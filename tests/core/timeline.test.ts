@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { cuesFromDeck, splitSentences } from "../../src/core/cue.ts";
 import { parseScript } from "../../src/core/parse.ts";
 import {
-  buildTimeline,
   DEFAULT_LEAD_MS,
   playbackSchedule,
   scheduleVoice,
@@ -36,7 +35,7 @@ describe("splitSentences", () => {
   });
 });
 
-describe("buildTimeline", () => {
+describe("scheduleVoice timeline", () => {
   const pause = { sentence: 350, beat: 700 };
 
   test("inserts sentence and beat pauses and keeps empty beats at the previous end", () => {
@@ -55,7 +54,7 @@ Next.
 ### later
 `);
     const cues = cuesFromDeck(deck);
-    const timeline = buildTimeline(
+    const timeline = scheduleVoice(
       cues,
       [
         { text: "Hello.", kana: "ハロー", durationMs: 1000 },
@@ -63,10 +62,11 @@ Next.
       ],
       pause,
       "audio.wav",
-    );
+    ).timeline;
 
     expect(timeline.audio).toBe("audio.wav");
-    expect(timeline.beats).toHaveLength(2);
+    expect(timeline.beats).toHaveLength(3);
+    expect(timeline.beats[0]?.position).toEqual({ slideIndex: 0, beatIndex: 0 });
     expect(timeline.beats[0]?.sentences).toEqual([
       { text: "Hello.", kana: "ハロー", start: 0, end: 1000 },
       { text: "Next.", kana: "ネクスト", start: 1350, end: 1850 },
@@ -76,11 +76,13 @@ Next.
     expect(timeline.beats[1]?.sentences).toEqual([]);
     expect(timeline.beats[1]?.start).toBe(1850);
     expect(timeline.beats[1]?.end).toBe(2550);
-    expect(timeline.durationMs).toBe(2550);
+    expect(timeline.beats[2]?.start).toBe(2550);
+    expect(timeline.beats[2]?.end).toBe(3250);
+    expect(timeline.durationMs).toBe(3250);
   });
 
   test("keeps duplicate sentences as separate utterances", () => {
-    const timeline = buildTimeline(
+    const timeline = scheduleVoice(
       [
         {
           position: { slideIndex: 0, beatIndex: 0 },
@@ -100,7 +102,7 @@ Next.
         { text: "Hello.", kana: "two", durationMs: 400 },
       ],
       pause,
-    );
+    ).timeline;
     expect(timeline.beats[0]?.sentences[0]).toMatchObject({ kana: "one", end: 1000 });
     expect(timeline.beats[1]?.sentences[0]).toMatchObject({ kana: "two", start: 1700, end: 2100 });
     expect(timeline.durationMs).toBe(2800);
@@ -121,21 +123,23 @@ Hello.
 
 ### c
 `);
-    const timeline = buildTimeline(
+    const timeline = scheduleVoice(
       cuesFromDeck(deck),
       [{ text: "Hello.", kana: "", durationMs: 1000 }],
       pause,
-    );
-    expect(timeline.beats).toHaveLength(3);
+    ).timeline;
+    expect(timeline.beats).toHaveLength(4);
     expect(timeline.beats[1]?.start).toBe(1000);
     expect(timeline.beats[1]?.end).toBe(1700);
     expect(timeline.beats[2]?.start).toBe(1700);
     expect(timeline.beats[2]?.end).toBe(2400);
-    expect(timeline.durationMs).toBe(2400);
+    expect(timeline.beats[3]?.start).toBe(2400);
+    expect(timeline.beats[3]?.end).toBe(3100);
+    expect(timeline.durationMs).toBe(3100);
   });
 
   test("playbackSchedule defaults to the shared lead-in", () => {
-    const timeline = buildTimeline(
+    const timeline = scheduleVoice(
       [
         {
           position: { slideIndex: 0, beatIndex: 0 },
@@ -150,7 +154,7 @@ Hello.
         { text: "Next.", kana: "", durationMs: 1000 },
       ],
       pause,
-    );
+    ).timeline;
     expect(playbackSchedule(timeline).map((go) => go.at)).toEqual([0, 1700 - DEFAULT_LEAD_MS]);
   });
 });
@@ -189,6 +193,24 @@ describe("scheduleVoice beat timing", () => {
       (position) => (position.slideIndex === 1 ? { pause: 1500 } : {}),
     );
     expect(timeline.beats[1]?.end).toBe((timeline.beats[1]?.start ?? 0) + 1500);
+  });
+
+  test("a silent arrival waits out the previous slide's pause", () => {
+    const beat = (beatIndex: number, paragraphs: string[]) => ({
+      ...cue(1, paragraphs),
+      position: { slideIndex: 1, beatIndex },
+    });
+    const { timeline } = scheduleVoice(
+      [cue(0, ["Hello."]), beat(0, []), beat(1, ["Next."])],
+      utterances,
+      pause,
+      "",
+      (position) => (position.slideIndex === 0 ? { pause: 3000 } : {}),
+    );
+    expect(timeline.beats[1]).toMatchObject({ start: 4000, end: 4700 });
+    expect(timeline.beats[2]?.start).toBe(4700);
+    const [, arrival] = playbackSchedule(timeline);
+    expect(arrival?.at).toBe(4000 - DEFAULT_LEAD_MS);
   });
 
   test("every beat records its lead, and playbackSchedule follows it", () => {

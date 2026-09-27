@@ -10,6 +10,7 @@ import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { pagesOf } from "../helpers/visual.ts";
 
 const introSource = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -30,7 +31,7 @@ function fakeRunner() {
   const requests: VisualRequest[] = [];
   const runner = async (request: VisualRequest) => {
     requests.push(request);
-    for (const page of request.pages) {
+    for (const page of pagesOf(request)) {
       if (page.screenshotPath) {
         await Bun.write(page.screenshotPath, `png of ${page.slug}`);
       }
@@ -284,12 +285,14 @@ describe("buildDeck link preview", () => {
       const { runner, requests } = fakeRunner();
       const result = await build(deckDir, { runner });
 
-      expect(result.image).toBe(join(deckDir, "dist", "demo.png"));
+      expect(result).toMatchObject({ image: join(deckDir, "dist", "demo.png") });
       expect(await readFile(join(deckDir, "dist", "demo.png"), "utf8")).toBe("png of intro");
       expect(requests).toHaveLength(1);
-      expect(requests[0]?.actions).toEqual(["screenshot"]);
+      expect(requests[0]).toMatchObject({ kind: "pages", actions: [] });
       expect(requests[0]?.viewport).toEqual({ width: 1280, height: 720 });
-      expect(requests[0]?.pages.map((page) => [page.slug, page.step])).toEqual([["intro", "two"]]);
+      expect(pagesOf(requests[0]).map((page) => [page.slug, page.step])).toEqual([
+        ["intro", "two"],
+      ]);
 
       const html = await readFile(result.outPath, "utf8");
       expect(html).toContain('<meta property="og:title" content="Why dek">');
@@ -340,8 +343,7 @@ describe("buildDeck link preview", () => {
       const result = await build(deckDir, { runner });
 
       expect(requests).toHaveLength(0);
-      expect(result.image).toBeUndefined();
-      expect(result.imageSkipped).toBe("no-url");
+      expect(result).toEqual({ outPath: result.outPath, imageSkipped: "no-url" });
       expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(false);
       const html = await readFile(result.outPath, "utf8");
       expect(html).toContain('<meta property="og:title" content="Why dek">');
@@ -356,8 +358,7 @@ describe("buildDeck link preview", () => {
       await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
       const result = await build(deckDir, { runner: async () => null });
 
-      expect(result.image).toBeUndefined();
-      expect(result.imageSkipped).toBe("no-playwright");
+      expect(result).toEqual({ outPath: result.outPath, imageSkipped: "no-playwright" });
       const html = await readFile(result.outPath, "utf8");
       expect(html).toContain('<meta property="og:url" content="https://example.com/demo.html">');
       expect(html).not.toContain("og:image");

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { lintDeck } from "../../src/core/index.ts";
+import { lintDeck } from "../../src/core/lint.ts";
 
 const sampleDeck = join(import.meta.dir, "..", "..", "sample", "decks", "why-dek");
 

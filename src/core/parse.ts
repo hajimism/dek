@@ -21,10 +21,10 @@ export function parseScript(source: string, filename?: string): Deck {
   return result.data;
 }
 
-function splitFrontmatter(
-  source: string,
-  filename?: string,
-): { yaml: string; body: string; bodyStartLine: number } {
+/** A script.md cut at its frontmatter fences; the YAML starts on line 2. */
+export type ScriptParts = { yaml: string; body: string; bodyStartLine: number };
+
+export function splitFrontmatter(source: string, filename?: string): ScriptParts {
   const lines = splitLines(source);
   if (lines[0]?.trim() !== "---") {
     throw new DekError("script.md must start with YAML frontmatter", {
@@ -47,10 +47,15 @@ function splitFrontmatter(
   throw new DekError("YAML frontmatter is not closed", { line: 1, path: filename });
 }
 
+/** The frontmatter's YAML as a value, before the schema reads it; a syntax error throws. */
+export function readFrontmatterYaml(yaml: string): unknown {
+  return Bun.YAML.parse(quoteUnquotedHashes(yaml));
+}
+
 function parseFrontmatter(yaml: string, filename?: string): Frontmatter {
   let parsed: unknown;
   try {
-    parsed = Bun.YAML.parse(quoteUnquotedHashes(yaml));
+    parsed = readFrontmatterYaml(yaml);
   } catch (error) {
     throw new DekError(`invalid YAML frontmatter: ${parseFailure(error)}`, {
       path: filename,

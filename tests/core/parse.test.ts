@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { DekError, parseScript } from "../../src/core/index.ts";
+import { DekError } from "../../src/core/error.ts";
+import { parseScript } from "../../src/core/parse.ts";
 import { scriptFixturesDir } from "../helpers/paths.ts";
 
 function headingLine(source: string, prefix: string): number {

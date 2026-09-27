@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DEFAULT_CONFIG, loadConfig, parseDekToml } from "../../src/core/config.ts";
+import { unknownFrontmatterKeys } from "../../src/core/config-keys.ts";
 import { DekError } from "../../src/core/error.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -106,5 +107,18 @@ describe("parseDekToml errors", () => {
       expect(message).not.toMatch(/BuildMessage|SyntaxError|TOML Parse error/);
       expect(line === undefined || line === 2).toBe(true);
     }
+  });
+});
+
+describe("unknownFrontmatterKeys", () => {
+  // The schema decides what is unknown, as it does for dek.toml; the lines only say where.
+  test("judges a quoted key by the schema, and finds its line", () => {
+    expect(unknownFrontmatterKeys('title: Demo\n"venue": Tokyo\n', 2)).toEqual([
+      { key: "venue", line: 3 },
+    ]);
+  });
+
+  test("reads every key the schema knows as known", () => {
+    expect(unknownFrontmatterKeys("title: Demo\nratio: 4:3\nlang: en\n", 2)).toEqual([]);
   });
 });

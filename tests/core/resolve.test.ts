@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { realpathSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekError, resolveDeck, resolveProject } from "../../src/core/index.ts";
+import { DekError } from "../../src/core/error.ts";
+import { resolveDeck, resolveProject } from "../../src/core/resolve.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { projectFixturesDir } from "../helpers/paths.ts";
 

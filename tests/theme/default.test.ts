@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cssCustomProperties, cssDeclarations } from "../../src/core/css.ts";
-import { lintDeck } from "../../src/core/index.ts";
-import { REQUIRED_TOKENS } from "../../src/core/tokens.ts";
-import { contrastRatio, type Rgb } from "../../src/core/visual.ts";
+import { parseCss, publishedTokens } from "../../src/core/css.ts";
+import { REQUIRED_TOKENS } from "../../src/core/lint/tokens.ts";
+import { lintDeck } from "../../src/core/lint.ts";
+import { contrastRatio, type Rgb } from "../../src/core/text-contrast.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -32,6 +32,11 @@ function topLevelSelectors(css: string): string[] {
 
 describe("default theme", () => {
   const css = readFileSync(themePath, "utf8");
+
+  test("sets --step-transition once, on .slide, for the view transition to read", () => {
+    const motion = parseCss(css).decls.filter((decl) => decl.property === "--step-transition");
+    expect(motion.map((decl) => decl.selector)).toEqual([".slide"]);
+  });
 
   test("fills the player frame instead of hard-coding the pixel size", () => {
     const slideRule = css.match(/\.slide\s*\{[^}]*\}/)?.[0] ?? "";
@@ -111,10 +116,8 @@ describe("default theme", () => {
   });
 
   test("publishes the required tokens on .slide", () => {
-    const published = cssCustomProperties(css);
-    for (const name of REQUIRED_TOKENS) {
-      expect(published.has(name)).toBe(true);
-    }
+    const published = publishedTokens(parseCss(css)).map((token) => token.name);
+    expect(REQUIRED_TOKENS.filter((name) => !published.includes(name))).toEqual([]);
   });
 
   test("passes DEK014 and DEK015", async () => {
@@ -142,8 +145,8 @@ describe("default theme", () => {
 
 describe("default theme colors", () => {
   const tokens = new Map(
-    cssDeclarations(readFileSync(themePath, "utf8"))
-      .filter((decl) => decl.selector === ".slide" && decl.property.startsWith("--"))
+    parseCss(readFileSync(themePath, "utf8"))
+      .decls.filter((decl) => decl.selector === ".slide" && decl.property.startsWith("--"))
       .map((decl) => [decl.property, decl.value.trim()]),
   );
   const rgb = (name: string): Rgb => {

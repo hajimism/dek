@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defaultScript } from "../../src/cli/files.ts";
-import { Deck, Frontmatter, frontmatterJsonSchema, Id } from "../../src/core/index.ts";
+import { Deck, Frontmatter, frontmatterJsonSchema, Id } from "../../src/core/schema.ts";
 
 describe("Id", () => {
   test.each(["intro", "the-problem", "a1"])("accepts %s", (value) => {

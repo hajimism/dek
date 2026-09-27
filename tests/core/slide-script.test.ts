@@ -1,19 +1,16 @@
 import { describe, expect, test } from "bun:test";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadSlideSources, renderSlideHtml } from "../../src/core/html.ts";
-import { lintDeck, warmLintDeck } from "../../src/core/index.ts";
+import { seekProblems } from "../../src/core/lint/slide-script.ts";
+import { lintDeck, lintDeckAsync } from "../../src/core/lint.ts";
 import { renameSection } from "../../src/core/mv.ts";
 import { renderPdfHtml } from "../../src/core/pdf.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { stillDrawScript } from "../../src/core/slide-draw.ts";
-import {
-  readSlideScripts,
-  seekProblems,
-  slideScriptProblems,
-  slideScriptTags,
-  warmSlideScripts,
-  wrapSlideScript,
-} from "../../src/core/slide-script.ts";
+import { readSlideScripts, slideScriptTags } from "../../src/core/slide-script.ts";
+import { evaluateSlideScripts, slideScriptsProblems } from "../../src/core/slide-script-eval.ts";
+import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -25,6 +22,24 @@ type Registry = Record<string, { motion?: Record<string, number>; draw?: unknown
  */
 function uniqueStatement(): string {
   return `const run = "${crypto.randomUUID()}";`;
+}
+
+/** What stops one script, as lint asks for many at once. */
+function slideScriptProblems(code: string, options: { steps?: string[] } = {}): string[] {
+  return slideScriptsProblems([{ code, ...options }])[0] ?? [];
+}
+
+/** Each script compiled as `slides/<slug>.ts` of a deck, in slug order, joined. */
+async function compiled(scripts: Record<string, string>): Promise<string> {
+  return withTempDir(async (root) => {
+    const deckDir = join(root, "decks", "demo");
+    for (const [slug, code] of Object.entries(scripts)) {
+      await Bun.write(join(deckDir, "slides", `${slug}.ts`), code);
+    }
+    return readSlideScripts(deckDir, { strict: true })
+      .map((script) => script.code)
+      .join("");
+  });
 }
 
 function run(snippet: string): Registry {
@@ -60,7 +75,7 @@ describe("slideScriptProblems", () => {
 });
 
 describe("slideScriptProblems with the slide's beats", () => {
-  const steps = { steps: ["base", "growth"] };
+  const steps = { steps: ["0", "base", "growth"] };
 
   test("accepts motion keyed by the slide's beats", () => {
     expect(
@@ -70,13 +85,13 @@ describe("slideScriptProblems with the slide's beats", () => {
 
   test("names a motion key that is not a beat of the slide", () => {
     expect(slideScriptProblems("export default { motion: { grwth: 900 } };", steps)).toEqual([
-      'motion key "grwth" is not a beat of this slide; use one of: base, growth',
+      'motion key "grwth" is not a beat of this slide; use one of: 0, base, growth',
     ]);
   });
 
   test("a numbered key only works for a beat without an id", () => {
     expect(slideScriptProblems("export default { motion: { 2: 900 } };", steps)).toEqual([
-      'motion key "2" is not a beat of this slide; use one of: base, growth',
+      'motion key "2" is not a beat of this slide; use one of: 0, base, growth',
     ]);
     expect(slideScriptProblems("export default { motion: { 1: 900 } };", { steps: ["1"] })).toEqual(
       [],
@@ -91,7 +106,7 @@ describe("slideScriptProblems with the slide's beats", () => {
       ),
     ).toEqual([
       "imports are not supported; keep the slide script self-contained",
-      'motion key "grwth" is not a beat of this slide; use one of: base, growth',
+      'motion key "grwth" is not a beat of this slide; use one of: 0, base, growth',
     ]);
   });
 
@@ -147,7 +162,7 @@ export default { motion: { base: host.every((t) => t === "undefined") ? 1 : -1 }
   });
 });
 
-describe("warmSlideScripts", () => {
+describe("evaluateSlideScripts", () => {
   const steps = { steps: ["1"] };
   // Each test evaluates its own script: a cached one would skip the evaluation under test.
   const hang = () => `${uniqueStatement()}\nwhile (true) {}\nexport default { motion: { 1: 1 } };`;
@@ -158,16 +173,23 @@ describe("warmSlideScripts", () => {
     const timer = setTimeout(() => {
       ticked = true;
     }, 20);
-    const warming = warmSlideScripts([{ code: hang(), steps: ["1"] }]);
+    const warming = evaluateSlideScripts([{ code: hang(), steps: ["1"] }]);
     expect(ticked).toBe(false);
     await warming;
     clearTimeout(timer);
     expect(ticked).toBe(true);
   });
 
+  test("answers what the synchronous check does", async () => {
+    const code = `${uniqueStatement()}\nexport default { motion: { 2: 1 } };`;
+    expect(await evaluateSlideScripts([{ code, ...steps }])).toEqual([
+      ['motion key "2" is not a beat of this slide; use one of: 1'],
+    ]);
+  });
+
   test("lets the synchronous check answer from the cache without a new evaluation", async () => {
     const code = hang();
-    await warmSlideScripts([{ code, steps: ["1"] }]);
+    await evaluateSlideScripts([{ code, steps: ["1"] }]);
     const started = performance.now();
     expect(slideScriptProblems(code, steps)).toEqual([
       "top-level code did not finish; touch the slide only inside draw",
@@ -177,54 +199,53 @@ describe("warmSlideScripts", () => {
   });
 });
 
-describe("wrapSlideScript", () => {
-  test("registers the default export under the slug", () => {
+describe("compiled slide scripts", () => {
+  test("registers the default export under the slug", async () => {
     const registry = run(
-      wrapSlideScript("const k = 2;\nexport default { motion: { growth: 600 * k } };", "usb"),
+      await compiled({ usb: "const k = 2;\nexport default { motion: { growth: 600 * k } };" }),
     );
     expect(registry.usb?.motion).toEqual({ growth: 1200 });
   });
 
-  test("keeps statements after the default export working", () => {
+  test("keeps statements after the default export working", async () => {
     const registry = run(
-      wrapSlideScript(
-        "export default { draw };\nfunction draw() { return helper; }\nconst helper = 1;",
-        "usb",
-      ),
+      await compiled({
+        usb: "export default { draw };\nfunction draw() { return helper; }\nconst helper = 1;",
+      }),
     );
     expect(typeof registry.usb?.draw).toBe("function");
   });
 
-  test("finds the real export default past comments and strings that mention it", () => {
+  test("finds the real export default past comments and strings that mention it", async () => {
     const registry = run(
-      wrapSlideScript(
-        "// export default comes last\nconst note = `\nexport default`;\nexport default { motion: { a: note.length } };",
-        "usb",
-      ),
+      await compiled({
+        usb: "// export default comes last\nconst note = `\nexport default`;\nexport default { motion: { a: note.length } };",
+      }),
     );
     expect(registry.usb?.motion).toEqual({ a: 15 });
   });
 
-  test("an exported declaration keeps its name bound in the module", () => {
+  test("an exported declaration keeps its name bound in the module", async () => {
     const registry = run(
-      wrapSlideScript(
-        "export default class Chart { static motion = { a: Chart.name.length }; }",
-        "usb",
-      ),
+      await compiled({
+        usb: "export default class Chart { static motion = { a: Chart.name.length }; }",
+      }),
     );
     expect(registry.usb?.motion).toEqual({ a: 5 });
   });
 
-  test("keeps a </script> in a string from closing the page's script tag", () => {
-    const code = wrapSlideScript('export default { motion: { a: "</script>".length } };', "usb");
+  test("keeps a </script> in a string from closing the page's script tag", async () => {
+    const code = await compiled({ usb: 'export default { motion: { a: "</script>".length } };' });
     expect(code.toLowerCase()).not.toContain("</script");
     expect(run(code).usb?.motion).toEqual({ a: 9 });
   });
 
-  test("two slides do not share top-level names", () => {
+  test("two slides do not share top-level names", async () => {
     const registry = run(
-      wrapSlideScript("const k = 1; export default { motion: { a: k } };", "one") +
-        wrapSlideScript("const k = 2; export default { motion: { a: k } };", "two"),
+      await compiled({
+        one: "const k = 1; export default { motion: { a: k } };",
+        two: "const k = 2; export default { motion: { a: k } };",
+      }),
     );
     expect(registry.one?.motion?.a).toBe(1);
     expect(registry.two?.motion?.a).toBe(2);
@@ -319,25 +340,45 @@ describe("TypeScript slide scripts", () => {
       );
       const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
       expect(found.map((d) => d.message)).toEqual([
-        'motion key "grow" is not a beat of this slide; use one of: base, growth',
+        'motion key "grow" is not a beat of this slide; use one of: 0, base, growth',
       ]);
     });
   });
 
-  test("warmLintDeck lets lintDeck report a hanging script without a new evaluation", async () => {
+  test("lintDeckAsync checks each script as it read it, whatever is saved meanwhile", async () => {
+    await withTempProject(chartDeck, async (root) => {
+      const path = join(root, "decks", "demo", "slides", "chart.ts");
+      writeFileSync(path, `${uniqueStatement()}\nexport default { motion: { grow: 900 } };`);
+      const linting = lintDeckAsync(join(root, "decks", "demo"));
+      // A second read of the file would evaluate this one, on the event loop.
+      writeFileSync(path, `${uniqueStatement()}\nwhile (true) {}\nexport default {};`);
+      const found = (await linting).filter((d) => d.id === "DEK016");
+      expect(found.map((d) => d.message)).toEqual([
+        'motion key "grow" is not a beat of this slide; use one of: 0, base, growth',
+      ]);
+    });
+  });
+
+  // Alone: a concurrent test's synchronous evaluation would hold the loop until this one is done.
+  test.serial("lintDeckAsync evaluates without blocking the event loop", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(
         join(deckDir, "slides", "chart.ts"),
         `${uniqueStatement()}\nwhile (true) {}\nexport default {};`,
       );
-      await warmLintDeck(deckDir);
-      const started = performance.now();
-      const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
+      let ticked = false;
+      const timer = setTimeout(() => {
+        ticked = true;
+      }, 20);
+      const linting = lintDeckAsync(deckDir);
+      expect(ticked).toBe(false);
+      const found = (await linting).filter((d) => d.id === "DEK016");
+      clearTimeout(timer);
+      expect(ticked).toBe(true);
       expect(found.map((d) => d.message)).toEqual([
         "top-level code did not finish; touch the slide only inside draw",
       ]);
-      expect(performance.now() - started).toBeLessThan(500);
     });
   });
 
@@ -401,8 +442,8 @@ describe("still pages run slide scripts", () => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "chart.ts"), "export default { draw() {} };");
       const { deck } = resolveDeck(deckDir);
-      const html = renderSlideHtml(deck, "chart", 1);
-      expect(html).toContain('data-dek-beat="1"');
+      const html = renderSlideHtml(loadSlideSources(deck), "chart", 2);
+      expect(html).toContain('data-dek-beat="2"');
       expect(html).toContain('data-dek-step="growth"');
       expect(html).toContain('__dekSlides ||= {})["chart"]');
       expect(html).toContain(stillDrawScript());
@@ -414,7 +455,7 @@ describe("still pages run slide scripts", () => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "chart.ts"), "export default { draw() {} };");
       const html = renderPdfHtml(resolveDeck(deckDir).deck);
-      expect(html).toContain('data-dek-beat="1" data-dek-step="growth"');
+      expect(html).toContain('data-dek-beat="2" data-dek-step="growth"');
       expect(html).toContain(stillDrawScript());
     });
   });
@@ -428,7 +469,7 @@ describe("still pages run slide scripts", () => {
         'import x from "x";\nexport default {};',
       );
       const { deck } = resolveDeck(deckDir);
-      const html = renderSlideHtml(deck, "chart", 1);
+      const html = renderSlideHtml(loadSlideSources(deck), "chart", 1);
       expect(html).toContain('data-dek-slides="chart"');
       expect(html).not.toContain('"intro"');
     });
@@ -442,7 +483,7 @@ describe("still pages run slide scripts", () => {
       const { deck } = resolveDeck(deckDir);
       const sources = loadSlideSources(deck);
       await Bun.write(scriptPath, 'export default { draw() { return "second"; } };');
-      const html = renderSlideHtml(deck, "chart", 1, sources);
+      const html = renderSlideHtml(sources, "chart", 1);
       expect(html).toContain('"first"');
       expect(html).not.toContain('"second"');
     });
@@ -456,10 +497,10 @@ describe("still pages run slide scripts", () => {
         'import x from "x";\nexport default {};',
       );
       const { deck } = resolveDeck(deckDir);
-      expect(() => renderSlideHtml(deck, "chart", 1, loadSlideSources(deck))).toThrow(
+      expect(() => renderSlideHtml(loadSlideSources(deck), "chart", 2)).toThrow(
         'invalid slide script "chart"',
       );
-      const html = renderSlideHtml(deck, "chart", 1, loadSlideSources(deck, { strict: false }));
+      const html = renderSlideHtml(loadSlideSources(deck, { strict: false }), "chart", 2);
       expect(html).not.toContain("data-dek-slides");
       expect(html).toContain('data-dek-step="growth"');
     });
@@ -468,7 +509,10 @@ describe("still pages run slide scripts", () => {
   test("a deck without slide scripts still ends the theme's animations on its stills", async () => {
     await withTempProject(chartDeck, async (root) => {
       const { deck } = resolveDeck(join(root, "decks", "demo"));
-      for (const html of [renderSlideHtml(deck, "chart", 1), renderPdfHtml(deck)]) {
+      for (const html of [
+        renderSlideHtml(loadSlideSources(deck), "chart", 1),
+        renderPdfHtml(deck),
+      ]) {
         expect(html).not.toContain("data-dek-slides");
         expect(html).toContain(stillDrawScript());
       }
@@ -516,7 +560,7 @@ describe("slide script lint and mv", () => {
       );
       const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
       expect(found.map((d) => d.message)).toEqual([
-        'motion key "growht" is not a beat of this slide; use one of: base, growth',
+        'motion key "growht" is not a beat of this slide; use one of: 0, base, growth',
       ]);
     });
   });
