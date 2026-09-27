@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { decodePosition } from "../../src/core/live-protocol.ts";
 import {
   currentSlug,
   dekGo,
@@ -92,6 +93,13 @@ describe("player runtime in happy-dom", () => {
     pressKey("ArrowRight");
     await settle();
     expect(currentSlug()).toBe("steps");
+    expect(location.hash).toBe("#steps");
+    expect(document.querySelector('#deck [data-step="1"]')?.classList.contains("is-shown")).toBe(
+      false,
+    );
+    pressKey("ArrowRight");
+    await settle();
+    expect(location.hash).toBe("#steps/1");
     expect(document.querySelector('#deck [data-step="1"]')?.classList.contains("is-shown")).toBe(
       true,
     );
@@ -109,7 +117,10 @@ describe("player runtime in happy-dom", () => {
   test.serial("ArrowLeft retreats one beat and rewrites the hash", async () => {
     pressKey("ArrowLeft");
     await settle();
-    expect(location.hash).toBe("#steps");
+    expect(location.hash).toBe("#steps/1");
+    expect(document.querySelector('#deck [data-step="1"]')?.classList.contains("is-shown")).toBe(
+      true,
+    );
     expect(document.querySelector('#deck [data-step="2"]')?.classList.contains("is-shown")).toBe(
       false,
     );
@@ -190,7 +201,7 @@ describe("player runtime in happy-dom", () => {
     const peer = new BroadcastChannel(playerChannelName());
     const heard: unknown[] = [];
     peer.addEventListener("message", (event: MessageEvent) => {
-      heard.push(event.data);
+      heard.push(decodePosition(event.data));
     });
     try {
       peer.postMessage({ slideIndex: 2, beatIndex: 0 });
@@ -198,7 +209,7 @@ describe("player runtime in happy-dom", () => {
       // A local move follows; go serialises posts, so any echo of the remote move lands first.
       pressKey("ArrowLeft");
       await waitFor(() => heard.length > 0);
-      expect(heard).toEqual([{ slideIndex: 1, beatIndex: 1 }]);
+      expect(heard).toEqual([{ slideIndex: 1, beatIndex: 2 }]);
       expect(location.hash).toBe("#steps/2");
     } finally {
       peer.close();

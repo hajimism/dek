@@ -1,15 +1,24 @@
+import { comparePositions, positionsEqual } from "../core/position.ts";
 import type { Position } from "../core/step.ts";
-import type { ScheduledGo } from "../core/timeline.ts";
+import { playbackSchedule, type ScheduledGo, type Timeline } from "../core/timeline.ts";
+import type { RequestOrigin } from "./deck-control.ts";
+import type { GoOrigin } from "./navigator.ts";
+import { deckUrl } from "./routes.ts";
 
 export type RehearseDriver = {
   play: () => void;
   pause: () => void;
+  /** Move the clock to `position`; the caller moves the deck. */
   seek: (position: Position) => void;
   stop: () => void;
   playing: () => boolean;
   elapsed: () => number;
 };
 
+/**
+ * The rehearsal clock: it walks the deck through `schedule` as time passes. Only the clock's own
+ * moves go through `go`; a seek answers a move someone else already made.
+ */
 export function createRehearseDriver(options: {
   schedule: ScheduledGo[];
   go: (position: Position) => void | Promise<void>;
@@ -28,6 +37,8 @@ export function createRehearseDriver(options: {
   let playing = false;
   let origin = 0;
   let pausedElapsed = 0;
+  /** The entry the deck stands on as far as the clock knows. */
+  let shown: ScheduledGo | undefined;
 
   const elapsed = (): number => (playing ? now() - origin : pausedElapsed);
 
@@ -48,6 +59,7 @@ export function createRehearseDriver(options: {
       }
       const id = setTimer(() => {
         timers.delete(id);
+        shown = event;
         void options.go(event.position);
       }, wait);
       timers.add(id);
@@ -64,6 +76,21 @@ export function createRehearseDriver(options: {
     return found;
   };
 
+  /** The entry for `position`, or the last one before it when the timeline skips that stop. */
+  const entryFor = (position: Position): ScheduledGo | undefined => {
+    const exact = options.schedule.find((entry) => positionsEqual(entry.position, position));
+    if (exact) {
+      return exact;
+    }
+    let before: ScheduledGo | undefined;
+    for (const entry of options.schedule) {
+      if (comparePositions(entry.position, position) < 0) {
+        before = entry;
+      }
+    }
+    return before;
+  };
+
   return {
     play() {
       if (playing) {
@@ -73,7 +100,8 @@ export function createRehearseDriver(options: {
       origin = now() - pausedElapsed;
       options.onPlay?.();
       const due = lastDue(pausedElapsed);
-      if (due) {
+      if (due && due !== shown) {
+        shown = due;
         void options.go(due.position);
       }
       arm();
@@ -88,29 +116,153 @@ export function createRehearseDriver(options: {
       clear();
     },
     seek(position) {
-      const event =
-        options.schedule.find(
-          (entry) =>
-            entry.position.slideIndex === position.slideIndex &&
-            entry.position.beatIndex === position.beatIndex,
-        ) ?? options.schedule[0];
-      if (!event) {
-        return;
-      }
-      pausedElapsed = event.at;
-      options.onSeek?.(event.at);
+      pausedElapsed = entryFor(position)?.at ?? 0;
+      shown = lastDue(pausedElapsed);
+      options.onSeek?.(pausedElapsed);
       if (playing) {
         origin = now() - pausedElapsed;
         arm();
       }
-      void options.go(event.position);
     },
     stop() {
       playing = false;
       pausedElapsed = 0;
+      shown = undefined;
       clear();
     },
     playing: () => playing,
     elapsed,
   };
+}
+
+/** The slice of an audio element the rehearsal uses. */
+export type RehearseAudio = {
+  currentTime: number;
+  play(): Promise<void> | void;
+  pause(): void;
+};
+
+/** A loaded rehearsal: when each stop comes, and the voice track if there is one. */
+export type Rehearsal = { schedule: ScheduledGo[]; audio?: RehearseAudio };
+
+export type RehearseController = {
+  /** Whether a rehearsal is loaded and owns the keys. */
+  ready(): boolean;
+  /** Load the timeline, or load it again after it changed, and play from where the deck is. */
+  load(): Promise<void>;
+  toggle(): void;
+  /** Move the deck and the clock to `position`, asked for on this page or by a peer. */
+  move(position: Position, origin: RequestOrigin): void;
+};
+
+type RehearseState =
+  | { kind: "off" }
+  | { kind: "loading" }
+  | { kind: "ready"; driver: RehearseDriver; audio?: RehearseAudio };
+
+/**
+ * Owns the rehearsal: one state at a time, and the voice track with it. A reload stops the old
+ * clock and silences its track before anything new plays.
+ */
+export function createRehearseController(options: {
+  load: () => Promise<Rehearsal | undefined>;
+  /** Move the deck; the clock's own moves come as "rehearse". */
+  go: (position: Position, origin: GoOrigin) => void | Promise<void>;
+  /** Where the deck is headed, so a reload plays on from there. */
+  current: () => Position;
+}): RehearseController {
+  let state: RehearseState = { kind: "off" };
+  let generation = 0;
+
+  const stopCurrent = (): void => {
+    if (state.kind === "ready") {
+      state.driver.stop();
+      state.audio?.pause();
+    }
+  };
+
+  return {
+    ready: () => state.kind === "ready",
+    async load() {
+      generation += 1;
+      const mine = generation;
+      stopCurrent();
+      state = { kind: "loading" };
+      let loaded: Rehearsal | undefined;
+      try {
+        loaded = await options.load();
+      } catch (error) {
+        if (mine === generation) {
+          state = { kind: "off" };
+        }
+        throw error;
+      }
+      // A newer load started while this one waited; it owns the state now.
+      if (mine !== generation) {
+        return;
+      }
+      if (!loaded) {
+        state = { kind: "off" };
+        return;
+      }
+      const { audio } = loaded;
+      const driver = createRehearseDriver({
+        schedule: loaded.schedule,
+        go: (position) => options.go(position, "rehearse"),
+        ...(audio ? { now: () => audio.currentTime * 1000 } : {}),
+        onPlay: () => {
+          void audio?.play();
+        },
+        onPause: () => {
+          audio?.pause();
+        },
+        onSeek: (ms) => {
+          if (audio) {
+            audio.currentTime = ms / 1000;
+          }
+        },
+      });
+      state = audio ? { kind: "ready", driver, audio } : { kind: "ready", driver };
+      // Set the clock first: playing from zero would send the deck to the first slide.
+      driver.seek(options.current());
+      driver.play();
+    },
+    toggle() {
+      if (state.kind !== "ready") {
+        return;
+      }
+      if (state.driver.playing()) {
+        state.driver.pause();
+      } else {
+        state.driver.play();
+      }
+    },
+    move(position, origin) {
+      if (state.kind !== "ready") {
+        return;
+      }
+      state.driver.seek(position);
+      void options.go(position, origin);
+    },
+  };
+}
+
+/** Fetch the deck's timeline and, when the server has one, its voice track. */
+export async function fetchRehearsal(
+  pathname: string,
+  deps: {
+    fetch: (input: string, init?: { method: string }) => Promise<Response>;
+    audio: (src: string) => RehearseAudio;
+  },
+): Promise<Rehearsal | undefined> {
+  const timelinePath = deckUrl(pathname, { kind: "voice", file: "timeline.json" });
+  const audioPath = deckUrl(pathname, { kind: "voice", file: "audio.wav" });
+  const response = await deps.fetch(timelinePath);
+  if (!response.ok) {
+    return undefined;
+  }
+  const timeline = (await response.json()) as Timeline;
+  const audioHead = await deps.fetch(audioPath, { method: "HEAD" });
+  const schedule = playbackSchedule(timeline);
+  return audioHead.ok ? { schedule, audio: deps.audio(audioPath) } : { schedule };
 }

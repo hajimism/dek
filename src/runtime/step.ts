@@ -1,4 +1,4 @@
-import type { Position } from "../core/step.ts";
+import type { Move } from "../core/position.ts";
 
 export type StepElement = {
   getAttribute(name: string): string | null;
@@ -16,35 +16,6 @@ export function applyIsShown(elements: StepElement[], shown: Set<string>): void 
     el.classList.toggle("is-shown", step !== null && shown.has(step));
   }
 }
-
-export function advance(pos: Position, slideBeatCounts: number[]): Position | null {
-  const count = slideBeatCounts[pos.slideIndex];
-  if (count === undefined) {
-    return null;
-  }
-  if (pos.beatIndex + 1 < count) {
-    return { slideIndex: pos.slideIndex, beatIndex: pos.beatIndex + 1 };
-  }
-  const nextSlide = pos.slideIndex + 1;
-  if (nextSlide >= slideBeatCounts.length) {
-    return null;
-  }
-  return { slideIndex: nextSlide, beatIndex: 0 };
-}
-
-export function retreat(pos: Position, slideBeatCounts: number[]): Position | null {
-  if (pos.beatIndex > 0) {
-    return { slideIndex: pos.slideIndex, beatIndex: pos.beatIndex - 1 };
-  }
-  const prevSlide = pos.slideIndex - 1;
-  if (prevSlide < 0) {
-    return null;
-  }
-  const prevCount = slideBeatCounts[prevSlide] ?? 0;
-  return { slideIndex: prevSlide, beatIndex: Math.max(prevCount - 1, 0) };
-}
-
-export type Move = "advance" | "retreat" | "first" | "last";
 
 export type MoveKey = {
   key: string;
@@ -79,25 +50,6 @@ export function keyToMove(event: MoveKey): Move | null {
       return "last";
     default:
       return null;
-  }
-}
-
-/** Where `move` leads from `pos`, or null at either end of the talk. */
-export function moveTarget(move: Move, pos: Position, slideBeatCounts: number[]): Position | null {
-  switch (move) {
-    case "advance":
-      return advance(pos, slideBeatCounts);
-    case "retreat":
-      return retreat(pos, slideBeatCounts);
-    case "first":
-      return slideBeatCounts.length > 0 ? { slideIndex: 0, beatIndex: 0 } : null;
-    case "last": {
-      const slideIndex = slideBeatCounts.length - 1;
-      if (slideIndex < 0) {
-        return null;
-      }
-      return { slideIndex, beatIndex: Math.max((slideBeatCounts[slideIndex] ?? 0) - 1, 0) };
-    }
   }
 }
 

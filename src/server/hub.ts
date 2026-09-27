@@ -1,126 +1,104 @@
-import type { Diagnostic } from "../core/diagnostic.ts";
+import type { LiveEvent } from "../core/live-protocol.ts";
 
-export type DevEvent =
-  /** Slides by slug: the stream reaches the audience, so it names no path on disk. */
-  | { type: "sync"; created: string[]; updated?: string[]; removed?: string[] }
-  | { type: "reload-slide"; slug: string }
-  | { type: "reload-theme" }
-  | { type: "reload-script"; slugs: string[] }
-  | { type: "diagnostics"; diagnostics: Diagnostic[] }
-  | { type: "timeline" };
+/** A live event and the deck it happened in; a page hears only its own deck's. */
+export type DeckEvent = LiveEvent & { deck: string };
 
-export type EventHub = AsyncIterable<DevEvent> & {
-  emit(event: DevEvent): void;
-  close(): void;
+export type Listener = (event: DeckEvent) => void;
+
+/** What the server's own readers see of the hub: subscribe, and later unsubscribe. */
+export type EventFeed = { listen(fn: Listener): () => void };
+
+export type EventHub = EventFeed & {
+  emit(event: DeckEvent): void;
   /** An SSE stream of every event `accept` lets through, all of them when it is left out. */
-  subscribe(accept?: (event: DevEvent) => boolean): ReadableStream<Uint8Array>;
+  sse(accept?: (event: DeckEvent) => boolean): ReadableStream<Uint8Array>;
+  /** Drop every listener and end every stream; later events go nowhere. */
+  close(): void;
 };
 
 /** Bun closes a request that is idle for 10s; an SSE comment keeps `/events` open. */
 export const SSE_HEARTBEAT_MS = 5_000;
 
+/**
+ * Fan-out: each event goes to whoever listens at the time, and to no one else. Nothing is kept
+ * for a listener that comes later, so a reader that stops reading cannot make the hub grow.
+ */
 export function createEventHub(options: { heartbeatMs?: number } = {}): EventHub {
-  const buffer: DevEvent[] = [];
-  const waiters: Array<(event: IteratorResult<DevEvent>) => void> = [];
-  type Accept = (event: DevEvent) => boolean;
-  const clients = new Map<ReadableStreamDefaultController<Uint8Array>, Accept>();
+  const listeners = new Set<Listener>();
+  const streams = new Set<() => void>();
   const encoder = new TextEncoder();
   let closed = false;
 
-  const take = (): DevEvent | undefined => buffer.shift();
-
-  const broadcast = (bytes: Uint8Array, event?: DevEvent): void => {
-    for (const [client, accept] of clients) {
-      if (event && !accept(event)) {
-        continue;
-      }
-      try {
-        client.enqueue(bytes);
-      } catch {
-        clients.delete(client);
-      }
+  const listen = (fn: Listener): (() => void) => {
+    if (closed) {
+      return () => undefined;
     }
-    if (clients.size === 0) {
-      stopHeartbeat();
-    }
+    listeners.add(fn);
+    return () => {
+      listeners.delete(fn);
+    };
   };
-
-  const pushSse = (event: DevEvent): void => {
-    broadcast(encoder.encode(`data: ${JSON.stringify(event)}\n\n`), event);
-  };
-
-  const ping = encoder.encode(": ping\n\n");
-  let heartbeat: ReturnType<typeof setInterval> | undefined;
-  const startHeartbeat = (): void => {
-    heartbeat ??= setInterval(() => broadcast(ping), options.heartbeatMs ?? SSE_HEARTBEAT_MS);
-  };
-  function stopHeartbeat(): void {
-    clearInterval(heartbeat);
-    heartbeat = undefined;
-  }
 
   return {
+    listen,
     emit(event) {
-      if (closed) {
-        return;
-      }
-      pushSse(event);
-      const waiter = waiters.shift();
-      if (waiter) {
-        waiter({ value: event, done: false });
-        return;
-      }
-      buffer.push(event);
-    },
-    close() {
-      closed = true;
-      while (waiters.length > 0) {
-        waiters.shift()?.({ value: undefined, done: true });
-      }
-      for (const client of clients.keys()) {
+      for (const fn of [...listeners]) {
         try {
-          client.close();
+          fn(event);
         } catch {
-          /* already closed */
+          // One reader's failure is its own; the rest still hear the event.
         }
       }
-      clients.clear();
-      stopHeartbeat();
     },
-    subscribe(accept = () => true) {
-      let client: ReadableStreamDefaultController<Uint8Array>;
+    sse(accept = () => true) {
+      let end = (): void => undefined;
       return new ReadableStream<Uint8Array>({
         start(controller) {
-          client = controller;
-          clients.set(controller, accept);
-          controller.enqueue(encoder.encode(": connected\n\n"));
-          startHeartbeat();
+          const send = (bytes: Uint8Array): void => {
+            try {
+              controller.enqueue(bytes);
+            } catch {
+              end();
+            }
+          };
+          const heartbeat = setInterval(
+            () => send(encoder.encode(": ping\n\n")),
+            options.heartbeatMs ?? SSE_HEARTBEAT_MS,
+          );
+          // The page's stream is its deck's already, so the deck stays off the wire.
+          const unlisten = listen((event) => {
+            if (accept(event)) {
+              const { deck: _deck, ...wire } = event;
+              send(encoder.encode(`data: ${JSON.stringify(wire)}\n\n`));
+            }
+          });
+          end = () => {
+            clearInterval(heartbeat);
+            unlisten();
+            streams.delete(end);
+            try {
+              controller.close();
+            } catch {
+              /* already closed */
+            }
+          };
+          streams.add(end);
+          send(encoder.encode(": connected\n\n"));
+          if (closed) {
+            end();
+          }
         },
         cancel() {
-          clients.delete(client);
-          if (clients.size === 0) {
-            stopHeartbeat();
-          }
+          end();
         },
       });
     },
-    [Symbol.asyncIterator]() {
-      return {
-        next(): Promise<IteratorResult<DevEvent>> {
-          if (buffer.length > 0) {
-            const value = take();
-            if (value) {
-              return Promise.resolve({ value, done: false });
-            }
-          }
-          if (closed) {
-            return Promise.resolve({ value: undefined, done: true });
-          }
-          return new Promise((resolve) => {
-            waiters.push(resolve);
-          });
-        },
-      };
+    close() {
+      closed = true;
+      listeners.clear();
+      for (const end of [...streams]) {
+        end();
+      }
     },
   };
 }

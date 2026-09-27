@@ -122,10 +122,9 @@ afterAll(async () => {
 });
 
 async function openPlayer(hash = ""): Promise<Page> {
-  const html = await renderDeckHtml(deckDir, {
-    mode: "player",
-    inlineAssets: true,
+  const html = renderDeckHtml(deckDir, {
     playerScript: await playerScript(),
+    target: { kind: "build" },
   });
   const page = await newPage();
   // A real URL, so the hash picks the opening slide as a built file's would.
@@ -172,14 +171,14 @@ describe("printing the player", () => {
   browserTest(
     "draws every slide's script at its last beat, then the stage's beat again",
     async () => {
-      const page = await openPlayer("#chart");
+      const page = await openPlayer("#chart/1");
       try {
-        expect(await bar(page)).toBe("0:base:0");
+        expect(await bar(page)).toBe("1:base:0");
         await page.emulateMedia({ media: "print" });
         await page.waitForFunction(
           () =>
             document.querySelector('#deck > .slide[data-slug="chart"] .bar')?.textContent ===
-            "1:growth:40",
+            "2:growth:40",
           undefined,
           { timeout: 2000 },
         );
@@ -187,7 +186,7 @@ describe("printing the player", () => {
         await page.waitForFunction(
           () =>
             document.querySelector('#deck > .slide[data-slug="chart"] .bar')?.textContent ===
-            "0:base:0",
+            "1:base:0",
           undefined,
           { timeout: 2000 },
         );

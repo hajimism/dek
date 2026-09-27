@@ -62,10 +62,11 @@ const slide = {} as HTMLElement;
 describe("motionMs", () => {
   test("motion is looked up by the same key and defaults to zero", () => {
     const module = { motion: { what: 400, 2: 900 } };
-    expect(motionMs(module, beats, 0)).toBe(400);
-    expect(motionMs(module, beats, 1)).toBe(900);
-    expect(motionMs(module, beats, 2)).toBe(0);
-    expect(motionMs(undefined, beats, 0)).toBe(0);
+    expect(motionMs(module, beats, 0)).toBe(0);
+    expect(motionMs(module, beats, 1)).toBe(400);
+    expect(motionMs(module, beats, 2)).toBe(900);
+    expect(motionMs({ motion: { 0: 300 } }, beats, 0)).toBe(300);
+    expect(motionMs(undefined, beats, 1)).toBe(0);
   });
 });
 
@@ -73,19 +74,19 @@ describe("createMotion", () => {
   test("animate draws from t=0 on every frame until the declared motion ends", () => {
     const { motion, tick, pending } = harness();
     const { frames, module } = recorder({ growth: 100 });
-    motion.show(slide, module, beats, 2, "animate");
+    motion.show(slide, module, beats, 3, "animate");
     tick(40);
     tick(40);
     tick(40);
     expect(frames.map((frame) => frame.t)).toEqual([0, 40, 80, 100]);
-    expect(frames[0]).toEqual({ index: 2, step: "growth", t: 0 });
+    expect(frames[0]).toEqual({ index: 3, step: "growth", t: 0 });
     expect(pending()).toBe(false);
   });
 
   test("the end state lands even when animation frames stop arriving", () => {
     const { motion, fireTimer, pending } = harness();
     const { frames, module } = recorder({ growth: 100 });
-    motion.show(slide, module, beats, 2, "animate");
+    motion.show(slide, module, beats, 3, "animate");
     fireTimer(250);
     expect(frames.map((frame) => frame.t)).toEqual([0, 100]);
     expect(pending()).toBe(false);
@@ -94,7 +95,7 @@ describe("createMotion", () => {
   test("final draws the end state once", () => {
     const { motion, pending } = harness();
     const { frames, module } = recorder({ growth: 100 });
-    motion.show(slide, module, beats, 2, "final");
+    motion.show(slide, module, beats, 3, "final");
     expect(frames.map((frame) => frame.t)).toEqual([100]);
     expect(pending()).toBe(false);
   });
@@ -102,7 +103,7 @@ describe("createMotion", () => {
   test("hold draws t=0 and waits for seek, which clamps to the motion", () => {
     const { motion, pending } = harness();
     const { frames, module } = recorder({ growth: 100 });
-    motion.show(slide, module, beats, 2, "hold");
+    motion.show(slide, module, beats, 3, "hold");
     expect(motion.duration()).toBe(100);
     motion.seek(30);
     motion.seek(500);
@@ -113,7 +114,7 @@ describe("createMotion", () => {
   test("showing another slide stops the running animation", () => {
     const { motion, tick } = harness();
     const first = recorder({ growth: 100 });
-    motion.show(slide, first.module, beats, 2, "animate");
+    motion.show(slide, first.module, beats, 3, "animate");
     motion.show(slide, undefined, beats, 0, "animate");
     tick(50);
     expect(first.frames.map((frame) => frame.t)).toEqual([0]);
@@ -152,18 +153,18 @@ describe("drawAtEnd", () => {
     drawAtEnd(
       { motion: { growth: 900 }, draw: (_, frame) => frames.push(frame) },
       slide,
-      2,
+      3,
       "growth",
     );
     drawAtEnd(
       { motion: { growth: -1 }, draw: (_, frame) => frames.push(frame) },
       slide,
-      2,
+      3,
       "growth",
     );
     expect(frames).toEqual([
-      { index: 2, step: "growth", t: 900 },
-      { index: 2, step: "growth", t: 0 },
+      { index: 3, step: "growth", t: 900 },
+      { index: 3, step: "growth", t: 0 },
     ]);
   });
 

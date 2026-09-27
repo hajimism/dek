@@ -1,5 +1,6 @@
 import type { PlaywrightRunner } from "../../src/core/playwright.ts";
-import { type DevEvent, type DevServer, startDevServer } from "../../src/server/dev.ts";
+import { type DevServer, startDevServer } from "../../src/server/dev.ts";
+import type { DeckEvent, EventFeed } from "../../src/server/hub.ts";
 import { WAIT_MS } from "./wait.ts";
 
 /**
@@ -34,21 +35,23 @@ export async function withDevServer<T>(
   }
 }
 
-export async function waitForEvent(
-  events: AsyncIterable<DevEvent>,
-  predicate: (event: DevEvent) => boolean,
+/** The first event `predicate` accepts; the listener goes away with the answer or the timeout. */
+export function waitForEvent(
+  events: EventFeed,
+  predicate: (event: DeckEvent) => boolean,
   timeoutMs = WAIT_MS,
-): Promise<DevEvent> {
-  const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("timed out waiting for dev event")), timeoutMs);
-  });
-  const matched = (async () => {
-    for await (const event of events) {
+): Promise<DeckEvent> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      unlisten();
+      reject(new Error("timed out waiting for dev event"));
+    }, timeoutMs);
+    const unlisten = events.listen((event) => {
       if (predicate(event)) {
-        return event;
+        clearTimeout(timer);
+        unlisten();
+        resolve(event);
       }
-    }
-    throw new Error("dev event stream ended");
-  })();
-  return Promise.race([matched, timeout]);
+    });
+  });
 }

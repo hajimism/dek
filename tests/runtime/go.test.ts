@@ -108,21 +108,4 @@ describe("applyIncomingPosition", () => {
 
     expect(seen).toEqual([1, 3]);
   });
-
-  test("seeks instead of calling go when a seek handler is present", async () => {
-    const seen: number[] = [];
-    const sought: number[] = [];
-    const go = createGuardedGo(async (next: number) => {
-      seen.push(next);
-    });
-    applyIncomingPosition(go, 4, {
-      equal: () => false,
-      current: () => 0,
-      seek: (next) => {
-        sought.push(next);
-      },
-    });
-    expect(seen).toEqual([]);
-    expect(sought).toEqual([4]);
-  });
 });

@@ -40,20 +40,16 @@ export function createGuardedGo<T>(
   };
 }
 
+/** Follow a peer's move to `next` through `go`, unless the deck already heads there. */
 export function applyIncomingPosition<T>(
-  go: (next: T) => Promise<void>,
+  go: (next: T) => unknown,
   next: T,
   options: {
     equal: (a: T, b: T) => boolean;
     current: () => T;
-    seek?: (next: T) => void;
   },
 ): void {
   if (options.equal(options.current(), next)) {
-    return;
-  }
-  if (options.seek) {
-    options.seek(next);
     return;
   }
   void go(next);

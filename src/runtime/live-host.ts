@@ -2,28 +2,13 @@
 
 import { type LiveHost, slideSelector } from "./live.ts";
 
-export function documentLiveHost(onReplace?: () => void): LiveHost {
+export function documentLiveHost(): LiveHost {
   return {
     replaceSlide(slug, html) {
       const current = document.querySelector(slideSelector(slug));
-      if (!current) {
-        return undefined;
+      if (current) {
+        current.outerHTML = html;
       }
-      const wasCurrent = current.classList.contains("is-current");
-      current.outerHTML = html;
-      onReplace?.();
-      const next = document.querySelector(slideSelector(slug));
-      if (!next) {
-        return undefined;
-      }
-      if (wasCurrent) {
-        next.classList.add("is-current");
-      }
-      return {
-        querySelectorAll(selector) {
-          return [...next.querySelectorAll(selector)];
-        },
-      };
     },
     setTheme(css) {
       const el = document.querySelector("style[data-dek-theme]");

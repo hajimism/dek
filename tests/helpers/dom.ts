@@ -26,7 +26,10 @@ export async function mountPlayer(
     beforeStart?: () => void;
   } = {},
 ): Promise<void> {
-  const html = await renderDeckHtml(deckDir, { mode: options.mode ?? "player", playerScript: "" });
+  const html = renderDeckHtml(deckDir, {
+    playerScript: "",
+    target: { kind: options.mode === "video" ? "video" : "build" },
+  });
   GlobalRegistrator.register({ url: options.url ?? "file:///deck.html", width: 1280, height: 720 });
   document.documentElement.innerHTML = html
     .replace(/^<!DOCTYPE html>\s*<html[^>]*>/, "")

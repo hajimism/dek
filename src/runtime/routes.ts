@@ -1,24 +1,111 @@
-export function deckNameFromPathname(pathname: string): string | undefined {
-  return pathname.match(/^\/decks\/([^/]+)/)?.[1];
+/**
+ * The dev server's URL scheme, shared by the server that matches paths and the page that builds
+ * them. Everything a deck serves sits under `/decks/:name`, or at the root of a server scoped to
+ * that deck; `DeckRoute` is what follows that prefix.
+ */
+export type VoiceFile = "timeline.json" | "audio.wav";
+
+export type DeckRoute =
+  | { kind: "player" }
+  | { kind: "presenter" }
+  /** The position socket. */
+  | { kind: "socket" }
+  /** The live event stream. */
+  | { kind: "events" }
+  | { kind: "theme" }
+  | { kind: "slide"; slug: string }
+  | { kind: "voice"; file: VoiceFile }
+  /** `dek current` and `dek goto`. */
+  | { kind: "current" }
+  | { kind: "goto" }
+  /** A file under the deck's `assets/`, decoded. */
+  | { kind: "asset"; path: string };
+
+type Fixed = Exclude<DeckRoute, { kind: "slide" | "voice" | "asset" }>["kind"];
+
+const FIXED: Record<Fixed, string> = {
+  player: "/",
+  presenter: "/presenter",
+  socket: "/ws",
+  events: "/events",
+  theme: "/theme",
+  current: "/current",
+  goto: "/goto",
+};
+
+/** The path of `route` below its deck's prefix. */
+export function formatDeckRoute(route: DeckRoute): string {
+  switch (route.kind) {
+    case "slide":
+      return `/slide/${encodeURIComponent(route.slug)}`;
+    case "voice":
+      return `/voice/${route.file}`;
+    case "asset":
+      return `/assets/${route.path.split("/").map(encodeURIComponent).join("/")}`;
+    default:
+      return FIXED[route.kind];
+  }
 }
 
+/** The route `rest` names below a deck's prefix; a fixed path may end in a slash. */
+export function parseDeckRoute(rest: string): DeckRoute | undefined {
+  const bare = rest.length > 1 && rest.endsWith("/") ? rest.slice(0, -1) : rest || "/";
+  for (const [kind, path] of Object.entries(FIXED) as Array<[Fixed, string]>) {
+    if (bare === path) {
+      return { kind };
+    }
+  }
+  try {
+    const slug = rest.match(/^\/slide\/([^/]+)\/?$/)?.[1];
+    if (slug) {
+      return { kind: "slide", slug: decodeURIComponent(slug) };
+    }
+    const file = rest.match(/^\/voice\/(timeline\.json|audio\.wav)$/)?.[1];
+    if (file) {
+      return { kind: "voice", file: file as VoiceFile };
+    }
+    const asset = rest.match(/^\/assets\/(.+)$/)?.[1];
+    if (asset) {
+      return { kind: "asset", path: decodeURIComponent(asset) };
+    }
+  } catch {
+    // Malformed percent-encoding names nothing.
+  }
+  return undefined;
+}
+
+/** Where `route` is on a server that serves every deck, for the deck named `deckName`. */
+export function deckRoutePath(deckName: string, route: DeckRoute): string {
+  return `/decks/${encodeURIComponent(deckName)}${formatDeckRoute(route)}`;
+}
+
+/**
+ * `localPath` under the deck the page at `pathname` belongs to. `liveReloadScript` embeds this
+ * function's source, so it must stay self-contained.
+ */
 export function withDeckPrefix(pathname: string, localPath: string): string {
-  const deck = deckNameFromPathname(pathname);
+  const deck = pathname.match(/^\/decks\/([^/]+)/)?.[1];
   return deck ? `/decks/${deck}${localPath}` : localPath;
 }
 
-/** Inverse of `withDeckPrefix`: `/decks/:name/rest` or a scoped local path. */
+/** Where `route` is for the page at `pathname`. */
+export function deckUrl(pathname: string, route: DeckRoute): string {
+  return withDeckPrefix(pathname, formatDeckRoute(route));
+}
+
+/** Inverse of `withDeckPrefix`: `/decks/:name/rest` or a scoped local path, the name decoded. */
 export function splitDeckPath(
   pathname: string,
   scopedDeckName?: string,
 ): { deckName: string; rest: string } | undefined {
   const prefixed = pathname.match(/^\/decks\/([^/]+)(\/.*)?$/);
   if (prefixed?.[1]) {
+    const deckName = decodeSegment(prefixed[1]);
     // A server scoped to one deck shares that deck, not the rest of the project.
-    if (scopedDeckName !== undefined && !namesDeck(prefixed[1], scopedDeckName)) {
+    if (deckName === undefined || (scopedDeckName !== undefined && deckName !== scopedDeckName)) {
       return undefined;
     }
-    return { deckName: prefixed[1], rest: prefixed[2] ?? "/" };
+    return { deckName, rest: prefixed[2] ?? "/" };
   }
   if (!scopedDeckName) {
     return undefined;
@@ -26,16 +113,12 @@ export function splitDeckPath(
   return { deckName: scopedDeckName, rest: pathname };
 }
 
-function namesDeck(segment: string, deckName: string): boolean {
+function decodeSegment(segment: string): string | undefined {
   try {
-    return segment === deckName || decodeURIComponent(segment) === deckName;
+    return decodeURIComponent(segment);
   } catch {
-    return false;
+    return undefined;
   }
-}
-
-export function isExactPath(pathname: string, base: string): boolean {
-  return pathname === base || pathname === `${base}/`;
 }
 
 /**

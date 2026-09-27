@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  advance,
   applyIsShown,
   applyMorphNames,
   clearMorphNames,
@@ -8,9 +7,7 @@ import {
   isTextEntry,
   keyToMove,
   type MorphElement,
-  moveTarget,
   pointerMove,
-  retreat,
   type StepElement,
   shouldUseViewTransition,
 } from "../../src/runtime/step.ts";
@@ -70,64 +67,6 @@ describe("applyIsShown", () => {
   });
 });
 
-describe("advance", () => {
-  const counts = [2, 1, 0];
-
-  test("advances a beat on the same slide while beats remain", () => {
-    expect(advance({ slideIndex: 0, beatIndex: 0 }, counts)).toEqual({
-      slideIndex: 0,
-      beatIndex: 1,
-    });
-  });
-
-  test("moves to the next slide after the last beat", () => {
-    expect(advance({ slideIndex: 0, beatIndex: 1 }, counts)).toEqual({
-      slideIndex: 1,
-      beatIndex: 0,
-    });
-  });
-
-  test("skips a title slide with no beats on the next advance", () => {
-    expect(advance({ slideIndex: 1, beatIndex: 0 }, counts)).toEqual({
-      slideIndex: 2,
-      beatIndex: 0,
-    });
-  });
-
-  test("stops on the last slide", () => {
-    expect(advance({ slideIndex: 2, beatIndex: 0 }, counts)).toBeNull();
-  });
-});
-
-describe("retreat", () => {
-  const counts = [2, 1, 0];
-
-  test("retreats a beat on the same slide while beats remain", () => {
-    expect(retreat({ slideIndex: 0, beatIndex: 1 }, counts)).toEqual({
-      slideIndex: 0,
-      beatIndex: 0,
-    });
-  });
-
-  test("moves to the previous slide's last beat from the first beat", () => {
-    expect(retreat({ slideIndex: 1, beatIndex: 0 }, counts)).toEqual({
-      slideIndex: 0,
-      beatIndex: 1,
-    });
-  });
-
-  test("lands on beat 0 when the previous slide has no beats", () => {
-    expect(retreat({ slideIndex: 2, beatIndex: 0 }, counts)).toEqual({
-      slideIndex: 1,
-      beatIndex: 0,
-    });
-  });
-
-  test("stops on the first slide", () => {
-    expect(retreat({ slideIndex: 0, beatIndex: 0 }, counts)).toBeNull();
-  });
-});
-
 describe("keyToMove", () => {
   test("maps forward keys to advance", () => {
     expect(keyToMove({ key: "ArrowRight" })).toBe("advance");
@@ -156,32 +95,6 @@ describe("keyToMove", () => {
   test("ignores other keys", () => {
     expect(keyToMove({ key: "ArrowUp" })).toBeNull();
     expect(keyToMove({ key: "Enter" })).toBeNull();
-  });
-});
-
-describe("moveTarget", () => {
-  const beats = [0, 3, 0];
-
-  test("steps one beat either way", () => {
-    expect(moveTarget("advance", { slideIndex: 1, beatIndex: 0 }, beats)).toEqual({
-      slideIndex: 1,
-      beatIndex: 1,
-    });
-    expect(moveTarget("retreat", { slideIndex: 1, beatIndex: 0 }, beats)).toEqual({
-      slideIndex: 0,
-      beatIndex: 0,
-    });
-  });
-
-  test("jumps to the first beat of the talk and to the last beat of the last slide", () => {
-    expect(moveTarget("first", { slideIndex: 1, beatIndex: 2 }, beats)).toEqual({
-      slideIndex: 0,
-      beatIndex: 0,
-    });
-    expect(moveTarget("last", { slideIndex: 0, beatIndex: 0 }, [0, 3, 2])).toEqual({
-      slideIndex: 2,
-      beatIndex: 1,
-    });
   });
 });
 

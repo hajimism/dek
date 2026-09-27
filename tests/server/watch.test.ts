@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
-import { createEventHub, type DevEvent } from "../../src/server/hub.ts";
-import { voiceFailureLine, watchDeck, watchTargets } from "../../src/server/watch.ts";
+import type { LiveEvent } from "../../src/core/live-protocol.ts";
+import { createEventHub, type EventHub } from "../../src/server/hub.ts";
+import { voiceFailureLine, watchDeck, watchErrorDiagnostic } from "../../src/server/watch.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -17,30 +18,6 @@ speed = 1
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
 </section>`);
-
-describe("watchTargets", () => {
-  test("includes failed deck directories", () => {
-    expect(
-      watchTargets({
-        decks: [{ dir: "/project/decks/demo" }],
-        failed: [{ dir: "/project/decks/broken" }],
-      }),
-    ).toEqual(["/project/decks/demo", "/project/decks/broken"]);
-  });
-
-  test("includes a deck added after start", () => {
-    const started = watchTargets({
-      decks: [{ dir: "/project/decks/demo" }],
-      failed: [],
-    });
-    const later = watchTargets({
-      decks: [{ dir: "/project/decks/demo" }, { dir: "/project/decks/newone" }],
-      failed: [],
-    });
-    expect(started).toEqual(["/project/decks/demo"]);
-    expect(later).toEqual(["/project/decks/demo", "/project/decks/newone"]);
-  });
-});
 
 describe("watchDeck", () => {
   test("does not poll when pollIntervalMs is 0", async () => {
@@ -72,7 +49,7 @@ describe("watchDeck", () => {
       let synths = 0;
       const hub = createEventHub();
       const timeline = waitForEvent(hub, (event) => event.type === "timeline");
-      const watcher = watchDeck(deckDir, hub, {
+      const watcher = watchDeck(deckDir, emitTo(hub), {
         pollIntervalMs: 20,
         synthVoice: async () => {
           synths += 1;
@@ -95,7 +72,7 @@ describe("watchDeck", () => {
       let synths = 0;
       const hub = createEventHub();
       const timeline = waitForEvent(hub, (event) => event.type === "timeline");
-      const watcher = watchDeck(deckDir, hub, {
+      const watcher = watchDeck(deckDir, emitTo(hub), {
         pollIntervalMs: 20,
         synthVoice: async () => {
           synths += 1;
@@ -119,7 +96,7 @@ describe("watchDeck", () => {
       async (root) => {
         let calls = 0;
         const hub = createEventHub();
-        const watcher = watchDeck(deckDir(root), hub, {
+        const watcher = watchDeck(deckDir(root), emitTo(hub), {
           pollIntervalMs: 0,
           visualRunner: async () => {
             calls += 1;
@@ -148,7 +125,7 @@ describe("watchDeck", () => {
             event.type === "diagnostics" &&
             event.diagnostics.some((diagnostic) => diagnostic.id === "DEK016"),
         );
-        const watcher = watchDeck(deckDir(root), hub, { pollIntervalMs: 20 });
+        const watcher = watchDeck(deckDir(root), emitTo(hub), { pollIntervalMs: 20 });
         // A synchronous evaluation holds the loop for the sandbox's whole 1s timeout, so a
         // timer due long before that could only fire after the diagnostics are out.
         let ticked = false;
@@ -188,12 +165,13 @@ describe("watchDeck", () => {
       async (root) => {
         const dir = deckDir(root);
         const hub = createEventHub();
-        const events: DevEvent[] = [];
+        const events: LiveEvent[] = [];
         const diagnosed = waitForEvent(hub, (event) => {
-          events.push(event);
+          const { deck: _deck, ...live } = event;
+          events.push(live);
           return event.type === "diagnostics";
         });
-        const watcher = watchDeck(dir, hub, { pollIntervalMs: 0 });
+        const watcher = watchDeck(dir, emitTo(hub), { pollIntervalMs: 0 });
         try {
           await diagnosed;
           expect(events).toEqual([
@@ -217,12 +195,13 @@ describe("watchDeck", () => {
       async (root) => {
         const dir = deckDir(root);
         const hub = createEventHub();
-        const events: DevEvent[] = [];
+        const events: LiveEvent[] = [];
         const diagnosed = waitForEvent(hub, (event) => {
-          events.push(event);
+          const { deck: _deck, ...live } = event;
+          events.push(live);
           return event.type === "diagnostics";
         });
-        const watcher = watchDeck(dir, hub, { pollIntervalMs: 0 });
+        const watcher = watchDeck(dir, emitTo(hub), { pollIntervalMs: 0 });
         try {
           await diagnosed;
           expect(events).toEqual([
@@ -247,7 +226,7 @@ describe("watchDeck", () => {
           events.push(event.type);
           return event.type === "diagnostics";
         });
-        const watcher = watchDeck(deckDir(root), hub, { pollIntervalMs: 0 });
+        const watcher = watchDeck(deckDir(root), emitTo(hub), { pollIntervalMs: 0 });
         try {
           await diagnosed;
           expect(events).toEqual(["diagnostics"]);
@@ -266,7 +245,7 @@ describe("watchDeck", () => {
         const dir = deckDir(root);
         const hub = createEventHub();
         const first = waitForEvent(hub, (event) => event.type === "diagnostics");
-        const watcher = watchDeck(dir, hub, { pollIntervalMs: 20 });
+        const watcher = watchDeck(dir, emitTo(hub), { pollIntervalMs: 20 });
         try {
           await first;
           const pending = waitForEvent(hub, (event) => event.type === "diagnostics");
@@ -301,7 +280,7 @@ describe("watchDeck", () => {
         let calls = 0;
         const hub = createEventHub();
         const first = waitForEvent(hub, (event) => event.type === "diagnostics");
-        const watcher = watchDeck(dir, hub, {
+        const watcher = watchDeck(dir, emitTo(hub), {
           pollIntervalMs: 20,
           visual: true,
           visualRunner: async () => {
@@ -338,7 +317,7 @@ describe("watchDeck", () => {
         let calls = 0;
         const hub = createEventHub();
         const pending = waitForEvent(hub, (event) => event.type === "diagnostics");
-        const watcher = watchDeck(deckDir(root), hub, {
+        const watcher = watchDeck(deckDir(root), emitTo(hub), {
           pollIntervalMs: 0,
           visual: true,
           visualRunner: async () => {
@@ -367,7 +346,7 @@ describe("watchDeck scan", () => {
         await withTempDir(async (outside) => {
           let scan: (() => void) | undefined;
           const hub = createEventHub();
-          const watcher = watchDeck(deckDir(root), hub, {
+          const watcher = watchDeck(deckDir(root), emitTo(hub), {
             pollIntervalMs: 50_000,
             setInterval: ((handler: () => void) => {
               scan = handler;
@@ -407,11 +386,16 @@ function startWatch(root: string, pollIntervalMs: number) {
     polls += 1;
     return setInterval(handler, ms, ...args);
   }) as typeof setInterval;
-  const watcher = watchDeck(deckDir(root), hub, {
+  const watcher = watchDeck(deckDir(root), emitTo(hub), {
     pollIntervalMs,
     setInterval: setIntervalSpy,
   });
   return { polls: () => polls, watcher, hub };
+}
+
+/** What a watcher of deck "demo" emits, into `hub` as the project watch passes it on. */
+function emitTo(hub: EventHub): (event: LiveEvent) => void {
+  return (event) => hub.emit({ ...event, deck: "demo" });
 }
 
 function deckDir(root: string): string {
@@ -428,5 +412,27 @@ describe("voiceFailureLine", () => {
       ),
     ).toBe("voice: voicevox is not running at http://127.0.0.1:50021 (start it with docker)");
     expect(voiceFailureLine(new Error("boom"))).toBe("voice: boom");
+  });
+});
+
+describe("watchErrorDiagnostic", () => {
+  test("keeps a DekError's location and its hint, the next step the author sees", () => {
+    expect(
+      watchErrorDiagnostic(
+        new DekError("bad frontmatter", { path: "decks/demo/script.md", line: 2, hint: "fix it" }),
+      ),
+    ).toEqual({
+      id: "parse",
+      severity: "error",
+      message: "bad frontmatter",
+      path: "decks/demo/script.md",
+      line: 2,
+      hint: "fix it",
+    });
+    expect(watchErrorDiagnostic(new Error("boom"))).toEqual({
+      id: "error",
+      severity: "error",
+      message: "boom",
+    });
   });
 });

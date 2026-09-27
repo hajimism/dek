@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { RAIL_WIDTH_DEFAULT } from "../../src/core/rail-width.ts";
 import {
   clampRailWidth,
   isRailToggleKey,
-  RAIL_WIDTH_DEFAULT,
   readStoredRailVisible,
   readStoredRailWidth,
 } from "../../src/runtime/rail.ts";

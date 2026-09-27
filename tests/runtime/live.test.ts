@@ -3,7 +3,6 @@ import {
   applyLiveEvent,
   hydrateLiveEvent,
   type LiveHost,
-  type LiveSlide,
   liveSlidePath,
   liveThemePath,
   slideSelector,
@@ -19,29 +18,6 @@ function fakeHost(doc: FakeDoc): LiveHost {
   return {
     replaceSlide(slug, html) {
       doc.slides.set(slug, html);
-      const slide: LiveSlide = {
-        querySelectorAll(selector) {
-          if (selector !== "[data-step]") {
-            return [];
-          }
-          return [...html.matchAll(/data-step="([^"]+)"/g)].map((match) => {
-            let shown = false;
-            return {
-              getAttribute(name: string) {
-                return name === "data-step" ? (match[1] ?? null) : null;
-              },
-              classList: {
-                toggle(name: string, force?: boolean) {
-                  if (name === "is-shown") {
-                    shown = force ?? !shown;
-                  }
-                },
-              },
-            };
-          });
-        },
-      };
-      return slide;
     },
     setTheme(css) {
       doc.theme = css;
@@ -96,7 +72,6 @@ describe("applyLiveEvent", () => {
         html: `<section class="slide" data-slug="intro"><h2 data-step="hook">new</h2></section>`,
       },
       fakeHost(doc),
-      { shown: new Set(["hook"]) },
     );
     expect(result.reload).toBe(false);
     expect(doc.slides.get("intro")).toContain("new");
@@ -108,7 +83,6 @@ describe("applyLiveEvent", () => {
     const result = applyLiveEvent(
       { type: "reload-theme", css: ".slide { background: red; }" },
       fakeHost(doc),
-      { shown: new Set() },
     );
     expect(result.reload).toBe(false);
     expect(doc.theme).toBe(".slide { background: red; }");
@@ -125,7 +99,6 @@ describe("applyLiveEvent", () => {
         ],
       },
       fakeHost(doc),
-      { shown: new Set() },
     );
     expect(doc.diagnostics).toBe(
       'DEK040 warning: dictionary is missing English word: AI\nDEK010: class "x"',
@@ -141,37 +114,28 @@ describe("applyLiveEvent", () => {
         diagnostics: [{ id: "DEK003", severity: "error", message: "bad step" }],
       },
       host,
-      { shown: new Set() },
     );
     expect(doc.diagnostics).toBe("DEK003: bad step");
-    applyLiveEvent({ type: "diagnostics", diagnostics: [] }, host, { shown: new Set() });
+    applyLiveEvent({ type: "diagnostics", diagnostics: [] }, host);
     expect(doc.diagnostics).toBeNull();
   });
 
   test("reloads the page when a slide script changes, since scripts register once", () => {
     const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: null };
-    const result = applyLiveEvent({ type: "reload-script", slugs: ["intro"] }, fakeHost(doc), {
-      shown: new Set(),
-    });
+    const result = applyLiveEvent({ type: "reload-script", slugs: ["intro"] }, fakeHost(doc));
     expect(result.reload).toBe(true);
   });
 
   test("reloads on any sync so presenter notes pick up script edits", () => {
     const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: null };
     const host = fakeHost(doc);
-    expect(applyLiveEvent({ type: "sync", created: [] }, host, { shown: new Set() }).reload).toBe(
+    expect(applyLiveEvent({ type: "sync", created: [] }, host).reload).toBe(true);
+    expect(applyLiveEvent({ type: "sync", created: ["/tmp/slides/extra.html"] }, host).reload).toBe(
       true,
     );
-    expect(
-      applyLiveEvent({ type: "sync", created: ["/tmp/slides/extra.html"] }, host, {
-        shown: new Set(),
-      }).reload,
-    ).toBe(true);
-    expect(
-      applyLiveEvent({ type: "sync", created: [], removed: ["intro"] }, host, {
-        shown: new Set(),
-      }).reload,
-    ).toBe(true);
+    expect(applyLiveEvent({ type: "sync", created: [], removed: ["intro"] }, host).reload).toBe(
+      true,
+    );
   });
 });
 

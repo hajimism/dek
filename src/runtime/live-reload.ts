@@ -1,12 +1,15 @@
-import { liveTokenQuery } from "./routes.ts";
+import { formatDeckRoute, liveTokenQuery, withDeckPrefix } from "./routes.ts";
 
 /**
- * The page's line to the dev server's event stream. A presenter page sends its token, as the
- * socket does, so the stream is cleared for the presenter's events from any page path.
+ * The page's line to its deck's event stream on the dev server. A presenter page sends its
+ * token, as the socket does, so the stream is cleared for the presenter's events.
  */
 export function liveReloadScript(): string {
   return `(() => {
-  const es = new EventSource("/events" + (${liveTokenQuery})(document.body.dataset.liveToken));
+  const withDeckPrefix = ${withDeckPrefix};
+  const liveTokenQuery = ${liveTokenQuery};
+  const url = withDeckPrefix(location.pathname, ${JSON.stringify(formatDeckRoute({ kind: "events" }))});
+  const es = new EventSource(url + liveTokenQuery(document.body.dataset.liveToken));
   es.onmessage = async (message) => {
     let event;
     try {

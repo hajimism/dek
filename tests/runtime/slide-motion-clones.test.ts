@@ -9,8 +9,9 @@ import { writeProject } from "../helpers/project.ts";
 
 // A script that measures its slide can only do so once the slide is in the document.
 const measuringScript = `export default {
-  draw(slide) {
+  draw(slide, { step }) {
     slide.querySelector("[data-seen]").textContent = String(slide.isConnected);
+    slide.querySelector("[data-drawn]").textContent = step;
   },
 };
 `;
@@ -23,10 +24,13 @@ beforeAll(async () => {
     decks: [
       {
         name: "demo",
-        script: "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n## chart\n\nbars\n",
+        script:
+          "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n## chart\n\nbars\n\n### grow\n\ntaller\n",
         slides: {
           intro: slideDocument(`<section class="slide"><h2>intro</h2></section>`),
-          chart: slideDocument(`<section class="slide"><p data-seen></p></section>`),
+          chart: slideDocument(
+            `<section class="slide"><p data-seen></p><p data-drawn></p><p data-step="grow">tall</p></section>`,
+          ),
         },
       },
     ],
@@ -45,6 +49,12 @@ describe("slide copies outside the stage", () => {
     expect(
       document.querySelector('#dek-rail [data-slide-index="1"] [data-seen]')?.textContent,
     ).toBe("true");
+  });
+
+  test("a rail thumbnail draws the last beat, which the rail shows every step of", () => {
+    expect(
+      document.querySelector('#dek-rail [data-slide-index="1"] [data-drawn]')?.textContent,
+    ).toBe("grow");
   });
 
   test("the presenter's next preview is drawn once it is in the document", () => {

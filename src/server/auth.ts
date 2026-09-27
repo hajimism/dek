@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { hostname } from "node:os";
-import type { DevEvent } from "./hub.ts";
+import type { LiveEventType } from "../core/live-protocol.ts";
 
 /**
  * Requests the dev server refuses before routing. A local server answers only to a loopback Host,
@@ -109,7 +109,7 @@ export type Route = keyof typeof ROUTE_EXPOSURE;
  * What each `/events` message reveals. Diagnostics quote the script and name files on disk; the
  * timeline follows the voice. A Record over every event type, so a new one must be placed here.
  */
-export const EVENT_EXPOSURE: Record<DevEvent["type"], Exposure> = {
+export const EVENT_EXPOSURE: Record<LiveEventType, Exposure> = {
   sync: "audience",
   "reload-slide": "audience",
   "reload-theme": "audience",

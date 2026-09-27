@@ -19,6 +19,10 @@ declare global {
     dekLive?: (raw: unknown) => Promise<void>;
     /** The go the video recorder started and has not awaited yet. */
     __dekPendingGo?: Promise<void>;
+    /** The animations that go started, so capture tools seek those and nothing older. */
+    __dekStarted?: Animation[];
+    /** The animations the last finished beat ended; the next go did not start them. */
+    __dekSettled?: Set<Animation>;
     __dekSlides?: Record<string, DekSlide>;
   }
 }

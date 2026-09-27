@@ -1,24 +1,21 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
-import { withDeckPrefix } from "./routes.ts";
-import { applyIsShown, type StepElement } from "./step.ts";
+import type { LiveEvent } from "../core/live-protocol.ts";
+import { deckUrl } from "./routes.ts";
 
-export type LiveSlide = {
-  querySelectorAll(selector: string): StepElement[];
-};
-
+/** What live reload changes on the page; the stage draws the current beat again after. */
 export type LiveHost = {
-  replaceSlide(slug: string, html: string): LiveSlide | undefined;
+  replaceSlide(slug: string, html: string): void;
   setTheme(css: string): void;
   setDiagnostics(text: string | null): void;
 };
 
-export type LivePayload =
-  | { type: "sync"; created: string[]; removed?: string[] }
-  | { type: "reload-slide"; slug: string; html?: string }
-  | { type: "reload-theme"; css?: string }
-  | { type: "reload-script"; slugs: string[] }
-  | { type: "diagnostics"; diagnostics: Diagnostic[] }
-  | { type: "timeline" };
+type Hydrated<Type extends LiveEvent["type"], Extra> = Extract<LiveEvent, { type: Type }> & Extra;
+
+/** A live event with what it names fetched: a slide's new fragment, the theme's new CSS. */
+export type HydratedLiveEvent =
+  | Exclude<LiveEvent, { type: "reload-slide" | "reload-theme" }>
+  | Hydrated<"reload-slide", { html: string }>
+  | Hydrated<"reload-theme", { css: string }>;
 
 export function slideSelector(slug: string): string {
   const escaped = slug.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -29,10 +26,10 @@ export function slideSelector(slug: string): string {
 export type LiveFetch = (input: string) => Promise<Response>;
 
 export async function hydrateLiveEvent(
-  event: LivePayload,
+  event: LiveEvent,
   pathname: string,
   fetchImpl: LiveFetch = fetch,
-): Promise<LivePayload | undefined> {
+): Promise<HydratedLiveEvent | undefined> {
   if (event.type === "reload-slide") {
     const response = await fetchImpl(liveSlidePath(pathname, event.slug));
     if (!response.ok) {
@@ -50,24 +47,16 @@ export async function hydrateLiveEvent(
   return event;
 }
 
-export function applyLiveEvent(
-  event: LivePayload,
-  host: LiveHost,
-  options: { shown: Set<string> },
-): { reload: boolean } {
+export function applyLiveEvent(event: HydratedLiveEvent, host: LiveHost): { reload: boolean } {
   switch (event.type) {
     case "sync":
     case "reload-script":
       return { reload: true };
-    case "reload-slide": {
-      const slide = host.replaceSlide(event.slug, event.html ?? "");
-      if (slide) {
-        applyIsShown(slide.querySelectorAll("[data-step]"), options.shown);
-      }
+    case "reload-slide":
+      host.replaceSlide(event.slug, event.html);
       return { reload: false };
-    }
     case "reload-theme":
-      host.setTheme(event.css ?? "");
+      host.setTheme(event.css);
       return { reload: false };
     case "diagnostics":
       host.setDiagnostics(formatLiveDiagnostics(event.diagnostics));
@@ -91,9 +80,9 @@ export function formatLiveDiagnostics(diagnostics: Diagnostic[]): string | null 
 }
 
 export function liveSlidePath(pathname: string, slug: string): string {
-  return withDeckPrefix(pathname, `/slide/${encodeURIComponent(slug)}`);
+  return deckUrl(pathname, { kind: "slide", slug });
 }
 
 export function liveThemePath(pathname: string): string {
-  return withDeckPrefix(pathname, "/theme");
+  return deckUrl(pathname, { kind: "theme" });
 }

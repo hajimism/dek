@@ -1,5 +1,6 @@
+import { decodePosition, encodePosition } from "../core/live-protocol.ts";
+import { positionsEqual } from "../core/position.ts";
 import type { Position } from "../core/step.ts";
-import { parsePosition, positionsEqual } from "./position.ts";
 
 export const RECONNECT_BASE_MS = 500;
 export const RECONNECT_MAX_MS = 10_000;
@@ -68,14 +69,14 @@ export function createPositionSocket(options: {
     current.addEventListener("open", () => {
       attempt = 0;
       if (unsent) {
-        current.send(JSON.stringify(unsent));
+        current.send(encodePosition(unsent));
         stale = synced;
         synced = unsent;
         unsent = undefined;
       }
     });
     current.addEventListener("message", (event) => {
-      const position = parsePosition(String(event.data));
+      const position = decodePosition(event.data);
       if (!position) {
         return;
       }
@@ -100,7 +101,7 @@ export function createPositionSocket(options: {
   return {
     publish(position) {
       if (socket?.readyState === OPEN) {
-        socket.send(JSON.stringify(position));
+        socket.send(encodePosition(position));
         synced = position;
       } else {
         unsent = position;

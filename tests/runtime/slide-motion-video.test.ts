@@ -12,13 +12,13 @@ afterAll(async () => {
 
 describe("slide scripts in video mode", () => {
   test("hold at t=0 and expose the motion for the recorder to seek", async () => {
-    await dekGo({ slideIndex: 1, beatIndex: 1 });
-    expect(bar()).toBe("1:growth:0");
+    await dekGo({ slideIndex: 1, beatIndex: 2 });
+    expect(bar()).toBe("2:growth:0");
     const motion = (
       window as unknown as { dekMotion: { duration(): number; seek(t: number): void } }
     ).dekMotion;
     expect(motion.duration()).toBe(40);
     motion.seek(25);
-    expect(bar()).toBe("1:growth:25");
+    expect(bar()).toBe("2:growth:25");
   });
 });

@@ -7,6 +7,8 @@ export type DevServerLock = {
   url: string;
   pid: number;
   password?: string;
+  /** The one deck a server scoped to a deck serves; absent when it serves the project. */
+  deck?: string;
 };
 
 function serverLockPath(root: string): string {
@@ -34,6 +36,7 @@ export function readDevServerLock(root: string): DevServerLock | undefined {
         url: parsed.url,
         pid: parsed.pid,
         ...(typeof parsed.password === "string" ? { password: parsed.password } : {}),
+        ...(typeof parsed.deck === "string" ? { deck: parsed.deck } : {}),
       };
     }
   } catch {
@@ -42,23 +45,35 @@ export function readDevServerLock(root: string): DevServerLock | undefined {
   return undefined;
 }
 
-const claimedRoots = new Set<string>();
+/** The URL of each root a server in this process holds, which two racing servers both see. */
+const claimedRoots = new Map<string, string>();
 
-export function writeDevServerLock(root: string, url: string, password?: string): void {
+/** Throw when a live server, in this process or another, already holds `root`. */
+export function assertNoDevServer(root: string): void {
   const existing = readDevServerLock(root);
-  if (claimedRoots.has(root) || (existing && isPidAlive(existing.pid))) {
-    const running = existing?.url ?? url;
+  const running =
+    claimedRoots.get(root) ?? (existing && isPidAlive(existing.pid) ? existing.url : undefined);
+  if (running !== undefined) {
     throw new DekError(`dev server already running at ${running}`, {
       path: serverLockPath(root),
       hint: `open ${running}`,
     });
   }
-  claimedRoots.add(root);
+}
+
+export function writeDevServerLock(
+  root: string,
+  url: string,
+  password?: string,
+  deck?: string,
+): void {
+  assertNoDevServer(root);
+  claimedRoots.set(root, url);
   try {
     // A fresh file renamed into place, so it may hold the --remote password: its owner's only.
     writeInside(
       serverLockPath(root),
-      `${JSON.stringify({ url, pid: process.pid, ...(password ? { password } : {}) })}\n`,
+      `${JSON.stringify({ url, pid: process.pid, ...(password ? { password } : {}), ...(deck ? { deck } : {}) })}\n`,
       root,
       { mode: 0o600 },
     );

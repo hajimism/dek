@@ -1,12 +1,20 @@
-import { existsSync, readdirSync, statSync, watch } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, watch } from "node:fs";
+import { basename } from "node:path";
 import { type Diagnostic, errorDiagnostic } from "../core/diagnostic.ts";
-import { DekError } from "../core/error.ts";
-import { lintDeck, resolveDeck, type SyncResult, syncDeck, warmLintDeck } from "../core/index.ts";
+import { DekError, errorFields } from "../core/error.ts";
+import { lintDeckAsync, lintProject } from "../core/lint.ts";
+import type { LiveEvent } from "../core/live-protocol.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
-import { listSlideFiles, type SlideSidecar } from "../core/resolve.ts";
+import { resolveDeck } from "../core/resolve.ts";
+import { type SyncResult, syncDeck } from "../core/sync.ts";
 import { lintVisualDeck } from "../core/visual.ts";
-import type { EventHub } from "./hub.ts";
+import {
+  type DiagnoseScope,
+  diffSnapshot,
+  mergeScope,
+  slideMtimes,
+  takeSnapshot,
+} from "./deck-snapshot.ts";
 import { createSerialTask } from "./serial.ts";
 
 export type Stoppable = { close: () => void };
@@ -14,25 +22,13 @@ export type Stoppable = { close: () => void };
 /** How often a watcher re-scans for edits fs.watch missed; shared by the deck and project polls. */
 export const POLL_INTERVAL_MS = 2000;
 
-export function watchTargets(project: {
-  decks: Array<{ dir: string }>;
-  failed: Array<{ dir: string }>;
-}): string[] {
-  const dirs: string[] = [];
-  const seen = new Set<string>();
-  for (const entry of [...project.decks, ...project.failed]) {
-    if (seen.has(entry.dir)) {
-      continue;
-    }
-    seen.add(entry.dir);
-    dirs.push(entry.dir);
-  }
-  return dirs;
-}
-
+/**
+ * Watch one deck and `emit` what its open pages must do: each scan diffs the deck's files
+ * against the last scan (see `diffSnapshot`), then syncs, lints, and synthesizes as it says.
+ */
 export function watchDeck(
   deckDir: string,
-  hub: EventHub,
+  emit: (event: LiveEvent) => void,
   options: {
     visual?: boolean;
     visualRunner?: PlaywrightRunner;
@@ -42,92 +38,61 @@ export function watchDeck(
     synthVoice?: () => Promise<void>;
   } = {},
 ): Stoppable {
-  const scriptPath = join(deckDir, "script.md");
-  const themePath = join(deckDir, "theme.css");
-  let lastScript = mtime(scriptPath);
-  let lastTheme = mtime(themePath);
-  let lastSlides = listSlideMtimes(deckDir);
-  let lastStyles = listSlideMtimes(deckDir, ".css");
-  let lastScripts = listSlideMtimes(deckDir, ".ts");
-  let lastJavascript = listSlideMtimes(deckDir, ".js");
-  const voiceDir = join(deckDir, "voice");
-  let lastVoice = listVoiceMtimes(voiceDir);
+  let snapshot = takeSnapshot(deckDir);
   let closed = false;
   let debounce: ReturnType<typeof setTimeout> | undefined;
   const startInterval = options.setInterval ?? setInterval;
   const stopInterval = options.clearInterval ?? clearInterval;
 
+  // A browser that is not installed turns the visual pass off until one is found again.
   let visualEnabled = options.visual === true;
-  let diagnosticsRunning = false;
-  let diagnosticsQueued = false;
-  let queuedAll = false;
-  let queuedSlug: string | undefined;
-
-  const emitDiagnostics = (slug?: string): void => {
-    if (slug === undefined) {
-      queuedAll = true;
-      queuedSlug = undefined;
-    } else if (!queuedAll) {
-      if (queuedSlug !== undefined && queuedSlug !== slug) {
-        queuedAll = true;
-        queuedSlug = undefined;
-      } else {
-        queuedSlug = slug;
+  const diagnose = async (scope: DiagnoseScope): Promise<Diagnostic[]> => {
+    let diagnostics: Diagnostic[] = [];
+    let resolved: ReturnType<typeof resolveDeck> | undefined;
+    try {
+      resolved = resolveDeck(deckDir);
+      diagnostics = [...lintProject(resolved.project), ...(await lintDeckAsync(resolved))];
+    } catch (error) {
+      diagnostics = [watchErrorDiagnostic(error)];
+    }
+    if (visualEnabled && resolved) {
+      try {
+        const visual = await lintVisualDeck(resolved, {
+          ...(scope.slug !== undefined ? { slug: scope.slug } : {}),
+          ...(options.visualRunner ? { runner: options.visualRunner } : {}),
+        });
+        visualEnabled = visual !== null;
+        diagnostics.push(...(visual ?? []));
+      } catch (error) {
+        diagnostics.push(watchErrorDiagnostic(error));
       }
     }
-    if (diagnosticsRunning) {
-      diagnosticsQueued = true;
+    return diagnostics;
+  };
+
+  // Edits that land while a pass runs are merged into one pass after it.
+  let pending: DiagnoseScope | undefined;
+  const runDiagnostics = createSerialTask(async () => {
+    const scope = pending;
+    pending = undefined;
+    if (!scope || closed) {
       return;
     }
-    diagnosticsRunning = true;
-    void (async () => {
-      await Promise.resolve();
-      try {
-        do {
-          diagnosticsQueued = false;
-          const all = queuedAll;
-          const only = queuedSlug;
-          queuedAll = false;
-          queuedSlug = undefined;
-          let diagnostics: Diagnostic[] = [];
-          let resolved: ReturnType<typeof resolveDeck> | undefined;
-          try {
-            resolved = resolveDeck(deckDir);
-            // Evaluate slide scripts off the event loop; lintDeck then reads the cache.
-            await warmLintDeck(resolved);
-            diagnostics = [...lintDeck(resolved)];
-          } catch (error) {
-            diagnostics = [watchErrorDiagnostic(error)];
-          }
-          if (visualEnabled && resolved) {
-            try {
-              const visual = await lintVisualDeck(resolved, {
-                ...(!all && only ? { slug: only } : {}),
-                ...(options.visualRunner ? { runner: options.visualRunner } : {}),
-              });
-              if (visual === null) {
-                visualEnabled = false;
-              } else {
-                visualEnabled = true;
-                diagnostics.push(...visual);
-              }
-            } catch (error) {
-              diagnostics.push(watchErrorDiagnostic(error));
-            }
-          }
-          hub.emit({ type: "diagnostics", diagnostics });
-        } while (diagnosticsQueued && !closed);
-      } finally {
-        diagnosticsRunning = false;
-      }
-    })();
+    const diagnostics = await diagnose(scope);
+    if (!closed) {
+      emit({ type: "diagnostics", diagnostics });
+    }
+  });
+  const requestDiagnostics = (scope: DiagnoseScope): void => {
+    pending = mergeScope(pending, scope);
+    runDiagnostics();
   };
 
   const synthVoice = createSerialTask(async () => {
     try {
       if (options.synthVoice) {
         await options.synthVoice();
-        hub.emit({ type: "timeline" });
+        emit({ type: "timeline" });
         return;
       }
       const { hasVoice } = await import("../core/voice.ts");
@@ -136,7 +101,7 @@ export function watchDeck(
       }
       const { synthDeck } = await import("../voice/synth.ts");
       await synthDeck(deckDir);
-      hub.emit({ type: "timeline" });
+      emit({ type: "timeline" });
     } catch (error) {
       // Voice is optional: an engine that is not running is worth a line, not a stack trace.
       console.error(voiceFailureLine(error));
@@ -152,23 +117,41 @@ export function watchDeck(
     try {
       result = syncDeck(deckDir);
     } catch {
-      // resolveDeck in emitDiagnostics reports the same error with its path and line.
+      // resolveDeck in diagnose reports the same error with its path and line.
     }
-    // A sync event reloads the whole page, so new and refreshed slides need no reload-slide.
-    lastSlides = listSlideMtimes(deckDir);
-    // Slides go by slug, as when the author deletes one (see scan): the stream reaches the
-    // audience, and a path on disk names the presenter's home and user.
+    // A sync event reloads the whole page, so the slides it wrote need no reload-slide.
+    snapshot = { ...snapshot, slides: slideMtimes(deckDir) };
+    // Slides go by slug: the stream reaches the audience, and a path on disk names the
+    // presenter's home and user.
     const slugs = (paths: string[]) => paths.map((path) => basename(path, ".html"));
     const created = slugs(result.created);
     const updated = slugs(result.updated);
     const removed = slugs(result.removed);
     if (created.length > 0 || updated.length > 0 || removed.length > 0 || options.announceEmpty) {
-      hub.emit({
+      emit({
         type: "sync",
         created,
         ...(updated.length > 0 ? { updated } : {}),
         ...(removed.length > 0 ? { removed } : {}),
       });
+    }
+  };
+
+  const scanOnce = (): void => {
+    const next = takeSnapshot(deckDir);
+    const change = diffSnapshot(snapshot, next);
+    snapshot = next;
+    if (change.sync) {
+      syncScript({ announceEmpty: true });
+    }
+    for (const event of change.events) {
+      emit(event);
+    }
+    if (change.diagnose) {
+      requestDiagnostics(change.diagnose);
+    }
+    if (change.synth) {
+      synthVoice();
     }
   };
 
@@ -182,74 +165,8 @@ export function watchDeck(
       scanOnce();
     } catch (error) {
       if (!closed && existsSync(deckDir)) {
-        hub.emit({ type: "diagnostics", diagnostics: [watchErrorDiagnostic(error)] });
+        emit({ type: "diagnostics", diagnostics: [watchErrorDiagnostic(error)] });
       }
-    }
-  };
-
-  const scanOnce = (): void => {
-    const scriptNow = mtime(scriptPath);
-    if (scriptNow > lastScript) {
-      lastScript = scriptNow;
-      syncScript({ announceEmpty: true });
-      emitDiagnostics();
-      synthVoice();
-    }
-
-    const themeNow = mtime(themePath);
-    if (themeNow > lastTheme) {
-      lastTheme = themeNow;
-      hub.emit({ type: "reload-theme" });
-      emitDiagnostics();
-    }
-
-    const stylesNow = listSlideMtimes(deckDir, ".css");
-    if (mtimesChanged(lastStyles, stylesNow)) {
-      lastStyles = stylesNow;
-      hub.emit({ type: "reload-theme" });
-      emitDiagnostics();
-    }
-
-    // Slide scripts register once at page load, so a change reloads the page.
-    const scriptsNow = listSlideMtimes(deckDir, ".ts");
-    const scriptSlugs = changedKeys(lastScripts, scriptsNow);
-    if (scriptSlugs.length > 0) {
-      lastScripts = scriptsNow;
-      hub.emit({ type: "reload-script", slugs: scriptSlugs });
-      emitDiagnostics();
-    }
-
-    // dek does not load a `.js` script, but lint names it so the author can rename it.
-    const javascriptNow = listSlideMtimes(deckDir, ".js");
-    if (mtimesChanged(lastJavascript, javascriptNow)) {
-      lastJavascript = javascriptNow;
-      emitDiagnostics();
-    }
-
-    const slidesNow = listSlideMtimes(deckDir);
-    const removed: string[] = [];
-    for (const slug of Object.keys(lastSlides)) {
-      if (!(slug in slidesNow)) {
-        delete lastSlides[slug];
-        removed.push(slug);
-      }
-    }
-    if (removed.length > 0) {
-      hub.emit({ type: "sync", created: [], removed });
-    }
-    for (const [slug, time] of Object.entries(slidesNow)) {
-      const previous = lastSlides[slug] ?? 0;
-      if (time > previous) {
-        lastSlides[slug] = time;
-        hub.emit({ type: "reload-slide", slug });
-        emitDiagnostics(slug);
-      }
-    }
-
-    const voiceNow = listVoiceMtimes(voiceDir);
-    if (mtimesChanged(lastVoice, voiceNow)) {
-      lastVoice = voiceNow;
-      synthVoice();
     }
   };
 
@@ -260,9 +177,7 @@ export function watchDeck(
     debounce = setTimeout(scan, 20);
   };
 
-  const watcher = watch(deckDir, { recursive: true }, () => {
-    schedule();
-  });
+  const watcher = watch(deckDir, { recursive: true }, schedule);
   let timer: ReturnType<typeof setInterval> | undefined;
   const startPoll = (ms: number): void => {
     if (timer || closed || ms <= 0) {
@@ -278,7 +193,7 @@ export function watchDeck(
   }
   // A script written before the server started still gets its skeletons.
   syncScript({ announceEmpty: false });
-  emitDiagnostics();
+  requestDiagnostics({});
 
   return {
     close() {
@@ -294,71 +209,13 @@ export function watchDeck(
   };
 }
 
-/** Mtimes of `slides/<slug><ext>`, keyed by slug; the same files lint and render read. */
-function listSlideMtimes(
-  deckDir: string,
-  ext: ".html" | ".js" | SlideSidecar = ".html",
-): Record<string, number> {
-  return Object.fromEntries(
-    listSlideFiles(deckDir, ext).map((file) => [file.slug, mtime(file.path)]),
-  );
-}
-
-function listVoiceMtimes(dir: string): Record<string, number> {
-  const times: Record<string, number> = {};
-  if (!existsSync(dir)) {
-    return times;
-  }
-  for (const name of ["voice.toml", "dict.toml"]) {
-    const path = join(dir, name);
-    if (existsSync(path)) {
-      times[name] = mtime(path);
-    }
-  }
-  const pinDir = join(dir, "pin");
-  if (!existsSync(pinDir)) {
-    return times;
-  }
-  for (const name of readdirSync(pinDir)) {
-    times[`pin/${name}`] = mtime(join(pinDir, name));
-  }
-  return times;
-}
-
-function mtimesChanged(previous: Record<string, number>, next: Record<string, number>): boolean {
-  return changedKeys(previous, next).length > 0;
-}
-
-/** Keys whose mtime changed, including files added or removed. */
-function changedKeys(previous: Record<string, number>, next: Record<string, number>): string[] {
-  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
-  return [...keys].filter((key) => (previous[key] ?? 0) !== (next[key] ?? 0)).sort();
-}
-
-function mtime(path: string): number {
-  try {
-    return statSync(path).mtimeMs;
-  } catch {
-    return 0;
-  }
-}
-
 /** A failed synthesis as one line on the server's stderr: what failed, then the fix. */
 export function voiceFailureLine(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  const hint = error instanceof DekError && error.hint ? ` (${error.hint})` : "";
-  return `voice: ${message}${hint}`;
+  const { message, hint } = errorFields(error);
+  return `voice: ${message}${hint ? ` (${hint})` : ""}`;
 }
 
-function watchErrorDiagnostic(error: unknown): Diagnostic {
-  if (error instanceof DekError) {
-    return errorDiagnostic("parse", {
-      message: error.message,
-      ...(error.path ? { path: error.path } : {}),
-      ...(error.line !== undefined ? { line: error.line } : {}),
-    });
-  }
-  return errorDiagnostic("error", {
-    message: error instanceof Error ? error.message : String(error),
-  });
+/** A failure while watching, as the diagnostic a page shows: a DekError keeps its hint. */
+export function watchErrorDiagnostic(error: unknown): Diagnostic {
+  return errorDiagnostic(error instanceof DekError ? "parse" : "error", errorFields(error));
 }

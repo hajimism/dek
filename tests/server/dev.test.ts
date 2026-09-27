@@ -10,6 +10,7 @@ import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
 import { waitForEvent, withDevServer } from "../helpers/server.ts";
+import { pagesOf } from "../helpers/visual.ts";
 import { WAIT_MS } from "../helpers/wait.ts";
 
 async function waitForSseEvent(
@@ -430,7 +431,7 @@ more
         await withDevServer({ cwd: deckDir }, async (server) => {
           const pending = waitForEvent(server.events, (event) => event.type === "reload-script");
           await writeFile(join(deckDir, "slides", "intro.ts"), "export default {};\n");
-          expect(await pending).toEqual({ type: "reload-script", slugs: ["intro"] });
+          expect(await pending).toEqual({ type: "reload-script", slugs: ["intro"], deck: "demo" });
         });
       },
     );
@@ -454,6 +455,37 @@ more
             introHtml.replace("intro", "intro-updated"),
           );
           expect(await pending).toContain("reload-slide");
+        });
+      },
+    );
+  });
+
+  test("streams each deck's page only its own deck's events", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "a", slides: { intro: introHtml } },
+          { name: "b", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        await withDevServer({ cwd: root }, async (server) => {
+          // A project-wide stream would carry every deck's events to every page.
+          expect((await fetch(new URL("/events", server.url))).status).toBe(404);
+          const res = await fetch(new URL("/decks/a/events", server.url));
+          expect(res.headers.get("content-type")).toContain("text/event-stream");
+
+          const fromB = waitForEvent(server.events, (event) => event.type === "reload-slide");
+          await writeFile(
+            join(root, "decks", "b", "slides", "intro.html"),
+            introHtml.replace("intro", "b"),
+          );
+          expect(await fromB).toMatchObject({ type: "reload-slide", slug: "intro", deck: "b" });
+
+          // A later event of deck a marks the end of what a's page was sent for b's save.
+          const heard = waitForSseEvent(res, (buf) => buf.includes("reload-theme"));
+          await writeFile(join(root, "decks", "a", "theme.css"), ":root {}\n");
+          expect(await heard).not.toContain("reload-slide");
         });
       },
     );
@@ -580,7 +612,7 @@ more
           cwd: deckDir,
           visual: true,
           visualRunner: async () => ({
-            overflows: [{ slug: "intro", step: "1", box: "h2" }],
+            overflows: [{ slug: "intro", step: "1", box: "h2", by: { bottom: 8 } }],
             contrasts: [],
           }),
         },
@@ -630,25 +662,30 @@ body
         const deckDir = join(root, "decks", "demo");
         const slugs: string[] = [];
         let recording = false;
+        let started = (): void => undefined;
+        const startPass = new Promise<void>((resolve) => {
+          started = resolve;
+        });
         await withDevServer(
           {
             cwd: deckDir,
             visual: true,
             visualRunner: async (request) => {
               if (recording) {
-                slugs.push(
-                  ...request.pages
-                    .map((page) => page.slug)
-                    .filter((slug): slug is string => Boolean(slug)),
-                );
+                slugs.push(...pagesOf(request).map((page) => page.slug));
               }
+              started();
               return { overflows: [], contrasts: [] };
             },
           },
           async (server) => {
-            await waitForEvent(server.events, (event) => event.type === "diagnostics");
+            // Passes run one at a time, so once the start pass has asked, the save's comes after.
+            await startPass;
             recording = true;
-            const pending = waitForEvent(server.events, (event) => event.type === "diagnostics");
+            const pending = waitForEvent(
+              server.events,
+              (event) => event.type === "diagnostics" && slugs.length > 0,
+            );
             await writeFile(join(deckDir, "slides", "intro.html"), introHtml);
             await pending;
             expect(slugs.length).toBeGreaterThan(0);
@@ -689,12 +726,14 @@ body
         await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
           expect(existsSync(leftover)).toBe(true);
           expect(await readFile(leftover, "utf8")).toContain("leftover");
-          const event = await waitForEvent(
+          // The hub keeps nothing for a late listener, so a save asks for a pass to hear.
+          const pending = waitForEvent(
             server.events,
             (entry) =>
               entry.type === "diagnostics" && entry.diagnostics.some((d) => d.id === "DEK002"),
           );
-          expect(event).toMatchObject({ type: "diagnostics" });
+          await writeFile(join(root, "decks", "demo", "slides", "intro.html"), `${introHtml}\n`);
+          expect(await pending).toMatchObject({ type: "diagnostics" });
         });
       },
     );
@@ -753,8 +792,9 @@ body
               () => "received",
               () => "timed out",
             );
+            // intro has no steps: the room keeps the move within the deck.
             alphaSender.send(JSON.stringify({ slideIndex: 0, beatIndex: 1 }));
-            expect(JSON.parse(await sameDeck)).toEqual({ slideIndex: 0, beatIndex: 1 });
+            expect(JSON.parse(await sameDeck)).toEqual({ slideIndex: 0, beatIndex: 0 });
             expect(await crossed).toBe("timed out");
           } finally {
             alphaSender.close();
@@ -954,9 +994,11 @@ body
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await withDevServer({ cwd: root }, async (server) => {
+          // Listen first: under load the sync can land before the write's await returns.
+          const synced = waitForEvent(server.events, (event) => event.type === "sync");
           await rm(join(root, "dek.toml"));
           await writeFile(join(root, "decks", "demo", "script.md"), defaultScript("Changed"));
-          await waitForEvent(server.events, (event) => event.type === "sync");
+          await synced;
           const response = await fetch(new URL("/decks/demo/", server.url));
           expect([200, 500]).toContain(response.status);
         });
@@ -1158,13 +1200,13 @@ describe("startDevServer --remote", () => {
             expect(player.ok).toBe(true);
             const playerHtml = await player.text();
             expect(playerHtml).not.toContain(speakerNotes);
-            expect(playerHtml).not.toContain("dek-presenter");
+            expect(playerHtml).not.toContain('id="dek-presenter"');
 
             const viaQuery = await fetch(new URL("/?presenter", server.url));
             expect(viaQuery.ok).toBe(true);
             const queryHtml = await viaQuery.text();
             expect(queryHtml).not.toContain(speakerNotes);
-            expect(queryHtml).not.toContain("dek-presenter");
+            expect(queryHtml).not.toContain('id="dek-presenter"');
           },
         );
       },
@@ -1374,7 +1416,7 @@ body
     );
   });
 
-  test("clears the presenter's event stream by its token, outside the deck's path too", async () => {
+  test("clears the presenter's event stream by its token", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -1388,8 +1430,8 @@ body
           const player = await fetch(new URL("/decks/demo/", server.url));
           expect(await player.text()).not.toContain("data-live-token");
 
-          // Basic auth covers only /decks/demo/, so the stream at the root carries the token.
-          const stream = await fetch(new URL(`/events?token=${token}`, server.url));
+          // The stream carries the token as the socket does, whatever Basic auth covers.
+          const stream = await fetch(new URL(`/decks/demo/events?token=${token}`, server.url));
           const diagnosed = waitForSseEvent(stream, (buf) => buf.includes('"diagnostics"'));
           await writeFile(join(deckDir, "slides", "intro.html"), introHtml.replace("intro", "x"));
           await diagnosed;

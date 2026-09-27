@@ -3,8 +3,10 @@ import { realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { decodePosition } from "../../src/core/live-protocol.ts";
 import {
   currentSlug,
+  dekGo,
   mountPlayer,
   playerChannelName,
   pressKey,
@@ -125,7 +127,7 @@ function click(x: number, init: PointerEventInit & { pointerType?: string } = {}
 
 describe("clicking the slide", () => {
   test.serial("a click on the right goes forward and on the left third goes back", async () => {
-    await mount("#steps");
+    await mount("#steps/1");
     click(700);
     await waitFor(() => shownSteps().includes("two"));
     click(100);
@@ -139,7 +141,7 @@ describe("clicking the slide", () => {
     ["a Shift click, which extends a selection", { shiftKey: true }],
   ] as const) {
     test.serial(`${name} stays on the beat`, async () => {
-      await mount("#steps");
+      await mount("#steps/1");
       click(700, init);
       await settle();
       expect(shownSteps()).toEqual(["one"]);
@@ -147,7 +149,7 @@ describe("clicking the slide", () => {
   }
 
   test.serial("a click that ends a text selection stays on the beat", async () => {
-    await mount("#steps");
+    await mount("#steps/1");
     const item = document.querySelector("#deck .slide.is-current [data-step]");
     if (item) {
       getSelection()?.selectAllChildren(item);
@@ -158,7 +160,7 @@ describe("clicking the slide", () => {
   });
 
   test.serial("a touch still swipes, where a mouse drag would select", async () => {
-    await mount("#steps");
+    await mount("#steps/1");
     const stage = document.getElementById("dek-current-stage");
     if (!stage) {
       throw new Error("no stage");
@@ -185,7 +187,7 @@ describe("navigation", () => {
     await mount("#intro");
     const animation = runningAnimation();
     (document as { getAnimations: () => unknown[] }).getAnimations = () => [animation];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       pressKey("ArrowRight");
     }
     await waitFor(() => currentSlug() === "last");
@@ -200,7 +202,9 @@ describe("navigation", () => {
     (document as { getAnimations: () => unknown[] }).getAnimations = () => [animation];
     const peer = new BroadcastChannel(playerChannelName());
     const heard: unknown[] = [];
-    peer.addEventListener("message", (event: MessageEvent) => heard.push(event.data));
+    peer.addEventListener("message", (event: MessageEvent) =>
+      heard.push(decodePosition(event.data)),
+    );
     try {
       pressKey("ArrowRight");
       await waitFor(() => heard.length > 0);
@@ -212,8 +216,24 @@ describe("navigation", () => {
     }
   });
 
+  test.serial("a move capture makes through dekGo tells no other window", async () => {
+    await mount("#intro");
+    const peer = new BroadcastChannel(playerChannelName());
+    const heard: unknown[] = [];
+    peer.addEventListener("message", (event: MessageEvent) => heard.push(event.data));
+    try {
+      await dekGo({ slideIndex: 1, beatIndex: 0 });
+      // A key press after it is heard, so anything dekGo had posted would have arrived first.
+      pressKey("ArrowRight");
+      await waitFor(() => heard.length > 0);
+      expect(heard.map(decodePosition)).toEqual([{ slideIndex: 1, beatIndex: 1 }]);
+    } finally {
+      peer.close();
+    }
+  });
+
   test.serial("ignores keys held with Alt, Ctrl, or Cmd, which belong to the browser", async () => {
-    await mount("#steps");
+    await mount("#steps/1");
     for (const init of [{ altKey: true }, { ctrlKey: true }, { metaKey: true }]) {
       expect(pressKey("ArrowRight", init)).toBe(false);
     }
@@ -222,7 +242,7 @@ describe("navigation", () => {
   });
 
   test.serial("leaves keys typed into a field on the slide to the field", async () => {
-    await mount("#steps");
+    await mount("#steps/1");
     const field = document.getElementById("field");
     if (!field) {
       throw new Error("no field");
@@ -265,12 +285,10 @@ describe("navigation", () => {
   test.serial("Back leaves the slide instead of stepping back through its beats", async () => {
     await mount("#intro");
     const start = history.length;
-    pressKey("ArrowRight");
-    await settle();
-    pressKey("ArrowRight");
-    await settle();
-    pressKey("ArrowRight");
-    await settle();
+    for (let i = 0; i < 4; i++) {
+      pressKey("ArrowRight");
+      await settle();
+    }
     expect(location.hash).toBe("#steps/3");
     // One entry for the slide, however many beats it took to get through it.
     expect(history.length).toBe(start + 1);
@@ -299,6 +317,21 @@ describe("navigation", () => {
     pressKey("ArrowRight");
     await settle();
     expect(announce?.textContent).toBe("");
+  });
+
+  test.serial("the presenter keeps its beat list while the beats advance", async () => {
+    await mount("?presenter#steps/1");
+    const items = (): Element[] => [...document.querySelectorAll("#dek-beats li")];
+    const before = items();
+    expect(before.map((li) => li.textContent)).toEqual(["one", "two", "three"]);
+    pressKey("ArrowRight");
+    await settle();
+    expect(items().every((li, i) => li === before[i])).toBe(true);
+    expect(document.querySelector("#dek-beats .is-current-beat")?.textContent).toBe("two");
+    pressKey("ArrowRight");
+    pressKey("ArrowRight");
+    await waitFor(() => currentSlug() === "last");
+    expect(items()).toEqual([]);
   });
 
   test.serial("the rail's resize handle reports its width and moves with arrow keys", async () => {

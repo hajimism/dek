@@ -46,7 +46,7 @@ export function totalBudgetSeconds(slides: Array<{ budgetSeconds?: number }>): n
   return any ? sum : undefined;
 }
 
-export function progressFill(beatIndex: number, beatCount: number): number {
-  const count = Math.max(beatCount, 1);
+export function progressFill(beatIndex: number, stops: number): number {
+  const count = Math.max(stops, 1);
   return Math.min(1, (beatIndex + 1) / count);
 }

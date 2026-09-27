@@ -3,7 +3,7 @@ import { bar, mountChartDeck, unmountChartDeck } from "../helpers/chart-deck.ts"
 import { dekGo, pressKey } from "../helpers/dom.ts";
 
 beforeAll(async () => {
-  await mountChartDeck("player", "file:///deck.html#chart");
+  await mountChartDeck("player", "file:///deck.html#chart/1");
 });
 
 afterAll(async () => {
@@ -13,7 +13,7 @@ afterAll(async () => {
 // Serial: the tests drive one mounted player, and a jump would cut off a running animation.
 describe("slide scripts in the player", () => {
   test.serial("a forward step animates from t=0 to the declared motion", async () => {
-    expect(bar()).toBe("0:base:0");
+    expect(bar()).toBe("1:base:0");
     const seen: number[] = [];
     const module = (
       window as unknown as {
@@ -37,9 +37,9 @@ describe("slide scripts in the player", () => {
     };
     pressKey("ArrowRight");
     // happy-dom's frame timing differs from a browser's, so only the ends are stable to assert.
-    expect(bar()).toBe("1:growth:0");
+    expect(bar()).toBe("2:growth:0");
     await done;
-    expect(bar()).toBe("1:growth:40");
+    expect(bar()).toBe("2:growth:40");
     expect(seen[0]).toBe(0);
     expect(seen.at(-1)).toBe(40);
     module.draw = draw;
@@ -47,13 +47,13 @@ describe("slide scripts in the player", () => {
 
   test.serial("a jump draws the beat's end state", async () => {
     await dekGo({ slideIndex: 0, beatIndex: 0 });
-    await dekGo({ slideIndex: 1, beatIndex: 1 });
-    expect(bar()).toBe("1:growth:40");
+    await dekGo({ slideIndex: 1, beatIndex: 2 });
+    expect(bar()).toBe("2:growth:40");
   });
 
-  test.serial("the rail thumbnail is drawn in its end state too", () => {
+  test.serial("the rail thumbnail is drawn at its last beat's end, as print draws it", () => {
     expect(
       document.querySelector('#dek-rail [data-slide-index="1"] .slide .bar')?.textContent,
-    ).toBe("0:base:0");
+    ).toBe("2:growth:40");
   });
 });

@@ -23,10 +23,16 @@ describe("liveReloadScript", () => {
 
   // Serial: each row registers happy-dom over the same globals.
   test.serial.each([
-    ["the presenter's token", "a b&c", "/events?token=a%20b%26c"],
-    ["no token on an audience page", undefined, "/events"],
-  ])("opens the stream with %s", async (_, token, url) => {
-    GlobalRegistrator.register({ url: "http://localhost:3000/decks/demo/presenter" });
+    [
+      "the presenter's token",
+      "/decks/demo/presenter",
+      "a b&c",
+      "/decks/demo/events?token=a%20b%26c",
+    ],
+    ["no token on an audience page", "/decks/demo/", undefined, "/decks/demo/events"],
+    ["a server scoped to the deck", "/presenter", undefined, "/events"],
+  ])("opens its deck's stream with %s", async (_, path, token, url) => {
+    GlobalRegistrator.register({ url: `http://localhost:3000${path}` });
     try {
       const opened: string[] = [];
       (globalThis as { EventSource: unknown }).EventSource = class {

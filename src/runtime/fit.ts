@@ -19,3 +19,14 @@ export function deckFitTransform(viewport: Size, logical: Size): string {
   const y = (viewport.height - logical.height * scale) / 2;
   return `translate(${x}px, ${y}px) scale(${scale})`;
 }
+
+/** Scale `el`, laid out at the deck's size, to fit inside `stage` and center it there. */
+export function fitStage(
+  el: { offsetWidth: number; offsetHeight: number; style: { transform: string } },
+  stage: { clientWidth: number; clientHeight: number },
+): void {
+  el.style.transform = deckFitTransform(
+    { width: stage.clientWidth, height: stage.clientHeight },
+    { width: el.offsetWidth || 1280, height: el.offsetHeight || 720 },
+  );
+}
