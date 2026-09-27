@@ -1,10 +1,15 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { DekError, writeFrontmatterSchema } from "../core/index.ts";
+import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { readTextIfExists } from "../core/resolve.ts";
-import { defaultTsconfig, writeAgentsMd, writeSlideTypes } from "../core/sync.ts";
+import {
+  defaultTsconfig,
+  writeAgentsMd,
+  writeFrontmatterSchema,
+  writeSlideTypes,
+} from "../core/sync.ts";
 import {
   applyPlan,
   checkFileSlots,
@@ -15,6 +20,7 @@ import {
   defaultToml,
   nextSteps,
   type PlannedPath,
+  playwrightStep,
   shellQuote,
 } from "./files.ts";
 
@@ -26,6 +32,8 @@ export type InitResult = {
   kept: string[];
   /** The commands to run next, from the directory init ran in. */
   next: string[];
+  /** The Playwright install, when the project lacks it: `dek shot`, `dek pdf`, and `--visual` need it. */
+  playwright?: string;
 };
 
 /**
@@ -45,7 +53,14 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
   const { created, kept } = applyPlan(projectPlan(root, options.deck));
   created.push(...writeDekFiles(root));
   const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
-  return { root, created, kept, next: nextSteps(options.cwd, root, deckDir) };
+  const playwright = playwrightStep(root);
+  return {
+    root,
+    created,
+    kept,
+    next: nextSteps(options.cwd, root, deckDir),
+    ...(playwright ? { playwright } : {}),
+  };
 }
 
 /** Everything init writes but `.dek/` and AGENTS.md, in the order a reader meets it. */

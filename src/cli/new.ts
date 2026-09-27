@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "../core/config.ts";
-import { DekError } from "../core/index.ts";
+import { deckPaths } from "../core/deck-paths.ts";
+import { DekError } from "../core/error.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { syncDeck } from "../core/sync.ts";
 import { applyPlan, deckPlan, nextSteps } from "./files.ts";
@@ -15,11 +16,8 @@ export type NewResult = {
   next: string[];
 };
 
-export function newCommand(options: { cwd: string; name?: string; themeFrom?: string }): NewResult {
-  const name = options.name?.trim();
-  if (!name) {
-    throw new DekError("usage: dek new <name>", { hint: "for example, `dek new 2026-10-talk`" });
-  }
+export function newCommand(options: { cwd: string; name: string; themeFrom?: string }): NewResult {
+  const { name } = options;
   if (!isDeckName(name)) {
     throw new DekError(`invalid deck name "${name}"`, {
       hint: DECK_NAME_HINT,
@@ -36,7 +34,7 @@ export function newCommand(options: { cwd: string; name?: string; themeFrom?: st
   }
 
   const themeSource = options.themeFrom
-    ? join(requireDeckFromCwd(options.cwd, options.themeFrom).deck.dir, "theme.css")
+    ? deckPaths(requireDeckFromCwd(options.cwd, options.themeFrom).deck.dir).theme
     : join(project.root, "theme.css");
   if (!existsSync(themeSource)) {
     throw new DekError("theme.css not found", {

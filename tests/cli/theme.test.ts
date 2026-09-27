@@ -3,9 +3,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { formatText } from "../../src/cli/result.ts";
+import { resolveTarget } from "../../src/cli/scope.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
-import { cssClassNames, cssLayoutNames, themeLayouts } from "../../src/core/css.ts";
+import { cssClassNames, cssLayoutNames, parseCss } from "../../src/core/css.ts";
 import { DekError } from "../../src/core/error.ts";
+import { syncDeck } from "../../src/core/sync.ts";
+import { themeFacts } from "../../src/core/theme-facts.ts";
+
+const themeLayouts = (css: string) => themeFacts(parseCss(css)).layouts;
+
 import { withTempProject } from "../helpers/project.ts";
 
 const repo = join(import.meta.dir, "..", "..");
@@ -54,7 +60,9 @@ describe("themeCommand", () => {
     await withTempProject(
       { theme: ".slide .project-only { }\n", decks: [{ name: "demo", theme }] },
       async (root) => {
-        const result = themeCommand({ cwd: join(root, "decks", "demo") });
+        const result = themeCommand(
+          resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+        );
         expect(result.path).toBe(join(root, "decks", "demo", "theme.css"));
         expect(result.classes).toEqual(["node", "slide"]);
         expect(result.tokens).toEqual([
@@ -68,7 +76,10 @@ describe("themeCommand", () => {
 
   test("prints one layout's example markup, ready to paste", async () => {
     await withTempProject({ decks: [{ name: "demo", theme }] }, async (root) => {
-      const result = themeCommand({ cwd: join(root, "decks", "demo"), layout: "split" });
+      const result = themeCommand(
+        resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+        "split",
+      );
       expect(formatText({ command: "theme", data: result })).toBe(
         themeLayouts(theme).find((layout) => layout.name === "split")?.example ?? "",
       );
@@ -77,7 +88,9 @@ describe("themeCommand", () => {
 
   test("says how to add an example when a layout has none", async () => {
     await withTempProject({ decks: [{ name: "demo", theme }] }, async (root) => {
-      expect(() => themeCommand({ cwd: join(root, "decks", "demo"), layout: "bare" })).toThrow(
+      expect(() =>
+        themeCommand(resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }), "bare"),
+      ).toThrow(
         expect.objectContaining({
           message: 'layout "bare" has no example in theme.css',
           hint: 'add a /* @layout bare ... */ comment with its markup above .slide[data-layout="bare"]',
@@ -90,13 +103,47 @@ describe("themeCommand", () => {
     await withTempProject({ decks: [{ name: "demo", theme }] }, async (root) => {
       let error: unknown;
       try {
-        themeCommand({ cwd: join(root, "decks", "demo"), layout: "nope" });
+        themeCommand(resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }), "nope");
       } catch (caught) {
         error = caught;
       }
       expect(error).toBeInstanceOf(DekError);
       expect(error).toMatchObject({ hint: "use one of: bare, split" });
     });
+  });
+});
+
+describe("the theme's tokens", () => {
+  // A token set only on a view transition, or only inside one element, is no token a slide can
+  // var(); both lists name the ones the bare .slide rule gives every slide.
+  const tokenTheme = `.slide {
+  --fg: #fff;
+  --gap: 2rem;
+}
+.slide[data-layout="split"] { --gap: 3rem; }
+.slide .card { --card-only: 1px; }
+@media (min-width: 1px) { .slide { --wide-only: 1; } }
+::view-transition-group(*) { --morph: 0.5s; }
+`;
+
+  test("AGENTS.md and dek theme list the same tokens", async () => {
+    await withTempProject(
+      { theme: tokenTheme, decks: [{ name: "demo", theme: tokenTheme }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        syncDeck(deckDir);
+        const agents = readFileSync(join(root, "AGENTS.md"), "utf8");
+        const listed = (agents.split("## Theme tokens")[1]?.split("##")[0] ?? "")
+          .split("\n")
+          .flatMap((line) => line.match(/^- `(--[-\w]+)`$/)?.[1] ?? []);
+        const result = themeCommand(resolveTarget(deckDir, "deck", { refs: true }));
+        expect(listed).toEqual(result.tokens.map((token) => token.name).sort());
+        expect(result.tokens).toEqual([
+          { name: "--fg", value: "#fff" },
+          { name: "--gap", value: "2rem" },
+        ]);
+      },
+    );
   });
 });
 
@@ -111,9 +158,11 @@ describe("bundled and sample themes", () => {
 
   for (const [path, css] of themes) {
     test(`${path}: every layout has an example that uses only its own classes`, () => {
-      const classes = cssClassNames(css);
+      const classes = cssClassNames(parseCss(css));
       const layouts = themeLayouts(css);
-      expect(layouts.map((layout) => layout.name)).toEqual([...cssLayoutNames(css)].sort());
+      expect(layouts.map((layout) => layout.name)).toEqual(
+        [...cssLayoutNames(parseCss(css))].sort(),
+      );
       for (const layout of layouts) {
         expect({ name: layout.name, has: layout.example !== undefined }).toEqual({
           name: layout.name,

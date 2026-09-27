@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { newCommand } from "../../src/cli/new.ts";
 import { DekError } from "../../src/core/error.ts";
-import { lintDeck } from "../../src/core/index.ts";
+import { lintDeck } from "../../src/core/lint.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";

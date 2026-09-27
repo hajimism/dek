@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
 import { parseScript } from "../core/parse.ts";
-import { skeletonHtml } from "../core/sync.ts";
+import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
+import { skeletonHtml } from "../core/skeleton.ts";
 import { formatVoiceToml } from "../core/voice.ts";
 
 const defaultThemePath = join(import.meta.dir, "..", "theme", "default.css");
@@ -211,27 +213,26 @@ export function deckPlan(
   theme: string,
   voice?: { engine: string; speaker: string; speed?: number },
 ): PlannedPath[] {
-  const dir = join(root, "decks", name);
-  const scriptPath = join(dir, "script.md");
+  const paths = deckPaths(join(root, "decks", name));
   const script = defaultScript(name, voice ? "ja" : "en");
   const plan: PlannedPath[] = [
-    { path: join(dir, "slides") },
-    { path: join(dir, "assets") },
-    { path: scriptPath, contents: script },
-    { path: join(dir, "theme.css"), contents: theme },
+    { path: paths.slides },
+    { path: paths.assets },
+    { path: paths.script, contents: script },
+    { path: paths.theme, contents: theme },
   ];
   if (voice) {
     plan.push(
-      { path: join(dir, "voice", "voice.toml"), contents: formatVoiceToml(voice) },
-      { path: join(dir, "voice", "dict.toml"), contents: "# voice dictionary\n" },
+      { path: paths.voiceToml, contents: formatVoiceToml(voice) },
+      { path: paths.voiceDict, contents: "# voice dictionary\n" },
     );
   }
-  if (!existsSync(scriptPath)) {
-    const deck = parseScript(script, scriptPath);
+  if (!existsSync(paths.script)) {
+    const deck = parseScript(script, paths.script);
     for (const section of deck.sections) {
       const contents = skeletonHtml(deck, section.slug);
       if (contents !== undefined) {
-        plan.push({ path: join(dir, "slides", `${section.slug}.html`), contents });
+        plan.push({ path: paths.slide(section.slug, ".html"), contents });
       }
     }
   }
@@ -266,9 +267,21 @@ export function nextSteps(cwd: string, root: string, deckDir?: string): string[]
 
 /** Whether `bunx dek` in the project runs this dek: bunx looks in node_modules/.bin up the tree. */
 function hasLocalDek(root: string): boolean {
+  return inNodeModules(root, ".bin", "dek");
+}
+
+/**
+ * The Playwright install, until the project has it: shots, the PDF, and the rendered lint rules
+ * need it, and dek does not bring it along.
+ */
+export function playwrightStep(root: string): string | undefined {
+  return inNodeModules(root, "playwright", "package.json") ? undefined : PLAYWRIGHT_INSTALL;
+}
+
+/** Whether node_modules holds `path` in `root` or a directory above it, as Bun resolves it. */
+function inNodeModules(root: string, ...path: string[]): boolean {
   return (
-    walkUp(root, (dir) => existsSync(join(dir, "node_modules", ".bin", "dek")) || undefined) ===
-    true
+    walkUp(root, (dir) => existsSync(join(dir, "node_modules", ...path)) || undefined) === true
   );
 }
 

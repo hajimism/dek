@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
+import { parseCommandLine } from "../../src/cli/flags.ts";
 import { lsCommand } from "../../src/cli/ls.ts";
+import { bindCommandLine } from "../../src/cli/main.ts";
 import { formatText } from "../../src/cli/result.ts";
-import { peelDeckArg, requireProject, resolveScope } from "../../src/cli/scope.ts";
+import { requireProject, resolveScope, resolveTarget } from "../../src/cli/scope.ts";
 import { shotCommand } from "../../src/cli/shot.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
@@ -70,14 +72,17 @@ describe("reading a ref", () => {
 
   test("show also works from inside one of the project's own decks", async () => {
     await withTempProject(project, async (root) => {
-      const result = showCommand({ cwd: join(root, "decks", "mine"), slug: "timing", deck: REF });
+      const result = showCommand(
+        resolveTarget(join(root, "decks", "mine"), "deck", { refs: true, deck: REF }),
+        "timing",
+      );
       expect(result.ref?.name).toBe(REF);
     });
   });
 
   test("ls times the ref at its own speaking rate and says lint was skipped", async () => {
     await withTempProject(project, async (root) => {
-      const result = lsCommand({ cwd: root, deck: REF });
+      const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: REF }));
       if (result.kind !== "deck") {
         throw new Error("expected one deck");
       }
@@ -97,7 +102,7 @@ describe("reading a ref", () => {
 
   test("theme returns the ref's theme.css", async () => {
     await withTempProject(project, async (root) => {
-      const result = themeCommand({ cwd: root, deck: REF });
+      const result = themeCommand(resolveTarget(root, "deck", { refs: true, deck: REF }));
       expect(result.path).toBe(join(snapshotDir(root), "decks", "why-dek", "theme.css"));
       expect(result.classes).toContain("card");
       expect(result.ref?.name).toBe(REF);
@@ -108,7 +113,7 @@ describe("reading a ref", () => {
     await withTempProject(project, async (root) => {
       await chmod(fakePlaywright, 0o755);
       const result = await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, () =>
-        shotCommand({ cwd: root, slug: "timing", deck: REF }),
+        shotCommand(resolveTarget(root, "deck", { refs: true, deck: REF }), { slug: "timing" }),
       );
       expect(result.shots[0]?.slug).toBe("timing");
     });
@@ -118,7 +123,9 @@ describe("reading a ref", () => {
     await withTempProject(
       { decks: [{ name: "mine" }], refs: [{ ...ref, declared: false }] },
       async (root) => {
-        expect(() => showCommand({ cwd: root, slug: "timing", deck: REF })).toThrow(
+        expect(() =>
+          showCommand(resolveTarget(root, "deck", { refs: true, deck: REF }), "timing"),
+        ).toThrow(
           expect.objectContaining({
             message: `ref "${REF}" is not added`,
             hint: expect.stringContaining(`dek ref ${REF}`),
@@ -130,18 +137,21 @@ describe("reading a ref", () => {
 
   test("a rev on a read that is not the pinned one points to dek ref with that rev", async () => {
     await withTempProject(project, async (root) => {
-      expect(() => showCommand({ cwd: root, slug: "timing", deck: `${REF}@v2` })).toThrow(
-        expect.objectContaining({ hint: expect.stringContaining(`dek ref ${REF}@v2`) }),
-      );
-      expect(showCommand({ cwd: root, slug: "timing", deck: `${REF}@${REF_SHA}` }).slug).toBe(
-        "timing",
-      );
+      expect(() =>
+        showCommand(resolveTarget(root, "deck", { refs: true, deck: `${REF}@v2` }), "timing"),
+      ).toThrow(expect.objectContaining({ hint: expect.stringContaining(`dek ref ${REF}@v2`) }));
+      expect(
+        showCommand(
+          resolveTarget(root, "deck", { refs: true, deck: `${REF}@${REF_SHA}` }),
+          "timing",
+        ).slug,
+      ).toBe("timing");
     });
   });
 });
 
 describe("refs are read-only", () => {
-  test("every command peels a ref name as its deck, so resolveScope refuses it", async () => {
+  test("every command takes a ref name as its deck, so resolveScope refuses it", async () => {
     await withTempProject(project, async (root) => {
       const cases: Array<[string, string[]]> = [
         ["lint", [REF]],
@@ -152,9 +162,9 @@ describe("refs are read-only", () => {
         ["goto", [REF, "timing"]],
       ];
       for (const [command, args] of cases) {
-        expect(peelDeckArg(root, { command, args }).deck).toBe(REF);
+        expect(bindCommandLine(root, parseCommandLine([command, ...args])).deck).toBe(REF);
       }
-      expect(() => resolveScope(root, { positionalDeck: REF })).toThrow(
+      expect(() => resolveScope(root, { deck: REF })).toThrow(
         expect.objectContaining({
           message: `"${REF}" is a ref; refs are read-only`,
           hint: expect.stringContaining(`dek show ${REF} <slug>`),

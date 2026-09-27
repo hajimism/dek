@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { cuesCommand } from "../../src/cli/cues.ts";
 import { formatText } from "../../src/cli/result.ts";
+import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -65,8 +66,14 @@ Use \`dek\`.
           {
             position: { slideIndex: 1, beatIndex: 0 },
             slug: "architecture",
+            line: 13,
+            paragraphs: ["さて。"],
+          },
+          {
+            position: { slideIndex: 1, beatIndex: 1 },
+            slug: "architecture",
             line: 17,
-            paragraphs: ["さて。", "Use dek."],
+            paragraphs: ["Use dek."],
           },
         ]);
         expect(json.diagnostics).toEqual([]);
@@ -89,15 +96,19 @@ title: Demo
 ## intro
 
 hello
+
+### point
+
+there
 `,
           },
         ],
       },
       async (root) => {
-        const data = cuesCommand({ cwd: join(root, "decks", "demo") });
+        const data = cuesCommand(requireDeckFromCwd(join(root, "decks", "demo")));
         const text = formatText({ command: "cues", data });
-        expect(text).toContain("intro #1");
-        expect(text).toContain("hello");
+        expect(text).toContain("intro\n  hello");
+        expect(text).toContain("intro #1\n  there");
       },
     );
   });
@@ -128,7 +139,7 @@ spoken
         ],
       },
       async (root) => {
-        const data = cuesCommand({ cwd: join(root, "decks", "demo") });
+        const data = cuesCommand(requireDeckFromCwd(join(root, "decks", "demo")));
         expect(data.diagnostics).toHaveLength(1);
         expect(data.diagnostics[0]?.id).toBe("DEK042");
         expect(data.diagnostics[0]?.line).toBe(13);
@@ -157,7 +168,7 @@ hello
         ],
       },
       async (root) => {
-        const data = cuesCommand({ cwd: root, deck: "demo" });
+        const data = cuesCommand(requireDeckFromCwd(root, "demo"));
         expect(data.name).toBe("demo");
         expect(data.cues[0]?.paragraphs).toEqual(["hello"]);
       },

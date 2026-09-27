@@ -1,14 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
-  agentHelpText,
   formatDevEvent,
   formatDiagnostics,
   formatError,
   formatErrorText,
-  formatInit,
-  helpText,
   writeDevEvent,
 } from "../../src/cli/format.ts";
+import { formatInit } from "../../src/cli/text.ts";
+import { agentHelpText, helpText } from "../../src/cli/usage.ts";
 import type { Diagnostic } from "../../src/core/diagnostic.ts";
 import { DekError } from "../../src/core/error.ts";
 
@@ -19,10 +18,10 @@ describe("helpText", () => {
     expect(text).toContain("lint");
     expect(text).toContain("build");
     expect(text).toContain("--json");
-    expect(text).toContain("Dev");
+    expect(text).toContain("Development");
     expect(text).toContain("Project");
     expect(text).toContain("Slide");
-    expect(text).toContain("CI");
+    expect(text).toContain("Output");
     expect(text).toContain("dek help --agent");
     expect(text).toContain("--root-dist");
     expect(text).toContain(
@@ -272,6 +271,22 @@ describe("formatDevEvent", () => {
       formatDiagnostics(diagnostics),
     );
   });
+
+  test("names the deck on each line that starts an entry, when serving several", () => {
+    expect(formatDevEvent({ type: "reload-slide", slug: "intro" }, { deck: "talk" })).toBe(
+      "[talk] reload-slide intro",
+    );
+    expect(
+      formatDevEvent({ type: "sync", created: ["a.html"], removed: ["b"] }, { deck: "talk" }),
+    ).toBe("[talk] synced 2 files\n  a.html\n  b (removed)");
+    const diagnostics: Diagnostic[] = [
+      { id: "DEK001", severity: "error", message: "one", hint: "fix one" },
+      { id: "DEK002", severity: "error", message: "two" },
+    ];
+    expect(formatDevEvent({ type: "diagnostics", diagnostics }, { deck: "talk" })).toBe(
+      "[talk] DEK001 one\n  help: fix one\n[talk] DEK002 two",
+    );
+  });
 });
 
 describe("writeDevEvent", () => {
@@ -318,13 +333,13 @@ describe("formatError paths", () => {
 
 describe("formatInit", () => {
   test("lists each file init wrote, and each it kept as it was", () => {
-    expect(formatInit({ root: "/tmp/talks", created: ["dek.toml"], kept: ["AGENTS.md"] })).toBe(
-      "created project at /tmp/talks\n  dek.toml\n  AGENTS.md (kept)",
-    );
+    expect(
+      formatInit({ root: "/tmp/talks", created: ["dek.toml"], kept: ["AGENTS.md"], next: [] }),
+    ).toBe("created project at /tmp/talks\n  dek.toml\n  AGENTS.md (kept)");
   });
 
   test("says so when every file was already there", () => {
-    expect(formatInit({ root: "/tmp/talks", created: [], kept: ["AGENTS.md"] })).toBe(
+    expect(formatInit({ root: "/tmp/talks", created: [], kept: ["AGENTS.md"], next: [] })).toBe(
       "project at /tmp/talks is already set up\n  AGENTS.md (kept)",
     );
   });

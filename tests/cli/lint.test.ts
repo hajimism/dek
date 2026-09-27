@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { lintCommand } from "../../src/cli/lint.ts";
+import { resolveDecks } from "../../src/cli/scope.ts";
 import { mergeSarif, toSarif } from "../../src/core/sarif.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
@@ -141,7 +142,9 @@ describe("lintCommand", () => {
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = await lintCommand({ cwd: join(root, "decks", "demo") });
+        const result = await lintCommand(resolveDecks(join(root, "decks", "demo")), {
+          cwd: join(root, "decks", "demo"),
+        });
         expect(result.diagnostics).toEqual([]);
       },
     );
@@ -153,7 +156,9 @@ describe("lintCommand", () => {
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = await lintCommand({ cwd: join(root, "decks", "demo") });
+        const result = await lintCommand(resolveDecks(join(root, "decks", "demo")), {
+          cwd: join(root, "decks", "demo"),
+        });
         expect(result.skipped).toBeUndefined();
         expect(result.diagnostics).toEqual([]);
       },
@@ -187,7 +192,7 @@ more
       },
       async (root) => {
         const deckDir = join(root, "decks", "demo");
-        const result = await lintCommand({ cwd: deckDir, fix: true });
+        const result = await lintCommand(resolveDecks(deckDir), { cwd: deckDir, fix: true });
         expect(result.diagnostics.some((d) => d.id === "DEK001")).toBe(false);
 
         const intro = await Bun.file(join(deckDir, "slides", "intro.html")).text();
@@ -211,7 +216,9 @@ more
       async (root) => {
         await chmod(fakeRumdl, 0o755);
         await withEnv({ DEK_RUMDL: fakeRumdl }, async () => {
-          const result = await lintCommand({ cwd: join(root, "decks", "demo") });
+          const result = await lintCommand(resolveDecks(join(root, "decks", "demo")), {
+            cwd: join(root, "decks", "demo"),
+          });
           expect(result.diagnostics.some((d) => d.id === "MD013")).toBe(true);
           expect(result.diagnostics.some((d) => d.id === "DEK001")).toBe(false);
           const sarif = mergeSarif(
@@ -234,7 +241,10 @@ more
         await chmod(fakeRumdl, 0o755);
         const marker = join(root, "rumdl-fix");
         await withEnv({ DEK_RUMDL: fakeRumdl, RUMDL_FIX_MARKER: marker }, async () => {
-          await lintCommand({ cwd: join(root, "decks", "demo"), fix: true });
+          await lintCommand(resolveDecks(join(root, "decks", "demo")), {
+            cwd: join(root, "decks", "demo"),
+            fix: true,
+          });
           expect(await Bun.file(marker).exists()).toBe(false);
         });
       },
@@ -245,7 +255,9 @@ more
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const result = await lintCommand({ cwd: join(root, "decks", "demo") });
+        const result = await lintCommand(resolveDecks(join(root, "decks", "demo")), {
+          cwd: join(root, "decks", "demo"),
+        });
         expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(false);
       },
     );
@@ -275,7 +287,9 @@ more
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await withEnv({ DEK_RUMDL: "/no/such/rumdl" }, async () => {
-          const result = await lintCommand({ cwd: join(root, "decks", "demo") });
+          const result = await lintCommand(resolveDecks(join(root, "decks", "demo")), {
+            cwd: join(root, "decks", "demo"),
+          });
           expect(result.diagnostics).toEqual([]);
           expect(result.skipped).toEqual([
             {
@@ -295,7 +309,7 @@ more
         decks: [{ name: "alpha", slides: { intro: introHtml } }, { name: "beta" }],
       },
       async (root) => {
-        const result = await lintCommand({ cwd: root });
+        const result = await lintCommand(resolveDecks(root), { cwd: root });
         expect(result.diagnostics.some((d) => d.id === "DEK001" && d.path?.includes("beta"))).toBe(
           true,
         );
@@ -308,10 +322,7 @@ more
     await withTempProject(
       { decks: [{ name: "alpha", slides: { intro: introHtml } }] },
       async (root) => {
-        await expect(lintCommand({ cwd: root, deck: "nope" })).rejects.toMatchObject({
-          name: "DekError",
-          message: expect.stringContaining('deck "nope" not found'),
-        });
+        expect(() => resolveDecks(root, { deck: "nope" })).toThrow('deck "nope" not found');
       },
     );
   });

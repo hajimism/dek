@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { mvCommand } from "../../src/cli/mv.ts";
+import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { DekError } from "../../src/core/error.ts";
 import { runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
@@ -66,20 +67,46 @@ describe("mvCommand", () => {
         ],
       },
       async (root) => {
-        expect(() => mvCommand({ cwd: root, slug: "architecture", before: "intro" })).toThrow(
-          DekError,
-        );
+        expect(() =>
+          mvCommand(requireDeckFromCwd(root), { slug: "architecture", before: "intro" }),
+        ).toThrow(DekError);
 
-        const result = mvCommand({
-          cwd: root,
+        const result = mvCommand(requireDeckFromCwd(root, "demo"), {
           slug: "architecture",
           before: "intro",
-          deck: "demo",
         });
         expect(result).toMatchObject({ from: "architecture", before: "intro" });
         const script = await readFile(join(root, "decks", "demo", "script.md"), "utf8");
         expect(script.indexOf("## architecture")).toBeLessThan(script.indexOf("## intro"));
         expect(existsSync(join(root, "decks", "demo", "slides", "intro.html"))).toBe(true);
+      },
+    );
+  });
+
+  test("takes one of --before and --after, and says so as usage", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: twoSectionScript,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        expect(() =>
+          mvCommand(requireDeckFromCwd(root, "demo"), {
+            slug: "architecture",
+            before: "intro",
+            after: "intro",
+          }),
+        ).toThrow(
+          expect.objectContaining({
+            message: "use only one of --before or --after",
+            hint: expect.stringContaining("run `dek help mv`"),
+          }),
+        );
       },
     );
   });

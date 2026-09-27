@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { currentCommand, gotoCommand } from "../../src/cli/goto.ts";
+import { requireDeckFromCwd } from "../../src/cli/scope.ts";
+import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek, spawnDekServer } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -54,13 +56,13 @@ describe("dek goto / current", () => {
       const deckDir = join(root, "decks", "demo");
       const { stop } = await spawnDekServer(deckDir);
       try {
-        const gotoResult = await gotoCommand({ cwd: deckDir, slug: "architecture" });
+        const gotoResult = await gotoCommand(requireDeckFromCwd(deckDir), "architecture");
         expect(gotoResult).toMatchObject({
           slug: "architecture",
           slideIndex: 1,
           beatIndex: 0,
         });
-        const current = await currentCommand({ cwd: deckDir });
+        const current = await currentCommand(requireDeckFromCwd(deckDir));
         expect(current).toMatchObject({
           slug: "architecture",
           slideIndex: 1,
@@ -78,18 +80,36 @@ describe("gotoCommand", () => {
     await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await withDevServer({ cwd: root }, async () => {
-        const gotoResult = await gotoCommand({ cwd: deckDir, slug: "architecture" });
+        const gotoResult = await gotoCommand(requireDeckFromCwd(deckDir), "architecture");
         expect(gotoResult).toMatchObject({
           slug: "architecture",
           slideIndex: 1,
           beatIndex: 0,
         });
-        const current = await currentCommand({ cwd: deckDir });
+        const current = await currentCommand(requireDeckFromCwd(deckDir));
         expect(current).toMatchObject({
           slug: "architecture",
           slideIndex: 1,
           beatIndex: 0,
         });
+      });
+    });
+  });
+});
+
+describe("gotoCommand against a server for another deck", () => {
+  test("says which deck the running server serves instead of failing to parse", async () => {
+    const other = { ...twoSlideDeck, name: "other" };
+    await withTempProject({ decks: [twoSlideDeck, other] }, async (root) => {
+      await withDevServer({ cwd: root, deck: "demo" }, async () => {
+        const error = await gotoCommand(requireDeckFromCwd(root, "other"), "intro").catch(
+          (caught: unknown) => caught,
+        );
+        expect(error).toBeInstanceOf(DekError);
+        expect((error as DekError).message).toBe(
+          'the running dev server serves deck "demo", not "other"',
+        );
+        expect((error as DekError).hint).toContain("--deck demo");
       });
     });
   });

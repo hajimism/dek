@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { pdfCommand } from "../../src/cli/pdf.ts";
+import { resolveDecks } from "../../src/cli/scope.ts";
 import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
@@ -48,7 +49,7 @@ describe("pdfCommand", () => {
       async (root) => {
         await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
           try {
-            await pdfCommand({ cwd: join(root, "decks", "demo") });
+            await pdfCommand(resolveDecks(join(root, "decks", "demo")));
             throw new Error("expected DekError");
           } catch (error) {
             expect(error).toBeInstanceOf(DekError);

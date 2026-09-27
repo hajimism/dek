@@ -1,41 +1,13 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import {
-  displayWidth,
-  padEndWidth,
-  shouldColor,
-  terminalSafe,
-  truncateWidth,
-  wrap,
-} from "../../src/cli/tty.ts";
+import { describe, expect, test } from "bun:test";
+import { ansi, displayWidth, padEndWidth, shouldColor, terminalSafe } from "../../src/cli/tty.ts";
+import { withEnv } from "../helpers/env.ts";
 
-const envKeys = ["NO_COLOR", "FORCE_COLOR", "CI"] as const;
-const saved = new Map<string, string | undefined>();
-
-function stashEnv(): void {
-  for (const key of envKeys) {
-    saved.set(key, process.env[key]);
-  }
+/** The color variables unset, then `env` on top: each case starts from a clean slate. */
+function withColorEnv(env: Record<string, string>, fn: () => void): Promise<void> {
+  return withEnv({ NO_COLOR: undefined, FORCE_COLOR: undefined, CI: undefined, ...env }, async () =>
+    fn(),
+  );
 }
-
-function restoreEnv(): void {
-  for (const key of envKeys) {
-    const value = saved.get(key);
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
-}
-
-function clearColorEnv(): void {
-  delete process.env.NO_COLOR;
-  delete process.env.FORCE_COLOR;
-  delete process.env.CI;
-}
-
-stashEnv();
-afterEach(restoreEnv);
 
 describe("displayWidth", () => {
   test("counts CJK as two columns and ignores ANSI", () => {
@@ -52,57 +24,37 @@ describe("padEndWidth", () => {
   });
 });
 
-describe("truncateWidth", () => {
-  test("leaves short ASCII unchanged", () => {
-    expect(truncateWidth("demo", 10)).toBe("demo");
-  });
-
-  test("truncates CJK to a display width with an ellipsis", () => {
-    const truncated = truncateWidth("日本語タイトル", 8);
-    expect(displayWidth(truncated)).toBeLessThanOrEqual(8);
-    expect(truncated.endsWith("...")).toBe(true);
-    expect(truncated.startsWith("日")).toBe(true);
-  });
-});
-
 describe("shouldColor", () => {
-  test.serial("NO_COLOR wins even on a TTY", () => {
-    clearColorEnv();
-    process.env.NO_COLOR = "1";
-    expect(shouldColor({ isTTY: true })).toBe(false);
+  test("NO_COLOR wins even on a TTY", async () => {
+    await withColorEnv({ NO_COLOR: "1", FORCE_COLOR: "1" }, () => {
+      expect(shouldColor({ isTTY: true })).toBe(false);
+    });
   });
 
-  test.serial("FORCE_COLOR wins even when not a TTY", () => {
-    clearColorEnv();
-    process.env.FORCE_COLOR = "1";
-    expect(shouldColor({ isTTY: false })).toBe(true);
+  test("FORCE_COLOR wins even when not a TTY", async () => {
+    await withColorEnv({ FORCE_COLOR: "1", CI: "1" }, () => {
+      expect(shouldColor({ isTTY: false })).toBe(true);
+    });
   });
 
-  test.serial("CI disables color without FORCE_COLOR", () => {
-    clearColorEnv();
-    process.env.CI = "1";
-    expect(shouldColor({ isTTY: true })).toBe(false);
+  test("CI disables color without FORCE_COLOR", async () => {
+    await withColorEnv({ CI: "1" }, () => {
+      expect(shouldColor({ isTTY: true })).toBe(false);
+    });
   });
 
-  test.serial("TTY enables color when no env overrides are set", () => {
-    clearColorEnv();
-    expect(shouldColor({ isTTY: true })).toBe(true);
-    expect(shouldColor({ isTTY: false })).toBe(false);
+  test("TTY enables color when no env overrides are set", async () => {
+    await withColorEnv({}, () => {
+      expect(shouldColor({ isTTY: true })).toBe(true);
+      expect(shouldColor({ isTTY: false })).toBe(false);
+    });
   });
 });
 
-describe("wrap", () => {
-  test.serial("wraps red on a TTY", () => {
-    clearColorEnv();
-    const colored = wrap({ isTTY: true }).red("x");
-    expect(colored).toContain("\x1b[31m");
-    expect(colored).toContain("x");
-    expect(colored).toContain("\x1b[0m");
-  });
-
-  test.serial("is a no-op when not a TTY", () => {
-    clearColorEnv();
-    expect(wrap({ isTTY: false }).red("x")).toBe("x");
+describe("ansi", () => {
+  test("wraps red when enabled, and is a no-op when not", () => {
+    expect(ansi(true).red("x")).toBe("\x1b[31mx\x1b[0m");
+    expect(ansi(false).red("x")).toBe("x");
   });
 });
 

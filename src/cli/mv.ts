@@ -1,6 +1,6 @@
-import { DekError } from "../core/error.ts";
 import { renameSection, reorderSection } from "../core/mv.ts";
-import { requireDeckFromCwd } from "./scope.ts";
+import type { DeckTarget } from "./scope.ts";
+import { usageError } from "./usage.ts";
 
 export type MvResult = {
   from: string;
@@ -9,42 +9,28 @@ export type MvResult = {
   after?: string;
 };
 
-export function mvCommand(options: {
-  cwd: string;
-  slug?: string;
-  to?: string;
-  before?: string;
-  after?: string;
-  deck?: string;
-}): MvResult {
-  const slug = options.slug?.trim();
-  if (!slug) {
-    throw new DekError("usage: dek mv <old> <new> | dek mv <slug> --before|--after <slug>", {
-      hint: "for example, `dek mv intro opening` or `dek mv intro --after agenda`",
-    });
+/** A rename to `to`, or a move before or after another section: exactly one of them. */
+export function mvCommand(
+  { project, deck }: DeckTarget,
+  options: { slug: string; to?: string; before?: string; after?: string },
+): MvResult {
+  const { slug, to, before, after } = options;
+  if (before && after) {
+    throw usageError("mv", "use only one of --before or --after", { match: "--before" });
   }
-
-  const { project, deck } = requireDeckFromCwd(options.cwd, options.deck);
-
-  if (options.before || options.after) {
-    if (options.before && options.after) {
-      throw new DekError("use only one of --before or --after", {
-        hint: "usage: dek mv <slug> --before|--after <slug>",
+  const place = before ? { before } : after ? { after } : undefined;
+  if (place) {
+    if (to !== undefined) {
+      throw usageError("mv", `unexpected argument "${to}" for dek mv --before|--after`, {
+        match: "--before",
       });
     }
-    reorderSection({ project, deck }, slug, { before: options.before, after: options.after });
-    return {
-      from: slug,
-      ...(options.before ? { before: options.before } : {}),
-      ...(options.after ? { after: options.after } : {}),
-    };
+    reorderSection({ project, deck }, slug, place);
+    return { from: slug, ...place };
   }
 
-  const to = options.to?.trim();
-  if (!to) {
-    throw new DekError("usage: dek mv <old> <new>", {
-      hint: "for example, `dek mv intro opening`",
-    });
+  if (to === undefined) {
+    throw usageError("mv", "missing <new> for dek mv", { match: "<new>" });
   }
   renameSection({ project, deck }, slug, to);
   return { from: slug, to };

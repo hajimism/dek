@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { lsCommand } from "../../src/cli/ls.ts";
+import { formatText } from "../../src/cli/result.ts";
+import { resolveTarget } from "../../src/cli/scope.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -48,6 +50,31 @@ describe("dek ls", () => {
 });
 
 describe("lsCommand", () => {
+  test("lists a dek.toml finding once, for the project, not on each deck's row", async () => {
+    await withTempProject(
+      {
+        toml: "bogus = 1\n",
+        decks: [
+          { name: "alpha", slides: { intro: introHtml } },
+          { name: "beta", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true }));
+        if (result.kind !== "list") {
+          throw new Error("expected list");
+        }
+        expect(result.diagnostics.map((d) => [d.id, d.path])).toEqual([
+          ["DEK008", join(root, "dek.toml")],
+        ]);
+        expect(result.decks.map((deck) => deck.diagnostics)).toEqual([[], []]);
+        expect(formatText({ command: "ls", data: result }).split("\n").at(-1)).toBe(
+          "project  1 diagnostic",
+        );
+      },
+    );
+  });
+
   test("includes decks that failed to load", async () => {
     await withTempProject(
       {
@@ -55,7 +82,7 @@ describe("lsCommand", () => {
       },
       async (root) => {
         await mkdir(join(root, "decks", "orphan"), { recursive: true });
-        const result = lsCommand({ cwd: root });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true }));
         if (result.kind !== "list") {
           throw new Error("expected list");
         }
@@ -90,7 +117,7 @@ body
         ],
       },
       async (root) => {
-        const result = lsCommand({ cwd: root, deck: "demo" });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }
@@ -110,7 +137,9 @@ body
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = lsCommand({ cwd: join(root, "decks", "demo") });
+        const result = lsCommand(
+          resolveTarget(join(root, "decks", "demo"), "decks", { refs: true }),
+        );
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }
@@ -126,7 +155,7 @@ body
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = lsCommand({ cwd: root, deck: "demo" });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }
@@ -158,7 +187,7 @@ a b c d e f g h i j k l m
         ],
       },
       async (root) => {
-        const result = lsCommand({ cwd: root, deck: "demo" });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }
@@ -198,7 +227,7 @@ duration: 10m
         ],
       },
       async (root) => {
-        const result = lsCommand({ cwd: root, deck: "demo" });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }
@@ -242,7 +271,7 @@ a b c d e f g h i j k l m
         ],
       },
       async (root) => {
-        const result = lsCommand({ cwd: root, deck: "demo" });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }
@@ -298,7 +327,7 @@ body
             ],
           }),
         );
-        const result = lsCommand({ cwd: root, deck: "demo" });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }
@@ -331,7 +360,7 @@ hello
         ],
       },
       async (root) => {
-        const result = lsCommand({ cwd: root, deck: "demo" });
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
         if (result.kind !== "deck") {
           throw new Error("expected deck");
         }

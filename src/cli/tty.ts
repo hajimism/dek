@@ -42,17 +42,6 @@ function paint(enabled: boolean, code: string, text: string): string {
   return `${code}${text}${reset}`;
 }
 
-export function wrap(stream: ColorStream): {
-  red(s: string): string;
-  yellow(s: string): string;
-  green(s: string): string;
-  cyan(s: string): string;
-  dim(s: string): string;
-  bold(s: string): string;
-} {
-  return ansi(shouldColor(stream));
-}
-
 export function ansi(enabled: boolean): {
   red(s: string): string;
   yellow(s: string): string;
@@ -89,21 +78,4 @@ export function padStartWidth(s: string, width: number): string {
     return s;
   }
   return `${" ".repeat(extra)}${s}`;
-}
-
-export function truncateWidth(s: string, width: number): string {
-  if (displayWidth(s) <= width) {
-    return s;
-  }
-  const ellipsis = "...";
-  const budget = Math.max(0, width - displayWidth(ellipsis));
-  let cut = "";
-  for (const char of s) {
-    const next = `${cut}${char}`;
-    if (displayWidth(next) > budget) {
-      break;
-    }
-    cut = next;
-  }
-  return `${cut}${ellipsis}`;
 }

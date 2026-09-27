@@ -1,5 +1,6 @@
+import type { Diagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
-import { type Diagnostic, lintDeck } from "../core/index.ts";
+import { lintDeck } from "../core/lint.ts";
 import {
   PLAYWRIGHT_INSTALL,
   type PlaywrightRunner,
@@ -8,7 +9,7 @@ import {
 import { runVisualDeck } from "../core/visual.ts";
 import { hasVoice, loadCachedTimeline, VOICE_SETUP_HINT } from "../core/voice.ts";
 import { type SkippedCheck, skippedChecks } from "./result.ts";
-import { requireDeckFromCwd, requireSection } from "./scope.ts";
+import { type DeckTarget, requireSection } from "./scope.ts";
 
 export type VoiceCheckBeat = {
   beatIndex: number;
@@ -26,20 +27,11 @@ export type CheckCliResult = {
   voice?: { beats: VoiceCheckBeat[] };
 };
 
-export async function checkCommand(options: {
-  cwd: string;
-  slug?: string;
-  shot?: boolean;
-  voice?: boolean;
-  deck?: string;
-  runner?: PlaywrightRunner;
-}): Promise<CheckCliResult> {
-  const slug = options.slug?.trim();
-  if (!slug) {
-    throw new DekError("usage: dek check <slug>", { hint: "run `dek ls` to see the slugs" });
-  }
-
-  const { project, deck } = requireDeckFromCwd(options.cwd, options.deck);
+export async function checkCommand(
+  { project, deck }: DeckTarget,
+  options: { slug: string; shot?: boolean; voice?: boolean; runner?: PlaywrightRunner },
+): Promise<CheckCliResult> {
+  const { slug } = options;
   requireSection(deck, slug);
 
   const diagnostics = lintDeck({ project, deck }, { slug });

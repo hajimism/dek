@@ -21,11 +21,13 @@ export async function keepDevServer(server: DevServer): Promise<void> {
     process.on(signal, stop);
   }
   onOrphaned(stop);
-  void (async () => {
-    for await (const event of server.events) {
-      writeDevEvent(event, process.stderr, { cwd: process.cwd() });
-    }
-  })();
+  // A server scoped to one deck has nothing to tell apart; one that serves several names each.
+  server.events.listen((event) =>
+    writeDevEvent(event, process.stderr, {
+      cwd: process.cwd(),
+      ...(server.deckDir === undefined ? { deck: event.deck } : {}),
+    }),
+  );
   await new Promise<void>(() => {
     /* keep the process alive until stopped */
   });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defaultScript } from "../../src/cli/files.ts";
-import { parseScript } from "../../src/core/index.ts";
+import { parseScript } from "../../src/core/parse.ts";
 
 describe("defaultScript", () => {
   test("quotes titles that would break YAML", () => {

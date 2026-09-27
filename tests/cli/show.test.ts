@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { formatText } from "../../src/cli/result.ts";
+import { resolveTarget } from "../../src/cli/scope.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -55,7 +58,10 @@ describe("showCommand", () => {
         ],
       },
       async (root) => {
-        const result = showCommand({ cwd: root, slug: "intro", deck: "beta" });
+        const result = showCommand(
+          resolveTarget(root, "deck", { refs: true, deck: "beta" }),
+          "intro",
+        );
         expect(result.slug).toBe("intro");
       },
     );
@@ -63,12 +69,39 @@ describe("showCommand", () => {
 
   test("returns html null when the slide file is missing", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      const result = showCommand({ cwd: join(root, "decks", "demo"), slug: "intro" });
+      const result = showCommand(
+        resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+        "intro",
+      );
       expect(result.slug).toBe("intro");
       expect(result.script).toContain("hello");
       expect(result.html).toBeNull();
     });
   });
+});
+
+describe("showCommand and links", () => {
+  // What show prints is what a build would publish; a link out of the project is neither.
+  test.each(["slides/intro.html", "slides/intro.css", "slides/intro.ts", "theme.css"])(
+    "refuses a %s that links out of the project, as the build does",
+    async (file) => {
+      await withTempDir(async (outside) => {
+        const secret = join(outside, "secret.css");
+        await writeFile(secret, "SECRET_TOKEN=ghp_1234");
+        await withTempProject(
+          { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+          async (root) => {
+            const deckDir = join(root, "decks", "demo");
+            await rm(join(deckDir, file), { force: true });
+            await symlink(secret, join(deckDir, file));
+            expect(() =>
+              showCommand(resolveTarget(deckDir, "deck", { refs: true }), "intro"),
+            ).toThrow("leads outside the project");
+          },
+        );
+      });
+    },
+  );
 });
 
 describe("show as a reading entry point", () => {
@@ -99,7 +132,10 @@ describe("show as a reading entry point", () => {
 
   test("returns the slide's stylesheet, motion module, theme excerpt, and assets", async () => {
     await withTempProject(spec, async (root) => {
-      const result = showCommand({ cwd: root, slug: "intro", deck: "demo" });
+      const result = showCommand(
+        resolveTarget(root, "deck", { refs: true, deck: "demo" }),
+        "intro",
+      );
       expect(result.css).toContain(".slide .mine");
       expect(result.ts).toContain("satisfies DekSlide");
       expect(result.theme).toContain(".slide .card {");
@@ -113,7 +149,10 @@ describe("show as a reading entry point", () => {
 
   test("returns null for the files a slide does not have", async () => {
     await withTempProject({ decks: [{ name: "demo", theme: null }] }, async (root) => {
-      const result = showCommand({ cwd: join(root, "decks", "demo"), slug: "intro" });
+      const result = showCommand(
+        resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+        "intro",
+      );
       expect(result.css).toBeNull();
       expect(result.ts).toBeNull();
       expect(result.theme).toBeNull();
@@ -125,7 +164,7 @@ describe("show as a reading entry point", () => {
     await withTempProject(spec, async (root) => {
       const out = formatText({
         command: "show",
-        data: showCommand({ cwd: root, slug: "intro", deck: "demo" }),
+        data: showCommand(resolveTarget(root, "deck", { refs: true, deck: "demo" }), "intro"),
       });
       const order = [
         "--- script.md",

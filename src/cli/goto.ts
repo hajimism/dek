@@ -1,6 +1,7 @@
 import { DekError } from "../core/error.ts";
+import { deckRoutePath } from "../runtime/routes.ts";
 import { isPidAlive, readDevServerLock } from "../server/lock.ts";
-import { requireDeckFromCwd, requireProject, requireSection } from "./scope.ts";
+import { type DeckTarget, requireSection } from "./scope.ts";
 
 export type NavResult = {
   slug: string;
@@ -8,41 +9,31 @@ export type NavResult = {
   beatIndex: number;
 };
 
-export async function gotoCommand(options: {
-  cwd: string;
-  slug?: string;
-  deck?: string;
-}): Promise<NavResult> {
-  const slug = options.slug?.trim();
-  if (!slug) {
-    throw new DekError("usage: dek goto <slug>", { hint: "run `dek ls` to see the slugs" });
-  }
-  const { deck } = requireDeckFromCwd(options.cwd, options.deck);
-  requireSection(deck, slug);
-  return requestDevServer(options.cwd, deck.name, {
+export async function gotoCommand(target: DeckTarget, slug: string): Promise<NavResult> {
+  requireSection(target.deck, slug);
+  return requestDevServer(target, {
     method: "POST",
     path: "goto",
     body: { slug },
   });
 }
 
-export async function currentCommand(options: { cwd: string; deck?: string }): Promise<NavResult> {
-  const { deck } = requireDeckFromCwd(options.cwd, options.deck);
-  return requestDevServer(options.cwd, deck.name, { method: "GET", path: "current" });
+export async function currentCommand(target: DeckTarget): Promise<NavResult> {
+  return requestDevServer(target, { method: "GET", path: "current" });
 }
 
 async function requestDevServer(
-  cwd: string,
-  deckName: string,
+  { project, deck }: DeckTarget,
   request: { method: "GET" | "POST"; path: "goto" | "current"; body?: { slug: string } },
 ): Promise<NavResult> {
-  const project = requireProject(cwd);
+  const deckName = deck.name;
   const lock = readDevServerLock(project.root);
   if (!lock || !isPidAlive(lock.pid)) {
     throw new DekError("dev server is not running", { hint: "run `dek`" });
   }
 
-  const url = new URL(`/decks/${deckName}/${request.path}`, lock.url);
+  // Under /decks/<name> whether or not the server is scoped to this deck; a scoped one takes both.
+  const url = new URL(deckRoutePath(deckName, { kind: request.path }), lock.url);
   const headers: Record<string, string> = {};
   if (request.body) {
     headers["content-type"] = "application/json";
@@ -55,6 +46,10 @@ async function requestDevServer(
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: request.body ? JSON.stringify(request.body) : undefined,
   });
+  // Only the nav routes answer JSON; a 404, 401, or 405 from the server itself is plain text.
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw refusal(response.status, lock, deckName, request.path);
+  }
   const json = (await response.json()) as {
     ok?: boolean;
     slug?: string;
@@ -72,4 +67,26 @@ async function requestDevServer(
     slideIndex: json.slideIndex ?? 0,
     beatIndex: json.beatIndex ?? 0,
   };
+}
+
+/** Why the server turned the request away before a nav route saw it. */
+function refusal(
+  status: number,
+  lock: { url: string; deck?: string },
+  deckName: string,
+  path: string,
+): DekError {
+  if (status === 404 && lock.deck !== undefined && lock.deck !== deckName) {
+    return new DekError(`the running dev server serves deck "${lock.deck}", not "${deckName}"`, {
+      hint: `pass --deck ${lock.deck}, or stop the server at ${lock.url} and run \`dek ${deckName}\``,
+    });
+  }
+  if (status === 401) {
+    return new DekError(`the dev server at ${lock.url} refused the password in .dek/server.json`, {
+      hint: "restart it: stop `dek` and run it again",
+    });
+  }
+  return new DekError(`dev server ${path} failed with HTTP ${status}`, {
+    hint: `restart the server at ${lock.url}: stop \`dek\` and run it again`,
+  });
 }

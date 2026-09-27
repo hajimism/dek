@@ -1,107 +1,8 @@
 import { isAbsolute, relative } from "node:path";
 import type { Diagnostic } from "../core/diagnostic.ts";
-import { DekError } from "../core/error.ts";
-import type { DevEvent } from "../server/dev.ts";
-import type { InitResult } from "./init.ts";
+import { type ErrorFields, errorFields } from "../core/error.ts";
+import type { LiveEvent } from "../core/live-protocol.ts";
 import { ansi, displayWidth, padEndWidth, padStartWidth } from "./tty.ts";
-
-export function helpText(): string {
-  return `dek — a build system for talks
-
-Dev
-  dek [deck] [--visual] [--port N]
-                      start the dev server; --visual lints overflow/contrast on save
-  dek --remote        share on LAN; presenter notes are password-protected
-  dek rehearse [slug] auto-advance from a Timeline (no video); --remote shares it
-
-Project
-  dek init [dir] [--deck NAME]
-                      create a project, optionally with a first deck
-  dek new <name> [--theme-from DECK]
-                      add a deck
-  dek ls [deck]       list decks or show one
-
-Refs (other people's decks to read as models; read-only)
-  dek ref owner/repo/deck[@rev]
-                      pin and fetch one (a GitHub link works too); again moves the pin
-  dek ref             list pinned refs
-  dek ref rm <ref>    drop one
-  dek ls|show|theme|shot <ref> ...
-                      read a ref as you would a deck
-
-Slide
-  dek show <slug>     print a slide's script, HTML, CSS, TS, theme rules, assets
-  dek theme [layout]  list the deck theme's layouts, classes, and tokens; print a layout's markup
-  dek check <slug>    lint one slide; --shot adds a screenshot; --voice adds readings
-  dek shot [slug]     write screenshots; --step <id|n> picks a beat
-  dek shot <a> --to <b> [--at 0.5]
-                      freeze the transition from a into b (morph check)
-  dek mv <old> <new>  rename a section id and its HTML
-  dek mv <slug> --before|--after <slug>
-                      reorder a section
-  dek goto <slug>     jump the open browser
-  dek current         print the slide on screen
-  dek sync            create missing skeletons; refresh or drop the ones nobody edited
-
-CI
-  dek lint [--fix]    check script.md against slides; --fix syncs first
-  dek lint --visual   add overflow and contrast rules
-  dek cues            print spoken paragraphs as Cue[]
-  dek voice           synthesize changed sentences
-  dek voice speakers  list engine speakers
-  dek voice say TEXT  speak one sentence
-  dek voice dict add  add a reading
-  dek voice pin       pin TTS master.wav + timeline.json
-  dek build [--root-dist]
-                      write a single HTML file
-  dek video [slug] [--fps N] [--root-dist]
-                      bake dist/<deck>.mp4 (or one slide under .cache/video/)
-  dek pdf [--root-dist]
-                      write a PDF
-  dek help [command]  show this help, or one command's usage and flags
-
-Commands that print a result accept --json. dek and dek rehearse stay running.
-Pass a deck name or --deck <name> to target a deck from the project root.
-Flags are checked per command: an unknown flag is an error, not ignored.
-dek <command> --help  one command's usage and flags; dek --version prints the version
-dek help --agent      compact command reference for agents
-`;
-}
-
-export function agentHelpText(): string {
-  return `dek — agent interface
-Result commands accept --json. dek / rehearse do not (long-running). Diagnostics: dek lint --format sarif.
-Each diagnostic has severity (error | warning) and data; only errors exit 1.
-Scope: project root = all decks; deck dir = that deck; NAME or --deck NAME.
-
-dek [deck] [--visual] [--port N]
-dek --remote
-dek rehearse [slug] [--remote]
-dek init [dir] [--deck NAME]
-dek new <name> [--theme-from DECK]
-dek ls [deck]
-dek show <slug>     script, HTML, CSS, TS, the theme rules it uses, assets
-dek ref [owner/repo/deck[@rev] | github-link]   pin + fetch; no args lists; dek ref rm REF
-Refs are read-only decks to learn from: ls, show, theme, shot take owner/repo/deck as the deck.
-dek theme [layout]  deck theme: layouts, classes, tokens; with a layout, its example markup
-dek mv <old> <new> | dek mv <slug> --before|--after <slug>
-dek sync            create missing skeletons; refresh or drop untouched ones; never edits your slides
-dek lint [--fix] [--visual] [--format sarif]
-dek cues
-dek voice [speakers | say TEXT | dict add WORD KANA | pin]
-dek check <slug> [--shot] [--voice]
-dek shot [slug] [--step <id|n>]
-dek shot <a> --to <b> [--at 0..1]   frame of the a→b transition, default 0.5
-dek goto <slug>     requires running dek
-dek current         requires running dek
-dek build [--root-dist]
-dek video [slug] [--fps N] [--root-dist]
-dek pdf [--root-dist]
-dek help [command] | dek <command> --help | dek --version
-
-Errors include hint with the next command to run.
-`;
-}
 
 function formatLocation(location: { path?: string; line?: number; column?: number }): string {
   if (location.path !== undefined && location.line !== undefined) {
@@ -138,12 +39,7 @@ export function formatDiagnostics(
   return lines.join("\n");
 }
 
-export type FormattedError = {
-  message: string;
-  path?: string;
-  line?: number;
-  hint?: string;
-};
+export type FormattedError = ErrorFields;
 
 /** A path as the reader should type it: relative to `cwd` when one is given. */
 export function displayPath(path: string, cwd?: string): string {
@@ -154,15 +50,10 @@ export function displayPath(path: string, cwd?: string): string {
 }
 
 export function formatError(error: unknown, opts?: { cwd?: string }): FormattedError {
-  if (error instanceof DekError) {
-    return {
-      message: error.message,
-      ...(error.path !== undefined ? { path: displayPath(error.path, opts?.cwd) } : {}),
-      ...(error.line !== undefined ? { line: error.line } : {}),
-      ...(error.hint !== undefined ? { hint: error.hint } : {}),
-    };
-  }
-  return { message: error instanceof Error ? error.message : String(error) };
+  const fields = errorFields(error);
+  return fields.path === undefined
+    ? fields
+    : { ...fields, path: displayPath(fields.path, opts?.cwd) };
 }
 
 export function formatErrorText(error: unknown, opts?: { color?: boolean; cwd?: string }): string {
@@ -198,16 +89,6 @@ export function formatTable(
   return [line(headers), ...rows.map((row) => line(row))].join("\n");
 }
 
-/** What init wrote, then each file it found already there and left as it was. */
-export function formatInit(data: Pick<InitResult, "root" | "created" | "kept">): string {
-  const header =
-    data.created.length > 0
-      ? `created project at ${data.root}`
-      : `project at ${data.root} is already set up`;
-  const lines = [...data.created, ...data.kept.map((path) => `${path} (kept)`)];
-  return [header, ...lines.map((line) => `  ${line}`)].join("\n");
-}
-
 export function formatCreated(
   created: string[],
   updated: string[] = [],
@@ -223,7 +104,26 @@ export function formatCreated(
   return [header, ...lines.map((line) => `  ${line}`)].join("\n");
 }
 
-export function formatDevEvent(event: DevEvent, opts?: { cwd?: string }): string | null {
+/**
+ * A dev server event as the terminal shows it. `deck` names the deck on each line that starts an
+ * entry, for a server that serves several; lines that continue one stay indented under it.
+ */
+export function formatDevEvent(
+  event: LiveEvent,
+  opts?: { cwd?: string; deck?: string },
+): string | null {
+  const text = formatLiveEvent(event, opts?.cwd);
+  const deck = opts?.deck;
+  if (text === null || deck === undefined) {
+    return text;
+  }
+  return text
+    .split("\n")
+    .map((line) => (/^\s/.test(line) ? line : `[${deck}] ${line}`))
+    .join("\n");
+}
+
+function formatLiveEvent(event: LiveEvent, cwd: string | undefined): string | null {
   switch (event.type) {
     case "reload-slide":
       return `reload-slide ${event.slug}`;
@@ -238,18 +138,16 @@ export function formatDevEvent(event: DevEvent, opts?: { cwd?: string }): string
       }
       return formatCreated(event.created, event.updated, event.removed);
     case "diagnostics":
-      return event.diagnostics.length === 0
-        ? null
-        : formatDiagnostics(event.diagnostics, { cwd: opts?.cwd });
+      return event.diagnostics.length === 0 ? null : formatDiagnostics(event.diagnostics, { cwd });
     case "timeline":
       return "timeline";
   }
 }
 
 export function writeDevEvent(
-  event: DevEvent,
+  event: LiveEvent,
   stream: { write(chunk: string): unknown },
-  opts?: { cwd?: string },
+  opts?: { cwd?: string; deck?: string },
 ): void {
   const text = formatDevEvent(event, opts);
   if (text) {

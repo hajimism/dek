@@ -1,11 +1,11 @@
-import { join } from "node:path";
 import { classifyAssetRef } from "../core/assets.ts";
-import { cssUrls, themeExcerpt } from "../core/css.ts";
-import { scanSlideHtml } from "../core/html.ts";
-import { DekError } from "../core/index.ts";
-import { readTextIfExists } from "../core/resolve.ts";
+import { cssUrls, parseCss } from "../core/css.ts";
+import { deckPaths } from "../core/deck-paths.ts";
+import { scanSlideHtml } from "../core/html-scan.ts";
+import { readDeckFile } from "../core/resolve.ts";
+import { themeExcerpt } from "../core/theme-excerpt.ts";
 import { formatSectionScript } from "../core/timing.ts";
-import { type RefInfo, requireReadableDeck, requireSection } from "./scope.ts";
+import { type ReadableDeck, type RefInfo, requireSection } from "./scope.ts";
 
 /**
  * Everything one slide is made of, read in one call: enough to learn how it is
@@ -28,34 +28,31 @@ export type ShowResult = {
   ref?: RefInfo;
 };
 
-export function showCommand(options: { cwd: string; slug?: string; deck?: string }): ShowResult {
-  const slug = options.slug?.trim();
-  if (!slug) {
-    throw new DekError("usage: dek show <slug>", { hint: "run `dek ls` to see the slugs" });
-  }
-
-  const { deck, ref } = requireReadableDeck(options.cwd, options.deck);
+export function showCommand({ deck, ref }: ReadableDeck, slug: string): ShowResult {
   const section = requireSection(deck, slug);
 
-  const slidesDir = join(deck.dir, "slides");
-  const html = readIfExists(join(slidesDir, `${slug}.html`));
-  const css = readIfExists(join(slidesDir, `${slug}.css`));
-  const ts = readIfExists(join(slidesDir, `${slug}.ts`));
-  const themeCss = readIfExists(join(deck.dir, "theme.css"));
+  const paths = deckPaths(deck.dir);
+  // Through the same link rules as the build: show prints nothing a build would refuse.
+  const read = (path: string): string | null => readDeckFile(deck.dir, path) ?? null;
+  const html = read(paths.slide(slug, ".html"));
+  const css = read(paths.slide(slug, ".css"));
+  const ts = read(paths.slide(slug, ".ts"));
+  const themeCss = read(paths.theme);
   const scan = html === null ? undefined : scanSlideHtml(html);
+  const sheet = css === null ? undefined : parseCss(css);
 
   const theme =
     themeCss === null
       ? null
-      : themeExcerpt(themeCss, {
+      : themeExcerpt(parseCss(themeCss), {
           classes: scan?.classes ?? [],
           ...(scan?.layout !== undefined ? { layout: scan.layout } : {}),
-          ...(css !== null ? { css } : {}),
+          ...(sheet ? { css: sheet } : {}),
         });
 
   const refs = [
     ...(scan?.refs.map((ref) => ref.value) ?? []),
-    ...(css === null ? [] : cssUrls(css).map((url) => url.value)),
+    ...(sheet ? cssUrls(sheet).map((url) => url.value) : []),
   ];
 
   return {
@@ -66,13 +63,9 @@ export function showCommand(options: { cwd: string; slug?: string; deck?: string
     css,
     ts,
     theme,
-    assets: existingRefs(refs, slidesDir, deck.dir),
+    assets: existingRefs(refs, paths.slides, deck.dir),
     ...(ref ? { ref } : {}),
   };
-}
-
-function readIfExists(path: string): string | null {
-  return readTextIfExists(path) ?? null;
 }
 
 /**

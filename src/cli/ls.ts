@@ -1,21 +1,18 @@
 import { type DekConfig, loadConfig } from "../core/config.ts";
-import {
-  type Diagnostic,
-  lintDeck,
-  listSlides,
-  type Project,
-  type ProjectDeck,
-} from "../core/index.ts";
-import { isRefName } from "../core/ref.ts";
+import type { Diagnostic } from "../core/diagnostic.ts";
+import { lintDeck, lintProject } from "../core/lint.ts";
+import { listSlides, type Project, type ProjectDeck } from "../core/resolve.ts";
 import { slideVideoSeconds, timelineSeconds } from "../core/timeline.ts";
 import { sectionTiming } from "../core/timing.ts";
 import { tryLoadCachedTimeline } from "../core/voice.ts";
 import { type SkippedCheck, skippedChecks } from "./result.ts";
-import { type RefInfo, requireDeck, requireReadableDeck, resolveScope } from "./scope.ts";
+import type { DecksTarget, RefInfo } from "./scope.ts";
 
 export type LsListResult = {
   kind: "list";
   root: string;
+  /** The project's own findings (dek.toml), once: no deck's row repeats them. */
+  diagnostics: Diagnostic[];
   decks: Array<{
     name: string;
     title: string;
@@ -52,40 +49,27 @@ export type LsDeckResult = {
   ref?: RefInfo;
 };
 
-export function lsCommand(options: {
-  cwd: string;
-  deck?: string;
-  positionalDeck?: string;
-}): LsListResult | LsDeckResult {
-  const named = options.deck ?? options.positionalDeck;
-  if (named !== undefined && isRefName(named)) {
-    const { project, deck, ref } = requireReadableDeck(options.cwd, named);
+/** The one deck in scope, a ref included, or else every deck of the project. */
+export function lsCommand(target: DecksTarget): LsListResult | LsDeckResult {
+  const { project, deck, ref } = target;
+  if (deck && ref) {
     return {
       ...formatDeck(deck, loadConfig(project.configPath), project, { lint: false }),
       ...skippedChecks([
         { check: "lint", reason: "a ref is read-only; its problems are not yours to fix" },
       ]),
-      ...(ref ? { ref } : {}),
+      ref,
     };
   }
-  const scope = resolveScope(options.cwd, {
-    deck: options.deck,
-    positionalDeck: options.positionalDeck,
-  });
-
-  if (options.deck || options.positionalDeck || scope.deck) {
-    return formatDeck(
-      requireDeck(scope, options.cwd),
-      loadConfig(scope.project.configPath),
-      scope.project,
-    );
+  if (deck) {
+    return formatDeck(deck, loadConfig(project.configPath), project);
   }
-
   return {
     kind: "list",
-    root: scope.project.root,
-    decks: scope.project.decks.map((deck) => summarizeDeck(deck, scope.project)),
-    failed: scope.project.failed.map((entry) => ({ name: entry.name })),
+    root: project.root,
+    diagnostics: lintProject(project),
+    decks: project.decks.map((entry) => summarizeDeck(entry, project)),
+    failed: project.failed.map((entry) => ({ name: entry.name })),
   };
 }
 

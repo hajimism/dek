@@ -1,15 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parseCommandLine } from "../../src/cli/flags.ts";
+import { bindCommandLine } from "../../src/cli/main.ts";
 import {
   inferDeckName,
-  peelDeckArg,
   requireDeckFromCwd,
   requireSection,
   resolveDecks,
   resolveScope,
 } from "../../src/cli/scope.ts";
-import { DekError, resolveProject } from "../../src/core/index.ts";
+import { DekError } from "../../src/core/error.ts";
+import { resolveProject } from "../../src/core/resolve.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 describe("inferDeckName", () => {
@@ -118,85 +120,88 @@ describe("resolveDecks", () => {
   });
 });
 
-describe("peelDeckArg", () => {
+describe("the deck a command line names", () => {
+  const bind = (cwd: string, argv: string[]) => {
+    const { deck, args } = bindCommandLine(cwd, parseCommandLine(argv));
+    return { deck, args };
+  };
+
   test("takes a positional deck for lint from the project root", async () => {
     await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
-      expect(peelDeckArg(root, { command: "lint", args: ["beta"] })).toEqual({
-        deck: "beta",
-        rest: [],
-      });
+      expect(bind(root, ["lint", "beta"])).toEqual({ deck: "beta", args: {} });
     });
   });
 
   test("keeps --deck and leaves remaining args alone", async () => {
     await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
-      expect(peelDeckArg(root, { command: "show", deck: "beta", args: ["intro"] })).toEqual({
+      expect(bind(root, ["show", "--deck", "beta", "intro"])).toEqual({
         deck: "beta",
-        rest: ["intro"],
+        args: { slug: "intro" },
       });
     });
   });
 
   test("peels a known deck before a slug from the project root", async () => {
     await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
-      expect(peelDeckArg(root, { command: "show", args: ["beta", "intro"] })).toEqual({
+      expect(bind(root, ["show", "beta", "intro"])).toEqual({
         deck: "beta",
-        rest: ["intro"],
+        args: { slug: "intro" },
       });
-      expect(peelDeckArg(root, { command: "shot", args: ["beta"] })).toEqual({
-        deck: "beta",
-        rest: [],
-      });
+      expect(bind(root, ["shot", "beta"])).toEqual({ deck: "beta", args: { slug: undefined } });
     });
   });
 
   test("does not steal a slug when cwd is already a deck", async () => {
     await withTempProject({ decks: [{ name: "intro" }, { name: "demo" }] }, async (root) => {
-      expect(
-        peelDeckArg(join(root, "decks", "demo"), { command: "shot", args: ["intro"] }),
-      ).toEqual({ rest: ["intro"] });
+      expect(bind(join(root, "decks", "demo"), ["shot", "intro"])).toEqual({
+        deck: undefined,
+        args: { slug: "intro" },
+      });
     });
   });
 
   test("keeps a layout name for theme when cwd is already a deck", async () => {
     await withTempProject({ decks: [{ name: "cover" }, { name: "demo" }] }, async (root) => {
-      expect(
-        peelDeckArg(join(root, "decks", "demo"), { command: "theme", args: ["cover"] }),
-      ).toEqual({ rest: ["cover"] });
-      expect(peelDeckArg(root, { command: "theme", args: ["cover", "title"] })).toEqual({
+      expect(bind(join(root, "decks", "demo"), ["theme", "cover"])).toEqual({
+        deck: undefined,
+        args: { layout: "cover" },
+      });
+      expect(bind(root, ["theme", "cover", "title"])).toEqual({
         deck: "cover",
-        rest: ["title"],
+        args: { layout: "title" },
       });
     });
   });
 
   test("does not treat voice subcommands as deck names", async () => {
     await withTempProject({ decks: [{ name: "demo" }, { name: "speakers" }] }, async (root) => {
-      expect(peelDeckArg(root, { command: "voice", args: ["speakers"] })).toEqual({
-        rest: ["speakers"],
+      expect(bindCommandLine(root, parseCommandLine(["voice", "speakers"]))).toEqual({
+        name: "voice",
+        subcommand: "speakers",
+        args: {},
       });
-      expect(peelDeckArg(root, { command: "voice", args: ["demo", "say", "hello"] })).toEqual({
+      expect(bindCommandLine(root, parseCommandLine(["voice", "demo", "say", "hello"]))).toEqual({
+        name: "voice",
+        subcommand: "say",
         deck: "demo",
-        rest: ["say", "hello"],
+        args: { text: "hello" },
       });
     });
   });
 
-  test("peels mv only when a deck plus two slugs are present", async () => {
+  test("peels mv's deck when the words say so", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      expect(peelDeckArg(root, { command: "mv", args: ["demo", "old", "new"] })).toEqual({
+      expect(bind(root, ["mv", "demo", "old", "new"])).toEqual({
         deck: "demo",
-        rest: ["old", "new"],
+        args: { old: "old", new: "new" },
       });
-      expect(
-        peelDeckArg(root, {
-          command: "mv",
-          args: ["demo", "architecture"],
-          before: "intro",
-        }),
-      ).toEqual({ deck: "demo", rest: ["architecture"] });
-      expect(peelDeckArg(root, { command: "mv", args: ["architecture", "intro"] })).toEqual({
-        rest: ["architecture", "intro"],
+      expect(bind(root, ["mv", "demo", "architecture", "--before", "intro"])).toEqual({
+        deck: "demo",
+        args: { old: "architecture", new: undefined },
+      });
+      expect(bind(root, ["mv", "architecture", "intro"])).toEqual({
+        deck: undefined,
+        args: { old: "architecture", new: "intro" },
       });
     });
   });

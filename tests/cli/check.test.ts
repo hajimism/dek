@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
+import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { DekError } from "../../src/core/error.ts";
 import type { VisualRequest, VisualResponse } from "../../src/core/playwright.ts";
 import { VOICE_SETUP_HINT } from "../../src/core/voice.ts";
@@ -9,6 +11,7 @@ import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { writeRequested } from "../helpers/visual.ts";
 
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -21,17 +24,9 @@ async function cleanRunner(): Promise<VisualResponse> {
   return { overflows: [], contrasts: [] };
 }
 
-async function overflowRunner(request: VisualRequest) {
-  for (const page of request.pages) {
-    if (page.screenshotPath) {
-      await Bun.write(page.screenshotPath, "");
-    }
-  }
-  return {
-    overflows: [{ slug: "intro", step: "1", box: "h2" }],
-    contrasts: [],
-    screenshotPath: request.pages.find((page) => page.screenshotPath)?.screenshotPath,
-  };
+async function overflowRunner(request: VisualRequest): Promise<VisualResponse> {
+  await writeRequested(request);
+  return { overflows: [{ slug: "intro", step: "1", box: "h2", by: { bottom: 8 } }], contrasts: [] };
 }
 
 describe("dek check", () => {
@@ -42,8 +37,10 @@ describe("dek check", () => {
         const result = await runDek(["check", "--json"], { cwd: join(root, "decks", "demo") });
         expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
-        expect(json.error.message).toBe("usage: dek check <slug>");
-        expect(json.error.hint).toBe("run `dek ls` to see the slugs");
+        expect(json.error.message).toBe("missing <slug> for dek check");
+        expect(json.error.hint).toBe(
+          "usage: dek check [deck] <slug> [--shot] [--voice]; run `dek help check`",
+        );
       },
     );
   });
@@ -93,8 +90,7 @@ more
         ],
       },
       async (root) => {
-        const result = await checkCommand({
-          cwd: join(root, "decks", "demo"),
+        const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
           slug: "intro",
           runner: cleanRunner,
         });
@@ -104,47 +100,28 @@ more
     );
   });
 
-  test("keeps theme diagnostics that affect the slide", async () => {
+  test("reports the slide's findings only; theme.css and the budget are dek lint's", async () => {
     await withTempProject(
       {
         decks: [
           {
             name: "demo",
-            theme: "body { color: red; }\n",
+            script: "---\ntitle: Demo\nduration: 60m\n---\n\n## intro\n\nhello\n",
+            theme: "body { color: #f00; }\n",
+            styles: { intro: ".slide p { color: #f00; }\n" },
             slides: { intro: introHtml },
           },
         ],
       },
       async (root) => {
-        const result = await checkCommand({
-          cwd: join(root, "decks", "demo"),
+        const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
           slug: "intro",
           runner: cleanRunner,
         });
-        expect(result.diagnostics.some((d) => d.id === "DEK012")).toBe(true);
-      },
-    );
-  });
-
-  test("keeps DEK014 and DEK015 theme diagnostics", async () => {
-    await withTempProject(
-      {
-        decks: [
-          {
-            name: "demo",
-            theme: `.slide { color: #f00; }\n`,
-            slides: { intro: introHtml },
-          },
-        ],
-      },
-      async (root) => {
-        const result = await checkCommand({
-          cwd: join(root, "decks", "demo"),
-          slug: "intro",
-          runner: cleanRunner,
-        });
-        expect(result.diagnostics.some((d) => d.id === "DEK014")).toBe(true);
-        expect(result.diagnostics.some((d) => d.id === "DEK015")).toBe(true);
+        const found = result.diagnostics.map((d) => `${d.id} ${d.path?.split("/").at(-1)}`);
+        expect(found).toContain("DEK014 intro.css");
+        expect(found.filter((d) => d.includes("theme.css") || d.includes("DEK041"))).toEqual([]);
+        expect(result.diagnostics.every((d) => d.slug === "intro")).toBe(true);
       },
     );
   });
@@ -153,8 +130,7 @@ more
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const result = await checkCommand({
-          cwd: join(root, "decks", "demo"),
+        const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
           slug: "intro",
           runner: overflowRunner,
         });
@@ -168,8 +144,7 @@ more
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         let calls = 0;
-        const result = await checkCommand({
-          cwd: join(root, "decks", "demo"),
+        const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
           slug: "intro",
           shot: true,
           runner: async (request: VisualRequest) => {
@@ -179,7 +154,7 @@ more
         });
         expect(calls).toBe(1);
         expect(result.shot).toContain(".cache/shots/intro");
-        expect(result.shot).toMatch(/intro\.[0-9a-f]{8}\.png$/);
+        expect(result.shot).toMatch(/intro~0\.[0-9a-f]{8}\.png$/);
         expect(await Bun.file(result.shot ?? "").exists()).toBe(true);
         expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
       },
@@ -191,8 +166,7 @@ more
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
-          const result = await checkCommand({
-            cwd: join(root, "decks", "demo"),
+          const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
             slug: "intro",
           });
           expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(false);
@@ -208,6 +182,21 @@ more
     );
   });
 
+  test.serial("fails --shot without Playwright before making the shot cache", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+          const deckDir = join(root, "decks", "demo");
+          await expect(
+            checkCommand(requireDeckFromCwd(deckDir), { slug: "intro", shot: true }),
+          ).rejects.toThrow("Playwright is not installed");
+          expect(existsSync(join(deckDir, ".cache", "shots"))).toBe(false);
+        });
+      },
+    );
+  });
+
   test.serial("fails when Playwright is installed but the worker exits non-zero", async () => {
     const fail = join(import.meta.dir, "..", "helpers", "fake-playwright-fail.ts");
     await withTempProject(
@@ -215,7 +204,7 @@ more
       async (root) => {
         await withEnv({ DEK_PLAYWRIGHT: fail }, async () => {
           try {
-            await checkCommand({ cwd: join(root, "decks", "demo"), slug: "intro" });
+            await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), { slug: "intro" });
             throw new Error("expected DekError");
           } catch (error) {
             expect(error).toBeInstanceOf(DekError);
@@ -233,8 +222,7 @@ more
         { decks: [{ name: "demo", slides: { intro: introHtml } }] },
         async (root) => {
           await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
-            const result = await checkCommand({
-              cwd: join(root, "decks", "demo"),
+            const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
               slug: "intro",
               voice: true,
             });

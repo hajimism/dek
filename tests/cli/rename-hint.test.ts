@@ -3,8 +3,11 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { mvCommand } from "../../src/cli/mv.ts";
+import { requireDeckFromCwd, resolveDecks } from "../../src/cli/scope.ts";
 import { syncCommand } from "../../src/cli/sync.ts";
-import { type Diagnostic, lintDeck, syncDeck } from "../../src/core/index.ts";
+import type { Diagnostic } from "../../src/core/diagnostic.ts";
+import { lintDeck } from "../../src/core/lint.ts";
+import { syncDeck } from "../../src/core/sync.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -34,9 +37,9 @@ async function lint(deck: string): Promise<{ ok: boolean; diagnostics: Diagnosti
 function run(argv: string[], cwd: string): void {
   const [command, ...args] = argv;
   if (command === "mv") {
-    mvCommand({ cwd, slug: args[0], to: args[1] });
+    mvCommand(requireDeckFromCwd(cwd), { slug: args[0] ?? "", to: args[1] });
   } else if (command === "sync") {
-    syncCommand({ cwd });
+    syncCommand(resolveDecks(cwd));
   } else {
     throw new Error(`unexpected command: ${argv.join(" ")}`);
   }

@@ -12,19 +12,20 @@ Create a project with `bunx github:hajimism/dek init`, then install dek into it 
 - **`init` and `sync` never overwrite your work.** They create what is missing and warn about what is left over. The only slides sync rewrites or removes are skeletons nobody has edited: rewritten when the script they came from changed, removed when their section is gone and no stylesheet or script sits beside them. In `AGENTS.md`, dek owns only the block between `<!-- dek:begin … -->` and `<!-- dek:end -->`. Neither renames.
 - **Every error carries a hint** naming the next command to run. Diagnostics carry one too when the fix is known: the beat ids a `data-step` may use, the classes a slide may use, the `assets/` path for a remote image.
 - **Paths into the source tree are relative to the working directory** in text and `--json` output: diagnostics, errors, and the files `init`, `new`, and `sync` create. Artifacts dek writes, such as a screenshot or a build, stay absolute. SARIF keeps absolute URIs.
-- **A check that did not run is listed in `"skipped"`**, each entry with the `check`, the `reason`, and a `hint` when there is a way to run it: `dek check` without Playwright skips `visual`, `dek check --voice` on a deck without `voice/` skips `voice`, `dek lint` without rumdl skips `rumdl`, and `dek ls` on a ref skips `lint`. Text output prints `<check>: skipped (<reason>)` and the hint as `help:`. The field is absent when every check ran.
+- **A check that did not run is listed in `"skipped"`**, each entry with the `check`, the `reason`, and a `hint` when there is a way to run it: `dek check` without Playwright skips `visual`, `dek check --voice` on a deck without `voice/` skips `voice`, `dek lint` without rumdl skips `rumdl`, `dek build` without a URL or Playwright skips `preview` (the link preview image), and `dek ls` on a ref skips `lint`. Text output prints `<check>: skipped (<reason>)` and the hint as `help:`; `lint`, `check`, and `build` print them on stderr, so stdout holds only the result. The field is absent when every check ran.
 - **Commands that write one file per deck return a list.** `build` and `pdf` return `outs`, one path per deck in scope, one deck included.
 - **A ref is read, never written.** `ls`, `show`, `theme`, and `shot` take a ref name (`owner/repo/deck`) where they take a deck; every other command refuses one. See [Refs](#refs).
 - **Help is per command.** `dek help <command>`, `dek <command> --help`, and `-h` print its usage, what it does, and every flag it takes. `dek --version` (`-v`) prints the version. A mistyped command or deck name gets `did you mean …?`.
-- **Flags are checked per command.** `--json`, `--help`, and `--version` go anywhere; every other flag only where its command takes it, and `--deck` everywhere but `new`, `ref`, and `help`. A misspelled flag, or one from another command, is an error whose hint lists the flags the command does take, not a silent no-op.
+- **Flags are checked per command.** `--json`, `--help`, and `--version` go anywhere; every other flag only where its command takes it, and `--deck` everywhere but `new`, `ref`, and `help`. A misspelled flag, or one from another command, is an error whose hint lists the flags the command does take and names `dek help <command>`, not a silent no-op. Values are checked before anything runs: `--port` takes a whole number from 1 to 65535, `--fps` a number above 0, `--accent` a whole number from 0, and `--format` only `sarif`; anything else, an empty value included, fails as `invalid --<flag> "<value>"` with what the flag takes.
+- **Arguments are checked per command, too.** A missing argument fails as `missing <slug> for dek show`, and one past what the command takes as `unexpected argument "extra" for dek ls`, each with the command's usage and `dek help <command>` as the hint. A mistyped subcommand gets `did you mean …?`: `dek voice speakr` suggests `dek voice speakers`.
 
 ## Development
 
 | Command | Purpose |
 | --- | --- |
-| `dek [deck] [--visual] [--port N]` | Start the dev server: sync on start and on every save, live reload, lint on save, presenter view. It answers only at `127.0.0.1` or `localhost`, and refuses a move (a WebSocket, `goto`) from another origin. `--visual` adds overflow and contrast on save. `--port` fixes the port; without it the OS picks a free one. It stops on Ctrl-C, or when the process that started it exits, so no server is left holding a port. |
+| `dek [deck] [--visual] [--port N] [--remote]` | Start the dev server: sync on start and on every save, live reload, lint on save, presenter view. It answers only at `127.0.0.1` or `localhost`, and refuses a move (a WebSocket, `goto`) from another origin. `--visual` adds overflow and contrast on save. `--port` fixes the port; without it the OS picks a free one. It stops on Ctrl-C, or when the process that started it exits, so no server is left holding a port. |
 | `dek --remote` | Serve on the LAN. The presenter view, `goto`, `current`, the voice timeline and audio, and the streamed diagnostics require the 10-letter password dek makes and prints on each start. On a terminal, a QR code under it opens the presenter view on a phone: once, within five minutes; Enter prints a new one. |
-| `dek rehearse [slug] [--remote]` | Auto-advance from the Timeline. Records nothing. `--remote` serves it on the LAN as `dek --remote` does. |
+| `dek rehearse [deck] [slug] [--remote]` | Auto-advance from the Timeline. Records nothing. `--remote` serves it on the LAN as `dek --remote` does. |
 
 ## Project
 
@@ -32,7 +33,7 @@ Create a project with `bunx github:hajimism/dek init`, then install dek into it 
 | --- | --- |
 | `dek init [dir] [--deck NAME]` | Create a project in `dir` (default: the current directory), optionally with a first deck, and print the commands to run next (`next` in `--json`). Writes `dek.toml`, `theme.css`, `.gitignore`, `.rumdl.toml`, `tsconfig.json`, `assets/`, `decks/`, `AGENTS.md`, `.dek/schema.json`, and `.dek/slide.d.ts`. A first deck comes with a short starter script and its skeleton slides, so it passes lint as created; once you replace the script with your own, `dek sync` removes the example skeletons you left untouched. Nothing that exists is overwritten: a file already there is kept, and listed as kept when it differs (`created` and `kept` in `--json`); every input is checked before the first write. An `AGENTS.md` already there keeps what you wrote and gets dek's block added, as sync does. Refuses to run inside another project; add a deck with `dek new` there. The next commands include `bun add -d github:hajimism/dek` until the project has dek installed. |
 | `dek new <name> [--theme-from DECK]` | Add a deck. Copies the project `theme.css`, or the named deck's, and creates its skeleton slides, so it passes lint as created. Prints the commands to run next (`next` in `--json`). |
-| `dek ls [deck]` | List decks, or summarize one: sections, slides, diagnostics, budget, estimate, and narrated length when a Timeline exists. |
+| `dek ls [deck]` | List decks, or summarize one: sections, slides, diagnostics, budget, estimate, and narrated length when a Timeline exists. Diagnostics are dek's own rules, without rumdl. The list counts each deck's findings on its row and the project's (`dek.toml`) once, on a `project` line and in the top-level `diagnostics` of `--json`. |
 
 ## Refs
 
@@ -51,31 +52,38 @@ A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. 
 
 | Command | Purpose |
 | --- | --- |
-| `dek show <slug>` | Print everything one slide is made of, each part labeled with its file: the section's script, `slides/<slug>.html`, `.css`, and `.ts`, the rules of the deck's `theme.css` the slide uses (with only the tokens and keyframes they reach), and the assets it references. A missing file is `null`. |
-| `dek theme [layout]` | List the layouts, classes, and tokens the deck's own `theme.css` defines. With a layout, print its example markup, ready to paste into `slides/<id>.html`. |
-| `dek check <slug> [--shot] [--voice]` | Lint one slide, including rendering rules when Playwright is available. `--shot` writes a screenshot and returns its path. `--voice` returns kana and durations; on a deck without `voice/` it lists `voice` in `skipped` with how to set it up, and the rest of the check still runs. |
-| `dek shot [slug] [--step <id\|n>]` | Screenshot one slide, or every slide, at the last beat by default. Files are `.cache/shots/<slug>[-<step>].<hash>.png`; the hash is of the rendered content, so a changed theme or slide yields a new path and the stale image is removed. An unchanged slide keeps its image and is not shot again. |
-| `dek shot <a> --to <b> [--at 0..1]` | One frame of the View Transition from the last beat of `a` into `b`, frozen at `--at` (default 0.5). Written to `.cache/shots/<a>-to-<b>-<at>.<hash>.png`. Does not combine with `--step`. |
-| `dek mv <old> <new>` | Rename a section id, its HTML file and `data-slug`, its `.css` and `.ts` if present, and its keys in `voice/voice.toml`. Heading text is untouched. Refuses if any destination exists; all files change or none do. |
-| `dek mv <slug> --before\|--after <other>` | Reorder a section in `script.md`. |
-| `dek goto <slug>` | Jump the open browser. Requires a running dev server. |
-| `dek current` | Print the slide on screen. Requires a running dev server. |
-| `dek sync` | Create missing skeleton slides, refresh skeletons nobody has edited since, remove untouched skeletons whose section is gone (unless a `slides/<id>.css` or `.ts` sits beside them), and refresh dek's block in `AGENTS.md`, `.dek/schema.json`, and `.dek/slide.d.ts`. Never touches a slide you edited, what you wrote in `AGENTS.md` outside dek's block, or `tsconfig.json`. `--json` returns `created`, `updated`, and `removed`. |
+| `dek show [deck] <slug>` | Print everything one slide is made of, each part labeled with its file: the section's script, `slides/<slug>.html`, `.css`, and `.ts`, the rules of the deck's `theme.css` the slide uses (with only the tokens and keyframes they reach), and the assets it references. A missing file is `null`. A file that is a symlink out of the project is an error, as it is for `dek build`. |
+| `dek theme [deck] [layout]` | List the layouts, classes, and tokens the deck's own `theme.css` defines. The tokens are the ones the bare `.slide` rule sets, which every slide can `var()`, the same list `AGENTS.md` gives. With a layout, print its example markup, ready to paste into `slides/<id>.html`. |
+| `dek check [deck] <slug> [--shot] [--voice]` | Lint one slide: the findings with that slide's scope, including rendering rules when Playwright is available. Findings about the deck (`theme.css`, the frontmatter, the length) or the project are `dek lint`'s; see [Scope](/reference/lint#scope). `--shot` writes a screenshot and returns its path. `--voice` returns kana and durations; on a deck without `voice/` it lists `voice` in `skipped` with how to set it up, and the rest of the check still runs. |
+| `dek shot [deck] [slug] [--step ID\|N]` | Screenshot one slide, or every slide, at the last beat by default; `--step 0` is the slide as it arrives, before any beat. Files are `.cache/shots/<slug>~<step>.<hash>.png`, where `<step>` is the beat id or number shot (the last beat by default), so `--step hook`, `--step 1`, and the default still share one file when they name the same beat; the hash is of the rendered content, so a changed theme or slide yields a new path and the stale image is removed. An unchanged slide keeps its image and is not shot again. |
+| `dek shot [deck] --sheet` | Every slide at its last beat, tiled on contact sheets at `.cache/shots/sheets/<hash>/sheet-<n>.png`. The tiles are as large as fits the whole deck on one image of at most 1568 px a side and 1.15 megapixels, which vision models read without scaling it down; a longer deck takes more sheets. The tiles are the slides' own shots, so an unchanged deck starts no browser, and `--json` lists each shot too. |
+| `dek shot [deck] <slug> --motion [--step ID\|N]` | A row for the slide's arrival and one per beat, each played from the beat or slide before it and held at 0, 25, 50, and 75% of everything that move starts, then at its end, the still `dek shot` takes. Written to `.cache/shots/motion/<slug>.<hash>/`: the sheets as `sheet-<n>.png`, the frames under `frames/`. `--json` returns each frame's path and ms. `--step` plays that beat alone. |
+| `dek shot [deck] <a> --to <b> [--at 0..1]` | One frame of the View Transition from the last beat of `a` into `b`, frozen at `--at` (default 0.5) of the transition's length; an entrance on `b` may still be running at `--at 1`, which `--motion` shows. Written to `.cache/shots/<a>~<b>~<at>.<hash>.png`. Does not combine with `--step`. |
+| `dek mv [deck] <old> <new>` | Rename a section id, its HTML file and `data-slug`, its `.css` and `.ts` if present, and its keys in `voice/voice.toml`. Heading text is untouched. Refuses if any destination exists; all files change or none do. |
+| `dek mv [deck] <slug> --before\|--after <slug>` | Reorder a section in `script.md`. |
+| `dek goto [deck] <slug>` | Jump the open browser. Requires a running dev server. |
+| `dek current [deck]` | Print the slide on screen. Requires a running dev server. |
+| `dek sync [deck]` | Create missing skeleton slides, refresh skeletons nobody has edited since, remove untouched skeletons whose section is gone (unless a `slides/<id>.css` or `.ts` sits beside them), and refresh dek's block in `AGENTS.md`, `.dek/schema.json`, and `.dek/slide.d.ts`. Never touches a slide you edited, what you wrote in `AGENTS.md` outside dek's block, or `tsconfig.json`. `--json` returns `created`, `updated`, and `removed`. |
 
 ## Output
 
 | Command | Purpose |
 | --- | --- |
-| `dek lint [--fix] [--visual] [--format sarif]` | Lint. `--fix` runs `dek sync` first. `--visual` adds overflow and contrast. |
-| `dek cues` | Print the spoken cues as `Cue[]`. Paragraphs only. No engine needed. |
-| `dek voice` | Synthesize changed sentences into `.cache/voice/`. Also runs on save. |
-| `dek voice speakers` | List the engine's speakers. |
-| `dek voice say TEXT` | Speak one sentence. |
-| `dek voice dict add WORD KANA [--accent N]` | Add a reading to `voice/dict.toml`, with the accent position when given. |
-| `dek voice pin` | Copy the master audio and `timeline.json` into `voice/pin/`. |
-| `dek build [--root-dist] [--url <url>]` | Write one HTML file to `decks/<deck>/dist/<deck>.html`, or `<root>/dist/<deck>.html` with `--root-dist`. Slide stylesheets and scripts are inlined. Lint never stops a build: a section with no HTML is built from its skeleton, and when lint finds something, the output says how many and `--json` includes the diagnostics. The page carries link preview tags; given the URL `dist/` is served from (`url` in `dek.toml`, or `--url`, which wins), the first slide also becomes `dist/<deck>.png` for `og:image`. See [On the web](/guide/present#on-the-web) |
-| `dek video [slug] [--fps N] [--root-dist]` | Bake `dist/<deck>.mp4` with `.vtt`, `.chapters.txt`, and `.credits.txt`, from the Timeline `dek voice` writes. One slide goes to `.cache/video/<slug>.mp4`. `--fps` defaults to 30. |
-| `dek pdf [--root-dist]` | Write `dist/<deck>.pdf` with every slide at its last beat. |
+| `dek lint [deck] [--fix] [--visual] [--format sarif]` | Lint. `--fix` runs `dek sync` first. `--visual` adds overflow and contrast. |
+| `dek cues [deck]` | Print the spoken cues as `Cue[]`. Paragraphs only. No engine needed. |
+| `dek voice [deck]` | Synthesize changed sentences into `.cache/voice/`. Also runs on save. |
+| `dek voice [deck] speakers` | List the engine's speakers. |
+| `dek voice [deck] say <text>` | Speak one sentence. |
+| `dek voice [deck] dict add <word> <kana> [--accent N]` | Add a reading to `voice/dict.toml`, with the accent position when given. |
+| `dek voice [deck] pin` | Copy the master audio and `timeline.json` into `voice/pin/`. |
+| `dek build [deck] [--root-dist] [--url <url>]` | Write one HTML file to `decks/<deck>/dist/<deck>.html`, or `<root>/dist/<deck>.html` with `--root-dist`. Slide stylesheets and scripts are inlined. Lint never stops a build: a section with no HTML is built from its skeleton, and when dek's rules find something (rumdl is `dek lint`'s alone), the output says how many and `--json` includes the diagnostics. The page carries link preview tags; given the URL `dist/` is served from (`url` in `dek.toml`, or `--url`, which wins), the first slide also becomes `dist/<deck>.png` for `og:image`. See [On the web](/guide/present#on-the-web) |
+| `dek video [deck] [slug] [--fps N] [--root-dist]` | Bake `dist/<deck>.mp4` with `.vtt`, `.chapters.txt`, and `.credits.txt`, from the Timeline `dek voice` writes. One slide goes to `.cache/video/<slug>.mp4`. `--fps` defaults to 30. |
+| `dek pdf [deck] [--root-dist]` | Write `dist/<deck>.pdf` with every slide at its last beat. |
+
+## Help
+
+| Command | Purpose |
+| --- | --- |
 | `dek help [command] [--agent]` | Help, or one command's usage and flags. `--agent` is the compact reference for agents. A word that is no command fails as `dek <word>` does, with `did you mean …?`. |
 
 ## Environment variables

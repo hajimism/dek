@@ -3,8 +3,9 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { initCommand } from "../../src/cli/init.ts";
+import { resolveDecks } from "../../src/cli/scope.ts";
 import { syncCommand } from "../../src/cli/sync.ts";
-import { lintDeck } from "../../src/core/index.ts";
+import { lintDeck } from "../../src/core/lint.ts";
 import { listSlides } from "../../src/core/resolve.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -98,7 +99,7 @@ more
         ],
       },
       async (root) => {
-        const result = syncCommand({ cwd: root });
+        const result = syncCommand(resolveDecks(root));
         expect(result.created.some((path) => path.endsWith("decks/alpha/slides/extra.html"))).toBe(
           true,
         );
@@ -115,7 +116,7 @@ more
       const deckDir = join(dir, "decks", "demo");
       await writeFile(join(deckDir, "script.md"), "---\ntitle: Mine\n---\n\n## hello\n");
 
-      const result = syncCommand({ cwd: deckDir });
+      const result = syncCommand(resolveDecks(deckDir));
       expect(result.created).toEqual([join(deckDir, "slides", "hello.html")]);
       expect(result.removed.length).toBeGreaterThan(0);
       expect(listSlides(deckDir).map((slide) => slide.slug)).toEqual(["hello"]);

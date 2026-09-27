@@ -124,7 +124,7 @@ pause   = { sentence = 350, beat = 700 }
 | `pause.sentence` | 文と文の間の無音（ミリ秒）。既定 350 |
 | `pause.beat` | ビート境界の無音（ミリ秒）。既定 700 |
 | `lead` | 画面の切り替えを第一声より何ミリ秒先にするか。既定 300 |
-| `beats."<key>".lead` | 1 枚の最初のビート（`slug`）、または 1 ビート（`slug/beat-id`、`slug/2`）だけの `lead` |
+| `beats."<key>".lead` | 1 枚が出るところ（`slug`、`slug/0`）、または 1 ビート（`slug/beat-id`、`slug/2`）だけの `lead` |
 | `beats."<key>".pause` | そのビート、またはその枚の最後のビートの直後の無音。`pause.beat` の代わり |
 
 ## `voice/dict.toml`
@@ -139,7 +139,7 @@ kana = "デック"
 kana = "スクリプトエムディー"
 ```
 
-`dek voice dict add WORD KANA` でエントリを追加できます。辞書にない単語は `DEK040` です。
+`dek voice dict add <word> <kana>` でエントリを追加できます。辞書にない単語は `DEK040` です。
 
 ## テーマのトークン
 

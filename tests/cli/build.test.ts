@@ -4,10 +4,12 @@ import { join } from "node:path";
 import { buildCommand } from "../../src/cli/build.ts";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { formatText } from "../../src/cli/result.ts";
+import { resolveDecks } from "../../src/cli/scope.ts";
 import { PLAYWRIGHT_INSTALL, type VisualRequest } from "../../src/core/playwright.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { writeRequested } from "../helpers/visual.ts";
 
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -33,16 +35,33 @@ describe("buildCommand and lint", () => {
         ],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: join(root, "decks", "demo") });
+        const result = await buildCommand(resolveDecks(join(root, "decks", "demo")));
         expect(result.outs).toEqual([join(root, "decks", "demo", "dist", "demo.html")]);
         expect(result.diagnostics.map((d) => d.id)).toEqual(["DEK010"]);
         expect(formatText({ command: "build", data: result })).toBe(
           [
             `wrote ${join(root, "decks", "demo", "dist", "demo.html")}`,
-            "no link preview image: set url in dek.toml, or pass --url, to the URL dist/ is served from",
-            "lint: 1 error; run `dek lint` to see it",
+            "lint: 1 error from dek's rules; run `dek lint` to see it",
           ].join("\n"),
         );
+      },
+    );
+  });
+
+  test("reports a dek.toml finding once, however many decks it builds", async () => {
+    await withTempProject(
+      {
+        toml: "bogus = 1\n",
+        decks: [
+          { name: "alpha", theme: defaultTheme(), slides: { intro: introHtml } },
+          { name: "beta", theme: defaultTheme(), slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const result = await buildCommand(resolveDecks(root));
+        expect(result.diagnostics.map((d) => [d.id, d.path])).toEqual([
+          ["DEK008", join(root, "dek.toml")],
+        ]);
       },
     );
   });
@@ -53,7 +72,7 @@ describe("buildCommand and lint", () => {
         decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: join(root, "decks", "demo") });
+        const result = await buildCommand(resolveDecks(join(root, "decks", "demo")));
         expect(result.diagnostics).toEqual([]);
         expect(formatText({ command: "build", data: result })).not.toContain("lint");
       },
@@ -63,11 +82,7 @@ describe("buildCommand and lint", () => {
 
 describe("buildCommand link preview", () => {
   const fakeRunner = async (request: VisualRequest) => {
-    for (const page of request.pages) {
-      if (page.screenshotPath) {
-        await Bun.write(page.screenshotPath, "png");
-      }
-    }
+    await writeRequested(request, "png");
     return { overflows: [], contrasts: [] };
   };
 
@@ -79,9 +94,9 @@ describe("buildCommand link preview", () => {
       },
       async (root) => {
         const deckDir = join(root, "decks", "demo");
-        const result = await buildCommand({ cwd: deckDir, runner: fakeRunner });
+        const result = await buildCommand(resolveDecks(deckDir), { runner: fakeRunner });
         expect(result.images).toEqual([join(deckDir, "dist", "demo.png")]);
-        expect(result.notes).toEqual([]);
+        expect(result.skipped).toBeUndefined();
         expect(formatText({ command: "build", data: result })).toBe(
           `wrote ${join(deckDir, "dist", "demo.html")}\nwrote ${join(deckDir, "dist", "demo.png")}`,
         );
@@ -98,14 +113,17 @@ describe("buildCommand link preview", () => {
         ],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: root, runner: fakeRunner });
+        const result = await buildCommand(resolveDecks(root), { runner: fakeRunner });
         expect(result.images).toEqual([]);
-        expect(result.notes).toEqual([
-          "no link preview image: set url in dek.toml, or pass --url, to the URL dist/ is served from",
+        expect(result.skipped).toEqual([
+          {
+            check: "preview",
+            reason: "url is not set",
+            hint: "set url in dek.toml, or pass --url, to the URL dist/ is served from",
+          },
         ]);
-        expect(formatText({ command: "build", data: result })).toEndWith(
-          "\nno link preview image: set url in dek.toml, or pass --url, to the URL dist/ is served from",
-        );
+        // The result on stdout stays the result; why an image is missing goes to stderr.
+        expect(formatText({ command: "build", data: result })).not.toContain("preview");
       },
     );
   });
@@ -114,13 +132,12 @@ describe("buildCommand link preview", () => {
     await withTempProject(
       { decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }] },
       async (root) => {
-        const result = await buildCommand({
-          cwd: join(root, "decks", "demo"),
+        const result = await buildCommand(resolveDecks(join(root, "decks", "demo")), {
           url: "https://example.com/",
           runner: async () => null,
         });
-        expect(result.notes).toEqual([
-          `no link preview image: Playwright is not installed; ${PLAYWRIGHT_INSTALL}`,
+        expect(result.skipped).toEqual([
+          { check: "preview", reason: "Playwright is not installed", hint: PLAYWRIGHT_INSTALL },
         ]);
       },
     );
@@ -131,7 +148,7 @@ describe("buildCommand link preview", () => {
       { decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }] },
       async (root) => {
         await expect(
-          buildCommand({ cwd: join(root, "decks", "demo"), url: "/talks/" }),
+          buildCommand(resolveDecks(join(root, "decks", "demo")), { url: "/talks/" }),
         ).rejects.toThrow('invalid --url "/talks/"');
       },
     );
@@ -176,7 +193,7 @@ describe("buildCommand", () => {
         ],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: join(root, "decks", "demo") });
+        const result = await buildCommand(resolveDecks(join(root, "decks", "demo")));
         expect(result.outs).toEqual([join(root, "decks", "demo", "dist", "demo.html")]);
       },
     );
@@ -191,7 +208,7 @@ describe("buildCommand", () => {
         ],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: root });
+        const result = await buildCommand(resolveDecks(root));
         expect(result.outs).toEqual([
           join(root, "decks", "alpha", "dist", "alpha.html"),
           join(root, "decks", "beta", "dist", "beta.html"),
@@ -211,7 +228,7 @@ describe("buildCommand", () => {
         ],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: root, deck: "beta" });
+        const result = await buildCommand(resolveDecks(root, { deck: "beta" }));
         expect(result.outs).toEqual([join(root, "decks", "beta", "dist", "beta.html")]);
         expect(await Bun.file(result.outs[0] ?? "").exists()).toBe(true);
         expect(await Bun.file(join(root, "decks", "alpha", "dist", "alpha.html")).exists()).toBe(
@@ -230,7 +247,7 @@ describe("buildCommand", () => {
         ],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: root, rootDist: true });
+        const result = await buildCommand(resolveDecks(root), { rootDist: true });
         expect(result.outs).toEqual([
           join(root, "dist", "alpha.html"),
           join(root, "dist", "beta.html"),
@@ -264,7 +281,7 @@ more
         ],
       },
       async (root) => {
-        const result = await buildCommand({ cwd: join(root, "decks", "demo") });
+        const result = await buildCommand(resolveDecks(join(root, "decks", "demo")));
         expect(existsSync(result.outs[0] ?? "")).toBe(true);
         expect(result.diagnostics).toContainEqual(
           expect.objectContaining({

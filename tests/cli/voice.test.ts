@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
-import { voiceCommand } from "../../src/cli/voice.ts";
+import { requireDeckFromCwd } from "../../src/cli/scope.ts";
+import { listSpeakers, pinVoice, synthVoice } from "../../src/cli/voice.ts";
 import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
@@ -60,21 +61,23 @@ describe("dek voice", () => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, "voice"), { recursive: true });
       await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
-      const result = await runDek(["voice", "dict", "add", "dek", "デック", "--json"], {
-        cwd: deckDir,
-      });
+      const result = await runDek(
+        ["voice", "dict", "add", "dek", "デック", "--accent", "1", "--json"],
+        { cwd: deckDir },
+      );
       expect(result).toMatchObject({ exitCode: 0 });
-      const json = jsonStdout<{ ok: true; key: string; kana: string }>(result);
+      const json = jsonStdout<{ ok: true; key: string; kana: string; path: string }>(result);
       expect(json.key).toBe("dek");
       expect(json.kana).toBe("デック");
+      expect(await Bun.file(json.path).text()).toContain("accent = 1");
     });
   });
 });
 
-describe("voiceCommand", () => {
+describe("dek voice and its subcommands", () => {
   test.serial("synthesizes changed sentences and reuses the cache", async () => {
     await withVoiceDeck(async (_root, deckDir) => {
-      const first = await voiceCommand({ cwd: deckDir });
+      const first = await synthVoice(requireDeckFromCwd(deckDir));
       if (first.action !== "synth") {
         throw new Error("expected synth");
       }
@@ -85,7 +88,7 @@ describe("voiceCommand", () => {
       ) as { audio: string };
       expect(timeline.audio).toBe("audio.wav");
 
-      const second = await voiceCommand({ cwd: deckDir });
+      const second = await synthVoice(requireDeckFromCwd(deckDir));
       if (second.action !== "synth") {
         throw new Error("expected synth");
       }
@@ -96,7 +99,7 @@ describe("voiceCommand", () => {
 
   test.serial("lists speakers", async () => {
     await withVoiceDeck(async (_root, deckDir) => {
-      const result = await voiceCommand({ cwd: deckDir, sub: "speakers" });
+      const result = await listSpeakers(requireDeckFromCwd(deckDir));
       if (result.action !== "speakers") {
         throw new Error("expected speakers");
       }
@@ -106,9 +109,9 @@ describe("voiceCommand", () => {
 
   test.serial("pins TTS master.wav and timeline.json", async () => {
     await withVoiceDeck(async (_root, deckDir) => {
-      const synth = await voiceCommand({ cwd: deckDir });
+      const synth = await synthVoice(requireDeckFromCwd(deckDir));
       expect(synth.action).toBe("synth");
-      const pin = await voiceCommand({ cwd: deckDir, sub: "pin" });
+      const pin = pinVoice(requireDeckFromCwd(deckDir));
       if (pin.action !== "pin") {
         throw new Error("expected pin");
       }
@@ -116,7 +119,7 @@ describe("voiceCommand", () => {
       expect(await Bun.file(pin.audioPath).exists()).toBe(true);
       expect(await Bun.file(pin.timelinePath).exists()).toBe(true);
       await withEnv({ DEK_VOICE_URL: "http://127.0.0.1:9", DEK_VOICE_PLAY: "0" }, async () => {
-        const again = await voiceCommand({ cwd: deckDir });
+        const again = await synthVoice(requireDeckFromCwd(deckDir));
         expect(again.action).toBe("synth");
       });
     });
@@ -132,7 +135,7 @@ describe("voiceCommand", () => {
       );
       await withEnv({ DEK_VOICE_URL: "http://127.0.0.1:9" }, async () => {
         try {
-          await voiceCommand({ cwd: deckDir, sub: "speakers" });
+          await listSpeakers(requireDeckFromCwd(deckDir));
           throw new Error("expected DekError");
         } catch (error) {
           expect(error).toBeInstanceOf(DekError);
@@ -147,7 +150,10 @@ describe("voiceCommand", () => {
 describe("checkCommand --voice", () => {
   test.serial("returns kana and duration", async () => {
     await withVoiceDeck(async (_root, deckDir) => {
-      const result = await checkCommand({ cwd: deckDir, slug: "intro", voice: true });
+      const result = await checkCommand(requireDeckFromCwd(deckDir), {
+        slug: "intro",
+        voice: true,
+      });
       expect(result.voice?.beats[0]?.sentences[0]?.kana).toContain("カナ");
       expect(result.diagnostics.some((diagnostic) => diagnostic.id === "DEK040")).toBe(true);
     });

@@ -1,6 +1,5 @@
-import { DekError } from "../core/error.ts";
 import { bakeVideo } from "../video/bake.ts";
-import { requireDeckFromCwd } from "./scope.ts";
+import type { DeckTarget } from "./scope.ts";
 
 export type VideoCliResult = {
   out: string;
@@ -9,17 +8,10 @@ export type VideoCliResult = {
   credits?: string;
 };
 
-export async function videoCommand(options: {
-  cwd: string;
-  slug?: string;
-  deck?: string;
-  fps?: string;
-  rootDist?: boolean;
-}): Promise<VideoCliResult> {
-  const { project, deck } = requireDeckFromCwd(options.cwd, options.deck);
-  const fps = options.fps ? Number(options.fps) : undefined;
-  if (fps !== undefined && (!Number.isFinite(fps) || fps <= 0)) {
-    throw new DekError("invalid --fps", { hint: "use a positive number, e.g. --fps 30" });
-  }
-  return bakeVideo({ project, deck }, { slug: options.slug, fps, rootDist: options.rootDist });
+/** `fps` is checked on the command line: a positive number, 30 when left out. */
+export async function videoCommand(
+  target: DeckTarget,
+  options: { slug?: string; fps?: number; rootDist?: boolean } = {},
+): Promise<VideoCliResult> {
+  return bakeVideo(target, options);
 }

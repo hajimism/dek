@@ -1,15 +1,17 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { cssClassNames, cssTokenValues, type ThemeLayout, themeLayouts } from "../core/css.ts";
+import { type CssToken, parseCss } from "../core/css.ts";
+import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { readDeckFile } from "../core/resolve.ts";
-import { type RefInfo, requireReadableDeck } from "./scope.ts";
+import { type ThemeLayout, themeFacts } from "../core/theme-facts.ts";
+import type { ReadableDeck, RefInfo } from "./scope.ts";
 
 export type ThemeResult = {
   /** The deck's theme.css: the one lint and the slides use. */
   path: string;
   classes: string[];
-  tokens: Array<{ name: string; value: string }>;
+  /** The tokens every slide can `var()`. */
+  tokens: CssToken[];
   layouts: ThemeLayout[];
   /** Set when one layout was asked for; text output prints its example alone. */
   layout?: { name: string; example: string };
@@ -17,29 +19,23 @@ export type ThemeResult = {
   ref?: RefInfo;
 };
 
-export function themeCommand(options: {
-  cwd: string;
-  deck?: string;
-  layout?: string;
-}): ThemeResult {
-  const { deck, ref } = requireReadableDeck(options.cwd, options.deck);
-  const path = join(deck.dir, "theme.css");
+/** The deck's theme, or one layout's example markup when `name` is given. */
+export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeResult {
+  const path = deckPaths(deck.dir).theme;
   if (!existsSync(path)) {
     throw new DekError("theme.css not found", {
       path,
       hint: "copy the project theme.css into the deck, or run `dek new <name>` for a fresh deck",
     });
   }
-  const css = readDeckFile(deck.dir, path) ?? "";
-  const layouts = themeLayouts(css);
+  const { classes, layouts, tokens } = themeFacts(parseCss(readDeckFile(deck.dir, path) ?? ""));
   const result: ThemeResult = {
     path,
-    classes: [...cssClassNames(css)].sort(),
-    tokens: cssTokenValues(css),
+    classes: [...classes].sort(),
+    tokens,
     layouts,
     ...(ref ? { ref } : {}),
   };
-  const name = options.layout?.trim();
   if (!name) {
     return result;
   }

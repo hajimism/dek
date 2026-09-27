@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
-import { shotCommand } from "../../src/cli/shot.ts";
+import { resolveTarget } from "../../src/cli/scope.ts";
+import { parseShotMode, shotCommand } from "../../src/cli/shot.ts";
 import { DekError } from "../../src/core/error.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
@@ -47,26 +48,60 @@ describe("shotCommand", () => {
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const cwd = join(root, "decks", "demo");
-        await expect(shotCommand({ cwd, to: "intro" })).rejects.toMatchObject({
+        await expect(
+          shotCommand(resolveTarget(cwd, "deck", { refs: true }), { to: "intro" }),
+        ).rejects.toMatchObject({
           name: "DekError",
-          hint: expect.stringContaining("dek shot <slug> --to <slug>"),
+          hint: expect.stringContaining("dek shot [deck] <a> --to <b>"),
         });
         await expect(
-          shotCommand({ cwd, slug: "intro", to: "intro", step: "1" }),
+          shotCommand(resolveTarget(cwd, "deck", { refs: true }), {
+            slug: "intro",
+            to: "intro",
+            step: "1",
+          }),
         ).rejects.toMatchObject({
           name: "DekError",
           hint: expect.stringContaining("--step"),
         });
         await expect(
-          shotCommand({ cwd, slug: "intro", to: "intro", at: "2" }),
+          shotCommand(resolveTarget(cwd, "deck", { refs: true }), {
+            slug: "intro",
+            to: "intro",
+            at: "2",
+          }),
         ).rejects.toMatchObject({
           name: "DekError",
           hint: expect.stringContaining("0 and 1"),
         });
-        await expect(shotCommand({ cwd, slug: "intro", at: "0.3" })).rejects.toMatchObject({
+        await expect(
+          shotCommand(resolveTarget(cwd, "deck", { refs: true }), { slug: "intro", at: "0.3" }),
+        ).rejects.toMatchObject({
           name: "DekError",
           hint: expect.stringContaining("--to"),
         });
+      },
+    );
+  });
+
+  test("--sheet takes the whole deck and --motion one slide, each alone", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const cwd = join(root, "decks", "demo");
+        const target = resolveTarget(cwd, "deck");
+        const refused = (options: Parameters<typeof shotCommand>[1], hint: string) =>
+          expect(shotCommand(target, options)).rejects.toMatchObject({
+            name: "DekError",
+            hint: expect.stringContaining(hint),
+          });
+        await refused({ slug: "intro", sheet: true }, "dek shot intro --motion");
+        await refused({ sheet: true, step: "1" }, "every slide at its last beat");
+        await refused({ slug: "intro", sheet: true, to: "intro" }, "--to");
+        await refused({ motion: true }, "dek shot [deck] <slug> --motion");
+        await refused({ slug: "intro", motion: true, to: "intro" }, "row 1 of --motion");
+        await refused({ slug: "intro", motion: true, at: "0.5" }, "--at");
+        await refused({ sheet: true, motion: true }, "one of --sheet and --motion");
       },
     );
   });
@@ -77,7 +112,9 @@ describe("shotCommand", () => {
       async (root) => {
         await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
           try {
-            await shotCommand({ cwd: join(root, "decks", "demo"), slug: "intro" });
+            await shotCommand(resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }), {
+              slug: "intro",
+            });
             throw new Error("expected DekError");
           } catch (error) {
             expect(error).toBeInstanceOf(DekError);
@@ -85,6 +122,44 @@ describe("shotCommand", () => {
           }
         });
       },
+    );
+  });
+});
+
+describe("parseShotMode", () => {
+  test("names one mode for the flags, with --at read as a number", () => {
+    expect(parseShotMode({})).toEqual({ kind: "still" });
+    expect(parseShotMode({ slug: "intro", step: "2" })).toEqual({
+      kind: "still",
+      slug: "intro",
+      step: "2",
+    });
+    expect(parseShotMode({ sheet: true })).toEqual({ kind: "sheet" });
+    expect(parseShotMode({ slug: "intro", motion: true })).toEqual({
+      kind: "motion",
+      slug: "intro",
+    });
+    expect(parseShotMode({ slug: "a", to: "b" })).toEqual({
+      kind: "morph",
+      from: "a",
+      to: "b",
+      at: 0.5,
+    });
+    expect(parseShotMode({ slug: "a", to: "b", at: "0.25" })).toMatchObject({ at: 0.25 });
+  });
+
+  test("refuses an empty --at instead of reading it as 0", () => {
+    for (const at of ["", " "]) {
+      expect(() => parseShotMode({ slug: "a", to: "b", at })).toThrow(`invalid --at "${at}"`);
+    }
+  });
+
+  test("says what --to needs, not the usage twice", () => {
+    expect(() => parseShotMode({ to: "intro" })).toThrow(
+      expect.objectContaining({
+        message: "--to needs the slide it starts from",
+        hint: "usage: dek shot [deck] <a> --to <b> [--at 0..1]; run `dek help shot`",
+      }),
     );
   });
 });

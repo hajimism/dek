@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { videoCommand } from "../../src/cli/video.ts";
 import { DekError } from "../../src/core/error.ts";
 import type { Timeline } from "../../src/core/timeline.ts";
@@ -149,7 +150,7 @@ describe("videoCommand", () => {
   test("a deck without voice gets the shared setup hint", async () => {
     await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
-      await expect(videoCommand({ cwd: deckDir })).rejects.toMatchObject({
+      await expect(videoCommand(requireDeckFromCwd(deckDir))).rejects.toMatchObject({
         message: "voice.toml not found",
         path: join(deckDir, "voice", "voice.toml"),
         hint: VOICE_SETUP_HINT,
@@ -165,12 +166,12 @@ describe("videoCommand", () => {
       const cacheDir = join(deckDir, ".cache", "voice");
       await mkdir(cacheDir, { recursive: true });
       await writeFile(join(cacheDir, "timeline.json"), '{"ok":true}\n');
-      await expect(videoCommand({ cwd: deckDir })).rejects.toMatchObject({
+      await expect(videoCommand(requireDeckFromCwd(deckDir))).rejects.toMatchObject({
         name: "DekError",
         message: expect.stringMatching(/invalid/i),
       });
       try {
-        await videoCommand({ cwd: deckDir });
+        await videoCommand(requireDeckFromCwd(deckDir));
       } catch (error) {
         expect(error).toBeInstanceOf(DekError);
         expect((error as DekError).message.toLowerCase()).not.toContain("not found");

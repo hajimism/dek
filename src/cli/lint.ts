@@ -1,13 +1,14 @@
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
-import { type Diagnostic, uniqueDiagnostics } from "../core/diagnostic.ts";
-import { lintDeck, syncDeck } from "../core/index.ts";
+import type { Diagnostic } from "../core/diagnostic.ts";
+import { lintDeck, lintProject } from "../core/lint.ts";
 import { playwrightMissingError } from "../core/playwright.ts";
 import { resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
 import { mergeSarif, type SarifLog } from "../core/sarif.ts";
+import { syncDeck } from "../core/sync.ts";
 import { lintVisualDeck } from "../core/visual.ts";
 import { type SkippedCheck, skippedChecks } from "./result.ts";
-import { resolveDecks } from "./scope.ts";
+import type { DecksTarget } from "./scope.ts";
 
 export type LintCliResult = {
   diagnostics: Diagnostic[];
@@ -16,14 +17,13 @@ export type LintCliResult = {
   rumdlSarif?: SarifLog;
 };
 
-export async function lintCommand(options: {
-  cwd: string;
-  deck?: string;
-  fix?: boolean;
-  visual?: boolean;
-}): Promise<LintCliResult> {
-  const { project, decks } = resolveDecks(options.cwd, { deck: options.deck });
-  const diagnostics: Diagnostic[] = [];
+/** `cwd` is where a skipped rumdl's hint says to run it from. */
+export async function lintCommand(
+  { project, decks }: DecksTarget,
+  options: { cwd: string; fix?: boolean; visual?: boolean },
+): Promise<LintCliResult> {
+  // dek.toml's findings once, then each deck's.
+  const diagnostics: Diagnostic[] = lintProject(project);
   let rumdlSkip: SkippedCheck | undefined;
   let rumdlSarif: SarifLog | undefined;
 
@@ -50,7 +50,7 @@ export async function lintCommand(options: {
   }
 
   return {
-    diagnostics: uniqueDiagnostics(diagnostics),
+    diagnostics,
     ...skippedChecks(rumdlSkip ? [rumdlSkip] : []),
     ...(rumdlSarif ? { rumdlSarif } : {}),
   };

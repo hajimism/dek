@@ -1,4 +1,3 @@
-import { DekError } from "../core/error.ts";
 import { type DevServer, startDevServer } from "../server/dev.ts";
 import { generateRemotePassword, remoteBanner } from "../server/lan.ts";
 import { PAIRING_TTL_MS } from "../server/pairing.ts";
@@ -13,24 +12,40 @@ export async function serveCommand(options: {
   visual?: boolean;
   port?: number;
 }): Promise<void> {
-  const remote = options.remote === true;
-  const password = remote ? generateRemotePassword() : undefined;
-  const server = await startDevServer({
-    cwd: options.cwd,
-    deck: options.deck,
-    remote,
-    password,
-    visual: options.visual === true,
-    ...(options.port !== undefined ? { port: options.port } : {}),
-  });
-  const presenterPaths = server.deckDir
-    ? ["presenter"]
-    : server.decks.map((name) => `decks/${name}/presenter`);
-  process.stdout.write(
-    `${devBanner(server.url, server.remoteUrls, { password, presenterPaths })}\n`,
+  await runDevSession(
+    {
+      cwd: options.cwd,
+      deck: options.deck,
+      remote: options.remote === true,
+      visual: options.visual === true,
+      ...(options.port !== undefined ? { port: options.port } : {}),
+    },
+    (server, password) => {
+      const presenterPaths = server.deckDir
+        ? ["presenter"]
+        : server.decks.map((name) => `decks/${name}/presenter`);
+      return {
+        banner: devBanner(server.url, server.remoteUrls, { password, presenterPaths }),
+        // One deck pairs straight into its presenter view; several, into the list to pick from.
+        pairPath: presenterPaths.length === 1 ? (presenterPaths[0] as string) : "",
+      };
+    },
   );
-  // One deck pairs straight into its presenter view; several, into the list to pick from.
-  offerPairing(server, presenterPaths.length === 1 ? (presenterPaths[0] as string) : "");
+}
+
+/**
+ * Start the dev server, print where to open it, offer a phone the presenter view, and serve until
+ * stopped. `show` says what to print once the server is up, and which path a QR code opens.
+ */
+export async function runDevSession(
+  options: Omit<Parameters<typeof startDevServer>[0], "password">,
+  show: (server: DevServer, password: string | undefined) => { banner: string; pairPath: string },
+): Promise<void> {
+  const password = options.remote === true ? generateRemotePassword() : undefined;
+  const server = await startDevServer({ ...options, password });
+  const { banner, pairPath } = show(server, password);
+  process.stdout.write(`${banner}\n`);
+  offerPairing(server, pairPath);
   await keepDevServer(server);
 }
 
@@ -99,18 +114,4 @@ export function devBanner(
   options: Parameters<typeof remoteBanner>[2],
 ): string {
   return `${remoteBanner(url, remoteUrls, options)}\n\np presenter view · s slide rail · Ctrl-C stops the server`;
-}
-
-/** `--port`: absent leaves the choice to the OS. */
-export function parsePort(value: string | undefined): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const port = /^\d+$/.test(value) ? Number(value) : Number.NaN;
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new DekError(`invalid port "${value}"`, {
-      hint: "pass a port from 1 to 65535, e.g. `dek --port 3030`",
-    });
-  }
-  return port;
 }

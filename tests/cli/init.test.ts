@@ -4,8 +4,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { initCommand } from "../../src/cli/init.ts";
 import { type LsDeckResult, lsCommand } from "../../src/cli/ls.ts";
+import { resolveTarget } from "../../src/cli/scope.ts";
 import { DekError } from "../../src/core/error.ts";
-import { lintDeck } from "../../src/core/index.ts";
+import { lintDeck } from "../../src/core/lint.ts";
+import { PLAYWRIGHT_INSTALL } from "../../src/core/playwright.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -62,6 +64,15 @@ describe("initCommand", () => {
         "$EDITOR script.md",
         "bunx dek",
       ]);
+    });
+  });
+
+  test("names the Playwright install until the project has it", async () => {
+    await withTempDir(async (dir) => {
+      expect(initCommand({ cwd: dir, dir: "my-talks" }).playwright).toBe(PLAYWRIGHT_INSTALL);
+      await mkdir(join(dir, "my-talks", "node_modules", "playwright"), { recursive: true });
+      await writeFile(join(dir, "my-talks", "node_modules", "playwright", "package.json"), "{}");
+      expect(initCommand({ cwd: dir, dir: "my-talks" }).playwright).toBeUndefined();
     });
   });
 
@@ -158,7 +169,7 @@ describe("initCommand", () => {
   test("starts the first deck with a real script: sections, beats, a budget, an estimate", async () => {
     await withTempDir(async (dir) => {
       initCommand({ cwd: dir, deck: "demo" });
-      const ls = lsCommand({ cwd: dir, positionalDeck: "demo" }) as LsDeckResult;
+      const ls = lsCommand(resolveTarget(dir, "decks", { deck: "demo" })) as LsDeckResult;
       expect(ls.duration).toBeDefined();
       expect(ls.estimateSeconds).toBeGreaterThan(0);
       expect(ls.sections.length).toBeGreaterThan(1);

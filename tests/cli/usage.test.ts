@@ -1,27 +1,65 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import pkg from "../../package.json";
-import { COMMAND_FLAGS, parseCommandLine } from "../../src/cli/flags.ts";
 import {
-  COMMAND_DOCS,
-  commandHelp,
-  FLAG_DOCS,
-  helpRequest,
-  unknownCommandError,
-  versionText,
-} from "../../src/cli/usage.ts";
+  allSpecs,
+  commandFlags,
+  type Group,
+  subcommandsOf,
+  usageLines,
+} from "../../src/cli/commands.ts";
+import { FLAGS, parseCommandLine } from "../../src/cli/flags.ts";
+import { commandHelp, helpRequest, unknownCommandError, versionText } from "../../src/cli/usage.ts";
 import type { DekError } from "../../src/core/error.ts";
 import { suggest } from "../../src/core/suggest.ts";
 import { runDek } from "../helpers/cli.ts";
 
 describe("command help", () => {
   test("documents every flag each command takes", () => {
-    for (const [command, flags] of Object.entries(COMMAND_FLAGS)) {
-      const help = commandHelp(command as keyof typeof COMMAND_FLAGS);
-      for (const flag of flags) {
+    for (const [command] of allSpecs()) {
+      const help = commandHelp(command);
+      for (const flag of commandFlags(command)) {
         expect(help).toContain(`--${flag}`);
-        expect(FLAG_DOCS[flag].text.length).toBeGreaterThan(0);
+        expect(FLAGS[flag].text.length).toBeGreaterThan(0);
       }
-      expect(COMMAND_DOCS[command as keyof typeof COMMAND_DOCS].usage.length).toBeGreaterThan(0);
+      expect(usageLines(command).length).toBeGreaterThan(0);
+    }
+  });
+
+  test("the overviews name every flag of every command, so they cannot drift from it", () => {
+    for (const [name, spec] of allSpecs()) {
+      const overview = spec.overview.map(([call, text]) => `${call} ${text}`).join("\n");
+      const agent = spec.agent.join("\n");
+      // --deck is said once for all; `dek help --agent` is in the footer of dek help.
+      for (const flag of commandFlags(name).filter((flag) => flag !== "deck" && flag !== "agent")) {
+        expect({ name, flag, found: overview.includes(`--${flag}`) }).toEqual({
+          name,
+          flag,
+          found: true,
+        });
+        expect({ name, flag, found: agent.includes(`--${flag}`) }).toEqual({
+          name,
+          flag,
+          found: true,
+        });
+      }
+    }
+  });
+
+  test("each usage names the words its form requires, as the errors name them", () => {
+    for (const [name, spec] of allSpecs()) {
+      for (const form of [spec, ...Object.values(subcommandsOf(spec))]) {
+        const usage = form.usage.join("\n");
+        for (const arg of form.args.filter((arg) => !arg.endsWith("?"))) {
+          const key = arg.replace(/\.\.\.$/, "");
+          expect({ name, arg, found: usage.includes(`<${key}>`) }).toEqual({
+            name,
+            arg,
+            found: true,
+          });
+        }
+      }
     }
   });
 
@@ -113,4 +151,75 @@ describe("dek help <unknown>", () => {
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("unknown command: bogus");
   });
+});
+
+describe("the CLI reference", () => {
+  const root = join(import.meta.dir, "..", "..");
+  const HEADINGS: Record<string, Record<Group, string>> = {
+    "docs/reference/cli.md": {
+      Development: "Development",
+      Project: "Project",
+      Refs: "Refs",
+      Slide: "Slide",
+      Output: "Output",
+      Help: "Help",
+    },
+    "docs/ja/reference/cli.md": {
+      Development: "開発",
+      Project: "プロジェクト",
+      Refs: "ref",
+      Slide: "スライド",
+      Output: "成果物",
+      Help: "ヘルプ",
+    },
+  };
+
+  /** Each `## ` section's calls: the code spans in the first cell of its table rows. */
+  function calls(path: string): Map<string, string[]> {
+    const sections = new Map<string, string[]>();
+    let heading = "";
+    for (const line of readFileSync(join(root, path), "utf8").split("\n")) {
+      if (line.startsWith("## ")) {
+        heading = line.slice(3);
+        sections.set(heading, []);
+        continue;
+      }
+      const cell = line.match(/^\| ((?:[^|\\]|\\\|)+) \|/)?.[1];
+      if (cell) {
+        const spans = [...cell.matchAll(/`([^`]+)`/g)].map((m) =>
+          (m[1] ?? "").replace(/\\\|/g, "|"),
+        );
+        sections.get(heading)?.push(...spans);
+      }
+    }
+    return sections;
+  }
+
+  for (const [path, headings] of Object.entries(HEADINGS)) {
+    test(`lists every usage line under its group in ${path}`, () => {
+      const sections = calls(path);
+      const missing = allSpecs().flatMap(([name, spec]) =>
+        usageLines(name)
+          .filter((usage) => !sections.get(headings[spec.group])?.includes(usage))
+          .map((usage) => `${headings[spec.group]}: ${usage}`),
+      );
+      expect(missing).toEqual([]);
+    });
+
+    test(`lists every command that reads a ref under refs in ${path}`, () => {
+      const refs = sections(path, headings.Refs);
+      const readers = allSpecs().filter(([, spec]) => spec.refs === true);
+      expect(readers.length).toBeGreaterThan(0);
+      for (const [name] of readers) {
+        expect({ name, found: refs.some((call) => call.startsWith(`dek ${name} <ref>`)) }).toEqual({
+          name,
+          found: true,
+        });
+      }
+    });
+  }
+
+  function sections(path: string, heading: string): string[] {
+    return calls(path).get(heading) ?? [];
+  }
 });

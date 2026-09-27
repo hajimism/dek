@@ -17,10 +17,35 @@ describe("formatText", () => {
     ).toBe("created project at /tmp/talks\n  dek.toml\n\nnext:\n  cd talks\n  bunx dek new <name>");
     expect(
       formatText({
+        command: "init",
+        data: {
+          root: "/tmp/talks",
+          created: ["dek.toml"],
+          kept: [],
+          next: ["bunx dek new <name>"],
+          playwright: "bun add -d playwright",
+        },
+      }),
+    ).toBe(
+      "created project at /tmp/talks\n  dek.toml\n\nnext:\n  bunx dek new <name>\n\nfor dek shot, dek pdf, and --visual:\n  bun add -d playwright",
+    );
+    expect(
+      formatText({
         command: "new",
         data: { name: "demo", dir: "/tmp/demo", created: [], next: ["cd decks/demo"] },
       }),
     ).toBe("created deck demo\n\nnext:\n  cd decks/demo");
+  });
+
+  test("prints the sheets of a shot when it made any, and its shots otherwise", () => {
+    const shots = [{ slug: "intro", step: "1", path: "/c/intro.png" }];
+    expect(formatText({ command: "shot", data: { shots } })).toBe("/c/intro.png");
+    expect(
+      formatText({
+        command: "shot",
+        data: { shots, sheets: ["/c/sheet-1.png", "/c/sheet-2.png"] },
+      }),
+    ).toBe("/c/sheet-1.png\n/c/sheet-2.png");
   });
 
   test("formats ls list with section, slide, and diagnostic counts", () => {
@@ -30,6 +55,7 @@ describe("formatText", () => {
         data: {
           kind: "list",
           root: "/tmp",
+          diagnostics: [],
           decks: [
             {
               name: "demo",
@@ -53,6 +79,7 @@ demo  Demo          2       2            1`);
         data: {
           kind: "list",
           root: "/tmp",
+          diagnostics: [],
           decks: [
             {
               name: "tokyo",
@@ -204,7 +231,6 @@ architecture  architecture      0:11   0:05
         data: {
           outs: ["/tmp/dist/demo.html"],
           images: ["/tmp/dist/demo.png"],
-          notes: [],
           diagnostics: [],
         },
       }),
@@ -215,7 +241,6 @@ architecture  architecture      0:11   0:05
         data: {
           outs: ["/tmp/dist/a.html", "/tmp/dist/b.html"],
           images: [],
-          notes: [],
           diagnostics: [],
         },
       }),
@@ -260,7 +285,7 @@ architecture  architecture      0:11   0:05
 });
 
 describe("formatText check", () => {
-  test("says why visual was skipped and how to turn it on", () => {
+  test("prints the diagnostics, not what was skipped: that goes to stderr", () => {
     expect(
       formatText({
         command: "check",
@@ -270,31 +295,7 @@ describe("formatText check", () => {
           skipped: [{ check: "visual", reason: "Playwright is not installed", hint: "install it" }],
         },
       }),
-    ).toBe("no diagnostics\nvisual: skipped (Playwright is not installed)\n  help: install it");
-  });
-
-  test("names every skipped check, with or without a hint", () => {
-    expect(
-      formatText({
-        command: "check",
-        data: {
-          slug: "intro",
-          diagnostics: [],
-          skipped: [
-            { check: "visual", reason: "Playwright is not installed", hint: "install it" },
-            { check: "voice", reason: "the deck has no voice/voice.toml", hint: "write it" },
-          ],
-        },
-      }),
-    ).toBe(
-      [
-        "no diagnostics",
-        "visual: skipped (Playwright is not installed)",
-        "  help: install it",
-        "voice: skipped (the deck has no voice/voice.toml)",
-        "  help: write it",
-      ].join("\n"),
-    );
+    ).toBe("no diagnostics");
   });
 });
 
@@ -346,6 +347,7 @@ describe("displayPaths", () => {
         data: {
           kind: "list",
           root: "/p",
+          diagnostics,
           decks: [{ name: "demo", title: "Demo", sections: 1, slides: 1, diagnostics }],
           failed: [],
         },
@@ -358,6 +360,9 @@ describe("displayPaths", () => {
       list.command === "ls" &&
         list.data.kind === "list" &&
         list.data.decks[0]?.diagnostics[0]?.path,
+    ).toBe("decks/demo/script.md");
+    expect(
+      list.command === "ls" && list.data.kind === "list" && list.data.diagnostics[0]?.path,
     ).toBe("decks/demo/script.md");
     expect(diagnostics[0]?.path).toBe("/p/decks/demo/script.md");
   });
@@ -513,6 +518,34 @@ describe("writeSuccess", () => {
     );
     expect(stdout).toBe("no diagnostics\n");
     expect(stderr).toBe("rumdl: skipped (rumdl is not installed)\n  help: install rumdl\n");
+  });
+
+  test("check text names every skipped check on stderr, as lint does", () => {
+    const { stdout, stderr } = captured(() =>
+      writeSuccess(
+        {
+          command: "check",
+          data: {
+            slug: "intro",
+            diagnostics: [],
+            skipped: [
+              { check: "visual", reason: "Playwright is not installed", hint: "install it" },
+              { check: "voice", reason: "the deck has no voice/voice.toml" },
+            ],
+          },
+        },
+        { json: false },
+      ),
+    );
+    expect(stdout).toBe("no diagnostics\n");
+    expect(stderr).toBe(
+      [
+        "visual: skipped (Playwright is not installed)",
+        "  help: install it",
+        "voice: skipped (the deck has no voice/voice.toml)",
+        "",
+      ].join("\n"),
+    );
   });
 
   test("SARIF output lists a skipped check as a tool execution notification", () => {

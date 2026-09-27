@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { refCommand, restoreRef } from "../../src/cli/ref.ts";
+import { addRef, listRefs, removeRef, restoreRef } from "../../src/cli/ref.ts";
 import { formatText } from "../../src/cli/result.ts";
+import { resolveTarget } from "../../src/cli/scope.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { loadConfig } from "../../src/core/config.ts";
 import { readRefMeta, refDir } from "../../src/core/ref.ts";
@@ -62,7 +63,7 @@ describe("dek ref <source>", () => {
 
         const list = formatText({
           command: "ref",
-          data: await refCommand({ cwd: root, args: [] }),
+          data: listRefs(root),
         });
         expect(list).toContain(REF);
         expect(list).toContain("Why dek");
@@ -73,8 +74,8 @@ describe("dek ref <source>", () => {
   refTest("running it again with nothing new downloads nothing", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async (fake) => {
-        await refCommand({ cwd: root, args: [REF] });
-        const again = await refCommand({ cwd: root, args: [REF] });
+        await addRef(root, REF);
+        const again = await addRef(root, REF);
         expect(again).toMatchObject({ action: "add", rev: SHA_A, changed: false });
         expect(tarballRequests(fake)).toBe(1);
         const gitignore = await readFile(join(root, ".gitignore"), "utf8");
@@ -86,9 +87,9 @@ describe("dek ref <source>", () => {
   refTest("moves the pin when the source moved, and reports both revs", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async (fake) => {
-        await refCommand({ cwd: root, args: [REF] });
+        await addRef(root, REF);
         fake.repos["someone/talks"] = { ...talks()["someone/talks"], head: SHA_B } as FakeRepo;
-        const moved = await refCommand({ cwd: root, args: [REF] });
+        const moved = await addRef(root, REF);
         expect(moved).toMatchObject({ rev: SHA_B, from: SHA_A, changed: true });
         expect(loadConfig(join(root, "dek.toml")).refs).toEqual({ [REF]: SHA_B });
         expect(formatText({ command: "ref", data: moved })).toContain("bbbbbbb (was aaaaaaa)");
@@ -99,9 +100,9 @@ describe("dek ref <source>", () => {
   refTest("pins a tag, and takes a GitHub link", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
-        expect(await refCommand({ cwd: root, args: [`${REF}@v1`] })).toMatchObject({ rev: SHA_B });
+        expect(await addRef(root, `${REF}@v1`)).toMatchObject({ rev: SHA_B });
         const link = "https://github.com/someone/talks/tree/main/decks/why-dek";
-        expect(await refCommand({ cwd: root, args: [link] })).toMatchObject({
+        expect(await addRef(root, link)).toMatchObject({
           name: REF,
           rev: SHA_A,
         });
@@ -115,7 +116,7 @@ describe("dek ref <source>", () => {
         "someone/talks": { head: SHA_A, commits: { [SHA_A]: deckRepoFiles("why-dek") } },
       };
       await withFakeGithub(repos, async () => {
-        const result = await refCommand({ cwd: root, args: [REF] });
+        const result = await addRef(root, REF);
         expect(result).toMatchObject({ license: null });
         expect(result.action === "add" && result.warnings[0]).toContain("no license");
       });
@@ -125,7 +126,7 @@ describe("dek ref <source>", () => {
   refTest("lists the ref in AGENTS.md with how to read it", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
-        await refCommand({ cwd: root, args: [REF] });
+        await addRef(root, REF);
         const agents = await readFile(join(root, "AGENTS.md"), "utf8");
         expect(agents).toContain("## References");
         expect(agents).toContain(`- \`${REF}\`: Why dek`);
@@ -139,9 +140,9 @@ describe("dek ref (list) and dek ref rm", () => {
   refTest("lists each pinned ref and says which are not fetched", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
-        await refCommand({ cwd: root, args: [REF] });
+        await addRef(root, REF);
         await rm(join(root, "refs"), { recursive: true });
-        const list = await refCommand({ cwd: root, args: [] });
+        const list = listRefs(root);
         expect(list).toEqual({
           action: "list",
           refs: [{ name: REF, rev: SHA_A, fetched: false }],
@@ -153,7 +154,7 @@ describe("dek ref (list) and dek ref rm", () => {
 
   refTest("with no refs, points to how to add one", async () => {
     await withTempProject(project, async (root) => {
-      const list = await refCommand({ cwd: root, args: [] });
+      const list = listRefs(root);
       expect(formatText({ command: "ref", data: list })).toContain("dek ref owner/repo/deck");
     });
   });
@@ -161,8 +162,8 @@ describe("dek ref (list) and dek ref rm", () => {
   refTest("rm drops the pin, the snapshot, and the AGENTS.md line", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
-        await refCommand({ cwd: root, args: [REF] });
-        const result = await refCommand({ cwd: root, args: ["rm", REF] });
+        await addRef(root, REF);
+        const result = await removeRef(root, REF);
         expect(result).toMatchObject({ action: "rm", name: REF });
         expect(await readFile(join(root, "dek.toml"), "utf8")).toBe(
           "# my talks\nmax_classes = 40\n",
@@ -175,10 +176,12 @@ describe("dek ref (list) and dek ref rm", () => {
 
   refTest("rm of a ref that is not added says so", async () => {
     await withTempProject(project, async (root) => {
-      await expect(refCommand({ cwd: root, args: ["rm", REF] })).rejects.toMatchObject({
-        message: `ref "${REF}" is not added`,
-        hint: expect.stringContaining("dek ref"),
-      });
+      expect(() => removeRef(root, REF)).toThrow(
+        expect.objectContaining({
+          message: `ref "${REF}" is not added`,
+          hint: expect.stringContaining("dek ref"),
+        }),
+      );
     });
   });
 });
@@ -187,12 +190,14 @@ describe("restoring a snapshot", () => {
   refTest("a pinned ref whose snapshot is gone is fetched again at the pinned commit", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async (fake) => {
-        await refCommand({ cwd: root, args: [`${REF}@v1`] });
+        await addRef(root, `${REF}@v1`);
         await rm(join(root, "refs"), { recursive: true });
         fake.repos["someone/talks"] = { ...talks()["someone/talks"], head: SHA_A } as FakeRepo;
         await restoreRef(root, REF);
         expect(readRefMeta(refDir(root, REF))?.rev).toBe(SHA_B);
-        expect(showCommand({ cwd: root, slug: "intro", deck: REF }).ref?.rev).toBe(SHA_B);
+        expect(
+          showCommand(resolveTarget(root, "deck", { refs: true, deck: REF }), "intro").ref?.rev,
+        ).toBe(SHA_B);
       });
     });
   });
@@ -202,7 +207,7 @@ describe("restoring a snapshot", () => {
     async () => {
       await withTempProject(project, async (root) => {
         await withFakeGithub(talks(), async (fake) => {
-          await refCommand({ cwd: root, args: [REF] });
+          await addRef(root, REF);
           const before = fake.requests.length;
           await restoreRef(root, REF);
           await restoreRef(root, "other/repo/deck");
@@ -215,7 +220,7 @@ describe("restoring a snapshot", () => {
   refTest("a snapshot left at another commit is replaced by the pinned one", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
-        await refCommand({ cwd: root, args: [REF] });
+        await addRef(root, REF);
         const toml = await readFile(join(root, "dek.toml"), "utf8");
         await writeFile(join(root, "dek.toml"), toml.replace(SHA_A, SHA_B));
         await restoreRef(root, REF);

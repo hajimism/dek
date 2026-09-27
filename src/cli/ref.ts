@@ -42,26 +42,6 @@ export type RefRmResult = { action: "rm"; name: string };
 export type RefCliResult = RefAddResult | RefListResult | RefRmResult;
 
 /**
- * `dek ref` lists, `dek ref <source>` pins and fetches (or moves the pin to
- * the latest, or to the rev after `@`), `dek ref rm <name>` drops one.
- */
-export async function refCommand(options: { cwd: string; args: string[] }): Promise<RefCliResult> {
-  const [first, second] = options.args;
-  if (first === undefined) {
-    return listRefs(options.cwd);
-  }
-  if (first === "rm") {
-    if (second === undefined) {
-      throw new DekError("usage: dek ref rm <owner/repo/deck>", {
-        hint: "run `dek ref` to list refs",
-      });
-    }
-    return removeRef(options.cwd, second);
-  }
-  return addRef(options.cwd, first);
-}
-
-/**
  * Fetches a pinned ref whose snapshot is missing or at another commit, so
  * clearing refs/ or cloning the project never loses one. A ref that is not
  * pinned is left for the read to explain.
@@ -81,7 +61,8 @@ async function fetchSnapshot(root: string, source: RefSource, sha: string) {
   return installSnapshot(root, source, sha, files);
 }
 
-async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
+/** `dek ref <source>`: pin and fetch, or move the pin to the latest or to the rev after `@`. */
+export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
   const source = parseRefSource(arg);
   const project = requireProject(cwd);
   const { pinned: from, dir, fetched } = refState(project, source.name);
@@ -122,7 +103,7 @@ async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
   };
 }
 
-function listRefs(cwd: string): RefListResult {
+export function listRefs(cwd: string): RefListResult {
   const project = requireProject(cwd);
   const refs = Object.keys(loadConfig(project.configPath).refs ?? {}).map((name) => {
     const { pinned: rev = "", dir, fetched } = refState(project, name);
@@ -132,7 +113,7 @@ function listRefs(cwd: string): RefListResult {
   return { action: "list", refs };
 }
 
-function removeRef(cwd: string, arg: string): RefRmResult {
+export function removeRef(cwd: string, arg: string): RefRmResult {
   const source = parseRefSource(arg);
   const project = requireProject(cwd);
   const { pinned, dir } = refState(project, source.name);

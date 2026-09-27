@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { helpText } from "../../src/cli/format.ts";
+import { helpText } from "../../src/cli/usage.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 
 describe("dek help", () => {
