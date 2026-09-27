@@ -4,7 +4,7 @@
 
 ## Thirteen tokens
 
-If class names are the contract between HTML and theme, custom properties are the surface where appearance is swapped. Every theme publishes these thirteen tokens on `.slide`. They live on `.slide`, not `:root`, so they never leak into the presenter chrome. That is the same reason top-level selectors are forbidden (`DEK012`).
+If class names are the contract between HTML and theme, custom properties are the surface where appearance is swapped. Every theme publishes these thirteen tokens on `.slide`. They live on `.slide`, not `:root`, so they never leak into the presenter chrome. That is the same reason top-level selectors are forbidden (`DEK012`). The view transition sits outside every slide, so dek hands it the tokens set on `.slide` as well; see [View Transitions](./steps#view-transitions).
 
 | Token | Role |
 | --- | --- |

@@ -62,14 +62,17 @@ Decoration that only one slide uses does not belong in the shared vocabulary. Pu
 
 ```css
 /* slides/usb.css */
-.usb-mark { color: var(--accent); }
+.slide { --mark-size: 96px; }
+.usb-mark { width: var(--mark-size); color: var(--accent); }
 .slide.is-current .usb-mark { animation: pop var(--step-transition); }
 @keyframes pop { from { transform: scale(0.9); } }
 ```
 
 The renderer scopes every rule to that slide. `.usb-mark` becomes `.slide:where([data-slug="usb"]) .usb-mark`, a leading `.slide` becomes `.slide:where([data-slug="usb"])`, and `pop` is renamed so that another slide's `pop` does not collide with it. The scope weighs exactly one `.slide`, so a rule here behaves as if it were written at the end of `theme.css`: it beats the theme's `.slide .x`, and the theme's more specific rules, such as a layout's `.slide[data-layout="split"] .x` or the beat state `.slide.is-current [data-step]`, still beat it. To override one of those, write the same selector here.
 
-The theme's rules still apply. Values come from tokens (`DEK014`), and you may define new tokens of your own. A class defined here counts as defined for this slide only (`DEK010`) and does not count toward `max_classes` (`DEK013`). Rules that reach past the slide stay in `theme.css` (`DEK012`): `::view-transition-*`, `@font-face`, `@import`, and `:root`, `html`, or `body`, which never match inside a slide. `url()` follows the slide HTML's asset rules: `assets/...`, relative to the deck, and nothing remote (`DEK020`, `DEK023`). `dek mv` moves the stylesheet along with the HTML, and a stylesheet with no section is `DEK002`. Once a class shows up on several slides, move it into `theme.css`.
+`pop` gives only its `from`: the rule for `.usb-mark` is the end state, and the animation starts somewhere else and arrives there. Write entry animations that way, and wherever the animation does not run, the finished slide is what shows. The rail's thumbnails and the presenter's preview are copies with `.is-current`, so they play it once and settle in the same place. An animation whose `to` holds the finished look instead depends on `forwards`, and on the animation running at all.
+
+The theme's rules still apply. Values come from tokens (`DEK014`). A value only this slide uses can be a token of the slide's own, as `--mark-size` is above; the `DEK014` hint for a slide stylesheet offers that. A class defined here counts as defined for this slide only (`DEK010`) and does not count toward `max_classes` (`DEK013`). Rules that reach past the slide stay in `theme.css` (`DEK012`): `::view-transition-*`, `@font-face`, `@import`, and `:root`, `html`, or `body`, which never match inside a slide. `url()` follows the slide HTML's asset rules: `assets/...`, relative to the deck, and nothing remote (`DEK020`, `DEK023`). `dek mv` moves the stylesheet along with the HTML, and a stylesheet with no section is `DEK002`. Once a class shows up on several slides, move it into `theme.css`.
 
 ## Density is the theme's job
 

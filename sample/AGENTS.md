@@ -14,10 +14,16 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - One `##` heading is one slide. HTML lives in `slides/<id>.html`.
 - Shared look lives in `theme.css`. Decoration only one slide uses lives in `slides/<id>.css`, which is scoped to that slide.
 - Use only classes defined in `theme.css` or in that slide's own `slides/<id>.css`.
-- Color, type, space, radius, and motion in either stylesheet use token `var()` only.
+- Color, type, space, radius, and motion in either stylesheet use token `var()` only. A value only one slide uses can be a token of its own on that slide's `.slide` rule in `slides/<id>.css`.
 - Do not add `<style>`, `style=`, `<script>`, event handler attributes (`onclick=` and the like), or `javascript:` URLs inside slide HTML.
-- Motion CSS cannot express lives in `slides/<id>.ts`: `export default { motion: { <step>: ms }, draw(slide, { index, step, t }) {} } satisfies DekSlide`. `DekSlide` is global, from `.dek/slide.d.ts`; do not import it. Draw from `t` alone and set everything you touch on every call, with no timers and no imports, so video and screenshots can seek it. In `draw`, find elements by data-* attributes, not classes.
+- Motion CSS cannot express lives in `slides/<id>.ts`: `export default { motion: { <step>: ms }, draw(slide, { index, step, t }) {} } satisfies DekSlide`. `DekSlide` is global, from `.dek/slide.d.ts`; do not import it. Key the slide's arrival, before its first beat, as `"0"`: every `data-step` element is hidden there, so draw what the slide shows before anything happens. Draw from `t` alone and set everything you touch on every call, with no timers and no imports, so video and screenshots can seek it. In `draw`, find elements by data-* attributes, not classes.
 - Keep the deck self-contained: no remote URLs and no paths outside the deck.
+
+## Checking a slide
+
+- `dek check <slug> --shot` lints one slide and screenshots it at its last beat.
+- `dek shot --sheet` tiles every slide on one image: read it to judge the deck's balance in one look, then open a slide's own shot for detail.
+- One shot shows no motion. `dek shot <slug> --motion` lays the slide's beats out as rows, each held at moments through everything it moves and ending as the shot does. `dek shot <a> --to <b> --at 0.5` freezes the view transition between any two slides.
 
 ## Theme classes
 

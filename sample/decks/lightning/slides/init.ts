@@ -46,7 +46,7 @@ function scenes(slide: HTMLElement, step: string, t: number, motion: Record<stri
   }
 }
 
-const MOTION = { "1": 4200 };
+const MOTION = { "0": 4200 };
 
 export default {
   motion: MOTION,

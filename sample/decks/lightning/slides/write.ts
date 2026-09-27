@@ -7,7 +7,7 @@ const TOTAL_MS = 400 + STEP_MS * 3;
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 
 export default {
-  motion: { "1": TOTAL_MS },
+  motion: { "0": TOTAL_MS },
   draw(slide, { t }) {
     const active = Math.min(2, Math.floor((t - 400) / STEP_MS));
     for (const el of slide.querySelectorAll<HTMLElement>("[data-legend]")) {

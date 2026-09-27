@@ -58,7 +58,9 @@ export default {
     if (verdict) {
       verdict.dataset.verdict = passed ? "pass" : "fail";
       verdict.textContent = passed ? "0 件。\n完成。" : "上に 132px\n下に 108px";
-      const fade = step === "lint-pass" ? Math.min(1, Math.abs(t - 1700) / 250) : 1;
+      // The verdict comes with the failing run's diagnostic, not before it.
+      const printed = slide.querySelector<HTMLElement>('[data-scene="lint-fail"] .err')?.style.opacity === "1";
+      const fade = !printed ? 0 : step === "lint-pass" ? Math.min(1, Math.abs(t - 1700) / 250) : 1;
       verdict.style.opacity = String(fade);
     }
   },

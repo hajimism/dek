@@ -3,7 +3,7 @@ const GROW_MS = 1000;
 const SCALE_LINES = 180;
 
 export default {
-  motion: { "1": GROW_MS },
+  motion: { "0": GROW_MS },
   draw(slide, { t }) {
     const p = 1 - (1 - Math.min(1, t / GROW_MS)) ** 3;
     for (const bar of slide.querySelectorAll<HTMLElement>("[data-lines]")) {

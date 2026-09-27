@@ -6,7 +6,7 @@ const TOTAL = 2600;
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 
 export default {
-  motion: { "1": TOTAL },
+  motion: { "0": TOTAL },
   draw(slide, { t }) {
     const reply = slide.querySelector<HTMLElement>("[data-type]");
     if (reply) {

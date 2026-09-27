@@ -1,8 +1,11 @@
 // One lap of the ring across three beats: the dot rests on 書く, runs to 確かめる, then through 直す
 // and home, where the hub turns from `dek check` to `ok: true`.
-const CHECK_MS = 1400;
-const FIX_MS = 2400;
 const STOPS = [0, 1 / 3, 2 / 3];
+// Each beat runs the dot one leg of the lap, keyed by beat id.
+const LEGS: Record<string, { from: number; to: number; ms: number }> = {
+  "loop-check": { from: 0, to: STOPS[1], ms: 1400 },
+  "loop-fix": { from: STOPS[1], to: 1, ms: 2400 },
+};
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const easeInOut = (x: number) => {
   const p = clamp(x);
@@ -10,11 +13,10 @@ const easeInOut = (x: number) => {
 };
 
 export default {
-  motion: { "loop-check": CHECK_MS, "loop-fix": FIX_MS },
-  draw(slide, { index, t }) {
-    let lap = 0;
-    if (index === 1) lap = STOPS[1] * easeInOut(t / CHECK_MS);
-    if (index >= 2) lap = STOPS[1] + (1 - STOPS[1]) * easeInOut(t / FIX_MS);
+  motion: Object.fromEntries(Object.entries(LEGS).map(([step, leg]) => [step, leg.ms])),
+  draw(slide, { step, t }) {
+    const leg = LEGS[step];
+    const lap = leg ? leg.from + (leg.to - leg.from) * easeInOut(t / leg.ms) : 0;
 
     const dot = slide.querySelector<HTMLElement>("[data-dot]");
     if (dot) {
@@ -30,7 +32,7 @@ export default {
       const at = STOPS[Number(node.dataset.node)] ?? 0;
       node.classList.toggle("is-lit", lap >= at - 0.001);
     }
-    const home = index >= 2 && lap >= 0.999;
+    const home = lap >= 0.999;
     for (const state of slide.querySelectorAll<HTMLElement>("[data-hub]")) {
       state.style.visibility = (state.dataset.hub === "1") === home ? "visible" : "hidden";
     }

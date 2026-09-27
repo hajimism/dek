@@ -18,7 +18,7 @@ function paint(frame: Element, t: number) {
 }
 
 export default {
-  motion: { "1": MS },
+  motion: { "0": MS },
   draw(slide, { t }) {
     for (const frame of frames(slide)) {
       paint(frame, Number(frame.dataset.t));

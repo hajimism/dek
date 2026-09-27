@@ -46,8 +46,8 @@ function scenes(slide: HTMLElement, step: string, t: number, motion: Record<stri
   }
 }
 
-const MOTION = { "1": 5200 };
-const LAND_AT = MOTION["1"] - 1300;
+const MOTION = { "0": 5200 };
+const LAND_AT = MOTION["0"] - 1300;
 const LAND_MS = 700;
 
 export default {

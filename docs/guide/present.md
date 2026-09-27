@@ -45,7 +45,7 @@ While the server is running, the terminal can drive the browser and ask which sl
 | --- | --- |
 | `→` `PageDown` `Space` | Next beat, then next slide |
 | `←` `PageUp` `Backspace` `Shift+Space` | Previous beat, then previous slide |
-| `Home` `End` | The first beat of the talk, the last beat of the last slide |
+| `Home` `End` | The first slide as it arrives, the last beat of the last slide |
 | `p` | Toggle the presenter view |
 | `s` | Toggle the slide rail |
 | `f` | Toggle fullscreen |

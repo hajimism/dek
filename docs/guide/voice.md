@@ -81,14 +81,14 @@ Rehearsal and video share one schedule. Each screen change leads its first word 
 lead = 300                  # the whole deck
 
 [beats.order]               # the whole slide
-lead = 600                  # before its first beat
+lead = 600                  # before the slide arrives
 pause = 1200                # after its last beat
 
-[beats."order/what"]        # one beat, by id or by 1-based position ("order/2")
+[beats."order/what"]        # one beat, by id or by 1-based position ("order/2"); "order/0" is the arrival
 pause = 1500                # silence after it, instead of pause.beat
 ```
 
-Keys follow the URL hash: `slug` for a slide, `slug/beat-id` or `slug/2` for a beat. A slide key frames the slide: its `lead` runs into the first beat and its `pause` follows the last. A beat key wins over its slide key. `dek mv` rewrites the keys along with the slide. A key that matches nothing is `DEK043`. On save, the dev server re-times the deck from cached clips, and `dek voice pin` freezes the timing together with the audio.
+Keys name a slide as `slug` and a beat as `slug/beat-id` or `slug/2`, the position the URL hash takes. A slide key frames the slide: its `lead` runs into the slide's arrival, where the paragraphs before its first `###` are spoken, and its `pause` follows the last beat. A beat key wins over its slide key. `dek mv` rewrites the keys along with the slide. A key that matches nothing is `DEK043`. On save, the dev server re-times the deck from cached clips, and `dek voice pin` freezes the timing together with the audio.
 
 ## The daily four
 

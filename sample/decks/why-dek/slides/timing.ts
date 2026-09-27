@@ -7,7 +7,7 @@ const ease = (x: number) => 1 - (1 - clamp(x)) ** 3;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s) % 60).padStart(2, "0")}`;
 
 export default {
-  motion: { "1": GROW_MS },
+  motion: { "0": GROW_MS },
   draw(slide, { t }) {
     const p = ease(t / GROW_MS);
     for (const bar of slide.querySelectorAll<HTMLElement>("[data-est]")) {

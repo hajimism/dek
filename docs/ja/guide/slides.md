@@ -62,14 +62,17 @@ sync は、あなたが手を入れたスライドには一切触れません。
 
 ```css
 /* slides/usb.css */
-.usb-mark { color: var(--accent); }
+.slide { --mark-size: 96px; }
+.usb-mark { width: var(--mark-size); color: var(--accent); }
 .slide.is-current .usb-mark { animation: pop var(--step-transition); }
 @keyframes pop { from { transform: scale(0.9); } }
 ```
 
 レンダラは、すべてのルールをその枚だけに効くように書き換えます。`.usb-mark` は `.slide:where([data-slug="usb"]) .usb-mark` に、先頭の `.slide` は `.slide:where([data-slug="usb"])` になります。`pop` も改名されるので、別の枚の `pop` とは衝突しません。スコープが足す詳細度は `.slide` ひとつ分だけなので、ここに書いたルールは `theme.css` の末尾に書いたのと同じ強さで効きます。テーマの `.slide .x` には勝ち、レイアウトの `.slide[data-layout="split"] .x` やビートの状態 `.slide.is-current [data-step]` のような、より詳細なテーマのルールには負けます。それらを上書きしたいときは、同じセレクタをここに書いてください。
 
-テーマと同じ規則も適用されます。値はトークンから取り（`DEK014`）、新しいトークンを自分で定義しても構いません。ここで定義したクラスは、この枚でだけ定義済みとみなされ（`DEK010`）、`max_classes` には数えません（`DEK013`）。スライドの外まで届くルールは `theme.css` に置きます（`DEK012`）。`::view-transition-*`、`@font-face`、`@import`、それにスライドの中では決して当たらない `:root`・`html`・`body` です。`url()` はスライドの HTML と同じ規則に従い、デッキからの相対で `assets/...` と書き、リモートは使えません（`DEK020`、`DEK023`）。`dek mv` はスタイルシートも HTML と一緒に動かします。対応するセクションのないスタイルシートは `DEK002` です。同じクラスが何枚にも出てきたら、`theme.css` に移してください。
+`pop` には `from` しか書いていません。`.usb-mark` のルールが終わりの状態で、アニメーションは別の状態から始まってそこへ着きます。入りのアニメーションをこう書けば、アニメーションが走らない場所では完成したスライドが見えます。スライド一覧のサムネイルと発表者ビューのプレビューは `.is-current` を付けた複製なので、そこでも一度再生されて同じ状態に落ち着きます。逆に `to` に完成形を書くと、`forwards` に頼ることになり、アニメーションが走らなければ完成形になりません。
+
+テーマと同じ規則も適用されます。値はトークンから取ります（`DEK014`）。この枚でしか使わない値は、上の `--mark-size` のように、この枚のトークンにして構いません。スライドのスタイルシートで出た `DEK014` の hint も、その書き方を案内します。ここで定義したクラスは、この枚でだけ定義済みとみなされ（`DEK010`）、`max_classes` には数えません（`DEK013`）。スライドの外まで届くルールは `theme.css` に置きます（`DEK012`）。`::view-transition-*`、`@font-face`、`@import`、それにスライドの中では決して当たらない `:root`・`html`・`body` です。`url()` はスライドの HTML と同じ規則に従い、デッキからの相対で `assets/...` と書き、リモートは使えません（`DEK020`、`DEK023`）。`dek mv` はスタイルシートも HTML と一緒に動かします。対応するセクションのないスタイルシートは `DEK002` です。同じクラスが何枚にも出てきたら、`theme.css` に移してください。
 
 ## 密度はテーマが決める
 

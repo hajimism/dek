@@ -7,9 +7,9 @@ export {};
 declare global {
   /** What `draw` receives for one frame of a beat. */
   interface DekMotionFrame {
-    /** 0-based beat index within the slide. */
+    /** Beats reached on the slide: 0 as it arrives, k at its k-th beat. */
     index: number;
-    /** The beat id, or its 1-based position: the values `data-step` takes. */
+    /** "0" as the slide arrives; at a beat, its id or 1-based position, the values `data-step` takes. */
     step: string;
     /** Milliseconds since the beat began, from 0 up to the beat's `motion`. */
     t: number;
@@ -17,7 +17,7 @@ declare global {
 
   /** The default export of a slide script. */
   interface DekSlide {
-    /** Milliseconds of motion per beat, keyed like `data-step`. A beat without an entry is drawn once, at t = 0. */
+    /** Milliseconds of motion per beat, keyed like `step`. A beat without an entry is drawn once, at t = 0. */
     motion?: Record<string, number>;
     /**
      * Draws the slide at `t`. The runtime owns the clock: video and screenshots seek it,

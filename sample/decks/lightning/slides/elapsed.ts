@@ -8,7 +8,7 @@ const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 export default {
-  motion: { "1": START_MS + DRAW_MS },
+  motion: { "0": START_MS + DRAW_MS },
   draw(slide, { t }) {
     const lanes = [...slide.querySelectorAll<HTMLElement>("[data-s]")];
     const total = lanes.reduce((sum, lane) => sum + Number(lane.dataset.s), 0);

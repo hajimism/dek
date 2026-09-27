@@ -6,7 +6,7 @@ const FADE_MS = 360;
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 
 export default {
-  motion: { "1": FIRST_MS + EACH_MS * 4 + FADE_MS },
+  motion: { "0": FIRST_MS + EACH_MS * 4 + FADE_MS },
   draw(slide, { t }) {
     slide.querySelectorAll<HTMLElement>("[data-token]").forEach((el, i) => {
       const p = clamp((t - FIRST_MS - i * EACH_MS) / FADE_MS);

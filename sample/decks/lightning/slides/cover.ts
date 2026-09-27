@@ -20,7 +20,7 @@ function typed(slide: HTMLElement, t: number): number {
 const TOTAL_MS = START_MS + 15 * CHAR_MS + 3 * 180 + RISE_MS * 2;
 
 export default {
-  motion: { "1": TOTAL_MS },
+  motion: { "0": TOTAL_MS },
   draw(slide, { t }) {
     const done = typed(slide, t);
     slide.querySelectorAll<HTMLElement>("[data-rise]").forEach((el, i) => {

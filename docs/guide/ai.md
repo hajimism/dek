@@ -66,6 +66,13 @@ dek check architecture --voice
 
 `check` lints one slide, including the rendering rules when Playwright is available, writes a screenshot, and returns the diagnostics and the image path. The path contains a hash of the rendered content, so an agent that opens the returned path never sees a stale image. `--voice` returns the kana reading and duration for each sentence. Write the HTML, run `check`, look at the picture, read the pronunciation, fix. Write, see, hear, fix: one loop, closed.
 
+```bash
+dek shot --sheet
+dek shot architecture --motion
+```
+
+Two views no single shot gives. `--sheet` puts the whole deck on one image, for the balance across slides. `--motion` spreads a slide's beats across time, each held at a few moments through everything it moves, so an entrance that hides text or a line that never draws shows up in stills. Both images are sized to be read whole without being scaled down, and both are cached by what they show.
+
 Without Playwright, `check` still lints and lists `visual` in `skipped` with the reason and a hint that installs it, so an agent never mistakes a skipped measurement for a pass. `--voice` on a deck without `voice/` does the same: `voice` is skipped with the reason and how to set it up, and the rest of the check still runs.
 
 Anything geometry can decide is a lint rule. Overflow and contrast have definite answers once a browser measures them, and a measured verdict is more reliable than showing an agent a screenshot and asking whether the text fits.

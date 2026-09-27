@@ -9,7 +9,7 @@ const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const ease = (x: number) => 1 - (1 - clamp(x)) ** 3;
 
 export default {
-  motion: { "1": TOTAL_MS },
+  motion: { "0": TOTAL_MS },
   draw(slide, { t }) {
     const rows = slide.querySelectorAll<HTMLElement>("[data-rise]");
     rows.forEach((row, i) => {

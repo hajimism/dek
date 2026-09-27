@@ -4,7 +4,7 @@ A beat is a `###` heading in the script. On screen, a beat is the moment an elem
 
 ## `data-step`
 
-`data-step` names the beat an element belongs to. Its value is a beat id, or a positive integer meaning "the k-th beat of this slide". The runtime does one thing: when you reach a beat, it adds `is-shown` to every element bound to that beat or an earlier one. The theme decides what shown and hidden look like.
+`data-step` names the beat an element belongs to. Its value is a beat id, or a positive integer meaning "the k-th beat of this slide". The runtime does one thing: when you reach a beat, it adds `is-shown` to every element bound to that beat or an earlier one. A slide arrives before its first beat, so nothing bound to a beat is shown until the first press on it; every beat, the first included, brings its elements in the same way. The theme decides what shown and hidden look like.
 
 ```html
 <div class="col" data-step="slides-hang">…</div>
@@ -35,6 +35,8 @@ Moving between slides uses the browser's View Transitions API. The runtime calls
 ::view-transition-new(slide) { animation: fade-in var(--step-transition); }
 ```
 
+The transition's pseudo-elements hang off the page, not a slide, so on their own they would not see the theme's tokens. dek repeats every token set on `.slide` on `::view-transition` when it serves the theme, so `var(--step-transition)` there reads the value the slides read, `@media` included. A token set on only some slides, such as under `[data-layout]` or in a slide stylesheet, stays with those slides.
+
 The player names the slide box `slide`, so only the slide moves. The slide list, the presenter view, and the letterbox around the slide stay still, and anything that slides in from an edge is clipped to the slide. The page itself, `root`, does not animate.
 
 ## `data-morph`
@@ -59,7 +61,7 @@ A morph is invisible in a still image. To judge one, freeze the transition part-
 dek shot problem --to architecture --at 0.5
 ```
 
-This writes one frame of the transition from the last beat of `problem` into `architecture`, stopped at 50%, to `.cache/shots/problem-to-architecture-0.5.<hash>.png`. Use `--at 0` and `--at 1` for the endpoints. The frame comes from the same player document that `dek video` records, so what you see is what the video shows.
+This writes one frame of the transition from the last beat of `problem` into `architecture`, stopped at 50%, to `.cache/shots/problem~architecture~0.5.<hash>.png`. Use `--at 0` and `--at 1` for the endpoints. `--at` counts along the view transition alone, so `--at 1` is where the transition ends; an entrance on the new slide can still be running there. To see all of it, use [`--motion`](#seeing-motion-in-stills). The frame comes from the same player document that `dek video` records, so what you see is what the video shows.
 
 The bundled theme honors `prefers-reduced-motion` and drops every animation when it is set.
 
@@ -70,7 +72,7 @@ When CSS cannot express a motion, such as a counter that runs, a chart that draw
 ```ts
 // slides/growth.ts
 export default {
-  motion: { growth: 1200 },            // ms of motion, keyed like data-step
+  motion: { growth: 1200 },            // ms of motion per beat: its id or number, "0" as the slide arrives
   draw(slide, { index, step, t }) {    // t: ms since this beat began
     const p = step === "growth" ? t / 1200 : 0;
     const bar = slide.querySelector<HTMLElement>("[data-bar]");
@@ -99,6 +101,18 @@ So draw from `t` alone, and set everything you touch on every call: the same `(i
 Every page that shows a beat without playing it shows the beat as it ends: `dek shot`, `lint --visual`, the PDF, and the slide a `dek shot <a> --to <b>` frame leaves. Slide scripts are drawn at the end of their motion, and every CSS animation and transition is run to its end, so an entrance in the theme is measured and photographed where it lands, not on its first frame.
 
 An animation that repeats forever, such as `animation-iteration-count: infinite`, has no end. Stills hold it at its first frame, so every still of the beat agrees. The player moves on without waiting for it, and `dek video` records it looping while the beat moves, then holds the first frame. Make the first frame the one you want in the handout.
+
+`dek shot --sheet` tiles every slide's still on one image, so the balance across the deck reads in one look.
+
+## Seeing motion in stills
+
+```bash
+dek shot timing --motion
+```
+
+This lays out the arrival of `timing` and each of its beats as a row, played the way the talk reaches it: the arrival from the slide before, each beat from the one it follows. Every row is held at 0, 25, 50, and 75% of everything that move starts (the view transition, the slide's CSS animations and transitions, and its script), then ended, so its last frame is the still `dek shot` takes. A beat that moves nothing is that frame alone, captioned `no motion`. Only what the move started is held: an entrance that finished on an earlier beat stays finished, as it does in the talk.
+
+The frames go on one image sized for an agent to read whole, and `--json` returns each frame's path and how many ms in it is, for a closer look. `--step` plays one beat alone, from the beat before it; `--step 0` plays the arrival.
 
 ## Next
 
