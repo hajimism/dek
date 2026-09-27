@@ -4,20 +4,25 @@ import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
   defaultPlaywrightRunner,
+  type PagesRequest,
+  PLAYWRIGHT_INSTALL,
   parseVisualResponse,
   playwrightMissingError,
   playwrightResolved,
+  requirePlaywright,
   resolvePlaywrightModule,
+  type VisualRequest,
 } from "../../src/core/playwright.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.ts");
 
-const request = {
-  viewport: { width: 1280, height: 720 } as const,
-  actions: ["overflow" as const],
-  pages: [{ html: "<html></html>" }],
+const request: PagesRequest = {
+  kind: "pages",
+  viewport: { width: 1280, height: 720 },
+  actions: ["overflow"],
+  pages: [{ html: "<html></html>", slug: "intro", step: "1" }],
 };
 
 describe("defaultPlaywrightRunner", () => {
@@ -46,19 +51,19 @@ describe("defaultPlaywrightRunner", () => {
     });
   });
 
-  test("writes a pdfPath from DEK_PLAYWRIGHT and returns it", async () => {
+  test("writes the pdfPath a pdf request names", async () => {
     await chmod(fakePlaywright, 0o755);
     await withTempDir(async (dir) => {
       const pdfPath = join(dir, "demo.pdf");
       await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
         const response = await defaultPlaywrightRunner({
+          kind: "pdf",
           viewport: { width: 1280, height: 720 },
-          actions: ["pdf"],
-          pages: [{ html: "<html></html>" }],
+          html: "<html></html>",
           pdfPath,
         });
         expect(await Bun.file(pdfPath).exists()).toBe(true);
-        expect(response).toMatchObject({ pdfPath });
+        expect(response).toEqual({});
       });
     });
   });
@@ -125,28 +130,99 @@ describe("resolvePlaywrightModule", () => {
   });
 });
 
-describe("parseVisualResponse", () => {
-  test("keeps pdfPath from the worker JSON", () => {
-    expect(
-      parseVisualResponse(
-        JSON.stringify({
-          overflows: [],
-          contrasts: [],
-          pdfPath: "/tmp/demo.pdf",
-        }),
-      ),
-    ).toMatchObject({
-      overflows: [],
-      contrasts: [],
-      pdfPath: "/tmp/demo.pdf",
-    });
-  });
-});
-
 describe("playwrightMissingError", () => {
   test("installs the module before the browser", () => {
     expect(playwrightMissingError().hint).toBe(
       "bun add -d playwright && bunx playwright install chromium",
     );
+  });
+});
+
+describe("parseVisualResponse", () => {
+  const overflow = { slug: "intro", step: "1", box: "ul", text: "a", by: { bottom: 12 } };
+  const contrast = {
+    slug: "intro",
+    step: "1",
+    ratio: 2.1,
+    box: "p",
+    fg: "rgb(68, 68, 68)",
+    bg: "rgb(17, 17, 17)",
+    fontSize: 20,
+    fontWeight: 400,
+  };
+  const motion = [
+    {
+      label: "arrival",
+      frames: [
+        { ms: 12.5, path: "/f.png" },
+        { ms: 40, path: "/e.png", end: true as const },
+      ],
+    },
+  ];
+  const parse = (fields: object, kind: VisualRequest["kind"]) =>
+    parseVisualResponse(JSON.stringify(fields), kind);
+
+  test("reads each kind's answer with that kind's parser", () => {
+    expect(parse({ overflows: [overflow], contrasts: [contrast] }, "pages")).toEqual({
+      overflows: [overflow],
+      contrasts: [contrast],
+    });
+    expect(parse({ motion, sheets: ["/s.png"] }, "motion")).toEqual({
+      motion,
+      sheets: ["/s.png"],
+    });
+    // A morph frame or a PDF is on disk where the request named it; the answer says only "done".
+    expect(parse({}, "morph")).toEqual({});
+    expect(parse({}, "pdf")).toEqual({});
+  });
+
+  test("keeps only what the kind it asked for answers with", () => {
+    expect(
+      parse({ overflows: [], contrasts: [], screenshotPath: "/a.png", sheets: [] }, "pages"),
+    ).toEqual({ overflows: [], contrasts: [] });
+    expect(parse({ motion, sheets: [], overflows: [] }, "motion")).toEqual({ motion, sheets: [] });
+    expect(parse({ pdfPath: "/a.pdf" }, "pdf")).toEqual({});
+  });
+
+  test("answers null to anything short of what the kind promises", () => {
+    expect(parse({ overflows: [] }, "pages")).toBeNull();
+    expect(parse({ contrasts: [] }, "pages")).toBeNull();
+    const { by: _by, ...noEdges } = overflow;
+    expect(parse({ overflows: [noEdges], contrasts: [] }, "pages")).toBeNull();
+    expect(
+      parse({ overflows: [{ ...overflow, by: { bottom: "12" } }], contrasts: [] }, "pages"),
+    ).toBeNull();
+    const { fg: _fg, ...noColor } = contrast;
+    expect(parse({ overflows: [], contrasts: [noColor] }, "pages")).toBeNull();
+    expect(parse({ motion }, "motion")).toBeNull();
+    expect(
+      parse(
+        { motion: [{ label: "beat 1", frames: [{ ms: "0", path: "/f.png" }] }], sheets: [] },
+        "motion",
+      ),
+    ).toBeNull();
+    expect(parse({ motion: [{ frames: [] }], sheets: [] }, "motion")).toBeNull();
+    expect(parse({ motion, sheets: ["/s.png", 3] }, "motion")).toBeNull();
+    expect(parse([], "morph")).toBeNull();
+    expect(parseVisualResponse("not json", "pages")).toBeNull();
+    expect(parseVisualResponse("", "pdf")).toBeNull();
+  });
+});
+
+describe("requirePlaywright", () => {
+  test("answers with what the runner answers", async () => {
+    const response = await requirePlaywright(request, async () => ({
+      overflows: [],
+      contrasts: [],
+    }));
+    expect(response.overflows).toEqual([]);
+  });
+
+  test("throws the install hint when the runner finds no Playwright", async () => {
+    await expect(requirePlaywright(request, async () => null)).rejects.toMatchObject({
+      name: "DekError",
+      message: "Playwright is not installed",
+      hint: PLAYWRIGHT_INSTALL,
+    });
   });
 });

@@ -8,6 +8,7 @@ import { resolveDeck } from "../../src/core/resolve.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { writeRequested } from "../helpers/visual.ts";
 
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -21,8 +22,6 @@ const architectureHtml = slideDocument(`<section class="slide" data-layout="defa
     <li data-step="slides-hang">スライドがぶら下がる</li>
   </ul>
 </section>`);
-
-type PdfRequest = VisualRequest & { pdfPath?: string };
 
 describe("renderPdfHtml", () => {
   test("uses lang from frontmatter on the document shell", async () => {
@@ -98,23 +97,20 @@ second
         const deckDir = join(root, "decks", "demo");
         await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
 
-        const calls: PdfRequest[] = [];
+        const calls: VisualRequest[] = [];
         const runner: PlaywrightRunner = async (request) => {
-          const pdfRequest = request as PdfRequest;
-          calls.push(pdfRequest);
-          const pdfPath = pdfRequest.pdfPath;
-          if (!pdfPath) {
-            return { overflows: [], contrasts: [] };
-          }
-          await Bun.write(pdfPath, "%PDF-1.4\n");
-          return { overflows: [], contrasts: [] };
+          calls.push(request);
+          await writeRequested(request, "%PDF-1.4\n");
+          return {};
         };
 
         const result = await pdfDeck(deckDir, { runner });
         expect(result.outPath).toBe(join(root, "decks", "demo", "dist", "demo.pdf"));
         expect(calls).toHaveLength(1);
+        const [request] = calls;
+        expect(request).toMatchObject({ kind: "pdf", pdfPath: result.outPath });
 
-        const html = calls[0]?.pages[0]?.html ?? "";
+        const html = request?.kind === "pdf" ? request.html : "";
         expect(html).toContain('data-slug="intro"');
         expect(html).toContain('data-slug="architecture"');
         expect(html.indexOf('data-slug="intro"')).toBeLessThan(
@@ -159,11 +155,9 @@ second
       async (root) => {
         const resolved = resolveDeck(join(root, "decks", "demo"));
         await writeFile(join(root, "decks", "demo", "script.md"), "this is not a deck\n");
-        const runner: PlaywrightRunner = async (request: PdfRequest) => {
-          if (request.pdfPath) {
-            await Bun.write(request.pdfPath, "");
-          }
-          return { overflows: [], contrasts: [], pdfPath: request.pdfPath };
+        const runner: PlaywrightRunner = async (request) => {
+          await writeRequested(request);
+          return {};
         };
         await expect(pdfDeck(resolved.deck.dir, { runner })).rejects.toThrow(DekError);
         const result = await pdfDeck(resolved, { runner });

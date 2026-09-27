@@ -25,7 +25,7 @@ export type MeasuredElement = {
   fontWeight: number;
 };
 
-export type SlideMeasure = {
+type SlideMeasure = {
   slideBox: Box | undefined;
   elements: MeasuredElement[];
 };

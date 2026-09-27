@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
-import { awaitPiped, workerCommand } from "../core/spawn.ts";
+import { runPiped, workerCommand } from "../core/spawn.ts";
 import type { VideoFrame } from "./recorder.ts";
 
 export function ffmpegResolved(): boolean {
@@ -25,10 +25,15 @@ function ffmpegCommand(args: string[]): string[] {
   return ["ffmpeg", ...args];
 }
 
+/** An encode of mostly held frames runs well inside this, even for a long talk. */
+const FFMPEG_TIMEOUT_MS = 30 * 60 * 1000;
+
 export async function muxVideo(options: {
   frames: VideoFrame[];
   audioPath: string;
   outPath: string;
+  /** A hung ffmpeg is stopped after this; 30 minutes when left out. */
+  timeoutMs?: number;
 }): Promise<string> {
   if (!ffmpegResolved()) {
     throw new DekError("ffmpeg not found", {
@@ -83,9 +88,12 @@ export async function muxVideo(options: {
       "-shortest",
       options.outPath,
     ];
-    const proc = Bun.spawn(ffmpegCommand(args), { stdout: "pipe", stderr: "pipe" });
-    const { stderr, exitCode: code } = await awaitPiped(proc);
-    if (code !== 0) {
+    const { stderr, exitCode } = await runPiped(ffmpegCommand(args), {
+      label: "ffmpeg failed",
+      hint: "check ffmpeg output",
+      timeoutMs: options.timeoutMs ?? FFMPEG_TIMEOUT_MS,
+    });
+    if (exitCode !== 0) {
       throw new DekError("ffmpeg failed", { hint: stderr.slice(0, 200) || "check ffmpeg output" });
     }
     return options.outPath;

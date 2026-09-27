@@ -1,14 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
+  contrastRatio,
+  contrastThreshold,
   measureTextContrast,
   type Pixels,
+  parseCssRgb,
   type Rgb,
   type TextLayers,
   textContrastScript,
   textLayerCss,
   withOverlaps,
 } from "../../src/core/text-contrast.ts";
-import { contrastRatio } from "../../src/core/visual.ts";
 
 const WIDTH = 10;
 const HEIGHT = 1;
@@ -213,5 +215,42 @@ describe("textContrastScript", () => {
     const scope: { __dekTextContrast?: unknown } = {};
     new Function("window", textContrastScript())(scope);
     expect(typeof scope.__dekTextContrast).toBe("function");
+  });
+});
+
+describe("parseCssRgb", () => {
+  test("parses comma and space separated rgb()", () => {
+    expect(parseCssRgb("rgb(245, 245, 245)")).toEqual([245, 245, 245]);
+    expect(parseCssRgb("rgb(245 245 245)")).toEqual([245, 245, 245]);
+    expect(parseCssRgb("rgba(17, 17, 17, 1)")).toEqual([17, 17, 17]);
+  });
+
+  test("skips oklch and other non-rgb colors", () => {
+    expect(parseCssRgb("oklch(0.7 0.1 120)")).toBeUndefined();
+  });
+});
+
+describe("contrastRatio", () => {
+  test("is high for light text on a dark background", () => {
+    expect(contrastRatio([245, 245, 245], [17, 17, 17])).toBeGreaterThan(4.5);
+  });
+
+  test("is below 4.5 for gray text on white", () => {
+    expect(contrastRatio([119, 119, 119], [255, 255, 255])).toBeLessThan(4.5);
+  });
+});
+
+describe("contrastThreshold", () => {
+  test("uses 3:1 for WCAG large text and 4.5:1 otherwise", () => {
+    expect(contrastThreshold({ fontSize: 24, fontWeight: 400 })).toBe(3);
+    expect(contrastThreshold({ fontSize: 18.66, fontWeight: 700 })).toBe(3);
+    expect(contrastThreshold({ fontSize: 18, fontWeight: 700 })).toBe(4.5);
+    expect(contrastThreshold({ fontSize: 23.9, fontWeight: 400 })).toBe(4.5);
+    expect(contrastThreshold({ fontSize: 24 })).toBe(3);
+  });
+
+  test("falls back to 4.5:1 when the runner did not report a size", () => {
+    expect(contrastThreshold({})).toBe(4.5);
+    expect(contrastThreshold({ fontWeight: 700 })).toBe(4.5);
   });
 });

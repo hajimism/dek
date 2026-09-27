@@ -5,15 +5,17 @@ import { playwrightResolved } from "../../src/core/playwright.ts";
 import { DEFAULT_LEAD_MS, type Timeline } from "../../src/core/timeline.ts";
 import { ffmpegResolved, muxVideo } from "../../src/video/mux.ts";
 import {
-  captureHoldFrames,
   defaultVideoRunner,
   frameStops,
   holdMs,
+  parseVideoResponse,
   planCapture,
+  type VideoFrame,
 } from "../../src/video/recorder.ts";
 import { encodeWav, parseWav, silentWav, sliceWav } from "../../src/voice/wav.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
+import { captureHoldFrames } from "../helpers/video.ts";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -40,27 +42,23 @@ const timeline: Timeline = {
 };
 
 describe("planCapture", () => {
-  test("hold is one frame per beat when there is no animation", () => {
-    const plan = planCapture(timeline, 30);
-    expect(plan.gos).toEqual([
-      { at: 0, position: { slideIndex: 0, beatIndex: 0 } },
-      { at: 1700 - DEFAULT_LEAD_MS, position: { slideIndex: 1, beatIndex: 0 } },
+  test("plans one go per beat, each shown until the next", () => {
+    expect(planCapture(timeline)).toEqual([
+      {
+        at: 0,
+        position: { slideIndex: 0, beatIndex: 0 },
+        durationMs: 1700 - DEFAULT_LEAD_MS,
+      },
+      {
+        at: 1700 - DEFAULT_LEAD_MS,
+        position: { slideIndex: 1, beatIndex: 0 },
+        durationMs: 2000 - (1700 - DEFAULT_LEAD_MS),
+      },
     ]);
-    expect(plan.frames.every((frame) => frame.kind === "hold")).toBe(true);
-    expect(plan.frames).toHaveLength(2);
   });
 
   test("leads each go by the shared lead-in, like rehearse", () => {
-    const plan = planCapture(timeline, 30);
-    expect(plan.gos.map((go) => go.at)).toEqual([0, 1700 - DEFAULT_LEAD_MS]);
-  });
-
-  test("spans run from go to go and cover the whole audio", () => {
-    const plan = planCapture(timeline, 30);
-    expect(plan.frames.map((frame) => frame.durationMs)).toEqual([
-      1700 - DEFAULT_LEAD_MS,
-      2000 - (1700 - DEFAULT_LEAD_MS),
-    ]);
+    expect(planCapture(timeline).map((go) => go.at)).toEqual([0, 1700 - DEFAULT_LEAD_MS]);
   });
 
   test("the first span starts at zero even when the first beat is silent lead", () => {
@@ -68,7 +66,7 @@ describe("planCapture", () => {
       ...timeline,
       beats: timeline.beats.map((beat, index) => (index === 0 ? { ...beat, start: 500 } : beat)),
     };
-    const total = planCapture(late, 30).frames.reduce((sum, frame) => sum + frame.durationMs, 0);
+    const total = planCapture(late).reduce((sum, go) => sum + go.durationMs, 0);
     expect(total).toBe(2000);
   });
 
@@ -87,7 +85,7 @@ describe("planCapture", () => {
         },
       ],
     };
-    const at = planCapture(early, 30).gos.map((go) => go.at);
+    const at = planCapture(early).map((go) => go.at);
     expect(at).toEqual([0, 1000 - DEFAULT_LEAD_MS, 1000 - DEFAULT_LEAD_MS]);
   });
 });
@@ -143,8 +141,32 @@ describe("captureHoldFrames", () => {
   });
 });
 
+describe("parseVideoResponse", () => {
+  test("keeps the frames, each a path and how long it shows", () => {
+    const frames: VideoFrame[] = [
+      { path: "/f/0.png", durationMs: 33.3, kind: "animation" },
+      { path: "/f/1.png", durationMs: 900, kind: "hold" },
+      { path: "/f/2.png", durationMs: 100 },
+    ];
+    expect(parseVideoResponse(JSON.stringify({ frames, strategy: "old", gos: [] }))).toEqual({
+      frames,
+    });
+  });
+
+  test("answers null to frames that are not what the worker promised", () => {
+    const parse = (frames: unknown) => parseVideoResponse(JSON.stringify({ frames }));
+    expect(parse(undefined)).toBeNull();
+    expect(parse([{ path: "/f.png" }])).toBeNull();
+    expect(parse([{ path: 3, durationMs: 1 }])).toBeNull();
+    expect(parse([{ path: "/f.png", durationMs: "1" }])).toBeNull();
+    expect(parse([{ path: "/f.png", durationMs: 1, kind: "still" }])).toBeNull();
+    expect(parseVideoResponse("null")).toBeNull();
+    expect(parseVideoResponse("not json")).toBeNull();
+  });
+});
+
 describe("fake video worker", () => {
-  test("records go positions and one hold screenshot per beat", async () => {
+  test("writes one hold screenshot per beat", async () => {
     await withTempDir(async (dir) => {
       const fake = join(import.meta.dir, "../helpers/fake-video.ts");
       const proc = Bun.spawn(["bun", "--no-install", fake], {
@@ -164,9 +186,7 @@ describe("fake video worker", () => {
       await proc.stdin.end();
       const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
       expect(code).toBe(0);
-      const json = JSON.parse(out) as { gos: unknown[]; frames: unknown[] };
-      expect(json.gos).toHaveLength(2);
-      expect(json.frames).toHaveLength(2);
+      expect(parseVideoResponse(out)?.frames).toHaveLength(2);
     });
   });
 });
@@ -374,6 +394,35 @@ describe("muxVideo", () => {
       }
     });
   });
+
+  test.serial(
+    "stops an ffmpeg that runs past timeoutMs, so a hung encode cannot hang dek",
+    async () => {
+      await withTempDir(async (dir) => {
+        const a = join(dir, "a.png");
+        writeFileSync(a, PNG);
+        const started = Date.now();
+        await withEnv(
+          { DEK_FFMPEG: join(import.meta.dir, "../helpers/fake-ffmpeg-slow.ts") },
+          async () => {
+            await expect(
+              muxVideo({
+                frames: [{ path: a, durationMs: 100 }],
+                audioPath: join(dir, "audio.wav"),
+                outPath: join(dir, "out.mp4"),
+                timeoutMs: 50,
+              }),
+            ).rejects.toMatchObject({
+              name: "DekError",
+              message: "ffmpeg failed",
+              hint: expect.stringContaining("did not finish"),
+            });
+          },
+        );
+        expect(Date.now() - started).toBeLessThan(3000);
+      });
+    },
+  );
 
   test.serial("removes the temp dir when ffmpeg fails", async () => {
     if (!ffmpegResolved()) {

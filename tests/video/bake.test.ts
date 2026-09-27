@@ -1,17 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { resolveTimelineAudio, voiceCacheFile } from "../../src/core/voice.ts";
 import { bakeVideo, sliceTimelineAudio } from "../../src/video/bake.ts";
 import { ffmpegResolved } from "../../src/video/mux.ts";
-import { captureHoldFrames } from "../../src/video/recorder.ts";
 import { encodeWav, parseWav, silentWav } from "../../src/voice/wav.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { captureHoldFrames } from "../helpers/video.ts";
 
 describe("sliceTimelineAudio", () => {
   test("writes a wav covering the slide range, not the deck start", async () => {
@@ -141,6 +141,21 @@ describe("bakeVideo", () => {
         }
       },
     );
+  });
+
+  test("says to run dek voice when the timeline is not there", async () => {
+    await withPreparedVoiceDeck(async (_root, resolved) => {
+      const timeline = voiceCacheFile(resolved.deck.dir, "timeline.json");
+      await rm(timeline);
+      await expect(
+        bakeVideo(resolved, { runner: async (request) => captureHoldFrames(request) }),
+      ).rejects.toMatchObject({
+        name: "DekError",
+        message: "Timeline not found",
+        path: timeline,
+        hint: "run `dek voice`",
+      });
+    });
   });
 
   test("writes one slide under .cache/video/", async () => {

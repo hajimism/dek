@@ -1,5 +1,5 @@
 /** The part of a Playwright page the pool drives. */
-export type PoolPage = {
+type PoolPage = {
   goto(url: string): Promise<unknown>;
   close(): Promise<void>;
 };
@@ -9,7 +9,7 @@ export type PoolPage = {
  * as much as rendering a slide on it, so pages are kept and reused; a few at
  * a time keep the renderer busy without keeping a long deck alive at once.
  */
-export const PAGE_LANES = 4;
+const PAGE_LANES = 4;
 
 /**
  * Visits every item on a small set of reused pages and returns the results

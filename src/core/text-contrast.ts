@@ -28,9 +28,9 @@ export type TextLayers = {
 };
 
 /** The layers the page is redrawn as; `shown` needs no change. */
-export type TextLayer = Exclude<keyof TextLayers, "shown">;
+type TextLayer = Exclude<keyof TextLayers, "shown">;
 
-export type TextContrast = {
+type TextContrast = {
   ratio: number;
   /** The text's color at the pixel that reads worst. */
   fg: Rgb;
@@ -38,7 +38,7 @@ export type TextContrast = {
   bg: Rgb;
 };
 
-export function relativeLuminance([r, g, b]: Rgb): number {
+function relativeLuminance([r, g, b]: Rgb): number {
   const linear = (channel: number): number => {
     const value = channel / 255;
     return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -53,8 +53,41 @@ export function contrastRatio(foreground: Rgb, background: Rgb): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+type TextSample = {
+  fontSize?: number;
+  fontWeight?: number;
+};
+
+/** WCAG large text: 24px (18pt) regular, or 18.66px (14pt) bold. */
+const LARGE_TEXT_PX = 24;
+const LARGE_BOLD_TEXT_PX = 18.66;
+const BOLD_WEIGHT = 700;
+
+function isLargeText(sample: TextSample): boolean {
+  if (sample.fontSize === undefined) {
+    return false;
+  }
+  if (sample.fontSize >= LARGE_TEXT_PX) {
+    return true;
+  }
+  return sample.fontSize >= LARGE_BOLD_TEXT_PX && (sample.fontWeight ?? 400) >= BOLD_WEIGHT;
+}
+
+/** 3:1 for large text, 4.5:1 otherwise. Unknown size falls back to 4.5:1. */
+export function contrastThreshold(sample: TextSample): 3 | 4.5 {
+  return isLargeText(sample) ? 3 : 4.5;
+}
+
+export function parseCssRgb(color: string): Rgb | undefined {
+  const match = color.match(/rgba?\(\s*([\d.]+)(?:\s*,\s*|\s+)([\d.]+)(?:\s*,\s*|\s+)([\d.]+)/i);
+  if (!match) {
+    return undefined;
+  }
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
 /** One text to measure. */
-export type TextBoxes = {
+type TextBoxes = {
   /** The line boxes of its own text. */
   rects: Box[];
   /** The boxes of other texts that cross them. */

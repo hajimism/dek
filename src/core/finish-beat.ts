@@ -8,7 +8,10 @@
  * pages, so it references nothing outside itself.
  */
 export function finishBeat(): void {
-  for (const animation of document.getAnimations()) {
+  // A paused animation seeked past its own end has no effect, so `getAnimations()` leaves it
+  // out, yet it never finishes: the go that started it would wait on it forever.
+  const held = (window.__dekStarted ?? []).filter((animation) => animation.playState === "paused");
+  for (const animation of new Set([...document.getAnimations(), ...held])) {
     const end = animation.effect?.getComputedTiming().endTime;
     if (typeof end === "number" && Number.isFinite(end)) {
       animation.finish();
@@ -22,4 +25,6 @@ export function finishBeat(): void {
   document.activeViewTransition?.skipTransition();
   const motion = window.dekMotion;
   motion?.seek(motion.duration());
+  // What the next go finds already here is this beat's, and seeking that go leaves it alone.
+  window.__dekSettled = new Set(document.getAnimations());
 }

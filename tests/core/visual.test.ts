@@ -1,60 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { copyFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { VisualRequest, VisualResponse } from "../../src/core/playwright.ts";
-import { shotDeck } from "../../src/core/shot.ts";
-import {
-  contrastRatio,
-  contrastThreshold,
-  findOverflows,
-  lintVisualDeck,
-  parseCssRgb,
-  runVisualDeck,
-} from "../../src/core/visual.ts";
+import type { PagesResponse, VisualRequest } from "../../src/core/playwright.ts";
+import { shotDeck } from "../../src/core/shot/still.ts";
+import { lintVisualDeck, runVisualDeck } from "../../src/core/visual.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { pagesOf, writeRequested } from "../helpers/visual.ts";
 
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
 </section>`);
-
-describe("parseCssRgb", () => {
-  test("parses comma and space separated rgb()", () => {
-    expect(parseCssRgb("rgb(245, 245, 245)")).toEqual([245, 245, 245]);
-    expect(parseCssRgb("rgb(245 245 245)")).toEqual([245, 245, 245]);
-    expect(parseCssRgb("rgba(17, 17, 17, 1)")).toEqual([17, 17, 17]);
-  });
-
-  test("skips oklch and other non-rgb colors", () => {
-    expect(parseCssRgb("oklch(0.7 0.1 120)")).toBeUndefined();
-  });
-});
-
-describe("contrastRatio", () => {
-  test("is high for light text on a dark background", () => {
-    expect(contrastRatio([245, 245, 245], [17, 17, 17])).toBeGreaterThan(4.5);
-  });
-
-  test("is below 4.5 for gray text on white", () => {
-    expect(contrastRatio([119, 119, 119], [255, 255, 255])).toBeLessThan(4.5);
-  });
-});
-
-describe("contrastThreshold", () => {
-  test("uses 3:1 for WCAG large text and 4.5:1 otherwise", () => {
-    expect(contrastThreshold({ fontSize: 24, fontWeight: 400 })).toBe(3);
-    expect(contrastThreshold({ fontSize: 18.66, fontWeight: 700 })).toBe(3);
-    expect(contrastThreshold({ fontSize: 18, fontWeight: 700 })).toBe(4.5);
-    expect(contrastThreshold({ fontSize: 23.9, fontWeight: 400 })).toBe(4.5);
-    expect(contrastThreshold({ fontSize: 24 })).toBe(3);
-  });
-
-  test("falls back to 4.5:1 when the runner did not report a size", () => {
-    expect(contrastThreshold({})).toBe(4.5);
-    expect(contrastThreshold({ fontWeight: 700 })).toBe(4.5);
-  });
-});
 
 describe("runVisualDeck screenshot", () => {
   test("names the screenshot exactly like shotDeck for the same slide", async () => {
@@ -63,30 +21,60 @@ describe("runVisualDeck screenshot", () => {
       async (root) => {
         const deckDir = join(root, "decks", "demo");
         const runner = async (request: VisualRequest) => {
-          for (const page of request.pages) {
-            if (page.screenshotPath) {
-              await Bun.write(page.screenshotPath, "");
-            }
-          }
+          await writeRequested(request);
           return { overflows: [], contrasts: [] };
         };
         const visual = await runVisualDeck(deckDir, { slug: "intro", screenshot: true, runner });
         const shots = await shotDeck(deckDir, { slug: "intro", runner });
-        expect(visual?.screenshotPath).toMatch(/\/intro\.[0-9a-f]{8}\.png$/);
+        expect(visual?.screenshotPath).toMatch(/\/intro~0\.[0-9a-f]{8}\.png$/);
         expect(visual?.screenshotPath).toBe(shots[0]?.path);
+      },
+    );
+  });
+
+  test("refuses a shots folder that links out of the project, and writes nothing there", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const outside = await mkdtemp(join(tmpdir(), "dek-outside-"));
+        try {
+          await mkdir(join(deckDir, ".cache"), { recursive: true });
+          await symlink(outside, join(deckDir, ".cache", "shots"));
+          const runner = async (request: VisualRequest) => {
+            await writeRequested(request);
+            return { overflows: [], contrasts: [] };
+          };
+          await expect(
+            runVisualDeck(deckDir, { slug: "intro", screenshot: true, runner }),
+          ).rejects.toThrow("leads outside the project");
+          expect(await readdir(outside)).toEqual([]);
+        } finally {
+          await rm(outside, { recursive: true, force: true });
+        }
       },
     );
   });
 });
 
 describe("lintVisualDeck", () => {
+  /** A text sample as the worker reports it; each test sets what it is about. */
+  const sample = {
+    slug: "intro",
+    step: "1",
+    box: "p",
+    fg: "rgb(119, 119, 119)",
+    bg: "rgb(255, 255, 255)",
+    fontWeight: 400,
+  };
+
   test("emits DEK030 when the runner reports overflow", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async () => ({
-            overflows: [{ slug: "intro", step: "1", box: "h2" }],
+            overflows: [{ slug: "intro", step: "1", box: "h2", by: { bottom: 8 } }],
             contrasts: [],
           }),
         });
@@ -105,14 +93,21 @@ describe("lintVisualDeck", () => {
         const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async () => ({
             overflows: [],
-            contrasts: [{ slug: "intro", step: "1", ratio: 2.1 }],
+            contrasts: [{ ...sample, ratio: 2.1, fontSize: 16 }],
           }),
         });
         expect(diagnostics?.some((d) => d.id === "DEK031")).toBe(true);
         const dek031 = diagnostics?.find((d) => d.id === "DEK031");
         expect(dek031?.path).toContain("slides/intro.html");
         expect(dek031?.message).toContain("2.1");
-        expect(dek031?.data).toEqual({ ratio: 2.1, threshold: 4.5, steps: ["1"] });
+        expect(dek031?.data).toEqual({
+          box: "p",
+          ratio: 2.1,
+          threshold: 4.5,
+          fg: "#777777",
+          bg: "#ffffff",
+          steps: ["1"],
+        });
       },
     );
   });
@@ -124,7 +119,7 @@ describe("lintVisualDeck", () => {
         const passing = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async () => ({
             overflows: [],
-            contrasts: [{ slug: "intro", step: "1", ratio: 3.2, fontSize: 32, fontWeight: 400 }],
+            contrasts: [{ ...sample, ratio: 3.2, fontSize: 32 }],
           }),
         });
         expect(passing?.some((d) => d.id === "DEK031")).toBe(false);
@@ -132,7 +127,7 @@ describe("lintVisualDeck", () => {
         const failing = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async () => ({
             overflows: [],
-            contrasts: [{ slug: "intro", step: "1", ratio: 2.8, fontSize: 32, fontWeight: 400 }],
+            contrasts: [{ ...sample, ratio: 2.8, fontSize: 32 }],
           }),
         });
         const dek031 = failing?.find((d) => d.id === "DEK031");
@@ -143,7 +138,7 @@ describe("lintVisualDeck", () => {
         const small = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async () => ({
             overflows: [],
-            contrasts: [{ slug: "intro", step: "1", ratio: 3.2, fontSize: 20, fontWeight: 400 }],
+            contrasts: [{ ...sample, ratio: 3.2, fontSize: 20 }],
           }),
         });
         expect(small?.find((d) => d.id === "DEK031")?.message).toContain("4.5:1");
@@ -170,7 +165,7 @@ describe("lintVisualDeck", () => {
         const seen: string[] = [];
         const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async (request: VisualRequest) => {
-            seen.push(...request.pages.map((page) => page.slug ?? ""));
+            seen.push(...pagesOf(request).map((page) => page.slug));
             return { overflows: [], contrasts: [] };
           },
         });
@@ -203,15 +198,15 @@ second
           join(deckDir, "slides", "intro.ts"),
           'import x from "x";\nexport default {};',
         );
-        const steps: Array<string | undefined> = [];
+        const steps: string[] = [];
         const diagnostics = await lintVisualDeck(deckDir, {
           runner: async (request: VisualRequest) => {
-            steps.push(...request.pages.map((page) => page.step));
+            steps.push(...pagesOf(request).map((page) => page.step));
             return { overflows: [], contrasts: [] };
           },
         });
         expect(diagnostics).toEqual([]);
-        expect(steps).toEqual(["one", "two"]);
+        expect(steps).toEqual(["0", "one", "two"]);
       },
     );
   });
@@ -229,7 +224,7 @@ second
         const seen: string[] = [];
         await lintVisualDeck(deckDir, {
           runner: async (request: VisualRequest) => {
-            seen.push(request.pages[0]?.html ?? "");
+            seen.push(pagesOf(request)[0]?.html ?? "");
             return { overflows: [], contrasts: [] };
           },
         });
@@ -270,55 +265,19 @@ second
         await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async (request: VisualRequest) => {
             calls += 1;
-            pages = request.pages.length;
+            pages = pagesOf(request).length;
             return { overflows: [], contrasts: [] };
           },
         });
         expect(calls).toBe(1);
-        expect(pages).toBe(2);
+        expect(pages).toBe(3);
       },
     );
   });
 });
 
-describe("findOverflows", () => {
-  const slideBox = { left: 0, top: 0, right: 1280, bottom: 720 };
-  const el = (box: string, rect: [number, number, number, number], parent = -1, text?: string) => ({
-    box,
-    parent,
-    rect: { left: rect[0], top: rect[1], right: rect[2], bottom: rect[3] },
-    ...(text ? { text } : {}),
-  });
-
-  test("reports the outermost element that overflows an edge, not every child", () => {
-    const found = findOverflows(slideBox, [
-      el("ul", [80, 150, 1200, 900], -1, "時間がかかる"),
-      el("li", [110, 150, 1200, 190], 0, "時間がかかる"),
-      el("li", [110, 860, 1200, 900], 0, "さらに追加"),
-    ]);
-    expect(found).toEqual([{ box: "ul", text: "時間がかかる", by: { bottom: 180 } }]);
-  });
-
-  test("reports a child only for the edges its parent stays inside", () => {
-    const found = findOverflows(slideBox, [
-      el("ul", [80, 150, 1200, 900]),
-      el("li", [110, 860, 1692, 900], 0, "https://example.com"),
-    ]);
-    expect(found).toEqual([
-      { box: "ul", by: { bottom: 180 } },
-      { box: "li", text: "https://example.com", by: { right: 412 } },
-    ]);
-  });
-
-  test("ignores empty boxes and sub-pixel rounding", () => {
-    expect(
-      findOverflows(slideBox, [el("span", [2000, 0, 2000, 0]), el("p", [80, 64, 1280.4, 719])]),
-    ).toEqual([]);
-  });
-});
-
 describe("lintVisualDeck messages", () => {
-  async function lintWith(response: VisualResponse) {
+  async function lintWith(response: PagesResponse) {
     const diagnostics = await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       (root) => lintVisualDeck(join(root, "decks", "demo"), { runner: async () => response }),

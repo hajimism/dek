@@ -19,9 +19,62 @@ export function workerCommand(bin: string, args: string[] = []): string[] {
 }
 
 /** A browser that hangs must not hang dek; a whole visual run or capture fits well inside this. */
-export const DEFAULT_WORKER_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_WORKER_TIMEOUT_MS = 10 * 60 * 1000;
 
-export type JsonWorkerOptions = {
+type PipedOptions = {
+  /** The error message when the command cannot start or overruns, such as "ffmpeg failed". */
+  label: string;
+  /** The hint when the command cannot start. */
+  hint: string;
+  /** Written to the command's stdin, which is then closed. */
+  stdin?: string;
+  /** Covers the whole run, from spawn to exit. */
+  timeoutMs: number;
+};
+
+type Piped = { stdout: string; stderr: string; exitCode: number };
+
+/**
+ * Runs `cmd` to its exit with its output piped back. A command that cannot start, or runs past
+ * `timeoutMs` and is killed, is a DekError named `label`; any exit code is the caller's to judge.
+ */
+export async function runPiped(cmd: string[], options: PipedOptions): Promise<Piped> {
+  let proc: Bun.Subprocess<"pipe", "pipe", "pipe">;
+  try {
+    proc = Bun.spawn(cmd, { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  } catch (error) {
+    throw new DekError(options.label, { hint: options.hint, cause: error });
+  }
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    proc.kill();
+  }, options.timeoutMs);
+  try {
+    // Read before writing: a command that answers while still reading must not block on a full pipe.
+    const piped = awaitPiped(proc);
+    if (options.stdin !== undefined) {
+      proc.stdin.write(options.stdin);
+    }
+    await proc.stdin.end();
+    const result = await piped;
+    if (timedOut) {
+      throw new DekError(options.label, {
+        hint: `it did not finish within ${Math.round(options.timeoutMs / 1000)}s and was stopped`,
+      });
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof DekError) {
+      throw error;
+    }
+    throw new DekError(options.label, { hint: options.hint, cause: error });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+type JsonWorkerOptions = {
   /** The error message for any failure, such as "Playwright worker failed". */
   label: string;
   /** The hint when the worker gives no reason of its own. */
@@ -42,44 +95,20 @@ export async function runJsonWorker<T>(
   parse: (stdout: string) => T | null,
   options: JsonWorkerOptions,
 ): Promise<T> {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_WORKER_TIMEOUT_MS;
-  let proc: Bun.Subprocess<"pipe", "pipe", "pipe">;
-  try {
-    proc = Bun.spawn(cmd, { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
-  } catch (error) {
-    throw new DekError(options.label, { hint: options.hint, cause: error });
+  const { stdout, stderr, exitCode } = await runPiped(cmd, {
+    label: options.label,
+    hint: options.hint,
+    stdin: JSON.stringify(request),
+    timeoutMs: options.timeoutMs ?? DEFAULT_WORKER_TIMEOUT_MS,
+  });
+  if (exitCode !== 0) {
+    throw new DekError(options.label, { hint: stderr.trim().slice(0, 200) || options.hint });
   }
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    proc.kill();
-  }, timeoutMs);
-  try {
-    const piped = awaitPiped(proc);
-    proc.stdin.write(JSON.stringify(request));
-    await proc.stdin.end();
-    const { stdout, stderr, exitCode } = await piped;
-    if (timedOut) {
-      throw new DekError(options.label, {
-        hint: `the worker did not finish within ${Math.round(timeoutMs / 1000)}s and was stopped`,
-      });
-    }
-    if (exitCode !== 0) {
-      throw new DekError(options.label, { hint: stderr.trim().slice(0, 200) || options.hint });
-    }
-    const parsed = parse(stdout);
-    if (parsed === null) {
-      throw new DekError(options.label, { hint: "worker returned invalid JSON" });
-    }
-    return parsed;
-  } catch (error) {
-    if (error instanceof DekError) {
-      throw error;
-    }
-    throw new DekError(options.label, { hint: options.hint, cause: error });
-  } finally {
-    clearTimeout(timer);
+  const parsed = parse(stdout);
+  if (parsed === null) {
+    throw new DekError(options.label, { hint: "worker returned invalid JSON" });
   }
+  return parsed;
 }
 
 /** The worker's side of `runJsonWorker`: its request, or exit 2 with the reason on stderr. */

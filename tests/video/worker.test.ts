@@ -43,9 +43,9 @@ bye
           ],
         },
         async (root) => {
-          const html = await renderDeckHtml(join(root, "decks", "demo"), {
-            mode: "video",
+          const html = renderDeckHtml(join(root, "decks", "demo"), {
             playerScript: await playerScript(),
+            target: { kind: "video" },
           });
           const timeline: Timeline = {
             audio: "a.wav",
@@ -128,9 +128,9 @@ bye
           ],
         },
         async (root) => {
-          const html = await renderDeckHtml(join(root, "decks", "demo"), {
-            mode: "video",
+          const html = renderDeckHtml(join(root, "decks", "demo"), {
             playerScript: await playerScript(),
+            target: { kind: "video" },
           });
           const timeline: Timeline = {
             audio: "a.wav",

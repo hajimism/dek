@@ -1,7 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig } from "../core/config.ts";
-import { renderDeckDocument } from "../core/document.ts";
 import { DekError } from "../core/error.ts";
 import { cacheDir, type DistOptions, distDir, distFile } from "../core/path.ts";
 import {
@@ -14,6 +12,7 @@ import {
 import { dropLinks, outputDir, outputPath, replaceFile } from "../core/safe-fs.ts";
 import { logicalSize } from "../core/size.ts";
 import { sliceTimeline, slideTimeRange, type Timeline } from "../core/timeline.ts";
+import { videoDocument } from "../core/video-document.ts";
 import {
   hasVoice,
   loadCachedTimeline,
@@ -63,12 +62,6 @@ async function bakeProjectDeck(
     throw voiceMissingError(deck.dir);
   }
   const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
-  if (!existsSync(timelinePath)) {
-    throw new DekError("Timeline not found", {
-      path: timelinePath,
-      hint: "run `dek voice`",
-    });
-  }
   const loaded = loadCachedTimeline(deck.dir);
   if (!loaded) {
     throw new DekError("Timeline not found", {
@@ -79,13 +72,7 @@ async function bakeProjectDeck(
   let timeline = { ...loaded, audio: resolveTimelineAudio(loaded, timelinePath) };
   const fps = options.fps ?? 30;
   const size = logicalSize(deck.deck.ratio);
-  const html = await renderDeckDocument(deck, {
-    mode: "video",
-    inlineAssets: true,
-    includeNotes: false,
-    config: loadConfig(project.configPath),
-    playerScript: await playerScript(),
-  });
+  const html = videoDocument({ project, deck }, await playerScript());
 
   const videoCache = cacheDir(deck.dir, "video");
   const outDir = options.slug ? videoCache : join(videoCache, "_full");
@@ -109,11 +96,6 @@ async function bakeProjectDeck(
     outDir,
     ...(options.slug ? { slug: options.slug } : {}),
   });
-  if (!captured) {
-    throw new DekError("video capture failed", {
-      hint: "install Playwright or set DEK_VIDEO",
-    });
-  }
 
   const out = options.slug
     ? join(videoCache, `${options.slug}.mp4`)

@@ -1,13 +1,25 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Browser } from "playwright";
+import { parseCss } from "../../src/core/css.ts";
+import { rewriteCss, shareTokensWithTransitions } from "../../src/core/css-transform.ts";
+import { finishBeat } from "../../src/core/finish-beat.ts";
+import { holdStarted, seekStarted, startGoPaused } from "../../src/core/in-page-go.ts";
 import {
-  defaultPlaywrightRunner,
   importPlaywright,
   playwrightResolved,
+  requirePlaywright,
   type VisualRequest,
 } from "../../src/core/playwright.ts";
 import { runVisualRequest } from "../../src/core/playwright-visual.ts";
+import { overviewSheets, sheetLayout } from "../../src/core/sheet.ts";
+import { shotMotion } from "../../src/core/shot/motion.ts";
+import { playerScript } from "../../src/runtime/player.ts";
+import { slideDocument } from "../helpers/html.ts";
+import { withTempProject } from "../helpers/project.ts";
 
 // What the Playwright worker measures, in a real Chromium. They live apart from the runner's own
 // tests, which swap DEK_PLAYWRIGHT while tests in one file run at once.
@@ -28,7 +40,7 @@ afterAll(async () => {
 });
 
 /** The worker's work in one shared browser: all of it but the spawn and the launch. */
-function render(request: VisualRequest) {
+function render<R extends VisualRequest>(request: R) {
   if (!browser) {
     throw new Error("no browser");
   }
@@ -38,6 +50,7 @@ function render(request: VisualRequest) {
 describe("playwright worker", () => {
   browserTest("reports font size and weight with each contrast sample", async () => {
     const response = await render({
+      kind: "pages",
       viewport: { width: 1280, height: 720 },
       actions: ["contrast"],
       pages: [
@@ -62,6 +75,7 @@ describe("playwright worker findings", () => {
     async () => {
       const items = Array.from({ length: 30 }, (_, i) => `<li>item ${i}</li>`).join("");
       const response = await render({
+        kind: "pages",
         viewport: { width: 1280, height: 720 },
         actions: ["overflow", "contrast"],
         pages: [
@@ -109,7 +123,8 @@ window.leftBehind = ${index};
         slug: `s${index}`,
         step: "1",
       }));
-      const response = await defaultPlaywrightRunner({
+      const response = await requirePlaywright({
+        kind: "pages",
         viewport: { width: 1280, height: 720 },
         actions: ["contrast"],
         pages,
@@ -129,6 +144,7 @@ describe("playwright worker text overflow", () => {
   browserTest("reports text that runs past the slide even when its box fits", async () => {
     const url = `https://example.com/${"a".repeat(200)}`;
     const response = await render({
+      kind: "pages",
       viewport: { width: 1280, height: 720 },
       actions: ["overflow"],
       pages: [
@@ -153,11 +169,57 @@ describe("playwright worker text overflow", () => {
   });
 });
 
+describe("playwright worker files", () => {
+  browserTest(
+    "shoots a page that names a screenshotPath, and measures nothing unasked",
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "dek-shoot-"));
+      try {
+        const screenshotPath = join(dir, "intro.png");
+        const response = await render({
+          kind: "pages",
+          viewport: { width: 320, height: 180 },
+          actions: [],
+          pages: [
+            {
+              html: `<html><body style="margin:0;background:#f00"><section class="slide" style="width:2000px;color:#f00">x</section></body></html>`,
+              slug: "intro",
+              step: "1",
+              screenshotPath,
+            },
+          ],
+        });
+        expect(response).toEqual({ overflows: [], contrasts: [] });
+        expect((await pixelAt(screenshotPath, 10, 10)).slice(0, 5)).toEqual([320, 180, 255, 0, 0]);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  browserTest("prints a pdf request to its pdfPath", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "dek-pdf-"));
+    try {
+      const pdfPath = join(dir, "demo.pdf");
+      const response = await render({
+        kind: "pdf",
+        viewport: { width: 1280, height: 720 },
+        html: '<html><body><section class="slide">a</section></body></html>',
+        pdfPath,
+      });
+      expect(response).toEqual({});
+      expect(readFileSync(pdfPath).subarray(0, 5).toString()).toBe("%PDF-");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("playwright worker morph", () => {
   browserTest("freezes a view transition at --at and produces a distinct frame", async () => {
     const { withTempProject } = await import("../helpers/project.ts");
     const { slideDocument } = await import("../helpers/html.ts");
-    const { shotMorph } = await import("../../src/core/shot.ts");
+    const { shotMorph } = await import("../../src/core/shot/morph.ts");
     const { playerScript } = await import("../../src/runtime/player.ts");
     const { defaultTheme } = await import("../../src/cli/files.ts");
     const script = `---
@@ -218,6 +280,7 @@ describe("playwright worker still pages", () => {
     async () => {
       const { stillPageScript } = await import("../../src/core/slide-script.ts");
       const response = await render({
+        kind: "pages",
         viewport: { width: 1280, height: 720 },
         actions: ["contrast"],
         pages: [
@@ -236,7 +299,7 @@ describe("playwright worker still pages", () => {
           },
         ],
       });
-      const { contrastRatio } = await import("../../src/core/visual.ts");
+      const { contrastRatio } = await import("../../src/core/text-contrast.ts");
       const ratios = Object.fromEntries(
         (response?.contrasts ?? []).map((sample) => [sample.text, sample.ratio]),
       );
@@ -250,6 +313,7 @@ describe("playwright worker still pages", () => {
 describe("playwright worker contrast from pixels", () => {
   const measure = async (body: string, css = "") => {
     const response = await render({
+      kind: "pages",
       viewport: { width: 1280, height: 720 },
       actions: ["contrast"],
       pages: [
@@ -305,6 +369,303 @@ ${css}
       );
       expect(found.struck?.ratio).toBeGreaterThan(15);
       expect(found.sheen?.ratio).toBeGreaterThan(10);
+    },
+  );
+});
+
+describe("view transitions in a real Chromium", () => {
+  const theme = readFileSync(
+    join(import.meta.dir, "..", "..", "src", "theme", "default.css"),
+    "utf8",
+  );
+
+  /** The duration the bundled theme's slide-in animation runs for, mid-transition. */
+  async function slideInDuration(css: string): Promise<string> {
+    if (!browser) {
+      throw new Error("no browser");
+    }
+    const page = await browser.newPage();
+    try {
+      await page.setContent(
+        `<html><head><style>${css}</style></head><body><div style="view-transition-name: slide"><section class="slide">a</section></div></body></html>`,
+      );
+      return await page.evaluate(async () => {
+        const transition = document.startViewTransition(() => {
+          document.querySelector(".slide")?.replaceChildren("b");
+        });
+        await transition.ready;
+        const style = getComputedStyle(document.documentElement, "::view-transition-new(slide)");
+        const duration = style.animationDuration;
+        transition.skipTransition();
+        return duration;
+      });
+    } finally {
+      await page.close();
+    }
+  }
+
+  browserTest("the slide's --step-transition reaches ::view-transition-new(slide)", async () => {
+    expect(await slideInDuration(rewriteCss(parseCss(theme), shareTokensWithTransitions))).toBe(
+      "0.3s",
+    );
+  });
+
+  browserTest(
+    "without the shared tokens, the pseudo-element sees no --step-transition",
+    async () => {
+      expect(await slideInDuration(theme)).toBe("0s");
+    },
+  );
+});
+
+describe("seeking one go in a real Chromium", () => {
+  browserTest(
+    "moves what the go started and leaves an earlier beat's animation finished",
+    async () => {
+      if (!browser) {
+        throw new Error("no browser");
+      }
+      const page = await browser.newPage();
+      try {
+        await page.setContent(`<style>
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes rise { from { opacity: 0; } }
+path { stroke-dasharray: 400; stroke-dashoffset: 400; animation: draw 1200ms forwards; }
+p { opacity: 1; }
+.two p { animation: rise 400ms linear; }
+</style><svg><path d="M0 0L100 100" stroke="red"/></svg><p>beat two</p>`);
+        await page.evaluate(finishBeat);
+        await page.evaluate(() => {
+          window.dekGo = async () => {
+            document.body.classList.add("two");
+          };
+        });
+        await page.evaluate(startGoPaused, { slideIndex: 0, beatIndex: 1 });
+        expect(await page.evaluate(holdStarted)).toBe(400);
+        await page.evaluate(seekStarted, 200);
+        const state = await page.evaluate(() => ({
+          line: getComputedStyle(document.querySelector("path") as Element).strokeDashoffset,
+          text: Number(getComputedStyle(document.querySelector("p") as Element).opacity),
+        }));
+        expect(state.line).toBe("0px");
+        expect(state.text).toBeCloseTo(0.5, 1);
+      } finally {
+        await page.close();
+      }
+    },
+  );
+});
+
+describe("a skipped view transition in a real Chromium", () => {
+  browserTest("starts the go without a transition, as the talk carries on past it", async () => {
+    if (!browser) {
+      throw new Error("no browser");
+    }
+    const page = await browser.newPage();
+    try {
+      // Two elements sharing a view-transition-name make Chromium skip the transition.
+      await page.setContent(`<style>.dup { view-transition-name: dup; }</style>
+<p class="dup">a</p><p class="dup">b</p>`);
+      await page.evaluate(() => {
+        window.dekGo = async () => {
+          const transition = document.startViewTransition(() => {
+            document.body.classList.add("two");
+          });
+          await transition.finished.catch(() => undefined);
+        };
+      });
+      expect(await page.evaluate(startGoPaused, { slideIndex: 0, beatIndex: 1 })).toBe(false);
+      await page.evaluate(() => window.__dekPendingGo);
+      expect(await page.evaluate(() => document.body.classList.contains("two"))).toBe(true);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+describe("ending a seeked go in a real Chromium", () => {
+  browserTest("ends an animation seeked past its own end, so the go settles", async () => {
+    if (!browser) {
+      throw new Error("no browser");
+    }
+    const page = await browser.newPage();
+    try {
+      await page.setContent(`<style>
+.a, .b { opacity: 0; }
+.two .a { opacity: 1; transition: opacity 200ms linear; }
+.two .b { opacity: 1; transition: opacity 400ms linear; }
+</style><p class="a">a</p><p class="b">b</p>`);
+      await page.evaluate(finishBeat);
+      await page.evaluate(() => {
+        window.dekGo = async () => {
+          document.body.classList.add("two");
+          await Promise.all(document.getAnimations().map((animation) => animation.finished));
+        };
+      });
+      await page.evaluate(startGoPaused, { slideIndex: 0, beatIndex: 1 });
+      expect(await page.evaluate(holdStarted)).toBe(400);
+      await page.evaluate(seekStarted, 300);
+      await page.evaluate(finishBeat);
+      const settled = await page.evaluate(() =>
+        Promise.race([
+          window.__dekPendingGo?.then(() => true),
+          new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
+        ]),
+      );
+      expect(settled).toBe(true);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+describe("holding a go at its start in a real Chromium", () => {
+  browserTest("draws a transition the go began before any of it has run", async () => {
+    if (!browser) {
+      throw new Error("no browser");
+    }
+    const page = await browser.newPage({ viewport: { width: 200, height: 200 } });
+    const dir = await mkdtemp(join(tmpdir(), "dek-hold-"));
+    try {
+      await page.setContent(`<style>
+body { margin: 0; background: #fff; }
+div { width: 200px; height: 200px; background: #000; opacity: 0; transition: opacity 1000ms linear; }
+.two div { opacity: 1; }
+</style><div></div>`);
+      await page.evaluate(finishBeat);
+      await page.evaluate(() => {
+        window.dekGo = async () => {
+          document.body.classList.add("two");
+        };
+      });
+      await page.evaluate(startGoPaused, { slideIndex: 0, beatIndex: 1 });
+      expect(await page.evaluate(holdStarted)).toBe(1000);
+      await page.evaluate(seekStarted, 0);
+      const path = join(dir, "start.png");
+      await page.screenshot({ path });
+      const [, , red] = await pixelAt(path, 100, 100);
+      expect(red).toBe(255);
+    } finally {
+      await page.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+/** The colour of one pixel of a PNG on disk, read by the browser that drew it. */
+async function pixelAt(path: string, x: number, y: number): Promise<number[]> {
+  if (!browser) {
+    throw new Error("no browser");
+  }
+  const page = await browser.newPage();
+  try {
+    const src = `data:image/png;base64,${readFileSync(path).toString("base64")}`;
+    return await page.evaluate(
+      async ({ src, x, y }) => {
+        const image = new Image();
+        image.src = src;
+        await image.decode();
+        const canvas = new OffscreenCanvas(image.width, image.height);
+        const context = canvas.getContext("2d");
+        context?.drawImage(image, 0, 0);
+        return [image.width, image.height, ...(context?.getImageData(x, y, 1, 1).data ?? [])];
+      },
+      { src, x, y },
+    );
+  } finally {
+    await page.close();
+  }
+}
+
+describe("contact sheets in a real Chromium", () => {
+  browserTest("draws each capture in its box, on a sheet the size of its layout", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "dek-sheet-"));
+    try {
+      const shots = ["#ff0000", "#0000ff"].map((color, i) => ({
+        html: `<html><body style="margin:0;background:${color}"></body></html>`,
+        slug: `s${i + 1}`,
+        step: "1",
+        screenshotPath: join(dir, `s${i + 1}.png`),
+      }));
+      const [spec] = overviewSheets(
+        shots.map((shot) => ({ image: shot.screenshotPath, label: shot.slug })),
+        { slide: { width: 1280, height: 720 }, title: "demo", dir: join(dir, "sheets") },
+      );
+      if (!spec) {
+        throw new Error("no sheet");
+      }
+      const response = await render({
+        kind: "pages",
+        viewport: { width: 1280, height: 720 },
+        actions: [],
+        pages: shots,
+        sheets: [spec],
+      });
+      expect(response).toEqual({ overflows: [], contrasts: [] });
+      expect(await Bun.file(spec.path).exists()).toBe(true);
+      const { size, boxes } = sheetLayout(spec);
+      const images = boxes.filter((box) => box.kind === "image");
+      const centre = (i: number) => {
+        const box = images[i];
+        return [
+          Math.round((box?.x ?? 0) + (box?.width ?? 0) / 2),
+          Math.round((box?.y ?? 0) + (box?.height ?? 0) / 2),
+        ] as const;
+      };
+      const [red, blue] = [
+        await pixelAt(spec.path, ...centre(0)),
+        await pixelAt(spec.path, ...centre(1)),
+      ];
+      expect(red.slice(0, 2)).toEqual([size.width, size.height]);
+      expect(red.slice(2, 5)).toEqual([255, 0, 0]);
+      expect(blue.slice(2, 5)).toEqual([0, 0, 255]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("shot --motion in a real Chromium", () => {
+  browserTest(
+    "holds the slide's entrance at each moment, and ends where dek shot does",
+    async () => {
+      const script = "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n## grow\n\nbody\n";
+      const plain = (title: string) =>
+        slideDocument(`<section class="slide"><h2 class="slide-title">${title}</h2></section>`);
+      const grow = slideDocument(`<section class="slide"><div class="bar"></div></section>`);
+      const css = `.slide { --bar-left: 100px; --bar-top: 400px; --bar-width: 400px; --bar-height: 40px; }
+.bar { position: absolute; left: var(--bar-left); top: var(--bar-top); width: var(--bar-width); height: var(--bar-height); background: var(--fg); transform-origin: left; }
+.slide.is-current .bar { animation: grow 1200ms linear; }
+@keyframes grow { from { transform: scaleX(0); } }`;
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              script,
+              slides: { intro: plain("intro"), grow },
+              styles: { grow: css },
+            },
+          ],
+        },
+        async (root) => {
+          const result = await shotMotion(join(root, "decks", "demo"), {
+            slug: "grow",
+            playerScript: await playerScript(),
+            runner: (request) => render(request),
+          });
+          const [beat] = result.beats;
+          expect(beat?.frames.map((frame) => frame.ms)).toEqual([0, 300, 600, 900, 1200]);
+          expect(beat?.frames.at(-1)?.end).toBe(true);
+          // 3/4 along the bar: still dark halfway through the entrance, filled once it ends.
+          const probe = [400, 420] as const;
+          const half = await pixelAt(beat?.frames[2]?.path ?? "", ...probe);
+          const end = await pixelAt(beat?.frames[4]?.path ?? "", ...probe);
+          expect(half[2]).toBeLessThan(64);
+          expect(end[2]).toBeGreaterThan(192);
+          expect(result.sheets).toHaveLength(1);
+        },
+      );
     },
   );
 });

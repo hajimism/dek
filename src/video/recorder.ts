@@ -1,12 +1,9 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import { moduleFilePath } from "../core/path.ts";
 import { playwrightResolved } from "../core/playwright.ts";
 import { runJsonWorker, workerCommand } from "../core/spawn.ts";
 import type { Position } from "../core/step.ts";
 import { playbackSchedule, type Timeline } from "../core/timeline.ts";
-import { VIDEO_CAPTURE_STRATEGY } from "./strategy.ts";
 
 export type VideoFrame = {
   path: string;
@@ -25,27 +22,16 @@ export type VideoCaptureRequest = {
 
 export type VideoCaptureResponse = {
   frames: VideoFrame[];
-  strategy: string;
-  gos?: Position[];
 };
 
-export type VideoRunner = (request: VideoCaptureRequest) => Promise<VideoCaptureResponse | null>;
+export type VideoRunner = (request: VideoCaptureRequest) => Promise<VideoCaptureResponse>;
 
-export type PlannedFrame = {
-  kind: "animation" | "hold";
+/** A go the video plays, and how long it shows: until the next go, the first from the start. */
+type PlannedGo = {
+  at: number;
+  position: Position;
   durationMs: number;
-  afterGo: number;
 };
-
-export type CapturePlan = {
-  gos: Array<{ at: number; position: Position }>;
-  frames: PlannedFrame[];
-};
-
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-  "base64",
-);
 
 export function frameStops(animationMs: number, fps: number): number[] {
   if (animationMs <= 0) {
@@ -62,18 +48,16 @@ export function holdMs(beatMs: number, animationMs: number): number {
   return Math.max(1, beatMs - animationMs);
 }
 
-export function planCapture(timeline: Timeline, _fps = 30): CapturePlan {
+/** Every go of the talk, each shown until the next; together they cover the whole audio. */
+export function planCapture(timeline: Timeline): PlannedGo[] {
   const gos = playbackSchedule(timeline);
-  // Each span runs from one go to the next; the first starts with the audio.
-  const frames: PlannedFrame[] = gos.map((event, index) => ({
-    kind: "hold",
+  return gos.map((go, index) => ({
+    ...go,
     durationMs: Math.max(
       1,
-      (gos[index + 1]?.at ?? timeline.durationMs) - (index === 0 ? 0 : event.at),
+      (gos[index + 1]?.at ?? timeline.durationMs) - (index === 0 ? 0 : go.at),
     ),
-    afterGo: index,
   }));
-  return { gos, frames };
 }
 
 export async function defaultVideoRunner(
@@ -108,31 +92,24 @@ function spawnVideoRunner(
   });
 }
 
-function parseVideoResponse(text: string): VideoCaptureResponse | null {
+/** The video worker's JSON, or null when its frames are not each a path and how long it shows. */
+export function parseVideoResponse(text: string): VideoCaptureResponse | null {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(text) as VideoCaptureResponse;
-    return parsed && Array.isArray(parsed.frames) ? parsed : null;
+    parsed = JSON.parse(text);
   } catch {
     return null;
   }
+  const frames = (parsed as { frames?: unknown } | null)?.frames;
+  return Array.isArray(frames) && frames.every(isVideoFrame) ? { frames } : null;
 }
 
-/** Deterministic helper for tests: one hold frame per scheduled beat. */
-export function captureHoldFrames(request: VideoCaptureRequest): VideoCaptureResponse {
-  mkdirSync(request.outDir, { recursive: true });
-  const plan = planCapture(request.timeline, request.fps);
-  const frames: VideoFrame[] = [];
-  for (const [index, planned] of plan.frames.entries()) {
-    const path = join(request.outDir, `frame-${String(index).padStart(4, "0")}.png`);
-    if (!existsSync(path)) {
-      writeFileSync(path, PNG);
-    }
-    frames.push({ path, durationMs: planned.durationMs, kind: planned.kind });
-  }
-  if (frames.length === 0) {
-    const path = join(request.outDir, "frame-0000.png");
-    writeFileSync(path, PNG);
-    frames.push({ path, durationMs: Math.max(1, request.timeline.durationMs), kind: "hold" });
-  }
-  return { frames, strategy: VIDEO_CAPTURE_STRATEGY, gos: plan.gos.map((event) => event.position) };
+function isVideoFrame(value: unknown): value is VideoFrame {
+  const { path, durationMs, kind } = (value ?? {}) as Record<string, unknown>;
+  return (
+    typeof path === "string" &&
+    typeof durationMs === "number" &&
+    Number.isFinite(durationMs) &&
+    (kind === undefined || kind === "animation" || kind === "hold")
+  );
 }
