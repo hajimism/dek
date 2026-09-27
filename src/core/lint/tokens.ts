@@ -1,3 +1,5 @@
+import { blankStringsAndComments, cssFunctions, splitTopLevel } from "../css-scan.ts";
+
 export const REQUIRED_TOKENS = [
   "--fg",
   "--bg",
@@ -185,13 +187,16 @@ export function isRawThemeValue(property: string, value: string): boolean {
   if (hasVarFallback(value)) {
     return true;
   }
-  const rest = stripCssFunctions(value, ["var", "url"]);
-  if (HEX_COLOR_RE.test(rest) || COLOR_FN_RE.test(rest) || BANNED_UNIT_RE.test(rest)) {
+  const rest = withoutFunctions(value, TOKEN_FUNCTIONS);
+  // A string is text: `content: "#fff"` shows the characters, it paints nothing.
+  const bare = blankStringsAndComments(rest);
+  if (HEX_COLOR_RE.test(bare) || COLOR_FN_RE.test(bare) || BANNED_UNIT_RE.test(bare)) {
     return true;
   }
-  if (hasNamedColor(rest)) {
+  if (hasNamedColor(bare)) {
     return true;
   }
+  // A family name is raw whether it is quoted or not.
   if (property === "font-family") {
     const leftover = rest.replace(IDENT_RE, (ident) =>
       /^(inherit|initial|unset|revert|revert-layer)$/i.test(ident) ? "" : ident,
@@ -202,6 +207,9 @@ export function isRawThemeValue(property: string, value: string): boolean {
   }
   return false;
 }
+
+/** The functions a design value may be written with: a token, or a file. */
+const TOKEN_FUNCTIONS = new Set(["var", "url"]);
 
 type TokenKind = "color" | "font" | "size" | "radius" | "space" | "time";
 
@@ -231,7 +239,7 @@ function tokenKind(name: string, value: string): TokenKind | undefined {
 
 /** The kind of token a declaration wants, or undefined when no token kind fits it. */
 function wantedKind(property: string, value: string): TokenKind | undefined {
-  const rest = stripCssFunctions(value, ["var", "url"]);
+  const rest = blankStringsAndComments(withoutFunctions(value, TOKEN_FUNCTIONS));
   if (isColorValue(rest)) {
     return "color";
   }
@@ -254,14 +262,14 @@ function wantedKind(property: string, value: string): TokenKind | undefined {
 }
 
 /**
- * DEK014's hint: the theme tokens that could replace a raw value, such as
- * `use var(--accent) or var(--fg)` for a hex color.
+ * The theme tokens that could replace a raw value, such as `use var(--accent) or var(--fg)`
+ * for a hex color; none when no token holds that kind of value.
  */
-export function rawValueHint(
+export function tokenSuggestion(
   property: string,
   value: string,
   tokens: Array<{ name: string; value: string }>,
-): string {
+): string | undefined {
   const kind = wantedKind(property, value);
   const names = [
     ...new Set(
@@ -271,7 +279,7 @@ export function rawValueHint(
     ),
   ].sort();
   if (names.length === 0) {
-    return "add a token for it to theme.css and use var() here";
+    return undefined;
   }
   const shown = names.slice(0, MAX_HINT_TOKENS).map((name) => `var(${name})`);
   if (names.length > MAX_HINT_TOKENS) {
@@ -298,109 +306,20 @@ function hasNamedColor(value: string): boolean {
 }
 
 function hasVarFallback(value: string): boolean {
-  let i = 0;
-  while (i < value.length) {
-    const start = value.indexOf("var(", i);
-    if (start === -1) {
-      return false;
-    }
-    const inner = functionInner(value, start + 3);
-    if (inner === undefined) {
-      return false;
-    }
-    if (hasTopLevelComma(inner.args)) {
-      return true;
-    }
-    i = inner.end;
-  }
-  return false;
+  return cssFunctions(value).some(
+    (call) => call.name === "var" && splitTopLevel(call.args, ",").length > 1,
+  );
 }
 
-function hasTopLevelComma(value: string): boolean {
-  let depth = 0;
-  let quote: string | undefined;
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    if (quote !== undefined) {
-      if (ch === "\\") {
-        i++;
-        continue;
-      }
-      if (ch === quote) {
-        quote = undefined;
-      }
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-    } else if (ch === "(") {
-      depth++;
-    } else if (ch === ")") {
-      depth--;
-    } else if (ch === "," && depth === 0) {
-      return true;
+/** The value with each call to one of `names` replaced by a space; calls inside them go too. */
+function withoutFunctions(value: string, names: Set<string>): string {
+  let out = "";
+  let from = 0;
+  for (const call of cssFunctions(value)) {
+    if (names.has(call.name) && call.start >= from) {
+      out += `${value.slice(from, call.start)} `;
+      from = call.end;
     }
   }
-  return false;
-}
-
-function stripCssFunctions(value: string, names: string[]): string {
-  let result = value;
-  for (const name of names) {
-    const needle = `${name}(`;
-    let i = 0;
-    let next = "";
-    while (i < result.length) {
-      const start = result.indexOf(needle, i);
-      if (start === -1) {
-        next += result.slice(i);
-        break;
-      }
-      next += result.slice(i, start);
-      const inner = functionInner(result, start + name.length);
-      if (inner === undefined) {
-        next += result.slice(start);
-        break;
-      }
-      next += " ";
-      i = inner.end;
-    }
-    result = next;
-  }
-  return result;
-}
-
-function functionInner(
-  value: string,
-  openIndex: number,
-): { args: string; end: number } | undefined {
-  if (value[openIndex] !== "(") {
-    return undefined;
-  }
-  let depth = 0;
-  let quote: string | undefined;
-  for (let i = openIndex; i < value.length; i++) {
-    const ch = value[i];
-    if (quote !== undefined) {
-      if (ch === "\\") {
-        i++;
-        continue;
-      }
-      if (ch === quote) {
-        quote = undefined;
-      }
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-    } else if (ch === "(") {
-      depth++;
-    } else if (ch === ")") {
-      depth--;
-      if (depth === 0) {
-        return { args: value.slice(openIndex + 1, i), end: i + 1 };
-      }
-    }
-  }
-  return undefined;
+  return out + value.slice(from);
 }

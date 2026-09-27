@@ -2,46 +2,55 @@
 export type Severity = "error" | "warning";
 
 /**
- * The rule table: every diagnostic dek itself emits, with its severity. Voice
- * and timing rules are warnings: a live-only deck is done without them. So are the
- * findings about input dek ignores (DEK008) or reads another way (DEK044), an empty
- * heading (DEK024), which a slide script may fill, and a step bound by position where the
- * beat has an id (DEK025), which is right until a beat is inserted.
+ * What a finding is about. A slide finding names its slide (`slug`), and `dek check <slug>`
+ * reports exactly those; a deck finding is about a file the slides share, such as theme.css
+ * or the frontmatter; a project finding is about dek.toml, one per project however many decks.
+ * `dek lint` reports all three.
+ */
+export type Scope = "project" | "deck" | "slide";
+
+/**
+ * The rule table: every diagnostic dek itself emits, with its severity and the scopes it is
+ * found in. A rule that reads a shared file and a slide's own, like DEK014 on theme.css and on
+ * slides/<slug>.css, has both. Voice and timing rules are warnings: a live-only deck is done
+ * without them. So are the findings about input dek ignores (DEK008) or reads another way
+ * (DEK044), an empty heading (DEK024), which a slide script may fill, and a step bound by
+ * position where the beat has an id (DEK025), which is right until a beat is inserted.
  */
 export const RULES = {
-  DEK001: { severity: "error" },
-  DEK002: { severity: "error" },
-  DEK003: { severity: "error" },
-  DEK004: { severity: "error" },
-  DEK005: { severity: "error" },
-  DEK006: { severity: "error" },
-  DEK007: { severity: "error" },
-  DEK008: { severity: "warning" },
-  DEK009: { severity: "error" },
-  DEK010: { severity: "error" },
-  DEK011: { severity: "error" },
-  DEK012: { severity: "error" },
-  DEK013: { severity: "error" },
-  DEK014: { severity: "error" },
-  DEK015: { severity: "error" },
-  DEK016: { severity: "error" },
-  DEK017: { severity: "error" },
-  DEK018: { severity: "error" },
-  DEK019: { severity: "error" },
-  DEK020: { severity: "error" },
-  DEK021: { severity: "error" },
-  DEK022: { severity: "error" },
-  DEK023: { severity: "error" },
-  DEK024: { severity: "warning" },
-  DEK025: { severity: "warning" },
-  DEK030: { severity: "error" },
-  DEK031: { severity: "error" },
-  DEK040: { severity: "warning" },
-  DEK041: { severity: "warning" },
-  DEK042: { severity: "warning" },
-  DEK043: { severity: "warning" },
-  DEK044: { severity: "warning" },
-} as const satisfies Record<string, { severity: Severity }>;
+  DEK001: { severity: "error", scopes: ["slide"] },
+  DEK002: { severity: "error", scopes: ["slide"] },
+  DEK003: { severity: "error", scopes: ["slide"] },
+  DEK004: { severity: "error", scopes: ["slide"] },
+  DEK005: { severity: "error", scopes: ["slide"] },
+  DEK006: { severity: "error", scopes: ["slide"] },
+  DEK007: { severity: "error", scopes: ["slide"] },
+  DEK008: { severity: "warning", scopes: ["project", "deck"] },
+  DEK009: { severity: "error", scopes: ["slide"] },
+  DEK010: { severity: "error", scopes: ["slide"] },
+  DEK011: { severity: "error", scopes: ["slide"] },
+  DEK012: { severity: "error", scopes: ["deck", "slide"] },
+  DEK013: { severity: "error", scopes: ["deck"] },
+  DEK014: { severity: "error", scopes: ["deck", "slide"] },
+  DEK015: { severity: "error", scopes: ["deck"] },
+  DEK016: { severity: "error", scopes: ["slide"] },
+  DEK017: { severity: "error", scopes: ["slide"] },
+  DEK018: { severity: "error", scopes: ["deck"] },
+  DEK019: { severity: "error", scopes: ["slide"] },
+  DEK020: { severity: "error", scopes: ["slide"] },
+  DEK021: { severity: "error", scopes: ["slide"] },
+  DEK022: { severity: "error", scopes: ["slide"] },
+  DEK023: { severity: "error", scopes: ["slide"] },
+  DEK024: { severity: "warning", scopes: ["slide"] },
+  DEK025: { severity: "warning", scopes: ["slide"] },
+  DEK030: { severity: "error", scopes: ["slide"] },
+  DEK031: { severity: "error", scopes: ["slide"] },
+  DEK040: { severity: "warning", scopes: ["slide"] },
+  DEK041: { severity: "warning", scopes: ["deck"] },
+  DEK042: { severity: "warning", scopes: ["slide"] },
+  DEK043: { severity: "warning", scopes: ["deck"] },
+  DEK044: { severity: "warning", scopes: ["deck", "slide"] },
+} as const satisfies Record<string, { severity: Severity; scopes: readonly Scope[] }>;
 
 export type RuleId = keyof typeof RULES;
 
@@ -84,31 +93,13 @@ export function hasErrors(diagnostics: Diagnostic[]): boolean {
   return diagnostics.some((diagnostic) => diagnostic.severity === "error");
 }
 
-/** The diagnostics without repeats, in order: dek.toml findings come back from every deck. */
-export function uniqueDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
-  const seen = new Set<string>();
-  return diagnostics.filter((diagnostic) => {
-    const key = JSON.stringify([
-      diagnostic.id,
-      diagnostic.path,
-      diagnostic.line,
-      diagnostic.column,
-      diagnostic.message,
-    ]);
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-}
-
 /**
  * A check a command did not run, so its empty diagnostics are not a pass for it: why it did not
  * run, and what to do so that it does.
  */
 export type SkippedCheck = {
-  check: "lint" | "rumdl" | "visual" | "voice";
+  /** `preview` is a build's link preview image, which needs a URL and Playwright. */
+  check: "lint" | "preview" | "rumdl" | "visual" | "voice";
   reason: string;
   hint?: string;
 };

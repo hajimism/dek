@@ -1,12 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import {
-  diag,
-  errorDiagnostic,
-  hasErrors,
-  RULES,
-  type RuleId,
-  uniqueDiagnostics,
-} from "../../src/core/diagnostic.ts";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { diag, errorDiagnostic, hasErrors, RULES, type RuleId } from "../../src/core/diagnostic.ts";
 
 describe("diag", () => {
   test("voice and timing rules, and input dek ignores or reads another way, are warnings", () => {
@@ -76,26 +71,54 @@ describe("hasErrors", () => {
 });
 
 describe("RULES", () => {
-  test("every rule is a DEK id with a severity", () => {
+  test("every rule is a DEK id with a severity and at least one scope", () => {
     const ids = Object.keys(RULES) as RuleId[];
     expect(ids.length).toBeGreaterThan(20);
     for (const id of ids) {
       expect(id).toMatch(/^DEK\d{3}$/);
       expect(["error", "warning"]).toContain(RULES[id].severity);
+      expect(RULES[id].scopes.length).toBeGreaterThan(0);
+      for (const scope of RULES[id].scopes) {
+        expect(["project", "deck", "slide"]).toContain(scope);
+      }
     }
   });
 });
 
-describe("uniqueDiagnostics", () => {
-  test("keeps one of each, so a project-wide finding is not repeated per deck", () => {
-    const a = {
-      id: "DEK008",
-      severity: "warning" as const,
-      message: "m",
-      path: "/p/dek.toml",
-      line: 2,
-    };
-    const b = { ...a, path: "/p/decks/x/script.md" };
-    expect(uniqueDiagnostics([a, b, { ...a }])).toEqual([a, b]);
+describe("the rule table", () => {
+  const root = join(import.meta.dir, "..", "..");
+  const source = readdirSync(join(root, "src"), { recursive: true, encoding: "utf8" })
+    .filter((file) => file.endsWith(".ts") && !file.endsWith("diagnostic.ts"))
+    .map((file) => readFileSync(join(root, "src", file), "utf8"))
+    .join("\n");
+
+  test("every rule is emitted somewhere in src", () => {
+    const silent = Object.keys(RULES).filter((id) => !source.includes(`diag("${id}"`));
+    expect(silent).toEqual([]);
+  });
+
+  test("every rule has a row in the lint reference, in English and in Japanese", () => {
+    for (const docs of [["docs"], ["docs", "ja"]]) {
+      const reference = readFileSync(join(root, ...docs, "reference", "lint.md"), "utf8");
+      const rows = new Set([...reference.matchAll(/^\| `(DEK\d{3})` \|/gm)].map((m) => m[1]));
+      expect(Object.keys(RULES).filter((id) => !rows.has(id))).toEqual([]);
+      expect([...rows].filter((id) => !(id && id in RULES))).toEqual([]);
+    }
+  });
+
+  test("the lint reference gives each rule the scopes the table does, in both languages", () => {
+    for (const docs of [["docs"], ["docs", "ja"]]) {
+      const reference = readFileSync(join(root, ...docs, "reference", "lint.md"), "utf8");
+      const documented = Object.fromEntries(
+        [...reference.matchAll(/^\| `(DEK\d{3})` \| ([^|]+) \|/gm)].map((m) => [
+          m[1],
+          [...(m[2] ?? "").matchAll(/`(\w+)`/g)].map((scope) => scope[1]),
+        ]),
+      );
+      const table = Object.fromEntries(
+        Object.entries(RULES).map(([id, rule]) => [id, [...rule.scopes]]),
+      );
+      expect(documented).toEqual(table);
+    }
   });
 });

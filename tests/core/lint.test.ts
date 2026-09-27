@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekError, lintDeck, resolveDeck } from "../../src/core/index.ts";
+import { RULES, type RuleId } from "../../src/core/diagnostic.ts";
+import { DekError } from "../../src/core/error.ts";
+import { lintDeck, lintProject } from "../../src/core/lint.ts";
+import { resolveDeck } from "../../src/core/resolve.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { type DeckSpec, withTempProject } from "../helpers/project.ts";
 
@@ -242,15 +245,16 @@ describe("lintDeck", () => {
     );
   });
 
-  test("DEK008: a misspelled dek.toml key is a warning that names the key it meant", async () => {
+  test("DEK008: a misspelled dek.toml key is a project warning that names the key it meant", async () => {
     await withTempProject(
       {
         toml: '# project\nlatin_per_minut = 150\n\n[voice]\nspeaker = "a"\nsped = 1.2\n',
         decks: [{ name: "demo", slides: { intro: titleSlide } }],
       },
       async (root) => {
-        const diagnostics = lintDeck(join(root, "decks", "demo"));
-        expect(diagnostics).toEqual([
+        // Once per project, not once per deck.
+        expect(lintDeck(join(root, "decks", "demo"))).toEqual([]);
+        expect(lintProject(resolveDeck(join(root, "decks", "demo")).project)).toEqual([
           {
             id: "DEK008",
             severity: "warning",
@@ -1335,7 +1339,7 @@ more
     );
   });
 
-  test("slug option keeps theme diagnostics", async () => {
+  test("slug option leaves theme.css to the deck: DEK012 there is not one slide's", async () => {
     await withTempProject(
       {
         decks: [
@@ -1347,13 +1351,15 @@ more
         ],
       },
       async (root) => {
-        const diagnostics = lintDeck(join(root, "decks", "demo"), { slug: "intro" });
-        expect(diagnostics.some((d) => d.id === "DEK012")).toBe(true);
+        expect(lintDeck(join(root, "decks", "demo")).some((d) => d.id === "DEK012")).toBe(true);
+        const slide = lintDeck(join(root, "decks", "demo"), { slug: "intro" });
+        expect(slide.some((d) => d.id === "DEK012")).toBe(false);
+        expect(slide.every((d) => d.slug === "intro")).toBe(true);
       },
     );
   });
 
-  test("slug option keeps DEK041 and filters DEK040 to that slide", async () => {
+  test("slug option drops DEK041, a deck finding, and filters DEK040 to that slide", async () => {
     await withTempProject(
       {
         decks: [
@@ -1399,9 +1405,10 @@ hello dek
             ],
           }),
         );
-        const diagnostics = lintDeck(join(root, "decks", "demo"), { slug: "extra" });
-        expect(diagnostics.some((d) => d.id === "DEK041")).toBe(true);
-        expect(diagnostics.some((d) => d.id === "DEK040")).toBe(false);
+        expect(lintDeck(join(root, "decks", "demo")).some((d) => d.id === "DEK041")).toBe(true);
+        const intro = lintDeck(join(root, "decks", "demo"), { slug: "intro" });
+        expect(new Set(intro.map((d) => `${d.id} ${d.slug}`))).toEqual(new Set(["DEK040 intro"]));
+        expect(lintDeck(join(root, "decks", "demo"), { slug: "extra" })).toEqual([]);
       },
     );
   });
@@ -1738,30 +1745,87 @@ describe("DEK014 hints", () => {
     );
   }
 
-  test("offers the theme's color tokens for a raw color", async () => {
-    expect(await hintFor(".x { color: #ff0066; }\n")).toBe("use var(--accent) or var(--fg)");
+  const local = (value: string) => `name it in this file: .slide { --<name>: ${value}; }`;
+
+  test("offers the theme's color tokens for a raw color, or a name of the slide's own", async () => {
+    expect(await hintFor(".x { color: #ff0066; }\n")).toBe(
+      `use var(--accent) or var(--fg); or ${local("#ff0066")}`,
+    );
   });
 
   test("offers the size tokens for a raw font-size", async () => {
     expect(await hintFor(".x { font-size: 96px; }\n")).toBe(
-      "use var(--size-body) or var(--size-stat)",
+      `use var(--size-body) or var(--size-stat); or ${local("96px")}`,
     );
   });
 
   test("offers length tokens for raw spacing and radius", async () => {
-    expect(await hintFor(".x { margin: 12px; }\n")).toBe("use var(--gap)");
-    expect(await hintFor(".x { border-radius: 8px; }\n")).toBe("use var(--radius)");
+    expect(await hintFor(".x { margin: 12px; }\n")).toBe(`use var(--gap); or ${local("12px")}`);
+    expect(await hintFor(".x { border-radius: 8px; }\n")).toBe(
+      `use var(--radius); or ${local("8px")}`,
+    );
   });
 
   test("offers the font tokens for a raw font-family", async () => {
-    expect(await hintFor('.x { font-family: "Noto Sans"; }\n')).toBe("use var(--font-body)");
+    expect(await hintFor('.x { font-family: "Noto Sans"; }\n')).toBe(
+      `use var(--font-body); or ${local('"Noto Sans"')}`,
+    );
   });
 
-  test("points at theme.css when no token fits", async () => {
-    expect(await hintFor(".x { transition: opacity 200ms; }\n")).toBe("use var(--step-transition)");
-    expect(await hintFor(".x { width: 100px; }\n")).toBe(
-      "add a token for it to theme.css and use var() here",
+  test("names the value on the slide when no theme token fits", async () => {
+    expect(await hintFor(".x { transition: opacity 200ms; }\n")).toBe(
+      `use var(--step-transition); or ${local("opacity 200ms")}`,
     );
+    expect(await hintFor(".x { width: 100px; }\n")).toBe(
+      `${local("100px")}, then use var(--<name>)`,
+    );
+  });
+
+  test("offers a slide stylesheet's own tokens only when it sets them on .slide", async () => {
+    expect(
+      await hintFor(
+        ".slide { --own: 12px; }\n.slide .bar { --bar-h: 12px; }\n.x { margin: 12px; }\n",
+      ),
+    ).toBe(`use var(--gap) or var(--own); or ${local("12px")}`);
+  });
+
+  test("points theme.css at a token of its own when none fits", async () => {
+    const hint = await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: { intro: titleSlide },
+            theme: `${theme}.slide .x { width: 100px; margin: 12px; }\n`,
+          },
+        ],
+      },
+      async (root) =>
+        lintDeck(join(root, "decks", "demo"))
+          .filter((d) => d.id === "DEK014")
+          .map((d) => d.hint),
+    );
+    expect(hint).toEqual(["add a token for it to .slide and use var() here", "use var(--gap)"]);
+  });
+
+  test("offers theme.css only the tokens every slide gets, as a slide stylesheet sees them", async () => {
+    const hint = await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: { intro: titleSlide },
+            // --wide-gap is set only on one layout: a rule elsewhere cannot count on it.
+            theme: `${theme}.slide[data-layout="wide"] { --wide-gap: 3rem; }\n.slide .x { margin: 12px; }\n`,
+          },
+        ],
+      },
+      async (root) =>
+        lintDeck(join(root, "decks", "demo"))
+          .filter((d) => d.id === "DEK014")
+          .map((d) => d.hint),
+    );
+    expect(hint).toEqual(["use var(--gap)"]);
   });
 });
 
@@ -2048,5 +2112,95 @@ how it fits
 `;
     const diagnostics = await lintTwo({ intro: titleSlide, architecture: withTitle });
     expect(diagnostics.filter((d) => d.id === "DEK024")).toEqual([]);
+  });
+});
+
+describe("rule scopes", () => {
+  // One of nearly every kind of finding: a slide finding names its slide, a deck finding none.
+  const script = `---
+title: Demo
+duration: 60m
+venu: Tokyo
+---
+
+# Part one
+
+## intro
+
+hello dek
+
+### a {#a}
+
+- item
+
+### b {#a}
+
+#### aside
+
+## missing
+
+text
+`;
+  const intro = slideDocument(`<section class="slide">
+  <h2 class="slide-title">intro</h2>
+  <p class="nope" style="color: red" data-step="zz">x</p>
+  <img src="https://example.com/a.png" alt="">
+</section>`);
+
+  test("each finding falls in a scope its rule declares", async () => {
+    await withTempProject(
+      {
+        toml: "bogus = 1\n",
+        decks: [
+          {
+            name: "demo",
+            script,
+            slides: { intro, gone: intro },
+            styles: { intro: "body { color: #fff; }\n" },
+            scripts: { intro: "export default { draw() { setTimeout(() => {}, 1); } };\n" },
+            theme: "html { color: red; }\n.slide { --fg: #fff; }\n.slide p { color: #000; }\n",
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await writeFile(join(deckDir, "slides", "old.js"), "export default {};\n");
+        await mkdir(join(deckDir, "voice"), { recursive: true });
+        await writeFile(
+          join(deckDir, "voice", "voice.toml"),
+          'engine = "voicevox"\nspeaker = "a"\n\n[beats."nope"]\npause = 1\n',
+        );
+        const resolved = resolveDeck(deckDir);
+        const found = [
+          ...lintProject(resolved.project).map((d) => ({ d, scope: "project" })),
+          ...lintDeck(resolved).map((d) => ({ d, scope: d.slug === undefined ? "deck" : "slide" })),
+        ];
+        const outOfScope = found
+          .filter(
+            ({ d, scope }) => !(RULES[d.id as RuleId].scopes as readonly string[]).includes(scope),
+          )
+          .map(({ d, scope }) => `${d.id} as ${scope}: ${d.message}`);
+        expect(outOfScope).toEqual([]);
+        const seen = new Set(found.map(({ d, scope }) => `${d.id} ${scope}`));
+        for (const expected of [
+          "DEK008 project",
+          "DEK008 deck",
+          "DEK012 deck",
+          "DEK012 slide",
+          "DEK014 deck",
+          "DEK014 slide",
+          "DEK044 deck",
+          "DEK044 slide",
+          "DEK041 deck",
+          "DEK043 deck",
+          "DEK001 slide",
+          "DEK002 slide",
+          "DEK016 slide",
+          "DEK017 slide",
+        ]) {
+          expect(seen).toContain(expected);
+        }
+      },
+    );
   });
 });

@@ -1,0 +1,93 @@
+import { type DekConfig, loadConfig } from "../config.ts";
+import { parseCss, type Stylesheet } from "../css.ts";
+import { deckPaths } from "../deck-paths.ts";
+import type { Diagnostic } from "../diagnostic.ts";
+import { type ScriptParts, splitFrontmatter } from "../parse.ts";
+import {
+  listSlideFiles,
+  listSlides,
+  type Project,
+  type ProjectDeck,
+  readDeckFile,
+} from "../resolve.ts";
+import type { Section } from "../schema.ts";
+import { skeletonHtml } from "../skeleton.ts";
+import { type ThemeFacts, themeFacts } from "../theme-facts.ts";
+
+export type SlideFile = { slug: string; path: string };
+
+/**
+ * What every rule reads: the deck, its config, and the files beside script.md. Rules see every
+ * slide; `lintDeck` narrows their findings to one slide when asked.
+ */
+export type LintContext = DeckFiles & {
+  /** DEK016 and DEK017 of each slide script, by slug: evaluated before the rules run. */
+  scripts: Map<string, Diagnostic[]>;
+};
+
+/** The deck as read from disk, each file once. */
+export type DeckFiles = {
+  project: Project;
+  deck: ProjectDeck;
+  config: DekConfig;
+  /** script.md, read once and cut at its frontmatter; none when it cannot be cut. */
+  script?: ScriptParts;
+  /** The first section of each slug, in script order; a second one is DEK004. */
+  sectionsBySlug: Map<string, Section>;
+  slidesBySlug: Map<string, SlideFile>;
+  stylesBySlug: Map<string, SlideFile>;
+  /** theme.css, parsed once for every rule that reads it. */
+  theme?: ThemeFacts & { path: string; sheet: Stylesheet };
+  /** A slide's HTML, read once, and whether it is still the skeleton `dek sync` wrote. */
+  slideSource(slug: string): { html: string; skeleton: boolean } | undefined;
+};
+
+export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
+  const themePath = deckPaths(deck.dir).theme;
+  const themeCss = readDeckFile(deck.dir, themePath);
+  const sectionsBySlug = new Map<string, Section>();
+  for (const section of deck.deck.sections) {
+    if (!sectionsBySlug.has(section.slug)) {
+      sectionsBySlug.set(section.slug, section);
+    }
+  }
+  const slidesBySlug = new Map(listSlides(deck.dir).map((slide) => [slide.slug, slide]));
+  const sources = new Map<string, { html: string; skeleton: boolean } | undefined>();
+  const sheet = themeCss === undefined ? undefined : parseCss(themeCss);
+  const script = scriptParts(deck);
+  return {
+    project,
+    deck,
+    config: loadConfig(project.configPath),
+    ...(script ? { script } : {}),
+    sectionsBySlug,
+    slidesBySlug,
+    stylesBySlug: new Map(listSlideFiles(deck.dir, ".css").map((file) => [file.slug, file])),
+    ...(sheet === undefined
+      ? {}
+      : {
+          theme: { path: themePath, sheet, ...themeFacts(sheet) },
+        }),
+    slideSource(slug) {
+      if (!sources.has(slug)) {
+        const slide = slidesBySlug.get(slug);
+        const html = slide && readDeckFile(deck.dir, slide.path);
+        sources.set(
+          slug,
+          html === undefined
+            ? undefined
+            : { html, skeleton: html === skeletonHtml(deck.deck, slug) },
+        );
+      }
+      return sources.get(slug);
+    },
+  };
+}
+
+function scriptParts(deck: ProjectDeck): ScriptParts | undefined {
+  try {
+    return splitFrontmatter(readDeckFile(deck.dir, deck.scriptPath) ?? "", deck.scriptPath);
+  } catch {
+    return undefined;
+  }
+}
