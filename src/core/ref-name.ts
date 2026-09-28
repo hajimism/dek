@@ -23,7 +23,7 @@ const REPO_RE = /^[A-Za-z0-9._-]+$/;
 const DECK_RE = /^[^/\\\s@]+$/;
 const SHA_RE = /^[0-9a-f]{40}$/;
 
-export const REF_HINT =
+const REF_HINT =
   "name a ref as owner/repo/deck, e.g. hajimism/dek/why-dek or hajimism/dek/why-dek@v1";
 
 /** True for `owner/repo/deck[@rev]` or a GitHub link, which a deck name never is. */

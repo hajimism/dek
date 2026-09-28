@@ -5,9 +5,7 @@ import { formatSectionScript, sectionTiming } from "./timing.ts";
 
 export {
   nextPresenterTitle,
-  type PresenterBeat,
   type PresenterSlide,
-  type PresenterState,
   presenterState,
 } from "./presenter-state.ts";
 

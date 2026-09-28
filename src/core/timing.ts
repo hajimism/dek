@@ -28,7 +28,7 @@ function speechChars(text: string): number {
   return stripBlockquotes(text).replace(/\s+/g, "").length;
 }
 
-export function estimateSeconds(text: string, config: DekConfig): number {
+function estimateSeconds(text: string, config: DekConfig): number {
   const stripped = stripBlockquotes(text);
   const cjk = [...stripped.matchAll(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu)]
     .length;

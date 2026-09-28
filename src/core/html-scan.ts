@@ -9,7 +9,7 @@ export type SourceSpot = { line: number; column: number };
 export type HtmlAttribute = SourceSpot & { name: string; value: string };
 
 /** One start tag, located at its `<`, with its attributes in source order. */
-export type HtmlElement = SourceSpot & { tag: string; attributes: HtmlAttribute[] };
+type HtmlElement = SourceSpot & { tag: string; attributes: HtmlAttribute[] };
 
 /** One URL an attribute names, located where the URL itself is written. */
 export type HtmlRef = SourceSpot & { tag: string; attr: string; value: string; use: UrlUse };

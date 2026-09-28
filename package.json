@@ -39,6 +39,7 @@
     "test": "bun test --parallel=4",
     "test:watch": "bun test --watch",
     "typecheck": "tsc --noEmit",
+    "knip": "knip",
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check": "biome check --write .",
@@ -54,6 +55,8 @@
     "@biomejs/biome": "2.5.14",
     "@happy-dom/global-registrator": "20.14.5",
     "@types/bun": "^1.4.2",
+    "happy-dom": "20.14.5",
+    "knip": "6.38.0",
     "playwright": "^1.63.0",
     "typescript": "^7.0.2",
     "vitepress": "^1.6.4"

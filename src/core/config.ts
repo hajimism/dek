@@ -40,7 +40,7 @@ export const DekToml = z.object({
     .optional(),
 });
 
-export type VoiceDefaults = {
+type VoiceDefaults = {
   engine: string;
   speaker: string;
   speed: number;

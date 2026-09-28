@@ -2,7 +2,7 @@ import { decodePosition, encodePosition } from "../core/live-protocol.ts";
 import { positionsEqual } from "../core/position.ts";
 import type { Position } from "../core/step.ts";
 
-export const RECONNECT_BASE_MS = 500;
+const RECONNECT_BASE_MS = 500;
 export const RECONNECT_MAX_MS = 10_000;
 
 /**

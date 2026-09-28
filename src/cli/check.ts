@@ -11,7 +11,7 @@ import { hasVoice, loadCachedTimeline, VOICE_SETUP_HINT } from "../core/voice.ts
 import { type SkippedCheck, skippedChecks } from "./result.ts";
 import { type DeckTarget, requireSection } from "./scope.ts";
 
-export type VoiceCheckBeat = {
+type VoiceCheckBeat = {
   beatIndex: number;
   durationMs: number;
   empty: boolean;

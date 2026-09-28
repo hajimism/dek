@@ -1,5 +1,5 @@
 /** One key segment as written on its line: `a`, `"b/c"`, or `'d'`. */
-export type KeySegment = { start: number; end: number; key: string; quote: string };
+type KeySegment = { start: number; end: number; key: string; quote: string };
 
 /** One key or table header of a TOML file, where it is written. */
 export type TomlKey = {

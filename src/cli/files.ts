@@ -37,7 +37,7 @@ disable = ["MD041"]
 }
 
 /** How to install dek into a project, until it is published to npm as `@hajimism/dek`. */
-export const INSTALL_DEK = "bun add -d github:hajimism/dek";
+const INSTALL_DEK = "bun add -d github:hajimism/dek";
 
 /**
  * The starter script: short, but a real talk, so the first `dek ls` already

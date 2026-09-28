@@ -2,7 +2,7 @@ import { outermostStyleRules, type Stylesheet, splitSelectorList, startsAtSlide 
 import { consumeComment, consumeString, cssIdents } from "./css-scan.ts";
 
 /** Text to put in place of `[start, end)` of the stylesheet as it was read. */
-export type CssEdit = { start: number; end: number; text: string };
+type CssEdit = { start: number; end: number; text: string };
 
 /** One rewrite, as the edits it makes to a stylesheet. */
 export type CssEditor = (sheet: Stylesheet) => CssEdit[];

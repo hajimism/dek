@@ -70,10 +70,6 @@ const DictToml = z.record(
   }),
 );
 
-export function voiceDir(deckDir: string): string {
-  return deckPaths(deckDir).voice;
-}
-
 export function hasVoice(deckDir: string): boolean {
   return existsSync(deckPaths(deckDir).voiceToml);
 }

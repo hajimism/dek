@@ -23,7 +23,7 @@ export type LsListResult = {
   failed: Array<{ name: string }>;
 };
 
-export type LsSectionRow = {
+type LsSectionRow = {
   slug: string;
   title: string;
   beats: number;

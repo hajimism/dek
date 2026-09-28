@@ -3,7 +3,7 @@ import type { LiveEvent } from "../core/live-protocol.ts";
 /** A live event and the deck it happened in; a page hears only its own deck's. */
 export type DeckEvent = LiveEvent & { deck: string };
 
-export type Listener = (event: DeckEvent) => void;
+type Listener = (event: DeckEvent) => void;
 
 /** What the server's own readers see of the hub: subscribe, and later unsubscribe. */
 export type EventFeed = { listen(fn: Listener): () => void };

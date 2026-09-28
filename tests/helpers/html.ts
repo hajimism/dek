@@ -1,4 +1,4 @@
-export function normalizeHtml(html: string): string {
+function normalizeHtml(html: string): string {
   return html.replace(/>\s+</g, "><").replace(/\s+/g, " ").trim();
 }
 

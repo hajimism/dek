@@ -155,7 +155,7 @@ export function resolveDecks(cwd: string, options: { deck?: string } = {}): Deck
   return { project: scope.project, decks: scope.project.decks };
 }
 
-export function requireDeck(scope: Scope, cwd: string): ProjectDeck {
+function requireDeck(scope: Scope, cwd: string): ProjectDeck {
   if (scope.deck) {
     return scope.deck;
   }

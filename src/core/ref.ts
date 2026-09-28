@@ -10,10 +10,8 @@ import { outputDir } from "./safe-fs.ts";
 
 export {
   isPinnedRev,
-  isPlainRefName,
   isRefName,
   parseRefSource,
-  REF_HINT,
   type RefSource,
 } from "./ref-name.ts";
 
@@ -88,7 +86,7 @@ export function refState(project: { root: string; configPath: string }, name: st
 export type RepoFiles = Map<string, Blob>;
 
 /** Beyond this, a snapshot is refused: a deck to read is a few hundred kilobytes. */
-export const MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
+const MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 
 /**
  * Reads a GitHub tarball. Bun leaves out links; a path that is absolute, has

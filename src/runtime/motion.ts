@@ -6,7 +6,7 @@
 import { drawFrame, stepMotionMs } from "../core/slide-draw.ts";
 import { stepKey } from "../core/step.ts";
 
-export { drawAtEnd, drawFrame, stepMotionMs } from "../core/slide-draw.ts";
+export { drawAtEnd } from "../core/slide-draw.ts";
 
 // The shapes live in slide.d.ts, which `dek sync` also hands to deck authors.
 export type MotionFrame = DekMotionFrame;
@@ -111,5 +111,3 @@ export function createMotion(clock: {
     stop,
   };
 }
-
-export type Motion = ReturnType<typeof createMotion>;

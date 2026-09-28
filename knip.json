@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/runtime/browser.ts",
+    "src/core/*-worker.ts",
+    "src/video/worker.ts",
+    "tests/helpers/fake-*.ts",
+    "scripts/*.ts"
+  ],
+  "project": ["src/**/*.ts", "tests/**/*.ts"]
+}

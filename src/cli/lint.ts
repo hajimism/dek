@@ -56,7 +56,7 @@ export async function lintCommand(
   };
 }
 
-export const RUMDL_INSTALL = "bun add -d rumdl; or put rumdl on PATH, or set DEK_RUMDL to its path";
+const RUMDL_INSTALL = "bun add -d rumdl; or put rumdl on PATH, or set DEK_RUMDL to its path";
 
 /** Why rumdl gave no result: dek looks for it on PATH, in node_modules/.bin, and at DEK_RUMDL. */
 function rumdlSkipped(scriptPath: string, cwd: string): SkippedCheck {

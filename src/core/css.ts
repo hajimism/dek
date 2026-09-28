@@ -54,16 +54,16 @@ export type StyleRule = RuleBase & {
  * An at-rule with a block. One nested in a style rule, such as `.card { @media (…) { … } }`,
  * styles that rule's elements: its `parent` names them.
  */
-export type AtRule = RuleBase & {
+type AtRule = RuleBase & {
   kind: "at";
   /** A block of descriptors, such as `@font-face`, instead of rules or declarations. */
   descriptors: boolean;
 };
 
-export type CssRule = StyleRule | AtRule;
+type CssRule = StyleRule | AtRule;
 
 /** One `url()`, the address it names and the span of the whole token. */
-export type CssUrl = { value: string; line: number; start: number; end: number };
+type CssUrl = { value: string; line: number; start: number; end: number };
 
 /** A stylesheet read once; every question css.ts answers is a look at this. */
 export type Stylesheet = {

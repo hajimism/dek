@@ -31,14 +31,14 @@ type ArgKey<S extends string> = S extends `${infer N}?` ? N : S extends `${infer
  * The words a command takes, by name: `name` is required, `name?` optional, and `name...`
  * takes every word left, joined by spaces.
  */
-export type Args<A extends readonly string[]> = {
+type Args<A extends readonly string[]> = {
   [S in A[number] as ArgKey<S>]: S extends `${string}?` ? string | undefined : string;
 };
 
 type TargetOf<S> = S extends "deck" ? ReadableDeck : S extends "decks" ? DecksTarget : undefined;
 
 /** What a command is handed: its arguments by name, its flags typed, and its decks resolved. */
-export type Ctx<A extends readonly string[], S extends DeckScope | undefined> = {
+type Ctx<A extends readonly string[], S extends DeckScope | undefined> = {
   cwd: string;
   flags: FlagValues;
   args: Args<A>;
@@ -687,7 +687,7 @@ export type ResultCommand = {
   [K in CommandName]: Specs[K] extends { kind: "result" } ? K : never;
 }[CommandName];
 
-export type DataOf<K extends ResultCommand> = Specs[K] extends ResultSpec<infer D> ? D : never;
+type DataOf<K extends ResultCommand> = Specs[K] extends ResultSpec<infer D> ? D : never;
 
 /** One command's result, before it is printed. */
 export type CliResult = { [K in ResultCommand]: { command: K; data: DataOf<K> } }[ResultCommand];
@@ -695,7 +695,7 @@ export type CliResult = { [K in ResultCommand]: { command: K; data: DataOf<K> } 
 export type AnySpec = ResultSpec<unknown> | SessionSpec | HelpSpec;
 
 /** The spec of a command, or nothing for a word that is none. */
-export function commandSpec(word: string | undefined): AnySpec | undefined {
+function commandSpec(word: string | undefined): AnySpec | undefined {
   return word !== undefined && Object.hasOwn(COMMANDS, word)
     ? (COMMANDS[word as CommandName] as AnySpec)
     : undefined;

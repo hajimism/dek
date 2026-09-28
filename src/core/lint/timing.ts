@@ -6,7 +6,7 @@ import { formatClock, parseDurationSeconds, sectionTiming } from "../timing.ts";
 import { tryLoadCachedTimeline } from "../voice.ts";
 import type { LintContext } from "./context.ts";
 
-export const DURATION_DRIFT_RATIO = 0.2;
+const DURATION_DRIFT_RATIO = 0.2;
 /** The reading-time estimate leaves out pauses and demos, so it gets more room than a Timeline. */
 const ESTIMATE_DRIFT_RATIO = 0.35;
 

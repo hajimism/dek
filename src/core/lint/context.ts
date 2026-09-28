@@ -14,7 +14,7 @@ import type { Section } from "../schema.ts";
 import { skeletonHtml } from "../skeleton.ts";
 import { type ThemeFacts, themeFacts } from "../theme-facts.ts";
 
-export type SlideFile = { slug: string; path: string };
+type SlideFile = { slug: string; path: string };
 
 /**
  * What every rule reads: the deck, its config, and the files beside script.md. Rules see every

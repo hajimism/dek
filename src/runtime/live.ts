@@ -66,7 +66,7 @@ export function applyLiveEvent(event: HydratedLiveEvent, host: LiveHost): { relo
   }
 }
 
-export function formatLiveDiagnostics(diagnostics: Diagnostic[]): string | null {
+function formatLiveDiagnostics(diagnostics: Diagnostic[]): string | null {
   if (diagnostics.length === 0) {
     return null;
   }

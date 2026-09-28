@@ -2,10 +2,10 @@ import type { DevServer } from "../server/dev.ts";
 import { writeDevEvent } from "./format.ts";
 
 /** How often the server checks that whoever started it is still there. */
-export const PARENT_POLL_MS = 1_000;
+const PARENT_POLL_MS = 1_000;
 
 /** How long a stop waits for the server to close before the process exits anyway. */
-export const SHUTDOWN_GRACE_MS = 2_000;
+const SHUTDOWN_GRACE_MS = 2_000;
 
 /**
  * Serve until told to stop: Ctrl-C, a kill, a closed terminal, or the process that started the

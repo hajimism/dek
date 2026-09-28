@@ -41,5 +41,7 @@ jobs:
           "$HOME/.local/bin/rumdl" --version
       - run: bunx biome ci .
       - run: bun run typecheck
+      # Exports, files, and dependencies nothing uses.
+      - run: bun run knip
       - run: bun test --coverage
       - run: bun run docs:build

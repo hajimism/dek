@@ -8,7 +8,7 @@ import { DekError } from "./error.ts";
 const DEFAULT_API = "https://api.github.com";
 
 /** A repository tarball larger than this is refused rather than held in memory. */
-export const MAX_TARBALL_BYTES = 200 * 1024 * 1024;
+const MAX_TARBALL_BYTES = 200 * 1024 * 1024;
 
 /** A commit lookup is one small answer; a stall this long is a dead connection. */
 const COMMIT_TIMEOUT_MS = 30 * 1000;

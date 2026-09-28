@@ -81,7 +81,7 @@ export function unknownAsciiWords(text: string, dict: VoiceDict): string[] {
   return found;
 }
 
-export type CueSource = {
+type CueSource = {
   position: Position;
   slug: string;
   line: number;

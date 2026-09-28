@@ -200,7 +200,7 @@ function diagnosticCount(count: number): string {
  * "lint: 1 error from dek's rules; run `dek lint` to see it", or nothing when clean. A build
  * runs dek's rules only; `dek lint` adds rumdl, so the count names what it covers.
  */
-export function lintSummary(diagnostics: Diagnostic[]): string | undefined {
+function lintSummary(diagnostics: Diagnostic[]): string | undefined {
   if (diagnostics.length === 0) {
     return undefined;
   }

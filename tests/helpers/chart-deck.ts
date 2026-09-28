@@ -6,7 +6,7 @@ import { mountPlayer, unmountPlayer } from "./dom.ts";
 import { slideDocument } from "./html.ts";
 import { writeProject } from "./project.ts";
 
-export const script = `---
+const script = `---
 title: Demo
 ---
 

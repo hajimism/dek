@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 /** The extensions a file under `slides/` can have: the slide, its sidecars, and its build. */
-export type SlideExt = ".html" | ".css" | ".ts" | ".js";
+type SlideExt = ".html" | ".css" | ".ts" | ".js";
 
 /** Where each file a deck is made of lives, named once instead of joined at every read. */
 export type DeckPaths = {

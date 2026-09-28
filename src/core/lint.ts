@@ -19,7 +19,6 @@ import { asResolvedDeck, type Project, type ProjectDeck } from "./resolve.ts";
 import type { Section } from "./schema.ts";
 import { evaluateSlideScripts, slideScriptsProblems } from "./slide-script-eval.ts";
 
-export { DURATION_DRIFT_RATIO } from "./lint/timing.ts";
 export { silentCueDiagnostics } from "./lint/voice.ts";
 
 export type LintDeckOptions = {

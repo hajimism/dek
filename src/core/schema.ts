@@ -27,7 +27,7 @@ export const Section = z.object({
 
 export type Section = z.infer<typeof Section>;
 
-export const Lang = z
+const Lang = z
   .string()
   .regex(/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/, "write a BCP 47 tag, like en or ja");
 

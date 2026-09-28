@@ -7,7 +7,7 @@ import type { Position } from "../core/step.ts";
 export type RoomClient = { send(payload: string): unknown };
 
 /** Where a deck stands, as `dek current` and `dek goto` print it. */
-export type RoomPosition = { slug: string; slideIndex: number; beatIndex: number };
+type RoomPosition = { slug: string; slideIndex: number; beatIndex: number };
 
 export type Rooms<C extends RoomClient> = {
   /** A socket joins its deck's room, and is told where the talk stands. */

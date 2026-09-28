@@ -130,7 +130,7 @@ export function engineSetupHint(engine: string): string {
   return `install ${setup.label} from ${setup.url}${docker}, ${fallback}`;
 }
 
-export class EngineMissingError extends DekError {
+class EngineMissingError extends DekError {
   constructor(engine: string, baseUrl: string) {
     super(`${engine} was not found at ${baseUrl}`, { hint: engineSetupHint(engine) });
     this.name = "DekError";

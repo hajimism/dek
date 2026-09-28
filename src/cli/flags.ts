@@ -106,7 +106,7 @@ export type FlagValues = { -readonly [K in FlagName]?: ValueOf<(typeof FLAGS)[K]
  * Taken by every invocation: --json also shapes an error, and --help and --version turn any
  * command line into help or the version.
  */
-export const GLOBAL_FLAGS: readonly FlagName[] = ["json", "help", "version"];
+const GLOBAL_FLAGS: readonly FlagName[] = ["json", "help", "version"];
 
 /** The placeholder help prints after a flag, or nothing for a switch. */
 export function flagValue(name: FlagName): string | undefined {

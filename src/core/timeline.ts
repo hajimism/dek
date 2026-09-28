@@ -18,14 +18,14 @@ export type Utterance = {
   durationMs: number;
 };
 
-export type TimelineSentence = {
+type TimelineSentence = {
   text: string;
   kana: string;
   start: number;
   end: number;
 };
 
-export type TimelineBeat = {
+type TimelineBeat = {
   position: Position;
   start: number;
   end: number;
