@@ -196,8 +196,6 @@ function contrastHint(origin: ContrastOrigin | undefined, threshold: number, slu
   }
 }
 
-type PathOf = (slug: string) => string;
-
 /** The file to change: the one the origin names, or the slide itself when it is not known. */
 function contrastPath(origin: ContrastOrigin | undefined, slug: string, paths: DeckPaths): string {
   switch (origin) {
@@ -214,11 +212,10 @@ function contrastPath(origin: ContrastOrigin | undefined, slug: string, paths: D
 
 function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic[] {
   const paths = deckPaths(deckDir);
-  const pathOf: PathOf = (slug) => paths.slide(slug, ".html");
   const failing = response.contrasts.filter((sample) => sample.ratio < contrastThreshold(sample));
   return [
     ...groupBySteps(response.overflows, overflowKey).map((group) =>
-      overflowDiagnostic(group, pathOf),
+      overflowDiagnostic(group, paths),
     ),
     ...groupBySteps(failing, contrastKey).map((group) => contrastDiagnostic(group, paths)),
     ...groupBySteps(response.drawErrors ?? [], drawErrorKey).map((group) =>
@@ -259,7 +256,7 @@ function crossedEdges(overflow: OverflowSample): Edge[] {
 }
 
 function overflowKey(o: OverflowSample): string {
-  return [o.slug, o.box, o.text ?? "", crossedEdges(o).join()].join("\0");
+  return [o.slug, o.box, o.text ?? "", crossedEdges(o).join(), o.origin ?? ""].join("\0");
 }
 
 /** The ratio as reported, to one decimal: samples that round alike are one finding. */
@@ -281,22 +278,45 @@ function overflowWhere(amounts: Partial<Record<Edge, number>>): string {
   return `overflows ${edges.map(([edge, px]) => `the ${edge} edge by ${px}px`).join(" and ")}`;
 }
 
-function overflowHint(edges: Edge[], slug: string): string | undefined {
-  const css = `slides/${slug}.css`;
-  const hints = [
-    ...(edges.some((edge) => edge === "left" || edge === "right")
-      ? [`${HORIZONTAL_HINT} ${css}`]
-      : []),
-    ...(edges.some((edge) => edge === "top" || edge === "bottom")
-      ? [`${VERTICAL_HINT} ${css}`]
-      : []),
-  ];
+/**
+ * What to do about an overflow, where its cause is. A script or a stylesheet that puts the
+ * element past the edge is fixed where it does; content too big for the slide is cut, split, or
+ * sized down on the slide. An element with no text may be decoration meant to bleed.
+ */
+function overflowHint(first: OverflowSample, edges: Edge[]): string | undefined {
+  const css = `slides/${first.slug}.css`;
+  const hints =
+    first.origin === "script"
+      ? [
+          `draw in slides/${first.slug}.ts moves or sizes it past the edge: keep what it draws inside the slide at every beat`,
+        ]
+      : first.origin === "slide"
+        ? [
+            `${css} puts it past the edge, which the theme alone does not: fix its position or size in ${css}`,
+          ]
+        : [
+            ...(edges.some((edge) => edge === "left" || edge === "right")
+              ? [`${HORIZONTAL_HINT} ${css}`]
+              : []),
+            ...(edges.some((edge) => edge === "top" || edge === "bottom")
+              ? [`${VERTICAL_HINT} ${css}`]
+              : []),
+          ];
+  if (!first.text && hints.length > 0) {
+    hints.push('if it is decoration meant to bleed off the slide, mark it aria-hidden="true"');
+  }
   return hints.length > 0 ? hints.join("; ") : undefined;
+}
+
+/** The file to change for an overflow: the script or stylesheet that caused it, else the slide. */
+function overflowPath(first: OverflowSample, paths: DeckPaths): string {
+  const ext = first.origin === "script" ? ".ts" : first.origin === "slide" ? ".css" : ".html";
+  return paths.slide(first.slug, ext);
 }
 
 function overflowDiagnostic(
   { first, items, steps }: StepGroup<OverflowSample>,
-  pathOf: PathOf,
+  paths: DeckPaths,
 ): Diagnostic {
   const edges = crossedEdges(first);
   // Each edge by the most it overflows at any step, so the fix covers the worst beat.
@@ -305,16 +325,17 @@ function overflowDiagnostic(
   );
   const target =
     edges.length === 0 && !first.text ? "content " : describeTarget(first.box, first.text);
-  const hint = overflowHint(edges, first.slug);
+  const hint = overflowHint(first, edges);
   return diag("DEK030", {
     message: `${target}${overflowWhere(amounts)} ${atSteps(steps)}`,
-    path: pathOf(first.slug),
+    path: overflowPath(first, paths),
     slug: first.slug,
     ...(hint ? { hint } : {}),
     data: {
       box: first.box,
       ...(first.text ? { text: first.text } : {}),
       edges: amounts,
+      ...(first.origin ? { origin: first.origin } : {}),
       steps,
     },
   });

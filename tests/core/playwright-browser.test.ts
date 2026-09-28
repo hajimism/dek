@@ -95,6 +95,7 @@ describe("playwright worker findings", () => {
           box: "div.wrap",
           text: expect.stringMatching(/^item 0 item 1 /),
           by: { bottom: 480 },
+          origin: "content",
         },
       ]);
       const boxes = new Set(response?.contrasts.map((sample) => sample.box));
@@ -164,8 +165,63 @@ describe("playwright worker text overflow", () => {
         box: "li",
         text: url,
         by: { right: expect.any(Number) },
+        origin: "content",
       },
     ]);
+  });
+});
+
+// An overflow is sent to what put the element past the edge, found as a contrast's cause is: the
+// script's changes taken back first, then the slide's own CSS. What overflows with both gone is the
+// content itself, too much for the theme's sizes.
+describe("playwright worker overflow origin", () => {
+  const measure = async (body: string, slideCss = "", draw = "") => {
+    const { stillPageScript } = await import("../../src/core/slide-script.ts");
+    const script = draw
+      ? `<script>(window.__dekSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
+      : "";
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["overflow"],
+      pages: [
+        {
+          html: `<html><head><style>
+body { margin: 0 }
+.slide { position: relative; width: 1280px; height: 720px; font: 400 24px sans-serif }
+</style><style id="dek-slide-css">${slideCss}</style></head><body><section class="slide" data-slug="intro" data-dek-step="1" data-dek-beat="0">${body}</section>${script}</body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+    return Object.fromEntries(
+      (response?.overflows ?? []).map((found) => [found.box, found.origin]),
+    );
+  };
+
+  browserTest("sends an element draw moves past the edge to the script", async () => {
+    expect(
+      await measure(
+        `<p class="moved">moved</p>`,
+        "",
+        `slide.querySelector(".moved").style.translate = "1400px 0";`,
+      ),
+    ).toEqual({ "p.moved": "script" });
+  });
+
+  browserTest("sends an element the slide's CSS pulls past the edge to that CSS", async () => {
+    expect(
+      await measure(`<p class="pulled">pulled</p>`, ".slide .pulled { margin-left: -300px }"),
+    ).toEqual({
+      "p.pulled": "slide",
+    });
+  });
+
+  browserTest("sends content too big for the theme to the slide's markup", async () => {
+    expect(
+      await measure(`<p class="long" style="white-space: nowrap">${"word ".repeat(200)}</p>`),
+    ).toEqual({ "p.long": "content" });
   });
 });
 

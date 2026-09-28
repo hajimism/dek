@@ -1,7 +1,7 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
 import { finishBeat } from "./finish-beat.ts";
-import { findOverflows } from "./overflow.ts";
+import { crossesEdge, findOverflows, type OverflowOrigin } from "./overflow.ts";
 import { visitInPages } from "./page-pool.ts";
 import type {
   ContrastFinding,
@@ -125,6 +125,9 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
 /** A contrast finding below its threshold, with the key of the text it came from. */
 type Failing = { finding: ContrastFinding; key: string };
 
+/** An overflow found on the page, with the index of the element that crosses the edge. */
+type Crossing = { finding: PagesResponse["overflows"][number]; element: number };
+
 /**
  * One text the page draws: an element's own, or one a pseudo-element draws. `key` finds the same
  * text again when the page is measured a second time.
@@ -184,14 +187,17 @@ async function visitPage(
 ): Promise<PagesResponse> {
   const response: PagesResponse = { overflows: [], contrasts: [] };
   const failing: Failing[] = [];
+  const crossing: Crossing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
   const { slug, step } = pageReq;
   response.drawErrors = await page.evaluate(() => window.__dekDrawErrors ?? []);
   if (actions.length > 0) {
     const measured = await page.evaluate(measureSlideInPage);
     if (actions.includes("overflow") && measured.slideBox) {
-      for (const overflow of findOverflows(measured.slideBox, measured.elements)) {
-        response.overflows.push({ slug, step, ...overflow });
+      for (const { element, ...overflow } of findOverflows(measured.slideBox, measured.elements)) {
+        const finding = { slug, step, ...overflow };
+        response.overflows.push(finding);
+        crossing.push({ finding, element });
       }
     }
     if (actions.includes("contrast")) {
@@ -223,22 +229,26 @@ async function visitPage(
   if (pageReq.screenshotPath) {
     await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
   }
-  // After the shot: what follows takes the slide's CSS away, and the page is not put back.
-  await attributeContrasts(page, failing);
+  // After the shot: what follows takes the page apart, and it is not put back.
+  await attributeFindings(page, { failing, crossing });
   await page.evaluate(unmarkPseudoTextsInPage);
   return response;
 }
 
 /**
- * Says what draws each failing text below its threshold, by taking the page apart one layer at a
- * time and measuring again: first what the slide's script drew, then the slide's own CSS. Text
- * that clears its threshold once a layer is gone is that layer's to fix; text that fails with
- * both gone is the theme's. The page is not put back.
+ * Says what brought each finding about, by taking the page apart one layer at a time and
+ * measuring again: first what the slide's script drew, then the slide's own CSS. A text that
+ * clears its threshold, or an element that no longer crosses an edge, once a layer is gone is
+ * that layer's to fix. With both gone, a text that still fails is the theme's, and an element that
+ * still overflows is its content's: too much for the theme's sizes. The page is not put back.
  */
-async function attributeContrasts(page: Page, failing: Failing[]): Promise<void> {
-  let left = failing;
-  for (const layer of CONTRAST_LAYERS) {
-    if (left.length === 0) {
+async function attributeFindings(
+  page: Page,
+  pending: { failing: Failing[]; crossing: Crossing[] },
+): Promise<void> {
+  let { failing, crossing } = pending;
+  for (const layer of LAYERS) {
+    if (failing.length === 0 && crossing.length === 0) {
       return;
     }
     if (!(await page.evaluate(layer.strip, SLIDE_CSS_ID))) {
@@ -246,20 +256,38 @@ async function attributeContrasts(page: Page, failing: Failing[]): Promise<void>
     }
     // Transitions and animations the change sets off would otherwise be caught midway.
     await page.evaluate(finishBeat);
-    const texts = await pageTexts(page, await page.evaluate(measureSlideInPage));
+    const measured = await page.evaluate(measureSlideInPage);
+    crossing = crossing.filter(({ finding, element }) => {
+      const now = measured.elements[element];
+      if (measured.slideBox && now && !crossesEdge(measured.slideBox, now)) {
+        finding.origin = layer.origin;
+        return false;
+      }
+      return true;
+    });
+    if (failing.length === 0) {
+      continue;
+    }
+    const texts = await pageTexts(page, measured);
     const contrasts = await textContrasts(page, texts);
     const now = new Map(texts.map((text, at) => [text.key, { text, contrast: contrasts[at] }]));
-    left = left.filter(({ finding, key }) => {
-      const measured = now.get(key);
-      if (measured?.contrast && measured.contrast.ratio >= contrastThreshold(measured.text)) {
+    failing = failing.filter(({ finding, key }) => {
+      const measuredText = now.get(key);
+      if (
+        measuredText?.contrast &&
+        measuredText.contrast.ratio >= contrastThreshold(measuredText.text)
+      ) {
         finding.origin = layer.origin;
         return false;
       }
       return true;
     });
   }
-  for (const { finding } of left) {
+  for (const { finding } of failing) {
     finding.origin = "theme";
+  }
+  for (const { finding } of crossing) {
+    finding.origin = "content";
   }
 }
 
@@ -267,8 +295,8 @@ async function attributeContrasts(page: Page, failing: Failing[]): Promise<void>
  * What a slide adds over the theme, outermost first, each with how to take it away in the page;
  * `strip` says whether there was anything to take.
  */
-const CONTRAST_LAYERS: Array<{
-  origin: Exclude<ContrastOrigin, "theme">;
+const LAYERS: Array<{
+  origin: Exclude<ContrastOrigin, "theme"> & OverflowOrigin;
   strip: (slideCssId: string) => boolean;
 }> = [
   {

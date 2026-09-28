@@ -117,7 +117,7 @@ Nothing else in a deck can be checked against a script that does not read, so th
 
 ### DEK030
 
-The hint keeps the fix on the slide: cut or split the content, or size it in `slides/<id>.css`. It never suggests changing a theme token, which would move every slide.
+The finding goes where its cause is, found the way a contrast's is: what the slide script's `draw` changed is taken back first, then the slide's own CSS is taken away, and the page is measured again after each. An element that fits once `draw` is undone is the script's: the path is `slides/<id>.ts` and `data.origin` is `"script"`. One that fits without the slide's CSS is that stylesheet's: `slides/<id>.css`, `"slide"`. One that overflows with both gone is its content, too much for the slide: `slides/<id>.html`, `"content"`, and the hint keeps the fix on the slide: cut or split the content, or size it in `slides/<id>.css`. It never suggests changing a theme token, which would move every slide. An element with no text may be decoration meant to bleed, and the hint says to mark it `aria-hidden="true"` if so.
 
 The message names the element, the start of its text, the edge, and how many pixels it runs past. A child is reported only for an edge its parent stays inside, so a list that runs off the bottom is one finding. The same finding on several beats is one diagnostic that names every beat. Text is measured as well as boxes, so an unbreakable string such as a URL counts even when its box fits.
 

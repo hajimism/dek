@@ -16,7 +16,7 @@ describe("findOverflows", () => {
       el("li", [110, 150, 1200, 190], 0, "時間がかかる"),
       el("li", [110, 860, 1200, 900], 0, "さらに追加"),
     ]);
-    expect(found).toEqual([{ box: "ul", text: "時間がかかる", by: { bottom: 180 } }]);
+    expect(found).toEqual([{ box: "ul", text: "時間がかかる", by: { bottom: 180 }, element: 0 }]);
   });
 
   test("reports a child only for the edges its parent stays inside", () => {
@@ -25,8 +25,8 @@ describe("findOverflows", () => {
       el("li", [110, 860, 1692, 900], 0, "https://example.com"),
     ]);
     expect(found).toEqual([
-      { box: "ul", by: { bottom: 180 } },
-      { box: "li", text: "https://example.com", by: { right: 412 } },
+      { box: "ul", by: { bottom: 180 }, element: 0 },
+      { box: "li", text: "https://example.com", by: { right: 412 }, element: 1 },
     ]);
   });
 

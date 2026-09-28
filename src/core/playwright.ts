@@ -334,7 +334,11 @@ function isOverflowFinding(value: unknown): value is OverflowFinding {
     typeof by === "object" &&
     Object.entries(by as object).every(
       ([edge, px]) => (EDGES as string[]).includes(edge) && isNumber(px),
-    )
+    ) &&
+    (value.origin === undefined ||
+      value.origin === "script" ||
+      value.origin === "slide" ||
+      value.origin === "content")
   );
 }
 

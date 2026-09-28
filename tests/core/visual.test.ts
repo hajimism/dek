@@ -420,8 +420,47 @@ describe("lintVisualDeck messages", () => {
       "ul overflows the right edge by 3px and the bottom edge by 180px at steps 1, 2",
     );
     expect(dek030?.hint).toBe(
-      "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut it, split it across beats or slides, or give it a smaller size in slides/intro.css",
+      "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut it, split it across beats or slides, or give it a smaller size in slides/intro.css; if it is decoration meant to bleed off the slide, mark it aria-hidden=\"true\"",
     );
+  });
+
+  // The fix is where the cause is: a script that moves the element, a stylesheet that places it,
+  // or, when neither does, content too big for the slide.
+  test("sends an overflow to the file that caused it", async () => {
+    const at = { slug: "intro", step: "1", text: "moved", by: { right: 120 } };
+    const diagnostics = await lintWith({
+      overflows: [
+        { ...at, box: "p.a", origin: "script" },
+        { ...at, box: "p.b", origin: "slide" },
+        { ...at, box: "p.c", origin: "content" },
+      ],
+      contrasts: [],
+    });
+    expect(
+      diagnostics
+        .filter((d) => d.id === "DEK030")
+        .map(({ path, hint, data }) => ({
+          path: path?.split("/").slice(-2).join("/"),
+          hint,
+          origin: data?.origin,
+        })),
+    ).toEqual([
+      {
+        path: "slides/intro.ts",
+        hint: "draw in slides/intro.ts moves or sizes it past the edge: keep what it draws inside the slide at every beat",
+        origin: "script",
+      },
+      {
+        path: "slides/intro.css",
+        hint: "slides/intro.css puts it past the edge, which the theme alone does not: fix its position or size in slides/intro.css",
+        origin: "slide",
+      },
+      {
+        path: "slides/intro.html",
+        hint: "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css",
+        origin: "content",
+      },
+    ]);
   });
 
   test("says the content overflows the slide when no edge is named", async () => {
