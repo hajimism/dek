@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
-import { cssClassNames, cssLayoutNames, parseCss } from "./css.ts";
+import { cssClassNames, cssLayoutNames } from "./css.ts";
 import type { Diagnostic } from "./diagnostic.ts";
 import { type DeckFiles, type LintContext, readDeckFiles } from "./lint/context.ts";
 import { pairingDiagnostics, suggestRename } from "./lint/files.ts";
 import { frontmatterKeyDiagnostics, tomlKeyDiagnostics } from "./lint/keys.ts";
 import { duplicateIdDiagnostics, strayHeadingDiagnostics } from "./lint/script.ts";
+import { sharedStyleDiagnostics } from "./lint/shared-styles.ts";
 import { lintSlideHtml } from "./lint/slide-html.ts";
 import {
   javascriptDiagnostics,
@@ -87,6 +87,7 @@ function runRules(ctx: LintContext, options: LintDeckOptions | undefined): Diagn
         ...javascriptDiagnostics(ctx),
         ...themeDiagnostics(ctx),
         ...[...ctx.sectionsBySlug.values()].flatMap((section) => slideDiagnostics(ctx, section)),
+        ...sharedStyleDiagnostics(ctx),
       ],
       ctx,
     ),
@@ -107,12 +108,12 @@ function slideDiagnostics(ctx: LintContext, section: Section): Diagnostic[] {
   if (!slide || !source) {
     return [];
   }
-  const style = ctx.stylesBySlug.get(section.slug);
-  const sheet = style ? parseCss(readFileSync(style.path, "utf8")) : undefined;
+  const style = ctx.slideStyle(section.slug);
+  const sheet = style?.sheet;
   const script = ctx.scripts.get(section.slug);
   return [
-    ...(style && sheet
-      ? lintSlideStyle(section.slug, style.path, sheet, ctx.theme?.tokens ?? [], ctx.deck.dir)
+    ...(style
+      ? lintSlideStyle(section.slug, style.path, style.sheet, ctx.theme?.tokens ?? [], ctx.deck.dir)
       : []),
     ...(script ?? []),
     ...lintSlideHtml(section, slide.path, source.html, {

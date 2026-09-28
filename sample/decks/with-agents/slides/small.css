@@ -1,9 +1,6 @@
 /* The slide's own files on the left, and what dek show hands an agent on the right. */
 .grid {
-  display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: calc(var(--gap) * 1.2);
-  align-items: start;
 }
 
 .files {

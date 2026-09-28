@@ -1,9 +1,6 @@
 /* A real overflowing slide on the left, the real diagnostic for it on the right. */
 .grid {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: calc(var(--gap) * 1.2);
-  align-items: start;
 }
 
 .viewport {

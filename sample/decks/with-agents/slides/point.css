@@ -5,7 +5,6 @@
 }
 
 .grid {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) var(--lane) minmax(0, 1fr);
   gap: calc(var(--gap) * 0.6);
   align-items: center;

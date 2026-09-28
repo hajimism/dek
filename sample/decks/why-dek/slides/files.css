@@ -66,10 +66,6 @@
   font-size: var(--size-caption);
 }
 
-.slide[data-layout="split"] > .col {
-  align-self: stretch;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

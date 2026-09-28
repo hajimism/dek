@@ -198,6 +198,13 @@
   min-width: 0;
 }
 
+/* Columns side by side, tops aligned; a slide sets how wide each is with grid-template-columns. */
+.slide .grid {
+  display: grid;
+  gap: calc(var(--gap) * 1.2);
+  align-items: start;
+}
+
 .slide .cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

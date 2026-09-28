@@ -41,6 +41,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK023` | `slide` | A local file the slide loads (`src`, `srcset`, `poster`, …, or a `url()` in a slide stylesheet) that does not start with `assets/` | — |
 | `DEK024` | `slide` | A heading with nothing to read: no text, no image, no `aria-label`. An id-only `##` heading after the first slide makes one. Warning | — |
 | `DEK025` | `slide` | A numeric `data-step` that points at a beat with an id. Warning | — |
+| `DEK026` | `slide` | The same declaration under the same selector in the stylesheets of three slides or more. Warning | — |
 | `DEK030` | `slide` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK040` | `slide` | An ASCII word missing from the pronunciation dictionary. Warning | — |
@@ -54,7 +55,7 @@ Each finding is about one of three things, and the command that reports it follo
 - `DEK030` and `DEK031` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
 - `DEK040`, `DEK042`, and `DEK043` apply only to decks with `voice/`; `DEK044` applies to every deck. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin). `data` carries `actualSeconds`, `budgetSeconds`, and `source` (`timeline` or `estimate`).
-- `DEK008`, `DEK024`, `DEK025`, and `DEK040` through `DEK044` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. A live-only deck's definition of done is unchanged.
+- `DEK008`, `DEK024` through `DEK026`, and `DEK040` through `DEK044` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. A live-only deck's definition of done is unchanged.
 
 ## Notes
 
@@ -103,6 +104,10 @@ One table decides which attributes name a URL and what the page does with it. A 
 ### DEK025
 
 A number in `data-step` means "the k-th beat of this slide", so a beat inserted above it moves the binding to a different beat without any error. When the beat at that position has an id, the id says the same thing and does not move, so the hint names it: `use data-step="turn"`. Lint only sees the script as it is now: after an insertion, the id it names is the beat that now holds the position, so check that it is the one you meant. A beat with no id has no other name, so its position raises nothing; give it a `{#id}` to make it stable. `data` carries `step` and `id`.
+
+### DEK026
+
+A declaration three slides each write in their own stylesheet is a fix the theme is missing: agents working on one slide each will make it again on the next. Selectors are compared as the slide's scope reads them, so `.card` and `.slide .card` are one selector and `.slide > .card` is another; a rule inside `@media` is compared only with the same rule inside the same `@media`. Each slide gets one finding per selector, in its own `dek check`, naming what it shares there and every slide it shares any of it with; `data` carries `selector`, `declarations`, and `slides`. Define it once in `theme.css` and delete it from each slide. Keyframes are left alone, since each slide's are renamed apart.
 
 ### DEK030
 

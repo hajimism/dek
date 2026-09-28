@@ -40,6 +40,8 @@ export type DeckFiles = {
   theme?: ThemeFacts & { path: string; sheet: Stylesheet };
   /** A slide's HTML, read once, and whether it is still the skeleton `dek sync` wrote. */
   slideSource(slug: string): { html: string; skeleton: boolean } | undefined;
+  /** A slide's own stylesheet, read and parsed once for every rule that reads it. */
+  slideStyle(slug: string): { path: string; sheet: Stylesheet } | undefined;
 };
 
 export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
@@ -53,6 +55,8 @@ export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
   }
   const slidesBySlug = new Map(listSlides(deck.dir).map((slide) => [slide.slug, slide]));
   const sources = new Map<string, { html: string; skeleton: boolean } | undefined>();
+  const stylesBySlug = new Map(listSlideFiles(deck.dir, ".css").map((file) => [file.slug, file]));
+  const styles = new Map<string, { path: string; sheet: Stylesheet } | undefined>();
   const sheet = themeCss === undefined ? undefined : parseCss(themeCss);
   const script = scriptParts(deck);
   return {
@@ -62,7 +66,7 @@ export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
     ...(script ? { script } : {}),
     sectionsBySlug,
     slidesBySlug,
-    stylesBySlug: new Map(listSlideFiles(deck.dir, ".css").map((file) => [file.slug, file])),
+    stylesBySlug,
     ...(sheet === undefined
       ? {}
       : {
@@ -80,6 +84,17 @@ export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
         );
       }
       return sources.get(slug);
+    },
+    slideStyle(slug) {
+      if (!styles.has(slug)) {
+        const style = stylesBySlug.get(slug);
+        const css = style && readDeckFile(deck.dir, style.path);
+        styles.set(
+          slug,
+          style && css !== undefined ? { path: style.path, sheet: parseCss(css) } : undefined,
+        );
+      }
+      return styles.get(slug);
     },
   };
 }

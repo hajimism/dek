@@ -32,11 +32,6 @@
   color: var(--accent);
 }
 
-.stage {
-  display: flex;
-  flex-direction: column;
-}
-
 .code {
   position: relative;
   flex: 1;

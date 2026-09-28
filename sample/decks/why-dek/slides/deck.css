@@ -6,8 +6,6 @@
 }
 
 .stage {
-  display: flex;
-  flex-direction: column;
   padding-top: calc(var(--gap) * 0.2);
 }
 

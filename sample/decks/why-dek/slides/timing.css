@@ -69,10 +69,6 @@
   border-right: var(--hair) solid var(--bg);
 }
 
-.slide[data-layout="split"] > .col {
-  align-self: stretch;
-}
-
 .chart-head {
   display: flex;
   justify-content: space-between;

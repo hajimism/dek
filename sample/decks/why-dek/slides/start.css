@@ -13,7 +13,6 @@
 }
 
 .slide[data-layout="split"] > .col {
-  align-self: stretch;
   padding-bottom: calc(var(--gap) * 0.4);
 }
 

@@ -391,6 +391,7 @@
 
 .slide[data-layout="split"] > .col {
   grid-column: 1 / 6;
+  align-self: stretch;
   gap: calc(var(--gap) * 0.8);
 }
 
@@ -401,6 +402,8 @@
 .slide[data-layout="split"] > .stage {
   grid-column: 6 / -1;
   align-self: stretch;
+  display: flex;
+  flex-direction: column;
 }
 
 /* @layout title

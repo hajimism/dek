@@ -15,7 +15,8 @@ export type Scope = "project" | "deck" | "slide";
  * slides/<slug>.css, has both. Voice and timing rules are warnings: a live-only deck is done
  * without them. So are the findings about input dek ignores (DEK008) or reads another way
  * (DEK044), an empty heading (DEK024), which a slide script may fill, and a step bound by
- * position where the beat has an id (DEK025), which is right until a beat is inserted.
+ * position where the beat has an id (DEK025), which is right until a beat is inserted, and a
+ * style several slides repeat (DEK026), which works but belongs in the theme.
  */
 export const RULES = {
   DEK001: { severity: "error", scopes: ["slide"] },
@@ -43,6 +44,7 @@ export const RULES = {
   DEK023: { severity: "error", scopes: ["slide"] },
   DEK024: { severity: "warning", scopes: ["slide"] },
   DEK025: { severity: "warning", scopes: ["slide"] },
+  DEK026: { severity: "warning", scopes: ["slide"] },
   DEK030: { severity: "error", scopes: ["slide"] },
   DEK031: { severity: "error", scopes: ["slide"] },
   DEK040: { severity: "warning", scopes: ["slide"] },

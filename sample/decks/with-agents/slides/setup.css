@@ -1,9 +1,7 @@
 /* What an agent does not need, the two short texts it does read, and the real AGENTS.md. */
 .grid {
-  display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   gap: calc(var(--gap) * 1.4);
-  align-items: start;
 }
 
 .grid .col {

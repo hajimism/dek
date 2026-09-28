@@ -1,9 +1,6 @@
 /* Two real envelopes side by side: a failure that names the next command, and a skipped check. */
 .grid {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: calc(var(--gap) * 1.2);
-  align-items: start;
 }
 
 .side {
