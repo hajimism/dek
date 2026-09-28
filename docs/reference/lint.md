@@ -44,6 +44,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK026` | `slide` | The same declaration under the same selector in the stylesheets of three slides or more. Warning | — |
 | `DEK030` | `slide` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
+| `DEK032` | `slide` | A slide script's `draw` throws while drawing the end of a beat | — |
 | `DEK040` | `slide` | An ASCII word missing from the pronunciation dictionary. Warning | — |
 | `DEK041` | `deck` | The talk's length far from the `duration` budget: narrated length with a Timeline, the reading-time estimate without. Warning | — |
 | `DEK042` | `slide` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
@@ -52,7 +53,7 @@ Each finding is about one of three things, and the command that reports it follo
 
 ## Conditions
 
-- `DEK030` and `DEK031` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
+- `DEK030`, `DEK031`, and `DEK032` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
 - `DEK040`, `DEK042`, and `DEK043` apply only to decks with `voice/`; `DEK044` applies to every deck. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin). `data` carries `actualSeconds`, `budgetSeconds`, and `source` (`timeline` or `estimate`).
 - `DEK008`, `DEK024` through `DEK026`, and `DEK040` through `DEK044` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
@@ -128,6 +129,10 @@ Contrast is measured from pixels, not from styles. Each beat is drawn with its t
 Only the pixels a text's glyphs cover most are read, each taken back to the color a glyph covering the whole pixel would draw, so antialiasing never lowers a ratio and a thin hyphen reads at its own color. The ratio reported is the one all but the worst 2% of those pixels reach: text over a gradient is judged by the part that reads worst. `fg` and `bg` are the two colors at that pixel. Where two texts overlap, neither is judged by the shared pixels unless it has no others. Text a `::before` or `::after` draws, such as a folio from `counter()` or a running head, is measured like any other and reported as `section.slide::after`. Its `content` counts as text when it has a letter or a digit, or comes from `counter()`, `counters()`, or `attr()`; a quote mark or an arrow on its own, a glow, and a rule count as background. `DEK030` does not measure pseudo-elements.
 
 When a text falls short, the beat is drawn again with the slide's own `slides/<id>.css` taken away and measured once more. If the text still falls short, the theme alone draws it that way: the hint sends the fix to `theme.css`, where one change reaches every slide that uses the same pair, and `data.origin` is `"theme"`. If it clears the threshold, the slide's own CSS brought it down: the hint keeps the fix in `slides/<id>.css`, and `data.origin` is `"slide"`. A slide with no CSS of its own leaves every color to the theme. Colors a slide script sets in `draw` stay on the page, so they count as the theme's.
+
+### DEK032
+
+Every still, whether a shot, a thumbnail, the PDF, or a page `--visual` measures, draws each slide at the end of its beat. A `draw` that throws there leaves the slide as it was before it ran, and no pixel measurement can tell that from a slide meant to look that way, so the throw is reported instead: the error, and every beat it happens at. The presenter keeps going whatever a slide does; the fix is in `slides/<id>.ts`. `data` carries `message` and `steps`.
 
 ### DEK042
 

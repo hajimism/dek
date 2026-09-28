@@ -86,6 +86,36 @@ describe("lintVisualDeck", () => {
     );
   });
 
+  test("emits DEK032 once per error when a slide's draw throws, naming every beat", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const diagnostics = await lintVisualDeck(deckDir, {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [],
+            drawErrors: [
+              { slug: "intro", step: "1", t: 0, message: "TypeError: x is null" },
+              { slug: "intro", step: "2", t: 300, message: "TypeError: x is null" },
+            ],
+          }),
+        });
+        expect(diagnostics?.filter((d) => d.id === "DEK032")).toEqual([
+          {
+            id: "DEK032",
+            severity: "error",
+            message: "draw threw TypeError: x is null at the end of steps 1, 2",
+            path: join(deckDir, "slides", "intro.ts"),
+            slug: "intro",
+            hint: "make draw in slides/intro.ts draw the end of every beat without throwing; until then every still, shot, and PDF shows the slide as if draw never ran",
+            data: { message: "TypeError: x is null", steps: ["1", "2"] },
+          },
+        ]);
+      },
+    );
+  });
+
   test("emits DEK031 when the runner reports low contrast", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

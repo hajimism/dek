@@ -189,7 +189,7 @@ describe("playwright worker files", () => {
             },
           ],
         });
-        expect(response).toEqual({ overflows: [], contrasts: [] });
+        expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [] });
         expect((await pixelAt(screenshotPath, 10, 10)).slice(0, 5)).toEqual([320, 180, 255, 0, 0]);
       } finally {
         await rm(dir, { recursive: true, force: true });
@@ -308,6 +308,31 @@ describe("playwright worker still pages", () => {
       expect(ratios.pulse).toBeCloseTo(contrastRatio([238, 238, 238], [17, 17, 17]), 0);
     },
   );
+});
+
+// A still page draws each slide at the end of its beat. A draw that throws there leaves the slide
+// as it was before, which no pixel measurement can tell from a slide meant to look that way.
+describe("playwright worker slide scripts", () => {
+  browserTest("reports a draw that throws at the end of a beat", async () => {
+    const { stillPageScript } = await import("../../src/core/slide-script.ts");
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["contrast"],
+      pages: [
+        {
+          html: `<html><body style="margin:0"><section class="slide" data-slug="intro" data-dek-step="turn" data-dek-beat="1">
+  <p>hello</p>
+</section><script>(window.__dekSlides ||= {}).intro = { motion: { turn: 400 }, draw(slide, frame) { if (frame.t >= 400) throw new TypeError("no bar at " + frame.t); } };</script>${stillPageScript([])}</body></html>`,
+          slug: "intro",
+          step: "turn",
+        },
+      ],
+    });
+    expect(response?.drawErrors).toEqual([
+      { slug: "intro", step: "turn", t: 400, message: "TypeError: no bar at 400" },
+    ]);
+  });
 });
 
 describe("playwright worker contrast from pixels", () => {
@@ -439,16 +464,19 @@ ${css}
       ],
     });
 
-  browserTest("measures nothing an aria-hidden element draws, its pseudo text included", async () => {
-    const response = await measure(
-      `<p>read me</p><div class="glow" aria-hidden="true"><span class="faint">too faint</span></div>`,
-      `.glow { position: absolute; left: -300px; top: -300px; width: 900px; height: 900px }
+  browserTest(
+    "measures nothing an aria-hidden element draws, its pseudo text included",
+    async () => {
+      const response = await measure(
+        `<p>read me</p><div class="glow" aria-hidden="true"><span class="faint">too faint</span></div>`,
+        `.glow { position: absolute; left: -300px; top: -300px; width: 900px; height: 900px }
 .faint { color: #111 }
 .glow::after { content: "03"; color: #111 }`,
-    );
-    expect(response?.overflows).toEqual([]);
-    expect(response?.contrasts.map((sample) => sample.box)).toEqual(["p"]);
-  });
+      );
+      expect(response?.overflows).toEqual([]);
+      expect(response?.contrasts.map((sample) => sample.box)).toEqual(["p"]);
+    },
+  );
 });
 
 describe("playwright worker contrast origin", () => {
@@ -728,7 +756,7 @@ describe("contact sheets in a real Chromium", () => {
         pages: shots,
         sheets: [spec],
       });
-      expect(response).toEqual({ overflows: [], contrasts: [] });
+      expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [] });
       expect(await Bun.file(spec.path).exists()).toBe(true);
       const { size, boxes } = sheetLayout(spec);
       const images = boxes.filter((box) => box.kind === "image");

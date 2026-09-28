@@ -201,7 +201,34 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
       overflowDiagnostic(group, pathOf),
     ),
     ...groupBySteps(failing, contrastKey).map((group) => contrastDiagnostic(group, pathOf)),
+    ...groupBySteps(response.drawErrors ?? [], drawErrorKey).map((group) =>
+      drawErrorDiagnostic(group, deckDir),
+    ),
   ];
+}
+
+type DrawErrorSample = NonNullable<PagesResponse["drawErrors"]>[number];
+
+function drawErrorKey(error: DrawErrorSample): string {
+  return [error.slug, error.message].join("\0");
+}
+
+/**
+ * A draw that throws leaves the slide as it was before it ran, and every page that shows a still
+ * shows that: pixels alone cannot tell it from a slide meant to look so.
+ */
+function drawErrorDiagnostic(
+  { first, steps }: StepGroup<DrawErrorSample>,
+  deckDir: string,
+): Diagnostic {
+  const script = `slides/${first.slug}.ts`;
+  return diag("DEK032", {
+    message: `draw threw ${first.message} at the end of ${atSteps(steps).replace(/^at /, "")}`,
+    path: deckPaths(deckDir).slide(first.slug, ".ts"),
+    slug: first.slug,
+    hint: `make draw in ${script} draw the end of every beat without throwing; until then every still, shot, and PDF shows the slide as if draw never ran`,
+    data: { message: first.message, steps },
+  });
 }
 
 type OverflowSample = PagesResponse["overflows"][number];

@@ -24,5 +24,7 @@ declare global {
     /** The animations the last finished beat ended; the next go did not start them. */
     __dekSettled?: Set<Animation>;
     __dekSlides?: Record<string, DekSlide>;
+    /** What each slide's draw threw on a still page, for the worker that measures it. */
+    __dekDrawErrors?: Array<{ slug: string; step: string; t: number; message: string }>;
   }
 }

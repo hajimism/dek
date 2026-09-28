@@ -1,11 +1,7 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
 import { lintDeck } from "../core/lint.ts";
-import {
-  PLAYWRIGHT_INSTALL,
-  type PlaywrightRunner,
-  playwrightMissingError,
-} from "../core/playwright.ts";
+import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
 import { runVisualDeck } from "../core/visual.ts";
 import { hasVoice, loadCachedTimeline, VOICE_SETUP_HINT } from "../core/voice.ts";
 import { type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";

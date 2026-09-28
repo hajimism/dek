@@ -117,6 +117,7 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
   return {
     overflows: found.flatMap((page) => page.overflows),
     contrasts: found.flatMap((page) => page.contrasts),
+    drawErrors: found.flatMap((page) => page.drawErrors ?? []),
   };
 }
 
@@ -184,6 +185,7 @@ async function visitPage(
   const failing: Failing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
   const { slug, step } = pageReq;
+  response.drawErrors = await page.evaluate(() => window.__dekDrawErrors ?? []);
   if (actions.length > 0) {
     const measured = await page.evaluate(measureSlideInPage);
     if (actions.includes("overflow") && measured.slideBox) {

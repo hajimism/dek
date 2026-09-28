@@ -106,9 +106,14 @@ export type ContrastFinding = {
 
 export type ContrastOrigin = "theme" | "slide";
 
+/** A slide's draw that threw at the end of a beat, as the still page caught it. */
+type DrawErrorFinding = { slug: string; step: string; t: number; message: string };
+
 export type PagesResponse = {
   overflows: OverflowFinding[];
   contrasts: ContrastFinding[];
+  /** Absent from a runner that has none to report. */
+  drawErrors?: DrawErrorFinding[];
 };
 
 export type MotionResponse = {
@@ -260,9 +265,11 @@ function spawnRunner(
 const RESPONSE_PARSERS: {
   [K in keyof VisualResponses]: (fields: Record<string, unknown>) => VisualResponses[K] | null;
 } = {
-  pages: ({ overflows, contrasts }) =>
-    isArrayOf(overflows, isOverflowFinding) && isArrayOf(contrasts, isContrastFinding)
-      ? { overflows, contrasts }
+  pages: ({ overflows, contrasts, drawErrors = [] }) =>
+    isArrayOf(overflows, isOverflowFinding) &&
+    isArrayOf(contrasts, isContrastFinding) &&
+    isArrayOf(drawErrors, isDrawErrorFinding)
+      ? { overflows, contrasts, drawErrors }
       : null,
   pdf: () => ({}),
   morph: () => ({}),
@@ -307,6 +314,14 @@ function isFinding(value: unknown): value is Record<string, unknown> {
   return (
     isString(slug) && isString(step) && isString(box) && (text === undefined || isString(text))
   );
+}
+
+function isDrawErrorFinding(value: unknown): value is DrawErrorFinding {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const { slug, step, t, message } = value as Record<string, unknown>;
+  return isString(slug) && isString(step) && isNumber(t) && isString(message);
 }
 
 function isOverflowFinding(value: unknown): value is OverflowFinding {

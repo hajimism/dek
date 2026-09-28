@@ -15,19 +15,24 @@ export function stepMotionMs(module: DekSlide | undefined, step: string): number
   return typeof ms === "number" && ms > 0 ? ms : 0;
 }
 
-/** The one place a slide's `draw` runs: a throw is reported, never passed to the player. */
+/**
+ * The one place a slide's `draw` runs: a throw is logged and handed back, never passed to the
+ * player, which keeps presenting whatever a slide does.
+ */
 export function drawFrame(
   module: DekSlide | undefined,
   slide: HTMLElement,
   frame: DekMotionFrame,
-): void {
+): { error: unknown } | undefined {
   if (!module || typeof module.draw !== "function") {
-    return;
+    return undefined;
   }
   try {
     module.draw(slide, frame);
+    return undefined;
   } catch (error) {
     console.error(error);
+    return { error };
   }
 }
 
@@ -37,21 +42,38 @@ export function drawAtEnd(
   slide: HTMLElement,
   index: number,
   step: string,
-): void {
-  drawFrame(module, slide, { index, step, t: stepMotionMs(module, step) });
+): { t: number; error: unknown } | undefined {
+  const t = stepMotionMs(module, step);
+  const failed = drawFrame(module, slide, { index, step, t });
+  return failed && { t, error: failed.error };
 }
 
-/** Draws every slide `markBeat` marked, at the end of its beat. */
+/**
+ * Draws every slide `markBeat` marked, at the end of its beat. A draw that throws leaves the slide
+ * as it was before, so each throw is kept in `window.__dekDrawErrors` for whoever measures the page.
+ */
 function drawMarkedSlides(): void {
   const modules = window.__dekSlides ?? {};
+  const errors: NonNullable<Window["__dekDrawErrors"]> = [];
+  window.__dekDrawErrors = errors;
   for (const el of document.querySelectorAll<HTMLElement>(".slide[data-slug]")) {
     // markBeat writes the step key, so this page never derives one itself.
     const step = el.getAttribute("data-dek-step");
     if (step === null) {
       continue;
     }
-    const module = modules[el.getAttribute("data-slug") ?? ""];
-    drawAtEnd(module, el, Number(el.getAttribute("data-dek-beat") || 0), step);
+    const slug = el.getAttribute("data-slug") ?? "";
+    const failed = drawAtEnd(
+      modules[slug],
+      el,
+      Number(el.getAttribute("data-dek-beat") || 0),
+      step,
+    );
+    if (failed) {
+      const { error } = failed;
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      errors.push({ slug, step, t: failed.t, message });
+    }
   }
 }
 
