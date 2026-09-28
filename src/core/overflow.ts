@@ -38,11 +38,19 @@ function overflowAmounts(slide: Box, rect: Box): Partial<Record<Edge, number>> {
  */
 export function findOverflows(
   slide: Box,
-  elements: Array<Pick<MeasuredElement, "box" | "parent" | "rect" | "text"> & { opacity?: number }>,
+  elements: Array<
+    Pick<MeasuredElement, "box" | "parent" | "rect" | "text"> & {
+      opacity?: number;
+      decorative?: boolean;
+    }
+  >,
 ): Overflow[] {
-  // An invisible element, such as a beat before it shows, overflows nothing anyone sees.
+  // An invisible element, such as a beat before it shows, overflows nothing anyone sees, and
+  // decoration, such as a glow, may bleed off the slide as it likes.
   const amounts = elements.map((element) =>
-    (element.opacity ?? 1) < 0.01 ? {} : overflowAmounts(slide, element.rect),
+    (element.opacity ?? 1) < 0.01 || element.decorative === true
+      ? {}
+      : overflowAmounts(slide, element.rect),
   );
   const found: Overflow[] = [];
   elements.forEach((element, index) => {

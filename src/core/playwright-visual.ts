@@ -140,7 +140,7 @@ type PageText = {
 /** Every text on the page, each measured once: an ancestor's sample would repeat its children's. */
 async function pageTexts(page: Page, measured: SlideMeasure): Promise<PageText[]> {
   const own = measured.elements.flatMap((element, index): PageText[] =>
-    element.ownText
+    element.ownText && !element.decorative
       ? [
           {
             key: String(index),

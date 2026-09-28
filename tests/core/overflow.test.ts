@@ -36,6 +36,16 @@ describe("findOverflows", () => {
     ).toEqual([]);
   });
 
+  // aria-hidden says an element is decoration, and a glow that bleeds off the slide is one.
+  test("ignores decoration: an element marked aria-hidden, and what it holds", () => {
+    expect(
+      findOverflows(slideBox, [
+        { ...el("div.glow", [-200, -200, 600, 400]), decorative: true },
+        { ...el("span", [-100, -100, 100, 100], 0), decorative: true },
+      ]),
+    ).toEqual([]);
+  });
+
   test("ignores empty boxes and sub-pixel rounding", () => {
     expect(
       findOverflows(slideBox, [el("span", [2000, 0, 2000, 0]), el("p", [80, 64, 1280.4, 719])]),

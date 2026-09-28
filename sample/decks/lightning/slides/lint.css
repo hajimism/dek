@@ -42,7 +42,7 @@
   transition: opacity var(--step-transition);
 }
 
-/* The overflowing title, as pixels the audience sees but lint here does not measure. */
+/* The overflowing title, drawn as a picture of a slide: the stack is aria-hidden, decoration lint leaves alone. */
 .slide .preview::before {
   content: "最初に書くのは、スライドではない";
   position: absolute;

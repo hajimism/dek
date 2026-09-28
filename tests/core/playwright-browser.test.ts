@@ -418,6 +418,39 @@ ${css}
   });
 });
 
+// Decoration is marked the way the page marks it for everyone: aria-hidden. A glow that bleeds off
+// the slide, or a sample of unreadable text the talk is about, is not a finding.
+describe("playwright worker and decoration", () => {
+  const measure = async (body: string, css = "") =>
+    render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["overflow", "contrast"],
+      pages: [
+        {
+          html: `<html><head><style>
+body { margin: 0; background: #000 }
+.slide { position: relative; width: 1280px; height: 720px; background: #000; color: #fff; font: 400 24px sans-serif }
+${css}
+</style></head><body><section class="slide">${body}</section></body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+
+  browserTest("measures nothing an aria-hidden element draws, its pseudo text included", async () => {
+    const response = await measure(
+      `<p>read me</p><div class="glow" aria-hidden="true"><span class="faint">too faint</span></div>`,
+      `.glow { position: absolute; left: -300px; top: -300px; width: 900px; height: 900px }
+.faint { color: #111 }
+.glow::after { content: "03"; color: #111 }`,
+    );
+    expect(response?.overflows).toEqual([]);
+    expect(response?.contrasts.map((sample) => sample.box)).toEqual(["p"]);
+  });
+});
+
 describe("playwright worker contrast origin", () => {
   const measure = async (slideCss: string | undefined) => {
     const own = slideCss === undefined ? "" : `<style id="dek-slide-css">${slideCss}</style>`;

@@ -115,6 +115,10 @@ The hint keeps the fix on the slide: cut or split the content, or size it in `sl
 
 The message names the element, the start of its text, the edge, and how many pixels it runs past. A child is reported only for an edge its parent stays inside, so a list that runs off the bottom is one finding. The same finding on several beats is one diagnostic that names every beat. Text is measured as well as boxes, so an unbreakable string such as a URL counts even when its box fits.
 
+#### Decoration
+
+An element marked `aria-hidden="true"`, with everything inside it and its pseudo-elements, is decoration, and neither `DEK030` nor `DEK031` measures it. That is how a glow bleeds off the slide on purpose, or a slide shows a sample of text too faint to read. The mark has a cost that keeps it honest: screen readers skip what it covers, so it never goes on text the audience should read.
+
 ### DEK031
 
 Thresholds follow WCAG AA: 4.5:1 for body text, 3:1 for large text. Large text is a computed `font-size` of 24px or more, or 18.66px or more at `font-weight` 700 or above. A big number in a soft color passes; the same color on body text fails. The thresholds are not configurable. The message names the element, its text, and both colors.

@@ -33,6 +33,11 @@ export type MeasuredElement = {
   opacity: number;
   fontSize: number;
   fontWeight: number;
+  /**
+   * Whether it is decoration: it or an ancestor is `aria-hidden="true"`, as a glow or a sample of
+   * bad contrast is. Neither overflow nor contrast is measured on decoration.
+   */
+  decorative: boolean;
 };
 
 /**
@@ -152,6 +157,7 @@ export function measureSlideInPage(): SlideMeasure {
       opacity: opacityOf(el),
       fontSize: Number.parseFloat(style.fontSize),
       fontWeight: Number(style.fontWeight) || 400,
+      decorative: el.closest('[aria-hidden="true"]') !== null,
     };
   });
   // A pseudo-element draws text when its content has a letter or a digit, or comes from a
@@ -164,6 +170,9 @@ export function measureSlideInPage(): SlideMeasure {
     );
   const pseudoTexts: PseudoText[] = [];
   for (const [index, el] of [slide, ...all].entries()) {
+    if (el.closest('[aria-hidden="true"]') !== null) {
+      continue;
+    }
     for (const pseudo of ["before", "after"] as const) {
       const style = getComputedStyle(el, `::${pseudo}`);
       const { content } = style;
