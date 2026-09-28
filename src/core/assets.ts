@@ -225,6 +225,7 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
   ".woff": "font/woff",
   ".woff2": "font/woff2",
   ".vtt": "text/vtt",
+  ".css": "text/css",
 };
 
 function mimeOf(filePath: string): string {

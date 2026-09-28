@@ -35,10 +35,10 @@ lint がワークフローにどう組み込まれるかは [Lint](/ja/guide/lin
 | `DEK017` | `slide` | 同じ `t` で同じ画面を描かないスライドのスクリプト。タイマー、`requestAnimationFrame`、`Date`、`performance.now`、`Math.random` を使っている。または、クラスで要素を探している（`querySelector`、`closest`、`matches`、`getElementsByClassName`） | — |
 | `DEK018` | `deck` | デッキに `theme.css` がなく、スタイルなしで表示され、テーマの規則も検査できない | — |
 | `DEK019` | `slide` | テーマにもスライド自身のスタイルシートにも定義のない `data-layout`。テーマがレイアウトを 1 つ以上定義しているときに検査する | — |
-| `DEK020` | `slide` | リモート URL（CDN、リモート画像）。URL を持つどの属性でも、スライドのスタイルシートの `url()` でも | — |
-| `DEK021` | `slide` | スライドが読み込むファイルが存在しない。画像、`srcset` の候補、動画、音声、字幕トラック、ポスター、フレーム、オブジェクト、スライドのスタイルシートの `url()`。プロジェクトの `assets/` にあれば、hint がデッキへのコピーを示す | — |
-| `DEK022` | `slide` | デッキディレクトリの外に出るパス | — |
-| `DEK023` | `slide` | スライドが読み込むローカルのファイル（`src`、`srcset`、`poster` など、またはスライドのスタイルシートの `url()`）が `assets/` で始まらない | — |
+| `DEK020` | `deck`, `slide` | リモート URL（CDN、リモート画像）。URL を持つどの属性でも、theme.css やスライドのスタイルシートの `url()` や `@import` でも | — |
+| `DEK021` | `deck`, `slide` | デッキが読み込むファイルが存在しない。画像、`srcset` の候補、動画、音声、字幕トラック、ポスター、フレーム、オブジェクト、theme.css やスライドのスタイルシートの `url()`。プロジェクトの `assets/` にあれば、hint がデッキへのコピーを示す | — |
+| `DEK022` | `deck`, `slide` | デッキディレクトリの外に出るパス | — |
+| `DEK023` | `deck`, `slide` | デッキが読み込むローカルのファイル（`src`、`srcset`、`poster` など、または theme.css やスライドのスタイルシートの `url()`）が `assets/` で始まらない | — |
 | `DEK024` | `slide` | 読むもののない見出し。テキストも画像も `aria-label` もない。最初のスライド以外で id だけの `##` 見出しを書くとこうなる。警告 | — |
 | `DEK025` | `slide` | id のあるビートを数字の `data-step` で指している。警告 | — |
 | `DEK026` | `slide` | 同じセレクタの同じ宣言が、3 枚以上のスライドのスタイルシートにある。警告 | — |

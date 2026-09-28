@@ -11,7 +11,7 @@ import type { HtmlRef } from "../html-scan.ts";
  */
 export function assetRefDiagnostics(
   ref: Pick<HtmlRef, "value" | "use"> & { tag?: string },
-  where: { path: string; line?: number; column?: number; slug: string; deckDir: string },
+  where: { path: string; line?: number; column?: number; slug?: string; deckDir: string },
 ): Diagnostic[] {
   const { deckDir, ...location } = where;
   const kind = classifyAssetRef(ref.value, { deckDir, from: dirname(where.path) }).kind;

@@ -35,10 +35,10 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK017` | `slide` | A slide script that would not draw the same frame for the same `t`: a timer, `requestAnimationFrame`, `Date`, `performance.now`, or `Math.random`; or a class used to find an element (`querySelector`, `closest`, `matches`, `getElementsByClassName`) | — |
 | `DEK018` | `deck` | The deck has no `theme.css`, so it shows unstyled and the theme rules cannot run | — |
 | `DEK019` | `slide` | A `data-layout` that neither the theme nor the slide's own stylesheet defines. Checked when the theme defines at least one layout | — |
-| `DEK020` | `slide` | A remote URL (CDN, remote image), in any attribute that names a URL or in a slide stylesheet's `url()` | — |
-| `DEK021` | `slide` | A file the slide loads does not exist: an image, a `srcset` candidate, a video, audio, track, poster, frame, or object, or a `url()` in a slide stylesheet. When the project's `assets/` has it, the hint says to copy it into the deck | — |
-| `DEK022` | `slide` | A path that leaves the deck directory | — |
-| `DEK023` | `slide` | A local file the slide loads (`src`, `srcset`, `poster`, …, or a `url()` in a slide stylesheet) that does not start with `assets/` | — |
+| `DEK020` | `deck`, `slide` | A remote URL (CDN, remote image), in any attribute that names a URL, or in a `url()` or `@import` of theme.css or a slide stylesheet | — |
+| `DEK021` | `deck`, `slide` | A file the deck loads does not exist: an image, a `srcset` candidate, a video, audio, track, poster, frame, or object, or a `url()` in theme.css or a slide stylesheet. When the project's `assets/` has it, the hint says to copy it into the deck | — |
+| `DEK022` | `deck`, `slide` | A path that leaves the deck directory | — |
+| `DEK023` | `deck`, `slide` | A local file the deck loads (`src`, `srcset`, `poster`, …, or a `url()` in theme.css or a slide stylesheet) that does not start with `assets/` | — |
 | `DEK024` | `slide` | A heading with nothing to read: no text, no image, no `aria-label`. An id-only `##` heading after the first slide makes one. Warning | — |
 | `DEK025` | `slide` | A numeric `data-step` that points at a beat with an id. Warning | — |
 | `DEK026` | `slide` | The same declaration under the same selector in the stylesheets of three slides or more. Warning | — |

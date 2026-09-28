@@ -76,7 +76,10 @@ export type Stylesheet = {
   descriptors: CssDeclaration[];
   /** Every at-rule, block or statement, by name without the `@`. */
   atRules: Array<{ name: string; start: number }>;
-  /** Every `url()` in a declaration or descriptor value; one inside a string is text. */
+  /**
+   * Every `url()` in a declaration or descriptor value, and every address `@import` loads; a
+   * `url(` inside a string is text.
+   */
   urls: CssUrl[];
   /** Where each `@keyframes` name is written. */
   keyframes: Array<{ name: string; start: number; end: number }>;
@@ -193,6 +196,9 @@ class SheetReader {
     }
     const stop = scanTopLevel(source, start, end, ";{}");
     if (source[stop] !== "{") {
+      if (name?.toLowerCase() === "import") {
+        this.importAddress(start + name.length + 1, stop);
+      }
       return source[stop] === ";" ? stop + 1 : stop;
     }
     const close = matchBrace(source, stop, end);
@@ -333,6 +339,23 @@ class SheetReader {
       }
     }
     return (out + this.source.slice(from, end)).trim();
+  }
+
+  /** What `@import` loads: a `url()`, or a bare string, which names an address all the same. */
+  importAddress(from: number, end: number): void {
+    const at = this.skipSpace(from, end);
+    const quote = this.source[at];
+    if (quote !== '"' && quote !== "'") {
+      this.urls(at, end);
+      return;
+    }
+    const close = consumeString(this.source, at, end);
+    this.sheet.urls.push({
+      value: this.source.slice(at + 1, close - 1).trim(),
+      line: this.lineOf(at),
+      start: at,
+      end: close,
+    });
   }
 
   urls(start: number, end: number): void {

@@ -27,10 +27,10 @@ function missingThemeDiagnostic(ctx: LintContext): Diagnostic {
   });
 }
 
-/** DEK012, DEK013, DEK015, and DEK014 for theme.css. */
+/** DEK012, DEK013, DEK015, DEK014, and what its `url()`s load (DEK020 to DEK023) for theme.css. */
 function lintTheme(
   { path, sheet, classes, tokens }: NonNullable<LintContext["theme"]>,
-  maxClasses: number,
+  { maxClasses, deckDir }: { maxClasses: number; deckDir: string },
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   // A rule inside `@media` reaches the page as surely as one outside it.
@@ -68,6 +68,16 @@ function lintTheme(
         path,
         data: { token: name },
       }),
+    );
+  }
+
+  // The theme is in the deck like its slides: what it loads stays inside it, or the build links out.
+  for (const url of cssUrls(sheet)) {
+    diagnostics.push(
+      ...assetRefDiagnostics(
+        { value: url.value, use: "resource" },
+        { path, line: url.line, deckDir },
+      ),
     );
   }
 
@@ -160,5 +170,7 @@ const PAGE_SELECTOR_RE = /^(:root|html|body)(?=$|[\s[.:#>+~])/;
 
 /** The theme's own findings, or DEK018 when there is no theme. */
 export function themeDiagnostics(ctx: LintContext): Diagnostic[] {
-  return ctx.theme ? lintTheme(ctx.theme, ctx.config.maxClasses) : [missingThemeDiagnostic(ctx)];
+  return ctx.theme
+    ? lintTheme(ctx.theme, { maxClasses: ctx.config.maxClasses, deckDir: ctx.deck.dir })
+    : [missingThemeDiagnostic(ctx)];
 }

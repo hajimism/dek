@@ -92,6 +92,28 @@ describe("theme.css is read as CSS reads it", () => {
 });
 
 describe("slide stylesheets are read as CSS reads them", () => {
+  // The theme is part of the deck like any slide: what it loads must be in the deck, or the build
+  // ships a link to the outside and the talk depends on a network at the venue.
+  test("DEK020 to DEK023 check the theme's url()s and @imports as they check a slide's", async () => {
+    const found = await lintWith({
+      theme: `.slide .lede { background-image: url(https://example.com/x.png); }
+@font-face { font-family: X; src: url("assets/missing.woff2"); }
+.slide .rule { background: url(../../outside.png); }
+@import "https://fonts.example.com/css?family=X";
+`,
+    });
+    expect(
+      found
+        .filter((d) => ["DEK020", "DEK021", "DEK022"].includes(d.id))
+        .map((d) => ({ id: d.id, path: d.path?.split("/").pop(), line: d.line, slug: d.slug })),
+    ).toEqual([
+      { id: "DEK020", path: "theme.css", line: 9, slug: undefined },
+      { id: "DEK021", path: "theme.css", line: 10, slug: undefined },
+      { id: "DEK022", path: "theme.css", line: 11, slug: undefined },
+      { id: "DEK020", path: "theme.css", line: 12, slug: undefined },
+    ]);
+  });
+
   test("DEK021 checks a url() in a nested rule", async () => {
     const found = await lintWith({
       css: ".slide { .hero { background: url(assets/gone.png); } }\n",
