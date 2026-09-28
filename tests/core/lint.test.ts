@@ -1785,11 +1785,21 @@ describe("DEK014 hints", () => {
   });
 
   test("offers a slide stylesheet's own tokens only when it sets them on .slide", async () => {
-    expect(
-      await hintFor(
-        ".slide { --own: 12px; }\n.slide .bar { --bar-h: 12px; }\n.x { margin: 12px; }\n",
-      ),
-    ).toBe(`use var(--gap) or var(--own); or ${local("12px")}`);
+    expect(await hintFor(".slide { --own: 12px; }\n.x { margin: 12px; }\n")).toBe(
+      `use var(--gap) or var(--own); or ${local("12px")}`,
+    );
+  });
+
+  test("sends a raw custom property set off .slide to the .slide rule", async () => {
+    expect(await hintFor(".slide .bar { --bar-h: 12px; }\n")).toBe(
+      "set --bar-h on this file's .slide rule, where the slide's own tokens go, and use var(--bar-h) below it",
+    );
+  });
+
+  test("offers an easing token for a raw easing, not a duration", async () => {
+    expect(await hintFor(".x { transition: opacity var(--step-transition) steps(4); }\n")).toBe(
+      `${local("opacity var(--step-transition) steps(4)")}, then use var(--<name>)`,
+    );
   });
 
   test("points theme.css at a token of its own when none fits", async () => {

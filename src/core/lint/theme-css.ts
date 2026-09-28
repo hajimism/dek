@@ -13,7 +13,7 @@ import { deckPaths } from "../deck-paths.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import { assetRefDiagnostics } from "./asset-refs.ts";
 import type { LintContext } from "./context.ts";
-import { isRawThemeValue, REQUIRED_TOKENS, tokenSuggestion } from "./tokens.ts";
+import { isRawThemeValue, isRawTokenValue, REQUIRED_TOKENS, tokenSuggestion } from "./tokens.ts";
 
 /**
  * DEK018: no theme.css beside script.md. The deck would show unstyled, and
@@ -151,6 +151,18 @@ export function lintSlideStyle(
   return diagnostics;
 }
 
+/**
+ * Whether a rule is where tokens are set: on the slide itself, as `.slide` or a compound of it such
+ * as `.slide[data-layout="split"]`, or on a view transition, which the theme draws. A custom
+ * property set anywhere else is a raw value handed to whatever reads it.
+ */
+function setsTokens(selector: string): boolean {
+  return splitSelectorList(selector).every((part) => {
+    const item = part.trim();
+    return item.startsWith("::view-transition") || /^\.slide(?![-\w])[^\s>+~]*$/.test(item);
+  });
+}
+
 /** DEK014 for theme.css and slide stylesheets alike: design values come from tokens. */
 function rawValueDiagnostics(
   sheet: Stylesheet,
@@ -159,13 +171,19 @@ function rawValueDiagnostics(
   slug?: string,
 ): Diagnostic[] {
   return sheet.decls
-    .filter((decl) => isRawThemeValue(decl.property, decl.value))
+    .filter((decl) =>
+      decl.property.startsWith("--")
+        ? !setsTokens(decl.selector) && isRawTokenValue(decl.value)
+        : isRawThemeValue(decl.property, decl.value),
+    )
     .map((decl) =>
       diag("DEK014", {
         message: `raw value in "${decl.property}: ${decl.value}"; use a theme token`,
         path,
         line: decl.line,
-        hint: rawValueHint(tokenSuggestion(decl.property, decl.value, tokens), decl.value, slug),
+        hint: decl.property.startsWith("--")
+          ? tokenPlaceHint(decl.property, slug)
+          : rawValueHint(tokenSuggestion(decl.property, decl.value, tokens), decl.value, slug),
         data: { property: decl.property, value: decl.value },
         ...(slug === undefined ? {} : { slug }),
       }),
@@ -176,6 +194,13 @@ function rawValueDiagnostics(
  * DEK014's hint. theme.css gains a token; a slide stylesheet may name the value on its own
  * `.slide` instead, since a value one slide uses need not join the theme.
  */
+/** A raw custom property set off the slide belongs on it, where a token is set and published. */
+function tokenPlaceHint(property: string, slug?: string): string {
+  return slug === undefined
+    ? `set ${property} on the .slide rule, where the theme's tokens go, and use var(${property}) below it`
+    : `set ${property} on this file's .slide rule, where the slide's own tokens go, and use var(${property}) below it`;
+}
+
 function rawValueHint(suggestion: string | undefined, value: string, slug?: string): string {
   if (slug === undefined) {
     return suggestion ?? "add a token for it to .slide and use var() here";

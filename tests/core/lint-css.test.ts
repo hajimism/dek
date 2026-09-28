@@ -107,6 +107,21 @@ describe("theme.css is read as CSS reads it", () => {
 });
 
 describe("slide stylesheets are read as CSS reads them", () => {
+  // A custom property is a token only on the .slide rule, where the theme or the slide publishes
+  // it; set anywhere else, it carries a raw value past DEK014 to whatever reads it.
+  test("DEK014 sees a raw value in a custom property set off the .slide rule", async () => {
+    const found = await lintWith({
+      theme: '.slide[data-layout="title"] { --gap: 3rem; }\n',
+      css: `.slide { --lift: 12px; }
+.card { --shade: #000; padding: var(--lift); }
+.card { --muted: var(--bg); }
+`,
+    });
+    expect(
+      found.filter((d) => d.id === "DEK014").map(({ line, data }) => ({ line, data })),
+    ).toEqual([{ line: 2, data: { property: "--shade", value: "#000" } }]);
+  });
+
   // A slide's CSS is scoped to its own slide, so a rule that reaches the slides after it, or an
   // at-rule that registers something for the whole page, escapes the scope and changes others.
   test("DEK012 refuses what reaches past the slide, with its line and where it belongs", async () => {

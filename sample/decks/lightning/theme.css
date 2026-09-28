@@ -461,8 +461,9 @@
 }
 
 ::view-transition-group(*) {
+  --morph-ease: cubic-bezier(0.6, 0, 0.2, 1);
   animation-duration: var(--morph);
-  animation-timing-function: cubic-bezier(0.6, 0, 0.2, 1);
+  animation-timing-function: var(--morph-ease);
 }
 
 /* The window frame glides; what is on its screen blinks over instead of stretching. */
