@@ -16,6 +16,7 @@ import { logicalSize } from "./size.ts";
 import { lastStop, stepKey } from "./step.ts";
 import { loadSlideSources, renderSlideHtml } from "./still-page.ts";
 import { contrastThreshold, parseCssRgb } from "./text-contrast.ts";
+import { type PageFindings, visualCache } from "./visual-cache.ts";
 
 export type VisualDeckOptions = {
   slug?: string;
@@ -79,20 +80,79 @@ async function visualDeck(
   }
 
   const actions: PageAction[] = ["overflow", "contrast"];
-  const response = await askPlaywright(
-    { kind: "pages", viewport: logicalSize(deck.deck.ratio), actions, pages },
-    options.runner,
-  );
+  const viewport = logicalSize(deck.deck.ratio);
+  const cache = visualCache(deck.dir, { viewport, actions });
+  const keyed = pages.map((page) => {
+    const key = cache.key(page);
+    return { page, key, found: cache.read(key) };
+  });
+  // A page is measured again only when its findings are not kept, or it still owes its shot.
+  const toMeasure = keyed.filter(({ page, found }) => !found || page.screenshotPath);
+  const response =
+    toMeasure.length === 0
+      ? NOTHING_FOUND
+      : await askPlaywright(
+          { kind: "pages", viewport, actions, pages: toMeasure.map(({ page }) => page) },
+          options.runner,
+        );
   if (response === null) {
     return null;
+  }
+  const fresh = findingsByPage(response);
+  for (const { page, key } of toMeasure) {
+    cache.write(key, fresh.get(pageId(page)) ?? NOTHING_FOUND);
+  }
+  if (!options.slug) {
+    cache.prune(new Set(keyed.map(({ key }) => key)));
   }
   for (const shot of stills) {
     shot.entry.commit();
   }
+  // In the pages' order; a finding that names no page asked for is reported all the same.
+  const asked = new Set(keyed.map(({ page }) => pageId(page)));
+  const all = [
+    ...keyed.map(({ page, found }) => fresh.get(pageId(page)) ?? found ?? NOTHING_FOUND),
+    ...[...fresh].flatMap(([id, found]) => (asked.has(id) ? [] : [found])),
+  ];
   return {
-    diagnostics: visualDiagnostics(response, deck.dir),
+    diagnostics: visualDiagnostics(
+      {
+        overflows: all.flatMap((page) => page.overflows),
+        contrasts: all.flatMap((page) => page.contrasts),
+        drawErrors: all.flatMap((page) => page.drawErrors),
+      },
+      deck.dir,
+    ),
     ...(stills[0] ? { screenshotPath: stills[0].screenshotPath } : {}),
   };
+}
+
+const NOTHING_FOUND: PageFindings = { overflows: [], contrasts: [], drawErrors: [] };
+
+/** A page's findings name its slide and step, which no two pages of one run share. */
+function pageId(page: { slug: string; step: string }): string {
+  return `${page.slug}\0${page.step}`;
+}
+
+/** A response split back into its pages' findings. */
+function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
+  const pages = new Map<string, PageFindings>();
+  const of = (finding: { slug: string; step: string }): PageFindings => {
+    const id = pageId(finding);
+    const found = pages.get(id) ?? { overflows: [], contrasts: [], drawErrors: [] };
+    pages.set(id, found);
+    return found;
+  };
+  for (const finding of response.overflows) {
+    of(finding).overflows.push(finding);
+  }
+  for (const finding of response.contrasts) {
+    of(finding).contrasts.push(finding);
+  }
+  for (const finding of response.drawErrors ?? []) {
+    of(finding).drawErrors.push(finding);
+  }
+  return pages;
 }
 
 /** Every beat of each section with a slide, the last one as a still shot with `screenshot`. */

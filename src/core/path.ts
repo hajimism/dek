@@ -53,6 +53,6 @@ export function distFile(
   return join(distDir(project, deck, options), `${deck.name}.${ext}`);
 }
 
-export function cacheDir(deckDir: string, kind: "voice" | "video" | "shots"): string {
+export function cacheDir(deckDir: string, kind: "voice" | "video" | "shots" | "visual"): string {
   return join(deckDir, ".cache", kind);
 }

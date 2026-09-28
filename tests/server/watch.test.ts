@@ -366,7 +366,8 @@ describe("watchDeck diagnostics", () => {
           const slidePath = join(dir, "slides", "intro.html");
           for (const offset of [10_000, 20_000]) {
             const reloaded = waitForEvent(hub, (event) => event.type === "reload-slide");
-            await writeFile(slidePath, `${introHtml}\n`);
+            // A real edit each time: a slide saved unchanged renders the same and is not re-measured.
+            await writeFile(slidePath, introHtml.replace("</h2>", ` ${offset}</h2>`));
             const later = new Date(Date.now() + offset);
             await utimes(slidePath, later, later);
             await reloaded;

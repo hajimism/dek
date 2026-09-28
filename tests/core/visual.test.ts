@@ -213,6 +213,10 @@ describe("lintVisualDeck", () => {
         });
         expect(passing?.some((d) => d.id === "DEK031")).toBe(false);
 
+        // The same pages answer differently here, which only a fresh measure can hear.
+        const fresh = () =>
+          rm(join(root, "decks", "demo", ".cache"), { recursive: true, force: true });
+        await fresh();
         const failing = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async () => ({
             overflows: [],
@@ -224,6 +228,7 @@ describe("lintVisualDeck", () => {
         expect(dek031?.message).toContain("3:1");
         expect(dek031?.message).toContain("large text");
 
+        await fresh();
         const small = await lintVisualDeck(join(root, "decks", "demo"), {
           runner: async () => ({
             overflows: [],
@@ -558,5 +563,74 @@ describe("lintVisualDeck messages", () => {
         },
       },
     ]);
+  });
+});
+
+// A page renders the same as long as its HTML, which holds its theme, CSS, script, and assets,
+// is the same: its findings are kept, and only what changed is measured again.
+describe("lintVisualDeck cache", () => {
+  const script = "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n\n### two\n";
+  const plan = slideDocument(
+    `<section class="slide"><ul><li data-step="one">a</li><li data-step="two">b</li></ul></section>`,
+  );
+
+  /** A runner that finds one overflow on every page, and counts the pages it was sent. */
+  function countingRunner() {
+    const asked: string[] = [];
+    const runner = async (request: VisualRequest) => {
+      const pages = pagesOf(request);
+      asked.push(...pages.map((page) => `${page.slug}@${page.step}`));
+      await writeRequested(request, "png");
+      return {
+        overflows: pages.map((page) => ({
+          slug: page.slug,
+          step: page.step,
+          box: "h2",
+          by: { bottom: 3 },
+        })),
+        contrasts: [],
+        drawErrors: [],
+      } satisfies PagesResponse;
+    };
+    return { asked, runner };
+  }
+
+  test("measures each page once, and again only when what it renders changes", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml, plan } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const first = countingRunner();
+        const found = await lintVisualDeck(deckDir, { runner: first.runner });
+        expect(first.asked).toEqual(["intro@0", "plan@0", "plan@one", "plan@two"]);
+
+        const second = countingRunner();
+        expect(await lintVisualDeck(deckDir, { runner: second.runner })).toEqual(found);
+        expect(second.asked).toEqual([]);
+
+        await Bun.write(join(deckDir, "slides", "plan.css"), ".slide li { font-weight: 700; }\n");
+        const third = countingRunner();
+        await lintVisualDeck(deckDir, { runner: third.runner });
+        expect(third.asked).toEqual(["plan@0", "plan@one", "plan@two"]);
+      },
+    );
+  });
+
+  test("still shoots a page whose findings it has, when the shot is not on disk", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml, plan } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await lintVisualDeck(deckDir, { runner: countingRunner().runner });
+        const shot = countingRunner();
+        const result = await runVisualDeck(deckDir, {
+          slug: "plan",
+          screenshot: true,
+          runner: shot.runner,
+        });
+        expect(shot.asked).toEqual(["plan@two"]);
+        expect(result?.diagnostics.map((d) => d.id)).toEqual(["DEK030"]);
+      },
+    );
   });
 });

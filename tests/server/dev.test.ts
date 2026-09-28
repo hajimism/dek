@@ -698,7 +698,11 @@ body
               server.events,
               (event) => event.type === "diagnostics" && slugs.length > 0,
             );
-            await writeFile(join(deckDir, "slides", "intro.html"), introHtml);
+            // An edit, so the page renders differently; a slide saved unchanged is not measured again.
+            await writeFile(
+              join(deckDir, "slides", "intro.html"),
+              introHtml.replace(">intro<", ">intro, edited<"),
+            );
             await pending;
             expect(slugs.length).toBeGreaterThan(0);
             expect(slugs.every((slug) => slug === "intro")).toBe(true);
