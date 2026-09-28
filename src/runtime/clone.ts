@@ -25,3 +25,28 @@ export function visualClone(source: HTMLElement): HTMLElement | undefined {
   clone.setAttribute("aria-hidden", "true");
   return clone;
 }
+
+/** The deck's size on screen, or the default stage before it is laid out. */
+export function deckSize(deckEl: { offsetWidth: number; offsetHeight: number }): {
+  width: number;
+  height: number;
+} {
+  return { width: deckEl.offsetWidth || 1280, height: deckEl.offsetHeight || 720 };
+}
+
+/**
+ * A box the deck's size holding `clone`, so a copy of a slide lays out as the slide does before
+ * it is scaled down to a thumbnail or a preview.
+ */
+export function stillFrame(
+  className: string,
+  clone: HTMLElement,
+  size: { width: number; height: number },
+): HTMLDivElement {
+  const frame = document.createElement("div");
+  frame.className = className;
+  frame.style.width = `${size.width}px`;
+  frame.style.height = `${size.height}px`;
+  frame.append(clone);
+  return frame;
+}

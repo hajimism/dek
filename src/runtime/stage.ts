@@ -7,7 +7,7 @@ import { lastStop, type Position, stepKey, stepValuesForBeat } from "../core/ste
 import { fitStage } from "./fit.ts";
 import { slideSelector } from "./live.ts";
 import { createMotion, drawAtEnd, type MotionMode, type SlideModule } from "./motion.ts";
-import { type ViewTransitionLike, waitForPlaybackSettle } from "./settle.ts";
+import { waitForPlaybackSettle } from "./settle.ts";
 import { applyIsShown, applyMorphNames, clearMorphNames, shouldUseViewTransition } from "./step.ts";
 import type { DekMotionHandle } from "./window.ts";
 
@@ -35,14 +35,142 @@ export type Stage = {
   motion: DekMotionHandle;
 };
 
+/** How the script draws a move: one beat forward animates, anything else jumps to its end. */
+export function motionModeFor(
+  from: Position,
+  to: Position,
+  deck: DeckStops,
+  env: { videoMode: boolean; reducedMotion: boolean },
+): MotionMode {
+  if (env.videoMode) {
+    return "hold";
+  }
+  if (env.reducedMotion) {
+    return "final";
+  }
+  const stepped = advance(from, deck);
+  return stepped && positionsEqual(stepped, to) ? "animate" : "final";
+}
+
+/** What a screen reader hears on arriving at `pos`. */
+export function announcement(
+  slides: ReadonlyArray<{ title: string }>,
+  pos: Position,
+): string | undefined {
+  const slide = slides[pos.slideIndex];
+  return slide ? `Slide ${pos.slideIndex + 1} of ${slides.length}: ${slide.title}` : undefined;
+}
+
+/** Only a running animation with an end can be finished; an endless one would throw. */
+export function isFinishable(animation: {
+  playState: string;
+  effect: { getComputedTiming(): { endTime?: unknown } } | null;
+}): boolean {
+  const end = animation.effect?.getComputedTiming().endTime;
+  return animation.playState === "running" && typeof end === "number" && Number.isFinite(end);
+}
+
+const slideModules = (): Record<string, SlideModule> => window.__dekSlides ?? {};
+
+function slideEl(slug: string | undefined): HTMLElement | undefined {
+  if (!slug) {
+    return undefined;
+  }
+  return document.querySelector<HTMLElement>(slideSelector(slug)) ?? undefined;
+}
+
+function prefersReducedMotion(): boolean {
+  return matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+const morphEls = (el: Element): HTMLElement[] => [
+  ...el.querySelectorAll<HTMLElement>("[data-morph]"),
+];
+
+function drawStill(clone: HTMLElement, slide: PresenterSlide, beatIndex: number): void {
+  drawAtEnd(slideModules()[slide.slug], clone, beatIndex, stepKey(slide.beats, beatIndex));
+}
+
+/** Read the slides afresh on each draw: live reload may have swapped one. */
+function renderSlides(slides: PresenterSlide[], pos: Position): void {
+  const slideEls = [...document.querySelectorAll("#deck > .slide")];
+  const current = slides[pos.slideIndex];
+  const currentEl = slideEl(current?.slug);
+  for (const el of slideEls) {
+    el.classList.toggle("is-current", el === currentEl);
+  }
+  const shown = current ? stepValuesForBeat(current.beats, pos.beatIndex) : new Set<string>();
+  if (currentEl) {
+    applyIsShown([...currentEl.querySelectorAll("[data-step]")], shown);
+    applyMorphNames(morphEls(currentEl));
+  }
+  for (const el of slideEls) {
+    if (el !== currentEl) {
+      clearMorphNames(morphEls(el));
+    }
+  }
+}
+
+/** Each slide at its last beat, as `dek pdf` gives it a page. */
+function drawPrintPages(slides: PresenterSlide[]): void {
+  for (const slide of slides) {
+    const el = slideEl(slide.slug);
+    if (el) {
+      const last = lastStop(slide.beats);
+      applyIsShown([...el.querySelectorAll("[data-step]")], stepValuesForBeat(slide.beats, last));
+      drawStill(el, slide, last);
+    }
+  }
+}
+
+/**
+ * Start a view transition that runs `apply` when the move changes slide and the browser and
+ * viewer allow one; else run `apply` now.
+ */
+function startTransition(
+  slides: PresenterSlide[],
+  from: Position,
+  to: Position,
+  apply: () => void,
+): ViewTransition | undefined {
+  if (
+    !shouldUseViewTransition(from.slideIndex, to.slideIndex) ||
+    !("startViewTransition" in document) ||
+    prefersReducedMotion()
+  ) {
+    apply();
+    return undefined;
+  }
+  const fromEl = slideEl(slides[from.slideIndex]?.slug);
+  if (fromEl) {
+    applyMorphNames(morphEls(fromEl));
+  }
+  return document.startViewTransition(apply);
+}
+
+function finishAnimations(): void {
+  for (const animation of document.getAnimations()) {
+    if (isFinishable(animation)) {
+      animation.finish();
+    }
+  }
+}
+
+function fitDeck(): void {
+  const deckEl = document.getElementById(PAGE_ID.deck);
+  const currentStage = document.getElementById(PAGE_ID.currentStage);
+  if (deckEl instanceof HTMLElement && currentStage) {
+    fitStage(deckEl, currentStage);
+  }
+}
+
 /** Owns the deck's slides on screen: which is current, its beats, morphs, script, and print. */
 export function createStage(options: {
   slides: PresenterSlide[];
   deck: DeckStops;
   videoMode: boolean;
 }): Stage {
-  const { slides } = options;
-  const slideModules = (): Record<string, SlideModule> => window.__dekSlides ?? {};
+  const { slides, videoMode } = options;
   const motion = createMotion({
     now: () => performance.now(),
     requestFrame: (fn) => requestAnimationFrame(fn),
@@ -52,17 +180,6 @@ export function createStage(options: {
   });
   let inFlight: { skipTransition(): void } | undefined;
   let printing = false;
-
-  function slideEl(slug: string | undefined): HTMLElement | undefined {
-    if (!slug) {
-      return undefined;
-    }
-    return document.querySelector<HTMLElement>(slideSelector(slug)) ?? undefined;
-  }
-
-  function prefersReducedMotion(): boolean {
-    return matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
 
   function showMotion(pos: Position, mode: MotionMode): void {
     const current = slides[pos.slideIndex];
@@ -74,84 +191,15 @@ export function createStage(options: {
     motion.show(el, slideModules()[current.slug], current.beats, pos.beatIndex, mode);
   }
 
-  function motionModeFor(from: Position, to: Position): MotionMode {
-    if (options.videoMode) {
-      return "hold";
-    }
-    if (prefersReducedMotion()) {
-      return "final";
-    }
-    const stepped = advance(from, options.deck);
-    return stepped && positionsEqual(stepped, to) ? "animate" : "final";
-  }
-
-  function drawStill(clone: HTMLElement, slide: PresenterSlide, beatIndex: number): void {
-    drawAtEnd(slideModules()[slide.slug], clone, beatIndex, stepKey(slide.beats, beatIndex));
-  }
-
-  /** Read the slides afresh on each draw: live reload may have swapped one. */
-  function render(pos: Position): void {
-    const slideEls = [...document.querySelectorAll("#deck > .slide")];
-    const current = slides[pos.slideIndex];
-    const currentEl = slideEl(current?.slug);
-    for (const el of slideEls) {
-      el.classList.toggle("is-current", el === currentEl);
-    }
-    const shown = current ? stepValuesForBeat(current.beats, pos.beatIndex) : new Set<string>();
-    if (currentEl) {
-      applyIsShown([...currentEl.querySelectorAll("[data-step]")], shown);
-      applyMorphNames([...currentEl.querySelectorAll<HTMLElement>("[data-morph]")]);
-    }
-    for (const el of slideEls) {
-      if (el !== currentEl) {
-        clearMorphNames([...el.querySelectorAll<HTMLElement>("[data-morph]")]);
-      }
-    }
-  }
-
   async function present(from: Position, to: Position, apply: () => void): Promise<void> {
-    let viewTransition: ViewTransitionLike | undefined;
-    if (
-      shouldUseViewTransition(from.slideIndex, to.slideIndex) &&
-      "startViewTransition" in document &&
-      !prefersReducedMotion()
-    ) {
-      const fromEl = slideEl(slides[from.slideIndex]?.slug);
-      if (fromEl) {
-        applyMorphNames([...fromEl.querySelectorAll<HTMLElement>("[data-morph]")]);
-      }
-      const started = document.startViewTransition(apply);
-      viewTransition = started;
-      inFlight = started;
-    } else {
-      apply();
+    const viewTransition = startTransition(slides, from, to, apply);
+    if (viewTransition) {
+      inFlight = viewTransition;
     }
     try {
       await waitForPlaybackSettle({ animations: [...document.getAnimations()], viewTransition });
     } finally {
       inFlight = undefined;
-    }
-  }
-
-  function hurry(): void {
-    if (options.videoMode) {
-      return;
-    }
-    inFlight?.skipTransition();
-    for (const animation of document.getAnimations()) {
-      const end = animation.effect?.getComputedTiming().endTime;
-      if (animation.playState === "running" && typeof end === "number" && Number.isFinite(end)) {
-        animation.finish();
-      }
-    }
-  }
-
-  /** Beats within a slide pass quietly. */
-  function announce(pos: Position): void {
-    const el = document.getElementById(PAGE_ID.announce);
-    const slide = slides[pos.slideIndex];
-    if (el && slide) {
-      el.textContent = `Slide ${pos.slideIndex + 1} of ${slides.length}: ${slide.title}`;
     }
   }
 
@@ -166,41 +214,43 @@ export function createStage(options: {
       return;
     }
     printing = on;
-    if (!on) {
-      render(pos);
+    if (on) {
+      motion.stop();
+      drawPrintPages(slides);
+    } else {
+      renderSlides(slides, pos);
       showMotion(pos, "final");
-      return;
-    }
-    motion.stop();
-    for (const slide of slides) {
-      const el = slideEl(slide.slug);
-      if (el) {
-        const last = lastStop(slide.beats);
-        applyIsShown([...el.querySelectorAll("[data-step]")], stepValuesForBeat(slide.beats, last));
-        drawStill(el, slide, last);
-      }
-    }
-  }
-
-  function fit(): void {
-    const deckEl = document.getElementById(PAGE_ID.deck);
-    const currentStage = document.getElementById(PAGE_ID.currentStage);
-    if (deckEl instanceof HTMLElement && currentStage) {
-      fitStage(deckEl, currentStage);
     }
   }
 
   return {
     slideEl,
-    render,
+    render: (pos) => renderSlides(slides, pos),
     showMotion,
-    showMove: (from, to) => showMotion(to, motionModeFor(from, to)),
+    showMove: (from, to) =>
+      showMotion(
+        to,
+        motionModeFor(from, to, options.deck, { videoMode, reducedMotion: prefersReducedMotion() }),
+      ),
     drawStill,
     present,
-    hurry,
-    announce,
+    hurry() {
+      if (videoMode) {
+        return;
+      }
+      inFlight?.skipTransition();
+      finishAnimations();
+    },
+    /** Beats within a slide pass quietly. */
+    announce(pos) {
+      const el = document.getElementById(PAGE_ID.announce);
+      const text = announcement(slides, pos);
+      if (el && text !== undefined) {
+        el.textContent = text;
+      }
+    },
     setPrinting,
-    fit,
+    fit: fitDeck,
     motion: {
       duration: () => motion.duration(),
       seek: (t: number) => motion.seek(t),

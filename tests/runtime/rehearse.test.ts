@@ -6,6 +6,8 @@ import type { GoOrigin } from "../../src/runtime/navigator.ts";
 import {
   createRehearseController,
   createRehearseDriver,
+  entryFor,
+  lastDue,
   type Rehearsal,
   type RehearseAudio,
 } from "../../src/runtime/rehearse.ts";
@@ -238,5 +240,28 @@ describe("createRehearseController", () => {
     expect(rehearse.ready()).toBe(false);
     rehearse.move(at(2), "local");
     expect(moves).toEqual([]);
+  });
+});
+
+describe("the schedule's lookups", () => {
+  const at = (slideIndex: number, beatIndex = 0): Position => ({ slideIndex, beatIndex });
+  const schedule = [
+    { at: 0, position: at(0) },
+    { at: 1000, position: at(1) },
+    { at: 2500, position: at(1, 2) },
+  ];
+
+  test("lastDue is the latest entry whose time has come", () => {
+    expect(lastDue(schedule, 0)).toBe(schedule[0]);
+    expect(lastDue(schedule, 2499)).toBe(schedule[1]);
+    expect(lastDue(schedule, 9000)).toBe(schedule[2]);
+    expect(lastDue(schedule, -1)).toBeUndefined();
+  });
+
+  test("entryFor finds a position's entry, or the last before a stop the timeline skips", () => {
+    expect(entryFor(schedule, at(1))).toBe(schedule[1]);
+    expect(entryFor(schedule, at(1, 1))).toBe(schedule[1]);
+    expect(entryFor(schedule, at(4))).toBe(schedule[2]);
+    expect(entryFor(schedule.slice(1), at(0))).toBeUndefined();
   });
 });

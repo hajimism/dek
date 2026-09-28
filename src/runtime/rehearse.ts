@@ -15,6 +15,19 @@ export type RehearseDriver = {
   elapsed: () => number;
 };
 
+/** The latest entry whose time has come by `at` ms. */
+export function lastDue(schedule: ScheduledGo[], at: number): ScheduledGo | undefined {
+  return schedule.findLast((entry) => entry.at <= at);
+}
+
+/** The entry for `position`, or the last one before it when the timeline skips that stop. */
+export function entryFor(schedule: ScheduledGo[], position: Position): ScheduledGo | undefined {
+  return (
+    schedule.find((entry) => positionsEqual(entry.position, position)) ??
+    schedule.findLast((entry) => comparePositions(entry.position, position) < 0)
+  );
+}
+
 /**
  * The rehearsal clock: it walks the deck through `schedule` as time passes. Only the clock's own
  * moves go through `go`; a seek answers a move someone else already made.
@@ -66,31 +79,6 @@ export function createRehearseDriver(options: {
     }
   };
 
-  const lastDue = (at: number): ScheduledGo | undefined => {
-    let found: ScheduledGo | undefined;
-    for (const event of options.schedule) {
-      if (event.at <= at) {
-        found = event;
-      }
-    }
-    return found;
-  };
-
-  /** The entry for `position`, or the last one before it when the timeline skips that stop. */
-  const entryFor = (position: Position): ScheduledGo | undefined => {
-    const exact = options.schedule.find((entry) => positionsEqual(entry.position, position));
-    if (exact) {
-      return exact;
-    }
-    let before: ScheduledGo | undefined;
-    for (const entry of options.schedule) {
-      if (comparePositions(entry.position, position) < 0) {
-        before = entry;
-      }
-    }
-    return before;
-  };
-
   return {
     play() {
       if (playing) {
@@ -99,7 +87,7 @@ export function createRehearseDriver(options: {
       playing = true;
       origin = now() - pausedElapsed;
       options.onPlay?.();
-      const due = lastDue(pausedElapsed);
+      const due = lastDue(options.schedule, pausedElapsed);
       if (due && due !== shown) {
         shown = due;
         void options.go(due.position);
@@ -116,8 +104,8 @@ export function createRehearseDriver(options: {
       clear();
     },
     seek(position) {
-      pausedElapsed = entryFor(position)?.at ?? 0;
-      shown = lastDue(pausedElapsed);
+      pausedElapsed = entryFor(options.schedule, position)?.at ?? 0;
+      shown = lastDue(options.schedule, pausedElapsed);
       options.onSeek?.(pausedElapsed);
       if (playing) {
         origin = now() - pausedElapsed;
@@ -159,6 +147,29 @@ type RehearseState =
   | { kind: "off" }
   | { kind: "loading" }
   | { kind: "ready"; driver: RehearseDriver; audio?: RehearseAudio };
+
+/** A clock for `rehearsal`; with a voice track, the track keeps the time and follows the clock. */
+function rehearsalDriver(
+  { schedule, audio }: Rehearsal,
+  go: (position: Position) => void | Promise<void>,
+): RehearseDriver {
+  return createRehearseDriver({
+    schedule,
+    go,
+    ...(audio ? { now: () => audio.currentTime * 1000 } : {}),
+    onPlay: () => {
+      void audio?.play();
+    },
+    onPause: () => {
+      audio?.pause();
+    },
+    onSeek: (ms) => {
+      if (audio) {
+        audio.currentTime = ms / 1000;
+      }
+    },
+  });
+}
 
 /**
  * Owns the rehearsal: one state at a time, and the voice track with it. A reload stops the old
@@ -206,22 +217,7 @@ export function createRehearseController(options: {
         return;
       }
       const { audio } = loaded;
-      const driver = createRehearseDriver({
-        schedule: loaded.schedule,
-        go: (position) => options.go(position, "rehearse"),
-        ...(audio ? { now: () => audio.currentTime * 1000 } : {}),
-        onPlay: () => {
-          void audio?.play();
-        },
-        onPause: () => {
-          audio?.pause();
-        },
-        onSeek: (ms) => {
-          if (audio) {
-            audio.currentTime = ms / 1000;
-          }
-        },
-      });
+      const driver = rehearsalDriver(loaded, (position) => options.go(position, "rehearse"));
       state = audio ? { kind: "ready", driver, audio } : { kind: "ready", driver };
       // Set the clock first: playing from zero would send the deck to the first slide.
       driver.seek(options.current());
