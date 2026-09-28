@@ -5,14 +5,17 @@ export type FakeVoicevox = {
   url: string;
   close: () => Promise<void>;
   queries: string[];
+  /** Each /synthesis call's speaker id and speedScale, in order. */
+  syntheses: Array<{ speaker: number; speedScale: number }>;
   /** Answer this path with this status, as an engine that is up but unwell does. */
   failWith?: { path: string; status: number };
 };
 
 export async function startFakeVoicevox(): Promise<FakeVoicevox> {
   const queries: string[] = [];
-  const fake: FakeVoicevox = { url: "", queries, close: () => Promise.resolve() };
-  const server = createServer((req, res) => {
+  const syntheses: FakeVoicevox["syntheses"] = [];
+  const fake: FakeVoicevox = { url: "", queries, syntheses, close: () => Promise.resolve() };
+  const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (fake.failWith && url.pathname === fake.failWith.path) {
       res.writeHead(fake.failWith.status);
@@ -57,6 +60,14 @@ export async function startFakeVoicevox(): Promise<FakeVoicevox> {
       return;
     }
     if (url.pathname === "/synthesis") {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      await new Promise((resolve) => req.on("end", resolve));
+      const body = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { speedScale?: number };
+      syntheses.push({
+        speaker: Number(url.searchParams.get("speaker")),
+        speedScale: body.speedScale ?? Number.NaN,
+      });
       const wav = encodeWav({
         sampleRate: 24000,
         channels: 1,

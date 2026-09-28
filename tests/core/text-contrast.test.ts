@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   contrastRatio,
   contrastThreshold,
+  measurePageTextContrasts,
   measureTextContrast,
   type Pixels,
   parseCssRgb,
@@ -180,6 +181,99 @@ describe("measureTextContrast", () => {
   });
 });
 
+describe("measureTextContrast opacity", () => {
+  const solid = {
+    shown: pixels(fill(GREY)),
+    bare: pixels(fill(DARK)),
+    ...glyphs(fill(WHITE).map(() => true)),
+  };
+
+  test.each([
+    [1, GREY],
+    [1.5, GREY],
+    [undefined, GREY],
+  ] as const)("reads text at opacity %p as drawn, never brighter", (opacity, fg) => {
+    const measured = measureTextContrast(solid, {
+      rects: line,
+      ...(opacity === undefined ? {} : { opacity }),
+    });
+    expect(measured?.fg).toEqual([...fg]);
+  });
+
+  test.each([0, -0.5])("returns nothing for text at opacity %p", (opacity) => {
+    expect(measureTextContrast(solid, { rects: line, opacity })).toBeUndefined();
+  });
+});
+
+type Call = { screenshot: true } | { evaluate: unknown } | { script: string };
+
+/** A page that records what it is asked, and answers the sampler with `answer`. */
+function recordingPage(answer: unknown) {
+  const calls: Call[] = [];
+  let shots = 0;
+  const page = {
+    calls,
+    screenshot: async () => {
+      calls.push({ screenshot: true });
+      return new TextEncoder().encode(`shot-${++shots}`);
+    },
+    evaluate: async <T, A>(_fn: (arg: A) => T | Promise<T>, arg?: A): Promise<T> => {
+      calls.push({ evaluate: arg });
+      return (arg && typeof arg === "object" && "layers" in arg ? answer : undefined) as T;
+    },
+    addScriptTag: async ({ content }: { content: string }) => {
+      calls.push({ script: content });
+    },
+  };
+  return page;
+}
+
+const base64 = (text: string): string => Buffer.from(text).toString("base64");
+
+describe("measurePageTextContrasts", () => {
+  test("touches nothing on the page when there is no text to measure", async () => {
+    const page = recordingPage([]);
+    expect(await measurePageTextContrasts(page, [])).toEqual([]);
+    expect(page.calls).toEqual([]);
+  });
+
+  test("shoots the page as shown, then each layer, and takes the layer away before sampling", async () => {
+    const measured = [{ ratio: 7, fg: WHITE, bg: DARK }, null];
+    const page = recordingPage(measured);
+    const texts = [
+      { rects: [{ left: 0, top: 0, right: 10, bottom: 10 }] },
+      { rects: [{ left: 5, top: 5, right: 20, bottom: 20 }], opacity: 0.5 },
+    ];
+    expect(await measurePageTextContrasts(page, texts)).toEqual(measured);
+    const [shown, markClipped, ...rest] = page.calls;
+    expect(shown).toEqual({ screenshot: true });
+    expect(markClipped).toEqual({ evaluate: undefined });
+    expect(rest.slice(0, 6)).toEqual([
+      { evaluate: textLayerCss("bare") },
+      { screenshot: true },
+      { evaluate: textLayerCss("white") },
+      { screenshot: true },
+      { evaluate: textLayerCss("black") },
+      { screenshot: true },
+    ]);
+    expect(rest.slice(6)).toEqual([
+      { evaluate: null },
+      { script: textContrastScript() },
+      {
+        evaluate: {
+          layers: {
+            shown: base64("shot-1"),
+            bare: base64("shot-2"),
+            white: base64("shot-3"),
+            black: base64("shot-4"),
+          },
+          texts: withOverlaps(texts),
+        },
+      },
+    ]);
+  });
+});
+
 describe("withOverlaps", () => {
   test("pairs each text with the boxes of other texts that cross it", () => {
     const word = { left: 0, top: 0, right: 100, bottom: 40 };
@@ -228,6 +322,23 @@ describe("parseCssRgb", () => {
   test("skips oklch and other non-rgb colors", () => {
     expect(parseCssRgb("oklch(0.7 0.1 120)")).toBeUndefined();
   });
+
+  test.each([
+    ["RGB(1, 2, 3)", [1, 2, 3]],
+    ["rgb(12.5, 0, 255)", [12.5, 0, 255]],
+    ["rgb(1 2 3 / 50%)", [1, 2, 3]],
+    ["rgba(1,2,3,0.5)", [1, 2, 3]],
+    ["  rgb(  1 ,2 , 3 )", [1, 2, 3]],
+  ] as const)("reads the channels of %p and drops its alpha", (color, rgb) => {
+    expect(parseCssRgb(color)).toEqual([...rgb]);
+  });
+
+  test.each(["", "#fff", "transparent", "hsl(0 0% 50%)", "rgb(10%, 20%, 30%)", "rgb(1, 2)"])(
+    "reads nothing from %p",
+    (color) => {
+      expect(parseCssRgb(color)).toBeUndefined();
+    },
+  );
 });
 
 describe("contrastRatio", () => {
@@ -238,6 +349,27 @@ describe("contrastRatio", () => {
   test("is below 4.5 for gray text on white", () => {
     expect(contrastRatio([119, 119, 119], [255, 255, 255])).toBeLessThan(4.5);
   });
+
+  const grey = (v: number): Rgb => [v, v, v];
+  test.each([
+    ["black on white", BLACK, WHITE, 21],
+    ["white on black", WHITE, BLACK, 21],
+    ["a color on itself", GREY, GREY, 1],
+    ["#767676 on white", grey(0x76), WHITE, 4.54],
+    ["#777777 on white", grey(0x77), WHITE, 4.48],
+    ["#949494 on white", grey(0x94), WHITE, 3.03],
+    ["#959595 on white", grey(0x95), WHITE, 2.995],
+    ["#0a0a0a on black, in the linear part of the curve", grey(10), BLACK, 1.06],
+  ] as const)("is %s ≈ %d", (_name, fg, bg, ratio) => {
+    expect(contrastRatio([...fg], [...bg])).toBeCloseTo(ratio, 2);
+  });
+
+  test("puts the WCAG greys on either side of 4.5:1 and 3:1", () => {
+    expect(contrastRatio(grey(0x76), WHITE)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(grey(0x77), WHITE)).toBeLessThan(4.5);
+    expect(contrastRatio(grey(0x94), WHITE)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(grey(0x95), WHITE)).toBeLessThan(3);
+  });
 });
 
 describe("contrastThreshold", () => {
@@ -247,6 +379,17 @@ describe("contrastThreshold", () => {
     expect(contrastThreshold({ fontSize: 18, fontWeight: 700 })).toBe(4.5);
     expect(contrastThreshold({ fontSize: 23.9, fontWeight: 400 })).toBe(4.5);
     expect(contrastThreshold({ fontSize: 24 })).toBe(3);
+  });
+
+  test.each([
+    [{ fontSize: 18.65, fontWeight: 700 }, 4.5],
+    [{ fontSize: 18.66, fontWeight: 800 }, 3],
+    [{ fontSize: 18.66, fontWeight: 600 }, 4.5],
+    [{ fontSize: 20 }, 4.5],
+    [{ fontSize: 0 }, 4.5],
+    [{ fontSize: 96, fontWeight: 100 }, 3],
+  ] as const)("asks %j for %d:1", (sample, threshold) => {
+    expect(contrastThreshold(sample)).toBe(threshold);
   });
 
   test("falls back to 4.5:1 when the runner did not report a size", () => {

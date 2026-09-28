@@ -303,6 +303,29 @@ more
     );
   });
 
+  test.serial("says how to see why when rumdl runs but gives no result", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        // Exit 2 is rumdl failing to run at all, as a bad config makes it.
+        const rumdl = join(root, "rumdl");
+        await writeFile(rumdl, "#!/bin/sh\nexit 2\n");
+        await chmod(rumdl, 0o755);
+        await withEnv({ DEK_RUMDL: rumdl }, async () => {
+          const result = await lintCommand(resolveDecks(root), { cwd: root });
+          expect(result.skipped).toEqual([
+            {
+              check: "rumdl",
+              reason: "rumdl ran but gave no result",
+              hint: `run \`${rumdl} check decks/demo/script.md\` to see why`,
+            },
+          ]);
+          expect(result.rumdlSarif).toBeUndefined();
+        });
+      },
+    );
+  });
+
   test("lints every deck from the project root", async () => {
     await withTempProject(
       {

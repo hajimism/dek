@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chmod } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { parseShotMode, shotCommand } from "../../src/cli/shot.ts";
@@ -102,6 +102,38 @@ describe("shotCommand", () => {
         await refused({ slug: "intro", motion: true, to: "intro" }, "row 1 of --motion");
         await refused({ slug: "intro", motion: true, at: "0.5" }, "--at");
         await refused({ sheet: true, motion: true }, "one of --sheet and --motion");
+      },
+    );
+  });
+
+  test.serial("hands each mode to its own shot and returns what it made", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await chmod(fakePlaywright, 0o755);
+        const target = resolveTarget(join(root, "decks", "demo"), "deck", { refs: true });
+        await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
+          const sheet = await shotCommand(target, { sheet: true });
+          expect(sheet.shots.map((shot) => shot.slug)).toEqual(["intro"]);
+          expect(sheet.sheets).toHaveLength(1);
+          expect(sheet.motion).toBeUndefined();
+
+          const morph = await shotCommand(target, { slug: "intro", to: "intro", at: "0.5" });
+          expect(morph.shots).toHaveLength(1);
+          expect(morph.sheets).toBeUndefined();
+        });
+
+        // The shared fake answers no motion; this one answers each beat asked for with no frames.
+        const motionWorker = join(root, "motion-worker.ts");
+        await writeFile(
+          motionWorker,
+          `const request = JSON.parse(await new Response(Bun.stdin).text());
+process.stdout.write(JSON.stringify({ sheets: [], motion: request.motion.beats.map(({ label }) => ({ label, frames: [] })) }) + "\\n");\n`,
+        );
+        await withEnv({ DEK_PLAYWRIGHT: motionWorker }, async () => {
+          const motion = await shotCommand(target, { slug: "intro", motion: true });
+          expect(motion).toEqual({ shots: [], sheets: [], motion: [{ step: "0", frames: [] }] });
+        });
       },
     );
   });

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
 import { qrMatrix, renderQr } from "../../src/cli/qr.ts";
-import { devBanner, offerPairing, pairingBlock } from "../../src/cli/serve.ts";
+import { devBanner, devSessionView, offerPairing, pairingBlock } from "../../src/cli/serve.ts";
 
 describe("devBanner", () => {
   test("names the keys a viewer cannot discover and how to stop", () => {
@@ -79,5 +79,31 @@ describe("offerPairing", () => {
       color: false,
     });
     expect(written.join("")).toContain("no LAN address");
+  });
+});
+
+describe("devSessionView", () => {
+  const server = {
+    url: "http://127.0.0.1:5173/",
+    remoteUrls: ["http://127.0.0.1:5173/", "http://192.168.1.2:5173/"],
+  };
+
+  test("pairs a phone straight into the one deck's presenter view", () => {
+    const view = devSessionView({ ...server, deckDir: "/decks/demo", decks: ["demo"] }, "pw");
+    expect(view.pairPath).toBe("presenter");
+    expect(view.banner).toContain("presenter: http://192.168.1.2:5173/presenter\n");
+  });
+
+  test("names each deck's presenter view when it serves the whole project, and pairs into the list", () => {
+    const view = devSessionView({ ...server, decks: ["alpha", "beta"] }, "pw");
+    expect(view.pairPath).toBe("");
+    expect(view.banner).toContain("presenter: http://192.168.1.2:5173/decks/alpha/presenter\n");
+    expect(view.banner).toContain("presenter: http://192.168.1.2:5173/decks/beta/presenter\n");
+  });
+
+  test("pairs a project of one deck into that deck's presenter view", () => {
+    expect(devSessionView({ ...server, decks: ["alpha"] }, "pw").pairPath).toBe(
+      "decks/alpha/presenter",
+    );
   });
 });

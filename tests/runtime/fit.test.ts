@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { deckFitTransform, deckScale } from "../../src/runtime/fit.ts";
+import { deckFitTransform, deckScale, fitStage } from "../../src/runtime/fit.ts";
 
 describe("deckScale", () => {
   const logical = { width: 1280, height: 720 };
@@ -46,5 +46,21 @@ describe("deckScale", () => {
     expect(
       deckScale({ viewport: { width: 1280, height: 720 }, logical: { width: 1280, height: 0 } }),
     ).toBe(0);
+  });
+});
+
+describe("fitStage", () => {
+  const stage = { clientWidth: 1920, clientHeight: 1200 };
+
+  test("fits and centers the element at its laid-out size inside the stage", () => {
+    const el = { offsetWidth: 960, offsetHeight: 540, style: { transform: "" } };
+    fitStage(el, stage);
+    expect(el.style.transform).toBe("translate(0px, 60px) scale(2)");
+  });
+
+  test("assumes 1280×720 while the element has no layout yet", () => {
+    const el = { offsetWidth: 0, offsetHeight: 0, style: { transform: "" } };
+    fitStage(el, stage);
+    expect(el.style.transform).toBe("translate(0px, 60px) scale(1.5)");
   });
 });

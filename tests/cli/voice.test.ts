@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
-import { listSpeakers, pinVoice, synthVoice } from "../../src/cli/voice.ts";
+import { addReading, listSpeakers, pinVoice, sayVoice, synthVoice } from "../../src/cli/voice.ts";
 import { DekError } from "../../src/core/error.ts";
+import { loadVoiceDict } from "../../src/core/voice.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
-import { startFakeVoicevox } from "../helpers/fake-voicevox.ts";
+import { type FakeVoicevox, startFakeVoicevox } from "../helpers/fake-voicevox.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 const script = `---
@@ -24,14 +25,19 @@ speaker = "ずんだもん/ノーマル"
 speed = 1
 `;
 
-async function withVoiceDeck(fn: (root: string, deckDir: string) => Promise<void>): Promise<void> {
+async function withVoiceDeck(
+  fn: (root: string, deckDir: string, fake: FakeVoicevox) => Promise<void>,
+  toml = voiceToml,
+): Promise<void> {
   const fake = await startFakeVoicevox();
   try {
     await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, "voice"), { recursive: true });
-      await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
-      await withEnv({ DEK_VOICE_URL: fake.url, DEK_VOICE_PLAY: "0" }, () => fn(root, deckDir));
+      await writeFile(join(deckDir, "voice", "voice.toml"), toml);
+      await withEnv({ DEK_VOICE_URL: fake.url, DEK_VOICE_PLAY: "0" }, () =>
+        fn(root, deckDir, fake),
+      );
     });
   } finally {
     await fake.close();
@@ -122,6 +128,63 @@ describe("dek voice and its subcommands", () => {
         const again = await synthVoice(requireDeckFromCwd(deckDir));
         expect(again.action).toBe("synth");
       });
+    });
+  });
+
+  test.serial("says one sentence in the deck's speaker and speed, kept at say.wav", async () => {
+    await withVoiceDeck(
+      async (_root, deckDir, fake) => {
+        const result = await sayVoice(requireDeckFromCwd(deckDir), "こんにちは");
+        expect(result).toEqual({
+          action: "say",
+          text: "こんにちは",
+          path: join(deckDir, ".cache", "voice", "say.wav"),
+        });
+        expect(fake.queries).toEqual(["こんにちは"]);
+        expect(fake.syntheses).toEqual([{ speaker: 3, speedScale: 1.25 }]);
+        const wav = new Uint8Array(
+          await Bun.file(join(deckDir, ".cache", "voice", "say.wav")).arrayBuffer(),
+        );
+        expect(new TextDecoder().decode(wav.slice(0, 4))).toBe("RIFF");
+      },
+      voiceToml.replace("speed = 1", "speed = 1.25"),
+    );
+  });
+
+  test.serial("adds a reading beside the others, and a new one replaces the old", async () => {
+    await withVoiceDeck(async (_root, deckDir) => {
+      const target = requireDeckFromCwd(deckDir);
+      addReading(target, { word: "dek", kana: "デック", accent: 1 });
+      const result = addReading(target, { word: "TOML", kana: "トムル" });
+      expect(result).toEqual({
+        action: "dict",
+        path: join(deckDir, "voice", "dict.toml"),
+        key: "TOML",
+        kana: "トムル",
+      });
+      addReading(target, { word: "dek", kana: "デク" });
+      expect(loadVoiceDict(deckDir)).toEqual({ TOML: { kana: "トムル" }, dek: { kana: "デク" } });
+    });
+  });
+
+  test.serial("pin asks for `dek voice` when nothing has been synthesized", async () => {
+    await withVoiceDeck(async (_root, deckDir) => {
+      expect(() => pinVoice(requireDeckFromCwd(deckDir))).toThrow(
+        expect.objectContaining({ message: "Timeline not found", hint: "run `dek voice`" }),
+      );
+    });
+  });
+
+  test.serial("pin refuses a link planted in the cache in place of the audio", async () => {
+    await withVoiceDeck(async (root, deckDir) => {
+      await synthVoice(requireDeckFromCwd(deckDir));
+      const audio = join(deckDir, ".cache", "voice", "audio.wav");
+      const secret = join(root, "secret.txt");
+      await writeFile(secret, "not audio");
+      await Bun.file(audio).delete();
+      await symlink(secret, audio);
+      expect(() => pinVoice(requireDeckFromCwd(deckDir))).toThrow("Timeline not found");
+      expect(await Bun.file(join(deckDir, "voice", "pin", "master.wav")).exists()).toBe(false);
     });
   });
 

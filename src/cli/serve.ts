@@ -20,17 +20,25 @@ export async function serveCommand(options: {
       visual: options.visual === true,
       ...(options.port !== undefined ? { port: options.port } : {}),
     },
-    (server, password) => {
-      const presenterPaths = server.deckDir
-        ? ["presenter"]
-        : server.decks.map((name) => `decks/${name}/presenter`);
-      return {
-        banner: devBanner(server.url, server.remoteUrls, { password, presenterPaths }),
-        // One deck pairs straight into its presenter view; several, into the list to pick from.
-        pairPath: presenterPaths.length === 1 ? (presenterPaths[0] as string) : "",
-      };
-    },
+    devSessionView,
   );
+}
+
+type SessionView = { banner: string; pairPath: string };
+
+/** What `dek dev` prints once up, and which presenter view a phone pairs into. */
+export function devSessionView(
+  server: Pick<DevServer, "url" | "remoteUrls" | "deckDir" | "decks">,
+  password: string | undefined,
+): SessionView {
+  const presenterPaths = server.deckDir
+    ? ["presenter"]
+    : server.decks.map((name) => `decks/${name}/presenter`);
+  return {
+    banner: devBanner(server.url, server.remoteUrls, { password, presenterPaths }),
+    // One deck pairs straight into its presenter view; several, into the list to pick from.
+    pairPath: presenterPaths.length === 1 ? (presenterPaths[0] as string) : "",
+  };
 }
 
 /**
@@ -39,7 +47,7 @@ export async function serveCommand(options: {
  */
 export async function runDevSession(
   options: Omit<Parameters<typeof startDevServer>[0], "password">,
-  show: (server: DevServer, password: string | undefined) => { banner: string; pairPath: string },
+  show: (server: DevServer, password: string | undefined) => SessionView,
 ): Promise<void> {
   const password = options.remote === true ? generateRemotePassword() : undefined;
   const server = await startDevServer({ ...options, password });
