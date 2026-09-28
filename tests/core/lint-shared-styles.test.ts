@@ -54,9 +54,25 @@ describe("DEK026 repeated slide styles", () => {
       path: expect.stringContaining(join("slides", "a.css")),
       line: 2,
       message: ".card { --muted: var(--bg) } is also in slides/b.css and slides/c.css",
-      hint: "define it once in theme.css and delete it from slides/a.css, slides/b.css, and slides/c.css",
-      data: { selector: ".card", declarations: ["--muted: var(--bg)"], slides: ["a", "b", "c"] },
+      hint: "write .slide .card { --muted: var(--bg) } once in theme.css and delete it from slides/a.css, slides/b.css, and slides/c.css; it also reaches slides/d.html, which uses .card without it, so check that slide after the move",
+      data: {
+        selector: ".card",
+        declarations: ["--muted: var(--bg)"],
+        slides: ["a", "b", "c"],
+        alsoReaches: ["d"],
+      },
     });
+  });
+
+  // A hint that moves the rule into theme.css as the slide wrote it, `.card { … }`, would trade
+  // DEK026 for DEK012: the theme scopes every selector under .slide itself.
+  test("names the rule as theme.css must write it, under .slide", async () => {
+    const child = ".slide > .card { --muted: var(--bg); }";
+    const found = await lintStyles({ a: child, b: child, c: child, d: child });
+    expect(found[0]?.hint).toBe(
+      "write .slide > .card { --muted: var(--bg) } once in theme.css and delete it from slides/a.css, slides/b.css, slides/c.css, and slides/d.css",
+    );
+    expect(found[0]?.data?.alsoReaches).toBeUndefined();
   });
 
   test("leaves a declaration only two slides share", async () => {

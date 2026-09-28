@@ -1,6 +1,7 @@
-import { isKeyframesPrelude, splitSelectorList, startsAtSlide } from "../css.ts";
+import { isKeyframesPrelude, selectorClasses, splitSelectorList, startsAtSlide } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { scanSlideHtml } from "../html-scan.ts";
 import type { LintContext } from "./context.ts";
 
 /** How many slides may style something alike before it belongs in the theme: the third copy. */
@@ -28,6 +29,31 @@ const squash = (text: string): string => text.replace(/\s+/g, " ").trim();
 function scopedSelector(part: string): string {
   const item = squash(part);
   return startsAtSlide(item) ? item.slice(".slide".length) : ` ${item}`;
+}
+
+/**
+ * The selector part as theme.css must write it: under `.slide`, as the theme scopes every rule
+ * and as the slide's own scope already read it.
+ */
+function themeSelector(part: string): string {
+  return `.slide${scopedSelector(part)}`;
+}
+
+/**
+ * The other slides a rule moved into the theme would also reach: the ones whose markup uses
+ * every class the selector names, and that do not set it themselves. A selector with no class,
+ * such as `h2`, is left out: which slides it matches is for the author to look at.
+ */
+function alsoReaches(ctx: LintContext, selector: string, setters: string[]): string[] {
+  const classes = selectorClasses(selector);
+  if (classes.length === 0) {
+    return [];
+  }
+  return [...ctx.sectionsBySlug.keys()].filter((slug) => {
+    const source = setters.includes(slug) ? undefined : ctx.slideSource(slug);
+    const used = source && new Set(scanSlideHtml(source.html).classes);
+    return used !== undefined && classes.every((name) => used.has(name));
+  });
 }
 
 /** "a", "a and b", "a, b, and c". */
@@ -110,19 +136,36 @@ export function sharedStyleDiagnostics(ctx: LintContext): Diagnostic[] {
         const selector = first?.selector ?? "";
         const atPath = first?.atPath ?? [];
         const declarations = settings.map((setting) => setting.declaration);
-        const rule = `${[...atPath, selector].join(" ")} { ${declarations.join("; ")} }`;
+        const block = `{ ${declarations.join("; ")} }`;
+        const rule = `${[...atPath, selector].join(" ")} ${block}`;
+        const themeRule = `${[...atPath, themeSelector(selector)].join(" ")} ${block}`;
         const others = slugs.filter((other) => other !== slug).map(cssOf);
+        // Moving it changes these too: a theme default that slides override is a real finding,
+        // and whether the rest should follow is the author's call, made with these in view.
+        const reaches = alsoReaches(ctx, selector, slugs);
+        const htmlOf = (other: string): string => `slides/${other}.html`;
+        const affected =
+          reaches.length === 0
+            ? ""
+            : `; it also reaches ${listed(reaches.map(htmlOf))}, which ${reaches.length === 1 ? "uses" : "use"} ${selectorClasses(
+                selector,
+              )
+                .map((name) => `.${name}`)
+                .join(
+                  "",
+                )} without it, so check ${reaches.length === 1 ? "that slide" : "those slides"} after the move`;
         return diag("DEK026", {
           message: `${rule} is also in ${listed(others)}`,
           path: paths.slide(slug, ".css"),
           line,
           slug,
-          hint: `define it once in theme.css and delete it from ${listed(slugs.map(cssOf))}`,
+          hint: `write ${themeRule} once in theme.css and delete it from ${listed(slugs.map(cssOf))}${affected}`,
           data: {
             selector,
             declarations,
             slides: slugs,
             ...(atPath.length > 0 ? { atRules: atPath } : {}),
+            ...(reaches.length > 0 ? { alsoReaches: reaches } : {}),
           },
         });
       }),
