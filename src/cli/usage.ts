@@ -12,6 +12,7 @@ import {
   subcommandsOf,
   usageLines,
 } from "./commands.ts";
+import { CLI_SCHEMA_URL } from "./contract.ts";
 import { type CommandLine, FLAGS, type FlagName, flagValue } from "./flags.ts";
 
 const GROUP_TITLES: Record<Group, string> = {
@@ -76,6 +77,7 @@ export function agentHelpText(): string {
   );
   return `dek — agent interface
 Result commands accept --json. dek / rehearse do not (long-running). Diagnostics: dek lint --format sarif.
+Each command's --json shape: ${CLI_SCHEMA_URL}
 Each diagnostic has severity (error | warning) and data; only errors exit 1.
 Scope: project root = all decks; deck dir = that deck; NAME or --deck NAME.
 

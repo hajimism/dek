@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 
 export const cliPath = join(import.meta.dir, "..", "..", "src", "cli.ts");
 
@@ -26,7 +27,33 @@ export async function runDek(
     new Response(proc.stderr).text(),
     proc.exited,
   ]);
+  if (args.includes("--json")) {
+    holdToContract(args, stdout);
+  }
   return { exitCode, stdout, stderr };
+}
+
+/**
+ * Every `--json` line a test makes dek print is held to the contract, so the suite as a whole
+ * checks it: a field the contract does not name, or one it needs that is missing, fails the test
+ * that printed it.
+ */
+function holdToContract(args: string[], stdout: string): void {
+  const schema = printedBy(args);
+  for (const line of stdout.split("\n").filter((text) => text.trim() !== "")) {
+    let value: unknown;
+    try {
+      value = JSON.parse(line);
+    } catch {
+      throw new Error(`dek ${args.join(" ")} printed a line that is no JSON:\n${line}`);
+    }
+    const issues = contractIssues(schema, value);
+    if (issues.length > 0) {
+      throw new Error(
+        `dek ${args.join(" ")} printed what src/cli/contract.ts does not name:\n${issues.join("\n")}\n${line}`,
+      );
+    }
+  }
 }
 
 export function jsonStdout<T = unknown>(result: RunResult): T {

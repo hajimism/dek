@@ -1,8 +1,10 @@
 import { hasErrors } from "../core/diagnostic.ts";
 import { mergeSarif, toSarif } from "../core/sarif.ts";
 import type { CheckCliResult } from "./check.ts";
+import type { ResultFields } from "./contract.ts";
 import type { FlagName, FlagValues } from "./flags.ts";
 import { type FormattedError, formatCreated, formatDiagnostics } from "./format.ts";
+import type { NavResult } from "./goto.ts";
 import type { DeckScope, DecksTarget, ReadableDeck } from "./scope.ts";
 import {
   countSummary,
@@ -130,19 +132,25 @@ type Declared<A extends readonly string[], S extends DeckScope | undefined, D> =
   Typed<A, S, D> & { scope?: S };
 
 // The declarations check each run against its own args and scope; the registry keeps them erased.
+// `J` is what `json` returns, kept so that what a command prints can be held to its contract below.
 function result<
   D,
   const A extends readonly string[],
   S extends DeckScope | undefined = undefined,
   const U extends Record<string, readonly string[]> = Record<never, never>,
+  J extends object = never,
 >(
   spec: Declared<A, S, D> & {
-    output: Output<D>;
+    output: Output<D> & { json?(data: D): J };
     subcommands?: { [K in keyof U]: Typed<U[K], S, D> };
   },
-): ResultSpec<D> {
-  return { kind: "result", ...spec } as unknown as ResultSpec<D>;
+): ResultSpec<D> & Printed<[J] extends [never] ? D : J> {
+  return { kind: "result", ...spec } as unknown as ResultSpec<D> &
+    Printed<[J] extends [never] ? D : J>;
 }
+
+/** What a result command prints beside `ok`, as a type alone: nothing carries it at run time. */
+type Printed<P> = { readonly printed?: P };
 
 function session<const A extends readonly string[], S extends DeckScope | undefined = undefined>(
   spec: Declared<A, S, void>,
@@ -166,7 +174,7 @@ function diagnosticFailure(
 }
 
 /** A position no page shows is where the next one lands; saying nothing would read as on screen. */
-function navNotes(data: { slug: string; viewers: number }): string | undefined {
+function navNotes(data: NavResult): string | undefined {
   return data.viewers > 0
     ? undefined
     : `no browser shows the deck: the next page opened on the dev server shows ${data.slug}`;
@@ -709,6 +717,18 @@ type DataOf<K extends ResultCommand> = Specs[K] extends ResultSpec<infer D> ? D 
 
 /** One command's result, before it is printed. */
 export type CliResult = { [K in ResultCommand]: { command: K; data: DataOf<K> } }[ResultCommand];
+
+type PrintedOf<K extends ResultCommand> = NonNullable<Specs[K]["printed"]>;
+
+/**
+ * Every command prints what its contract names. A command whose data outgrew its contract fails
+ * to compile here, by name; the tests hold the printed lines to the contract field by field.
+ */
+type BreaksContract = {
+  [K in ResultCommand]: PrintedOf<K> extends ResultFields[K] ? never : K;
+}[ResultCommand];
+const keepsContract: [BreaksContract] extends [never] ? true : BreaksContract = true;
+void keepsContract;
 
 export type AnySpec = ResultSpec<unknown> | SessionSpec | HelpSpec;
 

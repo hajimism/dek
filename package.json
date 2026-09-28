@@ -40,6 +40,7 @@
     "test:watch": "bun test --watch",
     "typecheck": "tsc --noEmit",
     "knip": "knip",
+    "schema": "bun scripts/cli-schema.ts",
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check": "biome check --write .",

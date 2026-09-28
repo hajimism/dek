@@ -6,6 +6,7 @@
 
 - **スコープは実行場所で決まる。** プロジェクト直下なら全デッキ、デッキの中ならそのデッキ。どこからでも、最初の引数か `--deck <name>` でデッキを指定できます: `dek lint why-dek`、`dek show why-dek intro`、`dek why-dek`。詳細は[プロジェクトとデッキ](/ja/guide/structure#実行場所がスコープを決める)。
 - **結果を返すコマンドは `--json` を受け付け、包みは一つ。** 成功は `{ "ok": true, ... }`。失敗は `{ "ok": false, "error": { "message", "hint", "path", "line" }, ... }` で終了コード 1。コマンドが実行できなかった場合も、`lint` や `check` が error を見つけた場合も同じです。`hint` は dek が次の一手を知っていれば、`path` と `line` は失敗に場所があれば付きます。診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は成否に関わらず `diagnostics` を持つので、読み手は `ok` で分岐し、`error` を読み、診断を読みます。起動し続ける `dek` と `dek rehearse` は `--json` を取りません。[JSON の約束](/ja/guide/ai#json-の約束)を参照してください。
+- **各コマンドの形は JSON Schema。** [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しており、`$defs` にコマンドごとの定義がある。
 - **形はまだ固まっていない。** dek が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID を別のルールに使い回すことはありません。
 - **診断は SARIF。** `dek lint --format sarif`。URI は `file://`、位置は行と列、hint・slug・data は `properties` に入り、飛ばしたチェックは tool execution notification になります。既定は ESLint 風のテキスト `path:line:column: id message` です。
 - **失敗になるのは error だけ。** 各診断は `severity` を持ちます。error が残っていれば `lint` と `check` は `"ok": false` と終了コード 1 を返し、warning だけなら終了コード 0 です。

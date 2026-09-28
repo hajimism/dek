@@ -54,6 +54,7 @@ Success is `{ "ok": true, ... }` with exit code 0. Failure is `{ "ok": false, "e
 - A check that did not run is an entry in `skipped`, never an empty pass: `{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }`. The field is absent when everything ran. `dek lint` without `--visual`, and `dek build`, always list `visual`: they did not measure overflow or contrast, and the hint is the command that does.
 - A command that writes files for every deck in scope returns a list, one deck or many: `build` and `pdf` return `outs`.
 - `dek lint --format sarif` returns the same diagnostics as SARIF 2.1.0.
+- Every command's shape is published as a JSON Schema at [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json): one entry under `$defs` per command, plus `failure` for a line that could not run. Every object is closed, so a field it does not name is a change to the contract. The schema, the CLI's own types, and what dek prints in its tests are checked against one definition, so they cannot drift apart.
 
 While dek is 0.x, the `--json` shape and the rule ids may still change between releases. A rule id is never reused: a retired id stays retired.
 

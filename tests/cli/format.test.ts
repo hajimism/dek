@@ -80,6 +80,12 @@ describe("agentHelpText", () => {
     expect(text.split("\n").length).toBeLessThan(80);
     expect(text).not.toBe(helpText());
   });
+
+  test("names where each command's --json shape is published", () => {
+    expect(agentHelpText()).toContain(
+      "Each command's --json shape: https://hajimism.github.io/dek/cli.schema.json",
+    );
+  });
 });
 
 describe("formatDiagnostics", () => {
