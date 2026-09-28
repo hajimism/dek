@@ -1,3 +1,4 @@
+import { DekError } from "../core/error.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { resolveProject } from "../core/resolve.ts";
 import {
@@ -145,6 +146,9 @@ export function bindCommandLine(cwd: string, line: CommandLine): Call {
 async function run(cwd: string, line: CommandLine): Promise<void> {
   const call = bindCommandLine(cwd, line);
   const spec = COMMANDS[call.name] as AnySpec;
+  if (spec.kind === "session" && line.values.json === true) {
+    throw sessionJsonError(spec.bare ? "dek" : `dek ${call.name}`);
+  }
   if (spec.refs && call.deck !== undefined && isRefName(call.deck)) {
     const { restoreRef } = await import("./ref.ts");
     await restoreRef(cwd, call.deck);
@@ -165,6 +169,13 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
       }),
     });
   }
+}
+
+/** A session prints no result, so --json has nothing to shape, and a reader would wait forever. */
+function sessionJsonError(name: string): DekError {
+  return new DekError(`${name} keeps running until stopped and prints no JSON`, {
+    hint: "start it without --json and leave it running; for a result, run `dek lint --json` or `dek check <slug> --json`",
+  });
 }
 
 /**

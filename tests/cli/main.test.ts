@@ -63,8 +63,9 @@ describe("main", () => {
     "rehearse refuses a slug the deck does not have before it starts a server",
     async () => {
       await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-        const error = await failure(["rehearse", "nope"], join(root, "decks", "demo"));
-        expect(error.message).toBe('section "nope" not found');
+        const result = await run(["rehearse", "nope"], join(root, "decks", "demo"));
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('section "nope" not found');
       });
     },
   );
@@ -100,6 +101,38 @@ describe("main", () => {
       });
     },
   );
+
+  // A session prints no result, so --json has nothing to shape: an agent waiting for one would
+  // wait on a server that never exits. Both say so at once, before anything starts.
+  test.serial("the dev server and rehearse refuse --json instead of starting", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const deck = join(root, "decks", "demo");
+      for (const [argv, name] of [
+        [[], "dek"],
+        [["demo"], "dek"],
+        [["rehearse"], "dek rehearse"],
+      ] as const) {
+        const error = await failure([...argv], argv.length === 1 ? root : deck);
+        expect(error.message).toBe(`${name} keeps running until stopped and prints no JSON`);
+        expect(error.hint).toBe(
+          `start it without --json and leave it running; for a result, run \`dek lint --json\` or \`dek check <slug> --json\``,
+        );
+      }
+    });
+  });
+
+  test.serial("--json is heard even where a value flag stands before it", async () => {
+    await withTempProject(decks, async (root) => {
+      for (const argv of [
+        ["lint", "--port", "--json"],
+        ["lint", "--json=false"],
+      ]) {
+        const result = await run(argv, root);
+        expect(result.exitCode).toBe(1);
+        expect((JSON.parse(result.stdout) as Failure).ok).toBe(false);
+      }
+    });
+  });
 
   test.serial("a malformed command line still answers in JSON when --json is on it", async () => {
     await withTempProject(decks, async (root) => {

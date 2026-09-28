@@ -150,9 +150,15 @@ function lenientParse(argv: string[]) {
   });
 }
 
-/** Whether argv asks for JSON, read even from a command line too broken to parse. */
+/**
+ * Whether argv asks for JSON, read even from a command line too broken to parse: from the words
+ * themselves, since a value flag in front, as in `--port --json`, would take it for its value.
+ */
 export function wantsJson(argv: string[]): boolean {
-  return lenientParse(argv).values.json === true;
+  const end = argv.indexOf("--");
+  return (end < 0 ? argv : argv.slice(0, end)).some(
+    (word) => word === "--json" || word.startsWith("--json="),
+  );
 }
 
 /**

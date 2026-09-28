@@ -16,7 +16,7 @@ That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a
 
 ## What the CLI promises
 
-1. **Every result command accepts `--json`, and every result has one shape.** An agent branches on `ok`, reads `error` when it is `false`, and works through `diagnostics`. `dek` and `dek rehearse` stay running and are the only exceptions. Nothing forces an agent to parse prose; the contract is [below](#the-json-contract).
+1. **Every result command accepts `--json`, and every result has one shape.** An agent branches on `ok`, reads `error` when it is `false`, and works through `diagnostics`. `dek` and `dek rehearse` stay running and are the only exceptions: given `--json`, they refuse at once rather than start a server a JSON reader would wait on forever. Nothing forces an agent to parse prose; the contract is [below](#the-json-contract).
 2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is, from wherever you ran the command: a command that takes a deck names it when you are not inside that deck, as `dek theme demo` at the project root. Diagnostics carry a hint too when the fix is known, such as `use hook, turn, or 1-2` for a `data-step` that names no beat.
 3. **`dek help --agent` is a few hundred tokens.** The CLI documents itself.
 4. **`AGENTS.md` stays short.**
