@@ -1,10 +1,17 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { readTextIfExists } from "../core/resolve.ts";
-import { defaultTsconfig, dekFilePaths, writeDekFiles } from "../core/sync.ts";
+import {
+  defaultTsconfig,
+  dekFilePaths,
+  type FileChanges,
+  syncDeck,
+  writeDekFiles,
+} from "../core/sync.ts";
 import {
   applyPlan,
   checkFileSlots,
@@ -48,9 +55,12 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
   checkFileSlots(dekFilePaths(root));
 
   const { created, kept } = applyPlan(projectPlan(root, options.deck));
-  const dekFiles = writeDekFiles(root);
-  created.push(...dekFiles.created);
   const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
+  // A starter script init just wrote gets its skeletons as sync writes them; a script that was
+  // already there is the author's, and so is whether it parses.
+  const started = deckDir !== undefined && created.includes(deckPaths(deckDir).script);
+  const dekFiles = started ? syncDeckFiles(deckDir, created) : writeDekFiles(root);
+  created.push(...dekFiles.created);
   const playwright = playwrightStep(root);
   return {
     root,
@@ -60,6 +70,12 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
     next: nextSteps(options.cwd, root, deckDir),
     ...(playwright ? { playwright } : {}),
   };
+}
+
+function syncDeckFiles(deckDir: string, created: string[]): FileChanges {
+  const synced = syncDeck(deckDir);
+  created.push(...synced.created);
+  return synced.dekFiles;
 }
 
 /** Everything init writes but `.dek/` and AGENTS.md, in the order a reader meets it. */

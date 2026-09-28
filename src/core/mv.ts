@@ -5,7 +5,7 @@ import { escapeRegExp } from "./escape.ts";
 import { joinLines, splitLines } from "./lines.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
 import { Id } from "./schema.ts";
-import { skeletonHtml } from "./skeleton.ts";
+import { deckLayouts, skeletonHtml } from "./skeleton.ts";
 import { renameTableKeys } from "./toml-keys.ts";
 
 export function renameSection(dir: string, from: string, to: string): void;
@@ -68,7 +68,9 @@ function slideFileSteps(
       hint: "run `dek lint` to see which slides have no section",
     });
   }
-  const skeleton = options.replaceSkeleton ? skeletonHtml(deck.deck, to) : undefined;
+  const skeleton = options.replaceSkeleton
+    ? skeletonHtml(deck.deck, to, deckLayouts(deck.dir))
+    : undefined;
   const replaced =
     skeleton !== undefined && existsSync(toPath) && readFileSync(toPath, "utf8") === skeleton
       ? skeleton

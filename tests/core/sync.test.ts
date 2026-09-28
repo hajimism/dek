@@ -1,7 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { lstat, mkdir, readFile, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { extname, join } from "node:path";
+import { defaultTheme } from "../../src/cli/files.ts";
+import { newCommand } from "../../src/cli/new.ts";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
@@ -120,6 +132,168 @@ more
 
         expect(syncDeck(deckDir).updated).toEqual([]);
         expect(await readFile(introPath, "utf8")).toBe(touched);
+      },
+    );
+  });
+
+  // A skeleton is dek's to rewrite only while it is byte for byte what dek last wrote there. The
+  // shape of one is no proof: an author who retypes the heading or a beat keeps the shape.
+  test("keeps a skeleton whose heading the author retyped", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script: "---\ntitle: Demo\n---\n\n## intro\n" }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const introPath = join(deckDir, "slides", "intro.html");
+        syncDeck(deckDir);
+        const retyped = (await readFile(introPath, "utf8")).replace(
+          /<h2 class="slide-title">[^<]*<\/h2>/,
+          '<h2 class="slide-title">A heading of my own</h2>',
+        );
+        await writeFile(introPath, retyped);
+
+        expect(syncDeck(deckDir).updated).toEqual([]);
+        expect(await readFile(introPath, "utf8")).toBe(retyped);
+      },
+    );
+  });
+
+  test("keeps a slide whose section is gone once the author retyped a beat", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", script: "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n" },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const planPath = join(deckDir, "slides", "plan.html");
+        syncDeck(deckDir);
+        const retyped = (await readFile(planPath, "utf8")).replace(">one</li>", ">mine</li>");
+        await writeFile(planPath, retyped);
+        await writeFile(join(deckDir, "script.md"), "---\ntitle: Demo\n---\n\n## intro\n");
+
+        expect(syncDeck(deckDir).removed).toEqual([]);
+        expect(await readFile(planPath, "utf8")).toBe(retyped);
+      },
+    );
+  });
+
+  test("still removes a skeleton nobody edited once its section is gone", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", script: "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n" },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        syncDeck(deckDir);
+        await writeFile(join(deckDir, "script.md"), "---\ntitle: Demo\n---\n\n## intro\n");
+
+        expect(syncDeck(deckDir).removed).toEqual([join(deckDir, "slides", "plan.html")]);
+        expect(existsSync(join(deckDir, "slides", "plan.html"))).toBe(false);
+      },
+    );
+  });
+
+  test("refreshes a skeleton dek new wrote after the script is edited", async () => {
+    await withTempProject({ theme: defaultTheme() }, async (root) => {
+      newCommand({ cwd: root, name: "talk" });
+      const deckDir = join(root, "decks", "talk");
+      await writeFile(join(deckDir, "script.md"), "---\ntitle: Retitled\n---\n\n## intro\n");
+
+      expect(syncDeck(deckDir).updated).toEqual([join(deckDir, "slides", "intro.html")]);
+      expect(await readFile(join(deckDir, "slides", "intro.html"), "utf8")).toContain(
+        ">Retitled</h2>",
+      );
+    });
+  });
+
+  // What dek wrote is kept under .cache, which anyone may delete. Losing it costs only refreshes:
+  // a slide that is exactly today's skeleton is dek's all the same, and anything else stays.
+  test("without its record, rewrites only what it can prove is its own", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", script: "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n" },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const planPath = join(deckDir, "slides", "plan.html");
+        syncDeck(deckDir);
+        await rm(join(deckDir, ".cache"), { recursive: true, force: true });
+        await writeFile(
+          join(deckDir, "script.md"),
+          "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### two\n",
+        );
+        const before = await readFile(planPath, "utf8");
+
+        expect(syncDeck(deckDir).updated).toEqual([]);
+        expect(await readFile(planPath, "utf8")).toBe(before);
+
+        await rm(join(deckDir, ".cache"), { recursive: true, force: true });
+        await writeFile(
+          planPath,
+          before.replace(">one</li>", ">two</li>").replace('"one"', '"two"'),
+        );
+        syncDeck(deckDir);
+        await writeFile(
+          join(deckDir, "script.md"),
+          "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### three\n",
+        );
+        expect(syncDeck(deckDir).updated).toEqual([planPath]);
+      },
+    );
+  });
+
+  test("a skeleton dek mv moved is still dek's to refresh", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", script: "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n" },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        syncDeck(deckDir);
+        await writeFile(
+          join(deckDir, "script.md"),
+          "---\ntitle: Demo\n---\n\n## intro\n\n## steps\n\n### one\n",
+        );
+        await rename(join(deckDir, "slides", "plan.html"), join(deckDir, "slides", "steps.html"));
+        await writeFile(
+          join(deckDir, "script.md"),
+          "---\ntitle: Demo\n---\n\n## intro\n\n## steps\n\n### one\n\n### two\n",
+        );
+
+        expect(syncDeck(deckDir).updated).toEqual([join(deckDir, "slides", "steps.html")]);
+      },
+    );
+  });
+
+  test("uses only layouts the deck's theme lays out", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n",
+            theme: `.slide { width: 100%; }
+.slide[data-layout="cover"] { display: grid; }
+.slide[data-layout="default"] { display: flex; }
+`,
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        syncDeck(deckDir);
+        const intro = await readFile(join(deckDir, "slides", "intro.html"), "utf8");
+        const plan = await readFile(join(deckDir, "slides", "plan.html"), "utf8");
+        expect(intro.startsWith('<section class="slide">\n')).toBe(true);
+        expect(plan.startsWith('<section class="slide" data-layout="default">\n')).toBe(true);
+        expect(lintDeck(deckDir).filter((d) => d.id === "DEK019")).toEqual([]);
       },
     );
   });

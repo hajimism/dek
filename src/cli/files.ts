@@ -3,9 +3,7 @@ import { dirname, join, relative } from "node:path";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
-import { parseScript } from "../core/parse.ts";
 import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
-import { skeletonHtml } from "../core/skeleton.ts";
 import { formatVoiceToml } from "../core/voice.ts";
 
 const defaultThemePath = join(import.meta.dir, "..", "theme", "default.css");
@@ -204,8 +202,7 @@ function placeable(path: string, kind: "file" | "directory"): boolean {
 /**
  * A deck's files: its directories, the starter script, the theme it starts
  * from, and voice settings when the project has a voice. The skeleton slides
- * come with the starter script, so a new deck passes lint as created; a deck
- * whose script is already there gets them from sync instead.
+ * are sync's to write, once the theme they are drawn in is in place.
  */
 export function deckPlan(
   root: string,
@@ -226,15 +223,6 @@ export function deckPlan(
       { path: paths.voiceToml, contents: formatVoiceToml(voice) },
       { path: paths.voiceDict, contents: "# voice dictionary\n" },
     );
-  }
-  if (!existsSync(paths.script)) {
-    const deck = parseScript(script, paths.script);
-    for (const section of deck.sections) {
-      const contents = skeletonHtml(deck, section.slug);
-      if (contents !== undefined) {
-        plan.push({ path: paths.slide(section.slug, ".html"), contents });
-      }
-    }
   }
   return plan;
 }

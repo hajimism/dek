@@ -40,6 +40,23 @@ describe("dek new", () => {
     );
   });
 
+  test("creates a deck that passes lint in a theme without the bundled layouts", async () => {
+    // The bundled theme with its title and default layouts renamed, as a grown theme may have them.
+    const theme = defaultTheme()
+      .replaceAll("@layout title", "@layout cover")
+      .replaceAll('data-layout="title"', 'data-layout="cover"')
+      .replaceAll("@layout default", "@layout center")
+      .replaceAll('data-layout="default"', 'data-layout="center"');
+    await withTempProject({ theme }, async (root) => {
+      newCommand({ cwd: root, name: "talk" });
+      const deckDir = join(root, "decks", "talk");
+      expect(await readFile(join(deckDir, "slides", "intro.html"), "utf8")).toStartWith(
+        '<section class="slide">\n',
+      );
+      expect(lintDeck(deckDir)).toEqual([]);
+    });
+  });
+
   test("adds a deck and copies the project theme.css", async () => {
     await withTempProject(
       {

@@ -1,5 +1,5 @@
 import { type DekConfig, loadConfig } from "../config.ts";
-import { parseCss, type Stylesheet } from "../css.ts";
+import { cssLayoutNames, parseCss, type Stylesheet } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import type { Diagnostic } from "../diagnostic.ts";
 import { type ScriptParts, splitFrontmatter } from "../parse.ts";
@@ -58,6 +58,7 @@ export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
   const stylesBySlug = new Map(listSlideFiles(deck.dir, ".css").map((file) => [file.slug, file]));
   const styles = new Map<string, { path: string; sheet: Stylesheet } | undefined>();
   const sheet = themeCss === undefined ? undefined : parseCss(themeCss);
+  const layouts = sheet === undefined ? new Set<string>() : cssLayoutNames(sheet);
   const script = scriptParts(deck);
   return {
     project,
@@ -80,7 +81,7 @@ export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
           slug,
           html === undefined
             ? undefined
-            : { html, skeleton: html === skeletonHtml(deck.deck, slug) },
+            : { html, skeleton: html === skeletonHtml(deck.deck, slug, layouts) },
         );
       }
       return sources.get(slug);

@@ -6,7 +6,8 @@ import { parseRefSource, refDir, refTitle } from "./ref.ts";
 import { asResolvedDeck, listSlides, type ResolvedDeck, SLIDE_SIDECARS } from "./resolve.ts";
 import { outputDir, readSourceIfExists, removeInside, writeInside } from "./safe-fs.ts";
 import { frontmatterJsonSchema } from "./schema.ts";
-import { isSkeleton, sectionSkeleton } from "./skeleton.ts";
+import { deckLayouts, sectionSkeleton } from "./skeleton.ts";
+import { type SkeletonRecord, skeletonRecord } from "./skeleton-record.ts";
 
 /**
  * `updated` lists skeletons nobody edited, rewritten because the script moved on; `removed`, the
@@ -114,25 +115,30 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
   const { project, deck } = asResolvedDeck(input);
   const paths = deckPaths(deck.dir);
   outputDir(paths.slides, project.root);
+  const layouts = deckLayouts(deck.dir);
+  const record = skeletonRecord(deck.dir);
 
   const existing = new Map(listSlides(deck.dir).map((slide) => [slide.slug, slide.path]));
   const created: string[] = [];
   const updated: string[] = [];
   const removed = removeOrphanSkeletons(
-    project.root,
-    paths,
+    { root: project.root, paths, record },
     [...existing].filter(([slug]) => !deck.deck.sections.some((section) => section.slug === slug)),
   );
 
   for (const [index, section] of deck.deck.sections.entries()) {
-    const skeleton = sectionSkeleton(deck.deck, index);
+    const skeleton = sectionSkeleton(deck.deck, index, layouts);
     const current = existing.get(section.slug);
     if (current) {
       const html = readFileSync(current, "utf8");
-      if (html !== skeleton && isSkeleton(html)) {
+      if (!record.owns(html, skeleton)) {
+        continue;
+      }
+      if (html !== skeleton) {
         writeInside(current, skeleton, project.root);
         updated.push(current);
       }
+      record.keep(skeleton);
       continue;
     }
     const path = paths.slide(section.slug, ".html");
@@ -141,7 +147,9 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
     }
     writeInside(path, skeleton, project.root);
     created.push(path);
+    record.keep(skeleton);
   }
+  record.save();
 
   return { created, updated, removed, dekFiles: writeDekFiles(project.root) };
 }
@@ -149,21 +157,26 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
 /**
  * A slide whose section is gone from the script is still dek's own output while it is a skeleton
  * nobody edited and nothing sits beside it: the script no longer asks for it, and it holds nothing
- * the script could not write again. Anything the author touched stays, and lint names it (DEK002).
- * A section renamed in the script gets a fresh skeleton under its new id, so nothing is lost there
- * either; the same holds for an id that flickers while a heading is being typed.
+ * the script could not write again. Anything the author touched stays, and lint names it
+ * (DEK002). A section renamed in the script gets a fresh skeleton under its new id, so nothing is
+ * lost there either; the same holds for an id that flickers while a heading is being typed.
  */
 function removeOrphanSkeletons(
-  root: string,
-  paths: DeckPaths,
+  { root, paths, record }: { root: string; paths: DeckPaths; record: SkeletonRecord },
   orphans: [string, string][],
 ): string[] {
   const removed: string[] = [];
   for (const [slug, path] of orphans) {
+    const html = readFileSync(path, "utf8");
+    if (!record.owns(html, undefined)) {
+      continue;
+    }
     const beside = ([...SLIDE_SIDECARS, ".js"] as const).some((ext) =>
       existsSync(paths.slide(slug, ext)),
     );
-    if (!beside && isSkeleton(readFileSync(path, "utf8"))) {
+    if (beside) {
+      record.keep(html);
+    } else {
       removeInside(path, root);
       removed.push(path);
     }

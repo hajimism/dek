@@ -3,6 +3,7 @@ import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import type { LiveEvent } from "../../src/core/live-protocol.ts";
+import { syncDeck } from "../../src/core/sync.ts";
 import { createEventHub, type EventHub } from "../../src/server/hub.ts";
 import { voiceFailureLine, watchDeck, watchErrorDiagnostic } from "../../src/server/watch.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -188,13 +189,15 @@ describe("watchDeck", () => {
   });
 
   test("removes an orphan skeleton on sync and names its slug", async () => {
+    // A skeleton dek wrote for a section the script has since dropped.
+    const before = "---\ntitle: Demo\n---\n\n## intro\n\n## Old {#old}\n";
     const script = "---\ntitle: Demo\n---\n\n## intro\n\n## Two {#two}\n\nhello\n";
-    const orphan =
-      '<section class="slide" data-layout="title">\n  <h2 class="slide-title">Old</h2>\n</section>\n';
     await withTempProject(
-      { decks: [{ name: "demo", script, slides: { intro: introHtml, old: orphan } }] },
+      { decks: [{ name: "demo", script: before, slides: { intro: introHtml } }] },
       async (root) => {
         const dir = deckDir(root);
+        syncDeck(dir);
+        await writeFile(join(dir, "script.md"), script);
         const hub = createEventHub();
         const events: LiveEvent[] = [];
         const diagnosed = waitForEvent(hub, (event) => {

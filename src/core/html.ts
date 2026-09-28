@@ -4,7 +4,7 @@ import { escapeAttr, escapeHtml } from "./escape.ts";
 import { isInside } from "./path.ts";
 import { type ProjectDeck, readDeckFile } from "./resolve.ts";
 import { FALLBACK_LANG, type Section } from "./schema.ts";
-import { skeletonHtml } from "./skeleton.ts";
+import { deckLayouts, type SkeletonLayouts, skeletonHtml } from "./skeleton.ts";
 
 export function htmlShell(options: {
   lang?: string;
@@ -91,6 +91,11 @@ export type DeckSlides = {
 export function deckSlides(deck: ProjectDeck): DeckSlides {
   const paths = deckPaths(deck.dir);
   const read = new Map<string, string | undefined>();
+  let layouts: SkeletonLayouts | undefined;
+  const skeleton = (slug: string): string | undefined => {
+    layouts ??= deckLayouts(deck.dir);
+    return skeletonHtml(deck.deck, slug, layouts);
+  };
   const written = (slug: string): string | undefined => {
     if (!read.has(slug)) {
       const path = paths.slide(slug, ".html");
@@ -106,8 +111,7 @@ export function deckSlides(deck: ProjectDeck): DeckSlides {
   return {
     has: (slug) => written(slug) !== undefined,
     written,
-    section: (slug) =>
-      written(slug) ?? extractSlideSection(skeletonHtml(deck.deck, slug) ?? "") ?? "",
+    section: (slug) => written(slug) ?? extractSlideSection(skeleton(slug) ?? "") ?? "",
   };
 }
 

@@ -48,13 +48,15 @@ dek check architecture --shot
 </section>
 ```
 
-A section without beats gets `data-layout="title"`; with beats, `default`. Beats with an id are bound by id; beats without one are bound by their 1-based position.
+A section without beats gets `data-layout="title"`; with beats, `default`. Each is used only when the deck's `theme.css` lays it out; otherwise the skeleton names no layout, so a new deck passes lint in any theme. Beats with an id are bound by id; beats without one are bound by their 1-based position.
 
 A heading that is only an id, such as `## recap`, has no display text, so its skeleton `<h2>` is empty. The first section is the exception: it takes the deck `title`. This keeps an English slug from ending up on a projected slide by accident. Lint warns about the empty heading as `DEK024`. If you want words there, write `## Recap {#recap}`.
 
 Sync never touches a slide you have edited. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide. A number you write by hand for a beat that has an id is `DEK025`, a warning whose hint names the id.
 
-A skeleton nobody has edited yet is different: it is still sync's output, so sync rewrites it when the script moves on. Change the deck `title` or add a beat, and the untouched skeleton follows; the first edit you make to the file ends that. `dek sync` lists such files as `(updated)`.
+A skeleton nobody has edited yet is different: it is still sync's output, so sync rewrites it when the script moves on. Change the deck `title` or add a beat, and the untouched skeleton follows; the first edit you make to the file ends that, even one that only retypes the heading. `dek sync` lists such files as `(updated)`.
+
+Sync knows a skeleton is untouched because it remembers the exact bytes it wrote, as hashes in the deck's `.cache/skeletons`. The shape of a file is no proof: a retyped heading keeps the shape. The record is a cache like the rest of `.cache/`. Without it, a slide that is exactly the skeleton sync would write now is still sync's, and every other slide is left as yours, so losing it costs refreshes, never edits.
 
 ## Slide stylesheets
 
