@@ -55,16 +55,19 @@ export function renderDeckDocument(
   const mode: PageMode =
     target.kind === "dev" ? target.mode : target.kind === "build" ? "player" : "video";
   const live = target.kind === "dev";
-  // A file that stands alone carries its assets and a minified theme, and a broken slide
-  // script stops it; the dev server serves assets by URL and skips a broken script.
+  // A file that stands alone carries its assets and a minified theme; the dev server serves
+  // assets by URL. A build skips a broken slide script, as the dev server does, since lint never
+  // stops a build and its findings name the script. A video has no findings to carry the news, and
+  // hours of rendering would show slides without their motion, so a broken script stops it.
   const standalone = !live;
+  const strictScripts = target.kind === "video";
   const includeNotes = target.kind === "dev" ? target.includeNotes : target.kind === "build";
   const data = presenterSlides(deck, options.config).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
   const slidesHtml = collectSlidesHtml(deck, { inline: standalone });
   const themeCss = readTheme(deck.dir, standalone);
-  const slideScripts = readSlideScripts(deck.dir, { strict: standalone });
+  const slideScripts = readSlideScripts(deck.dir, { strict: strictScripts });
   const state = data[0] ? presenterState(data, { slideIndex: 0, beatIndex: 0 }) : undefined;
   const budget = data[0]?.budgetSeconds !== undefined ? formatClock(data[0].budgetSeconds) : "";
   const size = logicalSize(deck.deck.ratio);

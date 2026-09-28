@@ -1264,11 +1264,13 @@ title: Demo
         await writeFile(join(dir, "dict.toml"), "API = \n");
         const found = lintDeck(join(root, "decks", "demo"));
         expect(
-          found.filter((d) => d.id === "DEK045").map(({ severity, path, message }) => ({
-            severity,
-            file: path?.split("/").pop(),
-            message,
-          })),
+          found
+            .filter((d) => d.id === "DEK045")
+            .map(({ severity, path, message }) => ({
+              severity,
+              file: path?.split("/").pop(),
+              message,
+            })),
         ).toEqual([
           {
             severity: "warning",
@@ -1709,9 +1711,7 @@ two
     );
     expect(typo?.data).toEqual({ class: "slide-titel", suggestion: "slide-title" });
     const unknown = diagnostics.find((d) => d.id === "DEK010" && d.data?.class === "mystery");
-    expect(unknown?.hint).toBe(
-      "define it in slides/intro.css, or use one of: node, slide-title",
-    );
+    expect(unknown?.hint).toBe("define it in slides/intro.css, or use one of: node, slide-title");
     expect(unknown?.data).toEqual({ class: "mystery" });
   });
 

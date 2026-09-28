@@ -76,9 +76,9 @@ A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. 
 | `dek voice [deck] say <text>` | Speak one sentence. |
 | `dek voice [deck] dict add <word> <kana> [--accent N]` | Add a reading to `voice/dict.toml`, with the accent position when given. |
 | `dek voice [deck] pin` | Copy the master audio and `timeline.json` into `voice/pin/`. |
-| `dek build [deck] [--root-dist] [--url <url>]` | Write one HTML file to `decks/<deck>/dist/<deck>.html`, or `<root>/dist/<deck>.html` with `--root-dist`. Slide stylesheets and scripts are inlined. Lint never stops a build: a section with no HTML is built from its skeleton, and when dek's rules find something (rumdl is `dek lint`'s alone), the output says how many and `--json` includes the diagnostics. The page carries link preview tags; given the URL `dist/` is served from (`url` in `dek.toml`, or `--url`, which wins), the first slide also becomes `dist/<deck>.png` for `og:image`. See [On the web](/guide/present#on-the-web) |
+| `dek build [deck] [--root-dist] [--url <url>]` | Write one HTML file to `decks/<deck>/dist/<deck>.html`, or `<root>/dist/<deck>.html` with `--root-dist`. Slide stylesheets and scripts are inlined. Lint never stops a build: a section with no HTML is built from its skeleton, a slide script that cannot run (`DEK016`) is left out and its slide built without motion, and when dek's rules find something (rumdl is `dek lint`'s alone), the output says how many and `--json` includes the diagnostics. The page carries link preview tags; given the URL `dist/` is served from (`url` in `dek.toml`, or `--url`, which wins), the first slide also becomes `dist/<deck>.png` for `og:image`. See [On the web](/guide/present#on-the-web) |
 | `dek video [deck] [slug] [--fps N] [--root-dist]` | Bake `dist/<deck>.mp4` with `.vtt`, `.chapters.txt`, and `.credits.txt`, from the Timeline `dek voice` writes. One slide goes to `.cache/video/<slug>.mp4`. `--fps` defaults to 30. |
-| `dek pdf [deck] [--root-dist]` | Write `dist/<deck>.pdf` with every slide at its last beat. |
+| `dek pdf [deck] [--root-dist]` | Write `dist/<deck>.pdf` with every slide at its last beat. A slide script that cannot run stops it, as it stops `dek video`: neither has findings to carry the news, and each would show the slide as if its script never ran. |
 
 ## Help
 

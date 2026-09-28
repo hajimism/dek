@@ -80,6 +80,29 @@ describe("buildCommand and lint", () => {
   });
 });
 
+describe("buildCommand and a slide script that cannot run", () => {
+  // Lint never stops a build: the slide is built without its motion, and the build says why.
+  test("builds the deck without the script, and names the problem", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await Bun.write(
+          join(deckDir, "slides", "intro.ts"),
+          'import x from "x";\nexport default {};',
+        );
+        const result = await buildCommand(resolveDecks(deckDir));
+        expect(result.outs).toEqual([join(deckDir, "dist", "demo.html")]);
+        expect(result.diagnostics.map((d) => d.id)).toContain("DEK016");
+        // Built without the script: nothing registers a module for the slide.
+        expect(await Bun.file(join(deckDir, "dist", "demo.html")).text()).not.toContain(
+          '{})["intro"] = (',
+        );
+      },
+    );
+  });
+});
+
 describe("buildCommand link preview", () => {
   const fakeRunner = async (request: VisualRequest) => {
     await writeRequested(request, "png");
