@@ -963,6 +963,20 @@ body
     }
   });
 
+  test("names a deck it does not know and starts nothing", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await expect(startDevServer({ cwd: root, deck: "missing" })).rejects.toMatchObject({
+          message: 'deck "missing" not found',
+          path: join(root, "decks", "missing"),
+          hint: "run `dek ls`",
+        });
+        expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
+      },
+    );
+  });
+
   test("refuses to start when another server lock is alive", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

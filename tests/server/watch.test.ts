@@ -9,6 +9,7 @@ import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { waitForEvent } from "../helpers/server.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 const voiceToml = `engine = "voicevox"
 speaker = "ずんだもん/ノーマル"
@@ -337,6 +338,77 @@ describe("watchDeck", () => {
   });
 });
 
+describe("watchDeck diagnostics", () => {
+  test("merges edits made while a pass runs into one pass after it", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const dir = deckDir(root);
+        const gate = createGate();
+        let calls = 0;
+        const hub = createEventHub();
+        const watcher = watchDeck(dir, emitTo(hub), {
+          pollIntervalMs: 20,
+          visual: true,
+          visualRunner: async () => {
+            calls += 1;
+            if (calls === 1) {
+              await gate.opened;
+            }
+            return { overflows: [], contrasts: [] };
+          },
+        });
+        try {
+          await waitFor(() => calls === 1);
+          const slidePath = join(dir, "slides", "intro.html");
+          for (const offset of [10_000, 20_000]) {
+            const reloaded = waitForEvent(hub, (event) => event.type === "reload-slide");
+            await writeFile(slidePath, `${introHtml}\n`);
+            const later = new Date(Date.now() + offset);
+            await utimes(slidePath, later, later);
+            await reloaded;
+          }
+          gate.open();
+          await waitFor(() => calls === 2);
+          // Two edits, one pass: a third call would mean each edit ran its own.
+          await Bun.sleep(100);
+          expect(calls).toBe(2);
+        } finally {
+          gate.open();
+          watcher.close();
+          hub.close();
+        }
+      },
+    );
+  });
+
+  test("emits nothing once closed, even for a pass that was running", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const gate = createGate();
+        let started = false;
+        const events: LiveEvent[] = [];
+        const watcher = watchDeck(deckDir(root), (event) => events.push(event), {
+          pollIntervalMs: 20,
+          visual: true,
+          visualRunner: async () => {
+            started = true;
+            await gate.opened;
+            return { overflows: [], contrasts: [] };
+          },
+        });
+        await waitFor(() => started);
+        watcher.close();
+        const seen = events.length;
+        gate.open();
+        await Bun.sleep(100);
+        expect(events).toHaveLength(seen);
+      },
+    );
+  });
+});
+
 describe("watchDeck scan", () => {
   // A scan runs from a timer, where a throw would end the dev server.
   test("reports a slides folder it may not read instead of throwing", async () => {
@@ -436,3 +508,21 @@ describe("watchErrorDiagnostic", () => {
     });
   });
 });
+
+function createGate(): { opened: Promise<void>; open: () => void } {
+  let open = (): void => undefined;
+  const opened = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { opened, open };
+}
+
+async function waitFor(condition: () => boolean, timeoutMs = WAIT_MS): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) {
+      throw new Error("timed out waiting for a condition");
+    }
+    await Bun.sleep(10);
+  }
+}

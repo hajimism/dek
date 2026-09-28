@@ -22,6 +22,15 @@ export type Stoppable = { close: () => void };
 /** How often a watcher re-scans for edits fs.watch missed; shared by the deck and project polls. */
 export const POLL_INTERVAL_MS = 2000;
 
+type WatchDeckOptions = {
+  visual?: boolean;
+  visualRunner?: PlaywrightRunner;
+  pollIntervalMs?: number;
+  setInterval?: typeof setInterval;
+  clearInterval?: typeof clearInterval;
+  synthVoice?: () => Promise<void>;
+};
+
 /**
  * Watch one deck and `emit` what its open pages must do: each scan diffs the deck's files
  * against the last scan (see `diffSnapshot`), then syncs, lints, and synthesizes as it says.
@@ -29,116 +38,21 @@ export const POLL_INTERVAL_MS = 2000;
 export function watchDeck(
   deckDir: string,
   emit: (event: LiveEvent) => void,
-  options: {
-    visual?: boolean;
-    visualRunner?: PlaywrightRunner;
-    pollIntervalMs?: number;
-    setInterval?: typeof setInterval;
-    clearInterval?: typeof clearInterval;
-    synthVoice?: () => Promise<void>;
-  } = {},
+  options: WatchDeckOptions = {},
 ): Stoppable {
   let snapshot = takeSnapshot(deckDir);
   let closed = false;
-  let debounce: ReturnType<typeof setTimeout> | undefined;
-  const startInterval = options.setInterval ?? setInterval;
-  const stopInterval = options.clearInterval ?? clearInterval;
+  const isClosed = () => closed;
+  const diagnose = createDiagnose(deckDir, options);
+  const requestDiagnostics = createDiagnosticsQueue(diagnose, emit, isClosed);
+  const synthVoice = createVoiceSynth(deckDir, emit, options.synthVoice);
 
-  // A browser that is not installed turns the visual pass off until one is found again.
-  let visualEnabled = options.visual === true;
-  const diagnose = async (scope: DiagnoseScope): Promise<Diagnostic[]> => {
-    let diagnostics: Diagnostic[] = [];
-    let resolved: ReturnType<typeof resolveDeck> | undefined;
-    try {
-      resolved = resolveDeck(deckDir);
-      diagnostics = [...lintProject(resolved.project), ...(await lintDeckAsync(resolved))];
-    } catch (error) {
-      diagnostics = [watchErrorDiagnostic(error)];
-    }
-    if (visualEnabled && resolved) {
-      try {
-        const visual = await lintVisualDeck(resolved, {
-          ...(scope.slug !== undefined ? { slug: scope.slug } : {}),
-          ...(options.visualRunner ? { runner: options.visualRunner } : {}),
-        });
-        visualEnabled = visual !== null;
-        diagnostics.push(...(visual ?? []));
-      } catch (error) {
-        diagnostics.push(watchErrorDiagnostic(error));
-      }
-    }
-    return diagnostics;
-  };
-
-  // Edits that land while a pass runs are merged into one pass after it.
-  let pending: DiagnoseScope | undefined;
-  const runDiagnostics = createSerialTask(async () => {
-    const scope = pending;
-    pending = undefined;
-    if (!scope || closed) {
-      return;
-    }
-    const diagnostics = await diagnose(scope);
-    if (!closed) {
-      emit({ type: "diagnostics", diagnostics });
-    }
-  });
-  const requestDiagnostics = (scope: DiagnoseScope): void => {
-    pending = mergeScope(pending, scope);
-    runDiagnostics();
-  };
-
-  const synthVoice = createSerialTask(async () => {
-    try {
-      if (options.synthVoice) {
-        await options.synthVoice();
-        emit({ type: "timeline" });
-        return;
-      }
-      const { hasVoice } = await import("../core/voice.ts");
-      if (!hasVoice(deckDir)) {
-        return;
-      }
-      const { synthDeck } = await import("../voice/synth.ts");
-      await synthDeck(deckDir);
-      emit({ type: "timeline" });
-    } catch (error) {
-      // Voice is optional: an engine that is not running is worth a line, not a stack trace.
-      console.error(voiceFailureLine(error));
-    }
-  });
-
-  /**
-   * Create skeletons for sections without slide HTML. A script the author cannot parse yet is
-   * reported by the diagnostics pass that follows, so the failure itself stays quiet here.
-   */
-  const syncScript = (options: { announceEmpty: boolean }): void => {
-    let result: SyncResult = {
-      created: [],
-      updated: [],
-      removed: [],
-      dekFiles: { created: [], updated: [] },
-    };
-    try {
-      result = syncDeck(deckDir);
-    } catch {
-      // resolveDeck in diagnose reports the same error with its path and line.
-    }
+  const syncScript = (announceEmpty: boolean): void => {
+    const event = syncEvent(syncQuietly(deckDir), announceEmpty);
     // A sync event reloads the whole page, so the slides it wrote need no reload-slide.
     snapshot = { ...snapshot, slides: slideMtimes(deckDir) };
-    // Slides go by slug: the stream reaches the audience, and a path on disk names the
-    // presenter's home and user.
-    const slugs = (paths: string[]) => paths.map((path) => basename(path, ".html"));
-    const created = slugs(result.created);
-    const updated = slugs(result.updated);
-    const removed = slugs(result.removed);
-    if (created.length > 0 || updated.length > 0 || removed.length > 0 || options.announceEmpty) {
-      emit({
-        type: "sync",
-        created,
-        ...(updated.length > 0 ? { updated } : {}),
-        ...(removed.length > 0 ? { removed } : {}),
-      });
+    if (event) {
+      emit(event);
     }
   };
 
@@ -147,7 +61,7 @@ export function watchDeck(
     const change = diffSnapshot(snapshot, next);
     snapshot = next;
     if (change.sync) {
-      syncScript({ announceEmpty: true });
+      syncScript(true);
     }
     for (const event of change.events) {
       emit(event);
@@ -175,34 +89,57 @@ export function watchDeck(
     }
   };
 
+  const triggers = startScanTriggers(deckDir, scan, options, isClosed);
+  // A script written before the server started still gets its skeletons.
+  syncScript(false);
+  requestDiagnostics({});
+
+  return {
+    close() {
+      closed = true;
+      triggers.close();
+    },
+  };
+}
+
+/**
+ * Run `scan` shortly after fs.watch reports an edit, and on a poll for the edits it misses; a
+ * watcher that fails turns the poll on even when it was off.
+ */
+function startScanTriggers(
+  deckDir: string,
+  scan: () => void,
+  options: WatchDeckOptions,
+  isClosed: () => boolean,
+): Stoppable {
+  const startInterval = options.setInterval ?? setInterval;
+  const stopInterval = options.clearInterval ?? clearInterval;
+  let debounce: ReturnType<typeof setTimeout> | undefined;
+  let timer: ReturnType<typeof setInterval> | undefined;
+
   const schedule = (): void => {
     if (debounce) {
       clearTimeout(debounce);
     }
     debounce = setTimeout(scan, 20);
   };
-
-  const watcher = watch(deckDir, { recursive: true }, schedule);
-  let timer: ReturnType<typeof setInterval> | undefined;
   const startPoll = (ms: number): void => {
-    if (timer || closed || ms <= 0) {
+    if (timer || isClosed() || ms <= 0) {
       return;
     }
     timer = startInterval(scan, ms);
   };
+
+  const watcher = watch(deckDir, { recursive: true }, schedule);
   startPoll(options.pollIntervalMs ?? POLL_INTERVAL_MS);
   if (typeof watcher.on === "function") {
     watcher.on("error", () => {
       startPoll(options.pollIntervalMs || POLL_INTERVAL_MS);
     });
   }
-  // A script written before the server started still gets its skeletons.
-  syncScript({ announceEmpty: false });
-  requestDiagnostics({});
 
   return {
     close() {
-      closed = true;
       if (debounce) {
         clearTimeout(debounce);
       }
@@ -211,6 +148,132 @@ export function watchDeck(
       }
       watcher.close();
     },
+  };
+}
+
+/** One diagnostics pass over the deck: the lint rules, then the visual pass when it is on. */
+function createDiagnose(
+  deckDir: string,
+  options: WatchDeckOptions,
+): (scope: DiagnoseScope) => Promise<Diagnostic[]> {
+  // A browser that is not installed turns the visual pass off until one is found again.
+  let visualEnabled = options.visual === true;
+  return async (scope) => {
+    const { diagnostics, resolved } = await lintPass(deckDir);
+    if (visualEnabled && resolved) {
+      try {
+        const visual = await lintVisualDeck(resolved, {
+          ...(scope.slug !== undefined ? { slug: scope.slug } : {}),
+          ...(options.visualRunner ? { runner: options.visualRunner } : {}),
+        });
+        visualEnabled = visual !== null;
+        diagnostics.push(...(visual ?? []));
+      } catch (error) {
+        diagnostics.push(watchErrorDiagnostic(error));
+      }
+    }
+    return diagnostics;
+  };
+}
+
+/** The lint rules over the deck, and the deck as resolved when it resolves. */
+async function lintPass(
+  deckDir: string,
+): Promise<{ diagnostics: Diagnostic[]; resolved?: ReturnType<typeof resolveDeck> }> {
+  let resolved: ReturnType<typeof resolveDeck> | undefined;
+  try {
+    resolved = resolveDeck(deckDir);
+    return {
+      diagnostics: [...lintProject(resolved.project), ...(await lintDeckAsync(resolved))],
+      resolved,
+    };
+  } catch (error) {
+    // A deck that resolved but failed to lint still gets its visual pass.
+    return { diagnostics: [watchErrorDiagnostic(error)], ...(resolved ? { resolved } : {}) };
+  }
+}
+
+/** Run one diagnostics pass at a time and `emit` what each finds, unless the watch closed. */
+function createDiagnosticsQueue(
+  diagnose: (scope: DiagnoseScope) => Promise<Diagnostic[]>,
+  emit: (event: LiveEvent) => void,
+  isClosed: () => boolean,
+): (scope: DiagnoseScope) => void {
+  // Edits that land while a pass runs are merged into one pass after it.
+  let pending: DiagnoseScope | undefined;
+  const run = createSerialTask(async () => {
+    const scope = pending;
+    pending = undefined;
+    if (!scope || isClosed()) {
+      return;
+    }
+    const diagnostics = await diagnose(scope);
+    if (!isClosed()) {
+      emit({ type: "diagnostics", diagnostics });
+    }
+  });
+  return (scope) => {
+    pending = mergeScope(pending, scope);
+    run();
+  };
+}
+
+/** Synthesize the deck's voice, one run at a time, and tell its pages the timeline changed. */
+function createVoiceSynth(
+  deckDir: string,
+  emit: (event: LiveEvent) => void,
+  synthVoice: (() => Promise<void>) | undefined,
+): () => void {
+  return createSerialTask(async () => {
+    try {
+      if (synthVoice) {
+        await synthVoice();
+        emit({ type: "timeline" });
+        return;
+      }
+      const { hasVoice } = await import("../core/voice.ts");
+      if (!hasVoice(deckDir)) {
+        return;
+      }
+      const { synthDeck } = await import("../voice/synth.ts");
+      await synthDeck(deckDir);
+      emit({ type: "timeline" });
+    } catch (error) {
+      // Voice is optional: an engine that is not running is worth a line, not a stack trace.
+      console.error(voiceFailureLine(error));
+    }
+  });
+}
+
+/**
+ * Create skeletons for sections without slide HTML. A script the author cannot parse yet is
+ * reported by the diagnostics pass that follows, so the failure itself stays quiet here.
+ */
+function syncQuietly(deckDir: string): SyncResult {
+  try {
+    return syncDeck(deckDir);
+  } catch {
+    // resolveDeck in diagnose reports the same error with its path and line.
+    return { created: [], updated: [], removed: [], dekFiles: { created: [], updated: [] } };
+  }
+}
+
+/** The sync event a page hears, or none when nothing changed and none is owed. */
+function syncEvent(result: SyncResult, announceEmpty: boolean): LiveEvent | undefined {
+  // Slides go by slug: the stream reaches the audience, and a path on disk names the
+  // presenter's home and user.
+  const slugs = (paths: string[]) => paths.map((path) => basename(path, ".html"));
+  const created = slugs(result.created);
+  const updated = slugs(result.updated);
+  const removed = slugs(result.removed);
+  if (created.length === 0 && updated.length === 0 && removed.length === 0 && !announceEmpty) {
+    return undefined;
+  }
+  return {
+    type: "sync",
+    created,
+    ...(updated.length > 0 ? { updated } : {}),
+    ...(removed.length > 0 ? { removed } : {}),
   };
 }
 
