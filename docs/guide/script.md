@@ -76,7 +76,7 @@ The first command rewrites the id in `script.md`, renames `slides/problem.html` 
 
 You can also edit the heading first, or rename the files first, and run `dek mv` afterwards; it finishes the rename from whichever you did. When `script.md` already has the new id, `dek mv problem the-problem` moves only the files. When the files already carry the new id, it rewrites only the heading and moves whatever is left. A skeleton the dev server generated on save gives way to the slide you wrote, under either id. Only two slides you wrote, one under each id, stop the command, and it asks you to merge them.
 
-When lint sees exactly one orphan (`DEK002`) and exactly one section without its own HTML, either missing (`DEK001`) or still the generated skeleton, it assumes a rename. Whether you renamed the heading or the file is yours to say, so the hint gives both: `dek mv problem the-problem` to move the files to the script's id, or `dek mv the-problem problem` to give the section the files' id. Either works as written. With more than one candidate, it does not guess.
+When lint sees exactly one orphan (`DEK002`) and exactly one section without its own HTML, either missing (`DEK001`) or still the generated skeleton, it assumes a rename. Whether you renamed the heading or the file is yours to say, so the hint gives both: `dek mv problem the-problem` to move the files to the script's id, or `dek mv the-problem problem` to give the section the files' id. Either works as written. With more than one candidate, such as a section you added while the dev server was running, it does not pick one: the hint names a `dek mv` for each, like `dek mv problem the-problem` or `dek mv problem qa`, and never suggests deleting the slide.
 
 ## Beats
 

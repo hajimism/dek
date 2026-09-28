@@ -65,7 +65,7 @@ Each finding is about one of three things, and the command that reports it follo
 
 ### DEK001 / DEK002
 
-`DEK001` points at the section heading in `script.md`; `data.expected` is the HTML path it looked for. `--fix` syncs first: it creates the skeleton, removes an orphan that is still an untouched skeleton with nothing beside it, and never touches a slide you have edited, so a `DEK002` that remains is a file with your work in it. One orphan and one section without its own HTML (missing, or still the generated skeleton) suggest a rename: both diagnostics carry `` run `dek mv <old> <new>` `` as the hint, and the command works whether or not `script.md` was edited first. More than one candidate and lint does not guess.
+`DEK001` points at the section heading in `script.md`; `data.expected` is the HTML path it looked for. `--fix` syncs first: it creates the skeleton, removes an orphan that is still an untouched skeleton with nothing beside it, and never touches a slide you have edited, so a `DEK002` that remains is a file with your work in it. One orphan and one section without its own HTML (missing, or still the generated skeleton) suggest a rename: both diagnostics carry `` run `dek mv <old> <new>` `` as the hint, and the command works whether or not `script.md` was edited first. With more than one candidate, each orphan's hint names a `dek mv` for every section it could be, in script order, instead of suggesting a new section or deleting the file. Whenever there is a candidate, the orphan's `data.renames` lists them.
 
 ### DEK003
 

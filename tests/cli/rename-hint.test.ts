@@ -189,7 +189,32 @@ describe("renaming after moving the files first", () => {
 });
 
 describe("rename hints", () => {
-  test("do not guess when two sections could be the target", async () => {
+  /** Every `dek ...` command a hint names, as argv. */
+  function commandsOf(hint: string | undefined): string[][] {
+    return [...(hint ?? "").matchAll(/`dek ([^`]+)`/g)].map((m) => (m[1] ?? "").split(" "));
+  }
+
+  test("name every section the orphan could be when more than one could, and never the delete", async () => {
+    // The dev server is running: the author adds `qa`, then renames `before` to `after`.
+    await withScriptRenamed(async (deck) => {
+      await writeFile(join(deck, "script.md"), `${script("after")}\n## 質疑応答 {#qa}\n\nthanks\n`);
+      syncDeck(deck);
+
+      const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEK002");
+      expect(orphan?.hint).toBe(
+        "run `dek mv before after` or `dek mv before qa` to move the files to the section they now belong to",
+      );
+      expect(orphan?.data).toMatchObject({ renames: ["after", "qa"] });
+
+      run(commandsOf(orphan?.hint)[0] ?? [], deck);
+
+      expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
+      expect(existsSync(join(deck, "slides", "qa.html"))).toBe(true);
+      expect((await lint(deck)).diagnostics).toEqual([]);
+    });
+  });
+
+  test("name every section without its own HTML as a place the orphan could go", async () => {
     await withTempProject(
       {
         decks: [
@@ -201,8 +226,42 @@ describe("rename hints", () => {
         ],
       },
       async (root) => {
-        const diagnostics = lintDeck(join(root, "decks", "demo"));
-        expect(diagnostics.find((d) => d.id === "DEK002")?.hint).not.toContain("dek mv");
+        const deck = join(root, "decks", "demo");
+        const diagnostics = (await lint(deck)).diagnostics;
+        const orphan = diagnostics.find((d) => d.id === "DEK002");
+        expect(commandsOf(orphan?.hint)).toEqual([
+          ["mv", "leftover", "a"],
+          ["mv", "leftover", "b"],
+        ]);
+        // Each section still gets its own skeleton if it was not a rename.
+        for (const missing of diagnostics.filter((d) => d.id === "DEK001")) {
+          expect(missing.hint).toBe("run `dek sync` to create the skeleton");
+        }
+      },
+    );
+  });
+
+  test("keep the section-or-remove hint when nothing could be a rename", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument('<section class="slide"></section>'),
+              leftover: written,
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const deck = join(root, "decks", "demo");
+        syncDeck(deck);
+        const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEK002");
+        expect(orphan?.hint).toBe(
+          "add a section for it to script.md, like `## Leftover {#leftover}`, or remove slides/leftover.html if the slide is gone from the talk",
+        );
+        expect(orphan?.data).not.toHaveProperty("renames");
       },
     );
   });

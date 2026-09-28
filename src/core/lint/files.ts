@@ -67,35 +67,58 @@ function orphanHint(slug: string, file: string): string {
 }
 
 /**
- * One orphaned HTML file and one section without its own HTML look like a
- * heading renamed in script.md first. The section either has no HTML yet, or
- * only the skeleton the dev server generated on save. `dek mv` handles both,
- * so both diagnostics get that hint.
+ * An orphaned HTML file beside sections without their own slide (missing, or still the skeleton
+ * the dev server generated on save) looks like a heading renamed in script.md first. `dek mv`
+ * finishes that rename from either state, so each orphan's hint names a `dek mv` for every such
+ * section, in script order, rather than asking to delete a slide someone wrote. With one of each
+ * the pairing is certain, and both diagnostics also offer the rename the other way.
  */
 export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diagnostic[] {
-  const orphans = diagnostics.filter(
-    (diagnostic) => diagnostic.id === "DEK002" && diagnostic.path?.endsWith(".html"),
+  const orphans = new Set(
+    diagnostics.filter(
+      (diagnostic) => diagnostic.id === "DEK002" && diagnostic.path?.endsWith(".html"),
+    ),
   );
+  const targets = ctx.deck.deck.sections
+    .filter(
+      (section) =>
+        !ctx.slidesBySlug.has(section.slug) || ctx.slideSource(section.slug)?.skeleton === true,
+    )
+    .map((section) => section.slug);
+  if (orphans.size === 0 || targets.length === 0) {
+    return diagnostics;
+  }
   const [orphan] = orphans;
-  if (orphans.length !== 1 || !orphan?.slug) {
-    return diagnostics;
-  }
-  const missing = diagnostics.filter((diagnostic) => diagnostic.id === "DEK001");
-  const targets =
-    missing.length > 0
-      ? missing.flatMap((diagnostic) => (diagnostic.slug ? [diagnostic.slug] : []))
-      : ctx.deck.deck.sections
-          .filter((section) => ctx.slideSource(section.slug)?.skeleton === true)
-          .map((section) => section.slug);
   const [target] = targets;
-  if (targets.length !== 1 || !target) {
-    return diagnostics;
+  if (orphans.size === 1 && targets.length === 1 && orphan?.slug && target) {
+    // An orphan beside a section without its own slide is a rename, made in the script or in the
+    // files: which one is the author's to say, and each command finishes it from this state.
+    const hint = `run \`dek mv ${orphan.slug} ${target}\` to move the files to the script's id, or \`dek mv ${target} ${orphan.slug}\` to give the section the files' id`;
+    return diagnostics.map((diagnostic) =>
+      diagnostic === orphan
+        ? { ...diagnostic, hint, data: { ...diagnostic.data, renames: targets } }
+        : diagnostic.id === "DEK001" && diagnostic.slug === target
+          ? { ...diagnostic, hint }
+          : diagnostic,
+    );
   }
-  // An orphan beside a section without its own slide is a rename, made in the script or in the
-  // files: which one is the author's to say, and each command finishes it from this state.
-  const hint = `run \`dek mv ${orphan.slug} ${target}\` to move the files to the script's id, or \`dek mv ${target} ${orphan.slug}\` to give the section the files' id`;
-  const renamed = new Set<Diagnostic>([orphan, ...missing]);
-  return diagnostics.map((diagnostic) =>
-    renamed.has(diagnostic) ? { ...diagnostic, hint } : diagnostic,
-  );
+  return diagnostics.map((diagnostic) => {
+    if (!orphans.has(diagnostic) || !diagnostic.slug) {
+      return diagnostic;
+    }
+    const commands = targets.map((slug) => `\`dek mv ${diagnostic.slug} ${slug}\``);
+    return {
+      ...diagnostic,
+      hint: `run ${either(commands)} to move the files to the section they now belong to`,
+      data: { ...diagnostic.data, renames: targets },
+    };
+  });
+}
+
+/** "a", "a or b", "a, b, or c". */
+function either(items: string[]): string {
+  if (items.length <= 2) {
+    return items.join(" or ");
+  }
+  return `${items.slice(0, -1).join(", ")}, or ${items.at(-1)}`;
 }
