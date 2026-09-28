@@ -112,6 +112,44 @@ describe("lintVisualDeck", () => {
     );
   });
 
+  test("sends a DEK031 the theme alone causes to theme.css", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [{ ...sample, ratio: 2.1, fontSize: 16, origin: "theme" }],
+          }),
+        });
+        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
+        expect(dek031?.hint).toBe(
+          "theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it",
+        );
+        expect(dek031?.data).toMatchObject({ origin: "theme" });
+      },
+    );
+  });
+
+  test("keeps a DEK031 the slide's own stylesheet causes on that slide", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [{ ...sample, ratio: 2.1, fontSize: 16, origin: "slide" }],
+          }),
+        });
+        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
+        expect(dek031?.hint).toBe(
+          "slides/intro.css brings it below 4.5:1, which theme.css alone does not: raise its contrast in slides/intro.css",
+        );
+        expect(dek031?.data).toMatchObject({ origin: "slide" });
+      },
+    );
+  });
+
   test("accepts 3:1 for large text and says so when it still fails", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

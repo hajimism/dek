@@ -489,6 +489,40 @@ describe("renderSlideHtml", () => {
     });
   });
 
+  test("keeps the slide's own stylesheet apart from the theme, and no other slide's", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            ...twoSlideDeck,
+            theme: `.slide { background: navy; }`,
+            styles: {
+              intro: `.intro-mark { color: teal; }`,
+              architecture: `.arch-mark { color: olive; }`,
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
+        const html = renderSlideHtml(loadSlideSources(deck), "architecture", 0);
+        const own = html.match(/<style id="dek-slide-css">([\s\S]*?)<\/style>/)?.[1] ?? "";
+        expect(own).toContain('.slide:where([data-slug="architecture"]) .arch-mark');
+        expect(own).not.toContain("navy");
+        expect(html).toContain("navy");
+        expect(html).not.toContain("intro-mark");
+      },
+    );
+  });
+
+  test("gives a slide with no stylesheet of its own no slide style element", async () => {
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      const { deck } = resolveDeck(join(root, "decks", "demo"));
+      const html = renderSlideHtml(loadSlideSources(deck), "architecture", 0);
+      expect(html).not.toContain("dek-slide-css");
+    });
+  });
+
   test("renders one slide at 1280x720 with is-shown for the requested beat", async () => {
     await withTempProject(
       {

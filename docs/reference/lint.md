@@ -118,6 +118,8 @@ Contrast is measured from pixels, not from styles. Each beat is drawn with its t
 
 Only the pixels a text's glyphs cover most are read, each taken back to the color a glyph covering the whole pixel would draw, so antialiasing never lowers a ratio and a thin hyphen reads at its own color. The ratio reported is the one all but the worst 2% of those pixels reach: text over a gradient is judged by the part that reads worst. `fg` and `bg` are the two colors at that pixel. Where two texts overlap, neither is judged by the shared pixels unless it has no others. What `::before` and `::after` draw counts as background, and `DEK030` does not measure it.
 
+When a text falls short, the beat is drawn again with the slide's own `slides/<id>.css` taken away and measured once more. If the text still falls short, the theme alone draws it that way: the hint sends the fix to `theme.css`, where one change reaches every slide that uses the same pair, and `data.origin` is `"theme"`. If it clears the threshold, the slide's own CSS brought it down: the hint keeps the fix in `slides/<id>.css`, and `data.origin` is `"slide"`. A slide with no CSS of its own leaves every color to the theme. Colors a slide script sets in `draw` stay on the page, so they count as the theme's.
+
 ### DEK042
 
 Only paragraphs are spoken. A beat that shows a list, code, or a table without a paragraph passes in `pause.beat` milliseconds when narrated. Empty beats and blockquote-only beats are treated as deliberate pauses and are not flagged.

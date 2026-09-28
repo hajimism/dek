@@ -3,6 +3,7 @@ import { type Diagnostic, diag } from "./diagnostic.ts";
 import { EDGES } from "./overflow.ts";
 import {
   askPlaywright,
+  type ContrastOrigin,
   type PageAction,
   type PagesResponse,
   type PlaywrightRunner,
@@ -164,6 +165,22 @@ function groupBySteps<T>(items: T[], key: (item: T) => string, step: (item: T) =
   return [...groups.values()];
 }
 
+/**
+ * Where to fix low contrast. Text the theme alone draws too faint is fixed once in theme.css
+ * for every slide that uses the pair; a slide that fixed it in its own CSS would leave the rest.
+ */
+function contrastHint(origin: ContrastOrigin | undefined, threshold: number, slug: string): string {
+  const own = `slides/${slug}.css`;
+  switch (origin) {
+    case "theme":
+      return `theme.css alone draws it below ${threshold}:1: fix the pair in theme.css, where one change reaches every slide that uses it`;
+    case "slide":
+      return `${own} brings it below ${threshold}:1, which theme.css alone does not: raise its contrast in ${own}`;
+    case undefined:
+      return `raise the contrast of its color against the background to ${threshold}:1`;
+  }
+}
+
 function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const pathOf = (slug: string): string => deckPaths(deckDir).slide(slug, ".html");
@@ -220,7 +237,15 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
   const failing = response.contrasts.filter((sample) => sample.ratio < contrastThreshold(sample));
   const contrastGroups = groupBySteps(
     failing,
-    (c) => [c.slug, c.box, c.text ?? "", Math.round(c.ratio * 10), contrastThreshold(c)].join("\0"),
+    (c) =>
+      [
+        c.slug,
+        c.box,
+        c.text ?? "",
+        Math.round(c.ratio * 10),
+        contrastThreshold(c),
+        c.origin ?? "",
+      ].join("\0"),
     (c) => c.step,
   );
   for (const { items, steps } of contrastGroups) {
@@ -239,13 +264,14 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
         message: `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`,
         path: pathOf(first.slug),
         slug: first.slug,
-        hint: `raise the contrast of its color against the background to ${threshold}:1`,
+        hint: contrastHint(first.origin, threshold, first.slug),
         data: {
           box: first.box,
           ...(first.text ? { text: first.text } : {}),
           ratio,
           threshold,
           ...(fg && bg ? { fg, bg } : {}),
+          ...(first.origin ? { origin: first.origin } : {}),
           steps,
         },
       }),

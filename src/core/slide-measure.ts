@@ -1,3 +1,9 @@
+/**
+ * The id of a still page's `<style>` holding the slide's own CSS, apart from the theme, so a
+ * measurement can take it away and see what the theme alone draws.
+ */
+export const SLIDE_CSS_ID = "dek-slide-css";
+
 /** A rectangle in viewport pixels. */
 export type Box = {
   left: number;

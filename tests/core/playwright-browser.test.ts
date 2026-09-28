@@ -373,6 +373,55 @@ ${css}
   );
 });
 
+describe("playwright worker contrast origin", () => {
+  const measure = async (slideCss: string | undefined) => {
+    const own = slideCss === undefined ? "" : `<style id="dek-slide-css">${slideCss}</style>`;
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["contrast"],
+      pages: [
+        {
+          html: `<html><head><style>
+body { margin: 0; background: #fff }
+.slide { width: 1280px; height: 720px; background: #fff; color: #111; font: 400 24px sans-serif }
+.card { background: #111; padding: 16px }
+.note { color: #555 }
+</style>${own}</head><body><section class="slide">
+  <p class="card"><span class="note">theme pair</span></p>
+  <p class="faint">slide color</p>
+  <p class="fine">fine</p>
+</section></body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+    return Object.fromEntries((response?.contrasts ?? []).map((sample) => [sample.text, sample]));
+  };
+
+  browserTest("blames the theme for text that fails without the slide's stylesheet", async () => {
+    const found = await measure(".slide .faint { color: #ccc }");
+    expect(found["theme pair"]?.origin).toBe("theme");
+  });
+
+  browserTest("blames the slide's stylesheet for text that passes without it", async () => {
+    const found = await measure(".slide .faint { color: #ccc }");
+    expect(found["slide color"]?.origin).toBe("slide");
+  });
+
+  browserTest("blames the theme when the slide has no stylesheet of its own", async () => {
+    const found = await measure(undefined);
+    expect(found["theme pair"]?.origin).toBe("theme");
+  });
+
+  browserTest("names no origin for text that passes", async () => {
+    const found = await measure(".slide .faint { color: #ccc }");
+    expect(found.fine).toBeDefined();
+    expect(found.fine?.origin).toBeUndefined();
+  });
+});
+
 describe("view transitions in a real Chromium", () => {
   const theme = readFileSync(
     join(import.meta.dir, "..", "..", "src", "theme", "default.css"),

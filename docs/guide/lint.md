@@ -38,7 +38,7 @@ A finding names what to fix: the element, the start of its text, and the amount.
 slides/objection.html: DEK030 li "https://example.com/very…" overflows the right edge by 102px at steps slow, vague
   help: shorten it, or let it wrap with overflow-wrap: anywhere in slides/objection.css
 slides/objection.html: DEK031 p.note "補足" has contrast 1.5 (#333333 on #111111), below 4.5:1 at steps slow, vague
-  help: raise the contrast of its color against the background to 4.5:1
+  help: theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it
 ```
 
 A list that runs off the bottom is one finding for the list, not one per item: a child is reported only for an edge its parent stays inside. The same finding on several beats is reported once, with every beat named. A string that cannot wrap, such as a URL, counts even when its box fits.
@@ -71,8 +71,8 @@ A diagnostic points at the file to change: `DEK001` at the section heading in `s
   "message": "p.note \"補足\" has contrast 1.5 (#333333 on #111111), below 4.5:1 at step 1",
   "path": "slides/objection.html",
   "slug": "objection",
-  "hint": "raise the contrast of its color against the background to 4.5:1",
-  "data": { "box": "p.note", "text": "補足", "ratio": 1.5, "threshold": 4.5, "fg": "#333333", "bg": "#111111", "steps": ["1"] }
+  "hint": "theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it",
+  "data": { "box": "p.note", "text": "補足", "ratio": 1.5, "threshold": 4.5, "fg": "#333333", "bg": "#111111", "origin": "theme", "steps": ["1"] }
 }
 ```
 

@@ -24,6 +24,7 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 
 - `dek check <slug> --shot` lints one slide and screenshots it at its last beat.
 - `dek shot --sheet` tiles every slide on one image: read it to judge the deck's balance in one look, then open a slide's own shot for detail.
+- When a hint sends a fix to `theme.css`, make it there, not in `slides/<id>.css`: the theme alone draws it that way, so other slides share the problem, and one change fixes them all.
 - One shot shows no motion. `dek shot <slug> --motion` lays the slide's beats out as rows, each held at moments through everything it moves and ending as the shot does. `dek shot <a> --to <b> --at 0.5` freezes the view transition between any two slides.
 
 ## Theme classes

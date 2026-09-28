@@ -38,7 +38,7 @@ dek check architecture --shot
 slides/objection.html: DEK030 li "https://example.com/very…" overflows the right edge by 102px at steps slow, vague
   help: shorten it, or let it wrap with overflow-wrap: anywhere in slides/objection.css
 slides/objection.html: DEK031 p.note "補足" has contrast 1.5 (#333333 on #111111), below 4.5:1 at steps slow, vague
-  help: raise the contrast of its color against the background to 4.5:1
+  help: theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it
 ```
 
 下にはみ出したリストは、項目ごとではなくリスト 1 件として報告します。子は、親が収まっている辺についてだけ報告されるからです。複数のビートで同じ指摘は 1 件にまとめ、該当するビートを並べます。URL のように折り返せない文字列は、箱が収まっていてもはみ出しとして数えます。
@@ -71,8 +71,8 @@ Playwright がなければ、それを必要とするコマンドだけがイン
   "message": "p.note \"補足\" has contrast 1.5 (#333333 on #111111), below 4.5:1 at step 1",
   "path": "slides/objection.html",
   "slug": "objection",
-  "hint": "raise the contrast of its color against the background to 4.5:1",
-  "data": { "box": "p.note", "text": "補足", "ratio": 1.5, "threshold": 4.5, "fg": "#333333", "bg": "#111111", "steps": ["1"] }
+  "hint": "theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it",
+  "data": { "box": "p.note", "text": "補足", "ratio": 1.5, "threshold": 4.5, "fg": "#333333", "bg": "#111111", "origin": "theme", "steps": ["1"] }
 }
 ```
 

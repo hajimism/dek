@@ -1,8 +1,10 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
+import { finishBeat } from "./finish-beat.ts";
 import { findOverflows } from "./overflow.ts";
 import { visitInPages } from "./page-pool.ts";
 import type {
+  ContrastFinding,
   DoneResponse,
   MorphRequest,
   MotionRequest,
@@ -17,8 +19,8 @@ import type {
 import { captureMotion } from "./playwright-motion.ts";
 import { renderSheets } from "./playwright-sheet.ts";
 import { motionSheets } from "./sheet.ts";
-import { measureSlideInPage } from "./slide-measure.ts";
-import { measurePageTextContrasts } from "./text-contrast.ts";
+import { type MeasuredElement, measureSlideInPage, SLIDE_CSS_ID } from "./slide-measure.ts";
+import { contrastThreshold, measurePageTextContrasts } from "./text-contrast.ts";
 
 /**
  * Answers a visual request in a running browser: what the Playwright worker
@@ -111,6 +113,15 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
   };
 }
 
+/** A contrast finding below its threshold, with the measured element it came from. */
+type Failing = { finding: ContrastFinding; element: number };
+
+/** The elements that draw text of their own, by their index among the slide's elements. */
+function ownTexts(elements: MeasuredElement[]): Array<{ element: MeasuredElement; index: number }> {
+  // Only text the element draws itself; an ancestor's sample would repeat it.
+  return elements.flatMap((element, index) => (element.ownText ? [{ element, index }] : []));
+}
+
 /** Measures one page as `actions` asks, and shoots it when it names a `screenshotPath`. */
 async function visitPage(
   page: Page,
@@ -118,6 +129,7 @@ async function visitPage(
   actions: PagesRequest["actions"],
 ): Promise<PagesResponse> {
   const response: PagesResponse = { overflows: [], contrasts: [] };
+  const failing: Failing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
   const { slug, step } = pageReq;
   if (actions.length > 0) {
@@ -128,18 +140,17 @@ async function visitPage(
       }
     }
     if (actions.includes("contrast")) {
-      // Only text the element draws itself; an ancestor's sample would repeat it.
-      const texts = measured.elements.filter((element) => element.ownText);
+      const texts = ownTexts(measured.elements);
       const measuredTexts = await measurePageTextContrasts(
         page,
-        texts.map((element) => ({ rects: element.textRects, opacity: element.opacity })),
+        texts.map(({ element }) => ({ rects: element.textRects, opacity: element.opacity })),
       );
-      texts.forEach((element, index) => {
-        const contrast = measuredTexts[index];
+      texts.forEach(({ element, index }, at) => {
+        const contrast = measuredTexts[at];
         if (!contrast) {
           return;
         }
-        response.contrasts.push({
+        const finding: ContrastFinding = {
           slug,
           step,
           ratio: contrast.ratio,
@@ -149,12 +160,56 @@ async function visitPage(
           ...(element.text ? { text: element.text } : {}),
           fg: `rgb(${contrast.fg.join(", ")})`,
           bg: `rgb(${contrast.bg.join(", ")})`,
-        });
+        };
+        response.contrasts.push(finding);
+        if (finding.ratio < contrastThreshold(finding)) {
+          failing.push({ finding, element: index });
+        }
       });
     }
   }
   if (pageReq.screenshotPath) {
     await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
   }
+  // After the shot: what follows takes the slide's CSS away, and the page is not put back.
+  await attributeContrasts(page, failing);
   return response;
+}
+
+/**
+ * Says which stylesheet draws each failing text below its threshold. The page is measured again
+ * with the slide's own CSS taken away and the beat finished anew: text still below its threshold
+ * is the theme's to fix, text that clears it the slide's. With no CSS of its own, the slide
+ * leaves every color to the theme.
+ */
+async function attributeContrasts(page: Page, failing: Failing[]): Promise<void> {
+  if (failing.length === 0) {
+    return;
+  }
+  const hadOwn = await page.evaluate((id) => {
+    const style = document.getElementById(id);
+    style?.remove();
+    return style !== null;
+  }, SLIDE_CSS_ID);
+  if (!hadOwn) {
+    for (const { finding } of failing) {
+      finding.origin = "theme";
+    }
+    return;
+  }
+  // Transitions and animations the theme now applies would otherwise be caught midway.
+  await page.evaluate(finishBeat);
+  const texts = ownTexts((await page.evaluate(measureSlideInPage)).elements);
+  const contrasts = await measurePageTextContrasts(
+    page,
+    texts.map(({ element }) => ({ rects: element.textRects, opacity: element.opacity })),
+  );
+  const alone = new Map(texts.map(({ element, index }, at) => [index, { element, at }]));
+  for (const { finding, element } of failing) {
+    const theme = alone.get(element);
+    const contrast = theme && contrasts[theme.at];
+    if (theme && contrast) {
+      finding.origin = contrast.ratio < contrastThreshold(theme.element) ? "theme" : "slide";
+    }
+  }
 }

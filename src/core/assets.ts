@@ -156,27 +156,41 @@ function inlinedUri(url: string, deckDir: string, from: string): string | undefi
   return `data:${mimeOf(ref.path)};base64,${readFileSync(ref.path).toString("base64")}${hash === -1 ? "" : url.slice(hash)}`;
 }
 
+/** The deck's stylesheets apart: theme.css, and each slide's own CSS scoped to that slide. */
+export type DeckStyles = { theme: string; slides: Map<string, string> };
+
 /**
- * The deck's stylesheet: theme.css, then each slide's own CSS scoped to that slide. Each is read
- * once and rewritten in one pass. A standalone page also gets its files as data: URIs, minified.
+ * The deck's stylesheets, each read once and rewritten in one pass; a slide with no CSS of its
+ * own has no entry. A standalone page also gets its files as data: URIs.
+ */
+export function readDeckStyles(deckDir: string, standalone: boolean): DeckStyles {
+  const paths = deckPaths(deckDir);
+  const theme = rewriteCss(
+    parseCss(readDeckFile(deckDir, paths.theme) ?? ""),
+    shareTokensWithTransitions,
+    ...(standalone ? [inlineCssUrls(deckDir)] : []),
+  );
+  const slides = new Map<string, string>();
+  for (const slide of listSlideFiles(deckDir, ".css")) {
+    const css = rewriteCss(
+      parseCss(readDeckFile(deckDir, slide.path) ?? ""),
+      scopeToSlide(slide.slug),
+      ...(standalone ? [inlineCssUrls(deckDir, paths.slides)] : []),
+    );
+    if (css) {
+      slides.set(slide.slug, css);
+    }
+  }
+  return { theme, slides };
+}
+
+/**
+ * The deck's stylesheet: theme.css, then each slide's own CSS scoped to that slide. A standalone
+ * page also gets its files as data: URIs, minified.
  */
 export function readTheme(deckDir: string, standalone: boolean): string {
-  const paths = deckPaths(deckDir);
-  const pieces = [
-    rewriteCss(
-      parseCss(readDeckFile(deckDir, paths.theme) ?? ""),
-      shareTokensWithTransitions,
-      ...(standalone ? [inlineCssUrls(deckDir)] : []),
-    ),
-    ...listSlideFiles(deckDir, ".css").map((slide) =>
-      rewriteCss(
-        parseCss(readDeckFile(deckDir, slide.path) ?? ""),
-        scopeToSlide(slide.slug),
-        ...(standalone ? [inlineCssUrls(deckDir, paths.slides)] : []),
-      ),
-    ),
-  ];
-  const css = pieces.filter(Boolean).join("\n");
+  const { theme, slides } = readDeckStyles(deckDir, standalone);
+  const css = [theme, ...slides.values()].filter(Boolean).join("\n");
   return standalone ? minifyCss(css) : css;
 }
 

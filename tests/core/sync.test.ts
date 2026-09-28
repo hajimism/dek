@@ -392,6 +392,7 @@ c
         expect(agents).toContain("dek shot <a> --to <b> --at 0.5");
         expect(agents).toContain("`--dek-slide-number` and `--dek-slide-count`");
         expect(agents).toContain("never by hand");
+        expect(agents).toContain("When a hint sends a fix to `theme.css`, make it there");
       },
     );
   });

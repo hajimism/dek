@@ -83,7 +83,7 @@ export type VisualRequest = PagesRequest | PdfRequest | MorphRequest | MotionReq
 
 type OverflowFinding = Overflow & { slug: string; step: string };
 
-type ContrastFinding = {
+export type ContrastFinding = {
   slug: string;
   step: string;
   ratio: number;
@@ -96,7 +96,15 @@ type ContrastFinding = {
   fontSize: number;
   /** Computed font-weight as a number. */
   fontWeight: number;
+  /**
+   * For text below its threshold, which stylesheet draws it so: "theme" when it stays below
+   * with the slide's own CSS taken away, "slide" when that CSS brings it there. Absent when the
+   * text passes, or shows no glyph without the slide's CSS.
+   */
+  origin?: ContrastOrigin;
 };
+
+export type ContrastOrigin = "theme" | "slide";
 
 export type PagesResponse = {
   overflows: OverflowFinding[];
@@ -319,9 +327,14 @@ function isContrastFinding(value: unknown): value is ContrastFinding {
   if (!isFinding(value)) {
     return false;
   }
-  const { ratio, fg, bg, fontSize, fontWeight } = value;
+  const { ratio, fg, bg, fontSize, fontWeight, origin } = value;
   return (
-    isNumber(ratio) && isString(fg) && isString(bg) && isNumber(fontSize) && isNumber(fontWeight)
+    isNumber(ratio) &&
+    isString(fg) &&
+    isString(bg) &&
+    isNumber(fontSize) &&
+    isNumber(fontWeight) &&
+    (origin === undefined || origin === "theme" || origin === "slide")
   );
 }
 
