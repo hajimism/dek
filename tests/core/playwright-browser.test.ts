@@ -480,8 +480,12 @@ ${css}
 });
 
 describe("playwright worker contrast origin", () => {
-  const measure = async (slideCss: string | undefined) => {
+  const measure = async (slideCss: string | undefined, draw = "") => {
     const own = slideCss === undefined ? "" : `<style id="dek-slide-css">${slideCss}</style>`;
+    const { stillPageScript } = await import("../../src/core/slide-script.ts");
+    const script = draw
+      ? `<script>(window.__dekSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
+      : "";
     const response = await render({
       kind: "pages",
       viewport: { width: 1280, height: 720 },
@@ -493,11 +497,11 @@ body { margin: 0; background: #fff }
 .slide { width: 1280px; height: 720px; background: #fff; color: #111; font: 400 24px sans-serif }
 .card { background: #111; padding: 16px }
 .note { color: #555 }
-</style>${own}</head><body><section class="slide">
+</style>${own}</head><body><section class="slide" data-slug="intro" data-dek-step="1" data-dek-beat="0">
   <p class="card"><span class="note">theme pair</span></p>
   <p class="faint">slide color</p>
   <p class="fine">fine</p>
-</section></body></html>`,
+</section>${script}</body></html>`,
           slug: "intro",
           step: "1",
         },
@@ -519,6 +523,24 @@ body { margin: 0; background: #fff }
   browserTest("blames the theme when the slide has no stylesheet of its own", async () => {
     const found = await measure(undefined);
     expect(found["theme pair"]?.origin).toBe("theme");
+  });
+
+  // A color draw sets inline wins over any stylesheet, so neither theme.css nor the slide's CSS
+  // can fix it; the hint has to send the agent to the script.
+  browserTest("blames the slide script for a color its draw sets", async () => {
+    const found = await measure(
+      ".slide .fine { font-weight: 700 }",
+      `slide.querySelector(".fine").style.color = "#eee";`,
+    );
+    expect(found.fine?.origin).toBe("script");
+  });
+
+  browserTest("blames the stylesheet under a draw that leaves the color alone", async () => {
+    const found = await measure(
+      ".slide .faint { color: #ccc }",
+      `slide.querySelector(".fine").style.letterSpacing = "1px";`,
+    );
+    expect(found["slide color"]?.origin).toBe("slide");
   });
 
   browserTest("names no origin for text that passes", async () => {

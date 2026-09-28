@@ -202,6 +202,13 @@ describe("stillDrawScript", () => {
       __dekSlides: {
         chart: { motion: { growth: 900 }, draw: (el: unknown, f: unknown) => frames.push([el, f]) },
       },
+      MutationObserver: class {
+        observe(): void {}
+        takeRecords(): unknown[] {
+          return [];
+        }
+        disconnect(): void {}
+      },
     };
     const document = { querySelectorAll: () => [chart, unmarked], getAnimations: () => [] };
     new Function("window", "document", stillDrawScript())(window, document);

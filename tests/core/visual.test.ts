@@ -157,6 +157,7 @@ describe("lintVisualDeck", () => {
           "theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it",
         );
         expect(dek031?.data).toMatchObject({ origin: "theme" });
+        expect(dek031?.path).toBe(join(root, "decks", "demo", "theme.css"));
       },
     );
   });
@@ -176,6 +177,26 @@ describe("lintVisualDeck", () => {
           "slides/intro.css brings it below 4.5:1, which theme.css alone does not: raise its contrast in slides/intro.css",
         );
         expect(dek031?.data).toMatchObject({ origin: "slide" });
+        expect(dek031?.path).toBe(join(root, "decks", "demo", "slides", "intro.css"));
+      },
+    );
+  });
+
+  test("sends a DEK031 a slide script's draw causes to the script", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [{ ...sample, ratio: 2.1, fontSize: 16, origin: "script" }],
+          }),
+        });
+        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
+        expect(dek031?.hint).toBe(
+          "slides/intro.ts draws it below 4.5:1, and a color draw sets inline wins over any stylesheet: raise the contrast of the color it sets in slides/intro.ts",
+        );
+        expect(dek031?.path).toBe(join(root, "decks", "demo", "slides", "intro.ts"));
       },
     );
   });

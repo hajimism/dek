@@ -1,4 +1,4 @@
-import { deckPaths } from "./deck-paths.ts";
+import { type DeckPaths, deckPaths } from "./deck-paths.ts";
 import { type Diagnostic, diag } from "./diagnostic.ts";
 import { EDGES, type Edge } from "./overflow.ts";
 import {
@@ -186,6 +186,11 @@ function contrastHint(origin: ContrastOrigin | undefined, threshold: number, slu
       return `theme.css alone draws it below ${threshold}:1: fix the pair in theme.css, where one change reaches every slide that uses it`;
     case "slide":
       return `${own} brings it below ${threshold}:1, which theme.css alone does not: raise its contrast in ${own}`;
+    case "script": {
+      // What draw sets inline wins over every stylesheet, so the fix is in the script.
+      const script = `slides/${slug}.ts`;
+      return `${script} draws it below ${threshold}:1, and a color draw sets inline wins over any stylesheet: raise the contrast of the color it sets in ${script}`;
+    }
     case undefined:
       return `raise the contrast of its color against the background to ${threshold}:1`;
   }
@@ -193,14 +198,29 @@ function contrastHint(origin: ContrastOrigin | undefined, threshold: number, slu
 
 type PathOf = (slug: string) => string;
 
+/** The file to change: the one the origin names, or the slide itself when it is not known. */
+function contrastPath(origin: ContrastOrigin | undefined, slug: string, paths: DeckPaths): string {
+  switch (origin) {
+    case "theme":
+      return paths.theme;
+    case "slide":
+      return paths.slide(slug, ".css");
+    case "script":
+      return paths.slide(slug, ".ts");
+    case undefined:
+      return paths.slide(slug, ".html");
+  }
+}
+
 function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic[] {
-  const pathOf: PathOf = (slug) => deckPaths(deckDir).slide(slug, ".html");
+  const paths = deckPaths(deckDir);
+  const pathOf: PathOf = (slug) => paths.slide(slug, ".html");
   const failing = response.contrasts.filter((sample) => sample.ratio < contrastThreshold(sample));
   return [
     ...groupBySteps(response.overflows, overflowKey).map((group) =>
       overflowDiagnostic(group, pathOf),
     ),
-    ...groupBySteps(failing, contrastKey).map((group) => contrastDiagnostic(group, pathOf)),
+    ...groupBySteps(failing, contrastKey).map((group) => contrastDiagnostic(group, paths)),
     ...groupBySteps(response.drawErrors ?? [], drawErrorKey).map((group) =>
       drawErrorDiagnostic(group, deckDir),
     ),
@@ -302,7 +322,7 @@ function overflowDiagnostic(
 
 function contrastDiagnostic(
   { first, steps }: StepGroup<ContrastSample>,
-  pathOf: PathOf,
+  paths: DeckPaths,
 ): Diagnostic {
   const threshold = contrastThreshold(first);
   const ratio = shownRatio(first);
@@ -312,7 +332,7 @@ function contrastDiagnostic(
   const colors = fg && bg ? ` (${fg} on ${bg})` : "";
   return diag("DEK031", {
     message: `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`,
-    path: pathOf(first.slug),
+    path: contrastPath(first.origin, first.slug, paths),
     slug: first.slug,
     hint: contrastHint(first.origin, threshold, first.slug),
     data: {

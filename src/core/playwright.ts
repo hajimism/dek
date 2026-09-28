@@ -104,7 +104,7 @@ export type ContrastFinding = {
   origin?: ContrastOrigin;
 };
 
-export type ContrastOrigin = "theme" | "slide";
+export type ContrastOrigin = "theme" | "slide" | "script";
 
 /** A slide's draw that threw at the end of a beat, as the still page caught it. */
 type DrawErrorFinding = { slug: string; step: string; t: number; message: string };
@@ -349,7 +349,7 @@ function isContrastFinding(value: unknown): value is ContrastFinding {
     isString(bg) &&
     isNumber(fontSize) &&
     isNumber(fontWeight) &&
-    (origin === undefined || origin === "theme" || origin === "slide")
+    (origin === undefined || origin === "theme" || origin === "slide" || origin === "script")
   );
 }
 

@@ -5,6 +5,7 @@ import { findOverflows } from "./overflow.ts";
 import { visitInPages } from "./page-pool.ts";
 import type {
   ContrastFinding,
+  ContrastOrigin,
   DoneResponse,
   MorphRequest,
   MotionRequest,
@@ -229,36 +230,61 @@ async function visitPage(
 }
 
 /**
- * Says which stylesheet draws each failing text below its threshold. The page is measured again
- * with the slide's own CSS taken away and the beat finished anew: text still below its threshold
- * is the theme's to fix, text that clears it the slide's. With no CSS of its own, the slide
- * leaves every color to the theme.
+ * Says what draws each failing text below its threshold, by taking the page apart one layer at a
+ * time and measuring again: first what the slide's script drew, then the slide's own CSS. Text
+ * that clears its threshold once a layer is gone is that layer's to fix; text that fails with
+ * both gone is the theme's. The page is not put back.
  */
 async function attributeContrasts(page: Page, failing: Failing[]): Promise<void> {
-  if (failing.length === 0) {
-    return;
-  }
-  const hadOwn = await page.evaluate((id) => {
-    const style = document.getElementById(id);
-    style?.remove();
-    return style !== null;
-  }, SLIDE_CSS_ID);
-  if (!hadOwn) {
-    for (const { finding } of failing) {
-      finding.origin = "theme";
+  let left = failing;
+  for (const layer of CONTRAST_LAYERS) {
+    if (left.length === 0) {
+      return;
     }
-    return;
-  }
-  // Transitions and animations the theme now applies would otherwise be caught midway.
-  await page.evaluate(finishBeat);
-  const texts = await pageTexts(page, await page.evaluate(measureSlideInPage));
-  const contrasts = await textContrasts(page, texts);
-  const alone = new Map(texts.map((text, at) => [text.key, { text, at }]));
-  for (const { finding, key } of failing) {
-    const theme = alone.get(key);
-    const contrast = theme && contrasts[theme.at];
-    if (theme && contrast) {
-      finding.origin = contrast.ratio < contrastThreshold(theme.text) ? "theme" : "slide";
+    if (!(await page.evaluate(layer.strip, SLIDE_CSS_ID))) {
+      continue;
     }
+    // Transitions and animations the change sets off would otherwise be caught midway.
+    await page.evaluate(finishBeat);
+    const texts = await pageTexts(page, await page.evaluate(measureSlideInPage));
+    const contrasts = await textContrasts(page, texts);
+    const now = new Map(texts.map((text, at) => [text.key, { text, contrast: contrasts[at] }]));
+    left = left.filter(({ finding, key }) => {
+      const measured = now.get(key);
+      if (measured?.contrast && measured.contrast.ratio >= contrastThreshold(measured.text)) {
+        finding.origin = layer.origin;
+        return false;
+      }
+      return true;
+    });
+  }
+  for (const { finding } of left) {
+    finding.origin = "theme";
   }
 }
+
+/**
+ * What a slide adds over the theme, outermost first, each with how to take it away in the page;
+ * `strip` says whether there was anything to take.
+ */
+const CONTRAST_LAYERS: Array<{
+  origin: Exclude<ContrastOrigin, "theme">;
+  strip: (slideCssId: string) => boolean;
+}> = [
+  {
+    origin: "script",
+    strip: () => {
+      const undo = window.__dekUndoDraw;
+      undo?.();
+      return undo !== undefined;
+    },
+  },
+  {
+    origin: "slide",
+    strip: (id) => {
+      const style = document.getElementById(id);
+      style?.remove();
+      return style !== null;
+    },
+  },
+];

@@ -51,11 +51,19 @@ export function drawAtEnd(
 /**
  * Draws every slide `markBeat` marked, at the end of its beat. A draw that throws leaves the slide
  * as it was before, so each throw is kept in `window.__dekDrawErrors` for whoever measures the page.
+ * What the draws change in attributes, inline styles above all, can be taken back with
+ * `window.__dekUndoDraw`, so a measurement can tell what the script draws from what CSS does.
  */
 function drawMarkedSlides(): void {
   const modules = window.__dekSlides ?? {};
   const errors: NonNullable<Window["__dekDrawErrors"]> = [];
   window.__dekDrawErrors = errors;
+  const observer = new window.MutationObserver(() => {});
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeOldValue: true,
+    subtree: true,
+  });
   for (const el of document.querySelectorAll<HTMLElement>(".slide[data-slug]")) {
     // markBeat writes the step key, so this page never derives one itself.
     const step = el.getAttribute("data-dek-step");
@@ -74,6 +82,31 @@ function drawMarkedSlides(): void {
       const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       errors.push({ slug, step, t: failed.t, message });
     }
+  }
+  const changes = observer.takeRecords();
+  observer.disconnect();
+  if (changes.length > 0) {
+    window.__dekUndoDraw = () => {
+      // The first old value of each attribute is what it held before any draw ran.
+      const before = new Map<Element, Map<string, string | null>>();
+      for (const change of changes) {
+        const el = change.target as Element;
+        const attrs = before.get(el) ?? new Map<string, string | null>();
+        if (change.attributeName !== null && !attrs.has(change.attributeName)) {
+          attrs.set(change.attributeName, change.oldValue);
+        }
+        before.set(el, attrs);
+      }
+      for (const [el, attrs] of before) {
+        for (const [name, value] of attrs) {
+          if (value === null) {
+            el.removeAttribute(name);
+          } else {
+            el.setAttribute(name, value);
+          }
+        }
+      }
+    };
   }
 }
 
