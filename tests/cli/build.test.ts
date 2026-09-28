@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildCommand } from "../../src/cli/build.ts";
+import { COMMANDS } from "../../src/cli/commands.ts";
 import { defaultTheme } from "../../src/cli/files.ts";
+import { parseCommandLine } from "../../src/cli/flags.ts";
 import { formatText } from "../../src/cli/result.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
 import { PLAYWRIGHT_INSTALL, type VisualRequest } from "../../src/core/playwright.ts";
@@ -333,6 +336,38 @@ more
             hint: expect.stringContaining("dek sync"),
           }),
         );
+      },
+    );
+  });
+});
+
+describe("dek build --public", () => {
+  const directedScript = `---
+title: Demo
+---
+
+## intro
+
+> 目次は読み上げない。
+
+今日は三つ話します。
+`;
+
+  test("builds a page for anyone with the link, without the stage directions", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script: directedScript, slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const line = parseCommandLine(["build", "--public"]);
+        const result = (await COMMANDS.build.run({
+          cwd: deckDir,
+          flags: line.values,
+          args: {},
+          target: resolveDecks(deckDir),
+        })) as { outs: string[] };
+        const html = await readFile(result.outs[0] ?? "", "utf8");
+        expect(html).toContain("今日は三つ話します。");
+        expect(html).not.toContain("目次は読み上げない");
       },
     );
   });

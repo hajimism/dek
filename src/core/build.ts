@@ -24,6 +24,8 @@ export type BuildOptions = DistOptions & {
   playerScript: string;
   /** Where dist/ is served from, ending in a slash; overrides `url` in dek.toml. */
   url?: string;
+  /** For anyone with the link: the presenter view carries only what is said aloud. */
+  public?: boolean;
   runner?: PlaywrightRunner;
 };
 
@@ -51,6 +53,7 @@ export async function buildDeck(
     playerScript: options.playerScript,
     target: {
       kind: "build",
+      ...(options.public ? { public: true } : {}),
       ...(baseUrl
         ? {
             publicUrl: new URL(encodeURIComponent(basename(outPath)), baseUrl).href,

@@ -46,7 +46,7 @@ Heading text is free-form. Write it in any language, as a question, with punctua
 
 Only paragraphs become speech. Blockquotes, lists, code blocks, and tables are for the screen or for your own direction; they are never synthesized. Inline emphasis, links, and `code` are flattened to plain text before synthesis. None of this affects the live presentation. It only matters once you run `dek cues` or add voice. A beat with a list but no paragraph is visible on screen yet passes in an instant when narrated, so `dek cues` and lint on a deck with `voice/` warn about it as `DEK042`.
 
-Use a blockquote for stage directions. Once you add narration this becomes a convention worth keeping, and a build published at a URL leaves blockquotes and HTML comments out of its presenter view (see [On the web](./present#on-the-web)). dek has no fuzzy rule for detecting directions, such as "short imperative sentences", and no special syntax for pauses. Timing adjustments for narration live in `voice/voice.toml`; see [Timing](./voice#timing).
+Use a blockquote for stage directions. Once you add narration this becomes a convention worth keeping, and `dek build --public` leaves blockquotes and HTML comments out of its presenter view (see [On the web](./present#on-the-web)). dek has no fuzzy rule for detecting directions, such as "short imperative sentences", and no special syntax for pauses. Timing adjustments for narration live in `voice/voice.toml`; see [Timing](./voice#timing).
 
 ## Headings and ids
 

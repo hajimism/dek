@@ -525,24 +525,22 @@ title: Why dek
     });
   });
 
-  test("leaves the stage directions out of a page served at a public URL", async () => {
+  test("keeps them in a page served at a URL, since only --public says who reads it", async () => {
     await withTempProject(spec('url = "https://example.com/talks/"\n'), async (root) => {
       const result = await build(join(root, "decks", "demo"), { runner: async () => null });
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain("目次は読み上げない。");
+      expect(html).toContain("押したら二つ");
+    });
+  });
+
+  test("leaves the stage directions and comments out of a public page", async () => {
+    await withTempProject(spec(), async (root) => {
+      const result = await build(join(root, "decks", "demo"), { public: true });
       const html = await readFile(result.outPath, "utf8");
       expect(html).toContain("今日は三つ話します。");
       expect(html).not.toContain("目次は読み上げない");
       expect(html).not.toContain("押したら二つ");
-    });
-  });
-
-  test("leaves them out when only the build names the URL", async () => {
-    await withTempProject(spec(), async (root) => {
-      const result = await build(join(root, "decks", "demo"), {
-        url: "https://preview-1.example.dev/",
-        runner: async () => null,
-      });
-      const html = await readFile(result.outPath, "utf8");
-      expect(html).not.toContain("目次は読み上げない");
     });
   });
 });

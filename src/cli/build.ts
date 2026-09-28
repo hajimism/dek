@@ -38,7 +38,7 @@ const PREVIEW_SKIPPED = {
 
 export async function buildCommand(
   { project, decks }: DecksTarget,
-  options: { rootDist?: boolean; url?: string; runner?: PlaywrightRunner } = {},
+  options: { rootDist?: boolean; url?: string; public?: boolean; runner?: PlaywrightRunner } = {},
 ): Promise<BuildCliResult> {
   const url = options.url === undefined ? undefined : parsePublicUrl(options.url);
   if (options.url !== undefined && url === undefined) {
@@ -55,6 +55,7 @@ export async function buildCommand(
           playerScript: script,
           rootDist: options.rootDist,
           ...(url ? { url } : {}),
+          ...(options.public ? { public: true } : {}),
           ...(options.runner ? { runner: options.runner } : {}),
         },
       ),

@@ -35,6 +35,8 @@ export type PageTarget =
   /** `dek build`: one file that stands alone, shared as a link. */
   | {
       kind: "build";
+      /** Built with `--public`, for anyone who has the link rather than the speaker. */
+      public?: boolean;
       /** The built page's absolute URL, for og:url. */
       publicUrl?: string;
       /** The first slide's picture, for og:image. */
@@ -162,11 +164,12 @@ export function renderDeckDocument(
 }
 
 /**
- * A built page that names its public URL is for anyone who has the link, so it carries the script
- * as the audience may read it; any other page is the speaker's own.
+ * A page built with `--public` is for anyone who has the link, so it carries the script as the
+ * audience may read it; any other page is the speaker's own. A URL alone says where the page is
+ * served, not who reads it: the speaker may present from that very page.
  */
 function scriptReader(target: PageTarget): ScriptReader {
-  return target.kind === "build" && target.publicUrl !== undefined ? "audience" : "speaker";
+  return target.kind === "build" && target.public === true ? "audience" : "speaker";
 }
 
 export function renderRailHtml(slides: Array<{ slug: string; title: string }>): string {

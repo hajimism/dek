@@ -87,6 +87,10 @@ export const FLAGS = {
     value: "<url>",
     text: "the URL dist/ is served from, over url in dek.toml",
   },
+  public: {
+    type: "boolean",
+    text: "a page for anyone with the link, without the script's stage directions and comments",
+  },
 } as const satisfies Record<string, FlagSpec>;
 
 export type FlagName = keyof typeof FLAGS;
