@@ -1,5 +1,13 @@
+import { escapeRegExp } from "./escape.ts";
 import { moduleFilePath } from "./path.ts";
-import { compileSlideScript, IMPORTS_PROBLEM, staticProblems } from "./slide-script.ts";
+import {
+  compileSlideScript,
+  IMPORTS_MESSAGE,
+  lineMatching,
+  type SlideScriptProblem,
+  staticProblems,
+} from "./slide-script.ts";
+import { suggest } from "./suggest.ts";
 
 /** One slide script as lint checks it: its source, and the slide's step keys to check `motion` by. */
 export type ScriptInput = { code: string; steps?: string[] };
@@ -14,7 +22,7 @@ const EVAL_BUDGET_MS = 5000;
  * Evaluation happens in one child process that cannot reach dek's globals and is killed if it
  * hangs; this waits for it. Scripts evaluated before are answered from a cache.
  */
-export function slideScriptsProblems(scripts: ScriptInput[]): string[][] {
+export function slideScriptsProblems(scripts: ScriptInput[]): SlideScriptProblem[][] {
   const { results, pending } = prepareScripts(scripts);
   const codes = uncached(pending);
   if (codes.length > 0) {
@@ -32,7 +40,9 @@ export function slideScriptsProblems(scripts: ScriptInput[]): string[][] {
  * `slideScriptsProblems` without blocking the event loop while the scripts run, for the dev
  * server. The answer is about the code passed in, however the files change in the meantime.
  */
-export async function evaluateSlideScripts(scripts: ScriptInput[]): Promise<string[][]> {
+export async function evaluateSlideScripts(
+  scripts: ScriptInput[],
+): Promise<SlideScriptProblem[][]> {
   const { results, pending } = prepareScripts(scripts);
   const codes = uncached(pending);
   if (codes.length > 0) {
@@ -57,7 +67,14 @@ export async function evaluateSlideScripts(scripts: ScriptInput[]): Promise<stri
  * imports removed, so lint can still check `motion`; what then fails at run
  * time is the missing import's doing, already reported.
  */
-type PendingScript = { index: number; code: string; steps: string[]; withoutImports: boolean };
+type PendingScript = {
+  index: number;
+  /** As written, where a problem the evaluation finds is looked for. */
+  source: string;
+  code: string;
+  steps: string[];
+  withoutImports: boolean;
+};
 
 const IMPORT_RE = /^[ \t]*import\s+(?:type\s+)?(?:[\s\S]*?\sfrom\s*)?["'][^"'\n]+["'][ \t]*;?/gm;
 
@@ -67,15 +84,15 @@ function withoutImports(code: string): string {
 }
 
 function prepareScripts(scripts: ScriptInput[]): {
-  results: string[][];
+  results: SlideScriptProblem[][];
   pending: PendingScript[];
 } {
-  const results: string[][] = [];
+  const results: SlideScriptProblem[][] = [];
   const pending: PendingScript[] = [];
   for (const [index, script] of scripts.entries()) {
     const problems = staticProblems(script.code);
     // Imports alone do not stop the rest of the checks: report everything in one run.
-    const importsOnly = problems.length > 0 && problems.every((p) => p === IMPORTS_PROBLEM);
+    const importsOnly = problems.length > 0 && problems.every((p) => p.message === IMPORTS_MESSAGE);
     const source = importsOnly ? withoutImports(script.code) : script.code;
     const compiled =
       problems.length > 0 && !importsOnly ? undefined : compileSlideScript(source, "slide");
@@ -86,6 +103,7 @@ function prepareScripts(scripts: ScriptInput[]): {
     if (compiled && "code" in compiled && script.steps) {
       pending.push({
         index,
+        source: script.code,
         code: compiled.code,
         steps: script.steps,
         withoutImports: importsOnly,
@@ -100,14 +118,17 @@ function uncached(pending: PendingScript[]): string[] {
   return [...new Set(pending.map((entry) => entry.code))].filter((code) => !summaryCache.has(code));
 }
 
-function finishProblems(results: string[][], pending: PendingScript[]): string[][] {
+function finishProblems(
+  results: SlideScriptProblem[][],
+  pending: PendingScript[],
+): SlideScriptProblem[][] {
   for (const entry of pending) {
     const summary = summaryCache.get(entry.code);
     const blamedOnImports =
       entry.withoutImports &&
       summary !== undefined &&
       ("threw" in summary || "timedOut" in summary);
-    const found = blamedOnImports ? [] : moduleProblems(summary, entry.steps);
+    const found = blamedOnImports ? [] : moduleProblems(summary, entry);
     results[entry.index] = [...(results[entry.index] ?? []), ...found];
   }
   return results;
@@ -158,33 +179,79 @@ function cacheSummaries(codes: string[], summaries: Array<ModuleSummary | undefi
   }
 }
 
-function moduleProblems(summary: ModuleSummary | undefined, steps: string[]): string[] {
+const TOP_LEVEL_HINT = "move what touches the page into draw(slide, { t }), which runs per frame";
+
+function moduleProblems(
+  summary: ModuleSummary | undefined,
+  { source, steps }: Pick<PendingScript, "source" | "steps">,
+): SlideScriptProblem[] {
   if (!summary || "timedOut" in summary) {
-    return ["top-level code did not finish; touch the slide only inside draw"];
+    return [
+      {
+        message: "top-level code did not finish; touch the slide only inside draw",
+        hint: TOP_LEVEL_HINT,
+      },
+    ];
   }
   if ("threw" in summary) {
-    return [`top-level code threw: ${summary.threw}; touch the slide only inside draw`];
+    return [
+      {
+        message: `top-level code threw: ${summary.threw}; touch the slide only inside draw`,
+        hint: TOP_LEVEL_HINT,
+      },
+    ];
   }
+  const exported = lineMatching(source, /\bexport\s+default\b/);
+  const at = (line: number | undefined) => (line === undefined ? {} : { line });
   if (!summary.object) {
-    return ["export default must be an object like { motion, draw }"];
+    return [
+      {
+        message: "export default must be an object like { motion, draw }",
+        ...at(exported),
+        hint: "export default { motion: { <step>: ms }, draw(slide, { t }) {} } satisfies DekSlide",
+      },
+    ];
   }
-  const problems: string[] = [];
+  const problems: SlideScriptProblem[] = [];
   if (summary.draw !== "undefined" && summary.draw !== "function") {
-    problems.push("draw must be a function");
+    problems.push({
+      message: "draw must be a function",
+      ...at(lineMatching(source, /\bdraw\b/) ?? exported),
+      hint: "write it as draw(slide, { index, step, t }) { … }",
+    });
   }
   if (summary.motion === "none") {
     return problems;
   }
   if (summary.motion === "invalid") {
-    return [...problems, "motion must be an object keyed by beat"];
+    return [
+      ...problems,
+      {
+        message: "motion must be an object keyed by beat",
+        ...at(lineMatching(source, /\bmotion\b/) ?? exported),
+        hint: `write it as motion: { ${steps[0] ?? "1"}: 600 }, one key per beat that moves`,
+      },
+    ];
   }
   for (const [key, ms] of summary.motion) {
+    // The key as the object literal writes it: bare, or quoted either way.
+    const keyLine = lineMatching(
+      source,
+      new RegExp(`(?:^|[\\s{,])(["']?)${escapeRegExp(key)}\\1\\s*:`),
+    );
     if (!steps.includes(key)) {
-      problems.push(
-        `motion key "${key}" is not a beat of this slide; use one of: ${steps.join(", ")}`,
-      );
+      const guess = suggest(key, steps);
+      problems.push({
+        message: `motion key "${key}" is not a beat of this slide`,
+        ...at(keyLine),
+        hint: `${guess ? `did you mean "${guess}"? ` : ""}use one of: ${steps.join(", ")}`,
+      });
     } else if (ms === null || ms < 0) {
-      problems.push(`motion "${key}" must be a non-negative number of milliseconds`);
+      problems.push({
+        message: `motion "${key}" must be a non-negative number of milliseconds`,
+        ...at(keyLine),
+        hint: `give it how long the beat moves, like ${key}: 600`,
+      });
     }
   }
   return problems;

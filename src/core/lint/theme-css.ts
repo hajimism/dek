@@ -1,6 +1,6 @@
 import {
   type CssToken,
-  cssAtRuleNames,
+  cssAtRules,
   cssStyleSelectors,
   cssUrls,
   isScopedThemeSelector,
@@ -34,7 +34,7 @@ function lintTheme(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   // A rule inside `@media` reaches the page as surely as one outside it.
-  for (const selector of outermostSelectors(sheet)) {
+  for (const { selector, line } of outermostSelectors(sheet)) {
     if (isScopedThemeSelector(selector)) {
       continue;
     }
@@ -42,6 +42,8 @@ function lintTheme(
       diag("DEK012", {
         message: `theme selector "${selector}" must be scoped under .slide`,
         path,
+        line,
+        hint: themeScopeHint(selector),
         data: { selector },
       }),
     );
@@ -95,29 +97,46 @@ export function lintSlideStyle(
   deckDir: string,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const selector of cssStyleSelectors(sheet)) {
+  const reach = (
+    message: string,
+    line: number,
+    hint: string,
+    data: Record<string, string>,
+  ): void => {
+    diagnostics.push(diag("DEK012", { message, path, line, slug, hint, data }));
+  };
+  for (const { selector, line } of cssStyleSelectors(sheet)) {
     const parts = splitSelectorList(selector).map((part) => part.trim());
-    const message = parts.some((part) => part.startsWith("::view-transition"))
-      ? `"${selector}" applies to every slide; view transitions belong in theme.css`
-      : parts.some((part) => PAGE_SELECTOR_RE.test(part))
-        ? `"${selector}" never matches inside a slide; page-wide rules belong in theme.css`
-        : undefined;
-    if (message) {
-      diagnostics.push(diag("DEK012", { message, path, slug, data: { selector } }));
-    }
-  }
-  for (const name of cssAtRuleNames(sheet)) {
-    if (name === "font-face" || name === "import") {
-      diagnostics.push(
-        diag("DEK012", {
-          message: `@${name} applies to the whole deck; it belongs in theme.css`,
-          path,
-          slug,
-          data: { atRule: name },
-        }),
+    if (parts.some((part) => part.startsWith("::view-transition"))) {
+      reach(
+        `"${selector}" applies to every slide`,
+        line,
+        "move it to theme.css, where view transitions belong",
+        { selector },
+      );
+    } else if (parts.some((part) => PAGE_SELECTOR_RE.test(part))) {
+      reach(
+        `"${selector}" never matches inside a slide`,
+        line,
+        "move it to theme.css, or start it at .slide",
+        { selector },
+      );
+    } else if (parts.some((part) => SIBLING_OF_SLIDE_RE.test(part))) {
+      reach(
+        `"${selector}" reaches the slides after this one`,
+        line,
+        "start the selector at .slide and stay inside it; a rule for more than one slide belongs in theme.css",
+        { selector },
       );
     }
   }
+  for (const { name, line } of cssAtRules(sheet)) {
+    if (DECK_AT_RULES.has(name.toLowerCase())) {
+      reach(`@${name} applies to the whole deck`, line, "move it to theme.css", { atRule: name });
+    }
+  }
+  // In the order the file writes them, selectors and at-rules alike.
+  diagnostics.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
   for (const url of cssUrls(sheet)) {
     diagnostics.push(
       ...assetRefDiagnostics(
@@ -167,6 +186,36 @@ function rawValueHint(suggestion: string | undefined, value: string, slug?: stri
 
 /** Selectors that name the page, which a scoped slide rule can never reach. */
 const PAGE_SELECTOR_RE = /^(:root|html|body)(?=$|[\s[.:#>+~])/;
+
+/**
+ * A slide rule that steps from the slide to a sibling: scoped, `.slide ~ .slide` still matches
+ * every slide after this one.
+ */
+const SIBLING_OF_SLIDE_RE = /^\.slide(?![-\w])[^\s>+~]*\s*[+~]/;
+
+/**
+ * At-rules that register something for the whole document, which no slide scope can confine: a
+ * font, an import, a custom property's type, a counter style, the printed page.
+ */
+const DECK_AT_RULES = new Set([
+  "font-face",
+  "import",
+  "property",
+  "counter-style",
+  "page",
+  "font-palette-values",
+  "font-feature-values",
+]);
+
+/** How to write an unscoped theme selector so it styles slides. */
+function themeScopeHint(selector: string): string {
+  const parts = splitSelectorList(selector).map((part) => part.trim());
+  if (parts.some((part) => PAGE_SELECTOR_RE.test(part))) {
+    return "theme.css styles slides, not the page: put it on .slide, whose content inherits it";
+  }
+  const scoped = parts.map((part) => (isScopedThemeSelector(part) ? part : `.slide ${part}`));
+  return `write it as ${scoped.join(", ")}`;
+}
 
 /** The theme's own findings, or DEK018 when there is no theme. */
 export function themeDiagnostics(ctx: LintContext): Diagnostic[] {

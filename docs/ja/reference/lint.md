@@ -27,7 +27,7 @@ lint がワークフローにどう組み込まれるかは [Lint](/ja/guide/lin
 | `DEK009` | `slide` | `slides/` の 1 ファイルに `<section class="slide">` が 2 つ以上ある。表示されるのは最初の 1 つだけ | — |
 | `DEK010` | `slide` | テーマにも、その枚のスタイルシートにも定義のないクラス | — |
 | `DEK011` | `slide` | スライド内の `<style>`、`style=`、`<script>`、イベントハンドラ属性（`onclick=` など）、`javascript:` URL | — |
-| `DEK012` | `deck`, `slide` | テーマに `.slide` の下にないセレクタ（トップレベルでも、`@media` などのアットルールの中でも。`.slide` のルールに入れ子にしたルールはその下にある）、またはスライドのスタイルシートにスライドの外まで届くルール（`::view-transition-*`、`@font-face`、`@import`、`:root`、`html`、`body`） | — |
+| `DEK012` | `deck`, `slide` | テーマに `.slide` の下にないセレクタ（トップレベルでも、`@media` などのアットルールの中でも。`.slide` のルールに入れ子にしたルールはその下にある）、またはスライドのスタイルシートにスライドの外まで届くルール（`::view-transition-*`、`:root`、`html`、`body`、`.slide` から `~` や `+` で兄弟へ進むもの、ページ全体に何かを登録するアットルール `@font-face`・`@import`・`@property`・`@counter-style`・`@page`・`@font-palette-values`・`@font-feature-values`）。どの指摘も行番号と、そのルールを置くべき場所を示す | — |
 | `DEK013` | `deck` | テーマのクラス数が `max_classes`（既定 40）を超過 | — |
 | `DEK014` | `deck`, `slide` | トークンへの代入の外にある生の色、`font-family`、絶対単位。テーマでもスライドのスタイルシートでも、入れ子のルールも含む。`content: "#fff"` のような文字列はテキストで、値ではない | — |
 | `DEK015` | `deck` | 必須トークンが `.slide` に無い | — |

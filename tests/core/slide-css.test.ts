@@ -154,11 +154,23 @@ describe("slide stylesheet lint", () => {
       }),
       async (root) => {
         const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK012");
-        expect(found.map((d) => d.message)).toEqual([
-          '":root" never matches inside a slide; page-wide rules belong in theme.css',
-          '"html, body" never matches inside a slide; page-wide rules belong in theme.css',
-          "@font-face applies to the whole deck; it belongs in theme.css",
-          "@import applies to the whole deck; it belongs in theme.css",
+        expect(found.map(({ message, line, hint }) => ({ message, line, hint }))).toEqual([
+          {
+            message: '":root" never matches inside a slide',
+            line: 1,
+            hint: "move it to theme.css, or start it at .slide",
+          },
+          {
+            message: '"html, body" never matches inside a slide',
+            line: 2,
+            hint: "move it to theme.css, or start it at .slide",
+          },
+          {
+            message: "@font-face applies to the whole deck",
+            line: 3,
+            hint: "move it to theme.css",
+          },
+          { message: "@import applies to the whole deck", line: 4, hint: "move it to theme.css" },
         ]);
       },
     );

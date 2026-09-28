@@ -26,7 +26,7 @@ function uniqueStatement(): string {
 
 /** What stops one script, as lint asks for many at once. */
 function slideScriptProblems(code: string, options: { steps?: string[] } = {}): string[] {
-  return slideScriptsProblems([{ code, ...options }])[0] ?? [];
+  return (slideScriptsProblems([{ code, ...options }])[0] ?? []).map((problem) => problem.message);
 }
 
 /** Each script compiled as `slides/<slug>.ts` of a deck, in slug order, joined. */
@@ -85,13 +85,13 @@ describe("slideScriptProblems with the slide's beats", () => {
 
   test("names a motion key that is not a beat of the slide", () => {
     expect(slideScriptProblems("export default { motion: { grwth: 900 } };", steps)).toEqual([
-      'motion key "grwth" is not a beat of this slide; use one of: 0, base, growth',
+      'motion key "grwth" is not a beat of this slide',
     ]);
   });
 
   test("a numbered key only works for a beat without an id", () => {
     expect(slideScriptProblems("export default { motion: { 2: 900 } };", steps)).toEqual([
-      'motion key "2" is not a beat of this slide; use one of: 0, base, growth',
+      'motion key "2" is not a beat of this slide',
     ]);
     expect(slideScriptProblems("export default { motion: { 1: 900 } };", { steps: ["1"] })).toEqual(
       [],
@@ -106,7 +106,7 @@ describe("slideScriptProblems with the slide's beats", () => {
       ),
     ).toEqual([
       "imports are not supported; keep the slide script self-contained",
-      'motion key "grwth" is not a beat of this slide; use one of: 0, base, growth',
+      'motion key "grwth" is not a beat of this slide',
     ]);
   });
 
@@ -182,9 +182,11 @@ describe("evaluateSlideScripts", () => {
 
   test("answers what the synchronous check does", async () => {
     const code = `${uniqueStatement()}\nexport default { motion: { 2: 1 } };`;
-    expect(await evaluateSlideScripts([{ code, ...steps }])).toEqual([
-      ['motion key "2" is not a beat of this slide; use one of: 1'],
-    ]);
+    expect(
+      (await evaluateSlideScripts([{ code, ...steps }])).map((found) =>
+        found.map((problem) => problem.message),
+      ),
+    ).toEqual([['motion key "2" is not a beat of this slide']]);
   });
 
   test("lets the synchronous check answer from the cache without a new evaluation", async () => {
@@ -340,7 +342,7 @@ describe("TypeScript slide scripts", () => {
       );
       const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
       expect(found.map((d) => d.message)).toEqual([
-        'motion key "grow" is not a beat of this slide; use one of: 0, base, growth',
+        'motion key "grow" is not a beat of this slide',
       ]);
     });
   });
@@ -354,7 +356,7 @@ describe("TypeScript slide scripts", () => {
       writeFileSync(path, `${uniqueStatement()}\nwhile (true) {}\nexport default {};`);
       const found = (await linting).filter((d) => d.id === "DEK016");
       expect(found.map((d) => d.message)).toEqual([
-        'motion key "grow" is not a beat of this slide; use one of: 0, base, growth',
+        'motion key "grow" is not a beat of this slide',
       ]);
     });
   });
@@ -551,6 +553,69 @@ describe("slide script lint and mv", () => {
     });
   });
 
+  // Each problem says where it is and what to do: the line when the source has one, and a hint.
+  test("DEK016: gives each problem its line and a hint", async () => {
+    const cases: Array<[string, { message: string; line?: number; hint: string }]> = [
+      [
+        "export default {\n  draw(slide) {\n    const x = ;\n  },\n};",
+        {
+          message: "syntax error: Unexpected ;",
+          line: 3,
+          hint: "fix the syntax there; until the script parses, the slide shows without it",
+        },
+      ],
+      [
+        "export default { draw( };",
+        {
+          message: 'syntax error: Expected identifier but found "}"',
+          line: 1,
+          hint: "fix the syntax there; until the script parses, the slide shows without it",
+        },
+      ],
+      [
+        'const a = 1;\nimport x from "x";\nexport default {};',
+        {
+          message: "imports are not supported; keep the slide script self-contained",
+          line: 2,
+          hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
+        },
+      ],
+      [
+        "export const x = 1;\nexport default {};",
+        {
+          message: 'only a default export is allowed; found "x"',
+          line: 1,
+          hint: 'drop export from "x", or make it part of the default export',
+        },
+      ],
+      [
+        "const x = 1;",
+        {
+          message: "missing export default",
+          hint: "end the script with export default { draw(slide, { t }) {} } satisfies DekSlide",
+        },
+      ],
+      [
+        "export default {\n  motion: {\n    grow: 900,\n  },\n};",
+        {
+          message: 'motion key "grow" is not a beat of this slide',
+          line: 3,
+          hint: 'did you mean "growth"? use one of: 0, base, growth',
+        },
+      ],
+    ];
+    await withTempProject(chartDeck, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      for (const [code, expected] of cases) {
+        await Bun.write(join(deckDir, "slides", "chart.ts"), `${code}\n// ${uniqueStatement()}`);
+        const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
+        expect(found.map(({ message, line, hint }) => ({ message, line, hint }))).toEqual([
+          { line: undefined, ...expected },
+        ]);
+      }
+    });
+  });
+
   test("DEK016: a motion key is checked against the slide's own beats", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
@@ -560,7 +625,7 @@ describe("slide script lint and mv", () => {
       );
       const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
       expect(found.map((d) => d.message)).toEqual([
-        'motion key "growht" is not a beat of this slide; use one of: 0, base, growth',
+        'motion key "growht" is not a beat of this slide',
       ]);
     });
   });

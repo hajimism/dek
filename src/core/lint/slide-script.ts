@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import { listSlideFiles } from "../resolve.ts";
 import type { Section } from "../schema.ts";
+import type { SlideScriptProblem } from "../slide-script.ts";
 import type { ScriptInput } from "../slide-script-eval.ts";
 import { stepKeys } from "../step.ts";
 import type { DeckFiles, LintContext } from "./context.ts";
@@ -27,17 +28,19 @@ export function lintedSlideScripts(files: DeckFiles): LintedScript[] {
 /** DEK016 from what evaluating each script found, and DEK017 from its source, by slug. */
 export function slideScriptDiagnostics(
   scripted: LintedScript[],
-  problems: string[][],
+  problems: SlideScriptProblem[][],
 ): Map<string, Diagnostic[]> {
   return new Map(
     scripted.map(({ section, path, input }, index) => [
       section.slug,
       [
-        ...(problems[index] ?? []).map((message) =>
+        ...(problems[index] ?? []).map(({ message, line, hint }) =>
           diag("DEK016", {
             message,
             path,
+            ...(line !== undefined ? { line } : {}),
             slug: section.slug,
+            ...(hint !== undefined ? { hint } : {}),
             data: { file: `slides/${section.slug}.ts` },
           }),
         ),
@@ -56,6 +59,7 @@ export function javascriptDiagnostics(ctx: LintContext): Diagnostic[] {
       message: `slide scripts are TypeScript; rename ${file.slug}.js to ${file.slug}.ts`,
       path: file.path,
       slug: file.slug,
+      hint: `run \`mv slides/${file.slug}.js slides/${file.slug}.ts\`; plain JavaScript is valid TypeScript`,
       data: { file: `slides/${file.slug}.js` },
     }),
   );

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { DekError } from "./error.ts";
+import { escapeRegExp } from "./escape.ts";
 import { listSlideFiles } from "./resolve.ts";
 import { stillDrawScript } from "./slide-draw.ts";
 
@@ -19,30 +20,86 @@ export type SlideScript = {
   code: string;
 };
 
-export const IMPORTS_PROBLEM = "imports are not supported; keep the slide script self-contained";
+/** What stops a slide script from running: where, when the source has a place for it, and the fix. */
+export type SlideScriptProblem = { message: string; line?: number; hint?: string };
+
+export const IMPORTS_MESSAGE = "imports are not supported; keep the slide script self-contained";
+
+/** The 1-based line of the first line `re` matches, if any. */
+export function lineMatching(code: string, re: RegExp): number | undefined {
+  const index = code.split("\n").findIndex((line) => re.test(line));
+  return index < 0 ? undefined : index + 1;
+}
+
+function withLine(problem: SlideScriptProblem, line: number | undefined): SlideScriptProblem {
+  return line === undefined ? problem : { ...problem, line };
+}
 
 /**
  * What stops a script from being one self-contained module whose only export is the default
  * object, found without running it.
  */
-export function staticProblems(code: string): string[] {
+export function staticProblems(code: string): SlideScriptProblem[] {
   let scan: ReturnType<Bun.Transpiler["scan"]>;
   try {
     scan = transpiler.scan(code);
   } catch (error) {
-    return [`syntax error: ${messageOf(error)}`];
+    return [syntaxProblem(error)];
   }
-  const problems: string[] = [];
+  const problems: SlideScriptProblem[] = [];
   if (scan.imports.length > 0) {
-    problems.push(IMPORTS_PROBLEM);
+    problems.push(
+      withLine(
+        {
+          message: IMPORTS_MESSAGE,
+          hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
+        },
+        lineMatching(code, /^\s*import\b/),
+      ),
+    );
   }
   for (const name of scan.exports.filter((entry) => entry !== "default")) {
-    problems.push(`only a default export is allowed; found "${name}"`);
+    problems.push(
+      withLine(
+        {
+          message: `only a default export is allowed; found "${name}"`,
+          hint: `drop export from "${name}", or make it part of the default export`,
+        },
+        lineMatching(
+          code,
+          new RegExp(`^\\s*export\\b(?!\\s+default\\b).*\\b${escapeRegExp(name)}\\b`),
+        ),
+      ),
+    );
   }
   if (!scan.exports.includes("default") || !DEFAULT_EXPORT_RE.test(code)) {
-    problems.push("missing export default");
+    problems.push({
+      message: "missing export default",
+      hint: "end the script with export default { draw(slide, { t }) {} } satisfies DekSlide",
+    });
   }
   return problems;
+}
+
+const SYNTAX_HINT = "fix the syntax there; until the script parses, the slide shows without it";
+
+/**
+ * A syntax error as Bun reports it: one message with its position, or several, of which the first
+ * says the most. "Parse error" alone names neither.
+ */
+function syntaxProblem(error: unknown): SlideScriptProblem {
+  type Located = { message?: string; position?: { line?: number } | null };
+  const first: Located =
+    error instanceof AggregateError && error.errors.length > 0
+      ? (error.errors[0] as Located)
+      : (error as Located);
+  const message = first.message ?? messageOf(error);
+  const line = first.position?.line;
+  return {
+    message: `syntax error: ${message}`,
+    ...(typeof line === "number" && line > 0 ? { line } : {}),
+    hint: SYNTAX_HINT,
+  };
 }
 
 /**
@@ -54,12 +111,12 @@ export function staticProblems(code: string): string[] {
 export function compileSlideScript(
   code: string,
   slug: string,
-): { code: string } | { problem: string } {
+): { code: string } | { problem: SlideScriptProblem } {
   let js: string;
   try {
     js = transpiler.transformSync(code);
   } catch (error) {
-    return { problem: `syntax error: ${messageOf(error)}` };
+    return { problem: syntaxProblem(error) };
   }
   let firstError: unknown;
   for (const match of js.matchAll(EXPORT_DEFAULT_LINE_RE)) {
@@ -72,13 +129,22 @@ export function compileSlideScript(
       firstError ??= error;
       if (parses(wrap(body, slug, true))) {
         return {
-          problem: "top-level await is not supported; the slide script must finish when it loads",
+          problem: withLine(
+            {
+              message:
+                "top-level await is not supported; the slide script must finish when it loads",
+              hint: "drop the await: draw from t alone, with nothing to wait for",
+            },
+            lineMatching(code, /\bawait\b/),
+          ),
         };
       }
     }
   }
   return {
-    problem: firstError ? `syntax error: ${messageOf(firstError)}` : "missing export default",
+    problem: firstError
+      ? { message: `syntax error: ${messageOf(firstError)}`, hint: SYNTAX_HINT }
+      : { message: "missing export default" },
   };
 }
 
@@ -122,7 +188,9 @@ function messageOf(error: unknown): string {
 }
 
 /** A slide script as read from disk: compiled, or the problem that stops it. */
-export type SlideScriptEntry = SlideScript | { slug: string; path: string; problem: string };
+export type SlideScriptEntry =
+  | SlideScript
+  | { slug: string; path: string; problem: SlideScriptProblem };
 
 /** Compiles every `slides/<slug>.ts`, or only `only`'s, without deciding what a problem means. */
 export function loadSlideScripts(deckDir: string, only?: string): SlideScriptEntry[] {
@@ -146,7 +214,7 @@ export function usableSlideScripts(entries: SlideScriptEntry[], strict: boolean)
       return [entry];
     }
     if (strict) {
-      throw new DekError(`invalid slide script "${entry.slug}": ${entry.problem}`, {
+      throw new DekError(`invalid slide script "${entry.slug}": ${entry.problem.message}`, {
         path: entry.path,
         hint: "run `dek lint`",
       });

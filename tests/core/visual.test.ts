@@ -420,7 +420,7 @@ describe("lintVisualDeck messages", () => {
       "ul overflows the right edge by 3px and the bottom edge by 180px at steps 1, 2",
     );
     expect(dek030?.hint).toBe(
-      "shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut it, split it across beats or slides, or give it a smaller size in slides/intro.css; if it is decoration meant to bleed off the slide, mark it aria-hidden=\"true\"",
+      'shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut it, split it across beats or slides, or give it a smaller size in slides/intro.css; if it is decoration meant to bleed off the slide, mark it aria-hidden="true"',
     );
   });
 

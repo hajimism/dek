@@ -27,7 +27,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK009` | `slide` | A file in `slides/` holds more than one `<section class="slide">`; only the first is shown | — |
 | `DEK010` | `slide` | A class that neither the theme nor the slide's own stylesheet defines | — |
 | `DEK011` | `slide` | `<style>`, `style=`, `<script>`, an event handler attribute (`onclick=` and the like), or a `javascript:` URL inside a slide | — |
-| `DEK012` | `deck`, `slide` | A selector in the theme that is not under `.slide`, at the top level or inside an at-rule such as `@media` (a rule nested in a `.slide` rule is under it), or a rule in a slide stylesheet that reaches past the slide (`::view-transition-*`, `@font-face`, `@import`, `:root`, `html`, `body`) | — |
+| `DEK012` | `deck`, `slide` | A selector in the theme that is not under `.slide`, at the top level or inside an at-rule such as `@media` (a rule nested in a `.slide` rule is under it), or a rule in a slide stylesheet that reaches past the slide (`::view-transition-*`, `:root`, `html`, `body`, a step from `.slide` to a sibling with `~` or `+`, and the at-rules that register something for the whole page: `@font-face`, `@import`, `@property`, `@counter-style`, `@page`, `@font-palette-values`, `@font-feature-values`). Each finding names its line and where the rule belongs | — |
 | `DEK013` | `deck` | The theme defines more classes than `max_classes` (default 40) | — |
 | `DEK014` | `deck`, `slide` | A raw color, `font-family`, or absolute unit outside a token assignment, in the theme or a slide stylesheet, nested rules included. A string such as `content: "#fff"` is text, not a value | — |
 | `DEK015` | `deck` | A required token is missing from `.slide` | — |

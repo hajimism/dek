@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import {
-  cssAtRuleNames,
+  cssAtRules,
   cssClassNames,
   cssLayoutNames,
   cssUrls,
@@ -192,7 +192,7 @@ describe("string-aware scanning", () => {
   });
 
   test("outermostSelectors reports only the real outermost rules", () => {
-    expect(outermostSelectors(parseCss(braceInString))).toEqual([
+    expect(outermostSelectors(parseCss(braceInString)).map((rule) => rule.selector)).toEqual([
       ".slide .a::before",
       ".slide .b",
       ".slide .c",
@@ -216,12 +216,18 @@ describe("string-aware scanning", () => {
   test("escaped quotes inside a string do not end it", () => {
     const css = `.slide .q::after { content: "\\"}"; color: var(--fg); }\n.slide .r { color: var(--fg); }`;
     expect([...cssClassNames(parseCss(css))].sort()).toEqual(["q", "r", "slide"]);
-    expect(outermostSelectors(parseCss(css))).toEqual([".slide .q::after", ".slide .r"]);
+    expect(outermostSelectors(parseCss(css)).map((rule) => rule.selector)).toEqual([
+      ".slide .q::after",
+      ".slide .r",
+    ]);
   });
 
   test("a brace in a string inside @media does not leak a rule out of it", () => {
     const css = `@media (min-width: 1px) { .slide .m::before { content: "}"; } }\n.slide .n { color: var(--fg); }`;
-    expect(outermostSelectors(parseCss(css))).toEqual([".slide .m::before", ".slide .n"]);
+    expect(outermostSelectors(parseCss(css)).map((rule) => rule.selector)).toEqual([
+      ".slide .m::before",
+      ".slide .n",
+    ]);
     expect([...cssClassNames(parseCss(css))].sort()).toEqual(["m", "n", "slide"]);
   });
 
@@ -413,13 +419,17 @@ describe("themeExcerpt", () => {
 });
 
 describe("scanners share the string-aware rule walker", () => {
-  test("cssAtRuleNames lists block and statement at-rules, not an @ inside a string", () => {
+  test("cssAtRules lists block and statement at-rules, not an @ inside a string", () => {
     const css = `@import "x.css";
 .a::before { content: "@ not a rule"; }
 @media (min-width: 1px) { .b { color: red; } }
 @font-face { font-family: "F"; }
 `;
-    expect(cssAtRuleNames(parseCss(css))).toEqual(["import", "media", "font-face"]);
+    expect(cssAtRules(parseCss(css)).map((at) => at.name)).toEqual([
+      "import",
+      "media",
+      "font-face",
+    ]);
   });
 
   test("cssUrls reads url() from declaration values, with lines, not from strings", () => {
@@ -491,7 +501,7 @@ describe("nested rules", () => {
   });
 
   test("a nested rule is not an outermost selector", () => {
-    expect(outermostSelectors(parseCss(nested))).toEqual([".slide"]);
+    expect(outermostSelectors(parseCss(nested)).map((rule) => rule.selector)).toEqual([".slide"]);
   });
 
   test("replaceUrls rewrites a nested url()", () => {

@@ -28,6 +28,8 @@ export type CssDeclaration = {
 type RuleBase = {
   /** The selector or the at-rule's prelude as written, comments dropped: `&:hover`, `@media (…)`. */
   prelude: string;
+  /** The line the prelude starts on. */
+  line: number;
   /** Where the prelude is written, spaces trimmed. */
   preludeStart: number;
   preludeEnd: number;
@@ -74,8 +76,8 @@ export type Stylesheet = {
   decls: CssDeclaration[];
   /** The descriptors of `@font-face` and its kind. */
   descriptors: CssDeclaration[];
-  /** Every at-rule, block or statement, by name without the `@`. */
-  atRules: Array<{ name: string; start: number }>;
+  /** Every at-rule, block or statement, by name without the `@`, with the line it starts on. */
+  atRules: Array<{ name: string; start: number; line: number }>;
   /**
    * Every `url()` in a declaration or descriptor value, and every address `@import` loads; a
    * `url(` inside a string is text.
@@ -192,7 +194,7 @@ class SheetReader {
     const { source, sheet } = this;
     const name = /^@([-a-zA-Z]+)/.exec(source.slice(start, start + 64))?.[1];
     if (name) {
-      sheet.atRules.push({ name, start });
+      sheet.atRules.push({ name, start, line: this.lineOf(start) });
     }
     const stop = scanTopLevel(source, start, end, ";{}");
     if (source[stop] !== "{") {
@@ -209,6 +211,7 @@ class SheetReader {
     const rule: AtRule = {
       kind: "at",
       prelude,
+      line: this.lineOf(start),
       preludeStart: start,
       preludeEnd,
       bodyStart: stop + 1,
@@ -263,6 +266,7 @@ class SheetReader {
     const rule: StyleRule = {
       kind: "style",
       prelude,
+      line: this.lineOf(start),
       preludeStart: start,
       preludeEnd,
       bodyStart: open + 1,
@@ -437,14 +441,20 @@ export function cssLayoutNames(sheet: Stylesheet): Set<string> {
   return new Set(styleRules(sheet).flatMap((rule) => selectorLayouts(rule.prelude)));
 }
 
+/** A selector as a rule writes it, with the line the rule starts on. */
+export type SelectorAt = { selector: string; line: number };
+
 /** Style rule selectors at any depth, nesting resolved, skipping keyframe stops. */
-export function cssStyleSelectors(sheet: Stylesheet): string[] {
-  return styleRules(sheet).map((rule) => rule.selector);
+export function cssStyleSelectors(sheet: Stylesheet): SelectorAt[] {
+  return styleRules(sheet).map((rule) => ({ selector: rule.selector, line: rule.line }));
 }
 
-/** Every at-rule name in the stylesheet, such as `font-face` or `media`, in source order; strings are skipped. */
-export function cssAtRuleNames(sheet: Stylesheet): string[] {
-  return sheet.atRules.map((at) => at.name);
+/**
+ * Every at-rule in the stylesheet, such as `font-face` or `media`, by name, with its line, in
+ * source order; strings are skipped.
+ */
+export function cssAtRules(sheet: Stylesheet): Array<{ name: string; line: number }> {
+  return sheet.atRules.map(({ name, line }) => ({ name, line }));
 }
 
 /**
@@ -459,10 +469,10 @@ export function cssUrls(sheet: Stylesheet): Array<{ value: string; line: number 
  * The selectors that reach the page on their own: every outermost style rule, but not those
  * under `@scope`, which names its own root.
  */
-export function outermostSelectors(sheet: Stylesheet): string[] {
+export function outermostSelectors(sheet: Stylesheet): SelectorAt[] {
   return outermostStyleRules(sheet)
     .filter((rule) => !rule.atPath.some((at) => /^@scope\b/i.test(at)))
-    .map((rule) => rule.prelude);
+    .map((rule) => ({ selector: rule.prelude, line: rule.line }));
 }
 
 /** Whether each part of a selector list starts at `.slide`, or is a view-transition pseudo-element. */
