@@ -47,6 +47,24 @@
 
 `dek theme split` でこの例を出力でき、`dek theme` でどのレイアウトに例があるかを一覧できます。同梱テーマと sample のテーマは全レイアウトに例を持っているので、エージェントは推測せずに、そのレイアウトが想定するマークアップからスライドを書き始められます。
 
+## スライド番号
+
+どのスライドにも、`script.md` での位置が付いています。`--dek-slide-number` は 1 から数えた番号、`--dek-slide-count` はデッキの枚数です。build、dev サーバー、スクショ、PDF のどれでも同じように付くので、これを使って刷ったノンブルは、スライドを足しても消しても、`dek mv` で動かしても台本に追従します。スライドの HTML に番号は書きません。
+
+CSS カウンターに渡せば、どのカウンタースタイルでも刷れます。
+
+```css
+.slide {
+  counter-reset: folio var(--dek-slide-number) folios var(--dek-slide-count);
+}
+
+.slide::after {
+  content: counter(folio, decimal-leading-zero) " / " counter(folios);
+}
+```
+
+どのスライドにノンブルを出すかは、本と同じくテーマが決めます。表紙で隠すなら `.slide[data-layout="cover"]::after { content: none; }` と書きます。隠しても、表紙は 1 枚目として数えられます。
+
 ## コピーして、固定する
 
 プロジェクト直下の `theme.css` は新しいデッキの出発点です。編集は一方向にしか流れません。作成時に新しいデッキへ下り、残す価値があると判断したときに手で上げる。

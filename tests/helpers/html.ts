@@ -23,3 +23,23 @@ export function slideDocument(sectionInner: string): string {
 </html>
 `;
 }
+
+export type StampedPlace = { slug: string; number?: number; count?: number };
+
+/**
+ * Each slide on a page with the place dek stamped on it, in page order. Only sections that carry
+ * a `data-slug` count: a theme's examples, quoted in its CSS, are not slides.
+ */
+export function slidePlaces(html: string): StampedPlace[] {
+  return [...html.matchAll(/<section\b[^>]*\bdata-slug="([^"]*)"[^>]*>/g)].map(
+    ([tag, slug = ""]) => {
+      const number = tag.match(/--dek-slide-number:\s*(\d+)/)?.[1];
+      const count = tag.match(/--dek-slide-count:\s*(\d+)/)?.[1];
+      return {
+        slug,
+        ...(number ? { number: Number(number) } : {}),
+        ...(count ? { count: Number(count) } : {}),
+      };
+    },
+  );
+}

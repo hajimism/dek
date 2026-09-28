@@ -1,6 +1,6 @@
 import { readTheme } from "./assets.ts";
 import { playerChromeCss } from "./chrome.ts";
-import { type DeckSlides, deckSlides, htmlShell, stampSlide } from "./html.ts";
+import { type DeckSlides, deckSlides, htmlShell, slidePlace, stampSlide } from "./html.ts";
 import { type ProjectDeck, requireSection } from "./resolve.ts";
 import { logicalSize } from "./size.ts";
 import {
@@ -38,8 +38,10 @@ export function loadSlideSources(
 export function renderSlideHtml(sources: SlideSources, slug: string, beatIndex: number): string {
   const { deck } = sources;
   const section = requireSection(deck, slug);
+  const { sections } = deck.deck;
   const slide = stampSlide(sources.slides.section(slug), {
     slug,
+    place: slidePlace(sections, sections.indexOf(section)),
     shown: stepValuesForBeat(section.beats, beatIndex),
     beat: { index: beatIndex, step: stepKey(section.beats, beatIndex) },
     inline: { deckDir: deck.dir },

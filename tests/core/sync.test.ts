@@ -390,6 +390,8 @@ c
         expect(agents).toContain("dek shot --sheet");
         expect(agents).toContain("dek shot <slug> --motion");
         expect(agents).toContain("dek shot <a> --to <b> --at 0.5");
+        expect(agents).toContain("`--dek-slide-number` and `--dek-slide-count`");
+        expect(agents).toContain("never by hand");
       },
     );
   });

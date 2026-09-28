@@ -80,6 +80,10 @@
 }
 
 /* Running head: the talk on the left, the folio on the right, over a ruled line. */
+.slide {
+  counter-reset: folio var(--dek-slide-number) folios var(--dek-slide-count);
+}
+
 .slide::before,
 .slide::after {
   position: absolute;
@@ -99,13 +103,9 @@
 }
 
 .slide::after {
-  content: attr(data-folio) " / 18";
+  content: counter(folio, decimal-leading-zero) " / " counter(folios, decimal-leading-zero);
   right: var(--margin);
   font-variant-numeric: tabular-nums;
-}
-
-.slide:not([data-folio])::after {
-  content: none;
 }
 
 .slide h2,
@@ -285,7 +285,7 @@
 }
 
 /* @layout cover
-<section class="slide" data-layout="cover" data-folio="01">
+<section class="slide" data-layout="cover">
   <p class="label">Event　2026.09.25</p>
   <h2 class="slide-title">The talk in one line</h2>
   <p class="lede">What the audience takes home, in one sentence.</p>
@@ -325,7 +325,7 @@
 }
 
 /* @layout page
-<section class="slide" data-layout="page" data-folio="02">
+<section class="slide" data-layout="page">
   <p class="numeral">02</p>
   <h2 class="slide-title">The point, as a full sentence</h2>
   <p class="lede">One or two sentences that explain the figure.</p>
@@ -369,7 +369,7 @@
 }
 
 /* @layout split
-<section class="slide" data-layout="split" data-folio="03">
+<section class="slide" data-layout="split">
   <div class="col">
     <p class="numeral">03</p>
     <h2 class="slide-title">Text on the left</h2>
@@ -404,7 +404,7 @@
 }
 
 /* @layout title
-<section class="slide" data-layout="title" data-folio="00">
+<section class="slide" data-layout="title">
   <h2 class="slide-title">A skeleton for a section with no beats</h2>
 </section>
 */
@@ -420,7 +420,7 @@
 }
 
 /* @layout default
-<section class="slide" data-layout="default" data-folio="00">
+<section class="slide" data-layout="default">
   <h2 class="slide-title">A skeleton, as dek sync writes it</h2>
   <ul>
     <li data-step="1">One beat per ruled line</li>

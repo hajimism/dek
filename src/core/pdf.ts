@@ -1,6 +1,6 @@
 import { readTheme } from "./assets.ts";
 import { printPageCss } from "./chrome.ts";
-import { deckSlides, htmlShell, stampSlide } from "./html.ts";
+import { deckSlides, htmlShell, slidePlace, stampSlide } from "./html.ts";
 import { type DistOptions, distFile } from "./path.ts";
 import { type PlaywrightRunner, requirePlaywright } from "./playwright.ts";
 import { asResolvedDeck, type ProjectDeck, type ResolvedDeck } from "./resolve.ts";
@@ -41,11 +41,13 @@ export async function pdfDeck(
 export function renderPdfHtml(deck: ProjectDeck): string {
   const slides = deckSlides(deck);
   // Every slide at its last beat, as a handout shows it.
-  const slidesHtml = deck.deck.sections
-    .map((section) => {
+  const { sections } = deck.deck;
+  const slidesHtml = sections
+    .map((section, index) => {
       const last = lastStop(section.beats);
       return stampSlide(slides.section(section.slug), {
         slug: section.slug,
+        place: slidePlace(sections, index),
         shown: stepValuesForBeat(section.beats, last),
         beat: { index: last, step: stepKey(section.beats, last) },
         inline: { deckDir: deck.dir },

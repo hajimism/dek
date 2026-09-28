@@ -47,6 +47,24 @@ A layout is a promise about markup: `split` expects a parent node and two result
 
 `dek theme split` prints the example, and `dek theme` lists which layouts have one. The bundled theme and the sample's themes carry an example for every layout, so an agent can start a slide from the markup the layout was designed for instead of guessing.
 
+## Slide numbers
+
+Every slide carries its place in `script.md`: `--dek-slide-number` counts from 1, and `--dek-slide-count` is how many slides the deck has. The build, the dev server, shots, and the PDF all set them the same way, so a folio printed from them follows the script whenever a slide is added, removed, or moved with `dek mv`. Nothing in the slide's HTML holds a number.
+
+Pass them to a CSS counter to print them in any counter style:
+
+```css
+.slide {
+  counter-reset: folio var(--dek-slide-number) folios var(--dek-slide-count);
+}
+
+.slide::after {
+  content: counter(folio, decimal-leading-zero) " / " counter(folios);
+}
+```
+
+Which slides show a folio is the theme's call, as it is in a book: hide it on the cover with `.slide[data-layout="cover"]::after { content: none; }`, and the cover still counts as slide 1.
+
 ## Copy, then freeze
 
 The project's `theme.css` is the starting point for new decks. Edits flow in one direction: down into a new deck on creation, and back up by hand when you decide something is worth keeping.

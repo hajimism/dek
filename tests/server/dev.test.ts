@@ -6,7 +6,7 @@ import { DekError } from "../../src/core/error.ts";
 import { startDevServer } from "../../src/server/dev.ts";
 import { POLL_INTERVAL_MS } from "../../src/server/watch.ts";
 import { spawnDekServer } from "../helpers/cli.ts";
-import { slideDocument } from "../helpers/html.ts";
+import { slideDocument, slidePlaces } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
 import { waitForEvent, withDevServer } from "../helpers/server.ts";
@@ -557,13 +557,25 @@ more
           expect(slide.ok).toBe(true);
           const html = await slide.text();
           expect(html).toContain("intro-updated");
-          expect(html).toContain('data-slug="intro"');
+          expect(slidePlaces(html)).toEqual([{ slug: "intro", number: 1, count: 1 }]);
           expect(html.startsWith("<section")).toBe(true);
           expect(html).not.toContain("data:image/png;base64,");
 
           const theme = await fetch(new URL("/theme", server.url));
           expect(theme.ok).toBe(true);
           expect(theme.headers.get("content-type")).toContain("text/css");
+        });
+      },
+    );
+  });
+
+  test("serves no fragment for a slide file the script does not list", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml, leftover: leftoverHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
+          const slide = await fetch(new URL("/slide/leftover", server.url));
+          expect(slide.status).toBe(404);
         });
       },
     );

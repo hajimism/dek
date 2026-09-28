@@ -3,7 +3,7 @@ import { deckPaths } from "./deck-paths.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { isInside } from "./path.ts";
 import { type ProjectDeck, readDeckFile } from "./resolve.ts";
-import { FALLBACK_LANG } from "./schema.ts";
+import { FALLBACK_LANG, type Section } from "./schema.ts";
 import { skeletonHtml } from "./skeleton.ts";
 
 export function htmlShell(options: {
@@ -115,9 +115,21 @@ function isSafeSlideSlug(slug: string): boolean {
   return slug.length > 0 && !slug.includes("/") && !slug.includes("\\") && !slug.includes("\0");
 }
 
-/** What a slide's section carries on a page; everything but the slug is for still pages. */
+/**
+ * Where the script puts a slide: its 1-based number and how many slides the deck has. Every
+ * page shows it the same, so a theme can print a folio that follows the script's order.
+ */
+export type SlidePlace = { number: number; count: number };
+
+/** The place of the script's `index`-th section. */
+export function slidePlace(sections: readonly Section[], index: number): SlidePlace {
+  return { number: index + 1, count: sections.length };
+}
+
+/** What a slide's section carries on a page; everything but the slug and place is for still pages. */
 export type SlideStamp = {
   slug: string;
+  place: SlidePlace;
   /** The `data-step` values shown; the slide is the current one, as the player would mark it. */
   shown?: Set<string>;
   /** The beat a still page shows, for its `stillDrawScript`. */
@@ -128,7 +140,8 @@ export type SlideStamp = {
 
 /**
  * One slide section with what the page needs on it, in one parser pass: its `data-slug` unless
- * it names its own, and for a still page the classes and beat the player would have set.
+ * it names its own, its place as `--dek-slide-number` and `--dek-slide-count`, and for a still
+ * page the classes and beat the player would have set.
  */
 export function stampSlide(html: string, stamp: SlideStamp): string {
   let done = false;
@@ -142,6 +155,10 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
         if (el.getAttribute("data-slug") === null) {
           el.setAttribute("data-slug", stamp.slug);
         }
+        // Ahead of the author's own style, so a slide can still set its own.
+        const place = `--dek-slide-number: ${stamp.place.number}; --dek-slide-count: ${stamp.place.count}`;
+        const own = el.getAttribute("style")?.trim();
+        el.setAttribute("style", own ? `${place}; ${own}` : place);
         if (stamp.shown) {
           addClass(el, "is-current");
         }
@@ -171,10 +188,12 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
 /** Every slide of the deck in script order, as the player pages hold them. */
 export function collectSlidesHtml(deck: ProjectDeck, options: { inline: boolean }): string {
   const slides = deckSlides(deck);
-  return deck.deck.sections
-    .map((section) =>
+  const { sections } = deck.deck;
+  return sections
+    .map((section, index) =>
       stampSlide(slides.section(section.slug), {
         slug: section.slug,
+        place: slidePlace(sections, index),
         ...(options.inline ? { inline: { deckDir: deck.dir } } : {}),
       }),
     )

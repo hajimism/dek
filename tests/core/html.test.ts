@@ -8,7 +8,7 @@ import { resolveDeck } from "../../src/core/resolve.ts";
 import { stepValuesForBeat } from "../../src/core/step.ts";
 import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
 import { playerEmbed } from "../helpers/embed.ts";
-import { slideDocument } from "../helpers/html.ts";
+import { slideDocument, slidePlaces } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -22,6 +22,24 @@ const architectureHtml = slideDocument(`<section class="slide" data-layout="defa
     <li data-step="hook">script.md が親</li>
   </ul>
 </section>`);
+
+/** A deck of two slides, intro then architecture, as script.md orders them. */
+const twoSlideDeck = {
+  name: "demo",
+  script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## architecture
+
+body
+`,
+  slides: { intro: introHtml, architecture: architectureHtml },
+};
 
 /** The page for a build, for video, or the dev server's player or presenter page. */
 async function renderPage(
@@ -90,21 +108,23 @@ describe("extractSlideSection", () => {
 });
 
 describe("stampSlide", () => {
+  const place = { number: 1, count: 1 };
+
   test("does not overwrite an existing data-slug", () => {
     const html = `<section class="slide" data-slug="kept"><h2>intro</h2></section>`;
-    expect(stampSlide(html, { slug: "intro" })).toContain('data-slug="kept"');
-    expect(stampSlide(html, { slug: "intro" })).not.toContain('data-slug="intro"');
+    expect(stampSlide(html, { slug: "intro", place })).toContain('data-slug="kept"');
+    expect(stampSlide(html, { slug: "intro", place })).not.toContain('data-slug="intro"');
   });
 
   test("adds data-slug to an unquoted slide section", () => {
     const html = `<section class=slide data-layout="title"><h2>intro</h2></section>`;
-    expect(stampSlide(html, { slug: "intro" })).toContain('data-slug="intro"');
+    expect(stampSlide(html, { slug: "intro", place })).toContain('data-slug="intro"');
   });
 
   test("marks the current slide and shown data-step values", () => {
     const html = `<section class="slide"><li data-step="hook">a</li><li data-step="2">b</li></section>`;
     const shown = stepValuesForBeat([{ id: "hook" }, {}], 1);
-    const next = stampSlide(html, { slug: "s", shown });
+    const next = stampSlide(html, { slug: "s", place, shown });
     expect(next).toContain("is-current");
     expect(next).toMatch(/data-step="hook"[^>]*is-shown|is-shown[^>]*data-step="hook"/);
     expect(next).not.toMatch(/data-step="2"[^>]*is-shown|is-shown[^>]*data-step="2"/);
@@ -113,19 +133,43 @@ describe("stampSlide", () => {
   test("keeps existing classes on quoted and unquoted tags", () => {
     const quoted = stampSlide(
       `<section class="slide title"><p class="node" data-step="hook">a</p></section>`,
-      { slug: "s", shown: new Set(["hook"]) },
+      { slug: "s", place, shown: new Set(["hook"]) },
     );
     expect(quoted).toMatch(/class="[^"]*slide[^"]*is-current|class="[^"]*is-current[^"]*slide/);
     expect(quoted).toMatch(/class="[^"]*node[^"]*is-shown|class="[^"]*is-shown[^"]*node/);
 
     const unquoted = stampSlide(
       `<section class=slide><p class=node data-step="hook">a</p></section>`,
-      { slug: "s", shown: new Set(["hook"]) },
+      { slug: "s", place, shown: new Set(["hook"]) },
     );
     expect(unquoted).toContain("is-current");
     expect(unquoted).toContain("is-shown");
     expect(unquoted).toContain("slide");
     expect(unquoted).toContain("node");
+  });
+
+  test("gives the slide its place in the script as custom properties", () => {
+    const html = stampSlide(`<section class="slide"><h2>b</h2></section>`, {
+      slug: "b",
+      place: { number: 2, count: 3 },
+    });
+    expect(html).toContain('style="--dek-slide-number: 2; --dek-slide-count: 3"');
+  });
+
+  test("keeps the author's inline style after the place, so it can override it", () => {
+    const html = stampSlide(`<section class="slide" style="color: red"><h2>b</h2></section>`, {
+      slug: "b",
+      place: { number: 2, count: 3 },
+    });
+    expect(html).toContain('style="--dek-slide-number: 2; --dek-slide-count: 3; color: red"');
+  });
+
+  test("stamps the place on the slide alone, not on a section inside it", () => {
+    const html = stampSlide(
+      `<section class="slide"><section class="slide-part">a</section></section>`,
+      { slug: "a", place: { number: 1, count: 1 } },
+    );
+    expect(html.match(/--dek-slide-number/g)).toHaveLength(1);
   });
 });
 
@@ -216,6 +260,16 @@ hello
 });
 
 describe("renderDeckHtml", () => {
+  test("numbers every slide in script order, against the deck's count", async () => {
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      const html = await renderPage(join(root, "decks", "demo"));
+      expect(slidePlaces(html)).toEqual([
+        { slug: "intro", number: 1, count: 2 },
+        { slug: "architecture", number: 2, count: 2 },
+      ]);
+    });
+  });
+
   test("lists slides in a left rail in player mode", async () => {
     await withTempProject(
       {
@@ -427,6 +481,14 @@ hello
 });
 
 describe("renderSlideHtml", () => {
+  test("numbers a slide shown alone by its place in the whole deck", async () => {
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      const { deck } = resolveDeck(join(root, "decks", "demo"));
+      const html = renderSlideHtml(loadSlideSources(deck), "architecture", 0);
+      expect(slidePlaces(html)).toEqual([{ slug: "architecture", number: 2, count: 2 }]);
+    });
+  });
+
   test("renders one slide at 1280x720 with is-shown for the requested beat", async () => {
     await withTempProject(
       {

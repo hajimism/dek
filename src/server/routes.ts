@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileInside, readTheme } from "../core/assets.ts";
 import { errorFields } from "../core/error.ts";
 import { escapeAttr, escapeHtml } from "../core/escape.ts";
-import { deckSlides, htmlShell, stampSlide } from "../core/html.ts";
+import { deckSlides, htmlShell, slidePlace, stampSlide } from "../core/html.ts";
 import type { Project, ProjectDeck } from "../core/resolve.ts";
 import { voiceCacheFile } from "../core/voice.ts";
 import { deckRoutePath, parseDeckRoute, splitDeckPath, type VoiceFile } from "../runtime/routes.ts";
@@ -70,8 +70,15 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
       return {
         route: "slide",
         respond: () => {
-          const html = deck && deckSlides(deck).written(route.slug);
-          return html ? htmlResponse(stampSlide(html, { slug: route.slug })) : notFound();
+          // A slide the script does not list has no place in the deck, so no page shows it.
+          const sections = deck?.deck.sections ?? [];
+          const index = sections.findIndex((section) => section.slug === route.slug);
+          const html = deck && index >= 0 && deckSlides(deck).written(route.slug);
+          return html
+            ? htmlResponse(
+                stampSlide(html, { slug: route.slug, place: slidePlace(sections, index) }),
+              )
+            : notFound();
         },
       };
     case "theme":

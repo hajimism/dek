@@ -5,7 +5,7 @@ import { DekError } from "../../src/core/error.ts";
 import { pdfDeck, renderPdfHtml } from "../../src/core/pdf.ts";
 import type { PlaywrightRunner, VisualRequest } from "../../src/core/playwright.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
-import { slideDocument } from "../helpers/html.ts";
+import { slideDocument, slidePlaces } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { writeRequested } from "../helpers/visual.ts";
@@ -24,6 +24,38 @@ const architectureHtml = slideDocument(`<section class="slide" data-layout="defa
 </section>`);
 
 describe("renderPdfHtml", () => {
+  test("numbers every page in script order, against the deck's count", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## architecture
+
+body
+`,
+            slides: { intro: introHtml, architecture: architectureHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
+        expect(slidePlaces(renderPdfHtml(deck))).toEqual([
+          { slug: "intro", number: 1, count: 2 },
+          { slug: "architecture", number: 2, count: 2 },
+        ]);
+      },
+    );
+  });
+
   test("uses lang from frontmatter on the document shell", async () => {
     await withTempProject(
       {
