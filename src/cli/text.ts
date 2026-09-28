@@ -42,6 +42,23 @@ export function formatSkipped(skipped: SkippedCheck[] | undefined, color = false
     .join("\n");
 }
 
+/**
+ * The slides sync kept though their section is gone, for stderr: sync removes only what it wrote,
+ * so saying nothing would read as a deck with nothing left over.
+ */
+export function formatKept(kept: string[], color = false): string {
+  const c = ansi(color);
+  return kept
+    .flatMap((path) => [
+      `kept ${path}: its section is gone from script.md, and the file is yours`,
+      `  ${c.yellow("help:")} ${ORPHAN_HINT}`,
+    ])
+    .join("\n");
+}
+
+const ORPHAN_HINT =
+  "add a section for it to script.md, or remove the file if the slide is gone from the talk";
+
 function withNext(done: string, next: string[]): string {
   return next.length === 0
     ? done

@@ -11,13 +11,15 @@ import { type SkeletonRecord, skeletonRecord } from "./skeleton-record.ts";
 
 /**
  * `updated` lists skeletons nobody edited, rewritten because the script moved on; `removed`, the
- * ones whose section is gone from the script. `dekFiles` is what became of dek's own files at the
- * project root.
+ * ones whose section is gone from the script. `kept` lists the slides whose section is gone too
+ * but that sync left alone, being the author's. `dekFiles` is what became of dek's own files at
+ * the project root.
  */
 export type SyncResult = {
   created: string[];
   updated: string[];
   removed: string[];
+  kept: string[];
   dekFiles: FileChanges;
 };
 
@@ -121,7 +123,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
   const existing = new Map(listSlides(deck.dir).map((slide) => [slide.slug, slide.path]));
   const created: string[] = [];
   const updated: string[] = [];
-  const removed = removeOrphanSkeletons(
+  const { removed, kept } = removeOrphanSkeletons(
     { root: project.root, paths, record },
     [...existing].filter(([slug]) => !deck.deck.sections.some((section) => section.slug === slug)),
   );
@@ -151,7 +153,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
   }
   record.save();
 
-  return { created, updated, removed, dekFiles: writeDekFiles(project.root) };
+  return { created, updated, removed, kept, dekFiles: writeDekFiles(project.root) };
 }
 
 /**
@@ -164,24 +166,25 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
 function removeOrphanSkeletons(
   { root, paths, record }: { root: string; paths: DeckPaths; record: SkeletonRecord },
   orphans: [string, string][],
-): string[] {
+): { removed: string[]; kept: string[] } {
   const removed: string[] = [];
+  const kept: string[] = [];
   for (const [slug, path] of orphans) {
     const html = readFileSync(path, "utf8");
-    if (!record.owns(html, undefined)) {
-      continue;
-    }
     const beside = ([...SLIDE_SIDECARS, ".js"] as const).some((ext) =>
       existsSync(paths.slide(slug, ext)),
     );
-    if (beside) {
-      record.keep(html);
-    } else {
-      removeInside(path, root);
-      removed.push(path);
+    if (!record.owns(html, undefined) || beside) {
+      kept.push(path);
+      if (record.owns(html, undefined)) {
+        record.keep(html);
+      }
+      continue;
     }
+    removeInside(path, root);
+    removed.push(path);
   }
-  return removed;
+  return { removed, kept };
 }
 
 /**

@@ -267,7 +267,13 @@ function syncQuietly(deckDir: string): SyncResult {
     return syncDeck(deckDir);
   } catch {
     // resolveDeck in diagnose reports the same error with its path and line.
-    return { created: [], updated: [], removed: [], dekFiles: { created: [], updated: [] } };
+    return {
+      created: [],
+      updated: [],
+      removed: [],
+      kept: [],
+      dekFiles: { created: [], updated: [] },
+    };
   }
 }
 

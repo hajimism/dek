@@ -100,6 +100,7 @@ more
           created: [],
           updated: [join(deckDir, "slides", "intro.html"), join(deckDir, "slides", "plan.html")],
           removed: [],
+          kept: [],
         });
         const intro = await readFile(join(deckDir, "slides", "intro.html"), "utf8");
         expect(intro).toContain('<h2 class="slide-title">The Bug That Was a Design</h2>');
@@ -109,6 +110,7 @@ more
           created: [],
           updated: [],
           removed: [],
+          kept: [],
           dekFiles: { created: [], updated: [] },
         });
       },
@@ -451,6 +453,7 @@ c
           created: [],
           updated: [],
           removed: [],
+          kept: [],
           dekFiles: { created: [], updated: [] },
         });
       },

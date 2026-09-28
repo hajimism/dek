@@ -11,6 +11,7 @@ import {
   formatCheck,
   formatCues,
   formatInit,
+  formatKept,
   formatLs,
   formatMv,
   formatNav,
@@ -498,10 +499,12 @@ export const COMMANDS = {
     },
     output: {
       text: (data) => formatCreated(data.created, data.updated, data.removed),
+      notes: (data, color) => formatKept(data.kept, color) || undefined,
       paths: (data, display) => ({
         created: data.created.map(display),
         updated: data.updated.map(display),
         removed: data.removed.map(display),
+        kept: data.kept.map(display),
       }),
     },
   }),

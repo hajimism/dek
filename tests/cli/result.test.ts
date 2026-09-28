@@ -253,22 +253,37 @@ architecture  architecture      0:11   0:05
     expect(
       formatText({
         command: "sync",
-        data: { created: ["/tmp/decks/demo/slides/extra.html"], updated: [], removed: [] },
+        data: {
+          created: ["/tmp/decks/demo/slides/extra.html"],
+          updated: [],
+          removed: [],
+          kept: [],
+        },
       }),
     ).toBe("synced 1 file\n  /tmp/decks/demo/slides/extra.html");
-    expect(formatText({ command: "sync", data: { created: [], updated: [], removed: [] } })).toBe(
-      "synced 0 files",
-    );
+    expect(
+      formatText({ command: "sync", data: { created: [], updated: [], removed: [], kept: [] } }),
+    ).toBe("synced 0 files");
     expect(
       formatText({
         command: "sync",
-        data: { created: ["/d/slides/extra.html"], updated: ["/d/slides/intro.html"], removed: [] },
+        data: {
+          created: ["/d/slides/extra.html"],
+          updated: ["/d/slides/intro.html"],
+          removed: [],
+          kept: [],
+        },
       }),
     ).toBe("synced 2 files\n  /d/slides/extra.html\n  /d/slides/intro.html (updated)");
     expect(
       formatText({
         command: "sync",
-        data: { created: ["/d/slides/mine.html"], updated: [], removed: ["/d/slides/next.html"] },
+        data: {
+          created: ["/d/slides/mine.html"],
+          updated: [],
+          removed: ["/d/slides/next.html"],
+          kept: [],
+        },
       }),
     ).toBe("synced 2 files\n  /d/slides/mine.html\n  /d/slides/next.html (removed)");
   });
@@ -380,6 +395,7 @@ describe("displayPaths created files", () => {
           created: ["/p/decks/demo/slides/intro.html"],
           updated: ["/p/decks/demo/slides/cover.html"],
           removed: ["/p/decks/demo/slides/next.html"],
+          kept: ["/p/decks/demo/slides/old.html"],
         },
       },
       cwd,
@@ -401,6 +417,7 @@ describe("displayPaths created files", () => {
       created: ["slides/intro.html"],
       updated: ["slides/cover.html"],
       removed: ["slides/next.html"],
+      kept: ["slides/old.html"],
     });
     expect(created.command === "new" && created.data.created).toEqual(["decks/next/script.md"]);
   });

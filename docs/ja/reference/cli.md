@@ -63,7 +63,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dek mv [deck] <slug> --before\|--after <slug>` | `script.md` の中でセクションを並べ替える |
 | `dek goto [deck] <slug>` | 開いているブラウザを飛ばす。開発サーバが必要 |
 | `dek current [deck]` | いま表示中の枚を出力。開発サーバが必要 |
-| `dek sync [deck]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、dek 自身のファイル（`AGENTS.md` の dek のブロック、`.dek/schema.json`、`.dek/slide.d.ts`）を更新する。これらはデッキではなく、プロジェクトのテーマと入っている dek に従うので、どちらかが変わった後にだけ変わる。そのとき最初に走ったコマンドが、どれであれ更新したと表示する。手を入れたスライド、`AGENTS.md` の dek のブロックの外に書いたこと、`tsconfig.json` には触れない。`--json` は `created`、`updated`、`removed` を返す |
+| `dek sync [deck]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、dek 自身のファイル（`AGENTS.md` の dek のブロック、`.dek/schema.json`、`.dek/slide.d.ts`）を更新する。これらはデッキではなく、入っている dek とプロジェクトの ref に従うので、どちらかが変わった後にだけ変わる。そのとき最初に走ったコマンドが、どれであれ更新したと表示する。手を入れたスライド、`AGENTS.md` の dek のブロックの外に書いたこと、`tsconfig.json` には触れない。セクションがなくなっても手が入っているスライドは残し、どうすればよいかと一緒に標準エラーに名前を出す。lint はそれを `DEK002` として報告する。`--json` は `created`、`updated`、`removed`、`kept` を返す |
 
 ## 成果物
 

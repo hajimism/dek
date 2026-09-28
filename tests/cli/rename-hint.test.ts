@@ -100,7 +100,7 @@ describe("renaming after editing script.md first", () => {
         written.replace("hand-written", "edited"),
       );
       const lintResult = await lint(deck);
-      expect(lintResult.diagnostics.find((d) => d.id === "DEK002")?.hint).toBeUndefined();
+      expect(lintResult.diagnostics.find((d) => d.id === "DEK002")?.hint).not.toContain("dek mv");
       expect(() => run(["mv", "before", "after"], deck)).toThrow(
         "slides/before.html and slides/after.html both hold a slide you wrote",
       );
@@ -202,7 +202,7 @@ describe("rename hints", () => {
       },
       async (root) => {
         const diagnostics = lintDeck(join(root, "decks", "demo"));
-        expect(diagnostics.find((d) => d.id === "DEK002")?.hint).toBeUndefined();
+        expect(diagnostics.find((d) => d.id === "DEK002")?.hint).not.toContain("dek mv");
       },
     );
   });

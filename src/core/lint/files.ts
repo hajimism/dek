@@ -30,6 +30,7 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
         message: `slide HTML has no section "${slide.slug}"`,
         path: slide.path,
         slug: slide.slug,
+        hint: orphanHint(slide.slug, `slides/${slide.slug}.html`),
         data: { slug: slide.slug, file: `slides/${slide.slug}.html` },
       }),
     );
@@ -47,12 +48,22 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
           message: `slide ${kind} has no section "${file.slug}"`,
           path: file.path,
           slug: file.slug,
+          hint: orphanHint(file.slug, `slides/${file.slug}${ext}`),
           data: { slug: file.slug, file: `slides/${file.slug}${ext}` },
         }),
       );
     }
   }
   return diagnostics;
+}
+
+/**
+ * What to do with a slide file the script does not name, when no rename explains it: give it a
+ * section, or take it out of the talk. Which one is the author's call.
+ */
+function orphanHint(slug: string, file: string): string {
+  const title = slug.charAt(0).toUpperCase() + slug.slice(1).replaceAll("-", " ");
+  return `add a section for it to script.md, like \`## ${title} {#${slug}}\`, or remove ${file} if the slide is gone from the talk`;
 }
 
 /**

@@ -352,6 +352,9 @@ describe("lintDeck", () => {
         expect(diagnostics.some((d) => d.id === "DEK002")).toBe(true);
         const dek002 = diagnostics.find((d) => d.id === "DEK002");
         expect(dek002?.path).toContain("slides/leftover.html");
+        expect(dek002?.hint).toBe(
+          "add a section for it to script.md, like `## Leftover {#leftover}`, or remove slides/leftover.html if the slide is gone from the talk",
+        );
       },
     );
   });

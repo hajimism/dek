@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { outputOf } from "../../src/cli/commands.ts";
 import { initCommand } from "../../src/cli/init.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
 import { syncCommand } from "../../src/cli/sync.ts";
@@ -131,5 +132,31 @@ more
       expect(listSlides(deckDir).map((slide) => slide.slug)).toEqual(["hello"]);
       expect(lintDeck(deckDir)).toEqual([]);
     });
+  });
+});
+
+describe("dek sync and slides the script no longer names", () => {
+  // Sync removes only what it wrote. A slide the author edited stays, and sync says so, so nobody
+  // takes the silence for a clean deck.
+  test("says which slides it kept though their section is gone", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n",
+            slides: { intro: customIntro, old: customIntro },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const result = syncCommand(resolveDecks(deckDir));
+        expect(result.kept).toEqual([join(deckDir, "slides", "old.html")]);
+        expect(outputOf("sync").notes?.(result, false)).toBe(
+          `kept ${join(deckDir, "slides", "old.html")}: its section is gone from script.md, and the file is yours\n  help: add a section for it to script.md, or remove the file if the slide is gone from the talk`,
+        );
+      },
+    );
   });
 });
