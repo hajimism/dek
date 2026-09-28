@@ -56,6 +56,24 @@ export function formatKept(kept: string[], color = false): string {
     .join("\n");
 }
 
+/**
+ * A theme.css init kept that is no dek theme, for stderr: every deck copies it, so each would fail
+ * lint on its first run with a DEK015 per token.
+ */
+export function formatKeptTheme(data: InitResult, color = false): string {
+  const missing = data.missingTokens ?? [];
+  if (missing.length === 0) {
+    return "";
+  }
+  const c = ansi(color);
+  const theme = data.kept.find((path) => path.endsWith("theme.css")) ?? "theme.css";
+  const named = missing.length > 3 ? [...missing.slice(0, 3), "…"] : missing;
+  return [
+    `${theme} was kept and lacks ${missing.length} ${missing.length === 1 ? "token" : "tokens"} every deck needs (${named.join(", ")})`,
+    `  ${c.yellow("help:")} add them to its .slide rule, or move it aside and run \`dek init\` again for dek's own theme`,
+  ].join("\n");
+}
+
 const ORPHAN_HINT =
   "add a section for it to script.md, or remove the file if the slide is gone from the talk";
 

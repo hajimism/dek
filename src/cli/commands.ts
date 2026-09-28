@@ -12,6 +12,7 @@ import {
   formatCues,
   formatInit,
   formatKept,
+  formatKeptTheme,
   formatLs,
   formatMv,
   formatNav,
@@ -242,6 +243,7 @@ export const COMMANDS = {
     },
     output: {
       text: formatInit,
+      notes: (data, color) => formatKeptTheme(data, color) || undefined,
       paths: (data, display) => ({
         ...data,
         created: data.created.map(display),

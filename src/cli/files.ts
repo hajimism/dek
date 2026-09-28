@@ -1,15 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { bundledTheme } from "../core/bundled-theme.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
 import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
 import { formatVoiceToml } from "../core/voice.ts";
 
-const defaultThemePath = join(import.meta.dir, "..", "theme", "default.css");
-
 export function defaultTheme(): string {
-  return readFileSync(defaultThemePath, "utf8");
+  return bundledTheme();
 }
 
 export function defaultToml(): string {

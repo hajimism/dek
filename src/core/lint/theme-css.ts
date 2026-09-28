@@ -1,3 +1,4 @@
+import { bundledTokenValue } from "../bundled-theme.ts";
 import {
   type CssToken,
   cssAtRules,
@@ -68,6 +69,7 @@ function lintTheme(
       diag("DEK015", {
         message: `theme.css is missing required token "${name}"`,
         path,
+        hint: missingTokenHint(name),
         data: { token: name },
       }),
     );
@@ -194,6 +196,14 @@ function rawValueDiagnostics(
  * DEK014's hint. theme.css gains a token; a slide stylesheet may name the value on its own
  * `.slide` instead, since a value one slide uses need not join the theme.
  */
+/** The line to add, with the value dek's own theme gives the token. */
+function missingTokenHint(name: string): string {
+  const value = bundledTokenValue(name);
+  return value === undefined
+    ? `add ${name} to the .slide rule in theme.css`
+    : `add ${name}: ${value}; to the .slide rule in theme.css, as dek's own theme sets it`;
+}
+
 /** A raw custom property set off the slide belongs on it, where a token is set and published. */
 function tokenPlaceHint(property: string, slug?: string): string {
   return slug === undefined

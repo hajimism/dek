@@ -383,13 +383,17 @@ function unknownClassDiagnostics(
   classes: Set<string>,
   hasScript: boolean,
 ): Diagnostic[] {
-  const known = [...classes].sort();
+  // `slide` is the root every slide already has, never a word to give content.
+  const known = [...classes].filter((name) => name !== "slide").sort();
   const shown =
     known.length > MAX_HINT_CLASSES ? [...known.slice(0, MAX_HINT_CLASSES), "…"] : known;
   const scriptHint = hasScript
     ? `; to find an element from slides/${section.slug}.ts, use a data-* attribute instead`
     : "";
-  const hint = `define it in slides/${section.slug}.css, or use one of: ${shown.join(", ")}${scriptHint}`;
+  const hint =
+    known.length === 0
+      ? `define it in slides/${section.slug}.css, or in theme.css for every slide; the theme defines no class yet${scriptHint}`
+      : `define it in slides/${section.slug}.css, or use one of: ${shown.join(", ")}${scriptHint}`;
   const unknown = new Map<string, HtmlAttribute>();
   for (const attribute of attributesNamed(scan, "class")) {
     for (const name of attribute.value.split(/\s+/).filter(Boolean)) {

@@ -1,7 +1,9 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { parseCss, publishedTokens } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
+import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { readTextIfExists } from "../core/resolve.ts";
@@ -38,6 +40,11 @@ export type InitResult = {
   next: string[];
   /** The Playwright install, when the project lacks it: `dek shot`, `dek pdf`, and `--visual` need it. */
   playwright?: string;
+  /**
+   * The tokens a kept theme.css lacks of the ones every deck needs, when it lacks any. Each deck
+   * copies the project theme, so its lint would report them all on its first run.
+   */
+  missingTokens?: string[];
 };
 
 /**
@@ -62,6 +69,7 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
   const dekFiles = started ? syncDeckFiles(deckDir, created) : writeDekFiles(root);
   created.push(...dekFiles.created);
   const playwright = playwrightStep(root);
+  const missingTokens = kept.includes(join(root, "theme.css")) ? missingThemeTokens(root) : [];
   return {
     root,
     created,
@@ -69,7 +77,18 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
     kept,
     next: nextSteps(options.cwd, root, deckDir),
     ...(playwright ? { playwright } : {}),
+    ...(missingTokens.length > 0 ? { missingTokens } : {}),
   };
+}
+
+/** The tokens every deck needs that the project's theme.css does not publish on `.slide`. */
+function missingThemeTokens(root: string): string[] {
+  const published = new Set(
+    publishedTokens(parseCss(readTextIfExists(join(root, "theme.css")) ?? "")).map(
+      (token) => token.name,
+    ),
+  );
+  return REQUIRED_TOKENS.filter((name) => !published.has(name));
 }
 
 function syncDeckFiles(deckDir: string, created: string[]): FileChanges {

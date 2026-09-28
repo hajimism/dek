@@ -854,6 +854,32 @@ b
         expect(dek015).toHaveLength(1);
         expect(dek015[0]?.message).toContain("--accent");
         expect(dek015[0]?.path).toContain("theme.css");
+        // The value dek's own theme gives it, so the fix can be written as is.
+        expect(dek015[0]?.hint).toMatch(
+          /^add --accent: #[0-9a-f]+; to the \.slide rule in theme\.css, as dek's own theme sets it$/,
+        );
+      },
+    );
+  });
+
+  test("DEK010: offers no empty list when the theme defines no class", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: themeWithTokens(contractTokens),
+            slides: {
+              intro: slideDocument(`<section class="slide"><p class="lede">x</p></section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const dek010 = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK010");
+        expect(dek010?.hint).toBe(
+          "define it in slides/intro.css, or in theme.css for every slide; the theme defines no class yet",
+        );
       },
     );
   });
@@ -1636,12 +1662,12 @@ two
     );
     const typo = diagnostics.find((d) => d.id === "DEK010" && d.data?.class === "slide-titel");
     expect(typo?.hint).toBe(
-      "did you mean slide-title? define it in slides/intro.css, or use one of: node, slide, slide-title",
+      "did you mean slide-title? define it in slides/intro.css, or use one of: node, slide-title",
     );
     expect(typo?.data).toEqual({ class: "slide-titel", suggestion: "slide-title" });
     const unknown = diagnostics.find((d) => d.id === "DEK010" && d.data?.class === "mystery");
     expect(unknown?.hint).toBe(
-      "define it in slides/intro.css, or use one of: node, slide, slide-title",
+      "define it in slides/intro.css, or use one of: node, slide-title",
     );
     expect(unknown?.data).toEqual({ class: "mystery" });
   });
@@ -1654,7 +1680,7 @@ two
       { theme: ".slide {}\n.slide .slide-title {}\n.slide .node {}\n" },
     );
     const hint = diagnostics.find((d) => d.id === "DEK010")?.hint;
-    expect(hint).toBe("define it in slides/intro.css, or use one of: node, slide, slide-title");
+    expect(hint).toBe("define it in slides/intro.css, or use one of: node, slide-title");
   });
 
   test("DEK010 suggests a data attribute when the slide has a script to find it", async () => {
@@ -1679,7 +1705,7 @@ two
         );
         const hint = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK010")?.hint;
         expect(hint).toBe(
-          "define it in slides/intro.css, or use one of: slide, slide-title; to find an element from slides/intro.ts, use a data-* attribute instead",
+          "define it in slides/intro.css, or use one of: slide-title; to find an element from slides/intro.ts, use a data-* attribute instead",
         );
       },
     );

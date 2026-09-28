@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { outputOf } from "../../src/cli/commands.ts";
 import { initCommand } from "../../src/cli/init.ts";
 import { type LsDeckResult, lsCommand } from "../../src/cli/ls.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
@@ -137,6 +138,21 @@ describe("initCommand", () => {
         expect((error as DekError).hint).toContain("dek new talk2");
       }
       expect(existsSync(inner)).toBe(false);
+    });
+  });
+
+  // Init never overwrites a file, so a theme.css it finds is kept, and the first deck copies it.
+  // One that is no dek theme would fail that deck's lint on its first run: init says so first.
+  test("says when the theme.css it kept lacks the tokens every deck needs", async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(join(dir, "theme.css"), "body { margin: 0; }\n");
+      const result = initCommand({ cwd: dir, deck: "demo" });
+      expect(result.kept).toContain(join(dir, "theme.css"));
+      expect(result.missingTokens).toHaveLength(13);
+      expect(result.missingTokens?.[0]).toBe("--fg");
+      expect(outputOf("init").notes?.(result, false)).toBe(
+        `${join(dir, "theme.css")} was kept and lacks 13 tokens every deck needs (--fg, --bg, --accent, …)\n  help: add them to its .slide rule, or move it aside and run \`dek init\` again for dek's own theme`,
+      );
     });
   });
 
