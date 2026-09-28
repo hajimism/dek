@@ -54,7 +54,7 @@
   font-size: var(--size-caption);
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--muted);
+  color: var(--fg);
 }
 
 .chain .is-mine {

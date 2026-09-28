@@ -13,7 +13,7 @@ afterEach(async () => {
 describe("measureSlideInPage", () => {
   test("returns no slide when the page has none", () => {
     document.body.innerHTML = "<p>no slide</p>";
-    expect(measureSlideInPage()).toEqual({ slideBox: undefined, elements: [] });
+    expect(measureSlideInPage()).toEqual({ slideBox: undefined, elements: [], pseudoTexts: [] });
   });
 
   test("describes each element by tag, id, first authored class, and data-step", () => {

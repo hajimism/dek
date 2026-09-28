@@ -20,9 +20,16 @@ declare module "playwright" {
       margin?: { top?: string; right?: string; bottom?: string; left?: string };
     }): Promise<Buffer>;
     close(): Promise<void>;
+    context(): BrowserContext;
+  };
+  /** A DevTools protocol session: Chromium's own answers, for what the page does not expose. */
+  export type CDPSession = {
+    send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+    detach(): Promise<void>;
   };
   export type BrowserContext = {
     newPage(): Promise<Page>;
+    newCDPSession(page: Page): Promise<CDPSession>;
     close(): Promise<void>;
   };
   export type Browser = {

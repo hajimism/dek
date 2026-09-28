@@ -35,20 +35,42 @@ export type MeasuredElement = {
   fontWeight: number;
 };
 
-type SlideMeasure = {
+/**
+ * Text a `::before` or `::after` draws, such as a folio from `counter()` or a running head. The page
+ * gives no box for it; the worker asks Chromium for one, by the mark this leaves on its host.
+ */
+type PseudoText = {
+  /** The host's mark, `data-dek-text` on the element, shared by both of its pseudo-elements. */
+  host: string;
+  pseudo: "before" | "after";
+  /** The host's short selector with the pseudo-element, as `section.slide::after`. */
+  box: string;
+  /** The `content` it draws, as the page computes it, its strings unquoted. */
+  text: string;
+  opacity: number;
+  fontSize: number;
+  fontWeight: number;
+};
+
+/** The attribute a pseudo text's host carries while it is measured; see `PseudoText`. */
+export const PSEUDO_TEXT_HOST = "data-dek-text";
+
+export type SlideMeasure = {
   slideBox: Box | undefined;
   elements: MeasuredElement[];
+  pseudoTexts: PseudoText[];
 };
 
 /**
- * Measures the first `.slide` in the current document. It runs inside the page
- * through `page.evaluate`, which serializes only this function, so it must not
+ * Measures the first `.slide` in the current document, and marks each element that draws a pseudo
+ * text with `data-dek-text` (and `data-dek-text-before` or `-after`) for the worker to find. It runs
+ * inside the page through `page.evaluate`, which serializes only this function, so it must not
  * reference anything outside its own body.
  */
 export function measureSlideInPage(): SlideMeasure {
   const slide = document.querySelector(".slide");
   if (!slide) {
-    return { slideBox: undefined, elements: [] };
+    return { slideBox: undefined, elements: [], pseudoTexts: [] };
   }
   const runtimeClasses = new Set(["is-current", "is-shown"]);
   const toBox = (rect: DOMRect): Box => ({
@@ -132,5 +154,46 @@ export function measureSlideInPage(): SlideMeasure {
       fontWeight: Number(style.fontWeight) || 400,
     };
   });
-  return { slideBox: toBox(slide.getBoundingClientRect()), elements };
+  // A pseudo-element draws text when its content has a letter or a digit, or comes from a
+  // counter or an attribute. A quote mark or an arrow on its own is ornament, and stays with
+  // the background as a glow or a rule does.
+  const readable = (content: string): boolean =>
+    /\b(?:counters?|attr)\(/.test(content) ||
+    [...content.matchAll(/"((?:[^"\\]|\\.)*)"/g)].some(([, text]) =>
+      /[\p{L}\p{N}]/u.test(text ?? ""),
+    );
+  const pseudoTexts: PseudoText[] = [];
+  for (const [index, el] of [slide, ...all].entries()) {
+    for (const pseudo of ["before", "after"] as const) {
+      const style = getComputedStyle(el, `::${pseudo}`);
+      const { content } = style;
+      if (content === "none" || content === "normal" || !readable(content)) {
+        continue;
+      }
+      const host = String(index);
+      el.setAttribute("data-dek-text", host);
+      el.setAttribute(`data-dek-text-${pseudo}`, "");
+      const own = Number.parseFloat(style.opacity);
+      pseudoTexts.push({
+        host,
+        pseudo,
+        box: `${describe(el)}::${pseudo}`,
+        // As the audience reads it: the strings without their quotes, a counter as written.
+        text: squash(content.replace(/"((?:[^"\\]|\\.)*)"/g, "$1")),
+        opacity: opacityOf(el) * (Number.isNaN(own) ? 1 : own),
+        fontSize: Number.parseFloat(style.fontSize),
+        fontWeight: Number(style.fontWeight) || 400,
+      });
+    }
+  }
+  return { slideBox: toBox(slide.getBoundingClientRect()), elements, pseudoTexts };
+}
+
+/** Runs in the page: takes away the marks `measureSlideInPage` left for pseudo texts. */
+export function unmarkPseudoTextsInPage(): void {
+  for (const el of document.querySelectorAll("[data-dek-text]")) {
+    for (const name of ["data-dek-text", "data-dek-text-before", "data-dek-text-after"]) {
+      el.removeAttribute(name);
+    }
+  }
 }

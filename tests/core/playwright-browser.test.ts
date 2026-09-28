@@ -373,6 +373,51 @@ ${css}
   );
 });
 
+// A folio and a running head are drawn by ::after and ::before, as AGENTS.md says to draw them, so
+// they are text the audience reads and are measured like any other.
+describe("playwright worker contrast of pseudo-element text", () => {
+  const measure = async (css: string) => {
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["contrast"],
+      pages: [
+        {
+          html: `<html><head><style>
+body { margin: 0; background: #000 }
+.slide { position: relative; width: 1280px; height: 720px; background: #000; color: #fff; font: 400 24px sans-serif; counter-reset: folio 3 }
+${css}
+</style></head><body><section class="slide"><p>body text</p></section></body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+    return Object.fromEntries((response?.contrasts ?? []).map((sample) => [sample.box, sample]));
+  };
+
+  browserTest("measures a folio drawn from a counter by ::after", async () => {
+    const found = await measure(
+      `.slide::after { content: counter(folio) " / 12"; position: absolute; right: 40px; bottom: 40px; color: #1a1a1a }`,
+    );
+    expect(found["section.slide::after"]).toMatchObject({ text: "counter(folio) / 12" });
+    expect(found["section.slide::after"]?.ratio).toBeLessThan(1.5);
+    expect(found.p?.ratio).toBeGreaterThan(15);
+  });
+
+  browserTest("measures a running head drawn by ::before on any element", async () => {
+    const found = await measure(`.slide p::before { content: "Chapter 1 "; color: #fff }`);
+    expect(found["p::before"]?.ratio).toBeGreaterThan(15);
+  });
+
+  browserTest("leaves a glyph with no letter or digit to the background", async () => {
+    const found = await measure(
+      `.slide::before { content: "\\201C"; position: absolute; top: 0; left: 0; font-size: 300px; color: #222 }`,
+    );
+    expect(found["section.slide::before"]).toBeUndefined();
+  });
+});
+
 describe("playwright worker contrast origin", () => {
   const measure = async (slideCss: string | undefined) => {
     const own = slideCss === undefined ? "" : `<style id="dek-slide-css">${slideCss}</style>`;

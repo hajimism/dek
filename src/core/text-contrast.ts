@@ -172,15 +172,17 @@ export function measureTextContrast(
 
 /**
  * The stylesheet that redraws the page as one layer. Transitions stop so the
- * change lands at once; pseudo-elements keep their own fill, since what they
- * draw is decoration and belongs to the background in every layer.
+ * change lands at once. A pseudo-element keeps its own fill, since what it
+ * draws is decoration and belongs to the background in every layer, unless it
+ * was marked as drawing text (`PseudoText`), which is measured as text is.
  */
 export function textLayerCss(layer: TextLayer): string {
   const fill = { bare: "transparent", white: "#fff", black: "#000" }[layer];
   const clipped = layer === "bare" ? "\n[data-dek-clip-text] { background: none !important; }" : "";
   return `*, *::before, *::after { transition: none !important; }
 * { -webkit-text-fill-color: ${fill} !important; }
-*::before, *::after { -webkit-text-fill-color: initial !important; }${clipped}`;
+*::before, *::after { -webkit-text-fill-color: initial !important; }
+[data-dek-text-before]::before, [data-dek-text-after]::after { -webkit-text-fill-color: ${fill} !important; }${clipped}`;
 }
 
 /**

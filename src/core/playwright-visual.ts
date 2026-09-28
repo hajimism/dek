@@ -18,8 +18,15 @@ import type {
 } from "./playwright.ts";
 import { captureMotion } from "./playwright-motion.ts";
 import { renderSheets } from "./playwright-sheet.ts";
+import { pseudoTextBoxes } from "./pseudo-text.ts";
 import { motionSheets } from "./sheet.ts";
-import { type MeasuredElement, measureSlideInPage, SLIDE_CSS_ID } from "./slide-measure.ts";
+import {
+  type Box,
+  measureSlideInPage,
+  SLIDE_CSS_ID,
+  type SlideMeasure,
+  unmarkPseudoTextsInPage,
+} from "./slide-measure.ts";
 import { contrastThreshold, measurePageTextContrasts } from "./text-contrast.ts";
 
 /**
@@ -113,13 +120,58 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
   };
 }
 
-/** A contrast finding below its threshold, with the measured element it came from. */
-type Failing = { finding: ContrastFinding; element: number };
+/** A contrast finding below its threshold, with the key of the text it came from. */
+type Failing = { finding: ContrastFinding; key: string };
 
-/** The elements that draw text of their own, by their index among the slide's elements. */
-function ownTexts(elements: MeasuredElement[]): Array<{ element: MeasuredElement; index: number }> {
-  // Only text the element draws itself; an ancestor's sample would repeat it.
-  return elements.flatMap((element, index) => (element.ownText ? [{ element, index }] : []));
+/**
+ * One text the page draws: an element's own, or one a pseudo-element draws. `key` finds the same
+ * text again when the page is measured a second time.
+ */
+type PageText = {
+  key: string;
+  rects: Box[];
+  opacity: number;
+  fontSize: number;
+  fontWeight: number;
+  box: string;
+  text?: string;
+};
+
+/** Every text on the page, each measured once: an ancestor's sample would repeat its children's. */
+async function pageTexts(page: Page, measured: SlideMeasure): Promise<PageText[]> {
+  const own = measured.elements.flatMap((element, index): PageText[] =>
+    element.ownText
+      ? [
+          {
+            key: String(index),
+            rects: element.textRects,
+            opacity: element.opacity,
+            fontSize: element.fontSize,
+            fontWeight: element.fontWeight,
+            box: element.box,
+            ...(element.text ? { text: element.text } : {}),
+          },
+        ]
+      : [],
+  );
+  if (measured.pseudoTexts.length === 0) {
+    return own;
+  }
+  const boxes = await pseudoTextBoxes(page);
+  const pseudo = measured.pseudoTexts.flatMap(({ host, pseudo, ...text }): PageText[] => {
+    const key = `${host}::${pseudo}`;
+    const rect = boxes.get(key);
+    return rect ? [{ key, rects: [rect], ...text }] : [];
+  });
+  return [...own, ...pseudo];
+}
+
+/** How each text measures against what it is drawn on, in the order of `texts`. */
+function textContrasts(page: Page, texts: PageText[]) {
+  return measurePageTextContrasts(
+    page,
+    texts.map(({ rects, opacity }) => ({ rects, opacity })),
+  );
 }
 
 /** Measures one page as `actions` asks, and shoots it when it names a `screenshotPath`. */
@@ -140,12 +192,9 @@ async function visitPage(
       }
     }
     if (actions.includes("contrast")) {
-      const texts = ownTexts(measured.elements);
-      const measuredTexts = await measurePageTextContrasts(
-        page,
-        texts.map(({ element }) => ({ rects: element.textRects, opacity: element.opacity })),
-      );
-      texts.forEach(({ element, index }, at) => {
+      const texts = await pageTexts(page, measured);
+      const measuredTexts = await textContrasts(page, texts);
+      texts.forEach((text, at) => {
         const contrast = measuredTexts[at];
         if (!contrast) {
           return;
@@ -154,16 +203,16 @@ async function visitPage(
           slug,
           step,
           ratio: contrast.ratio,
-          fontSize: element.fontSize,
-          fontWeight: element.fontWeight,
-          box: element.box,
-          ...(element.text ? { text: element.text } : {}),
+          fontSize: text.fontSize,
+          fontWeight: text.fontWeight,
+          box: text.box,
+          ...(text.text ? { text: text.text } : {}),
           fg: `rgb(${contrast.fg.join(", ")})`,
           bg: `rgb(${contrast.bg.join(", ")})`,
         };
         response.contrasts.push(finding);
         if (finding.ratio < contrastThreshold(finding)) {
-          failing.push({ finding, element: index });
+          failing.push({ finding, key: text.key });
         }
       });
     }
@@ -173,6 +222,7 @@ async function visitPage(
   }
   // After the shot: what follows takes the slide's CSS away, and the page is not put back.
   await attributeContrasts(page, failing);
+  await page.evaluate(unmarkPseudoTextsInPage);
   return response;
 }
 
@@ -199,17 +249,14 @@ async function attributeContrasts(page: Page, failing: Failing[]): Promise<void>
   }
   // Transitions and animations the theme now applies would otherwise be caught midway.
   await page.evaluate(finishBeat);
-  const texts = ownTexts((await page.evaluate(measureSlideInPage)).elements);
-  const contrasts = await measurePageTextContrasts(
-    page,
-    texts.map(({ element }) => ({ rects: element.textRects, opacity: element.opacity })),
-  );
-  const alone = new Map(texts.map(({ element, index }, at) => [index, { element, at }]));
-  for (const { finding, element } of failing) {
-    const theme = alone.get(element);
+  const texts = await pageTexts(page, await page.evaluate(measureSlideInPage));
+  const contrasts = await textContrasts(page, texts);
+  const alone = new Map(texts.map((text, at) => [text.key, { text, at }]));
+  for (const { finding, key } of failing) {
+    const theme = alone.get(key);
     const contrast = theme && contrasts[theme.at];
     if (theme && contrast) {
-      finding.origin = contrast.ratio < contrastThreshold(theme.element) ? "theme" : "slide";
+      finding.origin = contrast.ratio < contrastThreshold(theme.text) ? "theme" : "slide";
     }
   }
 }
