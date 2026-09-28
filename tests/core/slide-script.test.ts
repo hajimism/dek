@@ -705,6 +705,39 @@ describe("seekProblems", () => {
     ]);
   });
 
+  // Shots and the still pages hold one slide, so document.querySelector finds the right element
+  // there; the built deck holds every slide, and the same call reaches into another.
+  test("names a reach past the slide into the document", () => {
+    expect(
+      seekProblems(`export default {
+  draw(slide) {
+    document.querySelector("[data-bar]").style.width = "1px";
+    document.getElementById("chart");
+    document.body.dataset.mode = "dark";
+  },
+};`).map(({ line, message, data }) => ({ line, message, data })),
+    ).toEqual([
+      {
+        line: 3,
+        message:
+          "document.querySelector reaches every slide in the deck; find elements from the slide draw is given, as slide.querySelector",
+        data: { call: "document.querySelector" },
+      },
+      {
+        line: 4,
+        message:
+          "document.getElementById reaches every slide in the deck; find elements from the slide draw is given, as slide.querySelector",
+        data: { call: "document.getElementById" },
+      },
+      {
+        line: 5,
+        message:
+          "document.body reaches every slide in the deck; find elements from the slide draw is given, as slide.querySelector",
+        data: { call: "document.body" },
+      },
+    ]);
+  });
+
   test("names a class used to find an element", () => {
     expect(
       seekProblems(`export default {

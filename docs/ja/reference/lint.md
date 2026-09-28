@@ -32,7 +32,7 @@ lint がワークフローにどう組み込まれるかは [Lint](/ja/guide/lin
 | `DEK014` | `deck`, `slide` | トークンの外に書いた生のデザインの値。色（16 進、関数、色名、システムカラー）、フォントファミリー（`font-family` でも `font` ショートハンドでも）、絶対・ビューポート・コンテナ・ルート基準の単位の長さ、時間、書き下したイージング。テーマでもスライドのスタイルシートでも、入れ子のルールも含む。カスタムプロパティがトークンになるのは、トークンを置く場所、つまり `.slide` かビュー遷移の上だけ。`content: "#fff"` のような文字列はテキストで、値ではない。スライドの表示属性（`fill`、`stroke`、`color`、`stop-color`、`font-family`、`<font face>`、`bgcolor`）に書いた生の色やファミリーも対象。属性は `var()` を取れないので、hint は `slides/<id>.css` へ移すよう案内する。`fill="none"` と `currentColor` は通る | — |
 | `DEK015` | `deck` | 必須トークンが `.slide` に無い | — |
 | `DEK016` | `slide` | 動かせないスライドのスクリプト。import、名前付き export、default export がないかオブジェクトでない、関数でない `draw`、構文エラー、トップレベルの await や例外、スライドのビートにない `motion` のキーや 0 以上のミリ秒でない値、終わらないトップレベル、`.ts` ではなく `.js` で置かれたスクリプト | — |
-| `DEK017` | `slide` | 同じ `t` で同じ画面を描かないスライドのスクリプト。タイマー、`requestAnimationFrame`、`Date`、`performance.now`、`Math.random` を使っている。または、クラスで要素を探している（`querySelector`、`closest`、`matches`、`getElementsByClassName`） | — |
+| `DEK017` | `slide` | 同じ `t` で同じ画面を描かないスライドのスクリプト。タイマー、`requestAnimationFrame`、`Date`、`performance.now`、`Math.random` を使っている。または、クラスで要素を探している（`querySelector`、`closest`、`matches`、`getElementsByClassName`）。または文書全体に手を伸ばすもの（`document.querySelector`、`document.getElementById`、`document.body` など）。1 枚しかない静止画のページでは正しい要素が見つかるが、全スライドを持つビルドしたデッキでは別のスライドの要素に届く | — |
 | `DEK018` | `deck` | デッキに `theme.css` がなく、スタイルなしで表示され、テーマの規則も検査できない | — |
 | `DEK019` | `slide` | テーマにもスライド自身のスタイルシートにも定義のない `data-layout`。テーマがレイアウトを 1 つ以上定義しているときに検査する | — |
 | `DEK020` | `deck`, `slide` | リモート URL（CDN、リモート画像）。URL を持つどの属性でも、theme.css やスライドのスタイルシートの `url()` や `@import` でも | — |

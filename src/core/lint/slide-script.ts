@@ -108,6 +108,14 @@ const SEEK_PATTERNS: Array<{ re: RegExp; find: (match: RegExpMatchArray) => Seek
       byClass((m[2] ?? "").replace(/\[[^\]]*\]/g, "").match(/\.(-?[_a-zA-Z][\w-]*)/)?.[1]),
   },
   { re: /\bgetElementsByClassName\s*\(\s*(["'`])\s*([\w-]+)/g, find: (m) => byClass(m[2]) },
+  {
+    // One slide is on a still page, and every slide is in the built deck.
+    re: /\bdocument\s*\.\s*(querySelectorAll|querySelector|getElementById|getElementsBy\w+|body|documentElement)\b/g,
+    find: (m) => ({
+      message: `document.${m[1]} reaches every slide in the deck; find elements from the slide draw is given, as slide.querySelector`,
+      data: { call: `document.${m[1]}` },
+    }),
+  },
 ];
 
 /**
