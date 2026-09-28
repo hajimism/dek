@@ -15,6 +15,9 @@ type Setting = {
   line: number;
 };
 
+/** One slide's share under one selector: the slides it shares any of it with, and its settings. */
+type Finding = { slugs: Set<string>; settings: Setting[] };
+
 const squash = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 /**
@@ -74,13 +77,13 @@ export function sharedStyleDiagnostics(ctx: LintContext): Diagnostic[] {
 
   // Per slide, what it shares under one selector makes one finding, whoever it shares it with.
   const order = [...ctx.sectionsBySlug.keys()];
-  const findings = new Map<string, Map<string, { slugs: Set<string>; settings: Setting[] }>>();
+  const findings = new Map<string, Map<string, Finding>>();
   for (const { where, slides } of bySetting.values()) {
     if (slides.size < SHARED_BY) {
       continue;
     }
     for (const [slug, setting] of slides) {
-      const groups = findings.get(slug) ?? new Map();
+      const groups = findings.get(slug) ?? new Map<string, Finding>();
       const found = groups.get(where) ?? { slugs: new Set<string>(), settings: [] };
       for (const other of slides.keys()) {
         found.slugs.add(other);

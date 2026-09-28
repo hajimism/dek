@@ -1,3 +1,7 @@
+// This runs in the page. TypeScript 6 and later fold dom.iterable into dom; naming it keeps the
+// spreads of NodeLists and DOMTokenLists typed for any compiler that reads the file.
+/// <reference lib="dom" />
+/// <reference lib="dom.iterable" />
 /**
  * The id of a still page's `<style>` holding the slide's own CSS, apart from the theme, so a
  * measurement can take it away and see what the theme alone draws.
@@ -112,7 +116,9 @@ export function measureSlideInPage(): SlideMeasure {
     );
     const own = squash(textNodes.map((node) => node.textContent ?? "").join(" "));
     // innerText separates block children; textContent would run "item 0item 1" together.
-    const text = own || squash((el as HTMLElement).innerText ?? el.textContent ?? "");
+    // SVG and MathML have no innerText, so they fall back to textContent.
+    const whole = el instanceof HTMLElement ? el.innerText : el.textContent;
+    const text = own || squash(whole ?? "");
     const parentEl = el.parentElement;
     return {
       box: describe(el),

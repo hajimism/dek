@@ -1,3 +1,6 @@
+// Runs in the page; dom.iterable for older compilers, as in slide-measure.ts.
+/// <reference lib="dom" />
+/// <reference lib="dom.iterable" />
 /**
  * Draws slide scripts' frames. The player calls these directly; pages without
  * the player (shots, lint --visual, PDF) embed the same functions as source
