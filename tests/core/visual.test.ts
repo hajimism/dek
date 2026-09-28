@@ -373,6 +373,63 @@ describe("lintVisualDeck messages", () => {
     );
   });
 
+  test("says the content overflows the slide when no edge is named", async () => {
+    const diagnostics = await lintWith({
+      overflows: [
+        { slug: "intro", step: "1", box: "section", by: {} },
+        { slug: "intro", step: "1", box: "p", text: "late", by: {} },
+      ],
+      contrasts: [],
+    });
+    expect(
+      diagnostics.filter((d) => d.id === "DEK030").map(({ message, hint }) => ({ message, hint })),
+    ).toEqual([
+      { message: "content overflows the slide at step 1", hint: undefined },
+      { message: 'p "late" overflows the slide at step 1', hint: undefined },
+    ]);
+  });
+
+  test("reports an element once per set of edges it crosses", async () => {
+    const diagnostics = await lintWith({
+      overflows: [
+        { slug: "intro", step: "1", box: "ul", by: { bottom: 10 } },
+        { slug: "intro", step: "2", box: "ul", by: { right: 4 } },
+        { slug: "intro", step: "3", box: "ul", by: { bottom: 30 } },
+      ],
+      contrasts: [],
+    });
+    expect(diagnostics.filter((d) => d.id === "DEK030").map((d) => d.message)).toEqual([
+      "ul overflows the bottom edge by 30px at steps 1, 3",
+      "ul overflows the right edge by 4px at step 2",
+    ]);
+  });
+
+  test("reports contrasts apart when their rounded ratio or origin differs", async () => {
+    const sample = {
+      slug: "intro",
+      fontSize: 16,
+      fontWeight: 400,
+      box: "p",
+      fg: "rgb(119, 119, 119)",
+      bg: "rgb(255, 255, 255)",
+    };
+    const diagnostics = await lintWith({
+      overflows: [],
+      contrasts: [
+        { ...sample, step: "1", ratio: 2.12 },
+        { ...sample, step: "2", ratio: 2.14 },
+        { ...sample, step: "3", ratio: 2.4 },
+        { ...sample, step: "4", ratio: 2.12, origin: "theme" },
+        { ...sample, step: "5", ratio: 4.6 },
+      ],
+    });
+    expect(diagnostics.filter((d) => d.id === "DEK031").map((d) => d.message)).toEqual([
+      "p has contrast 2.1 (#777777 on #ffffff), below 4.5:1 at steps 1, 2",
+      "p has contrast 2.4 (#777777 on #ffffff), below 4.5:1 at step 3",
+      "p has contrast 2.1 (#777777 on #ffffff), below 4.5:1 at step 4",
+    ]);
+  });
+
   test("names the element and both colors when contrast is low", async () => {
     const sample = {
       slug: "intro",

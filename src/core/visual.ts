@@ -1,6 +1,6 @@
 import { deckPaths } from "./deck-paths.ts";
 import { type Diagnostic, diag } from "./diagnostic.ts";
-import { EDGES } from "./overflow.ts";
+import { EDGES, type Edge } from "./overflow.ts";
 import {
   askPlaywright,
   type ContrastOrigin,
@@ -72,35 +72,7 @@ async function visualDeck(
     return null;
   }
   const { deck } = asResolvedDeck(input);
-  // A broken slide script is DEK016's to report; keep checking the slide without it.
-  const sources = loadSlideSources(deck, { strict: false });
-  const pages: VisualPage[] = [];
-  const stills: Still[] = [];
-
-  for (const section of deck.deck.sections) {
-    if (options.slug && section.slug !== options.slug) {
-      continue;
-    }
-    // A missing file or section is lint's to report (DEK001, DEK007); there is nothing to render.
-    if (!sources.slides.has(section.slug)) {
-      continue;
-    }
-    const last = lastStop(section.beats);
-    for (let beatIndex = 0; beatIndex <= last; beatIndex++) {
-      if (options.screenshot && beatIndex === last) {
-        // The same still `dek shot` takes of the slide, and taken only when it is not on disk.
-        const shot = still(deck, section, beatIndex, sources);
-        stills.push(shot);
-        pages.push(stillPage(shot));
-      } else {
-        pages.push({
-          html: renderSlideHtml(sources, section.slug, beatIndex),
-          slug: section.slug,
-          step: stepKey(section.beats, beatIndex),
-        });
-      }
-    }
-  }
+  const { pages, stills } = visualPages(deck, options);
 
   if (pages.length === 0) {
     return { diagnostics: [] };
@@ -121,6 +93,40 @@ async function visualDeck(
     diagnostics: visualDiagnostics(response, deck.dir),
     ...(stills[0] ? { screenshotPath: stills[0].screenshotPath } : {}),
   };
+}
+
+/** Every beat of each section with a slide, the last one as a still shot with `screenshot`. */
+function visualPages(
+  deck: ResolvedDeck["deck"],
+  options: VisualDeckOptions,
+): { pages: VisualPage[]; stills: Still[] } {
+  // A broken slide script is DEK016's to report; keep checking the slide without it.
+  const sources = loadSlideSources(deck, { strict: false });
+  const pages: VisualPage[] = [];
+  const stills: Still[] = [];
+  // A missing file or section is lint's to report (DEK001, DEK007); there is nothing to render.
+  const sections = deck.deck.sections.filter(
+    (section) =>
+      (!options.slug || section.slug === options.slug) && sources.slides.has(section.slug),
+  );
+  for (const section of sections) {
+    const last = lastStop(section.beats);
+    for (let beatIndex = 0; beatIndex <= last; beatIndex++) {
+      if (options.screenshot && beatIndex === last) {
+        // The same still `dek shot` takes of the slide, and taken only when it is not on disk.
+        const shot = still(deck, section, beatIndex, sources);
+        stills.push(shot);
+        pages.push(stillPage(shot));
+      } else {
+        pages.push({
+          html: renderSlideHtml(sources, section.slug, beatIndex),
+          slug: section.slug,
+          step: stepKey(section.beats, beatIndex),
+        });
+      }
+    }
+  }
+  return { pages, stills };
 }
 
 const SNIPPET_CHARS = 24;
@@ -149,18 +155,22 @@ function toHex(color: string): string | undefined {
   );
 }
 
+type StepGroup<T> = { first: T; items: T[]; steps: string[] };
+
 /** Groups findings that differ only by step, keeping the first-seen order. */
-function groupBySteps<T>(items: T[], key: (item: T) => string, step: (item: T) => string) {
-  const groups = new Map<string, { items: T[]; steps: string[] }>();
+function groupBySteps<T extends { step: string }>(items: T[], key: (item: T) => string) {
+  const groups = new Map<string, StepGroup<T>>();
   for (const item of items) {
     const id = key(item);
-    const group = groups.get(id) ?? { items: [], steps: [] };
-    group.items.push(item);
-    const value = step(item);
-    if (!group.steps.includes(value)) {
-      group.steps.push(value);
+    const group = groups.get(id);
+    if (!group) {
+      groups.set(id, { first: item, items: [item], steps: [item.step] });
+      continue;
     }
-    groups.set(id, group);
+    group.items.push(item);
+    if (!group.steps.includes(item.step)) {
+      group.steps.push(item.step);
+    }
   }
   return [...groups.values()];
 }
@@ -181,101 +191,111 @@ function contrastHint(origin: ContrastOrigin | undefined, threshold: number, slu
   }
 }
 
+type PathOf = (slug: string) => string;
+
 function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  const pathOf = (slug: string): string => deckPaths(deckDir).slide(slug, ".html");
-
-  const overflowGroups = groupBySteps(
-    response.overflows,
-    (o) => [o.slug, o.box, o.text ?? "", EDGES.filter((edge) => o.by[edge]).join()].join("\0"),
-    (o) => o.step,
-  );
-  for (const { items, steps } of overflowGroups) {
-    const [first] = items;
-    if (!first) {
-      continue;
-    }
-    const edges = EDGES.filter((edge) => first.by[edge] !== undefined);
-    const where =
-      edges.length === 0
-        ? "overflows the slide"
-        : `overflows ${edges
-            .map((edge) => {
-              const px = Math.max(...items.map((item) => item.by[edge] ?? 0));
-              return `the ${edge} edge by ${px}px`;
-            })
-            .join(" and ")}`;
-    const hints = [
-      ...(edges.some((edge) => edge === "left" || edge === "right")
-        ? [`${HORIZONTAL_HINT} slides/${first.slug}.css`]
-        : []),
-      ...(edges.some((edge) => edge === "top" || edge === "bottom")
-        ? [`${VERTICAL_HINT} slides/${first.slug}.css`]
-        : []),
-    ];
-    const target =
-      edges.length === 0 && !first.text ? "content " : describeTarget(first.box, first.text);
-    const amounts = Object.fromEntries(
-      edges.map((edge) => [edge, Math.max(...items.map((item) => item.by[edge] ?? 0))]),
-    );
-    diagnostics.push(
-      diag("DEK030", {
-        message: `${target}${where} ${atSteps(steps)}`,
-        path: pathOf(first.slug),
-        slug: first.slug,
-        ...(hints.length > 0 ? { hint: hints.join("; ") } : {}),
-        data: {
-          box: first.box,
-          ...(first.text ? { text: first.text } : {}),
-          edges: amounts,
-          steps,
-        },
-      }),
-    );
-  }
-
+  const pathOf: PathOf = (slug) => deckPaths(deckDir).slide(slug, ".html");
   const failing = response.contrasts.filter((sample) => sample.ratio < contrastThreshold(sample));
-  const contrastGroups = groupBySteps(
-    failing,
-    (c) =>
-      [
-        c.slug,
-        c.box,
-        c.text ?? "",
-        Math.round(c.ratio * 10),
-        contrastThreshold(c),
-        c.origin ?? "",
-      ].join("\0"),
-    (c) => c.step,
+  return [
+    ...groupBySteps(response.overflows, overflowKey).map((group) =>
+      overflowDiagnostic(group, pathOf),
+    ),
+    ...groupBySteps(failing, contrastKey).map((group) => contrastDiagnostic(group, pathOf)),
+  ];
+}
+
+type OverflowSample = PagesResponse["overflows"][number];
+type ContrastSample = PagesResponse["contrasts"][number];
+
+function crossedEdges(overflow: OverflowSample): Edge[] {
+  return EDGES.filter((edge) => overflow.by[edge] !== undefined);
+}
+
+function overflowKey(o: OverflowSample): string {
+  return [o.slug, o.box, o.text ?? "", crossedEdges(o).join()].join("\0");
+}
+
+/** The ratio as reported, to one decimal: samples that round alike are one finding. */
+function shownRatio(sample: ContrastSample): number {
+  return Math.round(sample.ratio * 10) / 10;
+}
+
+function contrastKey(c: ContrastSample): string {
+  return [c.slug, c.box, c.text ?? "", shownRatio(c), contrastThreshold(c), c.origin ?? ""].join(
+    "\0",
   );
-  for (const { items, steps } of contrastGroups) {
-    const [first] = items;
-    if (!first) {
-      continue;
-    }
-    const threshold = contrastThreshold(first);
-    const ratio = Math.round(first.ratio * 10) / 10;
-    const size = threshold === 3 ? " (large text)" : "";
-    const fg = toHex(first.fg);
-    const bg = toHex(first.bg);
-    const colors = fg && bg ? ` (${fg} on ${bg})` : "";
-    diagnostics.push(
-      diag("DEK031", {
-        message: `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`,
-        path: pathOf(first.slug),
-        slug: first.slug,
-        hint: contrastHint(first.origin, threshold, first.slug),
-        data: {
-          box: first.box,
-          ...(first.text ? { text: first.text } : {}),
-          ratio,
-          threshold,
-          ...(fg && bg ? { fg, bg } : {}),
-          ...(first.origin ? { origin: first.origin } : {}),
-          steps,
-        },
-      }),
-    );
+}
+
+function overflowWhere(amounts: Partial<Record<Edge, number>>): string {
+  const edges = Object.entries(amounts);
+  if (edges.length === 0) {
+    return "overflows the slide";
   }
-  return diagnostics;
+  return `overflows ${edges.map(([edge, px]) => `the ${edge} edge by ${px}px`).join(" and ")}`;
+}
+
+function overflowHint(edges: Edge[], slug: string): string | undefined {
+  const css = `slides/${slug}.css`;
+  const hints = [
+    ...(edges.some((edge) => edge === "left" || edge === "right")
+      ? [`${HORIZONTAL_HINT} ${css}`]
+      : []),
+    ...(edges.some((edge) => edge === "top" || edge === "bottom")
+      ? [`${VERTICAL_HINT} ${css}`]
+      : []),
+  ];
+  return hints.length > 0 ? hints.join("; ") : undefined;
+}
+
+function overflowDiagnostic(
+  { first, items, steps }: StepGroup<OverflowSample>,
+  pathOf: PathOf,
+): Diagnostic {
+  const edges = crossedEdges(first);
+  // Each edge by the most it overflows at any step, so the fix covers the worst beat.
+  const amounts = Object.fromEntries(
+    edges.map((edge) => [edge, Math.max(...items.map((item) => item.by[edge] ?? 0))]),
+  );
+  const target =
+    edges.length === 0 && !first.text ? "content " : describeTarget(first.box, first.text);
+  const hint = overflowHint(edges, first.slug);
+  return diag("DEK030", {
+    message: `${target}${overflowWhere(amounts)} ${atSteps(steps)}`,
+    path: pathOf(first.slug),
+    slug: first.slug,
+    ...(hint ? { hint } : {}),
+    data: {
+      box: first.box,
+      ...(first.text ? { text: first.text } : {}),
+      edges: amounts,
+      steps,
+    },
+  });
+}
+
+function contrastDiagnostic(
+  { first, steps }: StepGroup<ContrastSample>,
+  pathOf: PathOf,
+): Diagnostic {
+  const threshold = contrastThreshold(first);
+  const ratio = shownRatio(first);
+  const size = threshold === 3 ? " (large text)" : "";
+  const fg = toHex(first.fg);
+  const bg = toHex(first.bg);
+  const colors = fg && bg ? ` (${fg} on ${bg})` : "";
+  return diag("DEK031", {
+    message: `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`,
+    path: pathOf(first.slug),
+    slug: first.slug,
+    hint: contrastHint(first.origin, threshold, first.slug),
+    data: {
+      box: first.box,
+      ...(first.text ? { text: first.text } : {}),
+      ratio,
+      threshold,
+      ...(fg && bg ? { fg, bg } : {}),
+      ...(first.origin ? { origin: first.origin } : {}),
+      steps,
+    },
+  });
 }

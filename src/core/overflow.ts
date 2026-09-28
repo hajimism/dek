@@ -1,6 +1,6 @@
 import type { Box, MeasuredElement } from "./slide-measure.ts";
 
-type Edge = "top" | "right" | "bottom" | "left";
+export type Edge = "top" | "right" | "bottom" | "left";
 
 export const EDGES: Edge[] = ["top", "right", "bottom", "left"];
 
