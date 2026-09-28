@@ -90,6 +90,8 @@ dek build --root-dist --url "https://$DEPLOY_HOST/"
 
 When the URL is only known after the upload, there is no absolute address to put in the page, and a shared link shows the title and description without the picture.
 
+A page that names its URL is for anyone who has the link, so its presenter view carries only what you say aloud: stage directions (blockquotes) and HTML comments in `script.md` are left out, and code blocks stay as written. A build without a URL is the file you present from, and keeps all of it. To present from a project whose `dek.toml` sets `url`, use the dev server, whose presenter view is yours alone.
+
 To print, use the browser's own Print: every slide gets a page of its own at the deck's size and in its own layout, with every beat shown, each slide script drawn at its last beat, and no rail or hint. `dek pdf` writes the same pages without a dialog.
 
 ## Another device

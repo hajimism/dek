@@ -1,7 +1,10 @@
 import { splitLines } from "./lines.ts";
 
-/** One line of a script's body, and whether it is literal text no heading can start. */
-export type ScriptLine = { text: string; literal: boolean };
+/**
+ * One line of a script's body, and whether it is literal text no heading can start: `fenced` when
+ * that is because it belongs to a fenced code block, whose text the slide shows as written.
+ */
+export type ScriptLine = { text: string; literal: boolean; fenced: boolean };
 
 const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
@@ -20,17 +23,17 @@ export function scriptLines(body: string): ScriptLine[] {
       if (close.test(text)) {
         fence = undefined;
       }
-      return { text, literal: true };
+      return { text, literal: true, fenced: true };
     }
     const literal = comment;
     const open = comment ? undefined : FENCE_OPEN_RE.exec(text);
     // A backtick fence's info string may not hold a backtick; such a line is inline code.
     if (open?.[1] && !(open[1].startsWith("`") && open[2]?.includes("`"))) {
       fence = { char: open[1].charAt(0), length: open[1].length };
-      return { text, literal: true };
+      return { text, literal: true, fenced: true };
     }
     comment = commentOpenAfter(text, comment);
-    return { text, literal };
+    return { text, literal, fenced: false };
   });
 }
 

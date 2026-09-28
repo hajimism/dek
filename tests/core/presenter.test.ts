@@ -4,6 +4,7 @@ import {
   type PresenterSlide,
   presenterState,
   reflowScript,
+  withoutDirections,
 } from "../../src/core/presenter.ts";
 
 const slides: PresenterSlide[] = [
@@ -121,5 +122,35 @@ describe("reflowScript", () => {
         "```",
       ].join("\n"),
     );
+  });
+});
+
+describe("withoutDirections", () => {
+  test("drops stage directions and what the author hid in comments", () => {
+    const script = [
+      "> 目次は読み上げない。",
+      "",
+      "今日は三つ話します。<!-- 時間が押したら二つ -->",
+      "",
+      "<!--",
+      "去年の失敗談はここで。",
+      "-->",
+      "",
+      "最後に質問を受けます。",
+    ].join("\n");
+    expect(withoutDirections(script)).toBe(
+      ["今日は三つ話します。", "", "最後に質問を受けます。"].join("\n"),
+    );
+  });
+
+  test("keeps a quote or a comment that is code the slide shows", () => {
+    const script = ["```sh", "> echo hi", "<!-- markup -->", "```", "", "> 間"].join("\n");
+    expect(withoutDirections(script)).toBe(
+      ["```sh", "> echo hi", "<!-- markup -->", "```"].join("\n"),
+    );
+  });
+
+  test("leaves a script made only of directions empty", () => {
+    expect(withoutDirections("> 間を取る。\n\n> 水を飲む。")).toBe("");
   });
 });

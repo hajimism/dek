@@ -5,7 +5,12 @@ import { escapeAttr, escapeHtml } from "./escape.ts";
 import { collectSlidesHtml, htmlShell } from "./html.ts";
 import { type OgpImage, ogpHead } from "./ogp.ts";
 import { PAGE_ID, type PageMode, pageConfigAttrs } from "./page.ts";
-import { nextPresenterTitle, presenterSlides, presenterState } from "./presenter.ts";
+import {
+  nextPresenterTitle,
+  presenterSlides,
+  presenterState,
+  type ScriptReader,
+} from "./presenter.ts";
 import { RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN } from "./rail-width.ts";
 import { type ProjectDeck, resolveDeck } from "./resolve.ts";
 import { logicalSize } from "./size.ts";
@@ -62,7 +67,7 @@ export function renderDeckDocument(
   const standalone = !live;
   const strictScripts = target.kind === "video";
   const includeNotes = target.kind === "dev" ? target.includeNotes : target.kind === "build";
-  const data = presenterSlides(deck, options.config).map((slide) =>
+  const data = presenterSlides(deck, options.config, scriptReader(target)).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
   const slidesHtml = collectSlidesHtml(deck, { inline: standalone });
@@ -152,6 +157,14 @@ export function renderDeckDocument(
   <script>${options.playerScript}</script>
   ${target.kind === "dev" ? `<script>${target.liveReloadScript}</script>` : ""}`,
   });
+}
+
+/**
+ * A built page that names its public URL is for anyone who has the link, so it carries the script
+ * as the audience may read it; any other page is the speaker's own.
+ */
+function scriptReader(target: PageTarget): ScriptReader {
+  return target.kind === "build" && target.publicUrl !== undefined ? "audience" : "speaker";
 }
 
 export function renderRailHtml(slides: Array<{ slug: string; title: string }>): string {

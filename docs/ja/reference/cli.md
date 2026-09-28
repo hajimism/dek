@@ -76,7 +76,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dek voice [deck] say <text>` | 1 文を再生 |
 | `dek voice [deck] dict add <word> <kana> [--accent N]` | `voice/dict.toml` に読みを追加。`--accent` でアクセント位置も指定する |
 | `dek voice [deck] pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
-| `dek build [deck] [--root-dist] [--url <url>]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dek lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照 |
+| `dek build [deck] [--root-dist] [--url <url>]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dek lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。URL 付きでビルドしたページは、発表者ビューから台本のト書きと HTML コメントを外す。 |
 | `dek video [deck] [slug] [--fps N] [--root-dist]` | `dek voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` を添える。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
 | `dek pdf [deck] [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く。動かないスライドスクリプトがあると `dek video` と同じく止まる。どちらも診断を返す場所がなく、スクリプトが走らなかったかのような枚を出してしまうから |
 

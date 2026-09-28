@@ -499,3 +499,50 @@ test("keeps og:url on the served origin whatever the deck is called", async () =
     },
   );
 });
+
+describe("buildDeck notes", () => {
+  const directedScript = `---
+title: Why dek
+---
+
+## intro
+
+> 目次は読み上げない。
+
+今日は三つ話します。<!-- 押したら二つ -->
+`;
+  const spec = (toml?: string) => ({
+    ...(toml ? { toml } : {}),
+    decks: [{ name: "demo", script: directedScript, slides: { intro: extraSource } }],
+  });
+
+  test("keeps the stage directions in a file built to present from", async () => {
+    await withTempProject(spec(), async (root) => {
+      const result = await build(join(root, "decks", "demo"));
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain("目次は読み上げない。");
+      expect(html).toContain("押したら二つ");
+    });
+  });
+
+  test("leaves the stage directions out of a page served at a public URL", async () => {
+    await withTempProject(spec('url = "https://example.com/talks/"\n'), async (root) => {
+      const result = await build(join(root, "decks", "demo"), { runner: async () => null });
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain("今日は三つ話します。");
+      expect(html).not.toContain("目次は読み上げない");
+      expect(html).not.toContain("押したら二つ");
+    });
+  });
+
+  test("leaves them out when only the build names the URL", async () => {
+    await withTempProject(spec(), async (root) => {
+      const result = await build(join(root, "decks", "demo"), {
+        url: "https://preview-1.example.dev/",
+        runner: async () => null,
+      });
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).not.toContain("目次は読み上げない");
+    });
+  });
+});
