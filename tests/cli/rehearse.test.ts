@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { rehearseCommand, rehearseSessionView } from "../../src/cli/rehearse.ts";
+import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { spawnDekServer } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -26,6 +28,40 @@ describe("dek rehearse", () => {
         } finally {
           await stop();
         }
+      },
+    );
+  });
+
+  test("opens the rehearsal at the slide it names on every address, and pairs a phone into the presenter", () => {
+    const server = {
+      url: "http://127.0.0.1:5173/",
+      remoteUrls: ["http://127.0.0.1:5173/", "http://192.168.1.2:5173/"],
+    };
+    expect(rehearseSessionView(server, undefined, "intro")).toEqual({
+      banner: "http://127.0.0.1:5173/?rehearse=#intro",
+      pairPath: "presenter",
+    });
+    expect(rehearseSessionView(server, "pw").banner).toBe(
+      [
+        "http://127.0.0.1:5173/?rehearse=",
+        "http://192.168.1.2:5173/?rehearse=",
+        "presenter: http://192.168.1.2:5173/presenter",
+        "password: pw (any user name)",
+      ].join("\n"),
+    );
+  });
+
+  test("refuses an unknown slug before starting the server", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await expect(
+          rehearseCommand(requireDeckFromCwd(join(root, "decks", "demo")), { slug: "intr" }),
+        ).rejects.toMatchObject({
+          name: "DekError",
+          message: 'section "intr" not found',
+          hint: "run `dek ls`",
+        });
       },
     );
   });
