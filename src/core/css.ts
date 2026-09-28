@@ -364,6 +364,24 @@ class SheetReader {
 
   urls(start: number, end: number): void {
     const syntax = this.blank.slice(start, end);
+    // image-set() takes its addresses as strings as well as url()s.
+    for (const match of syntax.matchAll(/(?<![-\w])(?:-webkit-)?image-set\(/gi)) {
+      const open = start + match.index + match[0].length - 1;
+      const close = matchBrace(this.source.replace(/\(/g, "{").replace(/\)/g, "}"), open, end);
+      for (let at = open + 1; at < close; at++) {
+        const quote = this.source[at];
+        if ((quote === '"' || quote === "'") && this.blank[at] === " ") {
+          const stop = consumeString(this.source, at, close);
+          this.sheet.urls.push({
+            value: this.source.slice(at + 1, stop - 1).trim(),
+            line: this.lineOf(at),
+            start: at,
+            end: stop,
+          });
+          at = stop - 1;
+        }
+      }
+    }
     for (const match of syntax.matchAll(/(?<![-\w])url\(/gi)) {
       const at = start + match.index;
       // The address itself may be quoted, so it is read from the source, not the blanked copy.

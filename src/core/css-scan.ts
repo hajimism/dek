@@ -148,41 +148,6 @@ export function splitTopLevel(text: string, separator = ","): string[] {
   }
 }
 
-/** One function call in a value, such as `var(--a, b)`: its name, its span, and what is inside. */
-export type CssFunction = { name: string; start: number; end: number; args: string };
-
-const IDENT_CHAR_RE = /[-\w]/;
-
-/**
- * The function calls in a value, outer before inner, strings and comments skipped. A name counts
- * only whole, so `somevar(` is not `var(`; an unclosed call runs to the end.
- */
-export function cssFunctions(value: string, offset = 0): CssFunction[] {
-  const found: CssFunction[] = [];
-  let i = 0;
-  while (i < value.length) {
-    const open = scanTopLevel(value, i, value.length, "(");
-    if (open >= value.length) {
-      break;
-    }
-    let nameStart = open;
-    while (nameStart > i && IDENT_CHAR_RE.test(value[nameStart - 1] ?? "")) {
-      nameStart--;
-    }
-    const close = scanTopLevel(value, open + 1, value.length, ")");
-    const args = value.slice(open + 1, close);
-    found.push({
-      name: value.slice(nameStart, open).toLowerCase(),
-      start: offset + nameStart,
-      end: offset + Math.min(close + 1, value.length),
-      args,
-    });
-    found.push(...cssFunctions(args, offset + open + 1));
-    i = close + 1;
-  }
-  return found;
-}
-
 /** Each whole identifier in a value outside strings and comments, with where it starts. */
 export function cssIdents(value: string): Array<{ ident: string; start: number }> {
   const bare = blankStringsAndComments(value);

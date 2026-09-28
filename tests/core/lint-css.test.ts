@@ -122,6 +122,23 @@ describe("slide stylesheets are read as CSS reads them", () => {
     ).toEqual([{ line: 2, data: { property: "--shade", value: "#000" } }]);
   });
 
+  test("DEK020 and DEK021 read the addresses image-set() takes as strings", async () => {
+    const found = await lintWith({
+      css: `.slide .a { background-image: image-set("https://cdn.example/x.png" 1x); }
+.slide .b { background-image: -webkit-image-set("assets/missing.png" 1x, url(assets/also.png) 2x); }
+`,
+    });
+    expect(
+      found
+        .filter((d) => d.id === "DEK020" || d.id === "DEK021")
+        .map(({ id, line, data }) => ({ id, line, data })),
+    ).toEqual([
+      { id: "DEK020", line: 1, data: { url: "https://cdn.example/x.png" } },
+      { id: "DEK021", line: 2, data: { src: "assets/missing.png" } },
+      { id: "DEK021", line: 2, data: { src: "assets/also.png" } },
+    ]);
+  });
+
   // A slide's CSS is scoped to its own slide, so a rule that reaches the slides after it, or an
   // at-rule that registers something for the whole page, escapes the scope and changes others.
   test("DEK012 refuses what reaches past the slide, with its line and where it belongs", async () => {

@@ -31,16 +31,6 @@ export function parseCssValue(text: string): CssValue[] {
   return new ValueReader(text).values(false);
 }
 
-/** Every value in `values` and in the arguments of each function, outer before inner. */
-export function* walkCssValue(values: CssValue[]): Generator<CssValue> {
-  for (const value of values) {
-    yield value;
-    if (value.kind === "function") {
-      yield* walkCssValue(value.args);
-    }
-  }
-}
-
 class ValueReader {
   at = 0;
 

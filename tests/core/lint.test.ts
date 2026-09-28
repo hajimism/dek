@@ -583,6 +583,89 @@ b
     );
   });
 
+  // A presentation attribute is a style written where var() cannot reach it; an SVG icon's
+  // `fill="none"` or `currentColor` takes nothing from the theme and passes.
+  test("DEK014: a raw color or font in a presentation attribute", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <svg viewBox="0 0 10 10"><circle fill="red" stroke="currentColor" r="4"/><path fill="none" d="M0 0"/></svg>
+  <font color="#f00" face="Comic Sans MS">old</font>
+  <table bgcolor="navy"></table>
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK014");
+        expect(found.map(({ message, line, hint }) => ({ message, line, hint }))).toEqual([
+          {
+            message: 'raw value in fill="red"; use a theme token',
+            line: 10,
+            hint: "set fill in slides/intro.css with a theme token instead, such as fill: var(--accent); an attribute cannot take var()",
+          },
+          {
+            message: 'raw value in color="#f00"; use a theme token',
+            line: 11,
+            hint: "set color in slides/intro.css with a theme token instead, such as color: var(--accent); an attribute cannot take var()",
+          },
+          {
+            message: 'raw value in face="Comic Sans MS"; use a theme token',
+            line: 11,
+            hint: "set font-family in slides/intro.css with a theme token instead, such as font-family: var(--font-body); an attribute cannot take var()",
+          },
+          {
+            message: 'raw value in bgcolor="navy"; use a theme token',
+            line: 12,
+            hint: "set background-color in slides/intro.css with a theme token instead, such as background-color: var(--accent); an attribute cannot take var()",
+          },
+        ]);
+      },
+    );
+  });
+
+  // A deck carries everything it shows. A file: URL names a file on one machine, an http: URL
+  // without its slashes still leaves for the network, and a link that climbs out of the deck from
+  // either place a slide is read from leads to another deck.
+  test("DEK020 and DEK022: every way a slide's address can leave the deck", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="file:///etc/hosts" alt="">
+  <img src="http:cdn.example/a.png" alt="">
+  <a href="../other-deck/">other</a>
+  <a href="file:///Users/me/notes.html">notes</a>
+  <a href="#intro">here</a>
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).filter(
+          (d) => d.id === "DEK020" || d.id === "DEK022",
+        );
+        expect(found.map(({ id, line }) => ({ id, line }))).toEqual([
+          { id: "DEK022", line: 10 },
+          { id: "DEK020", line: 11 },
+          { id: "DEK022", line: 12 },
+          { id: "DEK022", line: 13 },
+        ]);
+      },
+    );
+  });
+
   test("DEK011: script element in a slide", async () => {
     await withTempProject(
       {

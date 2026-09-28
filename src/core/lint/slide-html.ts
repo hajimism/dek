@@ -5,6 +5,7 @@ import { beatAt, formatStepChoices, resolveStep, stepChoices } from "../step.ts"
 import { suggest } from "../suggest.ts";
 import { isUrlAttribute } from "../url-attributes.ts";
 import { assetRefDiagnostics } from "./asset-refs.ts";
+import { isRawThemeValue } from "./tokens.ts";
 
 /**
  * view-transition-names a data-morph may not take. The player names the slide box "slide",
@@ -49,6 +50,7 @@ export function lintSlideHtml(
     ...stepDiagnostics(slide),
     ...morphDiagnostics(slide),
     ...inlineCodeDiagnostics(slide),
+    ...presentationDiagnostics(slide),
     ...emptyHeadingDiagnostics(slide),
     ...(options.classes
       ? unknownClassDiagnostics(slide, options.classes, options.hasScript === true)
@@ -74,6 +76,50 @@ function attributesNamed(scan: HtmlScan, name: string): HtmlAttribute[] {
 /** The location fields of a diagnostic, from wherever the scan found the thing. */
 function spotOf({ line, column }: SourceSpot): { line: number; column: number } {
   return { line, column };
+}
+
+/**
+ * The attributes that style an element as a property would, and the property each stands for:
+ * SVG's presentation attributes and the HTML ones that outlived CSS. Only colors and families are
+ * read; SVG's unitless lengths are its own coordinates.
+ */
+const PRESENTATION_ATTRIBUTES: Record<string, string> = {
+  fill: "fill",
+  stroke: "stroke",
+  color: "color",
+  "stop-color": "stop-color",
+  "flood-color": "flood-color",
+  "lighting-color": "lighting-color",
+  "font-family": "font-family",
+  face: "font-family",
+  bgcolor: "background-color",
+};
+
+/**
+ * DEK014: a raw color or font family in a presentation attribute, which styles the element where
+ * no var() can reach. `fill="none"` and `currentColor` take nothing from the theme and pass.
+ */
+function presentationDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
+  const css = `slides/${section.slug}.css`;
+  return scan.elements.flatMap((element) =>
+    element.attributes.flatMap((attribute) => {
+      const property = PRESENTATION_ATTRIBUTES[attribute.name];
+      if (property === undefined || !isRawThemeValue(property, attribute.value)) {
+        return [];
+      }
+      const token = property === "font-family" ? "var(--font-body)" : "var(--accent)";
+      return [
+        diag("DEK014", {
+          message: `raw value in ${attribute.name}="${attribute.value}"; use a theme token`,
+          path,
+          ...spotOf(attribute),
+          slug: section.slug,
+          hint: `set ${property} in ${css} with a theme token instead, such as ${property}: ${token}; an attribute cannot take var()`,
+          data: { attribute: attribute.name, value: attribute.value },
+        }),
+      ];
+    }),
+  );
 }
 
 /** DEK007: the file is there, but nothing in it is a slide, so build and show draw nothing for it. */

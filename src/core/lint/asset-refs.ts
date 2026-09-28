@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { dirname, join, posix } from "node:path";
+import { dirname, join, posix, resolve } from "node:path";
 import { classifyAssetRef, isCanonicalAssetPath } from "../assets.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import type { HtmlRef } from "../html-scan.ts";
+import { isInside } from "../path.ts";
 
 /**
  * DEK020 to DEK023 for one reference, whether it comes from a slide's markup
@@ -14,7 +15,18 @@ export function assetRefDiagnostics(
   where: { path: string; line?: number; column?: number; slug?: string; deckDir: string },
 ): Diagnostic[] {
   const { deckDir, ...location } = where;
-  const kind = classifyAssetRef(ref.value, { deckDir, from: dirname(where.path) }).kind;
+  const from = dirname(where.path);
+  const classified = classifyAssetRef(ref.value, { deckDir, from }).kind;
+  // A link someone follows, `<a>` or `<area>`, leaves from wherever the slide is read, the deck
+  // or its slides/, and must stay in the deck from both. A resource is found from either, and a
+  // full document's `<link>` sits in the head the deck never shows.
+  const followed = ref.use === "link" && ref.tag !== "link";
+  const kind =
+    followed &&
+    (classified === "missing" || classified === "file") &&
+    leavesFromEither(ref.value, deckDir, from)
+      ? "escape"
+      : classified;
   if (kind === "skip") {
     return [];
   }
@@ -60,6 +72,14 @@ export function assetRefDiagnostics(
     ];
   }
   return [];
+}
+
+function leavesFromEither(value: string, deckDir: string, from: string): boolean {
+  const path = value.trim().split(/[?#]/)[0] ?? "";
+  return (
+    path !== "" &&
+    [resolve(deckDir, path), resolve(from, path)].some((target) => !isInside(target, deckDir))
+  );
 }
 
 /**

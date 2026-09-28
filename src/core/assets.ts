@@ -25,7 +25,10 @@ export type AssetRef =
   | { kind: "missing" }
   | { kind: "file"; path: string; deckPath: string };
 
-const REMOTE_RE = /^(https?:)?\/\//i;
+/** A network address: `http:` or `https:` with or without its slashes, or protocol-relative. */
+const REMOTE_RE = /^(?:https?:|\/\/)/i;
+/** A file on the machine that opens the deck, which no copy of the deck carries along. */
+const FILE_RE = /^file:/i;
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 
 /**
@@ -44,6 +47,9 @@ export function classifyAssetRef(
   }
   if (REMOTE_RE.test(value)) {
     return { kind: "remote" };
+  }
+  if (FILE_RE.test(value)) {
+    return { kind: "escape" };
   }
   if (SCHEME_RE.test(value)) {
     return { kind: "skip" };
