@@ -1,5 +1,7 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
-import { splitLines } from "../lines.ts";
+import type { DekError } from "../error.ts";
+import { ScriptError } from "../parse.ts";
+import { scriptLines } from "../script-lines.ts";
 import type { LintContext } from "./context.ts";
 
 /** DEK004: a section id or a beat id used twice. */
@@ -56,14 +58,9 @@ export function strayHeadingDiagnostics(ctx: LintContext): Diagnostic[] {
   }
   const starts = deck.deck.sections.map((section) => ({ line: section.line, slug: section.slug }));
   const diagnostics: Diagnostic[] = [];
-  let fence: string | undefined;
-  for (const [offset, text] of splitLines(script.body).entries()) {
-    const marker = text.match(/^\s*(`{3,}|~{3,})/)?.[1];
-    if (marker) {
-      fence = fence === undefined ? marker : text.trim().startsWith(fence) ? undefined : fence;
-      continue;
-    }
-    const level = fence === undefined ? text.match(/^(#{1,6})\s/)?.[1]?.length : undefined;
+  // What the parser reads as text, a code block or a comment, is not a heading here either.
+  for (const [offset, { text, literal }] of scriptLines(script.body).entries()) {
+    const level = literal ? undefined : text.match(/^(#{1,6})\s/)?.[1]?.length;
     if (level === undefined || level === 2 || level === 3) {
       continue;
     }
@@ -82,4 +79,24 @@ export function strayHeadingDiagnostics(ctx: LintContext): Diagnostic[] {
     );
   }
   return diagnostics;
+}
+
+/**
+ * DEK027: a script.md that cannot be read, one finding for each problem that stops it. Nothing
+ * else in the deck can be checked against a script that does not read, so these are its findings.
+ */
+export function unreadableScriptDiagnostics(deck: {
+  scriptPath: string;
+  error: DekError;
+}): Diagnostic[] {
+  const { error } = deck;
+  const problems = error instanceof ScriptError ? error.problems : [error];
+  return problems.map(({ message, line, hint }) =>
+    diag("DEK027", {
+      message,
+      path: error.path ?? deck.scriptPath,
+      ...(line !== undefined ? { line } : {}),
+      ...(hint !== undefined ? { hint } : {}),
+    }),
+  );
 }

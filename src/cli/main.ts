@@ -154,7 +154,11 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
     await restoreRef(cwd, call.deck);
   }
   const target = spec.scope
-    ? resolveTarget(cwd, spec.scope, { deck: call.deck, refs: spec.refs === true })
+    ? resolveTarget(cwd, spec.scope, {
+        deck: call.deck,
+        refs: spec.refs === true,
+        unreadable: spec.unreadable === true,
+      })
     : undefined;
   const form = formOf(call.name, call.subcommand);
   const ctx = { cwd, flags: line.values, args: call.args, target };

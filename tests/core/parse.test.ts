@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
-import { parseScript } from "../../src/core/parse.ts";
+import { parseScript, ScriptError } from "../../src/core/parse.ts";
 import { scriptFixturesDir } from "../helpers/paths.ts";
 
 function headingLine(source: string, prefix: string): number {
@@ -251,5 +251,96 @@ describe("parseScript errors", () => {
   test("keeps YAML's own words for a syntax error, without its class name", () => {
     const { message } = failure("---\ntitle: T\nevent: [open\n---\n\n## a\n");
     expect(message).toBe("invalid YAML frontmatter: YAML Parse error: Unexpected token");
+  });
+});
+
+describe("parseScript problems", () => {
+  function problemsOf(source: string): ScriptError["problems"] {
+    try {
+      parseScript(source, "script.md");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ScriptError);
+      return (error as ScriptError).problems;
+    }
+    throw new Error("expected a ScriptError");
+  }
+
+  // One run should say everything that stops the script, not the first thing: four headings to
+  // fix should take one lint, not five.
+  test("reports every problem in the script at once, in order", () => {
+    const problems = problemsOf(`---
+title: B
+---
+
+### early
+
+## 日本語だけ
+
+x
+
+## Bad {#Bad}
+
+### beat {x}
+`);
+    expect(problems.map(({ message, line }) => ({ message, line }))).toEqual([
+      { message: "### beat is not inside a ## section", line: 5 },
+      { message: "heading requires {#id}", line: 7 },
+      { message: "heading attribute must be {#id}", line: 11 },
+      { message: "heading attribute must be {#id}", line: 13 },
+    ]);
+    expect(problems[1]?.hint).toBe(
+      "write it as `## 日本語だけ {#your-id}`; ids use a-z, 0-9, and -",
+    );
+  });
+
+  test("takes the first problem as the error's own, for commands that stop on it", () => {
+    try {
+      parseScript("---\ntitle: B\n---\n\n## 日本語\n\n## 英語も {#Bad}\n", "script.md");
+    } catch (error) {
+      expect(error).toMatchObject({
+        message: "heading requires {#id}",
+        line: 5,
+        path: "script.md",
+        hint: "write it as `## 日本語 {#your-id}`; ids use a-z, 0-9, and -",
+      });
+      return;
+    }
+    throw new Error("expected a ScriptError");
+  });
+
+  test("reports the frontmatter and the headings together", () => {
+    const problems = problemsOf("---\ndate: tomorrow\n---\n\n## 日本語\n");
+    expect(problems.map((problem) => problem.line)).toEqual([undefined, 5]);
+    expect(problems[0]?.message).toContain("title");
+  });
+});
+
+describe("parseScript literal text", () => {
+  // A `##` inside a code block or an HTML comment is text the slide shows or the author hides,
+  // never a slide: a talk about Markdown writes them all the time.
+  test("reads ## in a fenced code block or an HTML comment as text", () => {
+    const deck = parseScript(`---
+title: T
+---
+
+## intro
+
+\`\`\`\`md
+## not a slide
+\`\`\`
+## still code, since three backticks cannot close four
+\`\`\`\`
+
+<!--
+## not a slide either
+-->
+
+~~~
+### nor a beat
+~~~
+`);
+    expect(deck.sections.map((section) => section.slug)).toEqual(["intro"]);
+    expect(deck.sections[0]?.beats).toEqual([]);
+    expect(deck.sections[0]?.body).toContain("## not a slide");
   });
 });

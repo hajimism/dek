@@ -1,9 +1,11 @@
 import { existsSync, watch } from "node:fs";
 import { basename } from "node:path";
+import { deckPaths } from "../core/deck-paths.ts";
 import { type Diagnostic, errorDiagnostic } from "../core/diagnostic.ts";
 import { DekError, errorFields } from "../core/error.ts";
-import { lintDeckAsync, lintProject } from "../core/lint.ts";
+import { lintDeckAsync, lintProject, unreadableScriptDiagnostics } from "../core/lint.ts";
 import type { LiveEvent } from "../core/live-protocol.ts";
+import { ScriptError } from "../core/parse.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { resolveDeck } from "../core/resolve.ts";
 import { type SyncResult, syncDeck } from "../core/sync.ts";
@@ -188,8 +190,13 @@ async function lintPass(
       resolved,
     };
   } catch (error) {
+    // A script that does not read says every reason at once, as lint does.
+    const diagnostics =
+      error instanceof ScriptError
+        ? unreadableScriptDiagnostics({ scriptPath: deckPaths(deckDir).script, error })
+        : [watchErrorDiagnostic(error)];
     // A deck that resolved but failed to lint still gets its visual pass.
-    return { diagnostics: [watchErrorDiagnostic(error)], ...(resolved ? { resolved } : {}) };
+    return { diagnostics, ...(resolved ? { resolved } : {}) };
   }
 }
 

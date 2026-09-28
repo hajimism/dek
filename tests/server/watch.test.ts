@@ -513,6 +513,30 @@ describe("voiceFailureLine", () => {
   });
 });
 
+describe("watchDeck on a script that does not read", () => {
+  test("shows every reason at once, as lint does", async () => {
+    const script = "---\ntitle: Demo\n---\n\n## 日本語\n\n## Bad {#Bad}\n";
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const hub = createEventHub();
+      const diagnosed = waitForEvent(hub, (event) => event.type === "diagnostics");
+      const watcher = watchDeck(deckDir(root), emitTo(hub), { pollIntervalMs: 0 });
+      try {
+        const event = await diagnosed;
+        if (event.type !== "diagnostics") {
+          throw new Error("expected diagnostics");
+        }
+        expect(event.diagnostics.map((d) => [d.id, d.line])).toEqual([
+          ["DEK027", 5],
+          ["DEK027", 7],
+        ]);
+      } finally {
+        watcher.close();
+        hub.close();
+      }
+    });
+  });
+});
+
 describe("watchErrorDiagnostic", () => {
   test("keeps a DekError's location and its hint, the next step the author sees", () => {
     expect(

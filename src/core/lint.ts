@@ -19,6 +19,7 @@ import { asResolvedDeck, type Project, type ProjectDeck } from "./resolve.ts";
 import type { Section } from "./schema.ts";
 import { evaluateSlideScripts, slideScriptsProblems } from "./slide-script-eval.ts";
 
+export { unreadableScriptDiagnostics } from "./lint/script.ts";
 export { silentCueDiagnostics } from "./lint/voice.ts";
 
 export type LintDeckOptions = {

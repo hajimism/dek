@@ -93,6 +93,11 @@ type Base = Form & {
   scope?: DeckScope;
   /** A ref may be its deck: the CLI fetches a pinned ref's missing snapshot first. */
   refs?: true;
+  /**
+   * A deck whose script.md cannot be read is handed over in `failed` rather than refused, for a
+   * command whose answer is why: lint.
+   */
+  unreadable?: true;
   /** No word to type: `serve` is the bare `dek [deck]`. */
   bare?: true;
 };
@@ -502,6 +507,7 @@ export const COMMANDS = {
   }),
   lint: result({
     scope: "decks",
+    unreadable: true,
     args: [],
     flags: ["fix", "visual", "format"],
     usage: ["dek lint [deck] [--fix] [--visual] [--format sarif]"],

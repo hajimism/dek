@@ -24,6 +24,9 @@ export type Scope = {
   deck?: ProjectDeck;
 };
 
+/** A deck whose script.md cannot be read, and why. */
+type UnreadableDeck = Project["failed"][number];
+
 /**
  * What a command works on, which the CLI resolves before it runs: one deck, or every deck in
  * scope (the project's, or the one named).
@@ -38,6 +41,11 @@ export type DecksTarget = {
   project: Project;
   decks: ProjectDeck[];
   deck?: ProjectDeck;
+  /**
+   * The decks in scope whose script.md cannot be read. Only a command that declares `unreadable`
+   * is handed one it named; any other is refused with its error, as before.
+   */
+  failed?: UnreadableDeck[];
   /** Set when the deck is a ref. */
   ref?: RefInfo;
 };
@@ -147,12 +155,37 @@ export function resolveScope(cwd: string, options: { deck?: string } = {}): Scop
   return { project, deck };
 }
 
-export function resolveDecks(cwd: string, options: { deck?: string } = {}): DecksTarget {
+export function resolveDecks(
+  cwd: string,
+  options: { deck?: string; unreadable?: boolean } = {},
+): DecksTarget {
+  if (options.unreadable) {
+    const unreadable = unreadableInScope(cwd, options.deck);
+    if (unreadable) {
+      return { project: unreadable.project, decks: [], failed: [unreadable.failed] };
+    }
+  }
   const scope = resolveScope(cwd, options);
   if (scope.deck) {
     return { project: scope.project, decks: [scope.deck], deck: scope.deck };
   }
-  return { project: scope.project, decks: scope.project.decks };
+  const { failed } = scope.project;
+  return {
+    project: scope.project,
+    decks: scope.project.decks,
+    ...(failed.length > 0 && { failed }),
+  };
+}
+
+/** The one deck in scope, named or around `cwd`, when its script.md cannot be read. */
+function unreadableInScope(
+  cwd: string,
+  deck: string | undefined,
+): { project: Project; failed: UnreadableDeck } | undefined {
+  const project = requireProject(cwd);
+  const name = deck ?? inferDeckName(project, cwd);
+  const failed = project.failed.find((entry) => entry.name === name);
+  return failed ? { project, failed } : undefined;
 }
 
 function requireDeck(scope: Scope, cwd: string): ProjectDeck {
@@ -188,25 +221,17 @@ export type ReadableDeck = DeckTarget & { ref?: RefInfo };
  * whose spec says `refs` reads a ref; it never writes, so a ref cannot reach a command that
  * would change it. For every other command resolveScope refuses a ref.
  */
-export function resolveTarget(
-  cwd: string,
-  scope: "deck",
-  options?: { deck?: string; refs?: boolean },
-): ReadableDeck;
-export function resolveTarget(
-  cwd: string,
-  scope: "decks",
-  options?: { deck?: string; refs?: boolean },
-): DecksTarget;
+export function resolveTarget(cwd: string, scope: "deck", options?: TargetOptions): ReadableDeck;
+export function resolveTarget(cwd: string, scope: "decks", options?: TargetOptions): DecksTarget;
 export function resolveTarget(
   cwd: string,
   scope: DeckScope,
-  options?: { deck?: string; refs?: boolean },
+  options?: TargetOptions,
 ): ReadableDeck | DecksTarget;
 export function resolveTarget(
   cwd: string,
   scope: DeckScope,
-  options: { deck?: string; refs?: boolean } = {},
+  options: TargetOptions = {},
 ): ReadableDeck | DecksTarget {
   const ref =
     options.refs === true && options.deck !== undefined && isRefName(options.deck)
@@ -217,8 +242,11 @@ export function resolveTarget(
   }
   return ref
     ? { project: ref.project, decks: [ref.deck], deck: ref.deck, ref: ref.ref }
-    : resolveDecks(cwd, { deck: options.deck });
+    : resolveDecks(cwd, { deck: options.deck, unreadable: options.unreadable === true });
 }
+
+/** How a command's spec asks for its decks; see `refs` and `unreadable` there. */
+type TargetOptions = { deck?: string; refs?: boolean; unreadable?: boolean };
 
 function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
   const source = parseRefSource(arg);

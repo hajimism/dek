@@ -42,6 +42,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK024` | `slide` | A heading with nothing to read: no text, no image, no `aria-label`. An id-only `##` heading after the first slide makes one. Warning | — |
 | `DEK025` | `slide` | A numeric `data-step` that points at a beat with an id. Warning | — |
 | `DEK026` | `slide` | The same declaration under the same selector in the stylesheets of three slides or more. Warning | — |
+| `DEK027` | `deck` | `script.md` cannot be read: its frontmatter, a heading without a valid `{#id}`, or a beat before any slide. One finding per problem | — |
 | `DEK030` | `slide` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK032` | `slide` | A slide script's `draw` throws while drawing the end of a beat | — |
@@ -109,6 +110,10 @@ A number in `data-step` means "the k-th beat of this slide", so a beat inserted 
 ### DEK026
 
 A declaration three slides each write in their own stylesheet is a fix the theme is missing: agents working on one slide each will make it again on the next. Selectors are compared as the slide's scope reads them, so `.card` and `.slide .card` are one selector and `.slide > .card` is another; a rule inside `@media` is compared only with the same rule inside the same `@media`. Each slide gets one finding per selector, in its own `dek check`, naming what it shares there and every slide it shares any of it with; `data` carries `selector`, `declarations`, and `slides`. Define it once in `theme.css` and delete it from each slide. Keyframes are left alone, since each slide's are renamed apart.
+
+### DEK027
+
+Nothing else in a deck can be checked against a script that does not read, so these are the deck's only findings until it does. Every problem is reported in one run, each at its line with the fix: the heading and its frontmatter are read on their own, and a heading that cannot be read still opens its slide, so the beats under it are not reported as well. `dek lint` reports them wherever it runs, inside the deck or at the project root, and the dev server shows them all. A command that cannot work without the deck, such as `dek build`, stops on the first with the same message and hint.
 
 ### DEK030
 

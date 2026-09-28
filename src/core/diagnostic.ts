@@ -45,6 +45,7 @@ export const RULES = {
   DEK024: { severity: "warning", scopes: ["slide"] },
   DEK025: { severity: "warning", scopes: ["slide"] },
   DEK026: { severity: "warning", scopes: ["slide"] },
+  DEK027: { severity: "error", scopes: ["deck"] },
   DEK030: { severity: "error", scopes: ["slide"] },
   DEK031: { severity: "error", scopes: ["slide"] },
   DEK032: { severity: "error", scopes: ["slide"] },

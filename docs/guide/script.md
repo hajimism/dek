@@ -6,7 +6,7 @@
 
 There are three rules to remember. A `##` heading is one slide. Everything under it is that slide's script. Only paragraphs are spoken.
 
-Only `##` and `###` (a beat, below) mean anything. A `#` or `####` heading is read as script text, and lint warns about it as `DEK044`.
+Only `##` and `###` (a beat, below) mean anything. A `#` or `####` heading is read as script text, and lint warns about it as `DEK044`. A heading inside a fenced code block or an HTML comment is text too, so a talk about Markdown can quote `## Title` in a code block.
 
 ```markdown
 ---
@@ -55,7 +55,7 @@ Files in `slides/` and the `<slug>` arguments to the CLI use the section **id**.
 dek separates display from identity with Pandoc-style `{#id}`.
 
 - If the heading already qualifies as an id, it is the id. `## intro` becomes `slides/intro.html`.
-- Otherwise `{#id}` is required. `## What do you do the day before a talk? {#problem}` becomes `slides/problem.html`. A heading that does not qualify and has no `{#id}` is an error that points at the line and shows the fix: `## Why dek? {#why-dek}` when the heading has ASCII words to build an id from, `## まとめ {#your-id}` when it has none.
+- Otherwise `{#id}` is required. `## What do you do the day before a talk? {#problem}` becomes `slides/problem.html`. A heading that does not qualify and has no `{#id}` is an error (`DEK027`) that points at the line and shows the fix, and lint reports every such heading in one run: `## Why dek? {#why-dek}` when the heading has ASCII words to build an id from, `## まとめ {#your-id}` when it has none.
 - A qualifying heading may still carry `{#id}` when you want the display name and the file name to differ. `## intro {#opening}` is displayed as "intro" and stored as `opening.html`.
 - A heading that is only an id has no display text. The generated skeleton leaves its `<h2>` empty, except for the first section, which takes the deck `title`. The presenter view shows the id.
 

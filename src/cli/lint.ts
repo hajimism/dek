@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
 import type { Diagnostic } from "../core/diagnostic.ts";
-import { lintDeck, lintProject } from "../core/lint.ts";
+import { lintDeck, lintProject, unreadableScriptDiagnostics } from "../core/lint.ts";
 import { playwrightMissingError } from "../core/playwright.ts";
 import { resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
 import { mergeSarif, type SarifLog } from "../core/sarif.ts";
@@ -19,11 +19,14 @@ export type LintCliResult = {
 
 /** `cwd` is where a skipped rumdl's hint says to run it from. */
 export async function lintCommand(
-  { project, decks }: DecksTarget,
+  { project, decks, failed = [] }: DecksTarget,
   options: { cwd: string; fix?: boolean; visual?: boolean },
 ): Promise<LintCliResult> {
   // dek.toml's findings once, then each deck's.
-  const diagnostics: Diagnostic[] = lintProject(project);
+  const diagnostics: Diagnostic[] = [
+    ...lintProject(project),
+    ...failed.flatMap(unreadableScriptDiagnostics),
+  ];
   let rumdlSkip: SkippedCheck | undefined;
   let rumdlSarif: SarifLog | undefined;
 

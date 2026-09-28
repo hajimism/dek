@@ -134,6 +134,34 @@ describe("main", () => {
     });
   });
 
+  // A deck whose script.md cannot be read is not done, wherever lint runs from: every problem is a
+  // diagnostic, in the shape every other finding has, and SARIF carries them too.
+  test.serial("lint reports every problem of an unreadable script as diagnostics", async () => {
+    await withTempProject(decks, async (root) => {
+      const deck = join(root, "decks", "demo");
+      await Bun.write(
+        join(deck, "script.md"),
+        "---\ntitle: Demo\n---\n\n## 日本語\n\n## Bad {#Bad}\n",
+      );
+      for (const cwd of [deck, root]) {
+        const result = await run(["lint", "--json"], cwd);
+        expect(result.exitCode).toBe(1);
+        const json = JSON.parse(result.stdout) as {
+          ok: boolean;
+          diagnostics: Array<{ id: string; line?: number; hint?: string }>;
+        };
+        expect(json.ok).toBe(false);
+        expect(json.diagnostics.filter((d) => d.id === "DEK027").map((d) => d.line)).toEqual([
+          5, 7,
+        ]);
+      }
+      const sarif = JSON.parse((await run(["lint", "--format", "sarif"], deck)).stdout) as {
+        runs: Array<{ results: Array<{ ruleId: string }> }>;
+      };
+      expect(sarif.runs[0]?.results.map((r) => r.ruleId)).toEqual(["DEK027", "DEK027"]);
+    });
+  });
+
   test.serial("a malformed command line still answers in JSON when --json is on it", async () => {
     await withTempProject(decks, async (root) => {
       const error = await failure(["lint", "--fixx"], root);
