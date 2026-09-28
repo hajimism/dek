@@ -1093,8 +1093,8 @@ b
         expect(diagnostics.some((d) => d.id === "DEK002")).toBe(true);
         const hints = diagnostics.filter((d) => d.id === "DEK001" || d.id === "DEK002");
         expect(hints.map((d) => d.hint)).toEqual([
-          "run `dek mv leftover intro`",
-          "run `dek mv leftover intro`",
+          "run `dek mv leftover intro` to move the files to the script's id, or `dek mv intro leftover` to give the section the files' id",
+          "run `dek mv leftover intro` to move the files to the script's id, or `dek mv intro leftover` to give the section the files' id",
         ]);
       },
     );

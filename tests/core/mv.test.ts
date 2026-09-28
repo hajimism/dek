@@ -73,7 +73,9 @@ body
           throw new Error("expected renameSection to fail");
         } catch (error) {
           expect(error).toBeInstanceOf(DekError);
-          expect((error as DekError).message).toContain('slide "the-problem" already exists');
+          expect((error as DekError).message).toBe(
+            "slides/problem.html and slides/the-problem.html both hold a slide you wrote",
+          );
         }
         expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(before);
         expect(existsSync(join(deckDir, "slides", "problem.html"))).toBe(true);

@@ -80,7 +80,9 @@ export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diag
   if (targets.length !== 1 || !target) {
     return diagnostics;
   }
-  const hint = `run \`dek mv ${orphan.slug} ${target}\``;
+  // An orphan beside a section without its own slide is a rename, made in the script or in the
+  // files: which one is the author's to say, and each command finishes it from this state.
+  const hint = `run \`dek mv ${orphan.slug} ${target}\` to move the files to the script's id, or \`dek mv ${target} ${orphan.slug}\` to give the section the files' id`;
   const renamed = new Set<Diagnostic>([orphan, ...missing]);
   return diagnostics.map((diagnostic) =>
     renamed.has(diagnostic) ? { ...diagnostic, hint } : diagnostic,

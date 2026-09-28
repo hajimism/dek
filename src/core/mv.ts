@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { escapeRegExp } from "./escape.ts";
@@ -6,6 +7,7 @@ import { joinLines, splitLines } from "./lines.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
 import { Id } from "./schema.ts";
 import { deckLayouts, skeletonHtml } from "./skeleton.ts";
+import { skeletonRecord } from "./skeleton-record.ts";
 import { renameTableKeys } from "./toml-keys.ts";
 
 export function renameSection(dir: string, from: string, to: string): void;
@@ -18,7 +20,14 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   const has = (slug: string): boolean => deck.deck.sections.some((entry) => entry.slug === slug);
   if (!has(from) && has(to)) {
     // script.md was edited first; only the files still carry the old id.
-    applySteps(slideFileSteps(deck, from, to, { replaceSkeleton: true }));
+    const steps = slideFileSteps(deck, from, to);
+    if (steps.length === 0 && !existsSync(deckPaths(deck.dir).slide(to, ".html"))) {
+      throw new DekError(`slide "${from}" not found`, {
+        path: deckPaths(deck.dir).slide(from, ".html"),
+        hint: "run `dek lint` to see which slides have no section",
+      });
+    }
+    applySteps(steps);
     return;
   }
   const section = requireSection(deck, from);
@@ -42,63 +51,58 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   lines[headingIndex] = rewriteHeadingId(heading, from, to);
   applySteps([
     writeStep(deck.scriptPath, source, joinLines(source, lines)),
-    ...slideFileSteps(deck, from, to, { replaceSkeleton: false }),
+    ...slideFileSteps(deck, from, to),
   ]);
 }
 
 /**
- * The steps that move `slides/<from>.*` to `<to>` and point voice.toml at it.
- * Everything that could refuse is worked out before any file changes. With
- * `replaceSkeleton`, a `<to>.html` that is still the generated skeleton is
- * replaced rather than refused: the dev server writes one as soon as the
- * heading changes.
+ * The steps that leave `slides/<to>.*` holding the slide and voice.toml pointing at it, from
+ * whichever files the author already moved. Each file is settled on its own: one that is only at
+ * `<from>` moves, one already at `<to>` stays, and a skeleton dek wrote gives way to the author's
+ * file on the other side, as the dev server writes one for any id the script names. Only two files
+ * the author wrote, one under each id, stop the rename; everything that could stop it is worked
+ * out before any file changes.
  */
-function slideFileSteps(
-  deck: ResolvedDeck["deck"],
-  from: string,
-  to: string,
-  options: { replaceSkeleton: boolean },
-): FileStep[] {
+function slideFileSteps(deck: ResolvedDeck["deck"], from: string, to: string): FileStep[] {
   const paths = deckPaths(deck.dir);
-  const fromPath = paths.slide(from, ".html");
-  const toPath = paths.slide(to, ".html");
-  if (options.replaceSkeleton && !existsSync(fromPath)) {
-    throw new DekError(`slide "${from}" not found`, {
-      path: fromPath,
-      hint: "run `dek lint` to see which slides have no section",
-    });
+  const layouts = deckLayouts(deck.dir);
+  const record = skeletonRecord(deck.dir);
+  const read = (slug: string): SlideFile | undefined => {
+    const path = paths.slide(slug, ".html");
+    if (!existsSync(path)) {
+      return undefined;
+    }
+    const html = readFileSync(path, "utf8");
+    return { path, html, authored: !record.owns(html, skeletonHtml(deck.deck, slug, layouts)) };
+  };
+  const source = read(from);
+  const target = read(to);
+  if (source?.authored && target?.authored) {
+    throw bothHold(source.path, target.path, from, to);
   }
-  const skeleton = options.replaceSkeleton
-    ? skeletonHtml(deck.deck, to, deckLayouts(deck.dir))
-    : undefined;
-  const replaced =
-    skeleton !== undefined && existsSync(toPath) && readFileSync(toPath, "utf8") === skeleton
-      ? skeleton
-      : undefined;
-  for (const target of [
-    ...(replaced === undefined ? [toPath] : []),
-    ...SLIDE_SIDECARS.map((ext) => paths.slide(to, ext)),
-  ]) {
-    if (existsSync(target)) {
-      throw new DekError(`slide "${to}" already exists`, {
-        path: target,
-        hint: `merge slides/${from}.html into it by hand, or delete it and run \`dek mv ${from} ${to}\` again`,
-      });
+  for (const ext of SLIDE_SIDECARS) {
+    if (existsSync(paths.slide(from, ext)) && existsSync(paths.slide(to, ext))) {
+      throw bothHold(paths.slide(from, ext), paths.slide(to, ext), from, to);
     }
   }
 
   const voice = planVoiceBeatKeys(deck.dir, from, to);
   const steps: FileStep[] = [];
-  if (existsSync(fromPath)) {
-    const html = readFileSync(fromPath, "utf8");
-    const next = html.replaceAll(`data-slug="${from}"`, `data-slug="${to}"`);
-    if (replaced !== undefined) {
-      steps.push(writeStep(toPath, replaced, next), removeStep(fromPath, html));
-    } else {
-      steps.push(renameStep(fromPath, toPath));
-      if (next !== html) {
-        steps.push(writeStep(toPath, html, next));
-      }
+  // The HTML that ends up at <to>: the author's, wherever it is; else whichever is there.
+  const toPath = paths.slide(to, ".html");
+  const kept = source && (source.authored || !target) ? source : target;
+  if (source && kept === source) {
+    steps.push(
+      target ? writeStep(toPath, target.html, source.html) : renameStep(source.path, toPath),
+    );
+  }
+  if (source && target) {
+    steps.push(removeStep(source.path, source.html));
+  }
+  if (kept) {
+    const next = relabel(kept.html, from, to);
+    if (next !== kept.html) {
+      steps.push(writeStep(toPath, kept.html, next));
     }
   }
   for (const ext of SLIDE_SIDECARS) {
@@ -111,6 +115,24 @@ function slideFileSteps(
     steps.push(writeStep(voice.path, voice.source, voice.next));
   }
   return steps;
+}
+
+/** A slide's HTML under one id, and whether the author wrote it rather than dek. */
+type SlideFile = { path: string; html: string; authored: boolean };
+
+/** A slide's own `data-slug`, pointed at its new id. */
+function relabel(html: string, from: string, to: string): string {
+  return html.replaceAll(`data-slug="${from}"`, `data-slug="${to}"`);
+}
+
+function bothHold(fromPath: string, toPath: string, from: string, to: string): DekError {
+  const fromName = `slides/${basename(fromPath)}`;
+  const toName = `slides/${basename(toPath)}`;
+  const what = fromPath.endsWith(".html") ? "hold a slide you wrote" : "exist";
+  return new DekError(`${fromName} and ${toName} both ${what}`, {
+    path: fromPath,
+    hint: `merge them into ${toName} and remove ${fromName}, then run \`dek mv ${from} ${to}\` again`,
+  });
 }
 
 /** One file change `dek mv` makes, with how to take it back. */

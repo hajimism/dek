@@ -76,7 +76,9 @@ describe("renaming after editing script.md first", () => {
           const before = await lint(deck);
           expect(before.ok).toBe(false);
           const orphan = before.diagnostics.find((d) => d.id === "DEK002");
-          expect(orphan?.hint).toBe("run `dek mv before after`");
+          expect(orphan?.hint).toBe(
+            "run `dek mv before after` to move the files to the script's id, or `dek mv after before` to give the section the files' id",
+          );
 
           run(commandOf(orphan?.hint), deck);
 
@@ -99,8 +101,89 @@ describe("renaming after editing script.md first", () => {
       );
       const lintResult = await lint(deck);
       expect(lintResult.diagnostics.find((d) => d.id === "DEK002")?.hint).toBeUndefined();
-      expect(() => run(["mv", "before", "after"], deck)).toThrow('slide "after" already exists');
+      expect(() => run(["mv", "before", "after"], deck)).toThrow(
+        "slides/before.html and slides/after.html both hold a slide you wrote",
+      );
       expect(existsSync(join(deck, "slides", "before.html"))).toBe(true);
+    });
+  });
+});
+
+/** The files are already `after.*`; the script still says `before`. */
+async function withFilesRenamed(
+  fn: (deck: string) => Promise<void>,
+  options: { skeleton?: boolean } = {},
+): Promise<void> {
+  await withTempProject(
+    { decks: [{ name: "demo", script: script("before"), slides: { after: written } }] },
+    async (root) => {
+      const deck = join(root, "decks", "demo");
+      await writeFile(join(deck, "slides", "after.css"), ".slide { }\n");
+      if (options.skeleton) {
+        // What the dev server does on save: a skeleton for the id the script still has.
+        syncDeck(deck);
+      }
+      await fn(deck);
+    },
+  );
+}
+
+describe("renaming after moving the files first", () => {
+  for (const [state, skeleton] of [
+    ["the old HTML is gone", false],
+    ["the dev server already made a skeleton for the old id", true],
+  ] as const) {
+    test(`dek mv gives the section the files' id when ${state}`, async () => {
+      await withFilesRenamed(
+        async (deck) => {
+          run(["mv", "before", "after"], deck);
+
+          expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
+          expect(existsSync(join(deck, "slides", "after.css"))).toBe(true);
+          expect(existsSync(join(deck, "slides", "before.html"))).toBe(false);
+          expect(await readFile(join(deck, "script.md"), "utf8")).toBe(script("after"));
+          expect((await lint(deck)).diagnostics).toEqual([]);
+        },
+        { skeleton },
+      );
+    });
+
+    test(`lint offers the rename the files already made when ${state}`, async () => {
+      await withFilesRenamed(
+        async (deck) => {
+          const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEK002");
+          const [, second] = [...(orphan?.hint ?? "").matchAll(/`dek ([^`]+)`/g)].map((m) =>
+            (m[1] ?? "").split(" "),
+          );
+          expect(second).toEqual(["mv", "before", "after"]);
+
+          run(second ?? [], deck);
+
+          expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
+          expect((await lint(deck)).diagnostics).toEqual([]);
+        },
+        { skeleton },
+      );
+    });
+  }
+
+  test("refuses when both ids hold edited slides, and never asks to delete one", async () => {
+    await withFilesRenamed(async (deck) => {
+      const other = written.replace("hand-written", "the other one");
+      await writeFile(join(deck, "slides", "before.html"), other);
+      let error: unknown;
+      try {
+        run(["mv", "before", "after"], deck);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toMatchObject({
+        message: "slides/before.html and slides/after.html both hold a slide you wrote",
+        hint: "merge them into slides/after.html and remove slides/before.html, then run `dek mv before after` again",
+      });
+      expect(await readFile(join(deck, "slides", "before.html"), "utf8")).toBe(other);
+      expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
+      expect(await readFile(join(deck, "script.md"), "utf8")).toBe(script("before"));
     });
   });
 });
