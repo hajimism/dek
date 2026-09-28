@@ -267,6 +267,11 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - When a hint sends a fix to \`theme.css\`, make it there, not in \`slides/<id>.css\`: the theme alone draws it that way, so other slides share the problem, and one change fixes them all.
 - One shot shows no motion. \`dek shot <slug> --motion\` lays the slide's beats out as rows, each held at moments through everything it moves and ending as the shot does. \`dek shot <a> --to <b> --at 0.5\` freezes the view transition between any two slides.
 
+## After a rehearsal
+
+- \`dek marks\` lists the beats the speaker marked while rehearsing aloud (\`m\` in the presenter view): the words they stumbled over are \`was\`, at \`line\` in \`script.md\`. Rewrite those beats to be easier to say, and keep each beat's heading so its mark follows it; \`status\` turns \`edited\` once the words changed.
+- Leave \`dek marks clear\` to the speaker: only saying the new words aloud tells whether they work.
+
 ## Before you report a deck as done
 
 - \`dek lint --visual\` passes.

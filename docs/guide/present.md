@@ -49,6 +49,7 @@ While the server is running, the terminal can drive the browser and ask which sl
 | `p` | Toggle the presenter view |
 | `s` | Toggle the slide rail |
 | `f` | Toggle fullscreen |
+| `m` | Mark the beat on screen to rewrite, or unmark it (dev server) |
 | `↑` `↓` | Move within the slide rail |
 | `←` `→` on the rail's edge | Resize the rail |
 | `Space` | Play or pause during `dek rehearse` |
@@ -56,6 +57,8 @@ While the server is running, the terminal can drive the browser and ask which sl
 Every press counts. Pressing faster than the transitions play, as a clicker skipping ahead does, cuts each transition short and lands where the presses add up to; a second window follows each press at once. Keys held with `Alt`, `Ctrl`, or `Cmd` belong to the browser, and keys typed into a field on a slide belong to the field.
 
 Tap or click the slide to go forward, and its left third to go back. On a phone or tablet you can also swipe sideways; a mouse drag selects text instead, and a click that ends a selection, a right click, or a click held with a modifier key stays where it is. Taps and clicks on links, buttons, and fields are theirs. The slide rail and the key hint stay out of the way on a narrow or touch screen.
+
+Rehearsing aloud on the dev server, press `m`, or the pencil button in the presenter view's bar, on a beat whose words you stumble over. The beat gets a pencil in the beat list, and the mark is kept in `.dek/marks.json` until you clear it. Afterwards `dek marks` lists each marked beat with its line in `script.md` and what it said, for you or an agent to rewrite; see [After a rehearsal](./ai#after-a-rehearsal). A built file has no server to keep marks, so it has no button.
 
 The URL follows the deck: `#<slug>` for a slide, `#<slug>/<n>` for its nth beat. Each slide is one history entry, so Back leaves the slide rather than stepping back through its beats. A beat number past the slide's last opens at the last beat and rewrites the URL to say so.
 

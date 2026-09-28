@@ -18,6 +18,8 @@ export type DeckRoute =
   /** `dek current` and `dek goto`. */
   | { kind: "current" }
   | { kind: "goto" }
+  /** The beats the presenter marked to rewrite: listed, and one marked or unmarked. */
+  | { kind: "marks" }
   /** A file under the deck's `assets/`, decoded. */
   | { kind: "asset"; path: string };
 
@@ -31,6 +33,7 @@ const FIXED: Record<Fixed, string> = {
   theme: "/theme",
   current: "/current",
   goto: "/goto",
+  marks: "/marks",
 };
 
 /** The path of `route` below its deck's prefix. */

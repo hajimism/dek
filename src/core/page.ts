@@ -25,6 +25,7 @@ export const PAGE_ID = {
   page: "dek-page",
   elapsed: "dek-elapsed",
   budget: "dek-budget",
+  markToggle: "dek-mark-toggle",
   hint: "dek-hint",
   announce: "dek-announce",
 } as const;

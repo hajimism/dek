@@ -1160,6 +1160,152 @@
         }
       ]
     },
+    "marks": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "list"
+            },
+            "marks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string"
+                  },
+                  "beat": {
+                    "description": "The beat's title; null for what the slide says before its first ###.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "beatIndex": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Null once the beat is gone."
+                  },
+                  "line": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The heading's line in script.md."
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "edited",
+                      "gone"
+                    ],
+                    "description": "edited once the words differ from what was marked; gone with the beat."
+                  },
+                  "was": {
+                    "type": "string",
+                    "description": "The beat's words when it was marked."
+                  },
+                  "text": {
+                    "description": "The beat's words now.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "markedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "slug",
+                  "beat",
+                  "beatIndex",
+                  "line",
+                  "path",
+                  "status",
+                  "was",
+                  "text",
+                  "markedAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "marks",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "clear"
+            },
+            "cleared": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "cleared",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "sync": {
       "anyOf": [
         {

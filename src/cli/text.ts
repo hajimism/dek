@@ -9,6 +9,7 @@ import { formatDiagnostics, formatTable } from "./format.ts";
 import type { NavResult } from "./goto.ts";
 import type { InitResult } from "./init.ts";
 import type { LsDeckResult, LsListResult } from "./ls.ts";
+import type { MarksCliResult } from "./marks.ts";
 import type { MvResult } from "./mv.ts";
 import type { NewResult } from "./new.ts";
 import type { PdfCliResult } from "./pdf.ts";
@@ -124,6 +125,28 @@ export function formatMv(data: MvResult): string {
 
 export function formatNav(data: NavResult): string {
   return data.beatIndex > 0 ? `${data.slug} ${data.beatIndex}` : data.slug;
+}
+
+/**
+ * Each mark at its line in script.md, the way an editor jumps to it, and the first line of what
+ * the beat says now; a beat gone since it was marked shows what it said.
+ */
+export function formatMarks(data: MarksCliResult): string {
+  if (data.action === "clear") {
+    return data.cleared === 1 ? "cleared 1 mark" : `cleared ${data.cleared} marks`;
+  }
+  if (data.marks.length === 0) {
+    return "no marks: press m in the presenter view to mark a beat";
+  }
+  return data.marks
+    .flatMap((mark) => {
+      const where = mark.line === null ? mark.path : `${mark.path}:${mark.line}`;
+      const beat = mark.beat === null ? mark.slug : `${mark.slug} › ${mark.beat}`;
+      const status = mark.status === "open" ? "" : ` (${mark.status})`;
+      const words = (mark.text ?? mark.was).split("\n").find((line) => line.trim() !== "");
+      return [`${where}  ${beat}${status}`, ...(words ? [`  ${words.trim()}`] : [])];
+    })
+    .join("\n");
 }
 
 /** The contact sheets when there are any, else each screenshot. */

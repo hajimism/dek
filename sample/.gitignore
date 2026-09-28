@@ -2,5 +2,6 @@
 dist/
 .cache/
 .dek/server.json
+.dek/marks.json
 node_modules/
 refs/

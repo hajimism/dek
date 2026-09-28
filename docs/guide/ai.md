@@ -87,6 +87,15 @@ dek current
 
 After editing a slide, the agent can jump the human's browser to it. When the human says "make the figure on this slide smaller", the agent runs `dek current`, learns the slug, and fixes it without asking which slide.
 
+## After a rehearsal
+
+```bash
+dek marks
+dek marks clear
+```
+
+Rehearse aloud on the dev server and press `m` on each beat whose words trip you up. `dek marks` then hands the agent what it needs to rewrite them: the heading's `line` in `script.md`, `was` (what the beat said when you marked it), and `text` (what it says now). A mark follows its beat by id, or by title, so beats added before it do not move it, and `status` turns `edited` once the words change, or `gone` if the beat itself went away. Say the new words aloud before you run `dek marks clear`: only that tells whether they work.
+
 ## Using a slide as a model
 
 ```bash

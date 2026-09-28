@@ -16,6 +16,7 @@ import {
   formatKept,
   formatKeptTheme,
   formatLs,
+  formatMarks,
   formatMv,
   formatNav,
   formatNew,
@@ -497,6 +498,44 @@ export const COMMANDS = {
       return currentCommand(target);
     },
     output: { text: formatNav, notes: navNotes },
+  }),
+  marks: result({
+    scope: "deck",
+    args: [],
+    flags: [],
+    usage: ["dek marks [deck]"],
+    summary:
+      "List the beats marked to rewrite in the presenter view, by pressing m while rehearsing:\nwhere each is in script.md, what it said when marked, and what it says now.",
+    group: "Slide",
+    overview: [
+      ["dek marks", "list the beats marked in the presenter view (m) to rewrite"],
+      ["dek marks clear", "drop the deck's marks"],
+    ],
+    agent: [
+      "dek marks [clear]   beats the speaker marked (m) to rewrite: line, was, text, status open|edited|gone",
+    ],
+    run: async ({ target }) => {
+      const { marksCommand } = await import("./marks.ts");
+      return marksCommand(target);
+    },
+    subcommands: {
+      clear: {
+        args: [],
+        flags: [],
+        usage: ["dek marks [deck] clear"],
+        run: async ({ target }) => {
+          const { clearMarksCommand } = await import("./marks.ts");
+          return clearMarksCommand(target);
+        },
+      },
+    },
+    output: {
+      text: formatMarks,
+      paths: (data, display) =>
+        data.action === "list"
+          ? { ...data, marks: data.marks.map((mark) => ({ ...mark, path: display(mark.path) })) }
+          : data,
+    },
   }),
   sync: result({
     scope: "decks",

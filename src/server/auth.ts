@@ -85,8 +85,8 @@ function forbidden(reason: string): Response {
 export type Exposure = "audience" | "presenter";
 
 /**
- * What each dev server route reveals. The script, its notes, the voice read from it, and moving
- * the deck belong to the presenter. The server routes only by these names, so a new route does
+ * What each dev server route reveals. The script, its notes, the voice read from it, moving the
+ * deck, and the marks left on its beats belong to the presenter. The server routes only by these names, so a new route does
  * not compile until it is placed here.
  */
 export const ROUTE_EXPOSURE = {
@@ -100,6 +100,7 @@ export const ROUTE_EXPOSURE = {
   socket: "audience",
   voice: "presenter",
   control: "presenter",
+  marks: "presenter",
   missing: "audience",
 } as const satisfies Record<string, Exposure>;
 

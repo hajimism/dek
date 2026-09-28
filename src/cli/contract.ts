@@ -241,6 +241,30 @@ export const RESULT_FIELDS = {
   }),
   goto: nav,
   current: nav,
+  marks: z.union([
+    z.strictObject({
+      action: z.literal("list"),
+      marks: z.array(
+        z.strictObject({
+          slug: z.string(),
+          beat: z
+            .string()
+            .nullable()
+            .describe("The beat's title; null for what the slide says before its first ###."),
+          beatIndex: z.number().int().nullable().describe("Null once the beat is gone."),
+          line: z.number().int().nullable().describe("The heading's line in script.md."),
+          path: z.string(),
+          status: z
+            .enum(["open", "edited", "gone"])
+            .describe("edited once the words differ from what was marked; gone with the beat."),
+          was: z.string().describe("The beat's words when it was marked."),
+          text: z.string().nullable().describe("The beat's words now."),
+          markedAt: z.string(),
+        }),
+      ),
+    }),
+    z.strictObject({ action: z.literal("clear"), cleared: z.number().int() }),
+  ]),
   sync: z.strictObject({ created: paths, updated: paths, removed: paths, kept: paths }),
   lint: z.strictObject({ diagnostics, skipped }),
   cues: z.strictObject({

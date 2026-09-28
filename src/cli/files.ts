@@ -20,6 +20,7 @@ export function defaultGitignore(): string {
 dist/
 .cache/
 .dek/server.json
+.dek/marks.json
 node_modules/
 refs/
 `;

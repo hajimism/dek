@@ -22,13 +22,17 @@ export async function mountPlayer(
   options: {
     url?: string;
     mode?: "player" | "video";
+    /** The dev server's page, notes included, rather than a built file. */
+    live?: boolean;
     /** Runs after the page exists and before the player starts, e.g. to block storage. */
     beforeStart?: () => void;
   } = {},
 ): Promise<void> {
   const html = renderDeckHtml(deckDir, {
     playerScript: "",
-    target: { kind: options.mode === "video" ? "video" : "build" },
+    target: options.live
+      ? { kind: "dev", mode: "player", includeNotes: true, liveReloadScript: "" }
+      : { kind: options.mode === "video" ? "video" : "build" },
   });
   GlobalRegistrator.register({ url: options.url ?? "file:///deck.html", width: 1280, height: 720 });
   document.documentElement.innerHTML = html

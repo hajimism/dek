@@ -104,6 +104,7 @@ export function renderDeckDocument(
       <span id="${PAGE_ID.page}">${page}</span>
       <p id="${PAGE_ID.elapsed}">0:00</p>
       <p id="${PAGE_ID.budget}">${budget}</p>
+      ${target.kind === "dev" ? markButton(deck.deck.lang) : ""}
     </footer>
   </aside>`
     : "";
@@ -182,6 +183,17 @@ const KEY_HINT_LABELS = {
   ja: { rail: "スライド一覧", presenter: "プレゼンタービュー" },
   en: { rail: "Slide rail", presenter: "Presenter view" },
 };
+
+/**
+ * The button that marks the beat on screen to rewrite. Only the dev server's page has it: the
+ * marks go to a file of the project's, and a built file has no server to keep them.
+ */
+function markButton(lang: string): string {
+  const label = lang.toLowerCase().startsWith("ja")
+    ? "このビートに直す印を付ける (m)"
+    : "Mark this beat to rewrite (m)";
+  return `<button id="${PAGE_ID.markToggle}" type="button" aria-pressed="false" aria-label="${escapeAttr(label)}" title="${escapeAttr(label)}"></button>`;
+}
 
 /**
  * The keys a viewer of a built file cannot discover by looking: `s` and `p`. Shown once as

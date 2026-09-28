@@ -1423,6 +1423,79 @@ body
     );
   });
 
+  test("marks the beat the presenter is on, lists it, and unmarks it at the second press", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: twoSlideScript,
+            slides: { intro: introHtml, architecture: leftoverHtml },
+          },
+        ],
+      },
+      async (root) => {
+        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
+          const marks = new URL("/marks", server.url);
+          const post = (body: unknown) =>
+            fetch(marks, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(body),
+            });
+          const first = await post({ slideIndex: 1, beatIndex: 0 });
+          expect(await first.json()).toEqual({
+            ok: true,
+            marked: true,
+            positions: [{ slideIndex: 1, beatIndex: 0 }],
+          });
+          expect(await (await fetch(marks)).json()).toEqual({
+            ok: true,
+            positions: [{ slideIndex: 1, beatIndex: 0 }],
+          });
+          expect(existsSync(join(root, ".dek", "marks.json"))).toBe(true);
+          expect(await (await post({ slideIndex: 1, beatIndex: 0 })).json()).toEqual({
+            ok: true,
+            marked: false,
+            positions: [],
+          });
+
+          const unnamed = await post({ slide: 1 });
+          expect(unnamed.status).toBe(400);
+          const past = await post({ slideIndex: 9, beatIndex: 0 });
+          expect(past.status).toBe(404);
+          expect(await past.json()).toMatchObject({
+            ok: false,
+            error: { hint: expect.any(String) },
+          });
+        });
+      },
+    );
+  });
+
+  test("keeps marking for the presenter behind --remote", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer(
+          { cwd: join(root, "decks", "demo"), remote: true, password: "secret" },
+          async (server) => {
+            const marks = new URL("/marks", server.url);
+            const body = JSON.stringify({ slideIndex: 0, beatIndex: 0 });
+            expect((await fetch(marks, { method: "POST", body })).status).toBe(401);
+            expect(existsSync(join(root, ".dek", "marks.json"))).toBe(false);
+            const allowed = await fetch(marks, {
+              method: "POST",
+              body,
+              headers: { authorization: basicAuth("secret") },
+            });
+            expect(allowed.status).toBe(200);
+          },
+        );
+      },
+    );
+  });
+
   test("embeds the live token on the presenter page only", async () => {
     await withTempProject(
       {

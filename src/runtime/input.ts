@@ -15,6 +15,8 @@ export type InputActions = {
   toggleRail: () => boolean;
   /** Space; left to `move` unless this takes it (a rehearsal plays and pauses). */
   togglePlay: () => boolean;
+  /** Mark the beat on screen to rewrite, or unmark it; false where marks cannot be kept. */
+  toggleMark: () => boolean;
   move: (move: Move) => void;
 };
 
@@ -35,6 +37,12 @@ export function bindInput(actions: InputActions): void {
     if (isLetterKey(event, "f")) {
       event.preventDefault();
       actions.toggleFullscreen();
+      return;
+    }
+    if (isLetterKey(event, "m")) {
+      if (actions.toggleMark()) {
+        event.preventDefault();
+      }
       return;
     }
     if (isRailToggleKey(event)) {

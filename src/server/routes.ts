@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileInside, readTheme } from "../core/assets.ts";
-import { errorFields } from "../core/error.ts";
+import { DekError, errorFields } from "../core/error.ts";
 import { escapeAttr, escapeHtml } from "../core/escape.ts";
 import { deckSlides, htmlShell, slidePlace, stampSlide } from "../core/html.ts";
+import { decodePosition } from "../core/live-protocol.ts";
+import { markedPositions, toggleMark } from "../core/marks.ts";
 import type { Project, ProjectDeck } from "../core/resolve.ts";
 import { voiceCacheFile } from "../core/voice.ts";
 import { deckRoutePath, parseDeckRoute, splitDeckPath, type VoiceFile } from "../runtime/routes.ts";
@@ -102,6 +104,12 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
         route: "control",
         respond: () => navResponse(req, { room: deckName, action: route.kind }, ctx.rooms),
       };
+    case "marks":
+      return {
+        route: "marks",
+        respond: () =>
+          deck ? marksResponse(req, ctx.project().root, deck) : jsonNotFound(deckName),
+      };
     case "asset": {
       const asset = dir && safeDeckAsset(dir, route.path);
       return asset
@@ -164,6 +172,47 @@ async function navResponse(
       : jsonResponse({ ok: false, error: { message: moved.message } }, 404);
   }
   return new Response("Method not allowed", { status: 405 });
+}
+
+/**
+ * The presenter's marks on a deck: GET lists where they are, and a POST of a position marks the
+ * beat there, or unmarks it when it is marked. Both answer with where the deck's marks are now.
+ */
+async function marksResponse(req: Request, root: string, deck: ProjectDeck): Promise<Response> {
+  if (req.method === "GET") {
+    return jsonResponse({ ok: true, positions: markedPositions(root, deck) });
+  }
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    body = undefined;
+  }
+  const position = decodePosition(body);
+  if (!position) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { message: 'the request names no beat: send {"slideIndex": n, "beatIndex": n}' },
+      },
+      400,
+    );
+  }
+  try {
+    return jsonResponse({ ok: true, ...toggleMark(root, deck, position) });
+  } catch (error) {
+    if (!(error instanceof DekError)) {
+      throw error;
+    }
+    return jsonResponse({ ok: false, error: errorFields(error) }, 404);
+  }
+}
+
+function jsonNotFound(deckName: string): Response {
+  return jsonResponse({ ok: false, error: { message: `deck "${deckName}" not found` } }, 404);
 }
 
 function safeDeckAsset(deckDir: string, relative: string): string | undefined {

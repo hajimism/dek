@@ -9,6 +9,7 @@ import { createDeckControl } from "./deck-control.ts";
 import { bindInput } from "./input.ts";
 import { applyLiveEvent, hydrateLiveEvent } from "./live.ts";
 import { documentLiveHost } from "./live-host.ts";
+import { createMarksView } from "./marks-view.ts";
 import { createNavigator } from "./navigator.ts";
 import { createPresenterView } from "./presenter-view.ts";
 import { createRailView } from "./rail-view.ts";
@@ -35,6 +36,7 @@ if (dataEl?.textContent) {
     stage.render(pos);
     presenter.render(pos);
     rail.markCurrent(pos.slideIndex);
+    marks?.render(pos);
   }
 
   /**
@@ -84,6 +86,12 @@ if (dataEl?.textContent) {
     route: (next) => control.request(next, "remote"),
   });
 
+  const marks = createMarksView({
+    url: `${deckUrl(location.pathname, { kind: "marks" })}${liveTokenQuery(page.liveToken)}`,
+    current: () => nav.position(),
+    fetch: (input, init) => fetch(input, init),
+  });
+
   const rail = createRailView({
     slides,
     stage,
@@ -121,6 +129,7 @@ if (dataEl?.textContent) {
       return true;
     },
     togglePlay: control.togglePlay,
+    toggleMark: () => marks?.toggle() ?? false,
     move: (move) => control.request(moveTarget(move, nav.target(), deck), "local"),
   });
 

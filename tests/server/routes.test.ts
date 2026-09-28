@@ -29,6 +29,7 @@ describe("routeRequest", () => {
     expect(routeOf("/decks/talk/ws")).toBe("socket");
     expect(routeOf("/decks/talk/voice/audio.wav")).toBe("voice");
     expect(routeOf("/decks/talk/goto")).toBe("control");
+    expect(routeOf("/decks/talk/marks")).toBe("marks");
     expect(routeOf("/decks/nope/")).toBe("missing");
   });
 
