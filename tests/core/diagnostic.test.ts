@@ -5,7 +5,15 @@ import { diag, errorDiagnostic, hasErrors, RULES, type RuleId } from "../../src/
 
 describe("diag", () => {
   test("voice and timing rules, and input dek ignores or reads another way, are warnings", () => {
-    for (const id of ["DEK008", "DEK040", "DEK041", "DEK042", "DEK043", "DEK044"] as const) {
+    for (const id of [
+      "DEK008",
+      "DEK040",
+      "DEK041",
+      "DEK042",
+      "DEK043",
+      "DEK044",
+      "DEK045",
+    ] as const) {
       expect(diag(id, { message: "" }).severity).toBe("warning");
     }
   });

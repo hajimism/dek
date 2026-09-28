@@ -1244,6 +1244,49 @@ title: Demo
     );
   });
 
+  // A voice.toml that does not read stops narration, not the talk: lint says why and carries on,
+  // since everything else about the deck can still be checked.
+  test("DEK045: a voice.toml or dict.toml that cannot be read, and the rest of lint still runs", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n\nこんにちは\n\n## gone\n",
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const dir = join(root, "decks", "demo", "voice");
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, "voice.toml"), 'speaker = 3\nspeed = "fast"\n');
+        await writeFile(join(dir, "dict.toml"), "API = \n");
+        const found = lintDeck(join(root, "decks", "demo"));
+        expect(
+          found.filter((d) => d.id === "DEK045").map(({ severity, path, message }) => ({
+            severity,
+            file: path?.split("/").pop(),
+            message,
+          })),
+        ).toEqual([
+          {
+            severity: "warning",
+            file: "voice.toml",
+            message:
+              "speaker: Invalid input: expected string, received number; speed: Invalid input: expected number, received string",
+          },
+          {
+            severity: "warning",
+            file: "dict.toml",
+            message: expect.stringContaining("dict.toml"),
+          },
+        ]);
+        expect(found.some((d) => d.id === "DEK001")).toBe(true);
+      },
+    );
+  });
+
   test("DEK040: flags English words missing from the deck dictionary when voice/ exists", async () => {
     await withTempProject(
       {

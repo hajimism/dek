@@ -54,6 +54,7 @@ export const RULES = {
   DEK042: { severity: "warning", scopes: ["slide"] },
   DEK043: { severity: "warning", scopes: ["deck"] },
   DEK044: { severity: "warning", scopes: ["deck", "slide"] },
+  DEK045: { severity: "warning", scopes: ["deck"] },
 } as const satisfies Record<string, { severity: Severity; scopes: readonly Scope[] }>;
 
 export type RuleId = keyof typeof RULES;

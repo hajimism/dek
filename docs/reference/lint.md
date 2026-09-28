@@ -51,13 +51,14 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK042` | `slide` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
 | `DEK043` | `deck` | A `[beats]` key in `voice.toml` that matches no slide or beat. Warning | — |
 | `DEK044` | `deck`, `slide` | A `#` or `####` heading in `script.md`. Only `##` (slide) and `###` (beat) mean anything, so any other level is read out as script. Warning | — |
+| `DEK045` | `deck` | `voice/voice.toml` or `voice/dict.toml` cannot be read. The checks that need it are skipped, the rest of lint runs. Warning | — |
 
 ## Conditions
 
 - `DEK030`, `DEK031`, and `DEK032` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
-- `DEK040`, `DEK042`, and `DEK043` apply only to decks with `voice/`; `DEK044` applies to every deck. `dek cues` reports `DEK042` regardless.
+- `DEK040`, `DEK042`, `DEK043`, and `DEK045` apply only to decks with `voice/`; `DEK044` applies to every deck. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin). `data` carries `actualSeconds`, `budgetSeconds`, and `source` (`timeline` or `estimate`).
-- `DEK008`, `DEK024` through `DEK026`, and `DEK040` through `DEK044` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
+- `DEK008`, `DEK024` through `DEK026`, and `DEK040` through `DEK045` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
 
 ## Notes
 
