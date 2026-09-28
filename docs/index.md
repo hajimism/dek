@@ -22,8 +22,8 @@ features:
     details: Order, timing, and every spoken word live in one Markdown file. Slides hang off its headings. Put the boxes first and you get a polished deck you cannot deliver.
   - title: One slide, one HTML file
     details: Each slide is a single &lt;section class="slide"&gt; fragment, about forty lines. Small enough to read in a diff, small enough for an agent to edit without breaking anything else.
-  - title: Lint is the definition of done
-    details: Allowed classes, self-containment, overflow, contrast. Conventions are rules, not prose. When lint passes, the deck is finished.
+  - title: Lint measures, you judge
+    details: Allowed classes, self-containment, overflow, contrast. Conventions are rules, not prose. When lint passes, nothing measurable is wrong, and what is left is yours to judge.
   - title: One file on a USB stick
     details: dek build folds the whole talk into a single HTML file. No server, no network. Reach for the dev server only when you want your phone as a remote.
 ---

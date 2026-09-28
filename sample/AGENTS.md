@@ -7,11 +7,12 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 
 - `script.md` is the source of truth for order, script, and timing.
 - Each slide is a `<section class="slide">` fragment.
-- Conventions are enforced by lint; a deck is done when lint passes.
+- Conventions are enforced by lint. A deck is not done while `dek lint --visual` fails. Passing it means nothing measurable is wrong, not that the deck is good.
 
 ## Conventions
 
 - One `##` heading is one slide. HTML lives in `slides/<id>.html`.
+- Each deck owns its `theme.css`. Before writing a slide, run `dek theme` in the deck for the classes, tokens, and layouts it defines, and `dek theme <layout>` for a layout's markup.
 - Shared look lives in `theme.css`. Decoration only one slide uses lives in `slides/<id>.css`, which is scoped to that slide.
 - Use only classes defined in `theme.css` or in that slide's own `slides/<id>.css`.
 - Color, type, space, radius, and motion in either stylesheet use token `var()` only. A value only one slide uses can be a token of its own on that slide's `.slide` rule in `slides/<id>.css`.
@@ -27,82 +28,11 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - When a hint sends a fix to `theme.css`, make it there, not in `slides/<id>.css`: the theme alone draws it that way, so other slides share the problem, and one change fixes them all.
 - One shot shows no motion. `dek shot <slug> --motion` lays the slide's beats out as rows, each held at moments through everything it moves and ending as the shot does. `dek shot <a> --to <b> --at 0.5` freezes the view transition between any two slides.
 
-## Theme classes
+## Before you report a deck as done
 
-From the project `theme.css`. A deck's own `theme.css` can differ; `dek theme` lists what a deck's theme defines.
-
-- `chip`
-- `code`
-- `code-head`
-- `col`
-- `figure`
-- `is-current`
-- `is-shown`
-- `label`
-- `lede`
-- `mark`
-- `note`
-- `numeral`
-- `panel`
-- `signal`
-- `slide`
-- `slide-title`
-- `source`
-- `stage`
-- `stat`
-- `tok-c`
-- `tok-h`
-- `tok-s`
-- `unit`
-
-## Theme tokens
-
-- `--accent`
-- `--accent-tint`
-- `--bg`
-- `--col`
-- `--fg`
-- `--font-body`
-- `--font-mono`
-- `--font-title`
-- `--foot-rule`
-- `--gap`
-- `--grid-width`
-- `--hair`
-- `--head-rule`
-- `--head-top`
-- `--hi`
-- `--line`
-- `--line-soft`
-- `--margin`
-- `--muted`
-- `--pad`
-- `--paper-deep`
-- `--radius`
-- `--rise`
-- `--rule`
-- `--size-body`
-- `--size-caption`
-- `--size-code`
-- `--size-hero`
-- `--size-lede`
-- `--size-numeral`
-- `--size-small`
-- `--size-stat`
-- `--size-title`
-- `--step-transition`
-- `--tick`
-- `--track`
-
-## Layouts
-
-- `cover`
-- `default`
-- `page`
-- `split`
-- `title`
-
-For a layout's markup, run `dek theme <layout>`.
+- `dek lint --visual` passes.
+- You have read `dek shot --sheet` and judged the deck's balance.
+- Say what you could not judge, such as the argument and the timing, and leave it to the author.
 
 For commands, run `dek help --agent`.
 <!-- dek:end -->

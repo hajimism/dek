@@ -1,6 +1,6 @@
 # Lint
 
-Passing lint is the definition of done. The dev server lints on every save, so a deck you are working on is always passing or telling you why not. You rarely run `dek lint` by hand; it exists for CI and for checking one slide.
+Lint decides everything a rule can decide. A deck is not done while `dek lint --visual` fails; passing it means nothing measurable is wrong, not that the deck is good. The balance of the slides, the argument, and the timing are judged by reading the sheet and the script, and finally by the author. The dev server lints on every save, so a deck you are working on is always passing or telling you why not. You rarely run `dek lint` by hand; it exists for CI and for checking one slide.
 
 ```bash
 dek lint
@@ -22,7 +22,7 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 | Schema | Frontmatter and config, validated with Zod |
 | Consistency | `script.md` ↔ `slides/*.html`, beats ↔ `data-step` |
 | Theme contract | Unknown classes, inline styles, tokens, scoping, slide stylesheets |
-| Slide scripts | `slides/<id>.ts` evaluated in a sandbox |
+| Slide scripts | `slides/<id>.ts` evaluated apart from Node and Bun |
 | Self-containment | Remote URLs, missing files, paths outside the deck |
 | Rendering | Overflow and contrast, measured in a browser |
 | Narration | Only for decks with `voice/` |
@@ -50,9 +50,9 @@ Without Playwright, only the commands that need it fail, each with the install c
 - `dek lint --visual` is a verdict. It returns diagnostics (SARIF with `--format sarif`), and it is the primary way an agent checks its own output.
 - `dek shot` is an observation, not a verdict. Whether a slide looks good stays a human call.
 
-## The definition of done does not change with voice
+## Voice does not change what failing means
 
-`DEK040` (an English word missing from the pronunciation dictionary) and `DEK042` (a beat that shows something but says nothing) apply only to decks with `voice/`. `DEK041` compares the talk's length with the `duration` budget: the narrated length when a Timeline exists, otherwise the reading-time estimate `dek ls` shows, which gets a wider margin (35% instead of 20%) because it leaves out pauses and demos. `DEK043` (a `[beats]` key in `voice.toml` that matches nothing) applies only to decks with `voice/`. All four are warnings: they are reported, and they do not fail lint. A live-only deck that passes lint is finished, and adding voice never changes that.
+`DEK040` (an English word missing from the pronunciation dictionary) and `DEK042` (a beat that shows something but says nothing) apply only to decks with `voice/`. `DEK041` compares the talk's length with the `duration` budget: the narrated length when a Timeline exists, otherwise the reading-time estimate `dek ls` shows, which gets a wider margin (35% instead of 20%) because it leaves out pauses and demos. `DEK043` (a `[beats]` key in `voice.toml` that matches nothing) applies only to decks with `voice/`. All four are warnings: they are reported, and they do not fail lint. Adding voice never turns a passing live-only deck into a failing one.
 
 ## Output
 

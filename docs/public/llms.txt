@@ -20,13 +20,13 @@ Agents use the same CLI as humans. Run `dek help --agent`, or `dek help <command
 - [Slides](https://hajimism.github.io/dek/guide/slides.html): One `<section class="slide">` per file. Theme classes only. No `<script>` in the HTML; motion lives in `slides/<id>.ts`. Skeletons, refreshed until you edit them.
 - [Beats](https://hajimism.github.io/dek/guide/steps.html): `data-step` and `data-morph`. Order from the script, appearance from CSS.
 - [Themes](https://hajimism.github.io/dek/guide/theme.html): Thirteen tokens on `.slide`. Growing the vocabulary is a design decision.
-- [Lint](https://hajimism.github.io/dek/guide/lint.html): Passing lint is the definition of done. `--visual` measures geometry.
+- [Lint](https://hajimism.github.io/dek/guide/lint.html): Lint decides what a rule can measure; `--visual` measures geometry. The rest is the author's call.
 - [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys and touch, one file on a USB stick, print, remote, PDF.
 - [Voice and Video](https://hajimism.github.io/dek/guide/voice.html): Opt-in. Cue, Timeline, rehearse, video.
 - [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): CLI plus `AGENTS.md`. `check --shot --voice`. `show` a slide, or a ref's, to use it as a model. No MCP.
 - [FAQ](https://hajimism.github.io/dek/guide/faq.html): When to use Slidev, whether voice is required, and more.
 - [Architecture](https://hajimism.github.io/dek/guide/architecture.html): Core shared by the CLI and the dev server. Optional dependencies.
-- [Agent Usability Criteria](https://hajimism.github.io/dek/guide/agent-criteria.html): The yardstick for agent-facing changes: accurate guidance, conventions that lint checks, verifiable output, actionable diagnostics, a clear definition of done.
+- [Agent Usability Criteria](https://hajimism.github.io/dek/guide/agent-criteria.html): The yardstick for agent-facing changes: accurate guidance, conventions that lint checks, verifiable output, actionable diagnostics, a clear stopping point.
 
 ## Reference
 

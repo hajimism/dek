@@ -4,7 +4,7 @@ Agents use the same CLI you do. There is no MCP server and no tool schema to ins
 
 ## What the agent reads
 
-`dek init` writes a short `AGENTS.md` at the project root, and `dek new`, `dek ref`, and `dek sync` keep it current: the three principles, the conventions, the class names, tokens, and layouts from the project theme, and a pointer to the CLI's own reference. It stays under a hundred lines. Anything more detailed is pulled from the CLI when needed.
+`dek init` writes a short `AGENTS.md` at the project root, and `dek new`, `dek ref`, and `dek sync` keep it current: the principles, the conventions, what to check before reporting a deck as done, and a pointer to the CLI's own reference. It names no class, token, or layout: each deck owns its theme, so the agent reads the deck's own with `dek theme`. It stays under a hundred lines. Anything more detailed is pulled from the CLI when needed.
 
 dek owns only the block between `<!-- dek:begin … -->` and `<!-- dek:end -->`, and rewrites it in place. Write your team's own notes for agents above or below it; they stay. An `AGENTS.md` you already had keeps its text and gets dek's block appended.
 

@@ -6,7 +6,7 @@ Three talks about dek, made with dek. Each link opens the file `dek build` wrote
 | --- | --- | --- |
 | [why-dek](/dek/samples/why-dek.html){target="_self"} | 12 min | An explainer that doubles as a handout: every slide states its point and carries its own figure. Swiss editorial on print-friendly paper. |
 | [lightning](/dek/samples/lightning.html){target="_self"} | 3 min | A lightning talk that builds a talk in a terminal, with real command output. Amber CRT. |
-| [with-agents](/dek/samples/with-agents.html){target="_self"} | 6 min | Handing slides to an AI coding agent: measured verdicts, small files, lint as the finish line. Product-page UI. |
+| [with-agents](/dek/samples/with-agents.html){target="_self"} | 6 min | Handing slides to an AI coding agent: measured verdicts, small files, lint as the stopping point. Product-page UI. |
 
 Press `→` or `Space` to go forward and `←` to go back; beats come first, then the next slide. `p` opens the presenter view with the script, `s` hides the slide rail, and `f` goes fullscreen. Open the same deck in a second window and the two follow each other, the way you would put the audience view on a projector. The keys are all in [Presenting](/guide/present#keys).
 

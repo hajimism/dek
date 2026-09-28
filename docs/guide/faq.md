@@ -18,7 +18,7 @@ No. Write `script.md`, run `dek`, and the skeleton slides in the bundled theme a
 
 ## Do I have to use voice?
 
-No. A deck without `voice/` has exactly the same definition of done: lint passes. Voice adds warnings (`DEK040`, `DEK042`, and `DEK043`) only to decks that opt in. `DEK041`, the check against `duration`, applies to every deck that sets one.
+No. A deck without `voice/` fails lint for exactly the same reasons as one with it. Voice adds warnings (`DEK040`, `DEK042`, and `DEK043`) only to decks that opt in. `DEK041`, the check against `duration`, applies to every deck that sets one.
 
 ## Why do slide files have no numbers?
 

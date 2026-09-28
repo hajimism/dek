@@ -4,7 +4,7 @@ Slides exist so that you can talk. Every mainstream tool forgets this. PowerPoin
 
 dek starts from the other end. You write what you will say, in what order, and for how long. Only then do you ask what should be on screen at each moment. The script is the parent. Slides are derived from it.
 
-Put another way, dek is a build system for talks. `script.md` is the source. `dek sync` generates skeleton slides from it, the way a build generates code. `dek lint` checks every slide against the theme's vocabulary the way a compiler checks types, and `--visual` renders and measures it the way a test would. `dek build`, `dek pdf`, and `dek video` are the targets, and a deck is done when the build is clean.
+Put another way, dek is a build system for talks. `script.md` is the source. `dek sync` generates skeleton slides from it, the way a build generates code. `dek lint` checks every slide against the theme's vocabulary the way a compiler checks types, and `--visual` renders and measures it the way a test would. `dek build`, `dek pdf`, and `dek video` are the targets. A clean build says the deck is not broken; whether it is good is still the author's call.
 
 ## Three problems dek exists to solve
 
@@ -46,7 +46,7 @@ The same property scales up to the deck directory. A deck never references anyth
 
 "Only use these CSS classes." "No raw values outside tokens." "Never reference a file outside the deck." Rules like these are not kept by writing them down. dek implements every one as a lint rule and reports them as SARIF.
 
-**Passing lint is the definition of done.** The dev server lints on every save, so a deck you are working on is always either passing or telling you exactly why not. A deck without voice has the same definition of done as one with it. Voice adds diagnostics; it never changes what "finished" means.
+**Lint decides what can be measured, and nothing more.** A deck is not done while lint fails, and passing lint means nothing a rule can decide is wrong. The dev server lints on every save, so a deck you are working on is always either passing or telling you exactly why not. What lint cannot decide, the balance of the slides and whether the talk holds, is left to you, and dek hands you the sheet and the script to judge it by. Voice adds diagnostics; it never turns a passing deck into a failing one.
 
 Voice and video are derived from the script. The script itself knows nothing about how it looks or sounds.
 

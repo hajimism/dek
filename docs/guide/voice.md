@@ -1,6 +1,6 @@
 # Voice and Video
 
-Voice is opt-in. A deck with a `voice/` directory can synthesize its script with a local text-to-speech engine, rehearse to that audio, and bake an MP4. A deck without `voice/` is unaffected, and its definition of done does not change.
+Voice is opt-in. A deck with a `voice/` directory can synthesize its script with a local text-to-speech engine, rehearse to that audio, and bake an MP4. A deck without `voice/` is unaffected, and what fails its lint does not change.
 
 Voice and video are derived from the script. The script knows nothing about either.
 

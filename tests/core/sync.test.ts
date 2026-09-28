@@ -368,133 +368,89 @@ c
     });
   });
 
-  test("writes AGENTS.md with theme classes, layouts, and a help pointer", async () => {
-    await withTempProject(
-      {
-        theme: `.slide { width: 1280px; }
-.slide .node { color: red; }
-.slide[data-layout="two-col"] { display: grid; }
-.slide[data-layout="quote"] { font-style: italic; }
-`,
-        decks: [{ name: "demo" }],
-      },
-      async (root) => {
-        syncDeck(join(root, "decks", "demo"));
-        const agents = await readFile(join(root, "AGENTS.md"), "utf8");
-        expect(agents).toContain("node");
-        expect(agents).toContain("two-col");
-        expect(agents).toContain("quote");
-        expect(agents).toContain("dek help --agent");
-        expect(agents).toContain("script.md");
-        expect(agents).toContain("self-contained");
-        expect(agents).toContain("lint");
-        expect(agents).toContain("slides/<id>.css");
-        expect(agents).toContain("slides/<id>.ts");
-        expect(agents).toContain("satisfies DekSlide");
-        expect(agents).toContain("find elements by data-* attributes");
-        expect(agents).toContain("For a layout's markup, run `dek theme <layout>`.");
-        expect(agents).toContain("A deck's own `theme.css` can differ");
-        expect(agents).toContain("`onclick=`");
-        expect(agents).toContain("`javascript:` URLs");
-        expect(agents).toContain("a token of its own on that slide's `.slide`");
-        expect(agents).toContain("dek shot --sheet");
-        expect(agents).toContain("dek shot <slug> --motion");
-        expect(agents).toContain("dek shot <a> --to <b> --at 0.5");
-        expect(agents).toContain("`--dek-slide-number` and `--dek-slide-count`");
-        expect(agents).toContain("never by hand");
-        expect(agents).toContain("When a hint sends a fix to `theme.css`, make it there");
-      },
-    );
+  test("writes AGENTS.md with the conventions and a help pointer", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      syncDeck(join(root, "decks", "demo"));
+      const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      expect(agents).toContain("dek help --agent");
+      expect(agents).toContain("script.md");
+      expect(agents).toContain("self-contained");
+      expect(agents).toContain("slides/<id>.css");
+      expect(agents).toContain("slides/<id>.ts");
+      expect(agents).toContain("satisfies DekSlide");
+      expect(agents).toContain("find elements by data-* attributes");
+      expect(agents).toContain("`onclick=`");
+      expect(agents).toContain("`javascript:` URLs");
+      expect(agents).toContain("a token of its own on that slide's `.slide`");
+      expect(agents).toContain("dek shot --sheet");
+      expect(agents).toContain("dek shot <slug> --motion");
+      expect(agents).toContain("dek shot <a> --to <b> --at 0.5");
+      expect(agents).toContain("`--dek-slide-number` and `--dek-slide-count`");
+      expect(agents).toContain("never by hand");
+      expect(agents).toContain("When a hint sends a fix to `theme.css`, make it there");
+    });
   });
 
-  test("writes AGENTS.md with theme tokens from the project theme", async () => {
-    await withTempProject(
-      {
-        theme: `.slide {
-  --fg: #fff;
-  --bg: #111;
-  --extra: 1;
-}
-`,
-        decks: [{ name: "demo" }],
-      },
-      async (root) => {
-        syncDeck(join(root, "decks", "demo"));
-        const agents = await readFile(join(root, "AGENTS.md"), "utf8");
-        expect(agents).toContain("## Theme tokens");
-        expect(agents).toContain("`--fg`");
-        expect(agents).toContain("`--bg`");
-        expect(agents).toContain("`--extra`");
-        expect(agents).toContain("token");
-      },
-    );
+  test("AGENTS.md says where lint stops and judgment begins", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      syncDeck(join(root, "decks", "demo"));
+      const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      expect(agents).not.toContain("a deck is done when lint passes");
+      expect(agents).toContain("A deck is not done while `dek lint --visual` fails");
+      expect(agents).toContain("## Before you report a deck as done");
+      expect(agents).toContain("Say what you could not judge");
+    });
   });
 
-  test("rewrites AGENTS.md from the project theme, not the deck theme", async () => {
+  // Each deck owns its theme.css, so a list read from the project theme is wrong for any deck
+  // whose copy has grown. AGENTS.md names none of it and sends the agent to the deck's own theme.
+  test("AGENTS.md lists nothing a deck's theme decides, and points to dek theme", async () => {
     await withTempProject(
       {
         theme: `.slide { --fg: #fff; width: 100%; }
 .slide .figure { display: block; }
 .slide[data-layout="full-bleed"] { padding: 0; }
 `,
-        decks: [
-          {
-            name: "demo",
-            theme: `.slide { --deck-only: 1; width: 100%; }
-.slide .deck-only { color: inherit; }
-`,
-          },
-          {
-            name: "other",
-            theme: `.slide .other-only { color: green; }
-`,
-          },
-        ],
+        decks: [{ name: "demo" }],
       },
       async (root) => {
         const path = join(root, "AGENTS.md");
-        await Bun.write(path, "keep me\n");
         syncDeck(join(root, "decks", "demo"));
-        syncDeck(join(root, "decks", "other"));
         const agents = await readFile(path, "utf8");
-        expect(agents.startsWith("keep me\n")).toBe(true);
-        expect(agents).toContain("figure");
-        expect(agents).toContain("full-bleed");
-        expect(agents).not.toContain("deck-only");
-        expect(agents).not.toContain("other-only");
-        expect(agents).toContain("`--fg`");
-        expect(agents).not.toContain("`--deck-only`");
-        expect(agents).toContain("script.md");
-        expect(agents).toContain("self-contained");
-        expect(agents).toContain("lint");
-        expect(agents).toContain("dek help --agent");
+        expect(agents).not.toContain("figure");
+        expect(agents).not.toContain("full-bleed");
+        expect(agents).not.toContain("`--fg`");
+        expect(agents).toContain("dek theme");
+        expect(agents).toContain("dek theme <layout>");
+
+        await writeFile(join(root, "theme.css"), ".slide .changed { display: block; }\n");
+        expect(syncDeck(join(root, "decks", "demo")).dekFiles).toEqual({
+          created: [],
+          updated: [],
+        });
+        expect(await readFile(path, "utf8")).toBe(agents);
       },
     );
   });
 
   test("rewrites only dek's block in AGENTS.md and keeps the author's notes around it", async () => {
-    await withTempProject(
-      { theme: ".slide .figure { display: block; }\n", decks: [{ name: "demo" }] },
-      async (root) => {
-        const deckDir = join(root, "decks", "demo");
-        const path = join(root, "AGENTS.md");
-        await writeFile(path, "# Our team\n\nWrite in Japanese.\n");
-        syncDeck(deckDir);
-        const first = await readFile(path, "utf8");
-        expect(first.startsWith("# Our team\n\nWrite in Japanese.\n\n<!-- dek:begin")).toBe(true);
-        expect(first.endsWith("<!-- dek:end -->\n")).toBe(true);
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      const path = join(root, "AGENTS.md");
+      await writeFile(path, "# Our team\n\nWrite in Japanese.\n");
+      syncDeck(deckDir);
+      const first = await readFile(path, "utf8");
+      expect(first.startsWith("# Our team\n\nWrite in Japanese.\n\n<!-- dek:begin")).toBe(true);
+      expect(first.endsWith("<!-- dek:end -->\n")).toBe(true);
 
-        await writeFile(path, `${first}\n## After\n\nMore notes.\n`);
-        await writeFile(join(root, "theme.css"), ".slide .chart { display: block; }\n");
-        syncDeck(deckDir);
-        const second = await readFile(path, "utf8");
-        expect(second.startsWith("# Our team\n\nWrite in Japanese.\n\n<!-- dek:begin")).toBe(true);
-        expect(second.endsWith("<!-- dek:end -->\n\n## After\n\nMore notes.\n")).toBe(true);
-        expect(second).toContain("`chart`");
-        expect(second).not.toContain("`figure`");
-        expect(second.match(/<!-- dek:begin/g)).toHaveLength(1);
-      },
-    );
+      // An older dek's block, followed by notes the author added after it.
+      const stale = first.replace("## Principles", "## An older dek's principles");
+      await writeFile(path, `${stale}\n## After\n\nMore notes.\n`);
+      syncDeck(deckDir);
+      const second = await readFile(path, "utf8");
+      expect(second).toBe(`${first}\n## After\n\nMore notes.\n`);
+      expect(second.match(/<!-- dek:begin/g)).toHaveLength(1);
+    });
   });
 
   test("replaces an AGENTS.md that is exactly dek's own unmarked output", async () => {
@@ -595,7 +551,10 @@ describe("syncDeck and dek's own files", () => {
       const dir = join(root, "decks", "demo");
       syncDeck(dir);
       await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
-      await writeFile(join(root, "theme.css"), ".slide .fresh { color: var(--fg); }\n");
+      await writeFile(
+        join(root, "AGENTS.md"),
+        "<!-- dek:begin -->\nan older dek's block\n<!-- dek:end -->\n",
+      );
       expect(syncDeck(dir).dekFiles).toEqual({
         created: [],
         updated: [join(root, ".dek", "slide.d.ts"), join(root, "AGENTS.md")],

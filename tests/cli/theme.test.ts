@@ -7,7 +7,6 @@ import { resolveTarget } from "../../src/cli/scope.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
 import { cssClassNames, cssLayoutNames, parseCss } from "../../src/core/css.ts";
 import { DekError } from "../../src/core/error.ts";
-import { syncDeck } from "../../src/core/sync.ts";
 import { themeFacts } from "../../src/core/theme-facts.ts";
 
 const themeLayouts = (css: string) => themeFacts(parseCss(css)).layouts;
@@ -126,24 +125,16 @@ describe("the theme's tokens", () => {
 ::view-transition-group(*) { --morph: 0.5s; }
 `;
 
-  test("AGENTS.md and dek theme list the same tokens", async () => {
-    await withTempProject(
-      { theme: tokenTheme, decks: [{ name: "demo", theme: tokenTheme }] },
-      async (root) => {
-        const deckDir = join(root, "decks", "demo");
-        syncDeck(deckDir);
-        const agents = readFileSync(join(root, "AGENTS.md"), "utf8");
-        const listed = (agents.split("## Theme tokens")[1]?.split("##")[0] ?? "")
-          .split("\n")
-          .flatMap((line) => line.match(/^- `(--[-\w]+)`$/)?.[1] ?? []);
-        const result = themeCommand(resolveTarget(deckDir, "deck", { refs: true }));
-        expect(listed).toEqual(result.tokens.map((token) => token.name).sort());
-        expect(result.tokens).toEqual([
-          { name: "--fg", value: "#fff" },
-          { name: "--gap", value: "2rem" },
-        ]);
-      },
-    );
+  test("dek theme lists the tokens the bare .slide rule gives every slide", async () => {
+    await withTempProject({ decks: [{ name: "demo", theme: tokenTheme }] }, async (root) => {
+      const result = themeCommand(
+        resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+      );
+      expect(result.tokens).toEqual([
+        { name: "--fg", value: "#fff" },
+        { name: "--gap", value: "2rem" },
+      ]);
+    });
   });
 });
 

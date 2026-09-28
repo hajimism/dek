@@ -9,8 +9,8 @@
         <li class="not"><span class="x" aria-hidden="true"></span><span class="not-name">エージェントごとの設定</span><span class="pill pill-skip">不要</span></li>
       </ul>
       <div class="stats">
-        <p class="card stat"><span class="num">63</span><span class="unit">行</span><span class="stat-label">dek init が書く AGENTS.md</span></p>
-        <p class="card stat"><span class="num">32</span><span class="unit">行</span><span class="stat-label">dek help --agent の全文</span></p>
+        <p class="card stat"><span class="num">38</span><span class="unit">行</span><span class="stat-label">dek init が書く AGENTS.md</span></p>
+        <p class="card stat"><span class="num">34</span><span class="unit">行</span><span class="stat-label">dek help --agent の全文</span></p>
       </div>
       <p class="agents"><span class="pill">Claude Code</span><span class="pill">Codex</span><span class="pill">OpenCode</span><span class="pill">shell があれば何でも</span></p>
     </div>
@@ -25,7 +25,8 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 
 - `script.md` is the source of truth for order, script, and timing.
 - Each slide is a `&lt;section class="slide"&gt;` fragment.
-- Conventions are enforced by lint; a deck is done when lint passes.
+- Conventions are enforced by lint. A deck is not done while
+  `dek lint --visual` fails.
 
 <span class="tok-k">## Conventions</span>
 

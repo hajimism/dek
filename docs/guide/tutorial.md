@@ -141,7 +141,7 @@ The `cause` slide carries the point of the talk. Give it a real layout. Open `sl
 
 Save it. The browser updates only that slide. Every class you used is defined in the bundled theme: `slide-title`, `col`, `node`, `node-parent`. Try adding a class the theme does not know, such as `class="node highlight"`, and save. The terminal and the browser overlay both report `DEK010`: the class is not in `theme.css`. Remove it and the diagnostic disappears.
 
-That is the loop. Write, save, read the diagnostic, fix. The dev server lints on every save, and "no diagnostics" is what finished looks like.
+That is the loop. Write, save, read the diagnostic, fix. The dev server lints on every save, and "no diagnostics" means nothing measurable is left to fix.
 
 ## 6. Reveal in step with your speaking
 
@@ -259,7 +259,7 @@ Copy that one file to a USB stick. That is the talk.
 
 ## Where to go next
 
-You have used the whole core of dek: a script that owns order and timing, one HTML file per slide, beats bound by id, a morph between slides, a token-only theme, lint as the definition of done, and a single-file build.
+You have used the whole core of dek: a script that owns order and timing, one HTML file per slide, beats bound by id, a morph between slides, a token-only theme, lint for everything a rule can measure, and a single-file build.
 
 - The detailed rules for each piece: [The Script](./script), [Slides](./slides), [Beats](./steps), [Themes](./theme), [Lint](./lint)
 - Presenter view, remote control, and PDF: [Presenting](./present)

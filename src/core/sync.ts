@@ -1,14 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "./config.ts";
-import { parseCss } from "./css.ts";
 import { type DeckPaths, deckPaths } from "./deck-paths.ts";
 import { parseRefSource, refDir, refTitle } from "./ref.ts";
 import { asResolvedDeck, listSlides, type ResolvedDeck, SLIDE_SIDECARS } from "./resolve.ts";
 import { outputDir, readSourceIfExists, removeInside, writeInside } from "./safe-fs.ts";
 import { frontmatterJsonSchema } from "./schema.ts";
 import { isSkeleton, sectionSkeleton } from "./skeleton.ts";
-import { type ThemeFacts, themeFacts } from "./theme-facts.ts";
 
 /**
  * `updated` lists skeletons nobody edited, rewritten because the script moved on; `removed`, the
@@ -39,8 +37,8 @@ function writeIfChanged(path: string, contents: string, root: string): Written {
 
 /**
  * dek's own files at the project root, in the order they are written: the frontmatter schema and
- * the slide types an editor reads, and AGENTS.md, whose dek block agents read. They follow the
- * project theme and this version of dek, not any one deck.
+ * the slide types an editor reads, and AGENTS.md, whose dek block agents read. They follow this
+ * version of dek and the project's refs, not any one deck.
  */
 export function dekFilePaths(root: string): string[] {
   return dekFileWriters(root).map(([path]) => path);
@@ -56,7 +54,7 @@ function dekFileWriters(root: string): Array<[path: string, write: () => Written
 
 /**
  * Brings dek's own files up to date, writing only the ones that differ. They change when dek or
- * the project theme does, so the first command to run after either, whichever it is, reports them.
+ * the project's refs do, so the first command to run after either, whichever it is, reports them.
  */
 export function writeDekFiles(root: string): FileChanges {
   const changes: FileChanges = { created: [], updated: [] };
@@ -182,15 +180,14 @@ const AGENTS_BEGIN =
 const AGENTS_END = "<!-- dek:end -->";
 
 /**
- * Writes dek's block into AGENTS.md, from the project theme.css (or another, for a deck's own).
- * An unchanged file is left alone, so a sync on every save does not touch it.
+ * Writes dek's block into AGENTS.md. An unchanged file is left alone, so a sync on every save does
+ * not touch it.
  */
-export function writeAgentsMd(root: string, themePath = join(root, "theme.css")): Written {
+export function writeAgentsMd(root: string): Written {
   const path = join(root, "AGENTS.md");
-  const theme = themeFacts(parseCss(readSourceIfExists(themePath, root) ?? ""));
   return writeIfChanged(
     path,
-    withAgentsBlock(readSourceIfExists(path, root), agentsMd(root, theme)),
+    withAgentsBlock(readSourceIfExists(path, root), agentsMd(root)),
     root,
   );
 }
@@ -218,14 +215,12 @@ function withAgentsBlock(current: string | undefined, body: string): string {
   return `${current.endsWith("\n") ? current : `${current}\n`}\n${block}`;
 }
 
-/** What dek's block in AGENTS.md says for a project whose theme is `theme`. */
-function agentsMd(root: string, theme: ThemeFacts): string {
-  const classes = [...theme.classes].sort();
-  const layouts = theme.layouts.map((layout) => layout.name);
-  const tokens = theme.tokens.map((token) => token.name).sort();
-  const classList = classes.map((name) => `- \`${name}\``).join("\n") || "- (none)";
-  const layoutList = layouts.map((name) => `- \`${name}\``).join("\n") || "- (none)";
-  const tokenList = tokens.map((name) => `- \`${name}\``).join("\n") || "- (none)";
+/**
+ * What dek's block in AGENTS.md says. It names nothing a deck's theme decides: each deck owns its
+ * theme.css, so a class list read from any one theme is wrong for the decks whose copy has grown,
+ * and it would sit in every agent's context. `dek theme` reads the deck's own.
+ */
+function agentsMd(root: string): string {
   return `# dek
 
 A build system for talks. Write what you will say; dek builds, measures, and ships the rest.
@@ -234,11 +229,12 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 
 - \`script.md\` is the source of truth for order, script, and timing.
 - Each slide is a \`<section class="slide">\` fragment.
-- Conventions are enforced by lint; a deck is done when lint passes.
+- Conventions are enforced by lint. A deck is not done while \`dek lint --visual\` fails. Passing it means nothing measurable is wrong, not that the deck is good.
 
 ## Conventions
 
 - One \`##\` heading is one slide. HTML lives in \`slides/<id>.html\`.
+- Each deck owns its \`theme.css\`. Before writing a slide, run \`dek theme\` in the deck for the classes, tokens, and layouts it defines, and \`dek theme <layout>\` for a layout's markup.
 - Shared look lives in \`theme.css\`. Decoration only one slide uses lives in \`slides/<id>.css\`, which is scoped to that slide.
 - Use only classes defined in \`theme.css\` or in that slide's own \`slides/<id>.css\`.
 - Color, type, space, radius, and motion in either stylesheet use token \`var()\` only. A value only one slide uses can be a token of its own on that slide's \`.slide\` rule in \`slides/<id>.css\`.
@@ -254,21 +250,11 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - When a hint sends a fix to \`theme.css\`, make it there, not in \`slides/<id>.css\`: the theme alone draws it that way, so other slides share the problem, and one change fixes them all.
 - One shot shows no motion. \`dek shot <slug> --motion\` lays the slide's beats out as rows, each held at moments through everything it moves and ending as the shot does. \`dek shot <a> --to <b> --at 0.5\` freezes the view transition between any two slides.
 
-## Theme classes
+## Before you report a deck as done
 
-From the project \`theme.css\`. A deck's own \`theme.css\` can differ; \`dek theme\` lists what a deck's theme defines.
-
-${classList}
-
-## Theme tokens
-
-${tokenList}
-
-## Layouts
-
-${layoutList}
-
-For a layout's markup, run \`dek theme <layout>\`.
+- \`dek lint --visual\` passes.
+- You have read \`dek shot --sheet\` and judged the deck's balance.
+- Say what you could not judge, such as the argument and the timing, and leave it to the author.
 ${referencesSection(root)}
 For commands, run \`dek help --agent\`.
 `;
