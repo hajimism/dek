@@ -106,8 +106,17 @@ export type ContrastFinding = {
 
 export type ContrastOrigin = "theme" | "slide" | "script";
 
-/** A slide's draw that threw at the end of a beat, as the still page caught it. */
-type DrawErrorFinding = { slug: string; step: string; t: number; message: string };
+/**
+ * A slide's draw that misbehaved as a still page drew it at the end of a beat: it threw, changed
+ * the page outside its slide, or drew the end differently after drawing the start.
+ */
+type DrawErrorFinding = {
+  slug: string;
+  step: string;
+  t: number;
+  kind: "throw" | "reach" | "seek";
+  message: string;
+};
 
 export type PagesResponse = {
   overflows: OverflowFinding[];
@@ -320,8 +329,14 @@ function isDrawErrorFinding(value: unknown): value is DrawErrorFinding {
   if (!value || typeof value !== "object") {
     return false;
   }
-  const { slug, step, t, message } = value as Record<string, unknown>;
-  return isString(slug) && isString(step) && isNumber(t) && isString(message);
+  const { slug, step, t, kind, message } = value as Record<string, unknown>;
+  return (
+    isString(slug) &&
+    isString(step) &&
+    isNumber(t) &&
+    (kind === "throw" || kind === "reach" || kind === "seek") &&
+    isString(message)
+  );
 }
 
 function isOverflowFinding(value: unknown): value is OverflowFinding {

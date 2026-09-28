@@ -96,8 +96,8 @@ describe("lintVisualDeck", () => {
             overflows: [],
             contrasts: [],
             drawErrors: [
-              { slug: "intro", step: "1", t: 0, message: "TypeError: x is null" },
-              { slug: "intro", step: "2", t: 300, message: "TypeError: x is null" },
+              { slug: "intro", step: "1", t: 0, kind: "throw", message: "TypeError: x is null" },
+              { slug: "intro", step: "2", t: 300, kind: "throw", message: "TypeError: x is null" },
             ],
           }),
         });
@@ -109,7 +109,45 @@ describe("lintVisualDeck", () => {
             path: join(deckDir, "slides", "intro.ts"),
             slug: "intro",
             hint: "make draw in slides/intro.ts draw the end of every beat without throwing; until then every still, shot, and PDF shows the slide as if draw never ran",
-            data: { message: "TypeError: x is null", steps: ["1", "2"] },
+            data: { kind: "throw", message: "TypeError: x is null", steps: ["1", "2"] },
+          },
+        ]);
+      },
+    );
+  });
+
+  test("emits DEK032 for a draw that reaches outside its slide or keeps state", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const at = { slug: "intro", step: "1", t: 400 };
+        const diagnostics = await lintVisualDeck(deckDir, {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [],
+            drawErrors: [
+              { ...at, kind: "reach", message: "changes <body> outside its slide" },
+              {
+                ...at,
+                kind: "seek",
+                message: "draws the end of the beat differently after drawing its start",
+              },
+            ],
+          }),
+        });
+        expect(
+          diagnostics
+            ?.filter((d) => d.id === "DEK032")
+            .map(({ message, hint }) => ({ message, hint })),
+        ).toEqual([
+          {
+            message: "draw changes <body> outside its slide at the end of step 1",
+            hint: "find elements from the slide draw is given in slides/intro.ts, and change nothing else: the built deck holds every slide",
+          },
+          {
+            message: "draw draws the end of the beat differently after drawing its start at step 1",
+            hint: "draw from t alone in slides/intro.ts: work every value out from t and set everything you touch on every call, with nothing kept between calls",
           },
         ]);
       },
@@ -630,6 +668,72 @@ describe("lintVisualDeck cache", () => {
         });
         expect(shot.asked).toEqual(["plan@two"]);
         expect(result?.diagnostics.map((d) => d.id)).toEqual(["DEK030"]);
+      },
+    );
+  });
+});
+
+// A draw that finds another slide's element through the document looks right on its own page;
+// only a page that holds every slide, as the built deck does, shows it. One is measured for its
+// draws whenever a slide has a script.
+describe("lintVisualDeck and the whole deck", () => {
+  const script = "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n";
+  const plan = slideDocument(`<section class="slide"><p data-bar>plan</p></section>`);
+
+  test("draws every slide on one page, and reports what its draws do there", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml, plan } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await Bun.write(join(deckDir, "slides", "plan.ts"), "export default { draw() {} };\n");
+        const wholeDeck: string[] = [];
+        const diagnostics = await lintVisualDeck(deckDir, {
+          runner: async (request) => {
+            const pages = pagesOf(request);
+            const deckPage = pages.find(
+              (page) => (page.html.match(/data-slug="/g) ?? []).length > 1,
+            );
+            if (!deckPage) {
+              return { overflows: [], contrasts: [], drawErrors: [] };
+            }
+            wholeDeck.push(deckPage.html);
+            return {
+              overflows: [],
+              contrasts: [],
+              drawErrors: [
+                {
+                  slug: "plan",
+                  step: "0",
+                  t: 0,
+                  kind: "reach",
+                  message: `changes the "intro" slide's <h2> outside its slide`,
+                },
+              ],
+            };
+          },
+        });
+        expect(wholeDeck).toHaveLength(1);
+        expect(diagnostics?.find((d) => d.id === "DEK032")?.message).toBe(
+          `draw changes the "intro" slide's <h2> outside its slide at the end of step 0`,
+        );
+      },
+    );
+  });
+
+  test("draws no such page for a deck without slide scripts", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml, plan } }] },
+      async (root) => {
+        const counts: number[] = [];
+        await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async (request) => {
+            counts.push(
+              ...pagesOf(request).map((page) => (page.html.match(/data-slug="/g) ?? []).length),
+            );
+            return { overflows: [], contrasts: [], drawErrors: [] };
+          },
+        });
+        expect(counts.every((count) => count === 1)).toBe(true);
       },
     );
   });

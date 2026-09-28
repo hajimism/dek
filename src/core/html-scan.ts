@@ -8,8 +8,11 @@ export type SourceSpot = { line: number; column: number };
 /** One attribute as the parser read it, located at its name. */
 export type HtmlAttribute = SourceSpot & { name: string; value: string };
 
-/** One start tag, located at its `<`, with its attributes in source order. */
-type HtmlElement = SourceSpot & { tag: string; attributes: HtmlAttribute[] };
+/**
+ * One start tag, located at its `<`, with its attributes in source order, and whether it is in a
+ * slide: the `<section class="slide">` itself or inside one, rather than a full document's head.
+ */
+type HtmlElement = SourceSpot & { tag: string; attributes: HtmlAttribute[]; inSlide: boolean };
 
 /** One URL an attribute names, located where the URL itself is written. */
 export type HtmlRef = SourceSpot & { tag: string; attr: string; value: string; use: UrlUse };
@@ -40,7 +43,8 @@ const CONTENT_TAGS = new Set(["img", "svg", "picture", "video", "canvas", "objec
  */
 export function scanSlideHtml(html: string): HtmlScan {
   const mark = uniqueMark(html);
-  const parsed: Array<{ tag: string; attributes: Array<[string, string]> }> = [];
+  const parsed: Array<{ tag: string; attributes: Array<[string, string]>; inSlide: boolean }> = [];
+  let slidesOpen = 0;
   const headings: Array<{ index: number; content: boolean }> = [];
   const open: Array<{ index: number; content: boolean }> = [];
 
@@ -69,7 +73,13 @@ export function scanSlideHtml(html: string): HtmlScan {
             open.splice(open.indexOf(heading), 1);
           });
         }
-        parsed.push({ tag, attributes });
+        if (tag === "section" && hasSlideClass(el.getAttribute("class")) && el.canHaveContent) {
+          slidesOpen++;
+          el.onEndTag(() => {
+            slidesOpen--;
+          });
+        }
+        parsed.push({ tag, attributes, inSlide: slidesOpen > 0 });
       },
     })
     .onDocument({
@@ -92,10 +102,15 @@ export function scanSlideHtml(html: string): HtmlScan {
   let start = 0;
   for (const [index, before] of transformed.split(mark).slice(0, -1).entries()) {
     start += before.length;
-    const { tag, attributes } = parsed[index] ?? { tag: "", attributes: [] };
+    const { tag, attributes, inSlide } = parsed[index] ?? {
+      tag: "",
+      attributes: [],
+      inSlide: false,
+    };
     const offsets = attributeOffsets(html, start);
     const element: HtmlElement = {
       tag,
+      inSlide,
       ...spot(start),
       attributes: attributes.map(([name, value]) => ({
         name,

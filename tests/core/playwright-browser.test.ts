@@ -386,8 +386,97 @@ describe("playwright worker slide scripts", () => {
       ],
     });
     expect(response?.drawErrors).toEqual([
-      { slug: "intro", step: "turn", t: 400, message: "TypeError: no bar at 400" },
+      { slug: "intro", step: "turn", t: 400, kind: "throw", message: "TypeError: no bar at 400" },
     ]);
+  });
+});
+
+// A draw must be a function of t that touches only its own slide: video and shots seek it, and the
+// built deck holds every slide. Both are checked as each still page draws its slides.
+describe("playwright worker slide scripts that break seeking or reach out", () => {
+  const drawn = async (slides: Array<{ slug: string; body: string; script: string }>) => {
+    const { stillPageScript } = await import("../../src/core/slide-script.ts");
+    const html = `<html><body style="margin:0">${slides
+      .map(
+        ({ slug, body }) =>
+          `<section class="slide" data-slug="${slug}" data-dek-step="0" data-dek-beat="0">${body}</section>`,
+      )
+      .join("")}<script>${slides
+      .map(
+        ({ slug, script }) => `(window.__dekSlides ||= {})[${JSON.stringify(slug)}] = ${script};`,
+      )
+      .join("\n")}</script>${stillPageScript([])}</body></html>`;
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: [],
+      pages: [{ html, slug: slides[0]?.slug ?? "", step: "0" }],
+    });
+    return (response?.drawErrors ?? []).map(({ slug, kind, message }) => ({ slug, kind, message }));
+  };
+
+  browserTest("reports a draw that keeps state between calls", async () => {
+    expect(
+      await drawn([
+        {
+          slug: "count",
+          body: `<p data-n>0</p>`,
+          script: `(() => { let n = 0; return { draw(slide) { slide.querySelector("[data-n]").textContent = String(++n); } }; })()`,
+        },
+      ]),
+    ).toEqual([
+      {
+        slug: "count",
+        kind: "seek",
+        message: "draws the end of the beat differently after drawing its start",
+      },
+    ]);
+  });
+
+  browserTest("reports a draw that changes the page outside its slide", async () => {
+    expect(
+      await drawn([
+        {
+          slug: "mode",
+          body: `<p>x</p>`,
+          script: `{ draw(slide, { t }) { document.body.dataset.mode = String(t); } }`,
+        },
+      ]),
+    ).toEqual([{ slug: "mode", kind: "reach", message: "changes <body> outside its slide" }]);
+  });
+
+  browserTest(
+    "reports a draw that finds another slide's element through the document",
+    async () => {
+      expect(
+        await drawn([
+          { slug: "first", body: `<p data-bar>first</p>`, script: `{ draw() {} }` },
+          {
+            slug: "second",
+            body: `<p data-bar>second</p>`,
+            script: `{ draw() { document.querySelector("[data-bar]").style.width = "10px"; } }`,
+          },
+        ]),
+      ).toEqual([
+        {
+          slug: "second",
+          kind: "reach",
+          message: 'changes the "first" slide\'s <p> outside its slide',
+        },
+      ]);
+    },
+  );
+
+  browserTest("accepts a draw that is a function of t and stays in its slide", async () => {
+    expect(
+      await drawn([
+        {
+          slug: "fine",
+          body: `<p data-w>x</p>`,
+          script: `{ draw(slide, { t }) { slide.querySelector("[data-w]").style.width = t + "px"; } }`,
+        },
+      ]),
+    ).toEqual([]);
   });
 });
 

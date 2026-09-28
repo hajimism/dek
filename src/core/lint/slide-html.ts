@@ -279,7 +279,7 @@ function inlineCodeDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[]
     .flatMap((element) => [
       {
         spot: element as SourceSpot,
-        found: inlineElement(element.tag, section.slug),
+        found: inlineElement(element, section.slug),
         data: { kind: "element", name: element.tag },
       },
       ...element.attributes.map((attribute) => ({
@@ -306,7 +306,17 @@ function inlineCodeDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[]
 
 type InlineCode = { message: string; hint: string };
 
-function inlineElement(tag: string, slug: string): InlineCode | undefined {
+function inlineElement(
+  { tag, inSlide }: { tag: string; inSlide: boolean },
+  slug: string,
+): InlineCode | undefined {
+  // In a full document's head it is dropped with the head; in the slide it loads for every slide.
+  if (tag === "link" && inSlide) {
+    return {
+      message: "slide contains a <link>, which loads its stylesheet for every slide",
+      hint: `move what it loads into theme.css, or into slides/${slug}.css for this slide alone; a font goes in assets/ with @font-face`,
+    };
+  }
   if (tag === "style") {
     return {
       message: "slide contains a <style> element",

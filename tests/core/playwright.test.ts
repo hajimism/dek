@@ -168,7 +168,13 @@ describe("parseVisualResponse", () => {
       contrasts: [contrast],
       drawErrors: [],
     });
-    const thrown = { slug: "intro", step: "1", t: 0, message: "Error: boom" };
+    const thrown = {
+      slug: "intro",
+      step: "1",
+      t: 0,
+      kind: "throw" as const,
+      message: "Error: boom",
+    };
     expect(parse({ overflows: [], contrasts: [], drawErrors: [thrown] }, "pages")).toEqual({
       overflows: [],
       contrasts: [],

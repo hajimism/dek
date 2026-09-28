@@ -38,7 +38,11 @@ export async function pdfDeck(
   return { outPath };
 }
 
-export function renderPdfHtml(deck: ProjectDeck): string {
+/**
+ * Every slide of the deck on one page, each at its last beat, as the PDF prints it. `strict` stops
+ * on a slide script that cannot run, as a PDF must; a lenient page leaves it out.
+ */
+export function renderPdfHtml(deck: ProjectDeck, options: { strict?: boolean } = {}): string {
   const slides = deckSlides(deck);
   // Every slide at its last beat, as a handout shows it.
   const { sections } = deck.deck;
@@ -62,6 +66,6 @@ export function renderPdfHtml(deck: ProjectDeck): string {
     head: `<style>${themeCss}</style>
   <style>${printPageCss(size)}</style>`,
     body: `<div id="deck">${slidesHtml}</div>
-  ${stillPageScript(readSlideScripts(deck.dir, { strict: true }))}`,
+  ${stillPageScript(readSlideScripts(deck.dir, { strict: options.strict ?? true }))}`,
   });
 }

@@ -25,7 +25,13 @@ declare global {
     __dekSettled?: Set<Animation>;
     __dekSlides?: Record<string, DekSlide>;
     /** What each slide's draw threw on a still page, for the worker that measures it. */
-    __dekDrawErrors?: Array<{ slug: string; step: string; t: number; message: string }>;
+    __dekDrawErrors?: Array<{
+      slug: string;
+      step: string;
+      t: number;
+      kind: "throw" | "reach" | "seek";
+      message: string;
+    }>;
     /** Takes back what the draws on a still page changed in attributes; absent when nothing. */
     __dekUndoDraw?: () => void;
   }

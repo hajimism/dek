@@ -666,6 +666,33 @@ b
     );
   });
 
+  test("DEK011: a <link> in the slide, but not in a full document's head", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <link rel="stylesheet" href="assets/fonts.css">
+  <h2 class="slide-title">intro</h2>
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK011");
+        expect(found.map(({ message, line }) => ({ message, line }))).toEqual([
+          {
+            message: "slide contains a <link>, which loads its stylesheet for every slide",
+            line: 9,
+          },
+        ]);
+      },
+    );
+  });
+
   test("DEK011: script element in a slide", async () => {
     await withTempProject(
       {

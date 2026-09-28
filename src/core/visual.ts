@@ -1,6 +1,7 @@
 import { type DeckPaths, deckPaths } from "./deck-paths.ts";
 import { type Diagnostic, diag } from "./diagnostic.ts";
 import { EDGES, type Edge } from "./overflow.ts";
+import { renderPdfHtml } from "./pdf.ts";
 import {
   askPlaywright,
   type ContrastOrigin,
@@ -73,7 +74,7 @@ async function visualDeck(
     return null;
   }
   const { deck } = asResolvedDeck(input);
-  const { pages, stills } = visualPages(deck, options);
+  const { pages, stills, scripted } = visualPages(deck, options);
 
   if (pages.length === 0) {
     return { diagnostics: [] };
@@ -102,8 +103,12 @@ async function visualDeck(
   for (const { page, key } of toMeasure) {
     cache.write(key, fresh.get(pageId(page)) ?? NOTHING_FOUND);
   }
+  const whole = scripted ? await wholeDeckDraws(deck, viewport, options.runner) : undefined;
+  if (whole === null) {
+    return null;
+  }
   if (!options.slug) {
-    cache.prune(new Set(keyed.map(({ key }) => key)));
+    cache.prune(new Set([...keyed.map(({ key }) => key), ...(whole ? [whole.key] : [])]));
   }
   for (const shot of stills) {
     shot.entry.commit();
@@ -113,6 +118,12 @@ async function visualDeck(
   const all = [
     ...keyed.map(({ page, found }) => fresh.get(pageId(page)) ?? found ?? NOTHING_FOUND),
     ...[...fresh].flatMap(([id, found]) => (asked.has(id) ? [] : [found])),
+    {
+      ...NOTHING_FOUND,
+      drawErrors: (whole?.drawErrors ?? []).filter(
+        (error) => !options.slug || error.slug === options.slug,
+      ),
+    },
   ];
   return {
     diagnostics: visualDiagnostics(
@@ -159,7 +170,7 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
 function visualPages(
   deck: ResolvedDeck["deck"],
   options: VisualDeckOptions,
-): { pages: VisualPage[]; stills: Still[] } {
+): { pages: VisualPage[]; stills: Still[]; scripted: boolean } {
   // A broken slide script is DEK016's to report; keep checking the slide without it.
   const sources = loadSlideSources(deck, { strict: false });
   const pages: VisualPage[] = [];
@@ -186,7 +197,37 @@ function visualPages(
       }
     }
   }
-  return { pages, stills };
+  const scripted = sources.scripts.some((entry) => !("problem" in entry));
+  return { pages, stills, scripted };
+}
+
+/**
+ * What the slides' draws do with every slide on one page, as in the built deck: only there does a
+ * draw that finds its elements through the document reach another slide. The page is drawn for
+ * its draws alone, and kept like any page by what it renders. Null when Playwright is missing.
+ */
+async function wholeDeckDraws(
+  deck: ResolvedDeck["deck"],
+  viewport: { width: number; height: number },
+  runner: PlaywrightRunner | undefined,
+): Promise<{ key: string; drawErrors: PageFindings["drawErrors"] } | null> {
+  const cache = visualCache(deck.dir, { viewport, actions: [] });
+  const page: VisualPage = { html: renderPdfHtml(deck, { strict: false }), slug: "*", step: "*" };
+  const key = cache.key(page);
+  const kept = cache.read(key);
+  if (kept) {
+    return { key, drawErrors: kept.drawErrors };
+  }
+  const response = await askPlaywright(
+    { kind: "pages", viewport, actions: [], pages: [page] },
+    runner,
+  );
+  if (response === null) {
+    return null;
+  }
+  const drawErrors = response.drawErrors ?? [];
+  cache.write(key, { ...NOTHING_FOUND, drawErrors });
+  return { key, drawErrors };
 }
 
 const SNIPPET_CHARS = 24;
@@ -287,24 +328,40 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
 type DrawErrorSample = NonNullable<PagesResponse["drawErrors"]>[number];
 
 function drawErrorKey(error: DrawErrorSample): string {
-  return [error.slug, error.message].join("\0");
+  return [error.slug, error.kind, error.message].join("\0");
 }
 
 /**
- * A draw that throws leaves the slide as it was before it ran, and every page that shows a still
- * shows that: pixels alone cannot tell it from a slide meant to look so.
+ * A draw that misbehaves on a still page, which every shot, the PDF, and every measurement is:
+ * one that throws leaves the slide as if it never ran, one that reaches outside its slide changes
+ * another in the built deck, and one that keeps state draws something a seek cannot replay.
  */
 function drawErrorDiagnostic(
   { first, steps }: StepGroup<DrawErrorSample>,
   deckDir: string,
 ): Diagnostic {
   const script = `slides/${first.slug}.ts`;
+  const where = atSteps(steps);
+  const { message, hint } = {
+    throw: {
+      message: `draw threw ${first.message} at the end of ${where.replace(/^at /, "")}`,
+      hint: `make draw in ${script} draw the end of every beat without throwing; until then every still, shot, and PDF shows the slide as if draw never ran`,
+    },
+    reach: {
+      message: `draw ${first.message} at the end of ${where.replace(/^at /, "")}`,
+      hint: `find elements from the slide draw is given in ${script}, and change nothing else: the built deck holds every slide`,
+    },
+    seek: {
+      message: `draw ${first.message} ${where}`,
+      hint: `draw from t alone in ${script}: work every value out from t and set everything you touch on every call, with nothing kept between calls`,
+    },
+  }[first.kind ?? "throw"];
   return diag("DEK032", {
-    message: `draw threw ${first.message} at the end of ${atSteps(steps).replace(/^at /, "")}`,
+    message,
     path: deckPaths(deckDir).slide(first.slug, ".ts"),
     slug: first.slug,
-    hint: `make draw in ${script} draw the end of every beat without throwing; until then every still, shot, and PDF shows the slide as if draw never ran`,
-    data: { message: first.message, steps },
+    hint,
+    data: { kind: first.kind ?? "throw", message: first.message, steps },
   });
 }
 

@@ -26,7 +26,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK008` | `project`, `deck` | A key in `dek.toml` (inline tables such as `voice = { … }` included) or the frontmatter that dek does not read. The hint names the key it most likely meant. Warning | — |
 | `DEK009` | `slide` | A file in `slides/` holds more than one `<section class="slide">`; only the first is shown | — |
 | `DEK010` | `slide` | A class that neither the theme nor the slide's own stylesheet defines | — |
-| `DEK011` | `slide` | `<style>`, `style=`, `<script>`, an event handler attribute (`onclick=` and the like), or a `javascript:` URL inside a slide | — |
+| `DEK011` | `slide` | `<style>`, `style=`, `<script>`, a `<link>` inside the slide (one in a full document's head is dropped with it), an event handler attribute (`onclick=` and the like), or a `javascript:` URL inside a slide | — |
 | `DEK012` | `deck`, `slide` | A selector in the theme that is not under `.slide`, at the top level or inside an at-rule such as `@media` (a rule nested in a `.slide` rule is under it), or a rule in a slide stylesheet that reaches past the slide (`::view-transition-*`, `:root`, `html`, `body`, a step from `.slide` to a sibling with `~` or `+`, and the at-rules that register something for the whole page: `@font-face`, `@import`, `@property`, `@counter-style`, `@page`, `@font-palette-values`, `@font-feature-values`). Each finding names its line and where the rule belongs | — |
 | `DEK013` | `deck` | The theme defines more classes than `max_classes` (default 40) | — |
 | `DEK014` | `deck`, `slide` | A raw design value outside a token: a color (hex, function, named, or system), a font family (in `font-family` or the `font` shorthand), a length in an absolute, viewport, container, or root unit, a time, or an easing written out. In the theme or a slide stylesheet, nested rules included; a custom property is a token only where tokens are set, on `.slide` or a view transition. A string such as `content: "#fff"` is text, not a value. A presentation attribute in a slide (`fill`, `stroke`, `color`, `stop-color`, `font-family`, `<font face>`, `bgcolor`) holding a raw color or family is one too: an attribute cannot take `var()`, so the hint moves it into `slides/<id>.css`; `fill="none"` and `currentColor` pass | — |
@@ -45,7 +45,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK027` | `deck` | `script.md` cannot be read: its frontmatter, a heading without a valid `{#id}`, or a beat before any slide. One finding per problem | — |
 | `DEK030` | `slide` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
-| `DEK032` | `slide` | A slide script's `draw` throws while drawing the end of a beat | — |
+| `DEK032` | `slide` | A slide script's `draw` misbehaves while drawing the end of a beat: it throws, changes the page outside its slide, or draws the end differently after drawing the beat's start | — |
 | `DEK040` | `slide` | An ASCII word missing from the pronunciation dictionary. Warning | — |
 | `DEK041` | `deck` | The talk's length far from the `duration` budget: narrated length with a Timeline, the reading-time estimate without. Warning | — |
 | `DEK042` | `slide` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
@@ -138,7 +138,13 @@ When a text falls short, the page is taken apart one layer at a time and measure
 
 ### DEK032
 
-Every still, whether a shot, a thumbnail, the PDF, or a page `--visual` measures, draws each slide at the end of its beat. A `draw` that throws there leaves the slide as it was before it ran, and no pixel measurement can tell that from a slide meant to look that way, so the throw is reported instead: the error, and every beat it happens at. The presenter keeps going whatever a slide does; the fix is in `slides/<id>.ts`. `data` carries `message` and `steps`.
+Every still, whether a shot, a thumbnail, the PDF, or a page `--visual` measures, draws each slide at the end of its beat, and checks the draw as it goes. No pixel measurement can tell these from a slide meant to look the way it does, so each is reported instead, with every beat it happens at (`data.kind`):
+
+- `throw`: the draw threw, which leaves the slide as it was before it ran.
+- `reach`: the draw changed the page outside its slide. On its own page a draw that finds its elements through `document` finds its own; so `--visual` also draws every slide on one page, as the built deck holds them, where it finds another slide's.
+- `seek`: drawn at the start of the beat and then at its end, the draw drew the end differently than at first, so it keeps state between calls, and a seek in a video, a shot, or the presenter cannot replay it.
+
+The presenter keeps going whatever a slide does; the fix is in `slides/<id>.ts`. `data` carries `kind`, `message`, and `steps`.
 
 ### DEK042
 

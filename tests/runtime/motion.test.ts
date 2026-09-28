@@ -196,7 +196,11 @@ describe("stillDrawScript", () => {
   test("is self-contained and draws each marked slide with drawAtEnd", () => {
     const frames: unknown[] = [];
     const attrs = { "data-slug": "chart", "data-dek-beat": "1", "data-dek-step": "growth" };
-    const chart = { getAttribute: (name: string) => attrs[name as keyof typeof attrs] ?? null };
+    const chart = {
+      getAttribute: (name: string) => attrs[name as keyof typeof attrs] ?? null,
+      outerHTML: "<section></section>",
+      contains: () => true,
+    };
     const unmarked = { getAttribute: (name: string) => (name === "data-slug" ? "chart" : null) };
     const window = {
       __dekSlides: {
@@ -212,6 +216,11 @@ describe("stillDrawScript", () => {
     };
     const document = { querySelectorAll: () => [chart, unmarked], getAnimations: () => [] };
     new Function("window", "document", stillDrawScript())(window, document);
-    expect(frames).toEqual([[chart, { index: 1, step: "growth", t: 900 }]]);
+    // The end of the beat, then its start and its end again: a draw of t alone draws the same.
+    expect(frames).toEqual([
+      [chart, { index: 1, step: "growth", t: 900 }],
+      [chart, { index: 1, step: "growth", t: 0 }],
+      [chart, { index: 1, step: "growth", t: 900 }],
+    ]);
   });
 });
