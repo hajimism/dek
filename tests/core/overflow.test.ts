@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { findOverflows } from "../../src/core/overflow.ts";
+import { findCollisions, findOverflows } from "../../src/core/overflow.ts";
 
 describe("findOverflows", () => {
   const slideBox = { left: 0, top: 0, right: 1280, bottom: 720 };
@@ -49,6 +49,35 @@ describe("findOverflows", () => {
   test("ignores empty boxes and sub-pixel rounding", () => {
     expect(
       findOverflows(slideBox, [el("span", [2000, 0, 2000, 0]), el("p", [80, 64, 1280.4, 719])]),
+    ).toEqual([]);
+  });
+});
+
+describe("findCollisions", () => {
+  const line = (box: string, left: number, top: number, width = 200, height = 30) => ({
+    box,
+    opacity: 1,
+    rects: [{ left, top, right: left + width, bottom: top + height }],
+  });
+
+  test("reports two texts drawn over each other", () => {
+    expect(
+      findCollisions([line("p.a", 100, 100), line("p.b", 110, 104)]).map(([a, b]) => [
+        a.box,
+        b.box,
+      ]),
+    ).toEqual([["p.a", "p.b"]]);
+  });
+
+  // Words of one sentence set in two elements sit side by side, and lines stack a pixel apart.
+  test("leaves lines that only touch, and text nobody sees", () => {
+    expect(
+      findCollisions([
+        line("span.a", 100, 100),
+        line("span.b", 299, 100),
+        line("p.next", 100, 128),
+        { ...line("p.hidden", 100, 100), opacity: 0 },
+      ]),
     ).toEqual([]);
   });
 });

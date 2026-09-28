@@ -38,6 +38,12 @@ export type MeasuredElement = {
    * bad contrast is. Neither overflow nor contrast is measured on decoration.
    */
   decorative: boolean;
+  /**
+   * What an ancestor inside the slide cuts it to, with `overflow` other than `visible`: the
+   * nearest such ancestor, and the box every one of them leaves visible. `intended` when the cut is
+   * a truncation the author asked for, an ellipsis or a line clamp.
+   */
+  clip?: { box: string; rect: Box; intended: boolean };
 };
 
 /**
@@ -90,6 +96,10 @@ export function measureSlideInPage(): SlideMeasure {
   // sideways: glyphs rise above a tight line box without overflowing anything.
   const extent = (el: Element, textNodes: Node[]): Box => {
     const box = toBox(el.getBoundingClientRect());
+    // An element that clips its own content shows none of its text past its box.
+    if (getComputedStyle(el).overflowX !== "visible") {
+      return box;
+    }
     for (const node of textNodes) {
       const range = document.createRange();
       range.selectNodeContents(node);
@@ -118,12 +128,43 @@ export function measureSlideInPage(): SlideMeasure {
     return box;
   };
   const opacityOf = (el: Element): number => {
+    // Hidden text is not drawn at all, however opaque.
+    if (getComputedStyle(el).visibility !== "visible") {
+      return 0;
+    }
     let opacity = 1;
     for (let current: Element | null = el; current; current = current.parentElement) {
       const own = Number.parseFloat(getComputedStyle(current).opacity);
       opacity *= Number.isNaN(own) ? 1 : own;
     }
     return opacity;
+  };
+  const clipped = (clip: MeasuredElement["clip"]) => (clip ? { clip } : {});
+  const truncates = (style: CSSStyleDeclaration): boolean =>
+    style.textOverflow === "ellipsis" ||
+    (style.getPropertyValue("-webkit-line-clamp") || "none") !== "none";
+  const clipOf = (el: Element): MeasuredElement["clip"] => {
+    let found: MeasuredElement["clip"];
+    for (let at = el.parentElement; at && at !== slide; at = at.parentElement) {
+      const style = getComputedStyle(at);
+      if (style.overflowX === "visible" && style.overflowY === "visible") {
+        continue;
+      }
+      const rect = toBox(at.getBoundingClientRect());
+      found = found
+        ? {
+            ...found,
+            rect: {
+              left: Math.max(found.rect.left, rect.left),
+              top: Math.max(found.rect.top, rect.top),
+              right: Math.min(found.rect.right, rect.right),
+              bottom: Math.min(found.rect.bottom, rect.bottom),
+            },
+            intended: found.intended || truncates(style),
+          }
+        : { box: describe(at), rect, intended: truncates(style) };
+    }
+    return found && { ...found, intended: found.intended || truncates(getComputedStyle(el)) };
   };
   const lineBoxes = (textNodes: Node[]): Box[] =>
     textNodes.flatMap((node) => {
@@ -158,6 +199,7 @@ export function measureSlideInPage(): SlideMeasure {
       fontSize: Number.parseFloat(style.fontSize),
       fontWeight: Number(style.fontWeight) || 400,
       decorative: el.closest('[aria-hidden="true"]') !== null,
+      ...clipped(clipOf(el)),
     };
   });
   // A pseudo-element draws text when its content has a letter or a digit, or comes from a

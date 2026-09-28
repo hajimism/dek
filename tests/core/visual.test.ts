@@ -154,6 +154,71 @@ describe("lintVisualDeck", () => {
     );
   });
 
+  test("emits DEK030 for text an ancestor cuts off, and DEK033 for texts drawn over each other", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [
+              {
+                slug: "intro",
+                step: "1",
+                box: "p.note",
+                text: "many words",
+                by: { bottom: 40 },
+                clip: "div.card",
+                origin: "content",
+              },
+            ],
+            contrasts: [],
+            collisions: [
+              {
+                slug: "intro",
+                step: "1",
+                box: "p.a",
+                text: "first",
+                other: "p.b",
+                otherText: "second",
+              },
+              {
+                slug: "intro",
+                step: "1",
+                box: "p.c",
+                text: "corner",
+                other: "section.slide::after",
+                otherText: "3",
+              },
+            ],
+          }),
+        });
+        expect(
+          diagnostics
+            ?.filter((d) => d.id === "DEK030" || d.id === "DEK033")
+            .map(({ id, message, hint }) => ({ id, message, hint })),
+        ).toEqual([
+          {
+            id: "DEK030",
+            message:
+              'p.note "many words" is cut off by div.card past its bottom edge by 40px at step 1',
+            hint: "let div.card grow to fit it in slides/intro.css, or cut the text: div.card hides what does not fit",
+          },
+          {
+            id: "DEK033",
+            message: 'p.a "first" and p.b "second" are drawn over each other at step 1',
+            hint: "move one of them, or give the layout room for both, in slides/intro.css",
+          },
+          {
+            id: "DEK033",
+            message:
+              'p.c "corner" and section.slide::after "3" are drawn over each other at step 1',
+            hint: "keep the slide's content clear of what theme.css draws there, a folio or a running head: move it, or give it room in slides/intro.css",
+          },
+        ]);
+      },
+    );
+  });
+
   test("emits DEK031 when the runner reports low contrast", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

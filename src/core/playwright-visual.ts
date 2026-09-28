@@ -1,7 +1,13 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
 import { finishBeat } from "./finish-beat.ts";
-import { crossesEdge, findOverflows, type OverflowOrigin } from "./overflow.ts";
+import {
+  crossesEdge,
+  findClippedText,
+  findCollisions,
+  findOverflows,
+  type OverflowOrigin,
+} from "./overflow.ts";
 import { visitInPages } from "./page-pool.ts";
 import type {
   ContrastFinding,
@@ -28,7 +34,11 @@ import {
   type SlideMeasure,
   unmarkPseudoTextsInPage,
 } from "./slide-measure.ts";
-import { contrastThreshold, measurePageTextContrasts } from "./text-contrast.ts";
+import {
+  contrastThreshold,
+  measurePageTextContrasts,
+  measurePseudoGlyphBoxes,
+} from "./text-contrast.ts";
 
 /**
  * Answers a visual request in a running browser: what the Playwright worker
@@ -109,7 +119,7 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
   const found = await visitInPages(
     request.pages,
     () => context.newPage(),
-    (page, pageReq) => visitPage(page, pageReq, request.actions),
+    (page, pageReq) => visitPage(page, pageReq, request),
   );
   // Sheets come last: they tile what the pages above just wrote.
   if (request.sheets && request.sheets.length > 0) {
@@ -119,14 +129,18 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
     overflows: found.flatMap((page) => page.overflows),
     contrasts: found.flatMap((page) => page.contrasts),
     drawErrors: found.flatMap((page) => page.drawErrors ?? []),
+    collisions: found.flatMap((page) => page.collisions ?? []),
   };
 }
 
 /** A contrast finding below its threshold, with the key of the text it came from. */
 type Failing = { finding: ContrastFinding; key: string };
 
-/** An overflow found on the page, with the index of the element that crosses the edge. */
-type Crossing = { finding: PagesResponse["overflows"][number]; element: number };
+/**
+ * An overflow found on the page, with the index of the element that crosses the edge: the
+ * frame's, or an ancestor's that cuts the element's text off.
+ */
+type Crossing = { finding: PagesResponse["overflows"][number]; element: number; frame: Box };
 
 /**
  * One text the page draws: an element's own, or one a pseudo-element draws. `key` finds the same
@@ -134,6 +148,8 @@ type Crossing = { finding: PagesResponse["overflows"][number]; element: number }
  */
 type PageText = {
   key: string;
+  /** For text a pseudo-element draws: its host's mark and which pseudo-element it is. */
+  pseudo?: { host: string; pseudo: "before" | "after" };
   rects: Box[];
   opacity: number;
   fontSize: number;
@@ -166,9 +182,41 @@ async function pageTexts(page: Page, measured: SlideMeasure): Promise<PageText[]
   const pseudo = measured.pseudoTexts.flatMap(({ host, pseudo, ...text }): PageText[] => {
     const key = `${host}::${pseudo}`;
     const rect = boxes.get(key);
-    return rect ? [{ key, rects: [rect], ...text }] : [];
+    return rect ? [{ key, pseudo: { host, pseudo }, rects: [rect], ...text }] : [];
   });
   return [...own, ...pseudo];
+}
+
+/**
+ * The texts drawn over each other. A pseudo-element's box can be far wider than its words, as a
+ * full-width running head is, so a pair it is in is looked at again with the box its glyphs
+ * cover, drawn alone.
+ */
+async function textCollisions(page: Page, texts: PageText[]): Promise<Array<[PageText, PageText]>> {
+  const candidates = findCollisions(texts);
+  const loose = [...new Set(candidates.flat().filter((text) => text.pseudo && text.rects[0]))];
+  if (loose.length === 0) {
+    return candidates;
+  }
+  const glyphs = await measurePseudoGlyphBoxes(
+    page,
+    loose.map((text) => ({
+      host: text.pseudo?.host ?? "",
+      pseudo: text.pseudo?.pseudo ?? "before",
+      rect: text.rects[0] as Box,
+    })),
+  );
+  // Each text in a candidate pair as it is drawn, and back to itself once the pairs are found.
+  const drawn = new Map<PageText, PageText>();
+  for (const text of new Set(candidates.flat())) {
+    const at = loose.indexOf(text);
+    const glyph = at < 0 ? undefined : glyphs[at];
+    drawn.set(at < 0 ? text : { ...text, rects: glyph ? [glyph] : [] }, text);
+  }
+  const pairs = findCollisions([...drawn.keys()]).map(
+    ([a, b]) => [drawn.get(a) ?? a, drawn.get(b) ?? b] as [PageText, PageText],
+  );
+  return pairs.filter(([a, b]) => candidates.some(([x, y]) => x === a && y === b));
 }
 
 /** How each text measures against what it is drawn on, in the order of `texts`. */
@@ -183,9 +231,9 @@ function textContrasts(page: Page, texts: PageText[]) {
 async function visitPage(
   page: Page,
   pageReq: VisualPage,
-  actions: PagesRequest["actions"],
+  { actions, viewport }: Pick<PagesRequest, "actions" | "viewport">,
 ): Promise<PagesResponse> {
-  const response: PagesResponse = { overflows: [], contrasts: [] };
+  const response: PagesResponse = { overflows: [], contrasts: [], collisions: [] };
   const failing: Failing[] = [];
   const crossing: Crossing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
@@ -193,15 +241,35 @@ async function visitPage(
   response.drawErrors = await page.evaluate(() => window.__dekDrawErrors ?? []);
   if (actions.length > 0) {
     const measured = await page.evaluate(measureSlideInPage);
+    const texts = await pageTexts(page, measured);
     if (actions.includes("overflow") && measured.slideBox) {
-      for (const { element, ...overflow } of findOverflows(measured.slideBox, measured.elements)) {
+      // The audience sees the frame: a slide its CSS makes taller or scales up is cut to it.
+      const frame = {
+        left: Math.max(measured.slideBox.left, 0),
+        top: Math.max(measured.slideBox.top, 0),
+        right: Math.min(measured.slideBox.right, viewport.width),
+        bottom: Math.min(measured.slideBox.bottom, viewport.height),
+      };
+      for (const { element, ...overflow } of [
+        ...findOverflows(frame, measured.elements),
+        ...findClippedText(measured.elements),
+      ]) {
         const finding = { slug, step, ...overflow };
         response.overflows.push(finding);
-        crossing.push({ finding, element });
+        crossing.push({ finding, element, frame });
+      }
+      for (const [one, other] of await textCollisions(page, texts)) {
+        response.collisions?.push({
+          slug,
+          step,
+          box: one.box,
+          ...(one.text ? { text: one.text } : {}),
+          other: other.box,
+          ...(other.text ? { otherText: other.text } : {}),
+        });
       }
     }
     if (actions.includes("contrast")) {
-      const texts = await pageTexts(page, measured);
       const measuredTexts = await textContrasts(page, texts);
       texts.forEach((text, at) => {
         const contrast = measuredTexts[at];
@@ -257,9 +325,12 @@ async function attributeFindings(
     // Transitions and animations the change sets off would otherwise be caught midway.
     await page.evaluate(finishBeat);
     const measured = await page.evaluate(measureSlideInPage);
-    crossing = crossing.filter(({ finding, element }) => {
+    crossing = crossing.filter(({ finding, element, frame }) => {
       const now = measured.elements[element];
-      if (measured.slideBox && now && !crossesEdge(measured.slideBox, now)) {
+      const still =
+        now !== undefined &&
+        (finding.clip === undefined ? crossesEdge(frame, now) : findClippedText([now]).length > 0);
+      if (now && !still) {
         finding.origin = layer.origin;
         return false;
       }

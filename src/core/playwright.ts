@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
 import { DekError } from "./error.ts";
-import { EDGES, type Overflow } from "./overflow.ts";
+import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
 import { exitWorker, readWorkerRequest, runJsonWorker, workerCommand } from "./spawn.ts";
@@ -118,11 +118,16 @@ type DrawErrorFinding = {
   message: string;
 };
 
+/** Two texts drawn over each other on one page. */
+type CollisionFinding = Collision & { slug: string; step: string };
+
 export type PagesResponse = {
   overflows: OverflowFinding[];
   contrasts: ContrastFinding[];
   /** Absent from a runner that has none to report. */
   drawErrors?: DrawErrorFinding[];
+  /** Absent from a runner that has none to report. */
+  collisions?: CollisionFinding[];
 };
 
 export type MotionResponse = {
@@ -274,11 +279,12 @@ function spawnRunner(
 const RESPONSE_PARSERS: {
   [K in keyof VisualResponses]: (fields: Record<string, unknown>) => VisualResponses[K] | null;
 } = {
-  pages: ({ overflows, contrasts, drawErrors = [] }) =>
+  pages: ({ overflows, contrasts, drawErrors = [], collisions = [] }) =>
     isArrayOf(overflows, isOverflowFinding) &&
     isArrayOf(contrasts, isContrastFinding) &&
-    isArrayOf(drawErrors, isDrawErrorFinding)
-      ? { overflows, contrasts, drawErrors }
+    isArrayOf(drawErrors, isDrawErrorFinding) &&
+    isArrayOf(collisions, isCollisionFinding)
+      ? { overflows, contrasts, drawErrors, collisions }
       : null,
   pdf: () => ({}),
   morph: () => ({}),
@@ -325,6 +331,14 @@ function isFinding(value: unknown): value is Record<string, unknown> {
   );
 }
 
+function isCollisionFinding(value: unknown): value is CollisionFinding {
+  if (!isFinding(value)) {
+    return false;
+  }
+  const { other, otherText } = value;
+  return isString(other) && (otherText === undefined || isString(otherText));
+}
+
 function isDrawErrorFinding(value: unknown): value is DrawErrorFinding {
   if (!value || typeof value !== "object") {
     return false;
@@ -353,7 +367,8 @@ function isOverflowFinding(value: unknown): value is OverflowFinding {
     (value.origin === undefined ||
       value.origin === "script" ||
       value.origin === "slide" ||
-      value.origin === "content")
+      value.origin === "content") &&
+    (value.clip === undefined || isString(value.clip))
   );
 }
 

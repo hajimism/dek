@@ -47,7 +47,7 @@ describe("defaultPlaywrightRunner", () => {
     await chmod(fakePlaywright, 0o755);
     await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
       const response = await defaultPlaywrightRunner(request);
-      expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [] });
+      expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
     });
   });
 
@@ -167,6 +167,7 @@ describe("parseVisualResponse", () => {
       overflows: [overflow],
       contrasts: [contrast],
       drawErrors: [],
+      collisions: [],
     });
     const thrown = {
       slug: "intro",
@@ -179,6 +180,7 @@ describe("parseVisualResponse", () => {
       overflows: [],
       contrasts: [],
       drawErrors: [thrown],
+      collisions: [],
     });
     expect(parse({ motion, sheets: ["/s.png"] }, "motion")).toEqual({
       motion,
@@ -192,7 +194,7 @@ describe("parseVisualResponse", () => {
   test("keeps only what the kind it asked for answers with", () => {
     expect(
       parse({ overflows: [], contrasts: [], screenshotPath: "/a.png", sheets: [] }, "pages"),
-    ).toEqual({ overflows: [], contrasts: [], drawErrors: [] });
+    ).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
     expect(parse({ motion, sheets: [], overflows: [] }, "motion")).toEqual({ motion, sheets: [] });
     expect(parse({ pdfPath: "/a.pdf" }, "pdf")).toEqual({});
   });

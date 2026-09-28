@@ -225,6 +225,72 @@ body { margin: 0 }
   });
 });
 
+// What the audience sees is the frame, not whatever box the slide's CSS gives the slide: text
+// cut off inside a card, or drawn over other text, is as unreadable as text past the edge.
+describe("playwright worker collisions", () => {
+  const measure = async (body: string, css = "") =>
+    render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["overflow", "contrast"],
+      pages: [
+        {
+          html: `<html><head><style>
+body { margin: 0; background: #fff }
+.slide { position: relative; width: 1280px; height: 720px; background: #fff; color: #111; font: 400 24px sans-serif; counter-reset: folio 3 }
+p { margin: 0 }
+</style><style id="dek-slide-css">${css}</style></head><body><section class="slide">${body}</section></body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+
+  browserTest(
+    "measures overflow against the frame, however tall the slide's CSS makes it",
+    async () => {
+      const response = await measure(
+        `<p class="low" style="position:absolute; top: 900px">below the frame</p>`,
+        ".slide { height: 1400px }",
+      );
+      expect(response?.overflows.map(({ box, by }) => ({ box, by }))).toEqual([
+        { box: "p.low", by: { bottom: expect.any(Number) } },
+      ]);
+    },
+  );
+
+  browserTest("reports text an ancestor cuts off, and leaves an ellipsis alone", async () => {
+    const response = await measure(
+      `<div class="card"><p class="note">${"many words ".repeat(40)}</p></div><div class="card"><p class="dots">${"a very long title ".repeat(10)}</p></div>`,
+      `.card { width: 400px; height: 60px; overflow: hidden }
+.dots { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }`,
+    );
+    expect(response?.overflows.map(({ box, by, clip }) => ({ box, by, clip }))).toEqual([
+      { box: "p.note", by: { bottom: expect.any(Number) }, clip: "div.card" },
+    ]);
+  });
+
+  browserTest("reports texts that overlap, a folio included", async () => {
+    const response = await measure(
+      `<p class="a" style="position:absolute; left: 100px; top: 100px">first words</p>
+<p class="b" style="position:absolute; left: 110px; top: 104px">second words</p>
+<p class="corner" style="position:absolute; right: 30px; bottom: 30px">bottom right</p>`,
+      `.slide::after { content: counter(folio); position: absolute; right: 40px; bottom: 34px }`,
+    );
+    expect(
+      (response?.collisions ?? []).map(({ box, other }) => [box, other].sort().join(" + ")),
+    ).toEqual(["p.a + p.b", "p.corner + section.slide::after"]);
+  });
+
+  browserTest("measures the contrast of SVG text", async () => {
+    const response = await measure(
+      `<svg width="400" height="120"><text x="10" y="60" fill="#eee" font-size="32">svg label</text></svg>`,
+    );
+    const label = response?.contrasts.find((sample) => sample.text === "svg label");
+    expect(label?.ratio).toBeLessThan(1.5);
+  });
+});
+
 describe("playwright worker files", () => {
   browserTest(
     "shoots a page that names a screenshotPath, and measures nothing unasked",
@@ -245,7 +311,7 @@ describe("playwright worker files", () => {
             },
           ],
         });
-        expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [] });
+        expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
         expect((await pixelAt(screenshotPath, 10, 10)).slice(0, 5)).toEqual([320, 180, 255, 0, 0]);
       } finally {
         await rm(dir, { recursive: true, force: true });
@@ -923,7 +989,7 @@ describe("contact sheets in a real Chromium", () => {
         pages: shots,
         sheets: [spec],
       });
-      expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [] });
+      expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
       expect(await Bun.file(spec.path).exists()).toBe(true);
       const { size, boxes } = sheetLayout(spec);
       const images = boxes.filter((box) => box.kind === "image");

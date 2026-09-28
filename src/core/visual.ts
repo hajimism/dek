@@ -131,6 +131,7 @@ async function visualDeck(
         overflows: all.flatMap((page) => page.overflows),
         contrasts: all.flatMap((page) => page.contrasts),
         drawErrors: all.flatMap((page) => page.drawErrors),
+        collisions: all.flatMap((page) => page.collisions ?? []),
       },
       deck.dir,
     ),
@@ -138,7 +139,12 @@ async function visualDeck(
   };
 }
 
-const NOTHING_FOUND: PageFindings = { overflows: [], contrasts: [], drawErrors: [] };
+const NOTHING_FOUND: PageFindings = {
+  overflows: [],
+  contrasts: [],
+  drawErrors: [],
+  collisions: [],
+};
 
 /** A page's findings name its slide and step, which no two pages of one run share. */
 function pageId(page: { slug: string; step: string }): string {
@@ -150,7 +156,7 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   const pages = new Map<string, PageFindings>();
   const of = (finding: { slug: string; step: string }): PageFindings => {
     const id = pageId(finding);
-    const found = pages.get(id) ?? { overflows: [], contrasts: [], drawErrors: [] };
+    const found = pages.get(id) ?? { overflows: [], contrasts: [], drawErrors: [], collisions: [] };
     pages.set(id, found);
     return found;
   };
@@ -162,6 +168,9 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   }
   for (const finding of response.drawErrors ?? []) {
     of(finding).drawErrors.push(finding);
+  }
+  for (const finding of response.collisions ?? []) {
+    of(finding).collisions.push(finding);
   }
   return pages;
 }
@@ -322,7 +331,40 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
     ...groupBySteps(response.drawErrors ?? [], drawErrorKey).map((group) =>
       drawErrorDiagnostic(group, deckDir),
     ),
+    ...groupBySteps(response.collisions ?? [], collisionKey).map((group) =>
+      collisionDiagnostic(group, paths),
+    ),
   ];
+}
+
+type CollisionSample = NonNullable<PagesResponse["collisions"]>[number];
+
+function collisionKey(c: CollisionSample): string {
+  return [c.slug, c.box, c.text ?? "", c.other, c.otherText ?? ""].join("\0");
+}
+
+/** Two texts drawn over each other, which neither reads through. */
+function collisionDiagnostic(
+  { first, steps }: StepGroup<CollisionSample>,
+  paths: DeckPaths,
+): Diagnostic {
+  const css = `slides/${first.slug}.css`;
+  const drawn = [first.box, first.other].some((box) => box.includes("::"));
+  return diag("DEK033", {
+    message: `${describeTarget(first.box, first.text)}and ${describeTarget(first.other, first.otherText)}are drawn over each other ${atSteps(steps)}`,
+    path: paths.slide(first.slug, ".html"),
+    slug: first.slug,
+    hint: drawn
+      ? `keep the slide's content clear of what theme.css draws there, a folio or a running head: move it, or give it room in ${css}`
+      : `move one of them, or give the layout room for both, in ${css}`,
+    data: {
+      box: first.box,
+      ...(first.text ? { text: first.text } : {}),
+      other: first.other,
+      ...(first.otherText ? { otherText: first.otherText } : {}),
+      steps,
+    },
+  });
 }
 
 type DrawErrorSample = NonNullable<PagesResponse["drawErrors"]>[number];
@@ -373,7 +415,9 @@ function crossedEdges(overflow: OverflowSample): Edge[] {
 }
 
 function overflowKey(o: OverflowSample): string {
-  return [o.slug, o.box, o.text ?? "", crossedEdges(o).join(), o.origin ?? ""].join("\0");
+  return [o.slug, o.box, o.text ?? "", crossedEdges(o).join(), o.origin ?? "", o.clip ?? ""].join(
+    "\0",
+  );
 }
 
 /** The ratio as reported, to one decimal: samples that round alike are one finding. */
@@ -402,6 +446,9 @@ function overflowWhere(amounts: Partial<Record<Edge, number>>): string {
  */
 function overflowHint(first: OverflowSample, edges: Edge[]): string | undefined {
   const css = `slides/${first.slug}.css`;
+  if (first.clip !== undefined && first.origin !== "script") {
+    return `let ${first.clip} grow to fit it in ${css}, or cut the text: ${first.clip} hides what does not fit`;
+  }
   const hints =
     first.origin === "script"
       ? [
@@ -443,8 +490,14 @@ function overflowDiagnostic(
   const target =
     edges.length === 0 && !first.text ? "content " : describeTarget(first.box, first.text);
   const hint = overflowHint(first, edges);
+  const where =
+    first.clip === undefined
+      ? overflowWhere(amounts)
+      : `is cut off by ${first.clip} ${Object.entries(amounts)
+          .map(([edge, px]) => `past its ${edge} edge by ${px}px`)
+          .join(" and ")}`;
   return diag("DEK030", {
-    message: `${target}${overflowWhere(amounts)} ${atSteps(steps)}`,
+    message: `${target}${where} ${atSteps(steps)}`,
     path: overflowPath(first, paths),
     slug: first.slug,
     ...(hint ? { hint } : {}),
@@ -453,6 +506,7 @@ function overflowDiagnostic(
       ...(first.text ? { text: first.text } : {}),
       edges: amounts,
       ...(first.origin ? { origin: first.origin } : {}),
+      ...(first.clip ? { clip: first.clip } : {}),
       steps,
     },
   });

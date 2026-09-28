@@ -43,8 +43,9 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK025` | `slide` | A numeric `data-step` that points at a beat with an id. Warning | — |
 | `DEK026` | `slide` | The same declaration under the same selector in the stylesheets of three slides or more. Warning | — |
 | `DEK027` | `deck` | `script.md` cannot be read: its frontmatter, a heading without a valid `{#id}`, or a beat before any slide. One finding per problem | — |
-| `DEK030` | `slide` | An element or its text runs past an edge of the slide when rendered, at any beat | — |
+| `DEK030` | `slide` | An element or its text runs past an edge of the frame the audience sees when rendered, at any beat, or text is cut off by an ancestor with `overflow` other than `visible` | — |
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
+| `DEK033` | `slide` | Two texts are drawn over each other, a folio or a running head a pseudo-element draws included | — |
 | `DEK032` | `slide` | A slide script's `draw` misbehaves while drawing the end of a beat: it throws, changes the page outside its slide, or draws the end differently after drawing the beat's start | — |
 | `DEK040` | `slide` | An ASCII word missing from the pronunciation dictionary. Warning | — |
 | `DEK041` | `deck` | The talk's length far from the `duration` budget: narrated length with a Timeline, the reading-time estimate without. Warning | — |
@@ -55,7 +56,7 @@ Each finding is about one of three things, and the command that reports it follo
 
 ## Conditions
 
-- `DEK030`, `DEK031`, and `DEK032` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
+- `DEK030` through `DEK033` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
 - `DEK040`, `DEK042`, `DEK043`, and `DEK045` apply only to decks with `voice/`; `DEK044` applies to every deck. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin). `data` carries `actualSeconds`, `budgetSeconds`, and `source` (`timeline` or `estimate`).
 - `DEK008`, `DEK024` through `DEK026`, and `DEK040` through `DEK045` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
@@ -122,6 +123,8 @@ The finding goes where its cause is, found the way a contrast's is: what the sli
 
 The message names the element, the start of its text, the edge, and how many pixels it runs past. A child is reported only for an edge its parent stays inside, so a list that runs off the bottom is one finding. The same finding on several beats is one diagnostic that names every beat. Text is measured as well as boxes, so an unbreakable string such as a URL counts even when its box fits.
 
+The edge is the frame's: the slide at its logical size, however tall its CSS makes it or however it is scaled, since the player shows that much and no more. Text an ancestor inside the slide cuts off, with `overflow: hidden` or the like, is reported the same way, named by the ancestor: `p.note "…" is cut off by div.card past its bottom edge by 40px`, and `data.clip` names it. An ellipsis or a line clamp is a truncation the author asked for and passes.
+
 #### Decoration
 
 An element marked `aria-hidden="true"`, with everything inside it and its pseudo-elements, is decoration, and neither `DEK030` nor `DEK031` measures it. That is how a glow bleeds off the slide on purpose, or a slide shows a sample of text too faint to read. The mark has a cost that keeps it honest: screen readers skip what it covers, so it never goes on text the audience should read.
@@ -132,7 +135,7 @@ Thresholds follow WCAG AA: 4.5:1 for body text, 3:1 for large text. Large text i
 
 Contrast is measured from pixels, not from styles. Each beat is drawn with its text as shown, with every glyph transparent, and with every glyph filled white and then black. The white and black drawings show where the glyphs are, whatever their color; within them, each pixel of the text is compared with the pixel it sits on. Gradients, background images, glows, overlapping elements, opacity, and colors in any syntax are measured as drawn.
 
-Only the pixels a text's glyphs cover most are read, each taken back to the color a glyph covering the whole pixel would draw, so antialiasing never lowers a ratio and a thin hyphen reads at its own color. The ratio reported is the one all but the worst 2% of those pixels reach: text over a gradient is judged by the part that reads worst. `fg` and `bg` are the two colors at that pixel. Where two texts overlap, neither is judged by the shared pixels unless it has no others. Text a `::before` or `::after` draws, such as a folio from `counter()` or a running head, is measured like any other and reported as `section.slide::after`. Its `content` counts as text when it has a letter or a digit, or comes from `counter()`, `counters()`, or `attr()`; a quote mark or an arrow on its own, a glow, and a rule count as background. `DEK030` does not measure pseudo-elements.
+Only the pixels a text's glyphs cover most are read, each taken back to the color a glyph covering the whole pixel would draw, so antialiasing never lowers a ratio and a thin hyphen reads at its own color. The ratio reported is the one all but the worst 2% of those pixels reach: text over a gradient is judged by the part that reads worst. `fg` and `bg` are the two colors at that pixel. Where two texts overlap, neither is judged by the shared pixels unless it has no others. Text a `::before` or `::after` draws, such as a folio from `counter()` or a running head, is measured like any other and reported as `section.slide::after`. Its `content` counts as text when it has a letter or a digit, or comes from `counter()`, `counters()`, or `attr()`; a quote mark or an arrow on its own, a glow, and a rule count as background. `DEK030` does not measure pseudo-elements. SVG `<text>` is measured like any other text.
 
 When a text falls short, the page is taken apart one layer at a time and measured again, and the finding's `path` and hint go to the layer that brought it down. First what the slide script's `draw` changed in attributes, its inline colors above all, is taken back: if the text now clears the threshold, `draw` is the cause, and since a color it sets inline wins over any stylesheet, the fix goes to `slides/<id>.ts` and `data.origin` is `"script"`. Then the slide's own `slides/<id>.css` is taken away: if the text clears it now, the fix stays in `slides/<id>.css` and `data.origin` is `"slide"`. If it still falls short, the theme alone draws it that way: the fix goes to `theme.css`, where one change reaches every slide that uses the same pair, and `data.origin` is `"theme"`. A slide with neither leaves every color to the theme.
 
@@ -145,6 +148,10 @@ Every still, whether a shot, a thumbnail, the PDF, or a page `--visual` measures
 - `seek`: drawn at the start of the beat and then at its end, the draw drew the end differently than at first, so it keeps state between calls, and a seek in a video, a shot, or the presenter cannot replay it.
 
 The presenter keeps going whatever a slide does; the fix is in `slides/<id>.ts`. `data` carries `kind`, `message`, and `steps`.
+
+### DEK033
+
+Two texts whose lines cross by a few pixels each way, and share a fifth of the smaller one, are drawn over each other: neither reads. Lines that only touch, as the words of one sentence set in two elements do, pass. A folio or a running head a `::before` or `::after` draws is one of the texts, judged by the box its glyphs cover rather than the box it is laid out in, which for a full-width running head is the whole line. The hint says whether to move the content or make room for it. `data` carries `box`, `other`, their texts, and `steps`.
 
 ### DEK042
 

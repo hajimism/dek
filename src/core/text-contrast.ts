@@ -172,7 +172,8 @@ export function measureTextContrast(
 
 /**
  * The stylesheet that redraws the page as one layer. Transitions stop so the
- * change lands at once. A pseudo-element keeps its own fill, since what it
+ * change lands at once. SVG text is filled rather than text-filled, so its fill
+ * changes with the layer, and its stroke goes. A pseudo-element keeps its own fill, since what it
  * draws is decoration and belongs to the background in every layer, unless it
  * was marked as drawing text (`PseudoText`), which is measured as text is.
  */
@@ -182,7 +183,8 @@ export function textLayerCss(layer: TextLayer): string {
   return `*, *::before, *::after { transition: none !important; }
 * { -webkit-text-fill-color: ${fill} !important; }
 *::before, *::after { -webkit-text-fill-color: initial !important; }
-[data-dek-text-before]::before, [data-dek-text-after]::after { -webkit-text-fill-color: ${fill} !important; }${clipped}`;
+[data-dek-text-before]::before, [data-dek-text-after]::after { -webkit-text-fill-color: ${fill} !important; }
+svg text, svg tspan, svg textPath { fill: ${fill} !important; stroke: transparent !important; }${clipped}`;
 }
 
 /**
@@ -267,10 +269,35 @@ export async function measurePageTextContrasts(
   if (texts.length === 0) {
     return [];
   }
+  const { shot, setLayer } = layerDrawer(page);
+  const shown = await shot();
+  await page.evaluate(markClippedText);
+  const layers = { shown } as Record<keyof TextLayers, string>;
+  for (const layer of ["bare", "white", "black"] as const) {
+    await setLayer(textLayerCss(layer));
+    layers[layer] = await shot();
+  }
+  await setLayer(null);
+  await page.addScriptTag({ content: textContrastScript() });
+  return page.evaluate(
+    (input) =>
+      (
+        window as unknown as {
+          __dekTextContrast: (arg: SamplerInput) => Promise<Array<TextContrast | null>>;
+        }
+      ).__dekTextContrast(input),
+    { layers, texts: withOverlaps(texts) },
+  );
+}
+
+/**
+ * Shots of the page and a stylesheet to redraw it with. `setLayer(null)` takes the layer away
+ * again: the glyphs go back first, with transitions still off, so they do not fade back from the
+ * last layer's fill in whatever is drawn next.
+ */
+function layerDrawer(page: LayerPage) {
   const shot = async (): Promise<string> =>
     Buffer.from(await page.screenshot({ type: "png" })).toString("base64");
-  // null takes the layer away again. The glyphs go back first, with transitions still off,
-  // so they do not fade back from the last layer's fill in whatever is drawn next.
   const setLayer = (css: string | null): Promise<void> =>
     page.evaluate((text) => {
       let style = document.getElementById("dek-text-layer");
@@ -290,22 +317,80 @@ export async function measurePageTextContrasts(
       }
       style.textContent = text;
     }, css);
-  const shown = await shot();
-  await page.evaluate(markClippedText);
-  const layers = { shown } as Record<keyof TextLayers, string>;
-  for (const layer of ["bare", "white", "black"] as const) {
-    await setLayer(textLayerCss(layer));
-    layers[layer] = await shot();
+  return { shot, setLayer };
+}
+
+/** One pseudo-element's text, by the mark on its host, and the box Chromium lays it out in. */
+type PseudoGlyphs = { host: string; pseudo: "before" | "after"; rect: Box };
+
+/**
+ * The box each pseudo-element's glyphs cover, which can be far smaller than the box it is laid out
+ * in: a running head is often a full-width block holding a few words. Each is drawn alone, every
+ * other glyph transparent, in white and in black; where the two differ inside its box is where its
+ * glyphs are. Undefined for one none of whose glyphs shows.
+ */
+export async function measurePseudoGlyphBoxes(
+  page: LayerPage,
+  targets: PseudoGlyphs[],
+): Promise<Array<Box | undefined>> {
+  if (targets.length === 0) {
+    return [];
+  }
+  const { shot, setLayer } = layerDrawer(page);
+  const alone = ({ host, pseudo }: PseudoGlyphs, fill: string): string =>
+    `*, *::before, *::after { transition: none !important; -webkit-text-fill-color: transparent !important; }
+svg text, svg tspan, svg textPath { fill: transparent !important; stroke: transparent !important; }
+[data-dek-text="${host}"][data-dek-text-${pseudo}]::${pseudo} { -webkit-text-fill-color: ${fill} !important; }`;
+  const pairs: Array<{ white: string; black: string; rect: Box }> = [];
+  for (const target of targets) {
+    await setLayer(alone(target, "#fff"));
+    const white = await shot();
+    await setLayer(alone(target, "#000"));
+    pairs.push({ white, black: await shot(), rect: target.rect });
   }
   await setLayer(null);
-  await page.addScriptTag({ content: textContrastScript() });
-  return page.evaluate(
-    (input) =>
-      (
-        window as unknown as {
-          __dekTextContrast: (arg: SamplerInput) => Promise<Array<TextContrast | null>>;
+  const found = await page.evaluate(async (input) => {
+    const decode = async (base64: string) => {
+      const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+      const bitmap = await createImageBitmap(blob);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("no 2d context");
+      }
+      context.drawImage(bitmap, 0, 0);
+      return context.getImageData(0, 0, bitmap.width, bitmap.height);
+    };
+    const boxes: Array<Box | null> = [];
+    for (const { white, black, rect } of input) {
+      const [w, k] = [await decode(white), await decode(black)];
+      let box: Box | null = null;
+      const top = Math.max(0, Math.floor(rect.top));
+      const bottom = Math.min(w.height, Math.ceil(rect.bottom));
+      const left = Math.max(0, Math.floor(rect.left));
+      const right = Math.min(w.width, Math.ceil(rect.right));
+      for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) {
+          const i = (y * w.width + x) * 4;
+          const differs =
+            (w.data[i] ?? 0) !== (k.data[i] ?? 0) ||
+            (w.data[i + 1] ?? 0) !== (k.data[i + 1] ?? 0) ||
+            (w.data[i + 2] ?? 0) !== (k.data[i + 2] ?? 0);
+          if (differs) {
+            box = box
+              ? {
+                  left: Math.min(box.left, x),
+                  top: Math.min(box.top, y),
+                  right: Math.max(box.right, x + 1),
+                  bottom: Math.max(box.bottom, y + 1),
+                }
+              : { left: x, top: y, right: x + 1, bottom: y + 1 };
+          }
         }
-      ).__dekTextContrast(input),
-    { layers, texts: withOverlaps(texts) },
-  );
+      }
+      boxes.push(box);
+    }
+    return boxes;
+  }, pairs);
+  return found.map((box) => box ?? undefined);
 }
