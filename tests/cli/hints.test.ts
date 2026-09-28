@@ -67,3 +67,18 @@ describe("dek error hints", () => {
     });
   });
 });
+
+describe("typos in names", () => {
+  // A command word gets a guess when mistyped; so do the names typed after it.
+  test("a mistyped deck or slide name names the likeliest one", async () => {
+    await withTempProject({ decks: [{ name: "2026-10-talk" }] }, async (root) => {
+      const deck = errorOf(() =>
+        showCommand(resolveTarget(root, "deck", { refs: true, deck: "2026-10-tlak" }), "intro"),
+      );
+      expect(deck.hint).toBe("did you mean `2026-10-talk`? run `dek ls` for every deck");
+      const cwd = join(root, "decks", "2026-10-talk");
+      const slide = errorOf(() => showCommand(resolveTarget(cwd, "deck", { refs: true }), "intor"));
+      expect(slide.hint).toBe("did you mean `intro`? run `dek ls` for every slide");
+    });
+  });
+});

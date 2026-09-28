@@ -7,6 +7,7 @@ import { parseScript } from "./parse.ts";
 import { deckProjectRoot } from "./path.ts";
 import { readSourceIfExists, requireInside } from "./safe-fs.ts";
 import type { Deck, Section } from "./schema.ts";
+import { suggest } from "./suggest.ts";
 
 export type ProjectDeck = {
   name: string;
@@ -80,9 +81,13 @@ export function asResolvedDeck(input: string | ResolvedDeck): ResolvedDeck {
 export function requireSection(deck: ProjectDeck, slug: string): Section {
   const section = deck.deck.sections.find((entry) => entry.slug === slug);
   if (!section) {
+    const guess = suggest(
+      slug,
+      deck.deck.sections.map((entry) => entry.slug),
+    );
     throw new DekError(`section "${slug}" not found`, {
       path: deck.scriptPath,
-      hint: "run `dek ls`",
+      hint: guess ? `did you mean \`${guess}\`? run \`dek ls\` for every slide` : "run `dek ls`",
     });
   }
   return section;

@@ -16,6 +16,7 @@ import {
   requireSection,
   resolveProject,
 } from "../core/resolve.ts";
+import { suggest } from "../core/suggest.ts";
 
 export { requireSection };
 
@@ -147,9 +148,13 @@ export function resolveScope(cwd: string, options: { deck?: string } = {}): Scop
     if (failed) {
       throw failed.error;
     }
+    const guess = suggest(name, [
+      ...project.decks.map((entry) => entry.name),
+      ...project.failed.map((entry) => entry.name),
+    ]);
     throw new DekError(`deck "${name}" not found`, {
       path: join(project.root, "decks", name),
-      hint: "run `dek ls`",
+      hint: guess ? `did you mean \`${guess}\`? run \`dek ls\` for every deck` : "run `dek ls`",
     });
   }
   return { project, deck };

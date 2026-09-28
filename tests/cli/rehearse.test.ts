@@ -60,7 +60,7 @@ describe("dek rehearse", () => {
         ).rejects.toMatchObject({
           name: "DekError",
           message: 'section "intr" not found',
-          hint: "run `dek ls`",
+          hint: "did you mean `intro`? run `dek ls` for every slide",
         });
       },
     );
