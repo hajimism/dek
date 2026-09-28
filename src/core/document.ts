@@ -105,6 +105,7 @@ export function renderDeckDocument(
       <p id="${PAGE_ID.elapsed}">0:00</p>
       <p id="${PAGE_ID.budget}">${budget}</p>
       ${target.kind === "dev" ? markButton(deck.deck.lang) : ""}
+      <button id="${PAGE_ID.laserToggle}" type="button" aria-pressed="false" aria-label="${escapeAttr(laserLabel(deck.deck.lang))}" title="${escapeAttr(laserLabel(deck.deck.lang))}"></button>
     </footer>
   </aside>`
     : "";
@@ -193,6 +194,11 @@ function markButton(lang: string): string {
     ? "このビートに直す印を付ける (m)"
     : "Mark this beat to rewrite (m)";
   return `<button id="${PAGE_ID.markToggle}" type="button" aria-pressed="false" aria-label="${escapeAttr(label)}" title="${escapeAttr(label)}"></button>`;
+}
+
+/** The laser button's name, with the key that does the same. */
+function laserLabel(lang: string): string {
+  return lang.toLowerCase().startsWith("ja") ? "レーザーポインター (l)" : "Laser pointer (l)";
 }
 
 /**

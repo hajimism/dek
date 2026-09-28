@@ -220,10 +220,10 @@ function answer(req: Request, server: Bun.Server<WsData>, access: Access, routes
   return routed.respond(seen);
 }
 
-/** Each socket joins its deck's room; only a presenter's socket may move it. */
+/** Each socket joins its deck's room; only a presenter's socket may move it or point in it. */
 function roomSockets(rooms: RouteContext["rooms"]): Bun.WebSocketHandler<WsData> {
   return {
-    // A position is a few dozen bytes; anything near this is not one.
+    // A position or a point is a few dozen bytes; anything near this is neither.
     maxPayloadLength: 4 * 1024,
     open(ws) {
       rooms.join(ws.data.room, ws);
@@ -233,7 +233,7 @@ function roomSockets(rooms: RouteContext["rooms"]): Bun.WebSocketHandler<WsData>
         return;
       }
       const payload = typeof message === "string" ? message : new TextDecoder().decode(message);
-      rooms.move(ws.data.room, ws, payload);
+      rooms.relay(ws.data.room, ws, payload);
     },
     close(ws) {
       rooms.leave(ws.data.room, ws);

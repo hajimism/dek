@@ -49,6 +49,7 @@ While the server is running, the terminal can drive the browser and ask which sl
 | `p` | Toggle the presenter view |
 | `s` | Toggle the slide rail |
 | `f` | Toggle fullscreen |
+| `l` | Toggle the laser pointer |
 | `m` | Mark the beat on screen to rewrite, or unmark it (dev server) |
 | `↑` `↓` | Move within the slide rail |
 | `←` `→` on the rail's edge | Resize the rail |
@@ -57,6 +58,8 @@ While the server is running, the terminal can drive the browser and ask which sl
 Every press counts. Pressing faster than the transitions play, as a clicker skipping ahead does, cuts each transition short and lands where the presses add up to; a second window follows each press at once. Keys held with `Alt`, `Ctrl`, or `Cmd` belong to the browser, and keys typed into a field on a slide belong to the field.
 
 Tap or click the slide to go forward, and its left third to go back. On a phone or tablet you can also swipe sideways; a mouse drag selects text instead, and a click that ends a selection, a right click, or a click held with a modifier key stays where it is. Taps and clicks on links, buttons, and fields are theirs. The slide rail and the key hint stay out of the way on a narrow or touch screen.
+
+Press `l`, or the round button at the end of the presenter view's bar, for a laser pointer. Where the mouse or a finger rests on the slide, a red dot shows in every window of the deck, at the same place on the slide whatever the window's size: the projector, the presenter view, and a phone. While the laser is on, the slide is for pointing, so a tap or a click on it moves nothing; the keys still do. The dot goes when the pointer leaves the slide, the finger lifts, the deck moves to another slide, or the laser is turned off, and on its own a few seconds after its window stops saying where it is, so a closed laptop leaves no dot on the projector. On the dev server only the presenter may point: a laser in an audience window shows on that window alone. A video and a PDF have no dot.
 
 Rehearsing aloud on the dev server, press `m`, or the pencil button in the presenter view's bar, on a beat whose words you stumble over. The beat gets a pencil in the beat list, and the mark is kept in `.dek/marks.json` until you clear it. Afterwards `dek marks` lists each marked beat with its line in `script.md` and what it said, for you or an agent to rewrite; see [After a rehearsal](./ai#after-a-rehearsal). A built file has no server to keep marks, so it has no button.
 

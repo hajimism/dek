@@ -42,13 +42,16 @@ body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: calc(5
 @keyframes dek-hint { 12% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { #dek-hint { transform: translate(-50%, 0); animation-name: dek-hint-fade; } @keyframes dek-hint-fade { 12%, 80% { opacity: 1; } } }
 @media (pointer: coarse) { #dek-hint { display: none; } }
+#dek-laser { position: absolute; z-index: 30; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; background: radial-gradient(circle, #fff 0 12%, #ff3b30 22% 38%, rgba(255,59,48,0.45) 52%, rgba(255,59,48,0) 70%); pointer-events: none; }
+#dek-laser[hidden] { display: none; }
+body.is-laser #dek-current-stage { cursor: crosshair; touch-action: none; }
 .dek-diagnostics { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 12px; background: #900; color: #fff; font: 12px/1.4 monospace; white-space: pre-wrap; z-index: 10; }
 body[data-mode="video"] .dek-diagnostics { display: none !important; }
 @media print {
 ${indent(printPageCss({ width, height }))}
   body, #dek-shell, #dek-current, #dek-current-stage { display: block; height: auto; overflow: visible; position: static; padding: 0; }
   #deck [data-step] { opacity: 1 !important; transform: none !important; transition: none !important; }
-  #dek-rail, #dek-rail-resize, #dek-hint, .dek-panel-label, .dek-diagnostics { display: none !important; }
+  #dek-rail, #dek-rail-resize, #dek-hint, #dek-laser, .dek-panel-label, .dek-diagnostics { display: none !important; }
 }`;
   if (options.presenter === false) {
     return base;
@@ -62,6 +65,10 @@ body[data-mode="video"] #dek-presenter, body[data-mode="video"] #dek-progress { 
 #dek-mark-toggle[aria-pressed="true"] { border-color: #eab308; color: #eab308; }
 #dek-mark-toggle[data-error] { border-color: #ef4444; }
 #dek-beats li.is-marked::after { content: " ✎"; color: #eab308; }
+#dek-laser-toggle { flex: none; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; background: transparent; cursor: pointer; }
+#dek-laser-toggle::before { content: ""; display: block; width: 10px; height: 10px; margin: auto; border-radius: 50%; background: rgba(255,255,255,0.45); }
+#dek-laser-toggle[aria-pressed="true"] { border-color: #ff3b30; }
+#dek-laser-toggle[aria-pressed="true"]::before { background: #ff3b30; box-shadow: 0 0 8px #ff3b30; }
 body.is-presenter { background: #121212; color: #ddd; font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
 body.is-presenter .dek-panel-label { display: block; font: 12px/1.4 system-ui, sans-serif; opacity: 0.65; padding: 4px 8px; }
 body.is-presenter #dek-progress:not([hidden]) { display: flex; height: 4px; flex: none; background: #121212; gap: 1px; }

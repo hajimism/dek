@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { decodePosition, encodePosition, isLiveEvent } from "../../src/core/live-protocol.ts";
+import {
+  decodePointer,
+  decodePosition,
+  encodePointer,
+  encodePosition,
+  isLiveEvent,
+} from "../../src/core/live-protocol.ts";
 
 describe("isLiveEvent", () => {
   test("takes every event the server sends", () => {
@@ -63,6 +69,42 @@ describe("encodePosition / decodePosition", () => {
       { slideIndex: Number.POSITIVE_INFINITY, beatIndex: 0 },
     ]) {
       expect(decodePosition(raw)).toBeUndefined();
+    }
+  });
+});
+
+describe("encodePointer / decodePointer", () => {
+  test("round-trips where the laser points on a slide, and that it went away", () => {
+    const at = { slideIndex: 1, x: 0.25, y: 0.5 };
+    expect(decodePointer(encodePointer(at))).toEqual({ pointer: at });
+    expect(decodePointer(JSON.parse(encodePointer(at)))).toEqual({ pointer: at });
+    expect(decodePointer(encodePointer(null))).toEqual({ pointer: null });
+  });
+
+  test("sends a point to a ten-thousandth of the slide, which is finer than any screen", () => {
+    expect(JSON.parse(encodePointer({ slideIndex: 0, x: 1 / 3, y: 2 / 3 }))).toEqual({
+      pointer: { slideIndex: 0, x: 0.3333, y: 0.6667 },
+    });
+  });
+
+  test("is never taken for a position, nor a position for it", () => {
+    expect(decodePosition(encodePointer({ slideIndex: 1, x: 0.5, y: 0.5 }))).toBeUndefined();
+    expect(decodePointer(encodePosition({ slideIndex: 1, beatIndex: 0 }))).toBeUndefined();
+  });
+
+  test("turns away a point off the slide or a malformed one", () => {
+    for (const raw of [
+      "not json",
+      null,
+      {},
+      { pointer: { slideIndex: 0, x: 1.2, y: 0.5 } },
+      { pointer: { slideIndex: 0, x: 0.5, y: -0.1 } },
+      { pointer: { slideIndex: -1, x: 0.5, y: 0.5 } },
+      { pointer: { slideIndex: 0, x: "0.5", y: 0.5 } },
+      { pointer: { x: 0.5, y: 0.5 } },
+      { pointer: "here" },
+    ]) {
+      expect(decodePointer(raw)).toBeUndefined();
     }
   });
 });

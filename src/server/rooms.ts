@@ -1,4 +1,9 @@
-import { decodePosition, encodePosition } from "../core/live-protocol.ts";
+import {
+  decodePointer,
+  decodePosition,
+  encodePointer,
+  encodePosition,
+} from "../core/live-protocol.ts";
 import { clampPosition, deckStops } from "../core/position.ts";
 import type { ProjectDeck } from "../core/resolve.ts";
 import type { Position } from "../core/step.ts";
@@ -16,8 +21,12 @@ export type Rooms<C extends RoomClient> = {
   /** A socket joins its deck's room, and is told where the talk stands. */
   join(room: string, client: C): void;
   leave(room: string, client: C): void;
-  /** A move from a presenter: kept within the deck, and relayed to everyone else in the room. */
-  move(room: string, from: C, payload: string): void;
+  /**
+   * What a presenter sends, relayed to everyone else in the room: a move, kept within the deck and
+   * as where the room stands; or where the laser points, kept nowhere, since a page that joins
+   * later must not see a laser that pointed before it came.
+   */
+  relay(room: string, from: C, payload: string): void;
   /** Send the room to a slide; the reason when the deck or slide is not there. */
   goto(room: string, slug: string): { ok: true; at: RoomPosition } | { ok: false; message: string };
   current(room: string): RoomPosition;
@@ -81,7 +90,12 @@ export function createRooms<C extends RoomClient>(decks: () => ProjectDeck[]): R
         rooms.delete(room);
       }
     },
-    move(room, from, payload) {
+    relay(room, from, payload) {
+      const laser = decodePointer(payload);
+      if (laser) {
+        broadcast(room, encodePointer(laser.pointer), from);
+        return;
+      }
       const sent = decodePosition(payload);
       const pos = sent && within(room, sent);
       if (!pos) {

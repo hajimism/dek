@@ -1,4 +1,10 @@
-import { decodePosition, encodePosition } from "../core/live-protocol.ts";
+import {
+  decodePointer,
+  decodePosition,
+  encodePointer,
+  encodePosition,
+  type Pointer,
+} from "../core/live-protocol.ts";
 import { positionsEqual } from "../core/position.ts";
 import type { Position } from "../core/step.ts";
 
@@ -31,13 +37,18 @@ const OPEN = 1;
 export type PositionSocket = {
   /** Tell the server where the deck is headed; kept for the next connection while offline. */
   publish(position: Position): void;
+  /**
+   * Tell the server where the laser points, or null once it went away. Dropped while offline:
+   * a point is stale by the time the line is back, and the next move of the hand sends a new one.
+   */
+  point(pointer: Pointer | null): void;
   /** Close for good: no reconnect follows. */
   close(): void;
 };
 
 /**
  * The deck's line to the server, which relays positions between the presenter, the audience,
- * and a phone remote. Like an EventSource, it reconnects by itself after a drop (a restarted
+ * and a phone remote, and where the presenter's laser points. Like an EventSource, it reconnects by itself after a drop (a restarted
  * server, a Wi-Fi blip), backing off with `reconnectDelay`, until `close`.
  *
  * On reconnect the server greets with the last position it holds, and the deck follows it, having
@@ -47,6 +58,8 @@ export type PositionSocket = {
 export function createPositionSocket(options: {
   connect: () => SocketLike;
   onPosition: (position: Position) => void;
+  /** Where a presenter's laser points, or null once it went away. */
+  onPointer?: (pointer: Pointer | null) => void;
   setTimer: (fn: () => void, ms: number) => number;
   clearTimer: (id: number) => void;
   random?: () => number;
@@ -76,6 +89,11 @@ export function createPositionSocket(options: {
       }
     });
     current.addEventListener("message", (event) => {
+      const laser = decodePointer(event.data);
+      if (laser) {
+        options.onPointer?.(laser.pointer);
+        return;
+      }
       const position = decodePosition(event.data);
       if (!position) {
         return;
@@ -105,6 +123,11 @@ export function createPositionSocket(options: {
         synced = position;
       } else {
         unsent = position;
+      }
+    },
+    point(pointer) {
+      if (socket?.readyState === OPEN) {
+        socket.send(encodePointer(pointer));
       }
     },
     close() {

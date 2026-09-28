@@ -1423,6 +1423,40 @@ body
     );
   });
 
+  test("relays the presenter's laser to the room, and nobody else's", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer(
+          { cwd: join(root, "decks", "demo"), remote: true, password: "secret" },
+          async (server) => {
+            const audienceUrl = new URL("/ws", server.url);
+            audienceUrl.protocol = "ws:";
+            const presenterUrl = new URL(audienceUrl);
+            presenterUrl.searchParams.set("token", "secret");
+            const presenter = new WebSocket(presenterUrl);
+            const audience = new WebSocket(audienceUrl);
+            const phone = new WebSocket(audienceUrl);
+            try {
+              await Promise.all([presenter, audience, phone].map((ws) => waitForWsOpen(ws)));
+              // A phone in the audience points first; only the presenter's point may arrive.
+              const heard = waitForWsMessage(audience);
+              phone.send(JSON.stringify({ pointer: { slideIndex: 0, x: 0.9, y: 0.9 } }));
+              presenter.send(JSON.stringify({ pointer: { slideIndex: 0, x: 0.5, y: 0.25 } }));
+              expect(JSON.parse(await heard)).toEqual({
+                pointer: { slideIndex: 0, x: 0.5, y: 0.25 },
+              });
+            } finally {
+              for (const ws of [presenter, audience, phone]) {
+                ws.close();
+              }
+            }
+          },
+        );
+      },
+    );
+  });
+
   test("marks the beat the presenter is on, lists it, and unmarks it at the second press", async () => {
     await withTempProject(
       {

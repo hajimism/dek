@@ -73,3 +73,58 @@ export function decodePosition(raw: unknown): Position | undefined {
 
 const isIndex = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value >= 0;
+
+/**
+ * Where the laser points: a slide, and a point on it as a share of its width and height, so every
+ * window draws it at the same place on the slide whatever size the window is.
+ */
+export type Pointer = { slideIndex: number; x: number; y: number };
+
+/** What the laser says on the wire: where it points, or null once it went away. */
+export type PointerMessage = { pointer: Pointer | null };
+
+/** Four decimals: a ten-thousandth of the slide is finer than any screen shows it. */
+const round = (share: number): number => Math.round(share * 10_000) / 10_000;
+
+export function encodePointer(pointer: Pointer | null): string {
+  return JSON.stringify({
+    pointer: pointer && {
+      slideIndex: pointer.slideIndex,
+      x: round(pointer.x),
+      y: round(pointer.y),
+    },
+  });
+}
+
+/**
+ * A laser message read off the wire, as text or as the object a BroadcastChannel carries; nothing
+ * for anything else, a position included. Only the three fields travel, within the slide.
+ */
+export function decodePointer(raw: unknown): PointerMessage | undefined {
+  const value = typeof raw === "string" ? parseJson(raw) : raw;
+  if (typeof value !== "object" || value === null || !Object.hasOwn(value, "pointer")) {
+    return undefined;
+  }
+  const pointer = (value as { pointer: unknown }).pointer;
+  if (pointer === null) {
+    return { pointer: null };
+  }
+  if (typeof pointer !== "object") {
+    return undefined;
+  }
+  const { slideIndex, x, y } = pointer as Record<string, unknown>;
+  return isIndex(slideIndex) && isShare(x) && isShare(y)
+    ? { pointer: { slideIndex, x, y } }
+    : undefined;
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+const isShare = (value: unknown): value is number =>
+  typeof value === "number" && value >= 0 && value <= 1;

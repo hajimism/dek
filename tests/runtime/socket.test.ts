@@ -32,8 +32,8 @@ class FakeSocket implements SocketLike {
     this.emit("open");
   }
 
-  receive(position: Position): void {
-    this.emit("message", { data: JSON.stringify(position) });
+  receive(message: Position | { pointer: unknown }): void {
+    this.emit("message", { data: JSON.stringify(message) });
   }
 
   drop(): void {
@@ -53,6 +53,7 @@ function harness() {
   const timers = new Map<number, { fn: () => void; ms: number }>();
   let nextTimer = 1;
   const received: Position[] = [];
+  const pointed: unknown[] = [];
   const remote = createPositionSocket({
     connect: () => {
       const socket = new FakeSocket();
@@ -60,6 +61,7 @@ function harness() {
       return socket;
     },
     onPosition: (position) => received.push(position),
+    onPointer: (pointer) => pointed.push(pointer),
     setTimer: (fn, ms) => {
       const id = nextTimer++;
       timers.set(id, { fn, ms });
@@ -84,7 +86,7 @@ function harness() {
     }
     return socket;
   };
-  return { sockets, timers, received, remote, fire, last };
+  return { sockets, timers, received, pointed, remote, fire, last };
 }
 
 const at = (slideIndex: number, beatIndex = 0): Position => ({ slideIndex, beatIndex });
@@ -107,6 +109,30 @@ describe("createPositionSocket", () => {
     remote.publish(at(3));
     expect(received).toEqual([at(2)]);
     expect(last().sent).toEqual([JSON.stringify(at(3))]);
+  });
+
+  test("carries where the laser points both ways, apart from the position", () => {
+    const { received, pointed, remote, last } = harness();
+    last().open();
+    last().receive({ pointer: { slideIndex: 0, x: 0.5, y: 0.5 } });
+    remote.point({ slideIndex: 0, x: 0.1, y: 0.2 });
+    remote.point(null);
+    expect(pointed).toEqual([{ slideIndex: 0, x: 0.5, y: 0.5 }]);
+    expect(received).toEqual([]);
+    expect(last().sent).toEqual([
+      JSON.stringify({ pointer: { slideIndex: 0, x: 0.1, y: 0.2 } }),
+      JSON.stringify({ pointer: null }),
+    ]);
+  });
+
+  test("drops a point made while the line is down: by the time it is back, it is stale", () => {
+    const { remote, fire, last } = harness();
+    last().open();
+    last().drop();
+    remote.point({ slideIndex: 0, x: 0.1, y: 0.2 });
+    fire();
+    last().open();
+    expect(last().sent).toEqual([]);
   });
 
   test("reconnects after a drop, backing off until one opens", () => {

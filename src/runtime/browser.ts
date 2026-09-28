@@ -7,6 +7,7 @@ import type { PresenterSlide } from "../core/presenter-state.ts";
 import type { Position } from "../core/step.ts";
 import { createDeckControl } from "./deck-control.ts";
 import { bindInput } from "./input.ts";
+import { createLaserView, type LaserView } from "./laser-view.ts";
 import { applyLiveEvent, hydrateLiveEvent } from "./live.ts";
 import { documentLiveHost } from "./live-host.ts";
 import { createMarksView } from "./marks-view.ts";
@@ -58,6 +59,15 @@ if (dataEl?.textContent) {
   });
   const control = createDeckControl({ go: (next, origin) => nav.go(next, origin), rehearse });
 
+  // A video shows the talk as narrated; nobody points at it.
+  const laser: LaserView | undefined =
+    page.mode === "video"
+      ? undefined
+      : createLaserView({
+          current: () => nav.position().slideIndex,
+          send: (pointer) => nav.point(pointer),
+        });
+
   // Only the dev server has a socket to follow; a built file on a static host must not dial one.
   const socketUrl = page.live
     ? `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${deckUrl(location.pathname, { kind: "socket" })}${liveTokenQuery(page.liveToken)}`
@@ -76,6 +86,7 @@ if (dataEl?.textContent) {
       render(to);
       if (from.slideIndex !== to.slideIndex) {
         stage.announce(to);
+        laser?.sync();
       }
       // A hashchange echoing this same position must not cut a running animation short.
       if (!positionsEqual(from, to)) {
@@ -84,6 +95,7 @@ if (dataEl?.textContent) {
     },
     afterMove: presenter.startClock,
     route: (next) => control.request(next, "remote"),
+    ...(laser ? { onPointer: laser.receive } : {}),
   });
 
   const marks = createMarksView({
@@ -129,7 +141,9 @@ if (dataEl?.textContent) {
       return true;
     },
     togglePlay: control.togglePlay,
+    toggleLaser: () => laser?.toggle() ?? false,
     toggleMark: () => marks?.toggle() ?? false,
+    pointing: () => laser?.isOn() ?? false,
     move: (move) => control.request(moveTarget(move, nav.target(), deck), "local"),
   });
 

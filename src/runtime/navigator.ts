@@ -1,6 +1,12 @@
 /// <reference lib="dom" />
 
-import { decodePosition, encodePosition } from "../core/live-protocol.ts";
+import {
+  decodePointer,
+  decodePosition,
+  encodePointer,
+  encodePosition,
+  type Pointer,
+} from "../core/live-protocol.ts";
 import {
   clampPosition,
   type DeckStops,
@@ -32,13 +38,16 @@ export type Navigator = {
   go(next: Position | null | undefined, origin?: GoOrigin): Promise<void>;
   /** Write the position to the URL, e.g. once a hash past a slide's last beat was clamped. */
   writeHash(mode: "push" | "replace"): void;
+  /** Tell the other windows and the server where this window's laser points, or that it went away. */
+  point(pointer: Pointer | null): void;
 };
 
 type GoRequest = { position: Position; origin: GoOrigin };
 
 /**
  * Owns where the deck is: the position, the one it is headed to, and the lines that carry it
- * (the URL, other windows, the dev server's socket). Drawing a move is left to `present`.
+ * (the URL, other windows, the dev server's socket), which also carry where a laser points.
+ * Drawing a move is left to `present`.
  */
 export function createNavigator(options: {
   deck: DeckStops;
@@ -60,6 +69,8 @@ export function createNavigator(options: {
   afterMove?: () => void;
   /** Where a peer's move goes, once clamped and new; left out, the deck goes there. */
   route?: (next: Position) => void;
+  /** Where a peer's laser points, or null once it went away. */
+  onPointer?: (pointer: Pointer | null) => void;
 }): Navigator {
   const slugs = options.deck.map((slide) => slide.slug);
   // One channel per deck: two decks' built files open side by side must not drive each other.
@@ -135,6 +146,11 @@ export function createNavigator(options: {
   }
 
   channel.addEventListener("message", (event: MessageEvent) => {
+    const laser = decodePointer(event.data);
+    if (laser) {
+      options.onPointer?.(laser.pointer);
+      return;
+    }
     const next = decodePosition(event.data);
     if (next) {
       receive(next);
@@ -145,6 +161,7 @@ export function createNavigator(options: {
     remote = createPositionSocket({
       connect: () => new WebSocket(url),
       onPosition: receive,
+      ...(options.onPointer ? { onPointer: options.onPointer } : {}),
       setTimer: (fn, ms) => window.setTimeout(fn, ms),
       clearTimer: (id) => window.clearTimeout(id),
     });
@@ -164,5 +181,9 @@ export function createNavigator(options: {
     target: () => target,
     go,
     writeHash,
+    point(pointer) {
+      channel.postMessage(encodePointer(pointer));
+      remote?.point(pointer);
+    },
   };
 }

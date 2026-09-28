@@ -15,8 +15,11 @@ export type InputActions = {
   toggleRail: () => boolean;
   /** Space; left to `move` unless this takes it (a rehearsal plays and pauses). */
   togglePlay: () => boolean;
+  toggleLaser: () => boolean;
   /** Mark the beat on screen to rewrite, or unmark it; false where marks cannot be kept. */
   toggleMark: () => boolean;
+  /** While the laser is on, the slide is for pointing: a tap or a click on it moves nothing. */
+  pointing: () => boolean;
   move: (move: Move) => void;
 };
 
@@ -45,6 +48,12 @@ export function bindInput(actions: InputActions): void {
       }
       return;
     }
+    if (isLetterKey(event, "l")) {
+      if (actions.toggleLaser()) {
+        event.preventDefault();
+      }
+      return;
+    }
     if (isRailToggleKey(event)) {
       if (actions.toggleRail()) {
         event.preventDefault();
@@ -64,13 +73,21 @@ export function bindInput(actions: InputActions): void {
   });
   const stageEl = document.getElementById(PAGE_ID.currentStage);
   if (stageEl) {
-    bindStagePointer(stageEl, actions.move);
+    bindStagePointer(stageEl, actions);
   }
 }
 
-function bindStagePointer(stageEl: HTMLElement, onMove: (move: Move) => void): void {
+function bindStagePointer(
+  stageEl: HTMLElement,
+  actions: Pick<InputActions, "move" | "pointing">,
+): void {
+  const onMove = actions.move;
   let start: { x: number; y: number; id: number } | undefined;
   stageEl.addEventListener("pointerdown", (event) => {
+    if (actions.pointing()) {
+      start = undefined;
+      return;
+    }
     // A right click, or one held with a modifier (Shift extends a selection), is the browser's.
     const modified = event.altKey || event.ctrlKey || event.metaKey || event.shiftKey;
     const theirs = event.pointerType === "mouse" && (event.button !== 0 || modified);
