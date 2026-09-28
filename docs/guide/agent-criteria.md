@@ -2,7 +2,7 @@
 
 dek is built to be used by coding agents. This page is the yardstick for that: what a change must not break, and what an improvement should move. Use it when you design a command, a diagnostic, or a convention, and when you review one.
 
-An agent works in a loop: learn the project, write a slide, check the result, fix what is wrong, and decide that it is done. Each criterion below covers one place where that loop can stall.
+An agent works in a loop: learn the project, write a slide, check the result, fix what is wrong, and decide when to hand the deck back. Each criterion below covers one place where that loop can stall.
 
 ## Criteria
 
@@ -17,6 +17,8 @@ An agent works in a loop: learn the project, write a slide, check the result, fi
 ### 2. Conventions match checks
 
 Every convention written for agents is enforced by a lint rule. A deck that passes lint does not violate a documented convention.
+
+Lint checks what a cooperating agent writes, not input built to slip past it. An agent that means to follow the conventions and gets one wrong is caught; markup contrived to hide a violation, such as a script tucked into `<iframe srcdoc>` or `globalThis["Da" + "te"]`, is out of scope. dek builds decks you wrote or asked an agent to write, not decks from strangers, so the checks are a convention checker and not a sandbox.
 
 - Each convention in `AGENTS.md` maps to a rule id.
 - A convention that cannot be checked is either made checkable or removed from the list.
@@ -47,9 +49,11 @@ An agent never has to parse prose to decide what to do.
 - Each diagnostic carries its severity, and the exit code follows from severity alone.
 - Numbers in a diagnostic, such as pixels, contrast ratios, and the offending value, are fields, not only text in the message.
 
-### 6. A clear definition of done
+### 6. A clear stopping point
 
-An agent can tell when the work is finished and gets there in few runs.
+An agent can tell when nothing measurable is left to fix, and what is still left to judge, and gets there in few runs.
+
+Passing `dek lint --visual` is necessary for a finished deck, not sufficient. It says that nothing a rule can decide is wrong. Whether the slides balance, whether the argument holds, and whether the timing works are judged by reading the sheet and the script, and finally by the author.
 
 - A fresh project, a new deck, and the bundled sample pass lint as created.
 - Lint reports every problem it can find in one run, not one at a time.
@@ -77,8 +81,16 @@ When a change or a bug violates a criterion, rate it by what it does to the agen
 
 | Severity | Effect on the agent |
 | --- | --- |
-| S1 | The agent gets stuck, or reports the work as done when it is not |
+| S1 | The agent gets stuck, or reports a measurable problem as absent |
 | S2 | The agent reaches the goal, but with extra runs or guesswork |
 | S3 | Presentation only; the agent is not slowed down |
 
-S1 violations are fixed before new features. S2 violations are fixed when the area is touched. S3 violations are fixed when convenient.
+Then rate how an agent meets it. A violation is *natural* when an agent reaches it in ordinary work: writing slides the way the docs describe, following a hint, or running commands in the order it happens to. It is *contrived* when it takes input nobody would write except to find the gap.
+
+| | Natural | Contrived |
+| --- | --- | --- |
+| S1 | Fix before new features | Fix when the area is touched |
+| S2 | Fix before new features | Fix when the area is touched |
+| S3 | Fix when convenient | Fix when convenient |
+
+A contrived violation that only obfuscation reaches is out of scope (criterion 2) and is closed rather than scheduled.
