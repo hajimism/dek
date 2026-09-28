@@ -10,6 +10,7 @@ describe("formatText", () => {
         data: {
           root: "/tmp/talks",
           created: ["dek.toml"],
+          updated: [],
           kept: [],
           next: ["cd talks", "bunx dek new <name>"],
         },
@@ -21,6 +22,7 @@ describe("formatText", () => {
         data: {
           root: "/tmp/talks",
           created: ["dek.toml"],
+          updated: [],
           kept: [],
           next: ["bunx dek new <name>"],
           playwright: "bun add -d playwright",
@@ -32,7 +34,7 @@ describe("formatText", () => {
     expect(
       formatText({
         command: "new",
-        data: { name: "demo", dir: "/tmp/demo", created: [], next: ["cd decks/demo"] },
+        data: { name: "demo", dir: "/tmp/demo", created: [], updated: [], next: ["cd decks/demo"] },
       }),
     ).toBe("created deck demo\n\nnext:\n  cd decks/demo");
   });
@@ -389,6 +391,7 @@ describe("displayPaths created files", () => {
           name: "next",
           dir: "/p/decks/next",
           created: ["/p/decks/next/script.md"],
+          updated: [],
           next: [],
         },
       },

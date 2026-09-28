@@ -113,7 +113,12 @@ export function watchDeck(
    * reported by the diagnostics pass that follows, so the failure itself stays quiet here.
    */
   const syncScript = (options: { announceEmpty: boolean }): void => {
-    let result: SyncResult = { created: [], updated: [], removed: [] };
+    let result: SyncResult = {
+      created: [],
+      updated: [],
+      removed: [],
+      dekFiles: { created: [], updated: [] },
+    };
     try {
       result = syncDeck(deckDir);
     } catch {

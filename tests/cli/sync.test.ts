@@ -110,6 +110,15 @@ more
     );
   });
 
+  test("lists dek's own files it updated, once however many decks it syncs", async () => {
+    await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
+      syncCommand(resolveDecks(root));
+      await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
+      const result = syncCommand(resolveDecks(root));
+      expect(result.updated).toEqual([join(root, ".dek", "slide.d.ts")]);
+    });
+  });
+
   test("clears the example skeletons once the author writes their own script", async () => {
     await withTempDir(async (dir) => {
       initCommand({ cwd: dir, deck: "demo" });

@@ -12,6 +12,8 @@ export type NewResult = {
   name: string;
   dir: string;
   created: string[];
+  /** dek's own files at the project root that were there and are now brought up to date. */
+  updated: string[];
   /** The commands to run next, from the directory new ran in. */
   next: string[];
 };
@@ -48,7 +50,15 @@ export function newCommand(options: { cwd: string; name: string; themeFrom?: str
   const theme = readFileSync(themeSource, "utf8");
   const voice = loadConfig(project.configPath).voice;
   const { created } = applyPlan(deckPlan(project.root, name, theme, voice));
-  // As sync would: AGENTS.md and .dek/ follow the project, now one deck larger.
-  created.push(...syncDeck(dir).created);
-  return { name, dir, created, next: nextSteps(options.cwd, project.root, dir) };
+  // As sync would. AGENTS.md and .dek/ follow the project theme and dek, so they change here
+  // only when either moved on since the last command that wrote them: say which.
+  const synced = syncDeck(dir);
+  created.push(...synced.created, ...synced.dekFiles.created);
+  return {
+    name,
+    dir,
+    created,
+    updated: synced.dekFiles.updated,
+    next: nextSteps(options.cwd, project.root, dir),
+  };
 }

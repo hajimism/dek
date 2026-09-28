@@ -84,7 +84,7 @@ more
 
         const result = syncDeck(deckDir);
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           created: [],
           updated: [join(deckDir, "slides", "intro.html"), join(deckDir, "slides", "plan.html")],
           removed: [],
@@ -93,7 +93,12 @@ more
         expect(intro).toContain('<h2 class="slide-title">The Bug That Was a Design</h2>');
         const plan = await readFile(join(deckDir, "slides", "plan.html"), "utf8");
         expect(plan).toContain('<li data-step="two">two</li>');
-        expect(syncDeck(deckDir)).toEqual({ created: [], updated: [], removed: [] });
+        expect(syncDeck(deckDir)).toEqual({
+          created: [],
+          updated: [],
+          removed: [],
+          dekFiles: { created: [], updated: [] },
+        });
       },
     );
   });
@@ -268,7 +273,12 @@ c
         expect(result.created).toEqual([join(slidesDir, "mine.html")]);
         expect(existsSync(join(slidesDir, "plan.html"))).toBe(false);
         expect(lintDeck(deckDir).filter((d) => d.id === "DEK002")).toEqual([]);
-        expect(syncDeck(deckDir)).toEqual({ created: [], updated: [], removed: [] });
+        expect(syncDeck(deckDir)).toEqual({
+          created: [],
+          updated: [],
+          removed: [],
+          dekFiles: { created: [], updated: [] },
+        });
       },
     );
   });
@@ -554,6 +564,43 @@ more
         expect(result.created.some((path) => path.endsWith("slides/extra.html"))).toBe(true);
       },
     );
+  });
+});
+
+describe("syncDeck and dek's own files", () => {
+  const dekFiles = (root: string) => [
+    join(root, ".dek", "schema.json"),
+    join(root, ".dek", "slide.d.ts"),
+    join(root, "AGENTS.md"),
+  ];
+
+  test("creates them the first time, and leaves them alone once they are current", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const dir = join(root, "decks", "demo");
+      expect(syncDeck(dir).dekFiles).toEqual({ created: dekFiles(root), updated: [] });
+
+      const old = new Date("2020-01-01T00:00:00Z");
+      for (const path of dekFiles(root)) {
+        await utimes(path, old, old);
+      }
+      expect(syncDeck(dir).dekFiles).toEqual({ created: [], updated: [] });
+      for (const path of dekFiles(root)) {
+        expect((await stat(path)).mtime).toEqual(old);
+      }
+    });
+  });
+
+  test("brings one that has drifted up to date, and says so", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const dir = join(root, "decks", "demo");
+      syncDeck(dir);
+      await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
+      await writeFile(join(root, "theme.css"), ".slide .fresh { color: var(--fg); }\n");
+      expect(syncDeck(dir).dekFiles).toEqual({
+        created: [],
+        updated: [join(root, ".dek", "slide.d.ts"), join(root, "AGENTS.md")],
+      });
+    });
   });
 });
 

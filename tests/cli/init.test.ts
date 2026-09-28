@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { initCommand } from "../../src/cli/init.ts";
 import { type LsDeckResult, lsCommand } from "../../src/cli/ls.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
+import { formatInit } from "../../src/cli/text.ts";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { PLAYWRIGHT_INSTALL } from "../../src/core/playwright.ts";
@@ -153,7 +154,9 @@ describe("initCommand", () => {
       expect(agents).toContain("dek help --agent");
       expect(await readFile(join(dir, "decks", "demo", "script.md"), "utf8")).toBe("## mine\n");
       expect(again.created).toEqual([]);
+      expect(again.updated).toEqual([join(dir, "AGENTS.md")]);
       expect(again.kept).toEqual([join(dir, "decks", "demo", "script.md")]);
+      expect(formatInit(again)).toContain(`  ${join(dir, "AGENTS.md")} (updated)\n`);
     });
   });
 

@@ -4,12 +4,7 @@ import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { readTextIfExists } from "../core/resolve.ts";
-import {
-  defaultTsconfig,
-  writeAgentsMd,
-  writeFrontmatterSchema,
-  writeSlideTypes,
-} from "../core/sync.ts";
+import { defaultTsconfig, dekFilePaths, writeDekFiles } from "../core/sync.ts";
 import {
   applyPlan,
   checkFileSlots,
@@ -28,6 +23,8 @@ export type InitResult = {
   root: string;
   /** Paths init wrote. */
   created: string[];
+  /** dek's own files, already there, that init brought up to date. */
+  updated: string[];
   /** Files that were already there and differ from what init would write; left as they are. */
   kept: string[];
   /** The commands to run next, from the directory init ran in. */
@@ -48,15 +45,17 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
     });
   }
   checkTarget(root);
-  checkFileSlots(dekFiles(root));
+  checkFileSlots(dekFilePaths(root));
 
   const { created, kept } = applyPlan(projectPlan(root, options.deck));
-  created.push(...writeDekFiles(root));
+  const dekFiles = writeDekFiles(root);
+  created.push(...dekFiles.created);
   const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
   const playwright = playwrightStep(root);
   return {
     root,
     created,
+    updated: dekFiles.updated,
     kept,
     next: nextSteps(options.cwd, root, deckDir),
     ...(playwright ? { playwright } : {}),
@@ -99,25 +98,4 @@ function checkTarget(root: string): void {
       hint: `add a deck to that project with \`dek new ${shellQuote(basename(root))}\`, or run init outside it`,
     });
   }
-}
-
-function dekFiles(root: string): string[] {
-  return [
-    join(root, "AGENTS.md"),
-    join(root, ".dek", "schema.json"),
-    join(root, ".dek", "slide.d.ts"),
-  ];
-}
-
-/**
- * `.dek/` and dek's block in AGENTS.md are dek's own, refreshed on every run as sync would, from
- * the theme now in place; listed as created only the first time. The rest of AGENTS.md is the
- * author's and stays.
- */
-function writeDekFiles(root: string): string[] {
-  const fresh = dekFiles(root).filter((path) => !existsSync(path));
-  writeAgentsMd(root);
-  writeFrontmatterSchema(root);
-  writeSlideTypes(root);
-  return fresh;
 }

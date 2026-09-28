@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { newCommand } from "../../src/cli/new.ts";
+import { formatNew } from "../../src/cli/text.ts";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
@@ -118,6 +119,29 @@ describe("newCommand", () => {
         "$EDITOR script.md",
         "bunx dek",
       ]);
+    });
+  });
+
+  test("says which of dek's own files it brought up to date", async () => {
+    await withTempProject({ theme: defaultTheme() }, async (root) => {
+      newCommand({ cwd: root, name: "first" });
+      await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
+
+      const result = newCommand({ cwd: root, name: "second" });
+      expect(result.updated).toEqual([join(root, ".dek", "slide.d.ts")]);
+      expect(result.created).not.toContain(join(root, ".dek", "slide.d.ts"));
+      expect(formatNew(result)).toStartWith(
+        `created deck second\n  ${join(root, ".dek", "slide.d.ts")} (updated)\n`,
+      );
+    });
+  });
+
+  test("names only the deck when dek's own files were already current", async () => {
+    await withTempProject({ theme: defaultTheme() }, async (root) => {
+      newCommand({ cwd: root, name: "first" });
+      const result = newCommand({ cwd: root, name: "second" });
+      expect(result.updated).toEqual([]);
+      expect(formatNew(result)).toStartWith("created deck second\n\nnext:");
     });
   });
 

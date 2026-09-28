@@ -57,15 +57,21 @@ export function formatInit(data: InitResult): string {
     data.created.length > 0
       ? `created project at ${data.root}`
       : `project at ${data.root} is already set up`;
-  const lines = [...data.created, ...data.kept.map((path) => `${path} (kept)`)];
+  const lines = [
+    ...data.created,
+    ...data.updated.map((path) => `${path} (updated)`),
+    ...data.kept.map((path) => `${path} (kept)`),
+  ];
   const done = withNext([header, ...lines.map((line) => `  ${line}`)].join("\n"), data.next);
   return data.playwright
     ? `${done}\n\nfor dek shot, dek pdf, and --visual:\n  ${data.playwright}`
     : done;
 }
 
+/** The deck, and any of dek's own files it brought up to date: the rest is the deck's, and new. */
 export function formatNew(data: NewResult): string {
-  return withNext(`created deck ${data.name}`, data.next);
+  const updated = data.updated.map((path) => `  ${path} (updated)`);
+  return withNext([`created deck ${data.name}`, ...updated].join("\n"), data.next);
 }
 
 export function formatMv(data: MvResult): string {

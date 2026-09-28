@@ -232,6 +232,7 @@ export const COMMANDS = {
       paths: (data, display) => ({
         ...data,
         created: data.created.map(display),
+        updated: data.updated.map(display),
         kept: data.kept.map(display),
       }),
     },
@@ -250,7 +251,11 @@ export const COMMANDS = {
     },
     output: {
       text: formatNew,
-      paths: (data, display) => ({ ...data, created: data.created.map(display) }),
+      paths: (data, display) => ({
+        ...data,
+        created: data.created.map(display),
+        updated: data.updated.map(display),
+      }),
     },
   }),
   ls: result({

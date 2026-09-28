@@ -31,8 +31,8 @@
 
 | コマンド | 役割 |
 | --- | --- |
-| `dek init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dek/schema.json`、`.dek/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dek sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dek のブロックを足す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dek new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dek が入るまでは `bun add -d github:hajimism/dek` も含める |
-| `dek new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る。次に打つコマンドも表示する（`--json` では `next`） |
+| `dek init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dek/schema.json`、`.dek/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dek sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dek 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dek のブロックを足す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dek new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dek が入るまでは `bun add -d github:hajimism/dek` も含める |
+| `dek new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る。sync と同じく dek 自身のファイルを更新し、更新したものを一覧する（`--json` では `updated`）。次に打つコマンドも表示する（`--json` では `next`） |
 | `dek ls [deck]` | デッキ一覧、または 1 つの概要。セクション数、枚数、診断、予算、見積もり、Timeline があれば実尺。診断は rumdl を除いた dek 自身のルールの結果。一覧では各デッキの指摘をその行に、プロジェクトの指摘（`dek.toml`）を `project` 行と `--json` の最上位の `diagnostics` に 1 回だけ数える |
 
 ## ref
@@ -63,7 +63,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dek mv [deck] <slug> --before\|--after <slug>` | `script.md` の中でセクションを並べ替える |
 | `dek goto [deck] <slug>` | 開いているブラウザを飛ばす。開発サーバが必要 |
 | `dek current [deck]` | いま表示中の枚を出力。開発サーバが必要 |
-| `dek sync [deck]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、`AGENTS.md` の dek のブロック、`.dek/schema.json`、`.dek/slide.d.ts` を更新する。手を入れたスライド、`AGENTS.md` の dek のブロックの外に書いたこと、`tsconfig.json` には触れない。`--json` は `created`、`updated`、`removed` を返す |
+| `dek sync [deck]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、dek 自身のファイル（`AGENTS.md` の dek のブロック、`.dek/schema.json`、`.dek/slide.d.ts`）を更新する。これらはデッキではなく、プロジェクトのテーマと入っている dek に従うので、どちらかが変わった後にだけ変わる。そのとき最初に走ったコマンドが、どれであれ更新したと表示する。手を入れたスライド、`AGENTS.md` の dek のブロックの外に書いたこと、`tsconfig.json` には触れない。`--json` は `created`、`updated`、`removed` を返す |
 
 ## 成果物
 

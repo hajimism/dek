@@ -12,9 +12,62 @@ import { type ThemeFacts, themeFacts } from "./theme-facts.ts";
 
 /**
  * `updated` lists skeletons nobody edited, rewritten because the script moved on; `removed`, the
- * ones whose section is gone from the script.
+ * ones whose section is gone from the script. `dekFiles` is what became of dek's own files at the
+ * project root.
  */
-export type SyncResult = { created: string[]; updated: string[]; removed: string[] };
+export type SyncResult = {
+  created: string[];
+  updated: string[];
+  removed: string[];
+  dekFiles: FileChanges;
+};
+
+/** Files a write made (`created`) or brought up to date (`updated`); a current one is in neither. */
+export type FileChanges = { created: string[]; updated: string[] };
+
+/** What a write did to one file; undefined when it was already current and left alone. */
+type Written = "created" | "updated" | undefined;
+
+function writeIfChanged(path: string, contents: string, root: string): Written {
+  const current = readSourceIfExists(path, root);
+  if (current === contents) {
+    return undefined;
+  }
+  writeInside(path, contents, root);
+  return current === undefined ? "created" : "updated";
+}
+
+/**
+ * dek's own files at the project root, in the order they are written: the frontmatter schema and
+ * the slide types an editor reads, and AGENTS.md, whose dek block agents read. They follow the
+ * project theme and this version of dek, not any one deck.
+ */
+export function dekFilePaths(root: string): string[] {
+  return dekFileWriters(root).map(([path]) => path);
+}
+
+function dekFileWriters(root: string): Array<[path: string, write: () => Written]> {
+  return [
+    [join(root, ".dek", "schema.json"), () => writeFrontmatterSchema(root)],
+    [join(root, ".dek", "slide.d.ts"), () => writeSlideTypes(root)],
+    [join(root, "AGENTS.md"), () => writeAgentsMd(root)],
+  ];
+}
+
+/**
+ * Brings dek's own files up to date, writing only the ones that differ. They change when dek or
+ * the project theme does, so the first command to run after either, whichever it is, reports them.
+ */
+export function writeDekFiles(root: string): FileChanges {
+  const changes: FileChanges = { created: [], updated: [] };
+  for (const [path, write] of dekFileWriters(root)) {
+    const written = write();
+    if (written) {
+      changes[written].push(path);
+    }
+  }
+  return changes;
+}
 
 const slideTypesPath = join(import.meta.dir, "..", "runtime", "slide.d.ts");
 
@@ -44,19 +97,17 @@ export function defaultTsconfig(): string {
  * alone so the editor's TypeScript server does not reload on every sync.
  * `tsconfig.json` is the project's; only `dek init` writes one.
  */
-export function writeSlideTypes(root: string): string {
-  const path = join(root, ".dek", "slide.d.ts");
-  const types = readFileSync(slideTypesPath, "utf8");
-  if (readSourceIfExists(path, root) !== types) {
-    writeInside(path, types, root);
-  }
-  return path;
+function writeSlideTypes(root: string): Written {
+  return writeIfChanged(
+    join(root, ".dek", "slide.d.ts"),
+    readFileSync(slideTypesPath, "utf8"),
+    root,
+  );
 }
 
-export function writeFrontmatterSchema(root: string): string {
-  const path = join(root, ".dek", "schema.json");
-  writeInside(path, `${JSON.stringify(frontmatterJsonSchema(), null, 2)}\n`, root);
-  return path;
+function writeFrontmatterSchema(root: string): Written {
+  const schema = `${JSON.stringify(frontmatterJsonSchema(), null, 2)}\n`;
+  return writeIfChanged(join(root, ".dek", "schema.json"), schema, root);
 }
 
 export function syncDeck(dir: string): SyncResult;
@@ -94,10 +145,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
     created.push(path);
   }
 
-  writeFrontmatterSchema(project.root);
-  writeSlideTypes(project.root);
-  writeAgentsMd(project.root);
-  return { created, updated, removed };
+  return { created, updated, removed, dekFiles: writeDekFiles(project.root) };
 }
 
 /**
@@ -137,15 +185,14 @@ const AGENTS_END = "<!-- dek:end -->";
  * Writes dek's block into AGENTS.md, from the project theme.css (or another, for a deck's own).
  * An unchanged file is left alone, so a sync on every save does not touch it.
  */
-export function writeAgentsMd(root: string, themePath = join(root, "theme.css")): string {
+export function writeAgentsMd(root: string, themePath = join(root, "theme.css")): Written {
   const path = join(root, "AGENTS.md");
-  const current = readSourceIfExists(path, root);
   const theme = themeFacts(parseCss(readSourceIfExists(themePath, root) ?? ""));
-  const next = withAgentsBlock(current, agentsMd(root, theme));
-  if (next !== current) {
-    writeInside(path, next, root);
-  }
-  return path;
+  return writeIfChanged(
+    path,
+    withAgentsBlock(readSourceIfExists(path, root), agentsMd(root, theme)),
+    root,
+  );
 }
 
 /**

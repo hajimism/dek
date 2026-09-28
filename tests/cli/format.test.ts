@@ -334,13 +334,19 @@ describe("formatError paths", () => {
 describe("formatInit", () => {
   test("lists each file init wrote, and each it kept as it was", () => {
     expect(
-      formatInit({ root: "/tmp/talks", created: ["dek.toml"], kept: ["AGENTS.md"], next: [] }),
+      formatInit({
+        root: "/tmp/talks",
+        created: ["dek.toml"],
+        updated: [],
+        kept: ["AGENTS.md"],
+        next: [],
+      }),
     ).toBe("created project at /tmp/talks\n  dek.toml\n  AGENTS.md (kept)");
   });
 
   test("says so when every file was already there", () => {
-    expect(formatInit({ root: "/tmp/talks", created: [], kept: ["AGENTS.md"], next: [] })).toBe(
-      "project at /tmp/talks is already set up\n  AGENTS.md (kept)",
-    );
+    expect(
+      formatInit({ root: "/tmp/talks", created: [], updated: [], kept: ["AGENTS.md"], next: [] }),
+    ).toBe("project at /tmp/talks is already set up\n  AGENTS.md (kept)");
   });
 });
