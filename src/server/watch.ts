@@ -45,7 +45,7 @@ export function watchDeck(
   const isClosed = () => closed;
   const diagnose = createDiagnose(deckDir, options);
   const requestDiagnostics = createDiagnosticsQueue(diagnose, emit, isClosed);
-  const synthVoice = createVoiceSynth(deckDir, emit, options.synthVoice);
+  const synthVoice = createVoiceSynth(deckDir, emit, isClosed, options.synthVoice);
 
   const syncScript = (announceEmpty: boolean): void => {
     const event = syncEvent(syncQuietly(deckDir), announceEmpty);
@@ -222,22 +222,28 @@ function createDiagnosticsQueue(
 function createVoiceSynth(
   deckDir: string,
   emit: (event: LiveEvent) => void,
+  isClosed: () => boolean,
   synthVoice: (() => Promise<void>) | undefined,
 ): () => void {
+  const synth = async (): Promise<boolean> => {
+    if (synthVoice) {
+      await synthVoice();
+      return true;
+    }
+    const { hasVoice } = await import("../core/voice.ts");
+    if (!hasVoice(deckDir)) {
+      return false;
+    }
+    const { synthDeck } = await import("../voice/synth.ts");
+    await synthDeck(deckDir);
+    return true;
+  };
   return createSerialTask(async () => {
     try {
-      if (synthVoice) {
-        await synthVoice();
+      // A synthesis that outlives the watch has no pages left to tell.
+      if ((await synth()) && !isClosed()) {
         emit({ type: "timeline" });
-        return;
       }
-      const { hasVoice } = await import("../core/voice.ts");
-      if (!hasVoice(deckDir)) {
-        return;
-      }
-      const { synthDeck } = await import("../voice/synth.ts");
-      await synthDeck(deckDir);
-      emit({ type: "timeline" });
     } catch (error) {
       // Voice is optional: an engine that is not running is worth a line, not a stack trace.
       console.error(voiceFailureLine(error));

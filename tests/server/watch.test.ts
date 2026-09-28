@@ -407,6 +407,29 @@ describe("watchDeck diagnostics", () => {
       },
     );
   });
+
+  test("announces no timeline once closed, even for a synthesis that was running", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const dir = deckDir(root);
+      const gate = createGate();
+      let started = false;
+      const events: LiveEvent[] = [];
+      const watcher = watchDeck(dir, (event) => events.push(event), {
+        pollIntervalMs: 20,
+        synthVoice: async () => {
+          started = true;
+          await gate.opened;
+        },
+      });
+      await mkdir(join(dir, "voice"), { recursive: true });
+      await writeFile(join(dir, "voice", "voice.toml"), voiceToml);
+      await waitFor(() => started);
+      watcher.close();
+      gate.open();
+      await Bun.sleep(100);
+      expect(events.filter((event) => event.type === "timeline")).toEqual([]);
+    });
+  });
 });
 
 describe("watchDeck scan", () => {
