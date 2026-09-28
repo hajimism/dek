@@ -28,6 +28,9 @@ export async function defaultRumdlRunner(scriptPath: string): Promise<string | n
     const cmd = workerCommand(bin, args);
     const proc = Bun.spawn(cmd, {
       cwd: dirname(scriptPath),
+      // The environment as it is now, like the PATH rumdl was found on; left out, Bun passes
+      // the one the process started with.
+      env: process.env,
       stdout: "pipe",
       stderr: "pipe",
     });

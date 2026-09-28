@@ -97,4 +97,19 @@ describe("defaultRumdlRunner", () => {
       });
     });
   });
+
+  test.serial("runs rumdl with the environment as it is now", async () => {
+    const fake = join(import.meta.dir, "..", "helpers", "fake-rumdl.ts");
+    await chmod(fake, 0o755);
+    await withTempDir(async (dir) => {
+      const scriptPath = join(dir, "script.md");
+      await writeFile(scriptPath, "# demo\n");
+      await withEnv(
+        { DEK_RUMDL: fake, RUMDL_SARIF: "set after start", RUMDL_EXIT: "0" },
+        async () => {
+          expect(await defaultRumdlRunner(scriptPath)).toBe("set after start\n");
+        },
+      );
+    });
+  });
 });
