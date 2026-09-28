@@ -164,6 +164,13 @@ function diagnosticFailure(
   };
 }
 
+/** A position no page shows is where the next one lands; saying nothing would read as on screen. */
+function navNotes(data: { slug: string; viewers: number }): string | undefined {
+  return data.viewers > 0
+    ? undefined
+    : `no browser shows the deck: the next page opened on the dev server shows ${data.slug}`;
+}
+
 function withDisplayDiagnostics<D extends { diagnostics: CheckCliResult["diagnostics"] }>(
   data: D,
   display: (path: string) => string,
@@ -464,7 +471,7 @@ export const COMMANDS = {
       const { gotoCommand } = await import("./goto.ts");
       return gotoCommand(target, args.slug);
     },
-    output: { text: formatNav },
+    output: { text: formatNav, notes: navNotes },
   }),
   current: result({
     scope: "deck",
@@ -479,7 +486,7 @@ export const COMMANDS = {
       const { currentCommand } = await import("./goto.ts");
       return currentCommand(target);
     },
-    output: { text: formatNav },
+    output: { text: formatNav, notes: navNotes },
   }),
   sync: result({
     scope: "decks",

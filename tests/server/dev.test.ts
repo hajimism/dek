@@ -848,6 +848,7 @@ body
             slug: "intro",
             slideIndex: 0,
             beatIndex: 0,
+            viewers: 0,
           });
 
           const wsUrl = new URL("/ws", server.url);
@@ -862,6 +863,7 @@ body
               body: JSON.stringify({ slug: "architecture" }),
             });
             expect(gotoRes.ok).toBe(true);
+            expect(await gotoRes.json()).toMatchObject({ viewers: 1 });
             expect(JSON.parse(await pending)).toEqual({ slideIndex: 1, beatIndex: 0 });
           } finally {
             client.close();

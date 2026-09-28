@@ -6,8 +6,11 @@ import type { Position } from "../core/step.ts";
 /** A socket in a room, as far as a room needs one. */
 export type RoomClient = { send(payload: string): unknown };
 
-/** Where a deck stands, as `dek current` and `dek goto` print it. */
-type RoomPosition = { slug: string; slideIndex: number; beatIndex: number };
+/**
+ * Where a deck stands, as `dek current` and `dek goto` print it, and how many pages show it. With
+ * none, the position is where the next page opened lands.
+ */
+type RoomPosition = { slug: string; slideIndex: number; beatIndex: number; viewers: number };
 
 export type Rooms<C extends RoomClient> = {
   /** A socket joins its deck's room, and is told where the talk stands. */
@@ -49,12 +52,13 @@ export function createRooms<C extends RoomClient>(decks: () => ProjectDeck[]): R
 
   const current = (room: string): RoomPosition => {
     const deck = deckFor(room);
+    const viewers = rooms.get(room)?.size ?? 0;
     const pos = positions.get(room) ?? { slideIndex: 0, beatIndex: 0 };
     const slug = deck?.deck.sections[pos.slideIndex]?.slug;
     if (!slug) {
-      return { slug: deck?.deck.sections[0]?.slug ?? room, slideIndex: 0, beatIndex: 0 };
+      return { slug: deck?.deck.sections[0]?.slug ?? room, slideIndex: 0, beatIndex: 0, viewers };
     }
-    return { slug, slideIndex: pos.slideIndex, beatIndex: pos.beatIndex };
+    return { slug, slideIndex: pos.slideIndex, beatIndex: pos.beatIndex, viewers };
   };
 
   return {

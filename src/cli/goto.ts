@@ -7,6 +7,8 @@ export type NavResult = {
   slug: string;
   slideIndex: number;
   beatIndex: number;
+  /** The pages that show the deck; with none, the position is where the next one lands. */
+  viewers: number;
 };
 
 export async function gotoCommand(target: DeckTarget, slug: string): Promise<NavResult> {
@@ -55,6 +57,7 @@ async function requestDevServer(
     slug?: string;
     slideIndex?: number;
     beatIndex?: number;
+    viewers?: number;
     error?: { message?: string };
   };
   if (!response.ok || json.ok === false || json.slug === undefined) {
@@ -66,6 +69,7 @@ async function requestDevServer(
     slug: json.slug,
     slideIndex: json.slideIndex ?? 0,
     beatIndex: json.beatIndex ?? 0,
+    viewers: json.viewers ?? 0,
   };
 }
 

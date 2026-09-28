@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { outputOf } from "../../src/cli/commands.ts";
 import { currentCommand, gotoCommand } from "../../src/cli/goto.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { DekError } from "../../src/core/error.ts";
@@ -85,7 +86,12 @@ describe("gotoCommand", () => {
           slug: "architecture",
           slideIndex: 1,
           beatIndex: 0,
+          viewers: 0,
         });
+        // With no page open, the position is where the next one lands, and dek says so.
+        expect(outputOf("goto").notes?.(gotoResult, false)).toBe(
+          "no browser shows the deck: the next page opened on the dev server shows architecture",
+        );
         const current = await currentCommand(requireDeckFromCwd(deckDir));
         expect(current).toMatchObject({
           slug: "architecture",

@@ -36,7 +36,7 @@ describe("createRooms", () => {
     rooms.join("a", receiver);
     rooms.move("a", sender, JSON.stringify({ slideIndex: 7, beatIndex: 9 }));
     expect(receiver.got).toEqual([{ slideIndex: 1, beatIndex: 2 }]);
-    expect(rooms.current("a")).toEqual({ slug: "end", slideIndex: 1, beatIndex: 2 });
+    expect(rooms.current("a")).toEqual({ slug: "end", slideIndex: 1, beatIndex: 2, viewers: 2 });
   });
 
   test("goto moves everyone in the room and says where it stands", () => {
@@ -45,7 +45,7 @@ describe("createRooms", () => {
     rooms.join("a", viewer);
     expect(rooms.goto("a", "end")).toEqual({
       ok: true,
-      at: { slug: "end", slideIndex: 1, beatIndex: 0 },
+      at: { slug: "end", slideIndex: 1, beatIndex: 0, viewers: 1 },
     });
     expect(viewer.got).toEqual([{ slideIndex: 1, beatIndex: 0 }]);
     expect(rooms.goto("a", "nope")).toEqual({ ok: false, message: 'section "nope" not found' });
@@ -58,12 +58,22 @@ describe("createRooms", () => {
     rooms.move("a", client(), JSON.stringify({ slideIndex: 2, beatIndex: 0 }));
     decks = [deck("a", { intro: 0, middle: 1 })];
     rooms.reclamp();
-    expect(rooms.current("a")).toEqual({ slug: "middle", slideIndex: 1, beatIndex: 1 });
+    expect(rooms.current("a")).toEqual({
+      slug: "middle",
+      slideIndex: 1,
+      beatIndex: 1,
+      viewers: 0,
+    });
 
     rooms.move("a", client(), JSON.stringify({ slideIndex: 1, beatIndex: 1 }));
     decks = [deck("a", { intro: 0, middle: 0 })];
     rooms.reclamp();
-    expect(rooms.current("a")).toEqual({ slug: "middle", slideIndex: 1, beatIndex: 0 });
+    expect(rooms.current("a")).toEqual({
+      slug: "middle",
+      slideIndex: 1,
+      beatIndex: 0,
+      viewers: 0,
+    });
   });
 
   test("greets a new socket with where the room stands after the script changed", () => {
@@ -82,6 +92,6 @@ describe("createRooms", () => {
     const viewer = client();
     rooms.join("a", viewer);
     expect(viewer.got).toEqual([]);
-    expect(rooms.current("a")).toEqual({ slug: "intro", slideIndex: 0, beatIndex: 0 });
+    expect(rooms.current("a")).toEqual({ slug: "intro", slideIndex: 0, beatIndex: 0, viewers: 1 });
   });
 });
