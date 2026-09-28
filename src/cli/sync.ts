@@ -1,9 +1,12 @@
+import { join } from "node:path";
 import { syncDeck } from "../core/sync.ts";
+import { ignoreLocalState } from "./files.ts";
 import type { DecksTarget } from "./scope.ts";
 
 /**
- * Every file the sync wrote or removed: the decks' slides, then dek's own files; and the slides it
- * kept though their section is gone, which lint reports as DEK002.
+ * Every file the sync wrote or removed: the decks' slides, then dek's own files, then .gitignore
+ * when it lacked what dek keeps for itself; and the slides it kept though their section is gone,
+ * which lint reports as DEK002.
  */
 export type SyncCliResult = {
   created: string[];
@@ -27,5 +30,8 @@ export function syncCommand({ project, decks }: DecksTarget): SyncCliResult {
   }
   result.created.push(...dek.created);
   result.updated.push(...dek.updated);
+  if (ignoreLocalState(project.root)) {
+    result.updated.push(join(project.root, ".gitignore"));
+  }
   return result;
 }

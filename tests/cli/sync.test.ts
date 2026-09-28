@@ -160,3 +160,45 @@ describe("dek sync and slides the script no longer names", () => {
     );
   });
 });
+
+describe("syncCommand and .gitignore", () => {
+  test("adds the files dek keeps for itself to a .gitignore that lacks them, once", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const path = join(root, ".gitignore");
+      await writeFile(path, "# mine\ndist/\n.dek/server.json");
+      const first = syncCommand(resolveDecks(root));
+      expect(first.updated).toContain(path);
+      expect(await readFile(path, "utf8")).toBe(
+        "# mine\ndist/\n.dek/server.json\n.dek/marks.json\n",
+      );
+      const second = syncCommand(resolveDecks(root));
+      expect(second.updated).not.toContain(path);
+    });
+  });
+
+  test("leaves a .gitignore alone that ignores them through .dek/", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const path = join(root, ".gitignore");
+      await writeFile(path, "/.dek/\n");
+      expect(syncCommand(resolveDecks(root)).updated).not.toContain(path);
+      expect(await readFile(path, "utf8")).toBe("/.dek/\n");
+    });
+  });
+
+  test("writes no .gitignore where the project has none", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      syncCommand(resolveDecks(root));
+      expect(existsSync(join(root, ".gitignore"))).toBe(false);
+    });
+  });
+
+  test("leaves a new project's .gitignore as init wrote it", async () => {
+    await withTempDir(async (dir) => {
+      initCommand({ cwd: dir, deck: "demo" });
+      const path = join(dir, ".gitignore");
+      const before = await readFile(path, "utf8");
+      expect(syncCommand(resolveDecks(dir)).updated).not.toContain(path);
+      expect(await readFile(path, "utf8")).toBe(before);
+    });
+  });
+});

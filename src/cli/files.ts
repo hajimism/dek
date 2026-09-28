@@ -5,6 +5,7 @@ import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
 import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
+import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
 import { formatVoiceToml } from "../core/voice.ts";
 
 export function defaultTheme(): string {
@@ -15,15 +16,44 @@ export function defaultToml(): string {
   return "# dek project\n";
 }
 
+/**
+ * What dek keeps for itself under .dek/ while it runs: the dev server's lock, and the marks left
+ * while rehearsing. Neither belongs in the repository.
+ */
+const LOCAL_STATE = [".dek/server.json", ".dek/marks.json"];
+
 export function defaultGitignore(): string {
   return `# dek
 dist/
 .cache/
-.dek/server.json
-.dek/marks.json
+${LOCAL_STATE.join("\n")}
 node_modules/
 refs/
 `;
+}
+
+/** The lines that ignore `entry` whole or through .dek/, with or without a leading slash. */
+const ignores = (entry: string): string[] =>
+  [entry, ".dek", ".dek/", ".dek/*", ".dek/**"].flatMap((line) => [line, `/${line}`]);
+
+/**
+ * Add what dek keeps for itself to the project's .gitignore, for a project made before dek kept
+ * it; whether the file changed. A project with no .gitignore is left without one.
+ */
+export function ignoreLocalState(root: string): boolean {
+  const path = join(root, ".gitignore");
+  const current = readSourceIfExists(path, root);
+  if (current === undefined) {
+    return false;
+  }
+  const lines = new Set(current.split("\n").map((line) => line.trim()));
+  const missing = LOCAL_STATE.filter((entry) => !ignores(entry).some((line) => lines.has(line)));
+  if (missing.length === 0) {
+    return false;
+  }
+  const separator = current === "" || current.endsWith("\n") ? "" : "\n";
+  writeInside(path, `${current}${separator}${missing.join("\n")}\n`, root);
+  return true;
 }
 
 export function defaultRumdl(): string {
