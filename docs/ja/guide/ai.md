@@ -17,7 +17,7 @@ dek help --agent
 ## CLI が約束すること
 
 1. **結果を返すコマンドはすべて `--json` を受け付け、結果の形は一つ。** エージェントは `ok` で分岐し、`false` なら `error` を読み、`diagnostics` を順に片付けます。起動し続ける `dek` と `dek rehearse` だけが例外です。エージェントに文章をパースさせません。約束の中身は[下](#json-の約束)にあります。
-2. **エラーは次のコマンドを名指しする。** 「`slides/intro.html` がありません。`dek sync` を実行してください」。hint はそのまま実行できる文です。直し方が決まっている診断にも hint が付きます。たとえば、どの beat も指さない `data-step` には `use hook, turn, or 1-2` が返ります。
+2. **エラーは次のコマンドを名指しする。** 「`slides/intro.html` がありません。`dek sync` を実行してください」。hint は、コマンドを実行した場所からそのまま実行できる文です。デッキを取るコマンドは、そのデッキの外で実行したときにデッキ名を含みます。たとえばプロジェクトのルートなら `dek theme demo` です。直し方が決まっている診断にも hint が付きます。たとえば、どの beat も指さない `data-step` には `use hook, turn, or 1-2` が返ります。
 3. **`dek help --agent` は数百トークン。** CLI が自分自身のリファレンスです。
 4. **`AGENTS.md` は短く保つ。**
 
@@ -51,7 +51,7 @@ dek help --agent
 
 - `error` は必ず `message` を持ち、dek が次の一手を知っていれば `hint` を、失敗に場所があれば `path` と `line` を持ちます。
 - 診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は、成否に関わらず必ず `diagnostics` 配列を持ちます。各診断は `severity`、場所があれば `path`・`line`・`column`、直し方が決まっていれば `hint`、メッセージに含まれる値を `data` として持ちます。失敗になるのは error だけで、warning だけなら `"ok": true` です。
-- 実行しなかったチェックは `skipped` の要素になり、空の合格にはなりません。`{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }` のような形です。すべて実行できたときはこのフィールド自体がありません。
+- 実行しなかったチェックは `skipped` の要素になり、空の合格にはなりません。`{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }` のような形です。すべて実行できたときはこのフィールド自体がありません。`--visual` を付けない `dek lint` と `dek build` は、必ず `visual` を載せます。はみ出しもコントラストも測っていないからで、hint は測るためのコマンドです。
 - 対象のデッキごとにファイルを書くコマンドは、1 デッキでもリストを返します。`build` と `pdf` は `outs` を返します。
 - `dek lint --format sarif` は同じ診断を SARIF 2.1.0 で返します。
 

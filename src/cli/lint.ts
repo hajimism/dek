@@ -7,7 +7,7 @@ import { resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
 import { mergeSarif, type SarifLog } from "../core/sarif.ts";
 import { syncDeck } from "../core/sync.ts";
 import { lintVisualDeck } from "../core/visual.ts";
-import { type SkippedCheck, skippedChecks } from "./result.ts";
+import { type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
 import type { DecksTarget } from "./scope.ts";
 
 export type LintCliResult = {
@@ -51,7 +51,16 @@ export async function lintCommand(
 
   return {
     diagnostics,
-    ...skippedChecks(rumdlSkip ? [rumdlSkip] : []),
+    ...skippedChecks([
+      ...(rumdlSkip ? [rumdlSkip] : []),
+      ...(options.visual
+        ? []
+        : [
+            visualSkipped("dek lint --visual", {
+              reason: "overflow and contrast are measured only with --visual",
+            }),
+          ]),
+    ]),
     ...(rumdlSarif ? { rumdlSarif } : {}),
   };
 }

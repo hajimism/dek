@@ -17,7 +17,7 @@ That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a
 ## What the CLI promises
 
 1. **Every result command accepts `--json`, and every result has one shape.** An agent branches on `ok`, reads `error` when it is `false`, and works through `diagnostics`. `dek` and `dek rehearse` stay running and are the only exceptions. Nothing forces an agent to parse prose; the contract is [below](#the-json-contract).
-2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is. Diagnostics carry a hint too when the fix is known, such as `use hook, turn, or 1-2` for a `data-step` that names no beat.
+2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is, from wherever you ran the command: a command that takes a deck names it when you are not inside that deck, as `dek theme demo` at the project root. Diagnostics carry a hint too when the fix is known, such as `use hook, turn, or 1-2` for a `data-step` that names no beat.
 3. **`dek help --agent` is a few hundred tokens.** The CLI documents itself.
 4. **`AGENTS.md` stays short.**
 
@@ -51,7 +51,7 @@ Success is `{ "ok": true, ... }` with exit code 0. Failure is `{ "ok": false, "e
 
 - `error` always has a `message`, a `hint` whenever dek knows the next step, and `path` and `line` when the failure has a place.
 - Commands that report diagnostics (`lint`, `check`, `build`, `ls`, `cues`) always carry a `diagnostics` array, pass or fail. Each diagnostic has its `severity`, a `path`, `line`, and `column` when it has a place, a `hint` when the fix is known, and the values its message names as `data`. Only errors fail; warnings alone are `"ok": true`.
-- A check that did not run is an entry in `skipped`, never an empty pass: `{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }`. The field is absent when everything ran.
+- A check that did not run is an entry in `skipped`, never an empty pass: `{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }`. The field is absent when everything ran. `dek lint` without `--visual`, and `dek build`, always list `visual`: they did not measure overflow or contrast, and the hint is the command that does.
 - A command that writes files for every deck in scope returns a list, one deck or many: `build` and `pdf` return `outs`.
 - `dek lint --format sarif` returns the same diagnostics as SARIF 2.1.0.
 

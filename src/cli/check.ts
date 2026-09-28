@@ -8,7 +8,7 @@ import {
 } from "../core/playwright.ts";
 import { runVisualDeck } from "../core/visual.ts";
 import { hasVoice, loadCachedTimeline, VOICE_SETUP_HINT } from "../core/voice.ts";
-import { type SkippedCheck, skippedChecks } from "./result.ts";
+import { type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
 import { type DeckTarget, requireSection } from "./scope.ts";
 
 type VoiceCheckBeat = {
@@ -53,13 +53,7 @@ export async function checkCommand(
 
   const skipped: SkippedCheck[] = visual
     ? []
-    : [
-        {
-          check: "visual",
-          reason: "Playwright is not installed",
-          hint: `${PLAYWRIGHT_INSTALL} to also check overflow and contrast`,
-        },
-      ];
+    : [visualSkipped(`dek check ${slug}`, { reason: "Playwright is not installed" })];
 
   // A live-only deck is done without voice, so asking for it skips the check rather than failing,
   // the way a missing Playwright skips visual.

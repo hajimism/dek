@@ -159,7 +159,7 @@ describe("lintCommand", () => {
         const result = await lintCommand(resolveDecks(join(root, "decks", "demo")), {
           cwd: join(root, "decks", "demo"),
         });
-        expect(result.skipped).toBeUndefined();
+        expect(result.skipped?.map((entry) => entry.check)).toEqual(["visual"]);
         expect(result.diagnostics).toEqual([]);
       },
     );
@@ -251,6 +251,33 @@ more
     );
   });
 
+  // A lint without --visual measured nothing, so it says so: an agent that reads a clean result
+  // must not take the rendering for checked.
+  test.serial("says the rendering was not measured without --visual", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
+          const result = await lintCommand(resolveDecks(deckDir), { cwd: deckDir });
+          expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
+            check: "visual",
+            reason: "overflow and contrast are measured only with --visual",
+            hint: "run `dek lint --visual` to measure overflow and contrast",
+          });
+        });
+        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+          const result = await lintCommand(resolveDecks(deckDir), { cwd: deckDir });
+          expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
+            check: "visual",
+            reason: "Playwright is not installed",
+            hint: "bun add -d playwright && bunx playwright install chromium, then run `dek lint --visual` to measure overflow and contrast",
+          });
+        });
+      },
+    );
+  });
+
   test("does not emit DEK030 without visual", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
@@ -291,13 +318,11 @@ more
             cwd: join(root, "decks", "demo"),
           });
           expect(result.diagnostics).toEqual([]);
-          expect(result.skipped).toEqual([
-            {
-              check: "rumdl",
-              reason: "rumdl is not installed",
-              hint: "bun add -d rumdl; or put rumdl on PATH, or set DEK_RUMDL to its path",
-            },
-          ]);
+          expect(result.skipped?.[0]).toEqual({
+            check: "rumdl",
+            reason: "rumdl is not installed",
+            hint: "bun add -d rumdl; or put rumdl on PATH, or set DEK_RUMDL to its path",
+          });
         });
       },
     );
@@ -313,13 +338,11 @@ more
         await chmod(rumdl, 0o755);
         await withEnv({ DEK_RUMDL: rumdl }, async () => {
           const result = await lintCommand(resolveDecks(root), { cwd: root });
-          expect(result.skipped).toEqual([
-            {
-              check: "rumdl",
-              reason: "rumdl ran but gave no result",
-              hint: `run \`${rumdl} check decks/demo/script.md\` to see why`,
-            },
-          ]);
+          expect(result.skipped?.[0]).toEqual({
+            check: "rumdl",
+            reason: "rumdl ran but gave no result",
+            hint: `run \`${rumdl} check decks/demo/script.md\` to see why`,
+          });
           expect(result.rumdlSarif).toBeUndefined();
         });
       },

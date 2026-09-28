@@ -45,7 +45,7 @@ A list that runs off the bottom is one finding for the list, not one per item: a
 
 Contrast thresholds follow WCAG AA. Body text needs 4.5:1. Large text, meaning 24px or larger, or 18.66px and bold, needs 3:1. That is what lets a big number in a soft color pass while the same color on body text fails.
 
-Without Playwright, only the commands that need it fail, each with the install command in its hint. The rest of the CLI runs.
+Without `--visual`, `dek lint` says so: `visual` is in `"skipped"`, and the text output ends with `visual: skipped`, with the command that measures. A clean lint that did not measure is never mistaken for one that did. Without Playwright, only the commands that need it fail, each with the install command in its hint. The rest of the CLI runs.
 
 - `dek lint --visual` is a verdict. It returns diagnostics (SARIF with `--format sarif`), and it is the primary way an agent checks its own output.
 - `dek shot` is an observation, not a verdict. Whether a slide looks good stays a human call.

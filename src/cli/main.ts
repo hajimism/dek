@@ -160,6 +160,9 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
       json: line.values.json === true,
       format: line.values.format,
       cwd,
+      ...(target?.deck && {
+        deck: { name: target.ref?.name ?? target.deck.name, dir: target.deck.dir },
+      }),
     });
   }
 }

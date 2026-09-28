@@ -96,7 +96,7 @@ describe("buildCommand link preview", () => {
         const deckDir = join(root, "decks", "demo");
         const result = await buildCommand(resolveDecks(deckDir), { runner: fakeRunner });
         expect(result.images).toEqual([join(deckDir, "dist", "demo.png")]);
-        expect(result.skipped).toBeUndefined();
+        expect(result.skipped?.map((entry) => entry.check)).toEqual(["visual"]);
         expect(formatText({ command: "build", data: result })).toBe(
           `wrote ${join(deckDir, "dist", "demo.html")}\nwrote ${join(deckDir, "dist", "demo.png")}`,
         );
@@ -115,7 +115,7 @@ describe("buildCommand link preview", () => {
       async (root) => {
         const result = await buildCommand(resolveDecks(root), { runner: fakeRunner });
         expect(result.images).toEqual([]);
-        expect(result.skipped).toEqual([
+        expect(result.skipped?.filter((entry) => entry.check === "preview")).toEqual([
           {
             check: "preview",
             reason: "url is not set",
@@ -128,6 +128,24 @@ describe("buildCommand link preview", () => {
     );
   });
 
+  // A build reports what dek's rules say, and those leave the rendering unmeasured: it says so,
+  // as lint does, so a clean build is not read as a measured one.
+  test("says the rendering was not measured", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }] },
+      async (root) => {
+        const result = await buildCommand(resolveDecks(join(root, "decks", "demo")), {
+          runner: fakeRunner,
+        });
+        expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
+          check: "visual",
+          reason: "overflow and contrast are measured only by `dek lint --visual`",
+          hint: "run `dek lint --visual` to measure overflow and contrast",
+        });
+      },
+    );
+  });
+
   test("says how to install Playwright when it is missing", async () => {
     await withTempProject(
       { decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }] },
@@ -136,9 +154,11 @@ describe("buildCommand link preview", () => {
           url: "https://example.com/",
           runner: async () => null,
         });
-        expect(result.skipped).toEqual([
-          { check: "preview", reason: "Playwright is not installed", hint: PLAYWRIGHT_INSTALL },
-        ]);
+        expect(result.skipped?.find((entry) => entry.check === "preview")).toEqual({
+          check: "preview",
+          reason: "Playwright is not installed",
+          hint: PLAYWRIGHT_INSTALL,
+        });
       },
     );
   });
