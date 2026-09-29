@@ -154,7 +154,7 @@ describe("dek sync and slides the script no longer names", () => {
         const result = syncCommand(resolveDecks(deckDir));
         expect(result.kept).toEqual([join(deckDir, "slides", "old.html")]);
         expect(outputOf("sync").notes?.(result, false)).toBe(
-          `kept ${join(deckDir, "slides", "old.html")}: its section is gone from script.md, and the file is yours\n  help: add a section for it to script.md, or remove the file if the slide is gone from the talk`,
+          `kept ${join(deckDir, "slides", "old.html")}: its section is gone from script.md, and the file is yours\n  help: run \`dek lint\`, which names the \`dek mv\` if its section was renamed, or what else to do with it`,
         );
       },
     );

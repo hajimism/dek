@@ -75,8 +75,10 @@ export function formatKeptTheme(data: InitResult, color = false): string {
   ].join("\n");
 }
 
+// Lint alone weighs the sections a kept slide could be renamed to (DEK002), so sync defers to it
+// rather than suggest the section or the deletion a rename would make wrong.
 const ORPHAN_HINT =
-  "add a section for it to script.md, or remove the file if the slide is gone from the talk";
+  "run `dek lint`, which names the `dek mv` if its section was renamed, or what else to do with it";
 
 function withNext(done: string, next: string[]): string {
   return next.length === 0
