@@ -104,7 +104,7 @@ One table decides which attributes name a URL and what the page does with it. A 
 
 ### DEK024
 
-`dek sync` never puts a section id on a slide, so a `##` heading that is only an id (`## architecture`) gets an empty `<h2 class="slide-title">` in its skeleton, unless it is the first slide, which takes the deck title. While the file is still that skeleton, the hint says to give the heading a title in `script.md`, like `## Architecture {#architecture}`, and run `dek sync`, which rewrites the skeleton; the id and file name stay. Once the slide is edited, the hint says to write the heading's text or remove the element. It is a warning because a slide script may fill the heading as the slide draws.
+`dek sync` never puts a section id on a slide, so a `##` heading that is only an id (`## architecture`) gets an empty `<h2 class="slide-title">` in its skeleton, unless it is the first slide, which takes the deck title. While the file is still that skeleton, the hint says to give the heading a title in `script.md`, like `## Architecture {#architecture}`, and run `dek sync`, which rewrites the skeleton; the id and file name stay. An id-only heading can also mean the slide has no title, as a quote's does, so the hint adds the other way out: remove the element from the slide, which makes the file yours, and sync leaves it alone. Once the slide is edited, the hint says to write the heading's text or remove the element. It is a warning because a slide script may fill the heading as the slide draws.
 
 ### DEK025
 

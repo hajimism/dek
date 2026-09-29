@@ -369,10 +369,12 @@ function isJavascriptUrl(value: string): boolean {
 /**
  * DEK024: a heading with nothing in it, which the audience sees as a gap where a title should
  * be. An id-only `##` heading after the first slide makes one: sync never puts the id on a slide.
+ * Such a heading may also mean the slide has no title, as a quote's does, so its skeleton's hint
+ * offers both: a title for sync to write, or the element gone, which sync then leaves alone.
  */
 function emptyHeadingDiagnostics({ section, path, scan, skeleton }: SlideHtml): Diagnostic[] {
   const hint = skeleton
-    ? `give the slide a title in script.md, like \`## Your title {#${section.slug}}\`, then run \`dek sync\``
+    ? `give the slide a title in script.md, like \`## Your title {#${section.slug}}\`, then run \`dek sync\`; for a slide with no title, such as a quote, remove the element from slides/${section.slug}.html`
     : `write the heading's text in slides/${section.slug}.html, or remove the element`;
   return scan.emptyHeadings.map((element) =>
     diag("DEK024", {

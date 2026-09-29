@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { RULES, type RuleId } from "../../src/core/diagnostic.ts";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck, lintProject } from "../../src/core/lint.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
+import { syncDeck } from "../../src/core/sync.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { type DeckSpec, withTempProject } from "../helpers/project.ts";
 
@@ -2351,10 +2352,39 @@ how it fits
         line: 2,
         column: 3,
         slug: "architecture",
-        hint: "give the slide a title in script.md, like `## Your title {#architecture}`, then run `dek sync`",
+        hint: "give the slide a title in script.md, like `## Your title {#architecture}`, then run `dek sync`; for a slide with no title, such as a quote, remove the element from slides/architecture.html",
         data: { tag: "h2" },
       },
     ]);
+  });
+
+  test("a slide meant to have no title keeps none once the element is gone", async () => {
+    // `## architecture` on purpose: a quote slide, say. Taking the hint's second way out.
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script,
+            slides: {
+              intro: titleSlide,
+              architecture: `<section class="slide" data-layout="title">
+  <h2 class="slide-title"></h2>
+</section>
+`,
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const deck = join(root, "decks", "demo");
+        const file = join(deck, "slides", "architecture.html");
+        await writeFile(file, `<section class="slide" data-layout="title">\n</section>\n`);
+        syncDeck(deck);
+        expect(await readFile(file, "utf8")).not.toContain("<h2");
+        expect(lintDeck(deck)).toEqual([]);
+      },
+    );
   });
 
   test("an edited slide is told to fill the heading in or drop it", async () => {
