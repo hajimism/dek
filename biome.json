@@ -38,6 +38,33 @@
     {
       "includes": ["src/theme/**/*.css"],
       "linter": { "rules": { "correctness": { "noUnknownTypeSelector": "off" } } }
+    },
+    {
+      "includes": ["src/core/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/runtime/**",
+                      "**/video/**",
+                      "**/voice/**",
+                      "**/cli/**",
+                      "**/server/**",
+                      "**/cli.ts"
+                    ],
+                    "message": "core must not depend on adapters or entry points."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
