@@ -1,6 +1,8 @@
 import { DekError } from "../core/error.ts";
+import { either } from "../core/prose.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { resolveProject } from "../core/resolve.ts";
+import { addressHint } from "./address.ts";
 import {
   type AnySpec,
   type CliResult,
@@ -11,9 +13,10 @@ import {
   subcommandAt,
   subcommandsOf,
 } from "./commands.ts";
+import { shellQuote } from "./files.ts";
 import { type CommandLine, parseCommandLine, wantsJson } from "./flags.ts";
 import { writeFailure, writeSuccess } from "./result.ts";
-import { namesDeck, peelDeckArg, resolveTarget } from "./scope.ts";
+import { DeckRequiredError, namesDeck, peelDeckArg, resolveTarget } from "./scope.ts";
 import {
   agentHelpText,
   commandHelp,
@@ -153,12 +156,15 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
     const { restoreRef } = await import("./ref.ts");
     await restoreRef(cwd, call.deck);
   }
-  const target = spec.scope
-    ? resolveTarget(cwd, spec.scope, {
-        deck: call.deck,
-        refs: spec.refs === true,
-        unreadable: spec.unreadable === true,
-      })
+  const scope = spec.scope;
+  const target = scope
+    ? retypedWithDeck(line, cwd, () =>
+        resolveTarget(cwd, scope, {
+          deck: call.deck,
+          refs: spec.refs === true,
+          unreadable: spec.unreadable === true,
+        }),
+      )
     : undefined;
   const form = formOf(call.name, call.subcommand);
   const ctx = { cwd, flags: line.values, args: call.args, target };
@@ -172,6 +178,31 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
         deck: { name: target.ref?.name ?? target.deck.name, dir: target.deck.dir },
       }),
     });
+  }
+}
+
+/** Most decks a hint names a command for; past that, one and where the rest are listed. */
+const NAMED_DECKS = 3;
+
+/**
+ * `resolve`, with a missing deck hinted as the line that was typed, the deck named where the
+ * command takes it: one command per deck of the project, so the hint runs as written.
+ */
+function retypedWithDeck<T>(line: CommandLine, cwd: string, resolve: () => T): T {
+  try {
+    return resolve();
+  } catch (error) {
+    if (!(error instanceof DeckRequiredError)) {
+      throw error;
+    }
+    const typed = `\`dek ${line.typed.map(shellQuote).join(" ")}\``;
+    const [first] = error.decks;
+    const hint = !first
+      ? "run `dek new <name>` to make a deck"
+      : error.decks.length > NAMED_DECKS
+        ? `run ${addressHint(typed, first, cwd)}, or name another deck in place of ${first.name}; \`dek ls\` lists them`
+        : `run ${either(error.decks.map((deck) => addressHint(typed, deck, cwd)))}`;
+    throw new DekError(error.message, { hint, cause: error });
   }
 }
 

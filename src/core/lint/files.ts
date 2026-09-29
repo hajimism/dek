@@ -1,4 +1,5 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { either } from "../prose.ts";
 import { listSlideFiles, SLIDE_SIDECARS } from "../resolve.ts";
 import type { LintContext } from "./context.ts";
 
@@ -113,12 +114,4 @@ export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diag
       data: { ...diagnostic.data, renames: targets },
     };
   });
-}
-
-/** "a", "a or b", "a, b, or c". */
-function either(items: string[]): string {
-  if (items.length <= 2) {
-    return items.join(" or ");
-  }
-  return `${items.slice(0, -1).join(", ")}, or ${items.at(-1)}`;
 }

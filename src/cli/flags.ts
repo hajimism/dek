@@ -143,6 +143,11 @@ export type CommandLine = {
   /** Every word that is no flag, the command word first. */
   positionals: string[];
   values: FlagValues;
+  /**
+   * argv as typed with the command word moved first, which runs the same: what a hint retypes
+   * when it only needs to add a word after the command.
+   */
+  typed: string[];
 };
 
 function lenientParse(argv: string[]) {
@@ -197,6 +202,7 @@ export function parseCommandLine(argv: string[]): CommandLine {
       options: parseOptions(names),
       strict: true,
       allowPositionals: true,
+      tokens: true,
     });
   } catch (error) {
     throw describeParseError(error, { argv, label, hint });
@@ -206,7 +212,13 @@ export function parseCommandLine(argv: string[]): CommandLine {
     ...(sub ? { subcommand: sub.name } : {}),
     positionals: parsed.positionals,
     values: typedValues(parsed.values as Record<string, string | boolean>),
+    typed: commandFirst(argv, parsed.tokens?.find((token) => token.kind === "positional")?.index),
   };
+}
+
+function commandFirst(argv: string[], at: number | undefined): string[] {
+  const word = at === undefined ? undefined : argv[at];
+  return word === undefined ? argv : [word, ...argv.slice(0, at), ...argv.slice((at ?? 0) + 1)];
 }
 
 function typedValues(raw: Record<string, string | boolean>): FlagValues {

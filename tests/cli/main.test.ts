@@ -279,4 +279,49 @@ describe("deck scope", () => {
       expect(error.message).toBe("not inside a deck directory; pass a deck name");
     });
   });
+
+  test.serial(
+    "the hint at the project root is the command typed, with the deck named",
+    async () => {
+      await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+        const error = await failure(["--shot", "check", "intro"], root);
+        expect(error.hint).toBe("run `dek check demo --shot intro --json`");
+      });
+    },
+  );
+
+  test.serial("each deck gets its command, and the command runs as written", async () => {
+    await withTempProject(decks, async (root) => {
+      const error = await failure(["show", "intro"], root);
+      expect(error.hint).toBe("run `dek show demo intro --json` or `dek show other intro --json`");
+      const [first] = [...(error.hint ?? "").matchAll(/`dek ([^`]+)`/g)].map((m) =>
+        (m[1] ?? "").split(" "),
+      );
+      expect((await run(first ?? [], root)).exitCode).toBe(0);
+    });
+  });
+
+  test.serial("a deck the command line names before a subcommand goes there", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const error = await failure(["marks", "clear"], root);
+      expect(error.hint).toBe("run `dek marks demo clear --json`");
+    });
+  });
+
+  test.serial("many decks get one command and where to find the rest", async () => {
+    const many = { decks: ["a", "b", "c", "d"].map((name) => ({ name })) };
+    await withTempProject(many, async (root) => {
+      const error = await failure(["theme"], root);
+      expect(error.hint).toBe(
+        "run `dek theme a --json`, or name another deck in place of a; `dek ls` lists them",
+      );
+    });
+  });
+
+  test.serial("a project with no deck yet is told to make one", async () => {
+    await withTempProject({}, async (root) => {
+      const error = await failure(["theme"], root);
+      expect(error.hint).toBe("run `dek new <name>` to make a deck");
+    });
+  });
 });

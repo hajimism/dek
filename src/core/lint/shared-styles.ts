@@ -1,6 +1,7 @@
 import { isKeyframesPrelude, selectorClasses, splitSelectorList, startsAtSlide } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { listed } from "../prose.ts";
 import type { LintContext } from "./context.ts";
 
 /** How many slides may style something alike before it belongs in the theme: the third copy. */
@@ -53,14 +54,6 @@ function alsoReaches(ctx: LintContext, selector: string, setters: string[]): str
     const used = source && new Set(source.scan.classes);
     return used !== undefined && classes.every((name) => used.has(name));
   });
-}
-
-/** "a", "a and b", "a, b, and c". */
-function listed(items: string[]): string {
-  if (items.length <= 2) {
-    return items.join(" and ");
-  }
-  return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
 /**

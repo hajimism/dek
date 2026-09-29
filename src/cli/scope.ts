@@ -193,14 +193,27 @@ function unreadableInScope(
   return failed ? { project, failed } : undefined;
 }
 
+/**
+ * A deck command run where no deck is in scope. It carries the project's decks, so the CLI, which
+ * knows the command line, can hint that line with each one named.
+ */
+export class DeckRequiredError extends DekError {
+  readonly decks: ProjectDeck[];
+
+  constructor(cwd: string, decks: ProjectDeck[]) {
+    super("not inside a deck directory; pass a deck name", {
+      path: cwd,
+      hint: "pass a deck name or --deck <name>",
+    });
+    this.decks = decks;
+  }
+}
+
 function requireDeck(scope: Scope, cwd: string): ProjectDeck {
   if (scope.deck) {
     return scope.deck;
   }
-  throw new DekError("not inside a deck directory; pass a deck name", {
-    path: cwd,
-    hint: "pass a deck name or --deck <name>",
-  });
+  throw new DeckRequiredError(cwd, scope.project.decks);
 }
 
 export function requireDeckFromCwd(cwd: string, deck?: string): DeckTarget {
