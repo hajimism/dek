@@ -494,7 +494,33 @@
               "type": "string"
             },
             "script": {
-              "type": "string"
+              "type": "string",
+              "description": "The section as script.md has it, beat headings and their ids included."
+            },
+            "beats": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "title",
+                  "line"
+                ],
+                "additionalProperties": false
+              },
+              "description": "The section's beats in order: what a data-step names, by id or by position."
             },
             "html": {
               "type": [
@@ -539,6 +565,7 @@
             "slug",
             "title",
             "script",
+            "beats",
             "html",
             "css",
             "ts",

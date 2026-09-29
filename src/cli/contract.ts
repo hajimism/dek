@@ -178,7 +178,14 @@ export const RESULT_FIELDS = {
   show: z.strictObject({
     slug: z.string(),
     title: z.string(),
-    script: z.string(),
+    script: z
+      .string()
+      .describe("The section as script.md has it, beat headings and their ids included."),
+    beats: z
+      .array(
+        z.strictObject({ id: z.string().optional(), title: z.string(), line: z.number().int() }),
+      )
+      .describe("The section's beats in order: what a data-step names, by id or by position."),
     html: z.string().nullable(),
     css: z.string().nullable(),
     ts: z.string().nullable(),

@@ -7,6 +7,17 @@ export function joinLines(source: string, lines: string[]): string {
   return lines.join(newline);
 }
 
+/**
+ * The lines of each section, as script.md has them: from its heading up to the next section's,
+ * the last one to the end. `lines` is the whole file and `starts` the 1-based heading lines, in
+ * order.
+ */
+export function sectionChunks(lines: string[], starts: number[]): string[][] {
+  return starts.map((start, index) =>
+    lines.slice(start - 1, (starts[index + 1] ?? lines.length + 1) - 1),
+  );
+}
+
 /** Where an offset into a source is written: 1-based line, and 1-based column in UTF-16 units. */
 export type LineColumn = { line: number; column: number };
 

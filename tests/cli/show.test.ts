@@ -49,6 +49,57 @@ describe("dek show", () => {
 });
 
 describe("showCommand", () => {
+  test("gives the section as script.md has it, and its beats to bind data-step to", async () => {
+    const script = `---
+title: Demo
+---
+
+## 結果 {#results}
+
+数字を三つ見ます。
+
+### ヒット率 {#hit}
+
+ヒット率は 94% です。
+
+### 最後に
+
+p99 は 120ms。
+
+## まとめ {#end}
+
+以上です。
+`;
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const result = showCommand(
+        resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+        "results",
+      );
+      expect(result.script).toBe(`## 結果 {#results}
+
+数字を三つ見ます。
+
+### ヒット率 {#hit}
+
+ヒット率は 94% です。
+
+### 最後に
+
+p99 は 120ms。
+`);
+      expect(result.beats).toEqual([
+        { id: "hit", title: "ヒット率", line: 9 },
+        { title: "最後に", line: 13 },
+      ]);
+      const last = showCommand(
+        resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+        "end",
+      );
+      expect(last.script).toBe("## まとめ {#end}\n\n以上です。\n");
+      expect(last.beats).toEqual([]);
+    });
+  });
+
   test("accepts a named deck from the project root", async () => {
     await withTempProject(
       {

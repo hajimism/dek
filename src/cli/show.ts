@@ -2,9 +2,10 @@ import { classifyAssetRef } from "../core/assets.ts";
 import { cssUrls, parseCss } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { scanSlideHtml } from "../core/html-scan.ts";
+import { sectionChunks, splitLines } from "../core/lines.ts";
 import { readDeckFile } from "../core/resolve.ts";
+import type { Section } from "../core/schema.ts";
 import { themeExcerpt } from "../core/theme-excerpt.ts";
-import { formatSectionScript } from "../core/timing.ts";
 import { type ReadableDeck, type RefInfo, requireSection } from "./scope.ts";
 
 /**
@@ -14,7 +15,10 @@ import { type ReadableDeck, type RefInfo, requireSection } from "./scope.ts";
 export type ShowResult = {
   slug: string;
   title: string;
+  /** The section as script.md has it, from its `##` heading, beat headings and ids included. */
   script: string;
+  /** Its beats in order, the ids and positions a `data-step` binds to. */
+  beats: { id?: string; title: string; line: number }[];
   html: string | null;
   /** `slides/<slug>.css`. */
   css: string | null;
@@ -58,7 +62,8 @@ export function showCommand({ deck, ref }: ReadableDeck, slug: string): ShowResu
   return {
     slug: section.slug,
     title: section.title,
-    script: formatSectionScript(section),
+    script: sectionSource(deck, section),
+    beats: section.beats.map(({ id, title, line }) => ({ ...(id ? { id } : {}), title, line })),
     html,
     css,
     ts,
@@ -85,4 +90,14 @@ function existingRefs(values: string[], slidesDir: string, deckDir: string): str
     }
   }
   return [...found].sort();
+}
+
+/** The section's lines of script.md, up to the next section, without the blank lines between. */
+function sectionSource(deck: ReadableDeck["deck"], section: Section): string {
+  const sections = deck.deck.sections;
+  const chunk = sectionChunks(
+    splitLines(readDeckFile(deck.dir, deck.scriptPath) ?? ""),
+    sections.map((entry) => entry.line),
+  )[sections.indexOf(section)];
+  return `${(chunk ?? []).join("\n").trimEnd()}\n`;
 }

@@ -352,7 +352,9 @@ export const COMMANDS = {
     summary: "Print what one slide is made of: its script, HTML, CSS, TS, theme rules, and assets.",
     group: "Slide",
     overview: [["dek show <slug>", "print a slide's script, HTML, CSS, TS, theme rules, assets"]],
-    agent: ["dek show <slug>     script, HTML, CSS, TS, the theme rules it uses, assets"],
+    agent: [
+      "dek show <slug>     script with its beat ids, HTML, CSS, TS, the theme rules it uses, assets",
+    ],
     run: async ({ target, args }) => {
       const { showCommand } = await import("./show.ts");
       return showCommand(target, args.slug);

@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { escapeRegExp } from "./escape.ts";
-import { joinLines, splitLines } from "./lines.ts";
+import { joinLines, sectionChunks, splitLines } from "./lines.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
 import { Id } from "./schema.ts";
 import { deckLayouts, skeletonHtml } from "./skeleton.ts";
@@ -266,13 +266,10 @@ export function reorderSection(
     return;
   }
   const head = lines.slice(0, firstLine - 1);
-  const chunks = sections.map((section, index) => {
-    const start = section.line - 1;
-    const end = sections[index + 1]
-      ? (sections[index + 1]?.line ?? lines.length) - 1
-      : lines.length;
-    return lines.slice(start, end);
-  });
+  const chunks = sectionChunks(
+    lines,
+    sections.map((section) => section.line),
+  );
 
   const moved = chunks.splice(fromIndex, 1)[0];
   if (!moved) {

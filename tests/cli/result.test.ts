@@ -209,6 +209,7 @@ architecture  architecture      0:11   0:05
       slug: "intro",
       title: "intro",
       script: "hello",
+      beats: [],
       html: null,
       css: null,
       ts: null,
