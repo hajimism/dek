@@ -1,39 +1,7 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { main } from "../../src/cli/main.ts";
+import { runMain as run } from "../helpers/cli.ts";
 import { withTempProject } from "../helpers/project.ts";
-
-type Run = { stdout: string; stderr: string; exitCode: number };
-
-/**
- * Runs the CLI in this process, with what it writes captured. The capture swaps the global
- * stdout and stderr, so every test here is test.serial.
- */
-async function run(argv: string[], cwd: string): Promise<Run> {
-  const out: string[] = [];
-  const err: string[] = [];
-  const stdout = spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    out.push(String(chunk));
-    return true;
-  });
-  const stderr = spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    err.push(String(chunk));
-    return true;
-  });
-  const previous = process.exitCode;
-  process.exitCode = 0;
-  let exitCode = 0;
-  try {
-    await main(argv, cwd);
-  } finally {
-    exitCode = Number(process.exitCode ?? 0);
-    // Bun keeps a 1 when handed undefined, which would fail the whole run.
-    process.exitCode = previous ?? 0;
-    stdout.mockRestore();
-    stderr.mockRestore();
-  }
-  return { stdout: out.join(""), stderr: err.join(""), exitCode };
-}
 
 type Failure = { ok: false; error: { message: string; hint?: string } };
 

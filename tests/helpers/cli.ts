@@ -1,5 +1,7 @@
+import { spyOn } from "bun:test";
 import { join } from "node:path";
 import { contractIssues, printedBy } from "../../src/cli/contract.ts";
+import { main } from "../../src/cli/main.ts";
 
 export const cliPath = join(import.meta.dir, "..", "..", "src", "cli.ts");
 
@@ -149,4 +151,34 @@ async function readUntilReady(
   }
 
   throw new Error(`server output not ready: ${buf}`);
+}
+
+/**
+ * Runs the CLI in this process, with what it writes captured. The capture swaps the global
+ * stdout and stderr, so a test that uses it is test.serial.
+ */
+export async function runMain(argv: string[], cwd: string): Promise<RunResult> {
+  const out: string[] = [];
+  const err: string[] = [];
+  const stdout = spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    out.push(String(chunk));
+    return true;
+  });
+  const stderr = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    err.push(String(chunk));
+    return true;
+  });
+  const previous = process.exitCode;
+  process.exitCode = 0;
+  let exitCode = 0;
+  try {
+    await main(argv, cwd);
+  } finally {
+    exitCode = Number(process.exitCode ?? 0);
+    // Bun keeps a 1 when handed undefined, which would fail the whole run.
+    process.exitCode = previous ?? 0;
+    stdout.mockRestore();
+    stderr.mockRestore();
+  }
+  return { stdout: out.join(""), stderr: err.join(""), exitCode };
 }
