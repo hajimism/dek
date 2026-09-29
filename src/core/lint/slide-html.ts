@@ -1,18 +1,17 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
-import { type HtmlAttribute, type HtmlScan, type SourceSpot, scanSlideHtml } from "../html-scan.ts";
+import type { HtmlAttribute, HtmlScan, SourceSpot } from "../html-scan.ts";
 import type { Section } from "../schema.ts";
 import { beatAt, formatStepChoices, resolveStep, stepChoices } from "../step.ts";
 import { suggest } from "../suggest.ts";
 import { isUrlAttribute } from "../url-attributes.ts";
 import { assetRefDiagnostics } from "./asset-refs.ts";
+import { RESERVED_MORPHS } from "./morph.ts";
 import { isRawThemeValue } from "./tokens.ts";
 
 /**
  * view-transition-names a data-morph may not take. The player names the slide box "slide",
  * the browser names the page "root", and the rest are keywords of the property itself.
  */
-const RESERVED_MORPHS = new Set(["slide", "root", "none", "auto", "match-element"]);
-
 /** One slide's markup, scanned once; every finding in it is located by the scan. */
 type SlideHtml = {
   section: Section;
@@ -25,7 +24,7 @@ type SlideHtml = {
 export function lintSlideHtml(
   section: Section,
   path: string,
-  html: string,
+  scan: HtmlScan,
   options: {
     deckDir: string;
     skeleton?: boolean;
@@ -37,7 +36,7 @@ export function lintSlideHtml(
   const slide: SlideHtml = {
     section,
     path,
-    scan: scanSlideHtml(html),
+    scan,
     skeleton: options.skeleton === true,
   };
   if (slide.scan.slides.length === 0) {

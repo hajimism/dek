@@ -512,6 +512,80 @@ b
     );
   });
 
+  describe("DEK028: a data-morph with nothing to morph into", () => {
+    const three = `---\ntitle: Demo\n---\n\n## a {#a}\n\nx\n\n## b {#b}\n\ny\n\n## c {#c}\n\nz\n`;
+    const slide = (body: string) =>
+      slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">t</h2>
+${body}
+</section>`);
+
+    function lintThree(slides: Record<string, string>) {
+      return withTempProject({ decks: [{ name: "demo", script: three, slides }] }, async (root) =>
+        lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK028"),
+      );
+    }
+
+    test("is quiet when the slide before or after has the same name", async () => {
+      const found = await lintThree({
+        a: slide(`  <p data-morph="n">840</p>`),
+        b: slide(`  <p data-morph="n">840</p>\n  <img data-morph="chart" alt="">`),
+        c: slide(`  <img data-morph="chart" alt="">`),
+      });
+      expect(found).toEqual([]);
+    });
+
+    test("warns on the element, naming the slides it could go to", async () => {
+      const found = await lintThree({
+        a: slide(`  <p>x</p>`),
+        b: slide(`  <p data-morph="p99">840</p>`),
+        c: slide(`  <p>z</p>`),
+      });
+      expect(found).toEqual([
+        expect.objectContaining({
+          severity: "warning",
+          slug: "b",
+          path: expect.stringMatching(/\/slides\/b\.html$/),
+          line: 10,
+          message: 'data-morph "p99" is on neither slide beside it, so nothing morphs',
+          hint: 'give its partner data-morph="p99" in slides/a.html or slides/c.html, or remove it',
+          data: { morph: "p99", neighbors: ["a", "c"] },
+        }),
+      ]);
+    });
+
+    test("does not count a slide two away", async () => {
+      const found = await lintThree({
+        a: slide(`  <p data-morph="n">x</p>`),
+        b: slide(`  <p>y</p>`),
+        c: slide(`  <p data-morph="n">z</p>`),
+      });
+      expect(found.map((d) => d.slug)).toEqual(["a", "c"]);
+      expect(found[0]?.hint).toBe('give its partner data-morph="n" in slides/b.html, or remove it');
+    });
+
+    test("suggests the name next door it was probably meant to match", async () => {
+      const found = await lintThree({
+        a: slide(`  <p data-morph="p99">840</p>`),
+        b: slide(`  <p data-morph="p-99">840</p>`),
+        c: slide(`  <p>z</p>`),
+      });
+      expect(found.map((d) => d.hint)).toEqual([
+        'did you mean "p-99", as in slides/b.html?',
+        'did you mean "p99", as in slides/a.html?',
+      ]);
+    });
+
+    test("leaves reserved names to DEK005", async () => {
+      const found = await lintThree({
+        a: slide(`  <p data-morph="slide">x</p>`),
+        b: slide(`  <p>y</p>`),
+        c: slide(`  <p>z</p>`),
+      });
+      expect(found).toEqual([]);
+    });
+  });
+
   const vocabTheme = `.slide {}
 .slide .slide-title {}
 .slide .node {}

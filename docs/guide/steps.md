@@ -53,7 +53,7 @@ To carry an element into the next slide, give it the same `data-morph` name on b
 
 The runtime turns `data-morph` into a `view-transition-name`, and the browser interpolates position and size between the two slides. A figure that shrinks into the corner as the next topic begins is one attribute, and both slides remain plain `<section class="slide">` fragments.
 
-Two elements with the same `data-morph` on one slide is [DEK005](/reference/lint#dek005), and so is a name the player reserves, such as `slide`.
+Two elements with the same `data-morph` on one slide is [DEK005](/reference/lint#dek005), and so is a name the player reserves, such as `slide`. A name that neither the slide before nor the slide after has morphs into nothing, which is [DEK028](/reference/lint#dek028), a warning with the likeliest partner in its hint.
 
 A morph is invisible in a still image. To judge one, freeze the transition part-way and look:
 

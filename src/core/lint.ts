@@ -3,6 +3,7 @@ import type { Diagnostic } from "./diagnostic.ts";
 import { type DeckFiles, type LintContext, readDeckFiles } from "./lint/context.ts";
 import { pairingDiagnostics, suggestRename } from "./lint/files.ts";
 import { frontmatterKeyDiagnostics, tomlKeyDiagnostics } from "./lint/keys.ts";
+import { unpairedMorphDiagnostics } from "./lint/morph.ts";
 import { duplicateIdDiagnostics, strayHeadingDiagnostics } from "./lint/script.ts";
 import { sharedStyleDiagnostics } from "./lint/shared-styles.ts";
 import { lintSlideHtml } from "./lint/slide-html.ts";
@@ -87,6 +88,7 @@ function runRules(ctx: LintContext, options: LintDeckOptions | undefined): Diagn
         ...javascriptDiagnostics(ctx),
         ...themeDiagnostics(ctx),
         ...[...ctx.sectionsBySlug.values()].flatMap((section) => slideDiagnostics(ctx, section)),
+        ...unpairedMorphDiagnostics(ctx),
         ...sharedStyleDiagnostics(ctx),
       ],
       ctx,
@@ -116,7 +118,7 @@ function slideDiagnostics(ctx: LintContext, section: Section): Diagnostic[] {
       ? lintSlideStyle(section.slug, style.path, style.sheet, ctx.theme?.tokens ?? [], ctx.deck.dir)
       : []),
     ...(script ?? []),
-    ...lintSlideHtml(section, slide.path, source.html, {
+    ...lintSlideHtml(section, slide.path, source.scan, {
       deckDir: ctx.deck.dir,
       skeleton: source.skeleton,
       hasScript: script !== undefined,

@@ -43,6 +43,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK025` | `slide` | A numeric `data-step` that points at a beat with an id. Warning | — |
 | `DEK026` | `slide` | The same declaration under the same selector in the stylesheets of three slides or more. Warning | — |
 | `DEK027` | `deck` | `script.md` cannot be read: its frontmatter, a heading without a valid `{#id}`, or a beat before any slide. One finding per problem | — |
+| `DEK028` | `slide` | A `data-morph` name that neither the slide before nor the slide after has, so nothing morphs. Warning | — |
 | `DEK030` | `slide` | An element or its text runs past an edge of the frame the audience sees when rendered, at any beat, or text is cut off by an ancestor with `overflow` other than `visible` | — |
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK033` | `slide` | Two texts are drawn over each other, a folio or a running head a pseudo-element draws included | — |
@@ -116,6 +117,10 @@ A declaration three slides each write in their own stylesheet is a fix the theme
 ### DEK027
 
 Nothing else in a deck can be checked against a script that does not read, so these are the deck's only findings until it does. Every problem is reported in one run, each at its line with the fix: the heading and its frontmatter are read on their own, and a heading that cannot be read still opens its slide, so the beats under it are not reported as well. `dek lint` reports them wherever it runs, inside the deck or at the project root, and the dev server shows them all. A command that cannot work without the deck, such as `dek build`, stops on the first with the same message and hint.
+
+### DEK028
+
+A morph carries an element into the element of the same name on the slide it goes to, and only the slide right before or after counts: a partner two slides away is never on screen at the same time. A name neither neighbor has is a plain fade, which lint cannot tell from a typo, so it is a warning at the attribute. When a neighbor has a name one or two edits away that nothing on this slide already pairs with, the hint asks whether that was meant (`did you mean "p-99", as in slides/b.html?`); otherwise it names the neighbors' files to give the partner in, or says to remove the attribute. Reserved names are left to `DEK005`. `data` carries `morph` and `neighbors`, the slugs of the slides beside it.
 
 ### DEK030
 

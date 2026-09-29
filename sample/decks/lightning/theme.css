@@ -2,8 +2,8 @@
  * Phosphor theme. The talk is one terminal session on an amber CRT:
  * amber is the ink, green marks the prompt and anything that passed,
  * red marks what failed. Scanlines, vignette, and bloom live on pseudo-elements,
- * so lint measures only the words. Every window carries data-morph="window"
- * and every slide the same HUD, so the session never cuts away.
+ * so lint measures only the words. A window that follows a window carries
+ * data-morph="window", and every slide the same HUD, so the session never cuts away.
  */
 .slide {
   --fg: #ffb648;

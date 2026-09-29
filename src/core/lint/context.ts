@@ -2,6 +2,7 @@ import { type DekConfig, loadConfig } from "../config.ts";
 import { cssLayoutNames, parseCss, type Stylesheet } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import type { Diagnostic } from "../diagnostic.ts";
+import { type HtmlScan, scanSlideHtml } from "../html-scan.ts";
 import { type ScriptParts, splitFrontmatter } from "../parse.ts";
 import {
   listSlideFiles,
@@ -15,6 +16,8 @@ import { skeletonHtml } from "../skeleton.ts";
 import { type ThemeFacts, themeFacts } from "../theme-facts.ts";
 
 type SlideFile = { slug: string; path: string };
+
+type SlideSource = { html: string; scan: HtmlScan; skeleton: boolean };
 
 /**
  * What every rule reads: the deck, its config, and the files beside script.md. Rules see every
@@ -38,8 +41,8 @@ export type DeckFiles = {
   stylesBySlug: Map<string, SlideFile>;
   /** theme.css, parsed once for every rule that reads it. */
   theme?: ThemeFacts & { path: string; sheet: Stylesheet };
-  /** A slide's HTML, read once, and whether it is still the skeleton `dek sync` wrote. */
-  slideSource(slug: string): { html: string; skeleton: boolean } | undefined;
+  /** A slide's HTML, read and scanned once, and whether it is still the skeleton `dek sync` wrote. */
+  slideSource(slug: string): SlideSource | undefined;
   /** A slide's own stylesheet, read and parsed once for every rule that reads it. */
   slideStyle(slug: string): { path: string; sheet: Stylesheet } | undefined;
 };
@@ -54,7 +57,7 @@ export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
     }
   }
   const slidesBySlug = new Map(listSlides(deck.dir).map((slide) => [slide.slug, slide]));
-  const sources = new Map<string, { html: string; skeleton: boolean } | undefined>();
+  const sources = new Map<string, SlideSource | undefined>();
   const stylesBySlug = new Map(listSlideFiles(deck.dir, ".css").map((file) => [file.slug, file]));
   const styles = new Map<string, { path: string; sheet: Stylesheet } | undefined>();
   const sheet = themeCss === undefined ? undefined : parseCss(themeCss);
@@ -81,7 +84,11 @@ export function readDeckFiles(project: Project, deck: ProjectDeck): DeckFiles {
           slug,
           html === undefined
             ? undefined
-            : { html, skeleton: html === skeletonHtml(deck.deck, slug, layouts) },
+            : {
+                html,
+                scan: scanSlideHtml(html),
+                skeleton: html === skeletonHtml(deck.deck, slug, layouts),
+              },
         );
       }
       return sources.get(slug);
