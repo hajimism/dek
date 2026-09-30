@@ -44,6 +44,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK026` | `slide` | The same declaration under the same selector in the stylesheets of three slides or more. Warning | — |
 | `DEK027` | `deck` | `script.md` cannot be read: its frontmatter, a heading without a valid `{#id}`, or a beat before any slide. One finding per problem | — |
 | `DEK028` | `slide` | A `data-morph` name that neither the slide before nor the slide after has, so nothing morphs. Warning | — |
+| `DEK029` | `slide` | Text under `aria-hidden="true"`, which lint does not measure: a figure's labels, an SVG's `<text>`. `<title>` and `<desc>` are not drawn and do not count. Warning, since a sample the talk shows as unreadable belongs there | — |
 | `DEK030` | `slide` | An element or its text runs past an edge of the frame the audience sees when rendered, at any beat, or text is cut off by an ancestor with `overflow` other than `visible` | — |
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK033` | `slide` | Two texts are drawn over each other, a folio or a running head a pseudo-element draws included | — |

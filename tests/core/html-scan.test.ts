@@ -89,6 +89,31 @@ describe("srcsetUrls", () => {
   });
 });
 
+// aria-hidden is how a slide marks decoration, and lint measures nothing under it; text there is
+// text the audience may read and no check sees.
+describe("scanSlideHtml finds text hidden from lint", () => {
+  test.each<[string, [tag: string, text: string] | undefined]>([
+    [
+      '<svg aria-hidden="true"><text>試した技術</text><text>磨いた設計</text></svg>',
+      ["svg", "試した技術 磨いた設計"],
+    ],
+    ['<div aria-hidden="true"><p>  a\n  sample </p></div>', ["div", "a sample"]],
+    ['<div aria-hidden="true"><p aria-hidden="true">once</p></div>', ["div", "once"]],
+    ['<div aria-hidden="true"><span></span><span></span></div>', undefined],
+    [
+      '<svg aria-hidden="true"><title>Loop</title><desc>A path</desc><path d="M0 0"/></svg>',
+      undefined,
+    ],
+    ['<div aria-hidden="true">  </div>', undefined],
+    ['<p aria-hidden="false">read</p>', undefined],
+  ])("%s", (markup, hidden) => {
+    const scan = scanSlideHtml(`<section class="slide">\n  ${markup}\n</section>`);
+    expect(scan.hiddenTexts.map(({ element, text }) => [element.tag, element.line, text])).toEqual(
+      hidden ? [[hidden[0], 2, hidden[1]]] : [],
+    );
+  });
+});
+
 describe("scanSlideHtml finds empty headings", () => {
   test.each([
     ['<h2 class="slide-title"></h2>', true],

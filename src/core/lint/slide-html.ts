@@ -51,6 +51,7 @@ export function lintSlideHtml(
     ...inlineCodeDiagnostics(slide),
     ...presentationDiagnostics(slide),
     ...emptyHeadingDiagnostics(slide),
+    ...hiddenTextDiagnostics(slide),
     ...(options.classes
       ? unknownClassDiagnostics(slide, options.classes, options.hasScript === true)
       : []),
@@ -386,6 +387,35 @@ function emptyHeadingDiagnostics({ section, path, scan, skeleton }: SlideHtml): 
       data: { tag: element.tag },
     }),
   );
+}
+
+/** How much of a hidden text a message quotes. */
+const HIDDEN_SNIPPET_CHARS = 24;
+
+/**
+ * DEK029: text under `aria-hidden="true"`. That is how a slide marks decoration, and lint
+ * measures neither the contrast nor the overflow of anything under it, so a labeled figure
+ * marked that way is text the audience reads and no check sees. Right only on a sample the talk
+ * shows as unreadable, so it warns.
+ */
+function hiddenTextDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
+  return scan.hiddenTexts.map(({ element, text }) => {
+    const chars = [...text];
+    const quoted =
+      chars.length > HIDDEN_SNIPPET_CHARS
+        ? `${chars.slice(0, HIDDEN_SNIPPET_CHARS).join("")}…`
+        : text;
+    const svg =
+      element.tag === "svg" ? '; an SVG can take role="img" and an aria-label instead' : "";
+    return diag("DEK029", {
+      message: `<${element.tag} aria-hidden="true"> holds text the audience reads, "${quoted}", which lint does not measure`,
+      path,
+      ...spotOf(element),
+      slug: section.slug,
+      hint: `if the audience should read it, remove aria-hidden="true" from it so lint measures its contrast and overflow${svg}. Keep aria-hidden only on decoration, or on a sample the talk shows as unreadable`,
+      data: { tag: element.tag, text },
+    });
+  });
 }
 
 /** DEK010: a class neither theme.css nor the slide's own stylesheet defines. */

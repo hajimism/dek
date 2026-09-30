@@ -12,7 +12,11 @@ export type HtmlAttribute = SourceSpot & { name: string; value: string };
  * One start tag, located at its `<`, with its attributes in source order, and whether it is in a
  * slide: the `<section class="slide">` itself or inside one, rather than a full document's head.
  */
-type HtmlElement = SourceSpot & { tag: string; attributes: HtmlAttribute[]; inSlide: boolean };
+type HtmlElement = SourceSpot & {
+  tag: string;
+  attributes: HtmlAttribute[];
+  inSlide: boolean;
+};
 
 /** One URL an attribute names, located where the URL itself is written. */
 export type HtmlRef = SourceSpot & { tag: string; attr: string; value: string; use: UrlUse };
@@ -30,11 +34,18 @@ export type HtmlScan = {
   refs: HtmlRef[];
   /** Headings with nothing to read: no text, no image, no `aria-label`. */
   emptyHeadings: HtmlElement[];
+  /**
+   * Each outermost `aria-hidden="true"` element that holds text, with that text, its whitespace
+   * collapsed. An SVG's `<title>` and `<desc>` describe it and are never drawn, so they hold none.
+   */
+  hiddenTexts: Array<{ element: HtmlElement; text: string }>;
 };
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 /** Elements that give a heading something to show without any text. */
 const CONTENT_TAGS = new Set(["img", "svg", "picture", "video", "canvas", "object", "math"]);
+/** Elements whose text describes a picture rather than being drawn in it. */
+const UNDRAWN_TAGS = new Set(["title", "desc"]);
 
 /**
  * What a slide's markup uses and references, read in one pass of the real parser and located in
@@ -47,6 +58,10 @@ export function scanSlideHtml(html: string): HtmlScan {
   let slidesOpen = 0;
   const headings: Array<{ index: number; content: boolean }> = [];
   const open: Array<{ index: number; content: boolean }> = [];
+  const hidden: Array<{ index: number; text: string }> = [];
+  // The outermost aria-hidden element still open, and how many undrawn elements are open in it.
+  let hiding: { index: number; text: string } | undefined;
+  let undrawn = 0;
 
   const transformed = new HTMLRewriter()
     .on("*", {
@@ -61,6 +76,23 @@ export function scanSlideHtml(html: string): HtmlScan {
           for (const heading of open) {
             heading.content = true;
           }
+        }
+        if (hiding) {
+          // Two elements' texts are two words, whatever whitespace the source puts between them.
+          hiding.text += " ";
+          if (UNDRAWN_TAGS.has(tag) && el.canHaveContent) {
+            undrawn++;
+            el.onEndTag(() => {
+              undrawn--;
+            });
+          }
+        } else if (el.getAttribute("aria-hidden")?.trim() === "true" && el.canHaveContent) {
+          const entry = { index: parsed.length, text: "" };
+          hidden.push(entry);
+          hiding = entry;
+          el.onEndTag(() => {
+            hiding = undefined;
+          });
         }
         if (HEADING_TAGS.has(tag) && el.canHaveContent) {
           const heading = {
@@ -84,6 +116,9 @@ export function scanSlideHtml(html: string): HtmlScan {
     })
     .onDocument({
       text(chunk) {
+        if (hiding && undrawn === 0) {
+          hiding.text += chunk.text;
+        }
         if (open.length > 0 && chunk.text.trim() !== "") {
           for (const heading of open) {
             heading.content = true;
@@ -147,6 +182,11 @@ export function scanSlideHtml(html: string): HtmlScan {
     emptyHeadings: headings
       .filter((heading) => !heading.content)
       .flatMap((heading) => elements[heading.index] ?? []),
+    hiddenTexts: hidden.flatMap(({ index, text }) => {
+      const element = elements[index];
+      const squashed = text.replace(/\s+/g, " ").trim();
+      return element && squashed !== "" ? [{ element, text: squashed }] : [];
+    }),
   };
 }
 

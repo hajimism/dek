@@ -565,6 +565,7 @@ c
       expect(agents).toContain("`--dek-slide-number` and `--dek-slide-count`");
       expect(agents).toContain("never by hand");
       expect(agents).toContain("When a hint sends a fix to `theme.css`, make it there");
+      expect(agents).toContain("`DEK029` warns of text under it");
     });
   });
 

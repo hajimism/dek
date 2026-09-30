@@ -16,7 +16,8 @@ export type Scope = "project" | "deck" | "slide";
  * without them. So are the findings about input dek ignores (DEK008) or reads another way
  * (DEK044), an empty heading (DEK024), which a slide script may fill, and a step bound by
  * position where the beat has an id (DEK025), which is right until a beat is inserted, and a
- * style several slides repeat (DEK026), which works but belongs in the theme.
+ * style several slides repeat (DEK026), which works but belongs in the theme. Text under
+ * aria-hidden (DEK029) is right on a sample the talk shows as unreadable.
  */
 export const RULES = {
   DEK001: { severity: "error", scopes: ["slide"] },
@@ -47,6 +48,7 @@ export const RULES = {
   DEK026: { severity: "warning", scopes: ["slide"] },
   DEK027: { severity: "error", scopes: ["deck"] },
   DEK028: { severity: "warning", scopes: ["slide"] },
+  DEK029: { severity: "warning", scopes: ["slide"] },
   DEK030: { severity: "error", scopes: ["slide"] },
   DEK031: { severity: "error", scopes: ["slide"] },
   DEK032: { severity: "error", scopes: ["slide"] },

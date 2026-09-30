@@ -2316,6 +2316,51 @@ describe("markup rules report every occurrence where it is written", () => {
   });
 });
 
+describe("DEK029: text hidden from lint by aria-hidden", () => {
+  const script = "---\ntitle: Demo\n---\n\n## intro\n\nhello\n";
+
+  async function lintIntro(intro: string) {
+    return withTempProject({ decks: [{ name: "demo", script, slides: { intro } }] }, async (root) =>
+      lintDeck(join(root, "decks", "demo")),
+    );
+  }
+
+  test("warns of a labeled figure marked as decoration, and says how to let lint see it", async () => {
+    const found = (
+      await lintIntro(`<section class="slide">
+  <h2 class="slide-title">intro</h2>
+  <svg viewBox="0 0 10 10" aria-hidden="true"><text x="1" y="5">試した技術</text><text x="1" y="9">還ってくるまでの長い寄り道を本線に戻す</text></svg>
+</section>
+`)
+    ).filter((d) => d.id === "DEK029");
+    expect(found).toEqual([
+      {
+        id: "DEK029",
+        severity: "warning",
+        message:
+          '<svg aria-hidden="true"> holds text the audience reads, "試した技術 還ってくるまでの長い寄り道を本線に戻…", which lint does not measure',
+        path: expect.stringContaining("slides/intro.html"),
+        line: 3,
+        column: 3,
+        slug: "intro",
+        hint: 'if the audience should read it, remove aria-hidden="true" from it so lint measures its contrast and overflow; an SVG can take role="img" and an aria-label instead. Keep aria-hidden only on decoration, or on a sample the talk shows as unreadable',
+        data: { tag: "svg", text: "試した技術 還ってくるまでの長い寄り道を本線に戻す" },
+      },
+    ]);
+  });
+
+  test("leaves decoration with nothing to read alone", async () => {
+    const found = (
+      await lintIntro(`<section class="slide">
+  <h2 class="slide-title">intro</h2>
+  <div aria-hidden="true"><span></span><span></span></div>
+</section>
+`)
+    ).filter((d) => d.id === "DEK029");
+    expect(found).toEqual([]);
+  });
+});
+
 describe("DEK024: a heading with nothing to read", () => {
   const script = `---
 title: Demo
