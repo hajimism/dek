@@ -252,7 +252,8 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - One \`##\` heading is one slide. HTML lives in \`slides/<id>.html\`.
 - Each deck owns its \`theme.css\`. Before writing a slide, run \`dek theme\` in the deck for the classes, tokens, and layouts it defines, and \`dek theme <layout>\` for a layout's markup.
 - Shared look lives in \`theme.css\`. Decoration only one slide uses lives in \`slides/<id>.css\`, which is scoped to that slide.
-- Use only classes defined in \`theme.css\` or in that slide's own \`slides/<id>.css\`.
+- Use only classes defined in \`theme.css\` or in that slide's own \`slides/<id>.css\`. The theme holds at most \`max_classes\` in \`dek.toml\`, 40 by default (\`DEK013\`); classes in \`slides/<id>.css\` do not count, so keep a class only one slide uses there.
+- A rule in \`slides/<id>.css\` weighs as if it were written at the end of \`theme.css\`: it beats the theme's \`.slide .x\`, but not a more specific rule such as a layout's \`.slide[data-layout="split"] .x\` or the beat state \`.slide.is-current [data-step]\`. To override one of those, write the same selector.
 - Color, type, space, radius, and motion in either stylesheet use token \`var()\` only. A value only one slide uses can be a token of its own on that slide's \`.slide\` rule in \`slides/<id>.css\`.
 - Do not add \`<style>\`, \`style=\`, \`<script>\`, event handler attributes (\`onclick=\` and the like), or \`javascript:\` URLs inside slide HTML.
 - Motion CSS cannot express lives in \`slides/<id>.ts\`: \`export default { motion: { <step>: ms }, draw(slide, { index, step, t }) {} } satisfies DekSlide\`. \`DekSlide\` is global, from \`.dek/slide.d.ts\`; do not import it. Key the slide's arrival, before its first beat, as \`"0"\`: every \`data-step\` element is hidden there, so draw what the slide shows before anything happens. Draw from \`t\` alone and set everything you touch on every call, with no timers and no imports, so video and screenshots can seek it. In \`draw\`, find elements by data-* attributes from the slide it is given, never by class or through \`document\`: the built deck holds every slide.
@@ -262,6 +263,7 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 ## Checking a slide
 
 - \`dek check <slug> --shot\` lints one slide and screenshots it at its last beat.
+- A shot's path names what it drew, and an edit to the slide or the theme replaces the file. Never reuse a shot's path from before an edit: run \`dek shot <slug>\` again, which shoots only what changed, and read the path it prints.
 - \`dek shot --sheet\` tiles every slide on one image: read it to judge the deck's balance in one look, then open a slide's own shot for detail.
 - Mark decoration \`aria-hidden="true"\`: a glow that bleeds off the slide, or a sample of text the talk shows as unreadable. Lint measures neither overflow nor contrast on it, and screen readers skip it, so never mark text the audience should read.
 - When a hint sends a fix to \`theme.css\`, make it there, not in \`slides/<id>.css\`: the theme alone draws it that way, so other slides share the problem, and one change fixes them all.
