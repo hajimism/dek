@@ -1,5 +1,6 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
+import type { Fill } from "../core/fill.ts";
 import { lintDeck } from "../core/lint.ts";
 import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
 import { runVisualDeck } from "../core/visual.ts";
@@ -20,6 +21,8 @@ export type CheckCliResult = {
   /** Checks that did not run, each with why and how to run it, so an empty list is not a pass. */
   skipped?: SkippedCheck[];
   shot?: string;
+  /** How much of the frame the slide fills at `step`, its last beat; absent when not measured. */
+  fill?: Fill & { step: string };
   voice?: { beats: VoiceCheckBeat[] };
 };
 
@@ -46,6 +49,7 @@ export async function checkCommand(
   }
 
   const shot = visual?.screenshotPath;
+  const { slug: _slide, ...fill } = visual?.fills.find((found) => found.slug === slug) ?? {};
 
   const skipped: SkippedCheck[] = visual
     ? []
@@ -87,6 +91,7 @@ export async function checkCommand(
     diagnostics,
     ...skippedChecks(skipped),
     ...(shot ? { shot } : {}),
+    ...("step" in fill ? { fill } : {}),
     ...(voice ? { voice } : {}),
   };
 }

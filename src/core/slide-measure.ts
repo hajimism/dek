@@ -39,6 +39,13 @@ export type MeasuredElement = {
    */
   decorative: boolean;
   /**
+   * Whether it draws a picture the audience looks at: an image, an SVG, a video, a canvas, an
+   * embedded frame or object, or an image set as its background.
+   */
+  picture: boolean;
+  /** Whether it paints its own box: a background, or a border in a color that shows. */
+  paints: boolean;
+  /**
    * What an ancestor inside the slide cuts it to, with `overflow` other than `visible`: the
    * nearest such ancestor, and the box every one of them leaves visible. `intended` when the cut is
    * a truncation the author asked for, an ellipsis or a line clamp.
@@ -84,6 +91,19 @@ export function measureSlideInPage(): SlideMeasure {
     return { slideBox: undefined, elements: [], pseudoTexts: [] };
   }
   const runtimeClasses = new Set(["is-current", "is-shown"]);
+  const pictures = new Set(["img", "svg", "video", "canvas", "iframe", "object", "embed"]);
+  // Computed colors come back as rgba() or, from a newer syntax, with a "/ alpha" at the end.
+  const shows = (color: string): boolean =>
+    color !== "transparent" && !/^rgba\([^)]*,\s*0\)$/.test(color) && !/\/\s*0\)$/.test(color);
+  const paints = (style: CSSStyleDeclaration): boolean =>
+    style.backgroundImage !== "none" ||
+    shows(style.backgroundColor) ||
+    (["Top", "Right", "Bottom", "Left"] as const).some(
+      (side) =>
+        Number.parseFloat(style[`border${side}Width`]) > 0 &&
+        style[`border${side}Style`] !== "none" &&
+        shows(style[`border${side}Color`]),
+    );
   const toBox = (rect: DOMRect): Box => ({
     left: rect.left,
     top: rect.top,
@@ -199,6 +219,8 @@ export function measureSlideInPage(): SlideMeasure {
       fontSize: Number.parseFloat(style.fontSize),
       fontWeight: Number(style.fontWeight) || 400,
       decorative: el.closest('[aria-hidden="true"]') !== null,
+      picture: pictures.has(el.tagName.toLowerCase()) || style.backgroundImage.includes("url("),
+      paints: paints(style),
       ...clipped(clipOf(el)),
     };
   });

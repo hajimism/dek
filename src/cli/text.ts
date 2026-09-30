@@ -386,6 +386,9 @@ export function formatCheck(data: CheckCliResult, color = false): string {
   if (data.shot) {
     lines.push(data.shot);
   }
+  if (data.fill) {
+    lines.push(...formatFill(data.fill));
+  }
   if (data.voice) {
     for (const beat of data.voice.beats) {
       const kana = beat.sentences.map((sentence) => sentence.kana).join(" ");
@@ -394,6 +397,27 @@ export function formatCheck(data: CheckCliResult, color = false): string {
     }
   }
   return lines.join("\n");
+}
+
+/** A fill as whole percentages: the share of the frame, the box it lies in, then its bands. */
+function formatFill({
+  coverage,
+  box,
+  rows,
+  columns,
+}: NonNullable<CheckCliResult["fill"]>): string[] {
+  if (!box) {
+    return ["fill: nothing to read or look at on the slide"];
+  }
+  const percent = (share: number): string => String(Math.round(share * 100));
+  const within = (["left", "top", "right", "bottom"] as const)
+    .map((side) => `${side} ${percent(box[side])}%`)
+    .join(" ");
+  return [
+    `fill: ${percent(coverage)}% of the frame, within ${within}`,
+    `  rows, top to bottom:    ${rows.map(percent).join(" ")}`,
+    `  columns, left to right: ${columns.map(percent).join(" ")}`,
+  ];
 }
 
 /** Each diagnostic with its path as `display` shows it. */

@@ -4,6 +4,7 @@ import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
+import { formatCheck } from "../../src/cli/text.ts";
 import { DekError } from "../../src/core/error.ts";
 import type { VisualRequest, VisualResponse } from "../../src/core/playwright.ts";
 import { VOICE_SETUP_HINT } from "../../src/core/voice.ts";
@@ -237,4 +238,69 @@ more
       );
     },
   );
+});
+
+// What an agent otherwise opens a screenshot to see: whether the slide is sparse, and where.
+describe("dek check fill", () => {
+  const rows = [0.9, 0.8, 0.6, 0.2, 0, 0, 0, 0, 0, 0];
+  const columns = [0.4, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0];
+  const box = { left: 0.04, top: 0.06, right: 0.96, bottom: 0.4 };
+
+  async function fillRunner(request: VisualRequest): Promise<VisualResponse> {
+    const pages = request.kind === "pages" ? request.pages : [];
+    return {
+      overflows: [],
+      contrasts: [],
+      fills: pages.map(({ slug, step }) => ({ slug, step, coverage: 0.25, box, rows, columns })),
+    };
+  }
+
+  test("gives how much of the frame the slide fills at its last beat", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
+          slug: "intro",
+          runner: fillRunner,
+        });
+        expect(result.fill).toEqual({ step: "0", coverage: 0.25, box, rows, columns });
+      },
+    );
+  });
+
+  test("gives no fill when the slide could not be measured", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
+          slug: "intro",
+          runner: cleanRunner,
+        });
+        expect(result.fill).toBeUndefined();
+      },
+    );
+  });
+
+  test("prints the fill as percentages, with the bands top to bottom and left to right", () => {
+    const text = formatCheck({
+      slug: "intro",
+      diagnostics: [],
+      fill: { step: "0", coverage: 0.25, box, rows, columns },
+    });
+    expect(text.split("\n").slice(-3)).toEqual([
+      "fill: 25% of the frame, within left 4% top 6% right 96% bottom 40%",
+      "  rows, top to bottom:    90 80 60 20 0 0 0 0 0 0",
+      "  columns, left to right: 40 50 50 50 50 50 50 50 30 0",
+    ]);
+  });
+
+  test("says when nothing on the slide fills the frame", () => {
+    const empty = Array.from({ length: 10 }, () => 0);
+    const text = formatCheck({
+      slug: "intro",
+      diagnostics: [],
+      fill: { step: "0", coverage: 0, rows: empty, columns: empty },
+    });
+    expect(text.split("\n").at(-1)).toBe("fill: nothing to read or look at on the slide");
+  });
 });

@@ -109,6 +109,53 @@ describe("playwright worker findings", () => {
   );
 });
 
+describe("playwright worker fill", () => {
+  // A quarter each: an image as a background; an SVG; a card whose picture fills its top 216px;
+  // and a bar 72px tall across the top of the last, in an orange whose blue is 0, as a clear
+  // color's alpha is. A folio sits in the corner, drawn by ::after
+  // as every slide's is.
+  const html = `<html><head><style>
+body { margin: 0 }
+.slide { position: relative; width: 1280px; height: 720px; background: #fff }
+.slide > * { position: absolute; width: 640px; height: 360px; margin: 0 }
+.slide::after { content: "7"; position: absolute; right: 8px; bottom: 8px }
+</style></head><body><section class="slide">
+  <div class="photo" style="left:0;top:0;background-image:url('data:image/gif;base64,R0lGODlhAQABAAAAACw=')"></div>
+  <svg style="left:640px;top:360px" viewBox="0 0 1 1"></svg>
+  <div class="card" style="left:0;top:360px;background:#eee"><svg style="display:block;width:640px;height:216px" viewBox="0 0 1 1"></svg></div>
+  <div class="bar" style="left:640px;top:0;height:72px;background:#f80"></div>
+</section></body></html>`;
+
+  browserTest("says how much of the frame the slide fills, and where", async () => {
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["fill"],
+      pages: [{ html, slug: "intro", step: "1" }],
+    });
+    expect(response?.fills).toEqual([
+      {
+        slug: "intro",
+        step: "1",
+        coverage: 0.7,
+        box: { left: 0, top: 0, right: 1, bottom: 1 },
+        rows: [1, 0.5, 0.5, 0.5, 0.5, 1, 1, 1, 0.5, 0.5],
+        columns: [0.8, 0.8, 0.8, 0.8, 0.8, 0.6, 0.6, 0.6, 0.6, 0.6],
+      },
+    ]);
+  });
+
+  browserTest("measures no fill unless asked", async () => {
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["overflow"],
+      pages: [{ html, slug: "intro", step: "1" }],
+    });
+    expect(response?.fills ?? []).toEqual([]);
+  });
+});
+
 describe("playwright worker pages", () => {
   browserTest(
     "renders every slide fresh, in order, whatever the one before left behind",
@@ -312,7 +359,13 @@ describe("playwright worker files", () => {
             },
           ],
         });
-        expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
+        expect(response).toEqual({
+          overflows: [],
+          contrasts: [],
+          drawErrors: [],
+          collisions: [],
+          fills: [],
+        });
         expect((await pixelAt(screenshotPath, 10, 10)).slice(0, 5)).toEqual([320, 180, 255, 0, 0]);
       } finally {
         await rm(dir, { recursive: true, force: true });
@@ -1039,7 +1092,13 @@ describe("contact sheets in a real Chromium", () => {
         pages: shots,
         sheets: [spec],
       });
-      expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
+      expect(response).toEqual({
+        overflows: [],
+        contrasts: [],
+        drawErrors: [],
+        collisions: [],
+        fills: [],
+      });
       expect(await Bun.file(spec.path).exists()).toBe(true);
       const { size, boxes } = sheetLayout(spec);
       const images = boxes.filter((box) => box.kind === "image");

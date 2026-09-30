@@ -5,6 +5,7 @@ import { renderPdfHtml } from "./pdf.ts";
 import {
   askPlaywright,
   type ContrastOrigin,
+  type FillFinding,
   type PageAction,
   type PagesResponse,
   type PlaywrightRunner,
@@ -28,6 +29,8 @@ export type VisualDeckOptions = {
 export type VisualDeckResult = {
   diagnostics: Diagnostic[];
   screenshotPath?: string;
+  /** How much of the frame each slide measured fills at its last beat, as its shot shows it. */
+  fills: FillFinding[];
 };
 
 export async function lintVisualDeck(
@@ -77,10 +80,10 @@ async function visualDeck(
   const { pages, stills, scripted } = visualPages(deck, options);
 
   if (pages.length === 0) {
-    return { diagnostics: [] };
+    return { diagnostics: [], fills: [] };
   }
 
-  const actions: PageAction[] = ["overflow", "contrast"];
+  const actions: PageAction[] = ["overflow", "contrast", "fill"];
   const viewport = logicalSize(deck.deck.ratio);
   const cache = visualCache(deck.dir, { viewport, actions });
   const keyed = pages.map((page) => {
@@ -115,6 +118,8 @@ async function visualDeck(
   }
   // In the pages' order; a finding that names no page asked for is reported all the same.
   const asked = new Set(keyed.map(({ page }) => pageId(page)));
+  // Each slide's pages run from its arrival to its last beat, so the last one kept is its last.
+  const lastSteps = new Map(pages.map((page) => [page.slug, page.step]));
   const all = [
     ...keyed.map(({ page, found }) => fresh.get(pageId(page)) ?? found ?? NOTHING_FOUND),
     ...[...fresh].flatMap(([id, found]) => (asked.has(id) ? [] : [found])),
@@ -136,6 +141,9 @@ async function visualDeck(
       deck.dir,
     ),
     ...(stills[0] ? { screenshotPath: stills[0].screenshotPath } : {}),
+    fills: all
+      .flatMap((page) => page.fills)
+      .filter((fill) => lastSteps.get(fill.slug) === fill.step),
   };
 }
 
@@ -144,6 +152,7 @@ const NOTHING_FOUND: PageFindings = {
   contrasts: [],
   drawErrors: [],
   collisions: [],
+  fills: [],
 };
 
 /** A page's findings name its slide and step, which no two pages of one run share. */
@@ -156,7 +165,13 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   const pages = new Map<string, PageFindings>();
   const of = (finding: { slug: string; step: string }): PageFindings => {
     const id = pageId(finding);
-    const found = pages.get(id) ?? { overflows: [], contrasts: [], drawErrors: [], collisions: [] };
+    const found = pages.get(id) ?? {
+      overflows: [],
+      contrasts: [],
+      drawErrors: [],
+      collisions: [],
+      fills: [],
+    };
     pages.set(id, found);
     return found;
   };
@@ -171,6 +186,9 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   }
   for (const finding of response.collisions ?? []) {
     of(finding).collisions.push(finding);
+  }
+  for (const finding of response.fills ?? []) {
+    of(finding).fills.push(finding);
   }
   return pages;
 }

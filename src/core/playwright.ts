@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
 import { DekError } from "./error.ts";
+import type { Fill } from "./fill.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
@@ -39,7 +40,7 @@ export type MotionSpec = {
 };
 
 /** What to measure on each page; a screenshot is asked for by the page's `screenshotPath`. */
-export type PageAction = "overflow" | "contrast";
+export type PageAction = "overflow" | "contrast" | "fill";
 
 type Viewport = { width: number; height: number };
 
@@ -121,6 +122,9 @@ type DrawErrorFinding = {
 /** Two texts drawn over each other on one page. */
 type CollisionFinding = Collision & { slug: string; step: string };
 
+/** How much of the frame one page fills, and where. */
+export type FillFinding = Fill & { slug: string; step: string };
+
 export type PagesResponse = {
   overflows: OverflowFinding[];
   contrasts: ContrastFinding[];
@@ -128,6 +132,8 @@ export type PagesResponse = {
   drawErrors?: DrawErrorFinding[];
   /** Absent from a runner that has none to report. */
   collisions?: CollisionFinding[];
+  /** One for each page, when `fill` was asked for; absent from a runner that has none. */
+  fills?: FillFinding[];
 };
 
 export type MotionResponse = {
@@ -279,12 +285,13 @@ function spawnRunner(
 const RESPONSE_PARSERS: {
   [K in keyof VisualResponses]: (fields: Record<string, unknown>) => VisualResponses[K] | null;
 } = {
-  pages: ({ overflows, contrasts, drawErrors = [], collisions = [] }) =>
+  pages: ({ overflows, contrasts, drawErrors = [], collisions = [], fills = [] }) =>
     isArrayOf(overflows, isOverflowFinding) &&
     isArrayOf(contrasts, isContrastFinding) &&
     isArrayOf(drawErrors, isDrawErrorFinding) &&
-    isArrayOf(collisions, isCollisionFinding)
-      ? { overflows, contrasts, drawErrors, collisions }
+    isArrayOf(collisions, isCollisionFinding) &&
+    isArrayOf(fills, isFillFinding)
+      ? { overflows, contrasts, drawErrors, collisions, fills }
       : null,
   pdf: () => ({}),
   morph: () => ({}),
@@ -337,6 +344,27 @@ function isCollisionFinding(value: unknown): value is CollisionFinding {
   }
   const { other, otherText } = value;
   return isString(other) && (otherText === undefined || isString(otherText));
+}
+
+function isFillFinding(value: unknown): value is FillFinding {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const { slug, step, coverage, box, rows, columns } = value as Record<string, unknown>;
+  const isBox = (found: unknown): boolean =>
+    found !== null &&
+    typeof found === "object" &&
+    ["left", "top", "right", "bottom"].every((side) =>
+      isNumber((found as Record<string, unknown>)[side]),
+    );
+  return (
+    isString(slug) &&
+    isString(step) &&
+    isNumber(coverage) &&
+    (box === undefined || isBox(box)) &&
+    isArrayOf(rows, isNumber) &&
+    isArrayOf(columns, isNumber)
+  );
 }
 
 function isDrawErrorFinding(value: unknown): value is DrawErrorFinding {

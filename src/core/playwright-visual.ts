@@ -1,5 +1,6 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
+import { measureFill } from "./fill.ts";
 import { finishBeat } from "./finish-beat.ts";
 import {
   crossesEdge,
@@ -130,6 +131,7 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
     contrasts: found.flatMap((page) => page.contrasts),
     drawErrors: found.flatMap((page) => page.drawErrors ?? []),
     collisions: found.flatMap((page) => page.collisions ?? []),
+    fills: found.flatMap((page) => page.fills ?? []),
   };
 }
 
@@ -233,7 +235,7 @@ async function visitPage(
   pageReq: VisualPage,
   { actions, viewport }: Pick<PagesRequest, "actions" | "viewport">,
 ): Promise<PagesResponse> {
-  const response: PagesResponse = { overflows: [], contrasts: [], collisions: [] };
+  const response: PagesResponse = { overflows: [], contrasts: [], collisions: [], fills: [] };
   const failing: Failing[] = [];
   const crossing: Crossing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
@@ -242,14 +244,17 @@ async function visitPage(
   if (actions.length > 0) {
     const measured = await page.evaluate(measureSlideInPage);
     const texts = await pageTexts(page, measured);
-    if (actions.includes("overflow") && measured.slideBox) {
-      // The audience sees the frame: a slide its CSS makes taller or scales up is cut to it.
-      const frame = {
-        left: Math.max(measured.slideBox.left, 0),
-        top: Math.max(measured.slideBox.top, 0),
-        right: Math.min(measured.slideBox.right, viewport.width),
-        bottom: Math.min(measured.slideBox.bottom, viewport.height),
-      };
+    // The audience sees the frame: a slide its CSS makes taller or scales up is cut to it.
+    const frame = measured.slideBox && {
+      left: Math.max(measured.slideBox.left, 0),
+      top: Math.max(measured.slideBox.top, 0),
+      right: Math.min(measured.slideBox.right, viewport.width),
+      bottom: Math.min(measured.slideBox.bottom, viewport.height),
+    };
+    if (actions.includes("fill") && frame) {
+      response.fills?.push({ slug, step, ...measureFill(frame, measured.elements) });
+    }
+    if (actions.includes("overflow") && frame) {
       for (const { element, ...overflow } of [
         ...findOverflows(frame, measured.elements),
         ...findClippedText(measured.elements),

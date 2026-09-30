@@ -397,7 +397,7 @@ export const COMMANDS = {
     overview: [
       ["dek check <slug>", "lint one slide; --shot adds a screenshot; --voice adds readings"],
     ],
-    agent: ["dek check <slug> [--shot] [--voice]"],
+    agent: ["dek check <slug> [--shot] [--voice]   fill: share of the frame it fills, by tenths"],
     run: async ({ target, args, flags }) => {
       const { checkCommand } = await import("./check.ts");
       return checkCommand(target, { slug: args.slug, shot: flags.shot, voice: flags.voice });

@@ -738,6 +738,74 @@ describe("lintVisualDeck cache", () => {
   });
 });
 
+// How much of the frame a slide fills, as `dek shot` and the sheet show it: at its last beat.
+describe("runVisualDeck fill", () => {
+  const script = "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n\n### two\n";
+  const plan = slideDocument(
+    `<section class="slide"><ul><li data-step="one">a</li><li data-step="two">b</li></ul></section>`,
+  );
+
+  /** A runner that fills a tenth more of the frame at each page it is sent, and records them. */
+  function fillingRunner() {
+    const asked: string[] = [];
+    const runner = async (request: VisualRequest) => {
+      const pages = pagesOf(request);
+      asked.push(...pages.map((page) => `${page.slug}@${page.step}`));
+      return {
+        overflows: [],
+        contrasts: [],
+        fills: pages.map((page, at) => ({
+          slug: page.slug,
+          step: page.step,
+          coverage: (at + 1) / 10,
+          rows: [],
+          columns: [],
+        })),
+      } satisfies PagesResponse;
+    };
+    return { asked, runner };
+  }
+
+  test("asks for fill, and gives each slide's at its last beat", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml, plan } }] },
+      async (root) => {
+        const { runner } = fillingRunner();
+        let actions: unknown;
+        const result = await runVisualDeck(join(root, "decks", "demo"), {
+          runner: async (request) => {
+            actions = request.kind === "pages" ? request.actions : undefined;
+            return runner(request);
+          },
+        });
+        expect(actions).toContain("fill");
+        expect(result?.fills).toEqual([
+          { slug: "intro", step: "0", coverage: 0.1, rows: [], columns: [] },
+          { slug: "plan", step: "two", coverage: 0.4, rows: [], columns: [] },
+        ]);
+      },
+    );
+  });
+
+  test("gives a kept page's fill without measuring it again", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml, plan } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const first = await runVisualDeck(deckDir, {
+          slug: "plan",
+          runner: fillingRunner().runner,
+        });
+        const again = fillingRunner();
+        const second = await runVisualDeck(deckDir, { slug: "plan", runner: again.runner });
+        expect(again.asked).toEqual([]);
+        expect(second?.fills).toEqual(first?.fills ?? []);
+        expect(second?.fills).toHaveLength(1);
+      },
+    );
+  });
+});
+
 // A draw that finds another slide's element through the document looks right on its own page;
 // only a page that holds every slide, as the built deck does, shows it. One is measured for its
 // draws whenever a slide has a script.

@@ -206,6 +206,28 @@ export const RESULT_FIELDS = {
     diagnostics,
     skipped,
     shot: z.string().optional(),
+    fill: z
+      .strictObject({
+        step: z.string().describe("The beat measured: the last, as the slide's shot shows it."),
+        coverage: z.number().describe("The share of the frame the content covers."),
+        box: z
+          .strictObject({
+            left: z.number(),
+            top: z.number(),
+            right: z.number(),
+            bottom: z.number(),
+          })
+          .optional()
+          .describe(
+            "The smallest box holding it, as shares of the frame. Absent when there is none.",
+          ),
+        rows: z.array(z.number()).describe("The share of each tenth of the frame, top to bottom."),
+        columns: z.array(z.number()).describe("The same, left to right."),
+      })
+      .optional()
+      .describe(
+        "How much of the frame the slide fills: each text's lines, each picture's box, and each painted box that holds nothing, as a chart's bar; a card counts by what it holds. Not decoration or ::before and ::after text. Shares from 0 to 1. Absent when the slide was not measured.",
+      ),
     voice: z
       .strictObject({
         beats: z.array(

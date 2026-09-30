@@ -47,7 +47,13 @@ describe("defaultPlaywrightRunner", () => {
     await chmod(fakePlaywright, 0o755);
     await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
       const response = await defaultPlaywrightRunner(request);
-      expect(response).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
+      expect(response).toEqual({
+        overflows: [],
+        contrasts: [],
+        drawErrors: [],
+        collisions: [],
+        fills: [],
+      });
     });
   });
 
@@ -168,6 +174,7 @@ describe("parseVisualResponse", () => {
       contrasts: [contrast],
       drawErrors: [],
       collisions: [],
+      fills: [],
     });
     const thrown = {
       slug: "intro",
@@ -181,6 +188,7 @@ describe("parseVisualResponse", () => {
       contrasts: [],
       drawErrors: [thrown],
       collisions: [],
+      fills: [],
     });
     expect(parse({ motion, sheets: ["/s.png"] }, "motion")).toEqual({
       motion,
@@ -194,7 +202,7 @@ describe("parseVisualResponse", () => {
   test("keeps only what the kind it asked for answers with", () => {
     expect(
       parse({ overflows: [], contrasts: [], screenshotPath: "/a.png", sheets: [] }, "pages"),
-    ).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [] });
+    ).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [], fills: [] });
     expect(parse({ motion, sheets: [], overflows: [] }, "motion")).toEqual({ motion, sheets: [] });
     expect(parse({ pdfPath: "/a.pdf" }, "pdf")).toEqual({});
   });
@@ -209,6 +217,16 @@ describe("parseVisualResponse", () => {
     ).toBeNull();
     const { fg: _fg, ...noColor } = contrast;
     expect(parse({ overflows: [], contrasts: [noColor] }, "pages")).toBeNull();
+    const fill = { slug: "intro", step: "1", coverage: 0.5, rows: [0.5], columns: [0.5] };
+    expect(parse({ overflows: [], contrasts: [], fills: [fill] }, "pages")).toMatchObject({
+      fills: [fill],
+    });
+    expect(
+      parse({ overflows: [], contrasts: [], fills: [{ ...fill, rows: ["0.5"] }] }, "pages"),
+    ).toBeNull();
+    expect(
+      parse({ overflows: [], contrasts: [], fills: [{ ...fill, box: { left: 0 } }] }, "pages"),
+    ).toBeNull();
     expect(parse({ motion }, "motion")).toBeNull();
     expect(
       parse(

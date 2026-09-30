@@ -577,6 +577,7 @@ c
       expect(agents).toContain("as if it were written at the end of `theme.css`");
       expect(agents).toContain('`.slide[data-layout="split"] .x`');
       expect(agents).toContain("Never reuse a shot's path from before an edit");
+      expect(agents).toContain("`fill` says how much of the frame the slide fills");
     });
   });
 

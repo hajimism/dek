@@ -721,6 +721,66 @@
             "shot": {
               "type": "string"
             },
+            "fill": {
+              "description": "How much of the frame the slide fills: each text's lines, each picture's box, and each painted box that holds nothing, as a chart's bar; a card counts by what it holds. Not decoration or ::before and ::after text. Shares from 0 to 1. Absent when the slide was not measured.",
+              "type": "object",
+              "properties": {
+                "step": {
+                  "type": "string",
+                  "description": "The beat measured: the last, as the slide's shot shows it."
+                },
+                "coverage": {
+                  "type": "number",
+                  "description": "The share of the frame the content covers."
+                },
+                "box": {
+                  "description": "The smallest box holding it, as shares of the frame. Absent when there is none.",
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "number"
+                    },
+                    "top": {
+                      "type": "number"
+                    },
+                    "right": {
+                      "type": "number"
+                    },
+                    "bottom": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "left",
+                    "top",
+                    "right",
+                    "bottom"
+                  ],
+                  "additionalProperties": false
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "The share of each tenth of the frame, top to bottom."
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "The same, left to right."
+                }
+              },
+              "required": [
+                "step",
+                "coverage",
+                "rows",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
             "voice": {
               "type": "object",
               "properties": {
@@ -816,6 +876,66 @@
             },
             "shot": {
               "type": "string"
+            },
+            "fill": {
+              "description": "How much of the frame the slide fills: each text's lines, each picture's box, and each painted box that holds nothing, as a chart's bar; a card counts by what it holds. Not decoration or ::before and ::after text. Shares from 0 to 1. Absent when the slide was not measured.",
+              "type": "object",
+              "properties": {
+                "step": {
+                  "type": "string",
+                  "description": "The beat measured: the last, as the slide's shot shows it."
+                },
+                "coverage": {
+                  "type": "number",
+                  "description": "The share of the frame the content covers."
+                },
+                "box": {
+                  "description": "The smallest box holding it, as shares of the frame. Absent when there is none.",
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "number"
+                    },
+                    "top": {
+                      "type": "number"
+                    },
+                    "right": {
+                      "type": "number"
+                    },
+                    "bottom": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "left",
+                    "top",
+                    "right",
+                    "bottom"
+                  ],
+                  "additionalProperties": false
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "The share of each tenth of the frame, top to bottom."
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "The same, left to right."
+                }
+              },
+              "required": [
+                "step",
+                "coverage",
+                "rows",
+                "columns"
+              ],
+              "additionalProperties": false
             },
             "voice": {
               "type": "object",

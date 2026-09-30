@@ -22,6 +22,7 @@ const MEASURERS = [
   "playwright-visual.ts",
   "slide-measure.ts",
   "text-contrast.ts",
+  "fill.ts",
   "overflow.ts",
   "pseudo-text.ts",
   "finish-beat.ts",
