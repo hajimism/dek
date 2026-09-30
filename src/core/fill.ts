@@ -5,9 +5,10 @@ import type { Box, MeasuredElement } from "./slide-measure.ts";
  * see, as numbers. What fills a slide is what the audience reads or looks at: each text's lines,
  * each picture's box, and each painted box that holds nothing, as a chart's bar or a swatch is. A
  * painted box that holds something, a card or a window, is as full as what it holds, so one whose
- * words sit in its top half leaves the rest empty. Decoration fills nothing, nor does text a
- * pseudo-element draws (a folio sits in a corner of every slide), nor anything the beat has not
- * shown yet. Every share is of the frame, from 0 to 1, to two places.
+ * words sit in its top half leaves the rest empty. Decoration counts like the rest: aria-hidden
+ * tells lint and screen readers to pass it by, and the audience still sees it take its place.
+ * Text a pseudo-element draws fills nothing (a folio sits in a corner of every slide), nor does
+ * anything the beat has not shown yet. Every share is of the frame, from 0 to 1, to two places.
  */
 export type Fill = {
   /** The share of the frame the content covers, overlaps counted once. */
@@ -33,7 +34,7 @@ export function measureFill(frame: Box, elements: MeasuredElement[]): Fill {
   let extent: Box | undefined;
   const holding = new Set(elements.map((element) => element.parent));
   for (const [index, element] of elements.entries()) {
-    if (element.decorative || element.opacity <= 0) {
+    if (element.opacity <= 0) {
       continue;
     }
     const seen = element.clip?.rect;

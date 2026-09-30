@@ -417,7 +417,30 @@ function formatFill({
     `fill: ${percent(coverage)}% of the frame, within ${within}`,
     `  rows, top to bottom:    ${rows.map(percent).join(" ")}`,
     `  columns, left to right: ${columns.map(percent).join(" ")}`,
+    ...emptyBands("rows", rows, ["top", "bottom"]),
+    ...emptyBands("columns", columns, ["left", "right"]),
   ];
+}
+
+/**
+ * The runs of bands nothing fills, as spans of the frame, each named a margin at the edge it
+ * touches or a gap between content. Nothing when every band holds some.
+ */
+function emptyBands(name: string, bands: number[], [start, end]: [string, string]): string[] {
+  const runs: string[] = [];
+  let from: number | undefined;
+  for (let at = 0; at <= bands.length; at++) {
+    const empty = at < bands.length && bands[at] === 0;
+    if (empty && from === undefined) {
+      from = at;
+    } else if (!empty && from !== undefined) {
+      const where = from === 0 ? start : at === bands.length ? end : "between";
+      const tenth = 100 / bands.length;
+      runs.push(`${from * tenth}–${at * tenth}% (${where})`);
+      from = undefined;
+    }
+  }
+  return runs.length === 0 ? [] : [`  empty ${name}: ${runs.join(", ")}`];
 }
 
 /** Each diagnostic with its path as `display` shows it. */

@@ -579,6 +579,7 @@ c
       expect(agents).toContain('`.slide[data-layout="split"] .x`');
       expect(agents).toContain("Never reuse a shot's path from before an edit");
       expect(agents).toContain("`fill` says how much of the frame the slide fills");
+      expect(agents).toContain("`coverage` alone says little");
     });
   });
 

@@ -287,11 +287,31 @@ describe("dek check fill", () => {
       diagnostics: [],
       fill: { step: "0", coverage: 0.25, box, rows, columns },
     });
-    expect(text.split("\n").slice(-3)).toEqual([
+    expect(text.split("\n").slice(-5)).toEqual([
       "fill: 25% of the frame, within left 4% top 6% right 96% bottom 40%",
       "  rows, top to bottom:    90 80 60 20 0 0 0 0 0 0",
       "  columns, left to right: 40 50 50 50 50 50 50 50 30 0",
+      "  empty rows: 40–100% (bottom)",
+      "  empty columns: 90–100% (right)",
     ]);
+  });
+
+  // What the reader was after: a band left empty, told apart from the margin around the content.
+  test("names each empty band, a margin at an edge or a gap inside the content", () => {
+    const text = formatCheck({
+      slug: "intro",
+      diagnostics: [],
+      fill: {
+        step: "0",
+        coverage: 0.3,
+        box: { left: 0, top: 0.1, right: 1, bottom: 0.9 },
+        rows: [0, 0.5, 0.5, 0, 0, 0.4, 0, 0.3, 0.2, 0],
+        columns: Array.from({ length: 10 }, () => 0.3),
+      },
+    });
+    expect(text.split("\n").at(-1)).toBe(
+      "  empty rows: 0–10% (top), 30–50% (between), 60–70% (between), 90–100% (bottom)",
+    );
   });
 
   test("says when nothing on the slide fills the frame", () => {

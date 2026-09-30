@@ -226,7 +226,7 @@ export const RESULT_FIELDS = {
       })
       .optional()
       .describe(
-        "How much of the frame the slide fills: each text's lines, each picture's box, and each painted box that holds nothing, as a chart's bar; a card counts by what it holds. Not decoration or ::before and ::after text. Shares from 0 to 1. Absent when the slide was not measured.",
+        "How much of the frame the slide fills: each text's lines, each picture's box, and each painted box that holds nothing, as a chart's bar; a card counts by what it holds; decoration under aria-hidden counts too, ::before and ::after text does not. Judge a slide by rows, columns, and box, not coverage alone. Shares from 0 to 1. Absent when the slide was not measured.",
       ),
     voice: z
       .strictObject({

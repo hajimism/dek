@@ -87,14 +87,26 @@ describe("measureFill", () => {
     expect(fill.box).toEqual({ left: 0, top: 0, right: 0.2, bottom: 0.1 });
   });
 
-  test("leaves out decoration and what the beat has not shown yet", () => {
+  test("leaves out what the beat has not shown yet", () => {
     const whole = { left: 0, top: 0, right: 200, bottom: 100 };
     const fill = measureFill(FRAME, [
-      text(whole, { decorative: true }),
       text(whole, { opacity: 0 }),
-      element({ picture: true, rect: whole, decorative: true }),
+      element({ picture: true, rect: whole, opacity: 0 }),
     ]);
     expect(fill).toEqual({ coverage: 0, rows: none, columns: none });
+  });
+
+  // aria-hidden tells lint and screen readers to pass it by; the audience still sees it there.
+  test("counts decoration, which takes its place on the slide all the same", () => {
+    const fill = measureFill(FRAME, [
+      element({
+        box: "svg",
+        picture: true,
+        decorative: true,
+        rect: { left: 0, top: 0, right: 200, bottom: 50 },
+      }),
+    ]);
+    expect(fill.coverage).toBe(0.5);
   });
 
   test("counts what overlaps once", () => {
