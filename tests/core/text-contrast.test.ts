@@ -205,10 +205,80 @@ describe("measureTextContrast opacity", () => {
   });
 });
 
+describe("measureTextContrast and text shadows", () => {
+  const YELLOW: Rgb = [255, 216, 74];
+  const PINK: Rgb = [255, 77, 148];
+  const BLUE: Rgb = [33, 72, 214];
+  const covered = fill(WHITE).map(() => true);
+
+  test("reads a glyph over its own offset shadow against what is behind the shadow", () => {
+    // Yellow on blue, a pink shadow cast down and right: half the glyph sits on the shadow.
+    const measured = measureTextContrast(
+      {
+        shown: pixels(fill(YELLOW)),
+        bare: pixels(fill(BLUE).map((c, i) => (i < 5 ? PINK : c))),
+        shadowless: pixels(fill(BLUE)),
+        ...glyphs(covered),
+      },
+      { rects: line },
+    );
+    expect(measured).toEqual({ ratio: contrastRatio(YELLOW, BLUE), fg: YELLOW, bg: BLUE });
+  });
+
+  test("still reads text against the halo that sets it off", () => {
+    // White on white, set off by a dark glow: without the glow there is nothing to read.
+    const measured = measureTextContrast(
+      {
+        shown: pixels(fill(WHITE)),
+        bare: pixels(fill(DARK)),
+        shadowless: pixels(fill(WHITE)),
+        ...glyphs(covered),
+      },
+      { rects: line },
+    );
+    expect(measured).toEqual({ ratio: contrastRatio(WHITE, DARK), fg: WHITE, bg: DARK });
+  });
+
+  test("fails text that reads against neither its shadow nor what is behind it", () => {
+    const measured = measureTextContrast(
+      {
+        shown: pixels(fill(GREY)),
+        bare: pixels(fill(GREY)),
+        shadowless: pixels(fill(DARK)),
+        ...glyphs(covered),
+      },
+      { rects: line },
+    );
+    expect(measured?.ratio).toBeCloseTo(contrastRatio(GREY, DARK), 5);
+  });
+
+  test("undoes a thin glyph's blend against what it was drawn over, its shadow included", () => {
+    // A hyphen covers 60% of each pixel, over a pink shadow on a dark slide: the text is GREY.
+    const blend = (color: Rgb, under: Rgb, a: number): Rgb =>
+      color.map((c, i) => Math.round(c * a + (under[i] ?? 0) * (1 - a))) as Rgb;
+    const measured = measureTextContrast(
+      {
+        shown: pixels(fill(blend(GREY, PINK, 0.6))),
+        bare: pixels(fill(PINK)),
+        shadowless: pixels(fill(DARK)),
+        white: pixels(fill(blend(WHITE, PINK, 0.6))),
+        black: pixels(fill(blend(BLACK, PINK, 0.6))),
+      },
+      { rects: line },
+    );
+    // Within one step of an 8-bit channel: the pixels were rounded when the blend was drawn.
+    const off = (measured?.fg ?? WHITE).map((c, i) => Math.abs(c - (GREY[i] ?? 0)));
+    expect(Math.max(...off)).toBeLessThanOrEqual(1);
+  });
+});
+
 type Call = { screenshot: true } | { evaluate: unknown } | { script: string };
 
-/** A page that records what it is asked, and answers the sampler with `answer`. */
-function recordingPage(answer: unknown) {
+/**
+ * A page that records what it is asked, answers the sampler with `answer`, and the marking of the
+ * page (the one call that passes nothing) with `marks`.
+ */
+function recordingPage(answer: unknown, marks: unknown = { shadowed: false }) {
   const calls: Call[] = [];
   let shots = 0;
   const page = {
@@ -219,6 +289,9 @@ function recordingPage(answer: unknown) {
     },
     evaluate: async <T, A>(_fn: (arg: A) => T | Promise<T>, arg?: A): Promise<T> => {
       calls.push({ evaluate: arg });
+      if (arg === undefined) {
+        return marks as T;
+      }
       return (arg && typeof arg === "object" && "layers" in arg ? answer : undefined) as T;
     },
     addScriptTag: async ({ content }: { content: string }) => {
@@ -245,9 +318,9 @@ describe("measurePageTextContrasts", () => {
       { rects: [{ left: 5, top: 5, right: 20, bottom: 20 }], opacity: 0.5 },
     ];
     expect(await measurePageTextContrasts(page, texts)).toEqual(measured);
-    const [shown, markClipped, ...rest] = page.calls;
+    const [shown, mark, ...rest] = page.calls;
     expect(shown).toEqual({ screenshot: true });
-    expect(markClipped).toEqual({ evaluate: undefined });
+    expect(mark).toEqual({ evaluate: undefined });
     expect(rest.slice(0, 6)).toEqual([
       { evaluate: textLayerCss("bare") },
       { screenshot: true },
@@ -271,6 +344,34 @@ describe("measurePageTextContrasts", () => {
         },
       },
     ]);
+  });
+
+  test("shoots the shadowless layer too when some text casts a shadow", async () => {
+    const page = recordingPage([null], { shadowed: true });
+    const texts = [{ rects: [{ left: 0, top: 0, right: 10, bottom: 10 }] }];
+    await measurePageTextContrasts(page, texts);
+    expect(page.calls.slice(2, 10)).toEqual([
+      { evaluate: textLayerCss("bare") },
+      { screenshot: true },
+      { evaluate: textLayerCss("shadowless") },
+      { screenshot: true },
+      { evaluate: textLayerCss("white") },
+      { screenshot: true },
+      { evaluate: textLayerCss("black") },
+      { screenshot: true },
+    ]);
+    expect(page.calls.at(-1)).toEqual({
+      evaluate: {
+        layers: {
+          shown: base64("shot-1"),
+          bare: base64("shot-2"),
+          shadowless: base64("shot-3"),
+          white: base64("shot-4"),
+          black: base64("shot-5"),
+        },
+        texts: withOverlaps(texts),
+      },
+    });
   });
 });
 
@@ -301,6 +402,23 @@ describe("textLayerCss", () => {
     expect(textLayerCss("bare")).toContain("-webkit-text-fill-color: transparent !important");
     expect(textLayerCss("bare")).toContain("[data-dek-clip-text] { background: none !important; }");
     expect(textLayerCss("black")).not.toContain("data-dek-clip-text");
+  });
+
+  test("the shadowless layer is the bare layer with no text casting a shadow", () => {
+    const css = textLayerCss("shadowless");
+    expect(css).toContain(textLayerCss("bare"));
+    expect(css).toMatch(/\*::after\s*\{\s*text-shadow: none !important/);
+    expect(textLayerCss("bare")).not.toContain("text-shadow");
+  });
+
+  // The masks only find where glyphs are; a blend mode would scale white and black by what is
+  // under them. The shown and bare layers keep it, so the text is read as the audience sees it.
+  test("the white and black layers draw text unblended, the others as shown", () => {
+    const unblended = "[data-dek-blend] { mix-blend-mode: normal !important; }";
+    expect(textLayerCss("white")).toContain(unblended);
+    expect(textLayerCss("black")).toContain(unblended);
+    expect(textLayerCss("bare")).not.toContain("data-dek-blend");
+    expect(textLayerCss("shadowless")).not.toContain("data-dek-blend");
   });
 });
 

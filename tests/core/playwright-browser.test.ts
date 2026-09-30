@@ -17,6 +17,7 @@ import {
 import { runVisualRequest } from "../../src/core/playwright-visual.ts";
 import { overviewSheets, sheetLayout } from "../../src/core/sheet.ts";
 import { shotMotion } from "../../src/core/shot/motion.ts";
+import { contrastRatio } from "../../src/core/text-contrast.ts";
 import { playerScript } from "../../src/runtime/player.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -607,6 +608,55 @@ ${css}
       expect(found.sheen?.ratio).toBeGreaterThan(10);
     },
   );
+});
+
+// A chapter door's numeral, as an author drew it: yellow on blue, a pink shadow cast off it, or
+// pink multiplied into the blue.
+describe("playwright worker contrast of shadowed and blended text", () => {
+  const BLUE = "rgb(33, 72, 214)";
+  const measure = async (style: string, background = "#2148d6") => {
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["contrast"],
+      pages: [
+        {
+          html: `<html><body style="margin:0"><section class="slide" style="width:1280px;height:720px;background:${background}">
+  <p style="margin:0;font:700 300px sans-serif;${style}">1</p>
+</section></body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+    return response?.contrasts[0];
+  };
+
+  browserTest("reads text against what is behind it, not its own offset shadow", async () => {
+    const plain = await measure("color:#ffd84a");
+    const shadowed = await measure("color:#ffd84a;text-shadow:10px 7px 0 #ff4d94");
+    expect(shadowed).toMatchObject({ fg: "rgb(255, 216, 74)", bg: BLUE });
+    expect(shadowed?.ratio).toBeCloseTo(plain?.ratio ?? 0, 5);
+  });
+
+  browserTest("still counts a halo that sets the text off from what is behind it", async () => {
+    const halo = await measure("color:#fff;text-shadow:0 0 6px #000,0 0 12px #000", "#fff");
+    expect(halo?.ratio).toBeGreaterThan(4.5);
+  });
+
+  browserTest("measures text blended into its background as the audience sees it", async () => {
+    // #ff4d94 multiplied into #2148d6 is rgb(33, 22, 124).
+    const blended = await measure("color:#ff4d94;mix-blend-mode:multiply");
+    expect(blended?.bg).toBe(BLUE);
+    expect(blended?.ratio).toBeCloseTo(contrastRatio([33, 22, 124], [33, 72, 214]), 1);
+  });
+
+  browserTest("measures a blended text's shadow as blended too", async () => {
+    const both = await measure(
+      "color:#ff4d94;mix-blend-mode:multiply;text-shadow:10px 7px 0 #ffd84a",
+    );
+    expect(both?.ratio).toBeCloseTo(contrastRatio([33, 22, 124], [33, 72, 214]), 1);
+  });
 });
 
 // A folio and a running head are drawn by ::after and ::before, as AGENTS.md says to draw them, so

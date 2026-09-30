@@ -4,7 +4,12 @@
  * White minus black is where glyphs cover, whatever their color and whatever
  * sits above them; within that, the shown pixel is the text as the audience
  * sees it and the bare pixel is what it sits on. Gradients, images, glows,
- * opacity, and colors no parser reads are all measured as drawn.
+ * opacity, blend modes, and colors no parser reads are all measured as drawn.
+ *
+ * A text's shadow can set it off, as a halo does, but does not hide it: where
+ * a text casts one, the page is drawn once more with no shadows, and each
+ * pixel reads against its shadow or what is behind it, whichever it stands out
+ * from. An offset shadow is decoration; a glow is what the text is read on.
  *
  * The pure functions below run in Node for tests and in the page as source,
  * so each references nothing outside this file.
@@ -21,6 +26,8 @@ export type TextLayers = {
   shown: Pixels;
   /** Every glyph transparent: what the text sits on. */
   bare: Pixels;
+  /** The bare layer with no text casting a shadow; drawn only when some text casts one. */
+  shadowless?: Pixels;
   /** Every glyph filled white. */
   white: Pixels;
   /** Every glyph filled black. */
@@ -121,7 +128,8 @@ export function measureTextContrast(
   if (opacity <= 0) {
     return undefined;
   }
-  const { shown, bare, white, black } = layers;
+  const { shown, bare, shadowless, white, black } = layers;
+  const behind = shadowless ? [bare, shadowless] : [bare];
   const at = (image: Pixels, i: number): Rgb => [
     image.data[i] ?? 0,
     image.data[i + 1] ?? 0,
@@ -157,14 +165,20 @@ export function measureTextContrast(
   const samples = read
     .filter((pixel) => pixel.coverage >= most - COVERAGE_SLACK)
     .map(({ i, coverage }) => {
-      const bg = at(bare, i);
+      // The glyph was drawn over its shadow, so the blend is undone against the bare layer.
+      const under = at(bare, i);
       const [r, g, b] = at(shown, i);
       // The blend a glyph covering the whole pixel would make, at the text's own opacity.
       const whole = Math.min(1, opacity) / coverage;
-      const unblend = (drawn: number, under: number): number =>
-        Math.round(Math.min(255, Math.max(0, under + (drawn - under) * whole)));
-      const fg: Rgb = [unblend(r, bg[0]), unblend(g, bg[1]), unblend(b, bg[2])];
-      return { ratio: contrastRatio(fg, bg), fg, bg };
+      const unblend = (drawn: number, below: number): number =>
+        Math.round(Math.min(255, Math.max(0, below + (drawn - below) * whole)));
+      const fg: Rgb = [unblend(r, under[0]), unblend(g, under[1]), unblend(b, under[2])];
+      return behind
+        .map((layer) => {
+          const bg = at(layer, i);
+          return { ratio: contrastRatio(fg, bg), fg, bg };
+        })
+        .reduce((best, reading) => (reading.ratio > best.ratio ? reading : best));
     })
     .sort((a, b) => a.ratio - b.ratio);
   return samples[Math.floor(samples.length * WORST_SHARE)];
@@ -176,30 +190,50 @@ export function measureTextContrast(
  * changes with the layer, and its stroke goes. A pseudo-element keeps its own fill, since what it
  * draws is decoration and belongs to the background in every layer, unless it
  * was marked as drawing text (`PseudoText`), which is measured as text is.
+ *
+ * The white and black layers only find where glyphs are, so text is drawn unblended there: a
+ * blend mode would scale white and black by what is under them. The other layers keep it.
  */
 export function textLayerCss(layer: TextLayer): string {
-  const fill = { bare: "transparent", white: "#fff", black: "#000" }[layer];
-  const clipped = layer === "bare" ? "\n[data-dek-clip-text] { background: none !important; }" : "";
+  const glyphless = layer === "bare" || layer === "shadowless";
+  const fill = glyphless ? "transparent" : { white: "#fff", black: "#000" }[layer];
+  const clipped = glyphless ? "\n[data-dek-clip-text] { background: none !important; }" : "";
+  const unblended = glyphless ? "" : "\n[data-dek-blend] { mix-blend-mode: normal !important; }";
+  const unshadowed =
+    layer === "shadowless" ? "\n*, *::before, *::after { text-shadow: none !important; }" : "";
   return `*, *::before, *::after { transition: none !important; }
 * { -webkit-text-fill-color: ${fill} !important; }
 *::before, *::after { -webkit-text-fill-color: initial !important; }
 [data-dek-text-before]::before, [data-dek-text-after]::after { -webkit-text-fill-color: ${fill} !important; }
-svg text, svg tspan, svg textPath { fill: ${fill} !important; stroke: transparent !important; }${clipped}`;
+svg text, svg tspan, svg textPath { fill: ${fill} !important; stroke: transparent !important; }${clipped}${unblended}${unshadowed}`;
 }
 
 /**
- * Runs in the page: marks text whose background is clipped to its glyphs, so
- * the bare layer can take that background away with the glyphs.
+ * Runs in the page: marks text whose background is clipped to its glyphs, so the bare layer can
+ * take that background away with the glyphs, and each element that blends text into what is under
+ * it, so the masks can draw it unblended. Says whether any text casts a shadow.
  */
-function markClippedText(): void {
+function markTextLayers(): { shadowed: boolean } {
+  let shadowed = false;
   for (const el of document.querySelectorAll("*")) {
-    if (getComputedStyle(el).backgroundClip === "text") {
+    const style = getComputedStyle(el);
+    if (style.backgroundClip === "text") {
       el.setAttribute("data-dek-clip-text", "");
     }
+    if (style.mixBlendMode !== "normal" && el.textContent?.trim()) {
+      el.setAttribute("data-dek-blend", "");
+    }
+    shadowed ||= [style, getComputedStyle(el, "::before"), getComputedStyle(el, "::after")].some(
+      (drawn) => drawn.textShadow !== "none",
+    );
   }
+  return { shadowed };
 }
 
-type SamplerInput = { layers: Record<keyof TextLayers, string>; texts: TextBoxes[] };
+/** Each layer as a base64 PNG; the shadowless one only when it was drawn. */
+type EncodedLayers = { [layer in keyof TextLayers]: string };
+
+type SamplerInput = { layers: EncodedLayers; texts: TextBoxes[] };
 
 /** Each text, with the boxes of every other text that crosses one of its own. */
 export function withOverlaps(texts: TextBoxes[]): TextBoxes[] {
@@ -234,6 +268,7 @@ async function sampleTextContrasts({
   const decoded: TextLayers = {
     shown: await decode(layers.shown),
     bare: await decode(layers.bare),
+    ...(layers.shadowless ? { shadowless: await decode(layers.shadowless) } : {}),
     white: await decode(layers.white),
     black: await decode(layers.black),
   };
@@ -271,9 +306,12 @@ export async function measurePageTextContrasts(
   }
   const { shot, setLayer } = layerDrawer(page);
   const shown = await shot();
-  await page.evaluate(markClippedText);
-  const layers = { shown } as Record<keyof TextLayers, string>;
-  for (const layer of ["bare", "white", "black"] as const) {
+  const { shadowed } = await page.evaluate(markTextLayers);
+  const layers = { shown } as EncodedLayers;
+  const drawn = (["bare", "shadowless", "white", "black"] as const).filter(
+    (layer) => shadowed || layer !== "shadowless",
+  );
+  for (const layer of drawn) {
     await setLayer(textLayerCss(layer));
     layers[layer] = await shot();
   }
