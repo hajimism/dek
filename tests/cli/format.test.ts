@@ -6,7 +6,7 @@ import {
   formatErrorText,
   writeDevEvent,
 } from "../../src/cli/format.ts";
-import { formatInit } from "../../src/cli/text.ts";
+import { formatInit, formatReport } from "../../src/cli/text.ts";
 import { agentHelpText, helpText } from "../../src/cli/usage.ts";
 import type { Diagnostic } from "../../src/core/diagnostic.ts";
 import { DekError } from "../../src/core/error.ts";
@@ -191,6 +191,40 @@ describe("formatDiagnostics", () => {
       ]),
     ).toBe(`script.md:5: DEK001 missing slide HTML for "intro"
 slides/orphan.html: DEK002 slide HTML has no section "orphan"`);
+  });
+});
+
+// An agent reads a command's last lines; the verdict has to be there, whatever it cut above it.
+describe("formatReport", () => {
+  const found = (id: string, severity: Diagnostic["severity"] = "error"): Diagnostic => ({
+    id,
+    severity,
+    message: "found",
+  });
+
+  test("ends the list with how many errors and warnings, and of which rules, most first", () => {
+    const report = formatReport([
+      found("DEK014"),
+      found("DEK033"),
+      found("DEK029", "warning"),
+      found("DEK033"),
+    ]);
+    expect(report.split("\n").at(-1)).toBe(
+      "3 errors and 1 warning: DEK033 ×2, DEK014 ×1, DEK029 ×1",
+    );
+    expect(report.split("\n")).toHaveLength(5);
+  });
+
+  test("counts one in the singular, and names no errors when there are none", () => {
+    expect(
+      formatReport([found("DEK040", "warning")])
+        .split("\n")
+        .at(-1),
+    ).toBe("1 warning: DEK040 ×1");
+  });
+
+  test("says no diagnostics when there are none", () => {
+    expect(formatReport([])).toBe("no diagnostics");
   });
 });
 

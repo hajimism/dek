@@ -3,7 +3,7 @@ import { mergeSarif, toSarif } from "../core/sarif.ts";
 import type { CheckCliResult } from "./check.ts";
 import type { ResultFields } from "./contract.ts";
 import type { FlagName, FlagValues } from "./flags.ts";
-import { type FormattedError, formatCreated, formatDiagnostics } from "./format.ts";
+import { type FormattedError, formatCreated } from "./format.ts";
 import type { NavResult } from "./goto.ts";
 import type { DeckScope, DecksTarget, ReadableDeck } from "./scope.ts";
 import {
@@ -22,6 +22,7 @@ import {
   formatNew,
   formatPdf,
   formatRef,
+  formatReport,
   formatShot,
   formatShow,
   formatSkipped,
@@ -585,7 +586,7 @@ export const COMMANDS = {
       return lintCommand(target, { cwd, fix: flags.fix, visual: flags.visual });
     },
     output: {
-      text: (data, color) => formatDiagnostics(data.diagnostics, { color }),
+      text: (data, color) => formatReport(data.diagnostics, { color }),
       notes: (data, color) => formatSkipped(data.skipped, color) || undefined,
       json: ({ rumdlSarif: _rumdlSarif, ...data }) => data,
       paths: withDisplayDiagnostics,

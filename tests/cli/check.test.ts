@@ -287,7 +287,7 @@ describe("dek check fill", () => {
       diagnostics: [],
       fill: { step: "0", coverage: 0.25, box, rows, columns },
     });
-    expect(text.split("\n").slice(-5)).toEqual([
+    expect(text.split("\n").slice(0, 5)).toEqual([
       "fill: 25% of the frame, within left 4% top 6% right 96% bottom 40%",
       "  rows, top to bottom:    90 80 60 20 0 0 0 0 0 0",
       "  columns, left to right: 40 50 50 50 50 50 50 50 30 0",
@@ -309,9 +309,30 @@ describe("dek check fill", () => {
         columns: Array.from({ length: 10 }, () => 0.3),
       },
     });
-    expect(text.split("\n").at(-1)).toBe(
+    expect(text.split("\n").at(3)).toBe(
       "  empty rows: 0–10% (top), 30–50% (between), 60–70% (between), 90–100% (bottom)",
     );
+  });
+
+  // An agent takes the shot's path from the last line, and the verdict from the one above it.
+  test("prints what it measured, then the findings and their count, then the shot last", () => {
+    const text = formatCheck({
+      slug: "intro",
+      diagnostics: [{ id: "DEK031", severity: "error", message: "low contrast", hint: "raise it" }],
+      shot: "/deck/.cache/shots/intro~0.abcd1234.png",
+      fill: { step: "0", coverage: 0.25, box, rows, columns },
+    });
+    expect(text.split("\n")).toEqual([
+      "fill: 25% of the frame, within left 4% top 6% right 96% bottom 40%",
+      "  rows, top to bottom:    90 80 60 20 0 0 0 0 0 0",
+      "  columns, left to right: 40 50 50 50 50 50 50 50 30 0",
+      "  empty rows: 40–100% (bottom)",
+      "  empty columns: 90–100% (right)",
+      "DEK031 low contrast",
+      "  help: raise it",
+      "1 error: DEK031 ×1",
+      "/deck/.cache/shots/intro~0.abcd1234.png",
+    ]);
   });
 
   test("says when nothing on the slide fills the frame", () => {
@@ -321,6 +342,9 @@ describe("dek check fill", () => {
       diagnostics: [],
       fill: { step: "0", coverage: 0, rows: empty, columns: empty },
     });
-    expect(text.split("\n").at(-1)).toBe("fill: nothing to read or look at on the slide");
+    expect(text.split("\n")).toEqual([
+      "fill: nothing to read or look at on the slide",
+      "no diagnostics",
+    ]);
   });
 });

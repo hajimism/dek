@@ -32,6 +32,26 @@ export function countSummary(diagnostics: Diagnostic[]): string {
   ].join(" and ");
 }
 
+/**
+ * The diagnostics, then how many there are and of which rules, most first: "2 errors and 1
+ * warning: DEK033 ×2, DEK014 ×1". An agent reads a command's last lines, so the verdict ends the
+ * report, whatever was cut above it.
+ */
+export function formatReport(diagnostics: Diagnostic[], opts?: { color?: boolean }): string {
+  const list = formatDiagnostics(diagnostics, opts);
+  if (diagnostics.length === 0) {
+    return list;
+  }
+  const byRule = new Map<string, number>();
+  for (const { id } of diagnostics) {
+    byRule.set(id, (byRule.get(id) ?? 0) + 1);
+  }
+  const rules = [...byRule]
+    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+    .map(([id, n]) => `${id} ×${n}`);
+  return `${list}\n${countSummary(diagnostics)}: ${rules.join(", ")}`;
+}
+
 /** One `<check>: skipped (<reason>)` line per skipped check, each followed by its hint. */
 export function formatSkipped(skipped: SkippedCheck[] | undefined, color = false): string {
   const c = ansi(color);
@@ -311,7 +331,7 @@ export function formatCues(data: CuesResult, color = false): string {
   if (data.diagnostics.length === 0) {
     return body;
   }
-  return `${body}\n\n${formatDiagnostics(data.diagnostics, { color })}`;
+  return `${body}\n\n${formatReport(data.diagnostics, { color })}`;
 }
 
 export function formatVoice(data: VoiceCliResult): string {
@@ -380,12 +400,13 @@ export function formatRef(data: RefCliResult): string {
   }
 }
 
-/** A check's diagnostics, its screenshot, and each beat's reading; what it skipped goes to stderr. */
+/**
+ * What a check measured (the fill, each beat's reading), then its findings and their count, then
+ * the screenshot. An agent reads the last lines: the shot's path is the last, the verdict above it.
+ * What it skipped goes to stderr.
+ */
 export function formatCheck(data: CheckCliResult, color = false): string {
-  const lines = [formatDiagnostics(data.diagnostics, { color })];
-  if (data.shot) {
-    lines.push(data.shot);
-  }
+  const lines: string[] = [];
   if (data.fill) {
     lines.push(...formatFill(data.fill));
   }
@@ -395,6 +416,10 @@ export function formatCheck(data: CheckCliResult, color = false): string {
       const note = beat.empty ? " (empty beat)" : "";
       lines.push(`#${beat.beatIndex}  ${(beat.durationMs / 1000).toFixed(1)}s  ${kana}${note}`);
     }
+  }
+  lines.push(formatReport(data.diagnostics, { color }));
+  if (data.shot) {
+    lines.push(data.shot);
   }
   return lines.join("\n");
 }
