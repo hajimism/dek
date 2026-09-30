@@ -2050,6 +2050,36 @@ describe("DEK014 hints", () => {
     );
   });
 
+  // A slide's token, set on .slide and changed for one part of it, as a seal is drawn larger in
+  // one card: moving the value to .slide would lose the change, so it gets a name of its own.
+  test("names a part's own value on .slide when it changes a token the slide sets", async () => {
+    const css = ".slide { --seal-box: 76px; }\n.chance { --seal-box: 120px; }\n";
+    expect(await hintFor(css)).toBe(
+      "name the value on this file's .slide rule, as --seal-box-chance: 120px, and set --seal-box: var(--seal-box-chance) here, so .chance still changes --seal-box for what it holds",
+    );
+  });
+
+  test("names a part's own value too when it changes a token the theme sets", async () => {
+    expect(await hintFor(".triple { --gap: 12px; }\n")).toBe(
+      "name the value on this file's .slide rule, as --gap-triple: 12px, and set --gap: var(--gap-triple) here, so .triple still changes --gap for what it holds",
+    );
+  });
+
+  test("takes the hint's way out: the part changes the token through a name on .slide", async () => {
+    const fixed =
+      ".slide { --seal-box: 76px; --seal-box-chance: 120px; }\n.chance { --seal-box: var(--seal-box-chance); }\n";
+    expect(await hintFor(fixed)).toBeUndefined();
+  });
+
+  test.each([
+    [".slide .card > .title", "title"],
+    ["#hero", "hero"],
+    [".slide li", "li"],
+  ])("names the value after the last part of %p", async (selector, name) => {
+    const css = `.slide { --pad: 8px; }\n${selector} { --pad: 12px; }\n`;
+    expect(await hintFor(css)).toContain(`as --pad-${name}: 12px`);
+  });
+
   test("offers an easing token for a raw easing, not a duration", async () => {
     expect(await hintFor(".x { transition: opacity var(--step-transition) steps(4); }\n")).toBe(
       `${local("opacity var(--step-transition) steps(4)")}, then use var(--<name>)`,

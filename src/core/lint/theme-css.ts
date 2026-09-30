@@ -178,18 +178,53 @@ function rawValueDiagnostics(
         ? !setsTokens(decl.selector) && isRawTokenValue(decl.value)
         : isRawThemeValue(decl.property, decl.value),
     )
-    .map((decl) =>
-      diag("DEK014", {
+    .map((decl) => {
+      // A part that changes a token the theme or the sheet's own .slide sets keeps its change
+      // through a name of its own; moving the value to .slide would change the whole slide.
+      const changes =
+        decl.property.startsWith("--") &&
+        (tokens.some((token) => token.name === decl.property) ||
+          sheet.decls.some(
+            (other) => other.property === decl.property && setsTokens(other.selector),
+          ));
+      const token = changes ? `${decl.property}-${partName(decl.selector)}` : undefined;
+      return diag("DEK014", {
         message: `raw value in "${decl.property}: ${decl.value}"; use a theme token`,
         path,
         line: decl.line,
-        hint: decl.property.startsWith("--")
-          ? tokenPlaceHint(decl.property, slug)
-          : rawValueHint(tokenSuggestion(decl.property, decl.value, tokens), decl.value, slug),
-        data: { property: decl.property, value: decl.value },
+        hint: token
+          ? partTokenHint(decl, token, slug)
+          : decl.property.startsWith("--")
+            ? tokenPlaceHint(decl.property, slug)
+            : rawValueHint(tokenSuggestion(decl.property, decl.value, tokens), decl.value, slug),
+        data: { property: decl.property, value: decl.value, ...(token ? { token } : {}) },
         ...(slug === undefined ? {} : { slug }),
-      }),
-    );
+      });
+    });
+}
+
+/**
+ * What a rule is called by: the last class or id of its first selector's last compound, else its
+ * tag, so `.slide .card > .title` is "title" and `.slide li` is "li".
+ */
+function partName(selector: string): string {
+  const last =
+    (selector.split(",")[0] ?? "")
+      .trim()
+      .split(/\s*[\s>+~]\s*/)
+      .at(-1) ?? "";
+  const named = [...last.matchAll(/[.#]([\w-]+)/g)].at(-1)?.[1];
+  return named ?? last.match(/^[a-z][\w-]*/i)?.[0] ?? "part";
+}
+
+/** A token a part changes: the value named on .slide, and the part pointing its token at it. */
+function partTokenHint(
+  decl: { property: string; value: string; selector: string },
+  token: string,
+  slug?: string,
+): string {
+  const where = slug === undefined ? "the .slide rule in theme.css" : "this file's .slide rule";
+  return `name the value on ${where}, as ${token}: ${decl.value}, and set ${decl.property}: var(${token}) here, so ${decl.selector} still changes ${decl.property} for what it holds`;
 }
 
 /**
