@@ -330,6 +330,35 @@ p { margin: 0 }
     ).toEqual(["p.a + p.b", "p.corner + section.slide::after"]);
   });
 
+  // Numbers stacked in one cell to count up, as a slide that multiplies five chances does: each
+  // beat's number paints its box over the one before, so the audience sees only the last.
+  const stacked = (css: string) =>
+    measure(
+      `<p class="nums"><span class="num">1.00</span><span class="num">0.80</span><span class="num">0.48</span></p>`,
+      `.nums { display: grid; font-size: 96px } .num { grid-area: 1 / 1 } ${css}`,
+    );
+  const pairs = (response: Awaited<ReturnType<typeof measure>>) =>
+    (response?.collisions ?? []).map(({ text, otherText }) => `${text} + ${otherText}`);
+
+  browserTest(
+    "reports no collision for text another's box covers, which nothing shows",
+    async () => {
+      expect(pairs(await stacked(".num { background: #fff }"))).toEqual([]);
+    },
+  );
+
+  browserTest("reports the same numbers stacked with nothing to cover them", async () => {
+    expect(pairs(await stacked(""))).toEqual(["1.00 + 0.80", "1.00 + 0.48", "0.80 + 0.48"]);
+  });
+
+  browserTest("still reports text a box covers only in part, which shows cut off", async () => {
+    const response = await measure(
+      `<p class="a" style="position:absolute; left: 100px; top: 100px">first words</p>
+<p class="b" style="position:absolute; left: 110px; top: 104px; background: #fff">second words</p>`,
+    );
+    expect(pairs(response)).toEqual(["first words + second words"]);
+  });
+
   browserTest("measures the contrast of SVG text", async () => {
     const response = await measure(
       `<svg width="400" height="120"><text x="10" y="60" fill="#eee" font-size="32">svg label</text></svg>`,

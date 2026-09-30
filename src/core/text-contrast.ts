@@ -358,35 +358,65 @@ function layerDrawer(page: LayerPage) {
   return { shot, setLayer };
 }
 
-/** One pseudo-element's text, by the mark on its host, and the box Chromium lays it out in. */
-type PseudoGlyphs = { host: string; pseudo: "before" | "after"; rect: Box };
+/**
+ * A text to draw alone, with the boxes to look for its glyphs in: an element's own text, by the
+ * element's place among the slide's elements as `measureSlideInPage` lists them, or the text a
+ * pseudo-element draws, by the mark on its host.
+ */
+export type GlyphTarget = { rects: Box[] } & (
+  | { element: number }
+  | { host: string; pseudo: "before" | "after" }
+);
+
+/** The attribute that marks an element whose own text is drawn alone. */
+const GLYPHS_MARK = "data-dek-glyphs";
 
 /**
- * The box each pseudo-element's glyphs cover, which can be far smaller than the box it is laid out
- * in: a running head is often a full-width block holding a few words. Each is drawn alone, every
- * other glyph transparent, in white and in black; where the two differ inside its box is where its
- * glyphs are. Undefined for one none of whose glyphs shows.
+ * The box each text's glyphs show in, inside its own boxes. Each is drawn alone, every other glyph
+ * transparent, in white and in black; where the two differ is where its glyphs show. That can be
+ * far smaller than the box it is laid out in: a running head is often a full-width block holding a
+ * few words. A text whose every glyph lies under a box drawn above it shows none, as a number is
+ * when the next beat's paints its box over it: undefined.
  */
-export async function measurePseudoGlyphBoxes(
+export async function measureGlyphBoxes(
   page: LayerPage,
-  targets: PseudoGlyphs[],
+  targets: GlyphTarget[],
 ): Promise<Array<Box | undefined>> {
   if (targets.length === 0) {
     return [];
   }
   const { shot, setLayer } = layerDrawer(page);
-  const alone = ({ host, pseudo }: PseudoGlyphs, fill: string): string =>
+  const elements = targets.flatMap((target) => ("element" in target ? [target.element] : []));
+  await page.evaluate(
+    ({ mark, indices }) => {
+      const all = [...(document.querySelector(".slide")?.querySelectorAll("*") ?? [])];
+      for (const index of indices) {
+        all[index]?.setAttribute(mark, String(index));
+      }
+    },
+    { mark: GLYPHS_MARK, indices: elements },
+  );
+  const alone = (target: GlyphTarget, fill: string): string =>
     `*, *::before, *::after { transition: none !important; -webkit-text-fill-color: transparent !important; }
 svg text, svg tspan, svg textPath { fill: transparent !important; stroke: transparent !important; }
-[data-dek-text="${host}"][data-dek-text-${pseudo}]::${pseudo} { -webkit-text-fill-color: ${fill} !important; }`;
-  const pairs: Array<{ white: string; black: string; rect: Box }> = [];
+${
+  "element" in target
+    ? `[${GLYPHS_MARK}="${target.element}"] { -webkit-text-fill-color: ${fill} !important; fill: ${fill} !important; }`
+    : `[data-dek-text="${target.host}"][data-dek-text-${target.pseudo}]::${target.pseudo} { -webkit-text-fill-color: ${fill} !important; }`
+}`;
+  const pairs: Array<{ white: string; black: string; rects: Box[] }> = [];
   for (const target of targets) {
     await setLayer(alone(target, "#fff"));
     const white = await shot();
     await setLayer(alone(target, "#000"));
-    pairs.push({ white, black: await shot(), rect: target.rect });
+    pairs.push({ white, black: await shot(), rects: target.rects });
   }
   await setLayer(null);
+  await page.evaluate((mark) => {
+    for (const el of document.querySelectorAll(`[${mark}]`)) {
+      el.removeAttribute(mark);
+    }
+  }, GLYPHS_MARK);
   const found = await page.evaluate(async (input) => {
     const decode = async (base64: string) => {
       const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
@@ -400,29 +430,31 @@ svg text, svg tspan, svg textPath { fill: transparent !important; stroke: transp
       return context.getImageData(0, 0, bitmap.width, bitmap.height);
     };
     const boxes: Array<Box | null> = [];
-    for (const { white, black, rect } of input) {
+    for (const { white, black, rects } of input) {
       const [w, k] = [await decode(white), await decode(black)];
       let box: Box | null = null;
-      const top = Math.max(0, Math.floor(rect.top));
-      const bottom = Math.min(w.height, Math.ceil(rect.bottom));
-      const left = Math.max(0, Math.floor(rect.left));
-      const right = Math.min(w.width, Math.ceil(rect.right));
-      for (let y = top; y < bottom; y++) {
-        for (let x = left; x < right; x++) {
-          const i = (y * w.width + x) * 4;
-          const differs =
-            (w.data[i] ?? 0) !== (k.data[i] ?? 0) ||
-            (w.data[i + 1] ?? 0) !== (k.data[i + 1] ?? 0) ||
-            (w.data[i + 2] ?? 0) !== (k.data[i + 2] ?? 0);
-          if (differs) {
-            box = box
-              ? {
-                  left: Math.min(box.left, x),
-                  top: Math.min(box.top, y),
-                  right: Math.max(box.right, x + 1),
-                  bottom: Math.max(box.bottom, y + 1),
-                }
-              : { left: x, top: y, right: x + 1, bottom: y + 1 };
+      for (const rect of rects) {
+        const top = Math.max(0, Math.floor(rect.top));
+        const bottom = Math.min(w.height, Math.ceil(rect.bottom));
+        const left = Math.max(0, Math.floor(rect.left));
+        const right = Math.min(w.width, Math.ceil(rect.right));
+        for (let y = top; y < bottom; y++) {
+          for (let x = left; x < right; x++) {
+            const i = (y * w.width + x) * 4;
+            const differs =
+              (w.data[i] ?? 0) !== (k.data[i] ?? 0) ||
+              (w.data[i + 1] ?? 0) !== (k.data[i + 1] ?? 0) ||
+              (w.data[i + 2] ?? 0) !== (k.data[i + 2] ?? 0);
+            if (differs) {
+              box = box
+                ? {
+                    left: Math.min(box.left, x),
+                    top: Math.min(box.top, y),
+                    right: Math.max(box.right, x + 1),
+                    bottom: Math.max(box.bottom, y + 1),
+                  }
+                : { left: x, top: y, right: x + 1, bottom: y + 1 };
+            }
           }
         }
       }

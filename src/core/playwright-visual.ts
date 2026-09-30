@@ -35,11 +35,7 @@ import {
   type SlideMeasure,
   unmarkPseudoTextsInPage,
 } from "./slide-measure.ts";
-import {
-  contrastThreshold,
-  measurePageTextContrasts,
-  measurePseudoGlyphBoxes,
-} from "./text-contrast.ts";
+import { contrastThreshold, measureGlyphBoxes, measurePageTextContrasts } from "./text-contrast.ts";
 
 /**
  * Answers a visual request in a running browser: what the Playwright worker
@@ -190,30 +186,29 @@ async function pageTexts(page: Page, measured: SlideMeasure): Promise<PageText[]
 }
 
 /**
- * The texts drawn over each other. A pseudo-element's box can be far wider than its words, as a
- * full-width running head is, so a pair it is in is looked at again with the box its glyphs
- * cover, drawn alone.
+ * The texts drawn over each other. Each text in a pair the boxes suggest is looked at again as it
+ * shows, drawn alone: one none of whose glyphs shows, under a box drawn above it, collides with
+ * nothing, and a pseudo-element's, whose box can be far wider than its words as a full-width
+ * running head's is, is looked at with the box its glyphs cover.
  */
 async function textCollisions(page: Page, texts: PageText[]): Promise<Array<[PageText, PageText]>> {
   const candidates = findCollisions(texts);
-  const loose = [...new Set(candidates.flat().filter((text) => text.pseudo && text.rects[0]))];
-  if (loose.length === 0) {
+  const paired = [...new Set(candidates.flat())];
+  if (paired.length === 0) {
     return candidates;
   }
-  const glyphs = await measurePseudoGlyphBoxes(
+  const glyphs = await measureGlyphBoxes(
     page,
-    loose.map((text) => ({
-      host: text.pseudo?.host ?? "",
-      pseudo: text.pseudo?.pseudo ?? "before",
-      rect: text.rects[0] as Box,
-    })),
+    paired.map(({ key, pseudo, rects }) =>
+      pseudo ? { ...pseudo, rects } : { element: Number(key), rects },
+    ),
   );
-  // Each text in a candidate pair as it is drawn, and back to itself once the pairs are found.
+  // Each text in a candidate pair as it shows, and back to itself once the pairs are found.
   const drawn = new Map<PageText, PageText>();
-  for (const text of new Set(candidates.flat())) {
-    const at = loose.indexOf(text);
-    const glyph = at < 0 ? undefined : glyphs[at];
-    drawn.set(at < 0 ? text : { ...text, rects: glyph ? [glyph] : [] }, text);
+  for (const [at, text] of paired.entries()) {
+    const glyph = glyphs[at];
+    const rects = !glyph ? [] : text.pseudo ? [glyph] : text.rects;
+    drawn.set({ ...text, rects }, text);
   }
   const pairs = findCollisions([...drawn.keys()]).map(
     ([a, b]) => [drawn.get(a) ?? a, drawn.get(b) ?? b] as [PageText, PageText],
