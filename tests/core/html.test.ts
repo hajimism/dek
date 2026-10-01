@@ -449,7 +449,7 @@ hello
         const html = await renderPage(join(root, "decks", "demo"));
         expect(html).toContain('id="dek-hint"');
         expect(html).toContain("<kbd>s</kbd>スライド一覧");
-        expect(html).toContain("<kbd>p</kbd>プレゼンタービュー");
+        expect(html).toContain("<kbd>p</kbd>発表者ビュー");
       },
     );
     await withTempProject(

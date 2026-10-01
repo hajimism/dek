@@ -184,7 +184,7 @@ export function renderRailHtml(slides: Array<{ slug: string; title: string }>): 
 }
 
 const KEY_HINT_LABELS = {
-  ja: { rail: "スライド一覧", presenter: "プレゼンタービュー" },
+  ja: { rail: "スライド一覧", presenter: "発表者ビュー" },
   en: { rail: "Slide rail", presenter: "Presenter view" },
 };
 
