@@ -19,5 +19,8 @@
     "@hajimism/dek": "file:..",
     "playwright": "^1.63.0",
     "rumdl": "^0.2.73"
+  },
+  "overrides": {
+    "vite": "^6.4.3"
   }
 }
