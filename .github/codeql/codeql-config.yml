@@ -1,0 +1,3 @@
+# Tests load fixtures into happy-dom on purpose; what they do is not what dek ships.
+paths-ignore:
+  - tests
