@@ -31,7 +31,8 @@ function play(scene: HTMLElement, t: number, motion: number) {
       clock = end + ENTER_MS * k;
     } else {
       clock += Number(el.dataset.out || OUT_MS) * k;
-      el.style.opacity = t >= clock ? "1" : "0";
+      // Compressed, the last line lands on the beat's end itself: rounding must not hide it.
+      el.style.opacity = t + 1e-6 >= clock ? "1" : "0";
     }
   }
 }
