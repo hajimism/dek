@@ -1,4 +1,4 @@
-import { type DekConfig, loadConfig } from "../config.ts";
+import { type DekcConfig, loadConfig } from "../config.ts";
 import { cssLayoutNames, parseCss, type Stylesheet } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import type { Diagnostic } from "../diagnostic.ts";
@@ -24,7 +24,7 @@ type SlideSource = { html: string; scan: HtmlScan; skeleton: boolean };
  * slide; `lintDeck` narrows their findings to one slide when asked.
  */
 export type LintContext = DeckFiles & {
-  /** DEK016 and DEK017 of each slide script, by slug: evaluated before the rules run. */
+  /** DEKC016 and DEKC017 of each slide script, by slug: evaluated before the rules run. */
   scripts: Map<string, Diagnostic[]>;
 };
 
@@ -32,16 +32,16 @@ export type LintContext = DeckFiles & {
 export type DeckFiles = {
   project: Project;
   deck: ProjectDeck;
-  config: DekConfig;
+  config: DekcConfig;
   /** script.md, read once and cut at its frontmatter; none when it cannot be cut. */
   script?: ScriptParts;
-  /** The first section of each slug, in script order; a second one is DEK004. */
+  /** The first section of each slug, in script order; a second one is DEKC004. */
   sectionsBySlug: Map<string, Section>;
   slidesBySlug: Map<string, SlideFile>;
   stylesBySlug: Map<string, SlideFile>;
   /** theme.css, parsed once for every rule that reads it. */
   theme?: ThemeFacts & { path: string; sheet: Stylesheet };
-  /** A slide's HTML, read and scanned once, and whether it is still the skeleton `dek sync` wrote. */
+  /** A slide's HTML, read and scanned once, and whether it is still the skeleton `dekc sync` wrote. */
   slideSource(slug: string): SlideSource | undefined;
   /** A slide's own stylesheet, read and parsed once for every rule that reads it. */
   slideStyle(slug: string): { path: string; sheet: Stylesheet } | undefined;

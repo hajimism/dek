@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { lsCommand } from "../../src/cli/ls.ts";
 import { formatText } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -25,14 +25,14 @@ type LsListOk = {
   failed?: Array<{ name: string }>;
 };
 
-describe("dek ls", () => {
+describe("dekc ls", () => {
   test("lists decks from the project root", async () => {
     await withTempProject(
       {
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = await runDek(["ls", "--json"], { cwd: root });
+        const result = await runDekc(["ls", "--json"], { cwd: root });
         expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<LsListOk>(result);
         expect(json.ok).toBe(true);
@@ -50,7 +50,7 @@ describe("dek ls", () => {
 });
 
 describe("lsCommand", () => {
-  test("lists a dek.toml finding once, for the project, not on each deck's row", async () => {
+  test("lists a dekc.toml finding once, for the project, not on each deck's row", async () => {
     await withTempProject(
       {
         toml: "bogus = 1\n",
@@ -65,7 +65,7 @@ describe("lsCommand", () => {
           throw new Error("expected list");
         }
         expect(result.diagnostics.map((d) => [d.id, d.path])).toEqual([
-          ["DEK008", join(root, "dek.toml")],
+          ["DEKC008", join(root, "dekc.toml")],
         ]);
         expect(result.decks.map((deck) => deck.diagnostics)).toEqual([[], []]);
         expect(formatText({ command: "ls", data: result }).split("\n").at(-1)).toBe(
@@ -247,7 +247,7 @@ duration: 10m
     );
   });
 
-  test("uses cjk_per_minute and latin_per_minute from dek.toml", async () => {
+  test("uses cjk_per_minute and latin_per_minute from dekc.toml", async () => {
     await withTempProject(
       {
         toml: "cjk_per_minute = 5\nlatin_per_minute = 13\n",

@@ -2,10 +2,10 @@ import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import { startDevServer } from "../../src/server/dev.ts";
 import { POLL_INTERVAL_MS } from "../../src/server/watch.ts";
-import { spawnDekServer } from "../helpers/cli.ts";
+import { spawnDekcServer } from "../helpers/cli.ts";
 import { slideDocument, slidePlaces } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
@@ -354,7 +354,7 @@ more
         const page = await (await fetch(server.url)).text();
         expect(page).toContain('data-slug="intro"');
         expect(page).not.toContain("data-missing");
-        expect(page).not.toContain('class="dek-diagnostics"');
+        expect(page).not.toContain('class="dekc-diagnostics"');
 
         const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
         await writeFile(join(deckDir, "slides", "intro.html"), introHtml);
@@ -616,7 +616,7 @@ more
     });
   });
 
-  test("includes DEK030 on save when a playwright runner is available", async () => {
+  test("includes DEKC030 on save when a playwright runner is available", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await withDevServer(
@@ -632,13 +632,13 @@ more
           const pending = waitForEvent(
             server.events,
             (event) =>
-              event.type === "diagnostics" && event.diagnostics.some((d) => d.id === "DEK030"),
+              event.type === "diagnostics" && event.diagnostics.some((d) => d.id === "DEKC030"),
           );
           await writeFile(join(deckDir, "slides", "intro.html"), introHtml);
           const event = await pending;
           expect(event).toMatchObject({ type: "diagnostics" });
           if (event.type === "diagnostics") {
-            expect(event.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
+            expect(event.diagnostics.some((d) => d.id === "DEKC030")).toBe(true);
           }
         },
       );
@@ -727,7 +727,7 @@ body
     );
   });
 
-  test("does not delete orphan HTML and reports DEK002", async () => {
+  test("does not delete orphan HTML and reports DEKC002", async () => {
     await withTempProject(
       {
         decks: [
@@ -746,7 +746,7 @@ body
           const pending = waitForEvent(
             server.events,
             (entry) =>
-              entry.type === "diagnostics" && entry.diagnostics.some((d) => d.id === "DEK002"),
+              entry.type === "diagnostics" && entry.diagnostics.some((d) => d.id === "DEKC002"),
           );
           await writeFile(join(root, "decks", "demo", "slides", "intro.html"), `${introHtml}\n`);
           expect(await pending).toMatchObject({ type: "diagnostics" });
@@ -934,11 +934,11 @@ body
     );
   });
 
-  test("writes .dek/server.json while running and removes it on close", async () => {
+  test("writes .dekc/server.json while running and removes it on close", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const lock = join(root, ".dek", "server.json");
+        const lock = join(root, ".dekc", "server.json");
         await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
           expect(existsSync(lock)).toBe(true);
           const data = JSON.parse(await readFile(lock, "utf8")) as { url: string; pid: number };
@@ -976,9 +976,9 @@ body
         await expect(startDevServer({ cwd: root, deck: "missing" })).rejects.toMatchObject({
           message: 'deck "missing" not found',
           path: join(root, "decks", "missing"),
-          hint: "run `dek ls`",
+          hint: "run `dekc ls`",
         });
-        expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
+        expect(existsSync(join(root, ".dekc", "server.json"))).toBe(false);
       },
     );
   });
@@ -1014,21 +1014,21 @@ body
           throw new Error("expected one server to start");
         }
         const loserReason = lost[0]?.status === "rejected" ? lost[0].reason : undefined;
-        expect(loserReason).toBeInstanceOf(DekError);
+        expect(loserReason).toBeInstanceOf(DekcError);
         expect((await fetch(winner.url)).ok).toBe(true);
         await winner.close();
       },
     );
   });
 
-  test("keeps serving when dek.toml disappears mid-session", async () => {
+  test("keeps serving when dekc.toml disappears mid-session", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await withDevServer({ cwd: root }, async (server) => {
           // Listen first: under load the sync can land before the write's await returns.
           const synced = waitForEvent(server.events, (event) => event.type === "sync");
-          await rm(join(root, "dek.toml"));
+          await rm(join(root, "dekc.toml"));
           await writeFile(join(root, "decks", "demo", "script.md"), defaultScript("Changed"));
           await synced;
           const response = await fetch(new URL("/decks/demo/", server.url));
@@ -1049,7 +1049,7 @@ function asRemote(server: { url: string }): RemoteDevServer {
   return server as RemoteDevServer;
 }
 
-function basicAuth(password: string, user = "dek"): string {
+function basicAuth(password: string, user = "dekc"): string {
   return `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
 }
 
@@ -1082,7 +1082,7 @@ describe("startDevServer --remote", () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const lock = join(root, ".dek", "server.json");
+        const lock = join(root, ".dekc", "server.json");
         await withDevServer({ cwd: join(root, "decks", "demo"), remote: true }, async (server) => {
           const remote = asRemote(server);
           expect(server.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
@@ -1215,7 +1215,7 @@ describe("startDevServer --remote", () => {
             const presenter = await fetch(new URL("/presenter", server.url));
             expect(presenter.status).toBe(401);
             expect(presenter.headers.get("www-authenticate")).toContain("Basic");
-            expect(presenter.headers.get("www-authenticate")).toContain("dek presenter");
+            expect(presenter.headers.get("www-authenticate")).toContain("dekc presenter");
 
             const wrong = await fetch(new URL("/presenter", server.url), {
               headers: { authorization: basicAuth("nope") },
@@ -1232,13 +1232,13 @@ describe("startDevServer --remote", () => {
             expect(player.ok).toBe(true);
             const playerHtml = await player.text();
             expect(playerHtml).not.toContain(speakerNotes);
-            expect(playerHtml).not.toContain('id="dek-presenter"');
+            expect(playerHtml).not.toContain('id="dekc-presenter"');
 
             const viaQuery = await fetch(new URL("/?presenter", server.url));
             expect(viaQuery.ok).toBe(true);
             const queryHtml = await viaQuery.text();
             expect(queryHtml).not.toContain(speakerNotes);
-            expect(queryHtml).not.toContain('id="dek-presenter"');
+            expect(queryHtml).not.toContain('id="dekc-presenter"');
           },
         );
       },
@@ -1487,7 +1487,7 @@ body
             ok: true,
             positions: [{ slideIndex: 1, beatIndex: 0 }],
           });
-          expect(existsSync(join(root, ".dek", "marks.json"))).toBe(true);
+          expect(existsSync(join(root, ".dekc", "marks.json"))).toBe(true);
           expect(await (await post({ slideIndex: 1, beatIndex: 0 })).json()).toEqual({
             ok: true,
             marked: false,
@@ -1517,7 +1517,7 @@ body
             const marks = new URL("/marks", server.url);
             const body = JSON.stringify({ slideIndex: 0, beatIndex: 0 });
             expect((await fetch(marks, { method: "POST", body })).status).toBe(401);
-            expect(existsSync(join(root, ".dek", "marks.json"))).toBe(false);
+            expect(existsSync(join(root, ".dekc", "marks.json"))).toBe(false);
             const allowed = await fetch(marks, {
               method: "POST",
               body,
@@ -1708,14 +1708,14 @@ describe("startDevServer requests", () => {
   });
 });
 
-describe("dek (dev server CLI)", () => {
+describe("dekc (dev server CLI)", () => {
   test("prints a URL and serves the deck", async () => {
     await withTempProject(
       {
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const { url, stop } = await spawnDekServer(join(root, "decks", "demo"));
+        const { url, stop } = await spawnDekcServer(join(root, "decks", "demo"));
         try {
           expect(url).toMatch(/^https?:\/\//);
           const res = await fetch(url);
@@ -1731,7 +1731,7 @@ describe("dek (dev server CLI)", () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const { url, stdout, stop } = await spawnDekServer(join(root, "decks", "demo"), {
+        const { url, stdout, stop } = await spawnDekcServer(join(root, "decks", "demo"), {
           args: ["--remote"],
           ready: (buf) => buf.includes("password: "),
         });

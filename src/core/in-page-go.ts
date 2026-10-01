@@ -13,7 +13,7 @@ export type EvaluatingPage = {
  * `at` of a long morph, as it is when the talk plays.
  */
 export function freezeAt(at: number): void {
-  const animations = window.__dekStarted ?? document.getAnimations();
+  const animations = window.__dekcStarted ?? document.getAnimations();
   const endOf = (animation: Animation): number => {
     const end = animation.effect?.getComputedTiming().endTime;
     return typeof end === "number" && Number.isFinite(end) ? end : 0;
@@ -30,7 +30,7 @@ export function freezeAt(at: number): void {
     animation.currentTime = moment;
   }
   // The script started with the same go, so it is as many ms in as the morph.
-  window.dekMotion?.seek(moment);
+  window.dekcMotion?.seek(moment);
 }
 
 /**
@@ -41,8 +41,8 @@ export function freezeAt(at: number): void {
  * page counts, as on a page that has just loaded.
  */
 export function holdStarted(): number {
-  const started = window.__dekStarted ?? document.getAnimations();
-  let span = window.dekMotion?.duration() ?? 0;
+  const started = window.__dekcStarted ?? document.getAnimations();
+  let span = window.dekcMotion?.duration() ?? 0;
   for (const animation of started) {
     animation.pause();
     const end = animation.effect?.getComputedTiming().endTime;
@@ -60,16 +60,16 @@ export function holdStarted(): number {
  * an earlier beat again.
  */
 export function seekStarted(ms: number): void {
-  for (const animation of window.__dekStarted ?? document.getAnimations()) {
+  for (const animation of window.__dekcStarted ?? document.getAnimations()) {
     animation.currentTime = ms;
   }
-  window.dekMotion?.seek(ms);
+  window.dekcMotion?.seek(ms);
 }
 
 /**
  * Runs in the page, shipped by `page.evaluate`, so it references nothing
  * outside itself. Starts the player's `go(position)`, keeps it unawaited on
- * `window.__dekPendingGo`, and resolves once the view transition it opened
+ * `window.__dekcPendingGo`, and resolves once the view transition it opened
  * is ready to seek (true), or after one frame when it opened none or the
  * browser skipped it (false),
  * and every animation the go began has started.
@@ -77,7 +77,7 @@ export function seekStarted(ms: number): void {
  * put back before this returns; the runtime is not modified.
  */
 export async function startGoPaused(position: Position): Promise<boolean> {
-  const go = window.dekGo;
+  const go = window.dekcGo;
   if (!go) {
     return false;
   }
@@ -88,7 +88,7 @@ export async function startGoPaused(position: Position): Promise<boolean> {
   let pending: Promise<void>;
   // Whatever the last finished beat left belongs to it; on a page that has just loaded, nothing
   // does, so the first slide's entrance counts as this go's.
-  const settled = window.__dekSettled;
+  const settled = window.__dekcSettled;
   try {
     if (original) {
       const wrapped: typeof document.startViewTransition = (update) => {
@@ -103,7 +103,7 @@ export async function startGoPaused(position: Position): Promise<boolean> {
       document.startViewTransition = unwrapped;
     }
   }
-  window.__dekPendingGo = pending;
+  window.__dekcPendingGo = pending;
   void pending.catch(() => undefined);
   // A transition the browser skips, as it does for a duplicate name, still runs its update;
   // the talk carries on without the animation, and so does this, as a go that opened none.
@@ -120,7 +120,7 @@ export async function startGoPaused(position: Position): Promise<boolean> {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }
   const started = document.getAnimations().filter((animation) => !settled?.has(animation));
-  window.__dekStarted = started;
+  window.__dekcStarted = started;
   // A pending animation may already run a frame ahead on the compositor while its main-thread
   // time still reads 0, where a seek to 0 changes nothing. Once started, the two agree.
   await Promise.allSettled(started.map((animation) => animation.ready));

@@ -160,11 +160,11 @@ if (dataEl?.textContent) {
   // A hash that named a beat past the slide's last now says where the deck opened.
   nav.writeHash("replace");
   stage.showMotion(nav.position(), page.mode === "video" ? "hold" : "final");
-  // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekGo"]
-  window["dekGo"] = (next) => nav.go(next, "capture");
+  // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekcGo"]
+  window["dekcGo"] = (next) => nav.go(next, "capture");
   // The video recorder seeks slide scripts the way it seeks Web Animations.
-  // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekMotion"]
-  window["dekMotion"] = stage.motion;
+  // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekcMotion"]
+  window["dekcMotion"] = stage.motion;
 
   const rehearseMode = new URLSearchParams(location.search).has("rehearse");
   if (rehearseMode) {
@@ -173,8 +173,8 @@ if (dataEl?.textContent) {
 
   const liveHost = documentLiveHost();
   // Keep a string key so minify does not rename the hook liveReloadScript calls.
-  // biome-ignore lint/complexity/useLiteralKeys: liveReloadScript looks up window["dekLive"]
-  window["dekLive"] = async (raw: unknown) => {
+  // biome-ignore lint/complexity/useLiteralKeys: liveReloadScript looks up window["dekcLive"]
+  window["dekcLive"] = async (raw: unknown) => {
     if (!isLiveEvent(raw)) {
       location.reload();
       return;

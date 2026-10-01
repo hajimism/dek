@@ -16,7 +16,7 @@ export type TomlKey = {
 
 /**
  * Every key and table header in a TOML file, in order, with where each is written: the one reader
- * dek.toml lint, `dek mv`, and `dek ref` share. It reads `[table]`, `[[array]]`, (dotted) keys, and
+ * dekc.toml lint, `dekc mv`, and `dekc ref` share. It reads `[table]`, `[[array]]`, (dotted) keys, and
  * one-line inline tables, and steps over comments and multi-line strings.
  */
 export function scanTomlKeys(source: string): TomlKey[] {

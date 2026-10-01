@@ -12,14 +12,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import { DekError } from "./error.ts";
+import { DekcError } from "./error.ts";
 import { isInside } from "./path.ts";
 
 /**
- * Where `path` really lives, when dek may follow it there, else undefined. A path with no link
+ * Where `path` really lives, when dekc may follow it there, else undefined. A path with no link
  * in it is taken as written. A link must stay inside `root`, keep its name's extension, and not
  * lead into a hidden file or folder: a cloned repository can commit `theme.css -> ../../.env`
- * or `.dek/schema.json -> ~/.zshrc`, and dek must neither publish the one nor overwrite the
+ * or `.dekc/schema.json -> ~/.zshrc`, and dekc must neither publish the one nor overwrite the
  * other. The part of `path` that does not exist yet is judged as written.
  */
 export function followInside(path: string, root: string): string | undefined {
@@ -62,14 +62,14 @@ function realOf(path: string): string {
   }
 }
 
-function refused(path: string, root: string): DekError {
-  return new DekError(`${relative(root, path) || path} leads outside the project`, {
+function refused(path: string, root: string): DekcError {
+  return new DekcError(`${relative(root, path) || path} leads outside the project`, {
     path,
-    hint: "dek follows a symlink only to a file of the same kind inside the project and outside hidden folders; copy the file instead",
+    hint: "dekc follows a symlink only to a file of the same kind inside the project and outside hidden folders; copy the file instead",
   });
 }
 
-/** Like `followInside`, but a path dek may not follow is an error that says why. */
+/** Like `followInside`, but a path dekc may not follow is an error that says why. */
 export function requireInside(path: string, root: string): string {
   const real = followInside(path, root);
   if (real === undefined) {
@@ -84,7 +84,7 @@ export function readSourceIfExists(path: string, root: string): string | undefin
   return existsSync(real) ? readFileSync(real, "utf8") : undefined;
 }
 
-/** A folder dek writes into, made if missing; a link out of `root` on the way is an error. */
+/** A folder dekc writes into, made if missing; a link out of `root` on the way is an error. */
 export function outputDir(path: string, root: string): string {
   const real = requireInside(path, root);
   mkdirSync(real, { recursive: true });
@@ -114,7 +114,7 @@ export function outputPath(path: string, root: string): string {
 }
 
 /**
- * True when a cache entry dek wrote is there: a plain file. A link in its place is not dek's and
+ * True when a cache entry dekc wrote is there: a plain file. A link in its place is not dekc's and
  * is removed, so neither a build publishes what it points at nor a new entry is written through it.
  */
 export function isCachedFile(path: string): boolean {
@@ -166,7 +166,7 @@ export function replaceFile(
   }
 }
 
-/** Remove every link directly in `dir`, a folder of dek's own output that a writer fills by name. */
+/** Remove every link directly in `dir`, a folder of dekc's own output that a writer fills by name. */
 export function dropLinks(dir: string): void {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isSymbolicLink()) {

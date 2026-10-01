@@ -11,7 +11,7 @@ const dialed: string[] = [];
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-static-host-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-static-host-")));
   await writeProject(root, {
     decks: [
       {

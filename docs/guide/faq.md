@@ -2,39 +2,39 @@
 
 ## How do I install it?
 
-dek is not on npm yet. Create a project straight from GitHub with `bunx github:hajimism/dek init`, then install it inside the project with `bun add -d github:hajimism/dek` and use `bunx dek` from there. The package is `@hajimism/dek`; once it is published, `bun add -d @hajimism/dek` will do. See [Getting Started](./getting-started).
+dekc is not on npm yet. Create a project straight from GitHub with `bunx github:hajimism/dekc init`, then install it inside the project with `bun add -d github:hajimism/dekc` and use `bunx dekc` from there. Once it is published, `bun add -d dekc` will do. See [Getting Started](./getting-started).
 
 ## Why does `bunx dek` run something else?
 
-`dek` on npm is an unrelated package. `bunx dek` runs the dek in the project's `node_modules`, and where there is none, it downloads that other package instead. Run `bunx dek` inside a project that has dek installed, or `bunx github:hajimism/dek` anywhere else.
+The command is `dekc`, not `dek`. `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Until dekc is on npm, run `bunx dekc` inside a project that has dekc installed, or `bunx github:hajimism/dekc` anywhere else.
 
 ## When should I use Slidev instead?
 
-When you need live coding, Vue components inside slides, npm themes, or an embedded editor. dek is for talks where the speaking carries the weight, and it keeps plain HTML and CSS as its whole surface. The comparison is in [Why dek](./why#how-dek-compares).
+When you need live coding, Vue components inside slides, npm themes, or an embedded editor. dekc is for talks where the speaking carries the weight, and it keeps plain HTML and CSS as its whole surface. The comparison is in [Why dekc](./why#how-dekc-compares).
 
 ## Do I have to write HTML?
 
-No. Write `script.md`, run `dek`, and the skeleton slides in the bundled theme are enough to present. Write HTML when you want the screen to say more than the script does.
+No. Write `script.md`, run `dekc`, and the skeleton slides in the bundled theme are enough to present. Write HTML when you want the screen to say more than the script does.
 
 ## Do I have to use voice?
 
-No. A deck without `voice/` fails lint for exactly the same reasons as one with it. Voice adds warnings (`DEK040`, `DEK042`, and `DEK043`) only to decks that opt in. `DEK041`, the check against `duration`, applies to every deck that sets one.
+No. A deck without `voice/` fails lint for exactly the same reasons as one with it. Voice adds warnings (`DEKC040`, `DEKC042`, and `DEKC043`) only to decks that opt in. `DEKC041`, the check against `duration`, applies to every deck that sets one.
 
 ## Why do slide files have no numbers?
 
-Only one file may know the order, and that file is `script.md`. Numbered file names would force a rename on every reorder and destroy the diff. Reorder with `dek mv <slug> --before|--after <other>`.
+Only one file may know the order, and that file is `script.md`. Numbered file names would force a rename on every reorder and destroy the diff. Reorder with `dekc mv <slug> --before|--after <other>`.
 
 ## Does `sync` overwrite my HTML?
 
-Never once you have edited it. It creates skeletons for missing slides, rewrites a skeleton nobody has edited yet when its section changes, and removes such a skeleton when its section is gone. A file you have edited is never touched; if its section is gone, lint flags it as an orphan (`DEK002`). It does not rename either. Renaming is `dek mv`.
+Never once you have edited it. It creates skeletons for missing slides, rewrites a skeleton nobody has edited yet when its section changes, and removes such a skeleton when its section is gone. A file you have edited is never touched; if its section is gone, lint flags it as an orphan (`DEKC002`). It does not rename either. Renaming is `dekc mv`.
 
 ## What does an agent call?
 
-The same CLI as a human: `dek help --agent`, `dek check <slug> --shot`, `dek lint --format sarif`. There is no MCP server. See [Working with AI Agents](./ai).
+The same CLI as a human: `dekc help --agent`, `dekc check <slug> --shot`, `dekc lint --format sarif`. There is no MCP server. See [Working with AI Agents](./ai).
 
 ## Can I present without the dev server?
 
-Yes. `dek build` produces one HTML file. Put it on a USB stick. Press `p` or open it with `?presenter`, and a second window follows the first through `BroadcastChannel`. Use `dek --remote` only when another device needs to drive the deck.
+Yes. `dekc build` produces one HTML file. Put it on a USB stick. Press `p` or open it with `?presenter`, and a second window follows the first through `BroadcastChannel`. Use `dekc --remote` only when another device needs to drive the deck.
 
 ## Are Playwright, ffmpeg, and VOICEVOX required?
 
@@ -46,7 +46,7 @@ Not in the script. A beat with no paragraph passes through the transition and th
 
 ## Can a slide run JavaScript?
 
-Not inside its HTML: `<script>` there is `DEK011`. Motion that CSS cannot express, such as a counter or a chart that draws itself, goes in `slides/<id>.ts` as a `draw` function of time. The runtime owns the clock, so the same script plays live, seeks frame by frame in `dek video`, and shows its end state in `dek shot` and the PDF. Clickable demos are out of scope. See [Scripted motion](./steps#scripted-motion).
+Not inside its HTML: `<script>` there is `DEKC011`. Motion that CSS cannot express, such as a counter or a chart that draws itself, goes in `slides/<id>.ts` as a `draw` function of time. The runtime owns the clock, so the same script plays live, seeks frame by frame in `dekc video`, and shows its end state in `dekc shot` and the PDF. Clickable demos are out of scope. See [Scripted motion](./steps#scripted-motion).
 
 ## Where does CSS for one slide go?
 

@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { formatCheck } from "../../src/cli/text.ts";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import type { VisualRequest, VisualResponse } from "../../src/core/playwright.ts";
 import { VOICE_SETUP_HINT } from "../../src/core/voice.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -30,17 +30,17 @@ async function overflowRunner(request: VisualRequest): Promise<VisualResponse> {
   return { overflows: [{ slug: "intro", step: "1", box: "h2", by: { bottom: 8 } }], contrasts: [] };
 }
 
-describe("dek check", () => {
+describe("dekc check", () => {
   test("requires a slug", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const result = await runDek(["check", "--json"], { cwd: join(root, "decks", "demo") });
+        const result = await runDekc(["check", "--json"], { cwd: join(root, "decks", "demo") });
         expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
-        expect(json.error.message).toBe("missing <slug> for dek check");
+        expect(json.error.message).toBe("missing <slug> for dekc check");
         expect(json.error.hint).toBe(
-          "usage: dek check [deck] <slug> [--shot] [--voice]; run `dek help check`",
+          "usage: dekc check [deck] <slug> [--shot] [--voice]; run `dekc help check`",
         );
       },
     );
@@ -51,16 +51,16 @@ describe("dek check", () => {
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await chmod(fakePlaywright, 0o755);
-        const result = await runDek(["check", "intro", "--shot"], {
+        const result = await runDekc(["check", "intro", "--shot"], {
           cwd: join(root, "decks", "demo"),
           env: {
-            DEK_PLAYWRIGHT: fakePlaywright,
-            DEK_PLAYWRIGHT_OVERFLOWS: JSON.stringify([{ slug: "intro", step: "1", box: "h2" }]),
+            DEKC_PLAYWRIGHT: fakePlaywright,
+            DEKC_PLAYWRIGHT_OVERFLOWS: JSON.stringify([{ slug: "intro", step: "1", box: "h2" }]),
           },
         });
         expect(result).toMatchObject({ exitCode: 1 });
         expect(result.stdout.startsWith("{")).toBe(false);
-        expect(result.stdout).toContain("DEK030");
+        expect(result.stdout).toContain("DEKC030");
         expect(result.stdout).toContain(".cache/shots");
       },
     );
@@ -96,12 +96,12 @@ more
           runner: cleanRunner,
         });
         expect(result.slug).toBe("intro");
-        expect(result.diagnostics.some((d) => d.id === "DEK001")).toBe(false);
+        expect(result.diagnostics.some((d) => d.id === "DEKC001")).toBe(false);
       },
     );
   });
 
-  test("reports the slide's findings only; theme.css and the budget are dek lint's", async () => {
+  test("reports the slide's findings only; theme.css and the budget are dekc lint's", async () => {
     await withTempProject(
       {
         decks: [
@@ -120,8 +120,8 @@ more
           runner: cleanRunner,
         });
         const found = result.diagnostics.map((d) => `${d.id} ${d.path?.split("/").at(-1)}`);
-        expect(found).toContain("DEK014 intro.css");
-        expect(found.filter((d) => d.includes("theme.css") || d.includes("DEK041"))).toEqual([]);
+        expect(found).toContain("DEKC014 intro.css");
+        expect(found.filter((d) => d.includes("theme.css") || d.includes("DEKC041"))).toEqual([]);
         expect(result.diagnostics.every((d) => d.slug === "intro")).toBe(true);
       },
     );
@@ -135,7 +135,7 @@ more
           slug: "intro",
           runner: overflowRunner,
         });
-        expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
+        expect(result.diagnostics.some((d) => d.id === "DEKC030")).toBe(true);
       },
     );
   });
@@ -157,7 +157,7 @@ more
         expect(result.shot).toContain(".cache/shots/intro");
         expect(result.shot).toMatch(/intro~0\.[0-9a-f]{8}\.png$/);
         expect(await Bun.file(result.shot ?? "").exists()).toBe(true);
-        expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
+        expect(result.diagnostics.some((d) => d.id === "DEKC030")).toBe(true);
       },
     );
   });
@@ -166,16 +166,16 @@ more
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+        await withEnv({ DEKC_PLAYWRIGHT: "/no/such/playwright" }, async () => {
           const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
             slug: "intro",
           });
-          expect(result.diagnostics.some((d) => d.id === "DEK030")).toBe(false);
+          expect(result.diagnostics.some((d) => d.id === "DEKC030")).toBe(false);
           expect(result.skipped).toEqual([
             {
               check: "visual",
               reason: "Playwright is not installed",
-              hint: "bun add -d playwright && bunx playwright install chromium, then run `dek check intro` to measure overflow and contrast",
+              hint: "bun add -d playwright && bunx playwright install chromium, then run `dekc check intro` to measure overflow and contrast",
             },
           ]);
         });
@@ -187,7 +187,7 @@ more
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+        await withEnv({ DEKC_PLAYWRIGHT: "/no/such/playwright" }, async () => {
           const deckDir = join(root, "decks", "demo");
           await expect(
             checkCommand(requireDeckFromCwd(deckDir), { slug: "intro", shot: true }),
@@ -203,13 +203,13 @@ more
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        await withEnv({ DEK_PLAYWRIGHT: fail }, async () => {
+        await withEnv({ DEKC_PLAYWRIGHT: fail }, async () => {
           try {
             await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), { slug: "intro" });
-            throw new Error("expected DekError");
+            throw new Error("expected DekcError");
           } catch (error) {
-            expect(error).toBeInstanceOf(DekError);
-            expect((error as DekError).message.toLowerCase()).toContain("playwright");
+            expect(error).toBeInstanceOf(DekcError);
+            expect((error as DekcError).message.toLowerCase()).toContain("playwright");
           }
         });
       },
@@ -222,7 +222,7 @@ more
       await withTempProject(
         { decks: [{ name: "demo", slides: { intro: introHtml } }] },
         async (root) => {
-          await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+          await withEnv({ DEKC_PLAYWRIGHT: "/no/such/playwright" }, async () => {
             const result = await checkCommand(requireDeckFromCwd(join(root, "decks", "demo")), {
               slug: "intro",
               voice: true,
@@ -241,7 +241,7 @@ more
 });
 
 // What an agent otherwise opens a screenshot to see: whether the slide is sparse, and where.
-describe("dek check fill", () => {
+describe("dekc check fill", () => {
   const rows = [0.9, 0.8, 0.6, 0.2, 0, 0, 0, 0, 0, 0];
   const columns = [0.4, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0];
   const box = { left: 0.04, top: 0.06, right: 0.96, bottom: 0.4 };
@@ -318,7 +318,9 @@ describe("dek check fill", () => {
   test("prints what it measured, then the findings and their count, then the shot last", () => {
     const text = formatCheck({
       slug: "intro",
-      diagnostics: [{ id: "DEK031", severity: "error", message: "low contrast", hint: "raise it" }],
+      diagnostics: [
+        { id: "DEKC031", severity: "error", message: "low contrast", hint: "raise it" },
+      ],
       shot: "/deck/.cache/shots/intro~0.abcd1234.png",
       fill: { step: "0", coverage: 0.25, box, rows, columns },
     });
@@ -328,9 +330,9 @@ describe("dek check fill", () => {
       "  columns, left to right: 40 50 50 50 50 50 50 50 30 0",
       "  empty rows: 40–100% (bottom)",
       "  empty columns: 90–100% (right)",
-      "DEK031 low contrast",
+      "DEKC031 low contrast",
       "  help: raise it",
-      "1 error: DEK031 ×1",
+      "1 error: DEKC031 ×1",
       "/deck/.cache/shots/intro~0.abcd1234.png",
     ]);
   });

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { resolveTimelineAudio, voiceCacheFile } from "../../src/core/voice.ts";
 import { bakeVideo, sliceTimelineAudio } from "../../src/video/bake.ts";
@@ -131,29 +131,29 @@ describe("bakeVideo", () => {
         await writeFile(join(deckDir, "script.md"), "this is not a deck\n");
         const runner = async (request: Parameters<typeof captureHoldFrames>[0]) =>
           captureHoldFrames(request);
-        await expect(bakeVideo(resolved.deck.dir, { runner })).rejects.toThrow(DekError);
+        await expect(bakeVideo(resolved.deck.dir, { runner })).rejects.toThrow(DekcError);
         try {
           const result = await bakeVideo(resolved, { runner });
           expect(result.out).toBe(join(root, "decks", "demo", "dist", "demo.mp4"));
         } catch (error) {
-          expect(error).toBeInstanceOf(DekError);
-          expect((error as DekError).message).toBe("ffmpeg not found");
+          expect(error).toBeInstanceOf(DekcError);
+          expect((error as DekcError).message).toBe("ffmpeg not found");
         }
       },
     );
   });
 
-  test("says to run dek voice when the timeline is not there", async () => {
+  test("says to run dekc voice when the timeline is not there", async () => {
     await withPreparedVoiceDeck(async (_root, resolved) => {
       const timeline = voiceCacheFile(resolved.deck.dir, "timeline.json");
       await rm(timeline);
       await expect(
         bakeVideo(resolved, { runner: async (request) => captureHoldFrames(request) }),
       ).rejects.toMatchObject({
-        name: "DekError",
+        name: "DekcError",
         message: "Timeline not found",
         path: timeline,
-        hint: "run `dek voice`",
+        hint: "run `dekc voice`",
       });
     });
   });

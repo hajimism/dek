@@ -1,4 +1,4 @@
-/* The slide's own files on the left, and what dek show hands an agent on the right. */
+/* The slide's own files on the left, and what dekc show hands an agent on the right. */
 .grid {
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
 }

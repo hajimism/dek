@@ -12,7 +12,7 @@ import type { Position } from "../core/step.ts";
 export type RoomClient = { send(payload: string): unknown };
 
 /**
- * Where a deck stands, as `dek current` and `dek goto` print it, and how many pages show it. With
+ * Where a deck stands, as `dekc current` and `dekc goto` print it, and how many pages show it. With
  * none, the position is where the next page opened lands.
  */
 type RoomPosition = { slug: string; slideIndex: number; beatIndex: number; viewers: number };

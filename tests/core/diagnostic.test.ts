@@ -4,34 +4,34 @@ import { join } from "node:path";
 import { diag, errorDiagnostic, hasErrors, RULES, type RuleId } from "../../src/core/diagnostic.ts";
 
 describe("diag", () => {
-  test("voice and timing rules, and input dek ignores or reads another way, are warnings", () => {
+  test("voice and timing rules, and input dekc ignores or reads another way, are warnings", () => {
     for (const id of [
-      "DEK008",
-      "DEK040",
-      "DEK041",
-      "DEK042",
-      "DEK043",
-      "DEK044",
-      "DEK045",
+      "DEKC008",
+      "DEKC040",
+      "DEKC041",
+      "DEKC042",
+      "DEKC043",
+      "DEKC044",
+      "DEKC045",
     ] as const) {
       expect(diag(id, { message: "" }).severity).toBe("warning");
     }
   });
 
-  test("every other dek rule is an error", () => {
-    for (const id of ["DEK001", "DEK009", "DEK010", "DEK016", "DEK019", "DEK030"] as const) {
+  test("every other dekc rule is an error", () => {
+    for (const id of ["DEKC001", "DEKC009", "DEKC010", "DEKC016", "DEKC019", "DEKC030"] as const) {
       expect(diag(id, { message: "" }).severity).toBe("error");
     }
   });
 
   test("puts severity right after the id, so it reads first in --json", () => {
-    const keys = Object.keys(diag("DEK001", { message: "m", path: "p", slug: "s" }));
+    const keys = Object.keys(diag("DEKC001", { message: "m", path: "p", slug: "s" }));
     expect(keys).toEqual(["id", "severity", "message", "path", "slug"]);
   });
 
   test("keeps every field it is given", () => {
     expect(
-      diag("DEK003", {
+      diag("DEKC003", {
         message: "m",
         path: "p",
         line: 3,
@@ -40,7 +40,7 @@ describe("diag", () => {
         data: { step: "x" },
       }),
     ).toEqual({
-      id: "DEK003",
+      id: "DEKC003",
       severity: "error",
       message: "m",
       path: "p",
@@ -67,23 +67,23 @@ describe("errorDiagnostic", () => {
 
 describe("hasErrors", () => {
   test("is false for warnings only", () => {
-    expect(hasErrors([diag("DEK040", { message: "" })])).toBe(false);
+    expect(hasErrors([diag("DEKC040", { message: "" })])).toBe(false);
     expect(hasErrors([])).toBe(false);
   });
 
   test("is true when any diagnostic is an error", () => {
-    expect(hasErrors([diag("DEK040", { message: "" }), diag("DEK010", { message: "" })])).toBe(
+    expect(hasErrors([diag("DEKC040", { message: "" }), diag("DEKC010", { message: "" })])).toBe(
       true,
     );
   });
 });
 
 describe("RULES", () => {
-  test("every rule is a DEK id with a severity and at least one scope", () => {
+  test("every rule is a DEKC id with a severity and at least one scope", () => {
     const ids = Object.keys(RULES) as RuleId[];
     expect(ids.length).toBeGreaterThan(20);
     for (const id of ids) {
-      expect(id).toMatch(/^DEK\d{3}$/);
+      expect(id).toMatch(/^DEKC\d{3}$/);
       expect(["error", "warning"]).toContain(RULES[id].severity);
       expect(RULES[id].scopes.length).toBeGreaterThan(0);
       for (const scope of RULES[id].scopes) {
@@ -108,7 +108,7 @@ describe("the rule table", () => {
   test("every rule has a row in the lint reference, in English and in Japanese", () => {
     for (const docs of [["docs"], ["docs", "ja"]]) {
       const reference = readFileSync(join(root, ...docs, "reference", "lint.md"), "utf8");
-      const rows = new Set([...reference.matchAll(/^\| `(DEK\d{3})` \|/gm)].map((m) => m[1]));
+      const rows = new Set([...reference.matchAll(/^\| `(DEKC\d{3})` \|/gm)].map((m) => m[1]));
       expect(Object.keys(RULES).filter((id) => !rows.has(id))).toEqual([]);
       expect([...rows].filter((id) => !(id && id in RULES))).toEqual([]);
     }
@@ -118,7 +118,7 @@ describe("the rule table", () => {
     for (const docs of [["docs"], ["docs", "ja"]]) {
       const reference = readFileSync(join(root, ...docs, "reference", "lint.md"), "utf8");
       const documented = Object.fromEntries(
-        [...reference.matchAll(/^\| `(DEK\d{3})` \| ([^|]+) \|/gm)].map((m) => [
+        [...reference.matchAll(/^\| `(DEKC\d{3})` \| ([^|]+) \|/gm)].map((m) => [
           m[1],
           [...(m[2] ?? "").matchAll(/`(\w+)`/g)].map((scope) => scope[1]),
         ]),

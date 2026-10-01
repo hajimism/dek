@@ -2,20 +2,20 @@
 
 In this tutorial you build a short talk from scratch: a ten-minute lightning talk about a bug that turned out to be a design flaw. By the end you will have a script with beats, a hand-written slide that reveals itself in step with your speaking, a figure that carries over between two slides, a theme change that stays inside the rules, and a single HTML file you could present from a USB stick.
 
-Every step ends in a state you could stop at and still give the talk. That is deliberate. dek is designed so that the script alone is enough, and everything after it is optional polish.
+Every step ends in a state you could stop at and still give the talk. That is deliberate. dekc is designed so that the script alone is enough, and everything after it is optional polish.
 
 You need [Bun](https://bun.sh) 1.4 or later. Voice, video, and Playwright are not used here.
 
 ## 1. Create the project
 
 ```bash
-bunx github:hajimism/dek init lightning --deck postmortem
+bunx github:hajimism/dekc init lightning --deck postmortem
 cd lightning
-bun add -d github:hajimism/dek
+bun add -d github:hajimism/dekc
 cd decks/postmortem
 ```
 
-These are the steps `init` prints when it finishes. From here on, `dek` means `bunx dek`, which runs the dek installed in the project.
+These are the steps `init` prints when it finishes. From here on, `dekc` means `bunx dekc`, which runs the dekc installed in the project.
 
 ## 2. Write the script
 
@@ -23,7 +23,7 @@ Replace the contents of `script.md` with the talk. Write it the way you would sa
 
 ```markdown
 ---
-# yaml-language-server: $schema=../../.dek/schema.json
+# yaml-language-server: $schema=../../.dekc/schema.json
 title: The Bug That Was a Design
 event: Lightning Talks
 date: 2026-05-14
@@ -84,7 +84,7 @@ A few things to notice.
 ## 3. Start the dev server
 
 ```bash
-dek
+dekc
 ```
 
 The server prints a URL. Open it. You have six slides. Each one was generated from a heading: the first shows the deck title, the others show their heading text, and `search` lists its three beats.
@@ -107,7 +107,7 @@ Look at `slides/search.html`. This is what the server wrote for you.
 Each list item points at a beat by id through `data-step`. When you advance to a beat, the player marks every element for that beat and the ones before it as shown. The theme decides what "shown" looks like.
 
 ::: tip You could stop here
-Run `dek build` and you have a presentable deck. Everything that follows is about making the screen say more than the script does.
+Run `dekc build` and you have a presentable deck. Everything that follows is about making the screen say more than the script does.
 :::
 
 ## 4. Check your timing
@@ -115,10 +115,10 @@ Run `dek build` and you have a presentable deck. Everything that follows is abou
 In a second terminal, from the deck directory:
 
 ```bash
-dek ls
+dekc ls
 ```
 
-You see the budget from `duration`, an estimate from the word count, and the per-section split. dek estimates Latin text at 130 words per minute and CJK text at 300 characters per minute. Blockquotes are not counted. The script in this tutorial reads in about a minute, so `dek ls` ends with `1 diagnostic`, and `dek lint` and the dev server show what it is: a DEK041 warning that the script is short of its ten-minute budget. That warning is the point: it is your cue to write more script, not more slides. It is a warning, not an error, so lint still passes. Anything you plan to say out loud belongs in the file, because only then does it count.
+You see the budget from `duration`, an estimate from the word count, and the per-section split. dekc estimates Latin text at 130 words per minute and CJK text at 300 characters per minute. Blockquotes are not counted. The script in this tutorial reads in about a minute, so `dekc ls` ends with `1 diagnostic`, and `dekc lint` and the dev server show what it is: a DEKC041 warning that the script is short of its ten-minute budget. That warning is the point: it is your cue to write more script, not more slides. It is a warning, not an error, so lint still passes. Anything you plan to say out loud belongs in the file, because only then does it count.
 
 ## 5. Write one slide by hand
 
@@ -139,7 +139,7 @@ The `cause` slide carries the point of the talk. Give it a real layout. Open `sl
 </section>
 ```
 
-Save it. The browser updates only that slide. Every class you used is defined in the bundled theme: `slide-title`, `col`, `node`, `node-parent`. Try adding a class the theme does not know, such as `class="node highlight"`, and save. The terminal and the browser overlay both report `DEK010`: the class is not in `theme.css`. Remove it and the diagnostic disappears.
+Save it. The browser updates only that slide. Every class you used is defined in the bundled theme: `slide-title`, `col`, `node`, `node-parent`. Try adding a class the theme does not know, such as `class="node highlight"`, and save. The terminal and the browser overlay both report `DEKC010`: the class is not in `theme.css`. Remove it and the diagnostic disappears.
 
 That is the loop. Write, save, read the diagnostic, fix. The dev server lints on every save, and "no diagnostics" means nothing measurable is left to fix.
 
@@ -184,7 +184,7 @@ Now bind the columns to the beats in `slides/cause.html`:
 
 Advance through the slide. The left column appears on the first beat, the right on the second. The script decides *when*; the theme decides *how*. The bundled theme fades and lifts each element into place, and it hides them with opacity rather than `display: none`, so the layout never shifts between beats.
 
-You referenced the beats by id, not by number. If you later insert a beat in the middle, nothing here breaks. The `dek sync` skeleton uses the same ids, which is why it is worth naming beats with `{#id}` before you start writing HTML.
+You referenced the beats by id, not by number. If you later insert a beat in the middle, nothing here breaks. The `dekc sync` skeleton uses the same ids, which is why it is worth naming beats with `{#id}` before you start writing HTML.
 
 ## 7. Carry a figure across slides
 
@@ -211,7 +211,7 @@ Step from `cause` into `fix`. The `served-by` box slides from the right column i
 If you have Playwright installed, you can freeze the transition halfway to judge the motion:
 
 ```bash
-dek shot cause --to fix --at 0.5
+dekc shot cause --to fix --at 0.5
 ```
 
 ## 8. Change the look, within the rules
@@ -237,7 +237,7 @@ Now try to cheat. Add a raw color to a rule:
 }
 ```
 
-Save, and lint reports `DEK014`: a raw value outside a token assignment. Raw colors, font families, and absolute units may only appear when assigning a `--*` custom property. Everything else goes through `var()`. Change it back to `var(--accent)` and the deck is clean again.
+Save, and lint reports `DEKC014`: a raw value outside a token assignment. Raw colors, font families, and absolute units may only appear when assigning a `--*` custom property. Everything else goes through `var()`. Change it back to `var(--accent)` and the deck is clean again.
 
 This deck's theme is its own copy. The `theme.css` at the project root is untouched, and so is every other deck. When you like the result, promote it:
 
@@ -245,12 +245,12 @@ This deck's theme is its own copy. The `theme.css` at the project root is untouc
 cp theme.css ../../theme.css
 ```
 
-The next `dek new` starts from the warm palette.
+The next `dekc new` starts from the warm palette.
 
 ## 9. Build the file you will present from
 
 ```bash
-dek build
+dekc build
 ```
 
 You get `dist/postmortem.html`: every slide, the theme, the player runtime, and any images folded into one minified file. Open it in a browser. Arrow keys move through beats and slides. Press `p` for the presenter view, and open the same file in a second window: the two follow each other through `BroadcastChannel`, so you can put the audience view on the projector and the presenter view on your laptop with no server and no network.
@@ -259,7 +259,7 @@ Copy that one file to a USB stick. That is the talk.
 
 ## Where to go next
 
-You have used the whole core of dek: a script that owns order and timing, one HTML file per slide, beats bound by id, a morph between slides, a token-only theme, lint for everything a rule can measure, and a single-file build.
+You have used the whole core of dekc: a script that owns order and timing, one HTML file per slide, beats bound by id, a morph between slides, a token-only theme, lint for everything a rule can measure, and a single-file build.
 
 - The detailed rules for each piece: [The Script](./script), [Slides](./slides), [Beats](./steps), [Themes](./theme), [Lint](./lint)
 - Presenter view, remote control, and PDF: [Presenting](./present)

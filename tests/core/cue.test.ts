@@ -10,7 +10,7 @@ import {
 import { parseScript } from "../../src/core/parse.ts";
 
 const dict: VoiceDict = {
-  dek: { kana: "デック" },
+  dekc: { kana: "デック" },
   Vite: { kana: "ヴィート", accent: 1 },
   VitePress: { kana: "ヴィートプレス" },
 };
@@ -41,8 +41,8 @@ second paragraph.
   });
 
   test("unwraps emphasis, links, and inline code", () => {
-    expect(spokenParagraphs("Use `dek` and [Vite](https://vite.dev). **Now.**")).toEqual([
-      "Use dek and Vite. Now.",
+    expect(spokenParagraphs("Use `dekc` and [Vite](https://vite.dev). **Now.**")).toEqual([
+      "Use dekc and Vite. Now.",
     ]);
   });
 
@@ -63,7 +63,7 @@ second paragraph.
 
 describe("applyDict", () => {
   test("replaces the longest key first and keeps ASCII word boundaries", () => {
-    expect(applyDict("dek と Vite と VitePress", dict)).toBe(
+    expect(applyDict("dekc と Vite と VitePress", dict)).toBe(
       "デック と ヴィート と ヴィートプレス",
     );
   });
@@ -73,13 +73,13 @@ describe("applyDict", () => {
   });
 
   test("leaves unknown words unchanged", () => {
-    expect(applyDict("HTML と dek", dict)).toBe("HTML と デック");
+    expect(applyDict("HTML と dekc", dict)).toBe("HTML と デック");
   });
 });
 
 describe("unknownAsciiWords", () => {
   test("flags ASCII words of length 2+ that are missing from the dict", () => {
-    expect(unknownAsciiWords("dek と Vite と HTML と a", dict).sort()).toEqual(["HTML"]);
+    expect(unknownAsciiWords("dekc と Vite と HTML と a", dict).sort()).toEqual(["HTML"]);
   });
 
   test("does not flag single letters", () => {
@@ -87,7 +87,7 @@ describe("unknownAsciiWords", () => {
   });
 
   test("is deterministic and case-sensitive against dict keys", () => {
-    expect(unknownAsciiWords("vite dek", dict)).toEqual(["vite"]);
+    expect(unknownAsciiWords("vite dekc", dict)).toEqual(["vite"]);
   });
 
   test("a word that names an Object prototype member is still unknown", () => {
@@ -171,7 +171,7 @@ title: Talk
 
 ## intro
 
-Use \`dek\`.
+Use \`dekc\`.
 `);
     expect(cuesFromDeck(deck, dict)[0]?.paragraphs).toEqual(["Use デック."]);
   });

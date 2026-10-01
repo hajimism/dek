@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
-import { DekError } from "./error.ts";
+import { DekcError } from "./error.ts";
 import { escapeRegExp } from "./escape.ts";
 import { joinLines, sectionChunks, splitLines } from "./lines.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
@@ -14,7 +14,7 @@ export function renameSection(dir: string, from: string, to: string): void;
 export function renameSection(source: ResolvedDeck, from: string, to: string): void;
 export function renameSection(input: string | ResolvedDeck, from: string, to: string): void {
   if (!Id.safeParse(to).success) {
-    throw new DekError(`invalid id "${to}"`, { hint: "use [a-z0-9-] with at least one letter" });
+    throw new DekcError(`invalid id "${to}"`, { hint: "use [a-z0-9-] with at least one letter" });
   }
   const { deck } = asResolvedDeck(input);
   const has = (slug: string): boolean => deck.deck.sections.some((entry) => entry.slug === slug);
@@ -22,9 +22,9 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
     // script.md was edited first; only the files still carry the old id.
     const steps = slideFileSteps(deck, from, to);
     if (steps.length === 0 && !existsSync(deckPaths(deck.dir).slide(to, ".html"))) {
-      throw new DekError(`slide "${from}" not found`, {
+      throw new DekcError(`slide "${from}" not found`, {
         path: deckPaths(deck.dir).slide(from, ".html"),
-        hint: "run `dek lint` to see which slides have no section",
+        hint: "run `dekc lint` to see which slides have no section",
       });
     }
     applySteps(steps);
@@ -32,9 +32,9 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   }
   const section = requireSection(deck, from);
   if (has(to)) {
-    throw new DekError(`section "${to}" already exists`, {
+    throw new DekcError(`section "${to}" already exists`, {
       path: deck.scriptPath,
-      hint: "run `dek ls`",
+      hint: "run `dekc ls`",
     });
   }
 
@@ -43,9 +43,9 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   const headingIndex = section.line - 1;
   const heading = lines[headingIndex];
   if (heading === undefined) {
-    throw new DekError(`section "${from}" heading not found`, {
+    throw new DekcError(`section "${from}" heading not found`, {
       path: deck.scriptPath,
-      hint: "run `dek ls`",
+      hint: "run `dekc ls`",
     });
   }
   lines[headingIndex] = rewriteHeadingId(heading, from, to);
@@ -58,7 +58,7 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
 /**
  * The steps that leave `slides/<to>.*` holding the slide and voice.toml pointing at it, from
  * whichever files the author already moved. Each file is settled on its own: one that is only at
- * `<from>` moves, one already at `<to>` stays, and a skeleton dek wrote gives way to the author's
+ * `<from>` moves, one already at `<to>` stays, and a skeleton dekc wrote gives way to the author's
  * file on the other side, as the dev server writes one for any id the script names. Only two files
  * the author wrote, one under each id, stop the rename; everything that could stop it is worked
  * out before any file changes.
@@ -117,7 +117,7 @@ function slideFileSteps(deck: ResolvedDeck["deck"], from: string, to: string): F
   return steps;
 }
 
-/** A slide's HTML under one id, and whether the author wrote it rather than dek. */
+/** A slide's HTML under one id, and whether the author wrote it rather than dekc. */
 type SlideFile = { path: string; html: string; authored: boolean };
 
 /** A slide's own `data-slug`, pointed at its new id. */
@@ -125,17 +125,17 @@ function relabel(html: string, from: string, to: string): string {
   return html.replaceAll(`data-slug="${from}"`, `data-slug="${to}"`);
 }
 
-function bothHold(fromPath: string, toPath: string, from: string, to: string): DekError {
+function bothHold(fromPath: string, toPath: string, from: string, to: string): DekcError {
   const fromName = `slides/${basename(fromPath)}`;
   const toName = `slides/${basename(toPath)}`;
   const what = fromPath.endsWith(".html") ? "hold a slide you wrote" : "exist";
-  return new DekError(`${fromName} and ${toName} both ${what}`, {
+  return new DekcError(`${fromName} and ${toName} both ${what}`, {
     path: fromPath,
-    hint: `merge them into ${toName} and remove ${fromName}, then run \`dek mv ${from} ${to}\` again`,
+    hint: `merge them into ${toName} and remove ${fromName}, then run \`dekc mv ${from} ${to}\` again`,
   });
 }
 
-/** One file change `dek mv` makes, with how to take it back. */
+/** One file change `dekc mv` makes, with how to take it back. */
 type FileStep = { path: string; apply: () => void; undo: () => void };
 
 function writeStep(path: string, before: string, after: string): FileStep {
@@ -172,7 +172,7 @@ function applySteps(steps: FileStep[]): void {
       }
     }
     if (stuck.length > 0) {
-      throw new DekError(`dek mv failed and could not restore ${stuck.join(", ")}`, {
+      throw new DekcError(`dekc mv failed and could not restore ${stuck.join(", ")}`, {
         cause: error,
         hint: "check these files by hand",
       });
@@ -222,7 +222,7 @@ function planVoiceBeatKeys(
     actual = undefined;
   }
   if (!Bun.deepEquals(actual, expected, true)) {
-    throw new DekError(`cannot rewrite the [beats] keys for "${from}" in voice.toml`, {
+    throw new DekcError(`cannot rewrite the [beats] keys for "${from}" in voice.toml`, {
       path,
       hint: `write them as [beats."${from}/…"] tables or dotted keys, or rename them to "${to}" by hand`,
     });

@@ -11,20 +11,20 @@ export type DeckSpec = {
   styles?: Record<string, string>;
   /** `slides/<slug>.ts`, the slide's motion module. */
   scripts?: Record<string, string>;
-  /** theme.css; the default theme when omitted, as `dek new` leaves it, and `null` for none. */
+  /** theme.css; the default theme when omitted, as `dekc new` leaves it, and `null` for none. */
   theme?: string | null;
   assets?: Record<string, string>;
 };
 
-/** A ref snapshot laid out under `refs/owner/repo/deck`, as `dek ref` leaves it. */
+/** A ref snapshot laid out under `refs/owner/repo/deck`, as `dekc ref` leaves it. */
 export type RefSpec = {
   name: string;
   rev?: string;
   deck?: Omit<DeckSpec, "name">;
-  /** The source project's dek.toml, copied into the snapshot. */
+  /** The source project's dekc.toml, copied into the snapshot. */
   toml?: string;
   license?: string;
-  /** Pin it in the project's dek.toml; defaults to true. */
+  /** Pin it in the project's dekc.toml; defaults to true. */
   declared?: boolean;
   /** Write the snapshot files; defaults to true. */
   fetched?: boolean;
@@ -52,7 +52,7 @@ hello
 }
 
 export async function writeProject(root: string, spec: ProjectSpec = {}): Promise<void> {
-  await writeFile(join(root, "dek.toml"), spec.toml ?? "# test project\n");
+  await writeFile(join(root, "dekc.toml"), spec.toml ?? "# test project\n");
   await writeFile(join(root, ".rumdl.toml"), defaultRumdl());
   await mkdir(join(root, "assets"), { recursive: true });
   await mkdir(join(root, "decks"), { recursive: true });
@@ -71,7 +71,7 @@ async function writeRefs(root: string, spec: ProjectSpec): Promise<void> {
   if (declared.length > 0) {
     const lines = declared.map((ref) => `"${ref.name}" = "${ref.rev ?? REF_SHA}"`);
     await writeFile(
-      join(root, "dek.toml"),
+      join(root, "dekc.toml"),
       `${spec.toml ?? "# test project\n"}\n[refs]\n${lines.join("\n")}\n`,
     );
   }
@@ -82,7 +82,7 @@ async function writeRefs(root: string, spec: ProjectSpec): Promise<void> {
     const [owner = "", repo = "", deck = ""] = ref.name.split("/");
     const dir = join(root, "refs", owner, repo, deck);
     await mkdir(join(dir, "decks"), { recursive: true });
-    await writeFile(join(dir, "dek.toml"), ref.toml ?? "");
+    await writeFile(join(dir, "dekc.toml"), ref.toml ?? "");
     await writeFile(
       join(dir, ".ref.json"),
       `${JSON.stringify({ name: ref.name, rev: ref.rev ?? REF_SHA, path: `decks/${deck}` })}\n`,

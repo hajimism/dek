@@ -7,11 +7,11 @@ import { awaitPiped, workerCommand } from "./spawn.ts";
 export type RumdlRunner = (scriptPath: string) => Promise<string | null>;
 
 export function resolveRumdlBin(): string | undefined {
-  if (process.env.DEK_RUMDL) {
-    return process.env.DEK_RUMDL;
+  if (process.env.DEKC_RUMDL) {
+    return process.env.DEKC_RUMDL;
   }
-  // Beside dek's own install, as `bun add -d rumdl` puts it, never the working directory's: a
-  // repository someone else wrote can commit a node_modules/.bin/rumdl for `dek lint` to run.
+  // Beside dekc's own install, as `bun add -d rumdl` puts it, never the working directory's: a
+  // repository someone else wrote can commit a node_modules/.bin/rumdl for `dekc lint` to run.
   // The PATH as it is now: Bun.which alone searches the one the process started with.
   const onPath = Bun.which("rumdl", { PATH: process.env.PATH ?? "" });
   return onPath ?? resolveBinFromAncestors("rumdl", import.meta.dir);

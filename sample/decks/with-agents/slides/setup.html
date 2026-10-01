@@ -9,32 +9,32 @@
         <li class="not"><span class="x" aria-hidden="true"></span><span class="not-name">エージェントごとの設定</span><span class="pill pill-skip">不要</span></li>
       </ul>
       <div class="stats">
-        <p class="card stat"><span class="num">47</span><span class="unit">行</span><span class="stat-label">dek init が書く AGENTS.md</span></p>
-        <p class="card stat"><span class="num">36</span><span class="unit">行</span><span class="stat-label">dek help --agent の全文</span></p>
+        <p class="card stat"><span class="num">47</span><span class="unit">行</span><span class="stat-label">dekc init が書く AGENTS.md</span></p>
+        <p class="card stat"><span class="num">36</span><span class="unit">行</span><span class="stat-label">dekc help --agent の全文</span></p>
       </div>
       <p class="agents"><span class="pill">Claude Code</span><span class="pill">Codex</span><span class="pill">OpenCode</span><span class="pill">shell があれば何でも</span></p>
     </div>
     <figure class="window">
-      <div class="window-bar"><p class="window-title">AGENTS.md</p><span class="pill">dek init</span></div>
-<pre class="code"><span class="tok-p">&lt;!-- dek:begin (dek rewrites this block; write your own notes outside it) --&gt;</span>
-<span class="tok-k"># dek</span>
+      <div class="window-bar"><p class="window-title">AGENTS.md</p><span class="pill">dekc init</span></div>
+<pre class="code"><span class="tok-p">&lt;!-- dekc:begin (dekc rewrites this block; write your own notes outside it) --&gt;</span>
+<span class="tok-k"># dekc</span>
 
-A build system for talks. Write what you will say; dek builds, measures, and ships the rest.
+A build system for talks. Write what you will say; dekc builds, measures, and ships the rest.
 
 <span class="tok-k">## Principles</span>
 
 - `script.md` is the source of truth for order, script, and timing.
 - Each slide is a `&lt;section class="slide"&gt;` fragment.
 - Conventions are enforced by lint. A deck is not done while
-  `dek lint --visual` fails. Passing it means nothing measurable
+  `dekc lint --visual` fails. Passing it means nothing measurable
   is wrong, not that the deck is good.
 
 <span class="tok-k">## Conventions</span>
 
 - One `##` heading is one slide. HTML lives in `slides/&lt;id&gt;.html`.
 <span class="tok-p">…</span>
-For commands, run `dek help --agent`.
-<span class="tok-p">&lt;!-- dek:end --&gt;</span></pre>
+For commands, run `dekc help --agent`.
+<span class="tok-p">&lt;!-- dekc:end --&gt;</span></pre>
     </figure>
   </div>
   <p class="meta"><span>スライドを、エージェントに任せる</span></p>

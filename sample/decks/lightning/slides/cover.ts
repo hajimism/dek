@@ -1,4 +1,4 @@
-// The prompt types `dek`, then the title types itself; the lede powers on after it.
+// The prompt types `dekc`, then the title types itself; the lede powers on after it.
 const CHAR_MS = 70;
 const START_MS = 500;
 const RISE_MS = 600;
@@ -28,4 +28,4 @@ export default {
       el.style.opacity = String(p);
     });
   },
-} satisfies DekSlide;
+} satisfies DekcSlide;

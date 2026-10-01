@@ -11,7 +11,7 @@ const codes = {
 } as const;
 
 /**
- * Text for a terminal: dek's own colors, newlines, and tabs pass, and every other control
+ * Text for a terminal: dekc's own colors, newlines, and tabs pass, and every other control
  * character shows as U+FFFD. A deck title, a file name, or a ref's title fetched from GitHub
  * could otherwise set the window title, draw a fake link (OSC 8), or clear the screen.
  */

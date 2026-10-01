@@ -13,7 +13,7 @@ import {
 import { repoRoot } from "../helpers/paths.ts";
 
 const diagnostic = {
-  id: "DEK011",
+  id: "DEKC011",
   severity: "error",
   message: "slide contains an onclick attribute",
   path: "slides/intro.html",
@@ -47,13 +47,13 @@ describe("the --json contract", () => {
         ok: false,
         error: { message: "lint found 1 error", hint: "fix each error in diagnostics" },
         diagnostics: [diagnostic],
-        skipped: [{ check: "visual", reason: "not measured", hint: "run `dek lint --visual`" }],
+        skipped: [{ check: "visual", reason: "not measured", hint: "run `dekc lint --visual`" }],
       }),
     ).toEqual([]);
     expect(
       contractIssues(lint, {
         ok: false,
-        error: { message: 'deck "nope" not found', path: "decks/nope", hint: "run `dek ls`" },
+        error: { message: 'deck "nope" not found', path: "decks/nope", hint: "run `dekc ls`" },
       }),
     ).toEqual([]);
   });
@@ -71,7 +71,7 @@ describe("the --json contract", () => {
     const say = printedBy(["voice", "say", "こんにちは", "--json"]);
     expect(contractIssues(say, { ok: true, action: "say", text: "x", path: "/a.wav" })).toEqual([]);
     const help = printedBy(["help", "lint", "--json"]);
-    expect(contractIssues(help, { ok: true, help: "dek lint …" })).toEqual([]);
+    expect(contractIssues(help, { ok: true, help: "dekc lint …" })).toEqual([]);
     expect(
       contractIssues(printedBy(["--version", "--json"]), { ok: true, version: "0.0.0" }),
     ).toEqual([]);

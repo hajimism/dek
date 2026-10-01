@@ -1,4 +1,4 @@
-import { DekError } from "./error.ts";
+import { DekcError } from "./error.ts";
 import { splitLines } from "./lines.ts";
 import { type Beat, Deck, Frontmatter, Id, inferLang, type Section } from "./schema.ts";
 import { scriptLines } from "./script-lines.ts";
@@ -16,7 +16,7 @@ export type ScriptProblem = { message: string; line?: number; hint?: string };
  * A script.md that cannot be read, with every problem that stops it, so one run reports them all.
  * The first is the error's own message, line, and hint, for a command that stops on it.
  */
-export class ScriptError extends DekError {
+export class ScriptError extends DekcError {
   readonly problems: ScriptProblem[];
 
   constructor(problems: [ScriptProblem, ...ScriptProblem[]], path: string | undefined) {
@@ -55,12 +55,12 @@ export function parseScript(source: string, filename?: string): Deck {
   throw new ScriptError([first, ...rest], filename);
 }
 
-/** `read`'s value, or undefined with its DekError kept as a problem. */
+/** `read`'s value, or undefined with its DekcError kept as a problem. */
 function collect<T>(problems: ScriptProblem[], read: () => T): T | undefined {
   try {
     return read();
   } catch (error) {
-    if (!(error instanceof DekError)) {
+    if (!(error instanceof DekcError)) {
       throw error;
     }
     problems.push({
@@ -78,7 +78,7 @@ export type ScriptParts = { yaml: string; body: string; bodyStartLine: number };
 export function splitFrontmatter(source: string, filename?: string): ScriptParts {
   const lines = splitLines(source);
   if (lines[0]?.trim() !== "---") {
-    throw new DekError("script.md must start with YAML frontmatter", {
+    throw new DekcError("script.md must start with YAML frontmatter", {
       line: 1,
       path: filename,
       hint: "start it with three lines: ---, title: Your talk, ---",
@@ -95,7 +95,7 @@ export function splitFrontmatter(source: string, filename?: string): ScriptParts
     }
   }
 
-  throw new DekError("YAML frontmatter is not closed", { line: 1, path: filename });
+  throw new DekcError("YAML frontmatter is not closed", { line: 1, path: filename });
 }
 
 /** The frontmatter's YAML as a value, before the schema reads it; a syntax error throws. */
@@ -108,7 +108,7 @@ function parseFrontmatter(yaml: string, filename?: string): Frontmatter {
   try {
     parsed = readFrontmatterYaml(yaml);
   } catch (error) {
-    throw new DekError(`invalid YAML frontmatter: ${parseFailure(error)}`, {
+    throw new DekcError(`invalid YAML frontmatter: ${parseFailure(error)}`, {
       path: filename,
       cause: error,
       hint: configHint("frontmatter"),
@@ -117,7 +117,7 @@ function parseFrontmatter(yaml: string, filename?: string): Frontmatter {
 
   const result = Frontmatter.safeParse(parsed);
   if (!result.success) {
-    throw new DekError(formatZodIssues(result.error), {
+    throw new DekcError(formatZodIssues(result.error), {
       path: filename,
       hint: configHint("frontmatter"),
     });
@@ -269,7 +269,7 @@ function parseHeading(
     const idMatch = attrs.match(ID_ATTR_RE);
     const id = idMatch?.[1];
     if (!id || !Id.safeParse(id).success) {
-      throw new DekError("heading attribute must be {#id}", {
+      throw new DekcError("heading attribute must be {#id}", {
         line,
         hint: headingIdHint(options.hashes, title, attrs.trim().match(/^#(.+)$/)?.[1]),
       });
@@ -282,7 +282,7 @@ function parseHeading(
     return { title, id: title };
   }
   if (options.idRequired) {
-    throw new DekError("heading requires {#id}", {
+    throw new DekcError("heading requires {#id}", {
       line,
       hint: headingIdHint(options.hashes, title),
     });

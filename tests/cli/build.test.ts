@@ -9,7 +9,7 @@ import { parseCommandLine } from "../../src/cli/flags.ts";
 import { formatText } from "../../src/cli/result.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
 import { PLAYWRIGHT_INSTALL, type VisualRequest } from "../../src/core/playwright.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { writeRequested } from "../helpers/visual.ts";
@@ -40,18 +40,18 @@ describe("buildCommand and lint", () => {
       async (root) => {
         const result = await buildCommand(resolveDecks(join(root, "decks", "demo")));
         expect(result.outs).toEqual([join(root, "decks", "demo", "dist", "demo.html")]);
-        expect(result.diagnostics.map((d) => d.id)).toEqual(["DEK010"]);
+        expect(result.diagnostics.map((d) => d.id)).toEqual(["DEKC010"]);
         expect(formatText({ command: "build", data: result })).toBe(
           [
             `wrote ${join(root, "decks", "demo", "dist", "demo.html")}`,
-            "lint: 1 error from dek's rules; run `dek lint` to see it",
+            "lint: 1 error from dekc's rules; run `dekc lint` to see it",
           ].join("\n"),
         );
       },
     );
   });
 
-  test("reports a dek.toml finding once, however many decks it builds", async () => {
+  test("reports a dekc.toml finding once, however many decks it builds", async () => {
     await withTempProject(
       {
         toml: "bogus = 1\n",
@@ -63,7 +63,7 @@ describe("buildCommand and lint", () => {
       async (root) => {
         const result = await buildCommand(resolveDecks(root));
         expect(result.diagnostics.map((d) => [d.id, d.path])).toEqual([
-          ["DEK008", join(root, "dek.toml")],
+          ["DEKC008", join(root, "dekc.toml")],
         ]);
       },
     );
@@ -96,7 +96,7 @@ describe("buildCommand and a slide script that cannot run", () => {
         );
         const result = await buildCommand(resolveDecks(deckDir));
         expect(result.outs).toEqual([join(deckDir, "dist", "demo.html")]);
-        expect(result.diagnostics.map((d) => d.id)).toContain("DEK016");
+        expect(result.diagnostics.map((d) => d.id)).toContain("DEKC016");
         // Built without the script: nothing registers a module for the slide.
         expect(await Bun.file(join(deckDir, "dist", "demo.html")).text()).not.toContain(
           '{})["intro"] = (',
@@ -145,7 +145,7 @@ describe("buildCommand link preview", () => {
           {
             check: "preview",
             reason: "url is not set",
-            hint: "set url in dek.toml, or pass --url, to the URL dist/ is served from",
+            hint: "set url in dekc.toml, or pass --url, to the URL dist/ is served from",
           },
         ]);
         // The result on stdout stays the result; why an image is missing goes to stderr.
@@ -154,7 +154,7 @@ describe("buildCommand link preview", () => {
     );
   });
 
-  // A build reports what dek's rules say, and those leave the rendering unmeasured: it says so,
+  // A build reports what dekc's rules say, and those leave the rendering unmeasured: it says so,
   // as lint does, so a clean build is not read as a measured one.
   test("says the rendering was not measured", async () => {
     await withTempProject(
@@ -165,8 +165,8 @@ describe("buildCommand link preview", () => {
         });
         expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
           check: "visual",
-          reason: "overflow and contrast are measured only by `dek lint --visual`",
-          hint: "run `dek lint --visual` to measure overflow and contrast",
+          reason: "overflow and contrast are measured only by `dekc lint --visual`",
+          hint: "run `dekc lint --visual` to measure overflow and contrast",
         });
       },
     );
@@ -201,7 +201,7 @@ describe("buildCommand link preview", () => {
   });
 });
 
-describe("dek build", () => {
+describe("dekc build", () => {
   test("writes project dist/<deck>.html with --root-dist", async () => {
     await withTempProject(
       {
@@ -214,7 +214,7 @@ describe("dek build", () => {
         ],
       },
       async (root) => {
-        const result = await runDek(["build", "--json", "--root-dist"], {
+        const result = await runDekc(["build", "--json", "--root-dist"], {
           cwd: join(root, "decks", "demo"),
         });
         expect(result).toMatchObject({ exitCode: 0 });
@@ -304,7 +304,7 @@ describe("buildCommand", () => {
     );
   });
 
-  test("builds a section with no slide HTML and reports DEK001", async () => {
+  test("builds a section with no slide HTML and reports DEKC001", async () => {
     await withTempProject(
       {
         decks: [
@@ -331,9 +331,9 @@ more
         expect(existsSync(result.outs[0] ?? "")).toBe(true);
         expect(result.diagnostics).toContainEqual(
           expect.objectContaining({
-            id: "DEK001",
+            id: "DEKC001",
             slug: "extra",
-            hint: expect.stringContaining("dek sync"),
+            hint: expect.stringContaining("dekc sync"),
           }),
         );
       },
@@ -341,7 +341,7 @@ more
   });
 });
 
-describe("dek build --public", () => {
+describe("dekc build --public", () => {
   const directedScript = `---
 title: Demo
 ---

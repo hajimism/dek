@@ -9,7 +9,7 @@ import {
 export type ThemeLayout = { name: string; example?: string };
 
 /**
- * What a theme offers a slide, read once: AGENTS.md, `dek theme`, and lint all say the same
+ * What a theme offers a slide, read once: AGENTS.md, `dekc theme`, and lint all say the same
  * thing about it because they all read it here.
  */
 export type ThemeFacts = {

@@ -8,9 +8,9 @@ import { type ProjectSpec, withTempProject } from "../helpers/project.ts";
 
 // Criterion 4: a command in a hint succeeds when run, as written, in the state that produced it.
 // Each state below is one an agent reaches in ordinary work. From inside the deck and from the
-// project root, every `dek ...` a diagnostic's hint names is run on a fresh copy of that state:
+// project root, every `dekc ...` a diagnostic's hint names is run on a fresh copy of that state:
 // it must answer with a result, and a hint that is only a command that changes files, such as
-// `run \`dek mv a b\``, must clear the finding that named it.
+// `run \`dekc mv a b\``, must clear the finding that named it.
 
 type Diagnostic = { id: string; slug?: string; hint?: string };
 /** What `--json` prints: a result, or an error. A lint that finds errors is still a result. */
@@ -109,7 +109,7 @@ function runsHere(argv: string[]): boolean {
 }
 
 function commandsOf(hint: string | undefined): string[][] {
-  return [...(hint ?? "").matchAll(/`dek ([^`]+)`/g)].map((match) => (match[1] ?? "").split(" "));
+  return [...(hint ?? "").matchAll(/`dekc ([^`]+)`/g)].map((match) => (match[1] ?? "").split(" "));
 }
 
 const CHANGES_FILES = new Set(["sync", "mv"]);
@@ -149,7 +149,7 @@ describe("every command a hint names runs as written", () => {
               ran: true,
             });
             // A hint that opens with the command is the whole fix; "do X, then run" is a step.
-            if (CHANGES_FILES.has(argv[0] ?? "") && diagnostic.hint?.startsWith("run `dek ")) {
+            if (CHANGES_FILES.has(argv[0] ?? "") && diagnostic.hint?.startsWith("run `dekc ")) {
               const after = await lint(cwd);
               expect({ argv, left: after.filter((d) => sameFinding(d, diagnostic)) }).toEqual({
                 argv,

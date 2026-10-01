@@ -26,7 +26,7 @@ export async function serveCommand(options: {
 
 type SessionView = { banner: string; pairPath: string };
 
-/** What `dek dev` prints once up, and which presenter view a phone pairs into. */
+/** What `dekc dev` prints once up, and which presenter view a phone pairs into. */
 export function devSessionView(
   server: Pick<DevServer, "url" | "remoteUrls" | "deckDir" | "decks">,
   password: string | undefined,

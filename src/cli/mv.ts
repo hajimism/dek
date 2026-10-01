@@ -21,7 +21,7 @@ export function mvCommand(
   const place = before ? { before } : after ? { after } : undefined;
   if (place) {
     if (to !== undefined) {
-      throw usageError("mv", `unexpected argument "${to}" for dek mv --before|--after`, {
+      throw usageError("mv", `unexpected argument "${to}" for dekc mv --before|--after`, {
         match: "--before",
       });
     }
@@ -30,7 +30,7 @@ export function mvCommand(
   }
 
   if (to === undefined) {
-    throw usageError("mv", "missing <new> for dek mv", { match: "<new>" });
+    throw usageError("mv", "missing <new> for dekc mv", { match: "<new>" });
   }
   renameSection({ project, deck }, slug, to);
   return { from: slug, to };

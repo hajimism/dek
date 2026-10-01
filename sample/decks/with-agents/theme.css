@@ -85,7 +85,7 @@
   word-break: auto-phrase;
   -webkit-font-smoothing: antialiased;
   /* The slide's place in script.md, so the badge and the folio follow the script as slides move. */
-  counter-reset: folio var(--dek-slide-number) folios var(--dek-slide-count);
+  counter-reset: folio var(--dekc-slide-number) folios var(--dekc-slide-count);
 }
 
 .slide *,
@@ -449,13 +449,13 @@
 /* @layout title
 <section class="slide" data-layout="title">
   <div class="col">
-    <p class="kicker"><span class="badge"></span>dek sample</p>
+    <p class="kicker"><span class="badge"></span>dekc sample</p>
     <h2 class="slide-title">The talk in one line</h2>
     <p class="lede">One sentence on what the audience leaves with.</p>
   </div>
   <figure class="window">
     <div class="window-bar"><p class="window-title">agent session</p></div>
-    <pre class="code">$ dek lint</pre>
+    <pre class="code">$ dekc lint</pre>
   </figure>
 </section>
 */
@@ -502,7 +502,7 @@
   </div>
   <figure class="window" data-step="1">
     <div class="window-bar"><p class="window-title">terminal</p></div>
-    <pre class="code">$ dek check intro --json</pre>
+    <pre class="code">$ dekc check intro --json</pre>
   </figure>
 </section>
 */

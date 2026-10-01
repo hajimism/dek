@@ -1,4 +1,4 @@
-// The dek show panel slides in as its beat begins, then the used-rules bar fills.
+// The dekc show panel slides in as its beat begins, then the used-rules bar fills.
 const SHOW_MS = 600;
 const FILL_MS = 900;
 
@@ -20,4 +20,4 @@ export default {
       fill.style.width = `${pct * ease((t - SHOW_MS) / FILL_MS)}%`;
     }
   },
-} satisfies DekSlide;
+} satisfies DekcSlide;

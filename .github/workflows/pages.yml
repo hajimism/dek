@@ -26,7 +26,7 @@ jobs:
         with:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
-      # `dek build` shoots each sample's first slide for its link preview image.
+      # `dekc build` shoots each sample's first slide for its link preview image.
       - name: Install Chromium
         run: bunx playwright install --with-deps chromium
       # The sample themes ask for Hiragino, which Linux lacks; Noto CJK is the closest fallback.

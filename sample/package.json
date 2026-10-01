@@ -1,22 +1,22 @@
 {
-  "name": "dek-sample",
+  "name": "dekc-sample",
   "private": true,
   "type": "module",
   "scripts": {
     "setup": "playwright install chromium",
-    "dev": "dek",
-    "build": "dek build",
-    "lint": "dek lint",
-    "lint:visual": "dek lint --visual",
-    "shot": "dek shot",
-    "pdf": "dek pdf",
-    "cues": "dek cues",
-    "voice": "dek voice",
-    "rehearse": "dek rehearse",
-    "video": "dek video"
+    "dev": "dekc",
+    "build": "dekc build",
+    "lint": "dekc lint",
+    "lint:visual": "dekc lint --visual",
+    "shot": "dekc shot",
+    "pdf": "dekc pdf",
+    "cues": "dekc cues",
+    "voice": "dekc voice",
+    "rehearse": "dekc rehearse",
+    "video": "dekc video"
   },
   "devDependencies": {
-    "@hajimism/dek": "file:..",
+    "dekc": "file:..",
     "playwright": "^1.63.0",
     "rumdl": "^0.2.73"
   }

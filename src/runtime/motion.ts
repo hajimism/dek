@@ -8,9 +8,9 @@ import { stepKey } from "../core/step.ts";
 
 export { drawAtEnd } from "../core/slide-draw.ts";
 
-// The shapes live in slide.d.ts, which `dek sync` also hands to deck authors.
-export type MotionFrame = DekMotionFrame;
-export type SlideModule = DekSlide;
+// The shapes live in slide.d.ts, which `dekc sync` also hands to deck authors.
+export type MotionFrame = DekcMotionFrame;
+export type SlideModule = DekcSlide;
 
 /** animate: run t from 0 to the motion. final: jump to the end. hold: t=0, then `seek`. */
 export type MotionMode = "animate" | "final" | "hold";

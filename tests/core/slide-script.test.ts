@@ -43,9 +43,9 @@ async function compiled(scripts: Record<string, string>): Promise<string> {
 }
 
 function run(snippet: string): Registry {
-  const scope = {} as { __dekSlides?: Registry };
+  const scope = {} as { __dekcSlides?: Registry };
   new Function("window", snippet)(scope);
-  return scope.__dekSlides ?? {};
+  return scope.__dekcSlides ?? {};
 }
 
 describe("slideScriptProblems", () => {
@@ -271,7 +271,7 @@ describe("readSlideScripts", () => {
       await Bun.write(`${deckDir}/slides/intro.ts`, 'import x from "x";\nexport default {};');
       expect(readSlideScripts(deckDir)).toEqual([]);
       expect(() => readSlideScripts(deckDir, { strict: true })).toThrow(
-        expect.objectContaining({ name: "DekError", path: `${deckDir}/slides/intro.ts` }),
+        expect.objectContaining({ name: "DekcError", path: `${deckDir}/slides/intro.ts` }),
       );
     });
   });
@@ -300,7 +300,7 @@ describe("TypeScript slide scripts", () => {
       const deckDir = `${root}/decks/demo`;
       await Bun.write(
         `${deckDir}/slides/intro.ts`,
-        'import type { Foo } from "./foo";\nconst ms: number = 300;\nexport default { motion: { 1: ms } } satisfies DekSlide;',
+        'import type { Foo } from "./foo";\nconst ms: number = 300;\nexport default { motion: { 1: ms } } satisfies DekcSlide;',
       );
       const scripts = readSlideScripts(deckDir, { strict: true });
       expect(scripts.map((script) => script.slug)).toEqual(["intro"]);
@@ -313,18 +313,18 @@ describe("TypeScript slide scripts", () => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "chart.d.ts"), "export {};");
       expect(readSlideScripts(deckDir, { strict: true })).toEqual([]);
-      expect(lintDeck(deckDir).filter((d) => d.id === "DEK002" || d.id === "DEK016")).toEqual([]);
+      expect(lintDeck(deckDir).filter((d) => d.id === "DEKC002" || d.id === "DEKC016")).toEqual([]);
     });
   });
 
-  test("DEK016: a .js file in slides/ is named, since slide scripts are .ts", async () => {
+  test("DEKC016: a .js file in slides/ is named, since slide scripts are .ts", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "chart.js"), "export default {};");
-      const found = lintDeck(deckDir).filter((d) => d.id === "DEK016" || d.id === "DEK002");
+      const found = lintDeck(deckDir).filter((d) => d.id === "DEKC016" || d.id === "DEKC002");
       expect(found.map((d) => [d.id, d.message, d.path])).toEqual([
         [
-          "DEK016",
+          "DEKC016",
           "slide scripts are TypeScript; rename chart.js to chart.ts",
           join(deckDir, "slides", "chart.js"),
         ],
@@ -333,14 +333,14 @@ describe("TypeScript slide scripts", () => {
     });
   });
 
-  test("DEK016: lint checks a .ts script's motion against the slide's beats", async () => {
+  test("DEKC016: lint checks a .ts script's motion against the slide's beats", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(
         join(deckDir, "slides", "chart.ts"),
-        "export default { motion: { grow: 900 as number } } satisfies DekSlide;",
+        "export default { motion: { grow: 900 as number } } satisfies DekcSlide;",
       );
-      const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
+      const found = lintDeck(deckDir).filter((d) => d.id === "DEKC016");
       expect(found.map((d) => d.message)).toEqual([
         'motion key "grow" is not a beat of this slide',
       ]);
@@ -354,7 +354,7 @@ describe("TypeScript slide scripts", () => {
       const linting = lintDeckAsync(join(root, "decks", "demo"));
       // A second read of the file would evaluate this one, on the event loop.
       writeFileSync(path, `${uniqueStatement()}\nwhile (true) {}\nexport default {};`);
-      const found = (await linting).filter((d) => d.id === "DEK016");
+      const found = (await linting).filter((d) => d.id === "DEKC016");
       expect(found.map((d) => d.message)).toEqual([
         'motion key "grow" is not a beat of this slide',
       ]);
@@ -375,7 +375,7 @@ describe("TypeScript slide scripts", () => {
       }, 20);
       const linting = lintDeckAsync(deckDir);
       expect(ticked).toBe(false);
-      const found = (await linting).filter((d) => d.id === "DEK016");
+      const found = (await linting).filter((d) => d.id === "DEKC016");
       clearTimeout(timer);
       expect(ticked).toBe(true);
       expect(found.map((d) => d.message)).toEqual([
@@ -384,7 +384,7 @@ describe("TypeScript slide scripts", () => {
     });
   });
 
-  test("dek mv moves a .ts script with its HTML", async () => {
+  test("dekc mv moves a .ts script with its HTML", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "chart.ts"), "export default {};");
@@ -401,7 +401,7 @@ describe("slideScriptTags", () => {
       { slug: "two", path: "two.ts", code: "window.ok = 1;" },
     ]);
     expect(tags).toBe(
-      '<script data-dek-slides="one">throw new Error(\'boom\');</script><script data-dek-slides="two">window.ok = 1;</script>',
+      '<script data-dekc-slides="one">throw new Error(\'boom\');</script><script data-dekc-slides="two">window.ok = 1;</script>',
     );
   });
 });
@@ -445,9 +445,9 @@ describe("still pages run slide scripts", () => {
       await Bun.write(join(deckDir, "slides", "chart.ts"), "export default { draw() {} };");
       const { deck } = resolveDeck(deckDir);
       const html = renderSlideHtml(loadSlideSources(deck), "chart", 2);
-      expect(html).toContain('data-dek-beat="2"');
-      expect(html).toContain('data-dek-step="growth"');
-      expect(html).toContain('__dekSlides ||= {})["chart"]');
+      expect(html).toContain('data-dekc-beat="2"');
+      expect(html).toContain('data-dekc-step="growth"');
+      expect(html).toContain('__dekcSlides ||= {})["chart"]');
       expect(html).toContain(stillDrawScript());
     });
   });
@@ -457,7 +457,7 @@ describe("still pages run slide scripts", () => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "chart.ts"), "export default { draw() {} };");
       const html = renderPdfHtml(resolveDeck(deckDir).deck);
-      expect(html).toContain('data-dek-beat="2" data-dek-step="growth"');
+      expect(html).toContain('data-dekc-beat="2" data-dekc-step="growth"');
       expect(html).toContain(stillDrawScript());
     });
   });
@@ -472,7 +472,7 @@ describe("still pages run slide scripts", () => {
       );
       const { deck } = resolveDeck(deckDir);
       const html = renderSlideHtml(loadSlideSources(deck), "chart", 1);
-      expect(html).toContain('data-dek-slides="chart"');
+      expect(html).toContain('data-dekc-slides="chart"');
       expect(html).not.toContain('"intro"');
     });
   });
@@ -503,8 +503,8 @@ describe("still pages run slide scripts", () => {
         'invalid slide script "chart"',
       );
       const html = renderSlideHtml(loadSlideSources(deck, { strict: false }), "chart", 2);
-      expect(html).not.toContain("data-dek-slides");
-      expect(html).toContain('data-dek-step="growth"');
+      expect(html).not.toContain("data-dekc-slides");
+      expect(html).toContain('data-dekc-step="growth"');
     });
   });
 
@@ -515,7 +515,7 @@ describe("still pages run slide scripts", () => {
         renderSlideHtml(loadSlideSources(deck), "chart", 1),
         renderPdfHtml(deck),
       ]) {
-        expect(html).not.toContain("data-dek-slides");
+        expect(html).not.toContain("data-dekc-slides");
         expect(html).toContain(stillDrawScript());
       }
     });
@@ -523,14 +523,14 @@ describe("still pages run slide scripts", () => {
 });
 
 describe("slide script lint and mv", () => {
-  test("DEK017: a clock or a class lookup in a slide script is an error on its line", async () => {
+  test("DEKC017: a clock or a class lookup in a slide script is an error on its line", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(
         join(deckDir, "slides", "chart.ts"),
         'export default {\n  draw(slide) {\n    setTimeout(() => {}, 1);\n    slide.querySelector(".bar");\n  },\n};\n',
       );
-      const found = lintDeck(deckDir).filter((d) => d.id === "DEK017");
+      const found = lintDeck(deckDir).filter((d) => d.id === "DEKC017");
       expect(found.map((d) => [d.line, d.slug, d.path])).toEqual([
         [3, "chart", join(deckDir, "slides", "chart.ts")],
         [4, "chart", join(deckDir, "slides", "chart.ts")],
@@ -539,14 +539,14 @@ describe("slide script lint and mv", () => {
     });
   });
 
-  test("DEK016: a slide script that cannot run is reported against its file", async () => {
+  test("DEKC016: a slide script that cannot run is reported against its file", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(
         join(deckDir, "slides", "chart.ts"),
         'import x from "x";\nexport default {};',
       );
-      const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
+      const found = lintDeck(deckDir).filter((d) => d.id === "DEKC016");
       expect(found).toHaveLength(1);
       expect(found[0]?.path).toBe(join(deckDir, "slides", "chart.ts"));
       expect(found[0]?.message).toContain("imports are not supported");
@@ -554,7 +554,7 @@ describe("slide script lint and mv", () => {
   });
 
   // Each problem says where it is and what to do: the line when the source has one, and a hint.
-  test("DEK016: gives each problem its line and a hint", async () => {
+  test("DEKC016: gives each problem its line and a hint", async () => {
     const cases: Array<[string, { message: string; line?: number; hint: string }]> = [
       [
         "export default {\n  draw(slide) {\n    const x = ;\n  },\n};",
@@ -577,7 +577,7 @@ describe("slide script lint and mv", () => {
         {
           message: "imports are not supported; keep the slide script self-contained",
           line: 2,
-          hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
+          hint: "remove the import and write what it gave in this file; DekcSlide is global, from .dekc/slide.d.ts",
         },
       ],
       [
@@ -592,7 +592,7 @@ describe("slide script lint and mv", () => {
         "const x = 1;",
         {
           message: "missing export default",
-          hint: "end the script with export default { draw(slide, { t }) {} } satisfies DekSlide",
+          hint: "end the script with export default { draw(slide, { t }) {} } satisfies DekcSlide",
         },
       ],
       [
@@ -608,7 +608,7 @@ describe("slide script lint and mv", () => {
       const deckDir = join(root, "decks", "demo");
       for (const [code, expected] of cases) {
         await Bun.write(join(deckDir, "slides", "chart.ts"), `${code}\n// ${uniqueStatement()}`);
-        const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
+        const found = lintDeck(deckDir).filter((d) => d.id === "DEKC016");
         expect(found.map(({ message, line, hint }) => ({ message, line, hint }))).toEqual([
           { line: undefined, ...expected },
         ]);
@@ -616,30 +616,30 @@ describe("slide script lint and mv", () => {
     });
   });
 
-  test("DEK016: a motion key is checked against the slide's own beats", async () => {
+  test("DEKC016: a motion key is checked against the slide's own beats", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(
         join(deckDir, "slides", "chart.ts"),
         "export default { motion: { growht: 900 }, draw() {} };",
       );
-      const found = lintDeck(deckDir).filter((d) => d.id === "DEK016");
+      const found = lintDeck(deckDir).filter((d) => d.id === "DEKC016");
       expect(found.map((d) => d.message)).toEqual([
         'motion key "growht" is not a beat of this slide',
       ]);
     });
   });
 
-  test("DEK002: a slide script with no section is reported", async () => {
+  test("DEKC002: a slide script with no section is reported", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "gone.ts"), "export default {};");
-      const found = lintDeck(deckDir).filter((d) => d.id === "DEK002");
+      const found = lintDeck(deckDir).filter((d) => d.id === "DEKC002");
       expect(found.map((d) => d.path)).toEqual([join(deckDir, "slides", "gone.ts")]);
     });
   });
 
-  test("dek mv moves the slide's script with its HTML", async () => {
+  test("dekc mv moves the slide's script with its HTML", async () => {
     await withTempProject(chartDeck, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await Bun.write(join(deckDir, "slides", "chart.ts"), "export default {};");

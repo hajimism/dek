@@ -105,7 +105,7 @@
 
 /* The folio, from the slide's place in script.md: "# 03" before the heading. */
 .slide {
-  counter-reset: folio var(--dek-slide-number);
+  counter-reset: folio var(--dekc-slide-number);
 }
 
 .slide .slide-title::before {
@@ -285,7 +285,7 @@
 }
 
 /* The HUD: the talk's clock, carried across every slide. The fill is this slide's
-   start as a share of the three-minute budget, from `dek ls lightning --json`. */
+   start as a share of the three-minute budget, from `dekc ls lightning --json`. */
 .slide .hud {
   position: absolute;
   left: var(--pad-x);
@@ -329,7 +329,7 @@
 <section class="slide" data-layout="boot">
   <p class="line"><span class="prompt">~</span><span class="cursor"></span></p>
   <h1 class="display">三分で、発表をひとつ作る</h1>
-  <p class="lede">dek sample · 3:00</p>
+  <p class="lede">dekc sample · 3:00</p>
 </section>
 */
 .slide[data-layout="boot"] {
@@ -359,7 +359,7 @@
   <h2 class="slide-title">プロジェクトを作る</h2>
   <figure class="window" data-morph="window">
     <figcaption class="chrome">zsh — ~/</figcaption>
-    <div class="screen"><span class="line"><span class="prompt">~</span>bunx dek ls</span></div>
+    <div class="screen"><span class="line"><span class="prompt">~</span>bunx dekc ls</span></div>
   </figure>
 </section>
 */

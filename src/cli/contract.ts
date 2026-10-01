@@ -24,7 +24,7 @@ const DiagnosticValue: z.ZodType<DiagnosticValueType> = z
 
 const Diagnostic = z
   .strictObject({
-    id: z.string().describe("DEKnnn for dek's own rules; another tool's id for its findings."),
+    id: z.string().describe("DEKCnnn for dekc's own rules; another tool's id for its findings."),
     severity: z.enum(["error", "warning"]).describe("Only an error fails lint and check."),
     message: z.string(),
     path: z.string().optional(),
@@ -55,7 +55,7 @@ const Failure = z
     message: z.string(),
     path: z.string().optional(),
     line: z.number().int().optional(),
-    hint: z.string().optional().describe("The next step, whenever dek knows it."),
+    hint: z.string().optional().describe("The next step, whenever dekc knows it."),
   })
   .meta({ id: "Error" });
 
@@ -99,7 +99,7 @@ export const RESULT_FIELDS = {
   init: z.strictObject({
     root: z.string(),
     created: paths,
-    updated: paths.describe("dek's own files, already there, brought up to date."),
+    updated: paths.describe("dekc's own files, already there, brought up to date."),
     kept: paths.describe("Files already there that differ from what init would write."),
     next: z.array(z.string()).describe("The commands to run next."),
     playwright: z.string().optional().describe("How to install Playwright, when it is missing."),
@@ -388,7 +388,7 @@ function envelopes(): Record<string, z.ZodType> {
 }
 
 /**
- * The schema of what `dek <argv>` prints with `--json`, read from the line as `main` reads it: a
+ * The schema of what `dekc <argv>` prints with `--json`, read from the line as `main` reads it: a
  * result command's envelope, help's or the version's, and for anything else, such as the dev
  * server, which takes no `--json`, only the failure that says so.
  */
@@ -421,7 +421,7 @@ export function contractIssues(schema: z.ZodType, value: unknown): string[] {
 
 /** Where the generated JSON Schema is kept, and the address the docs site serves it at. */
 export const CLI_SCHEMA_PATH = "docs/public/cli.schema.json";
-export const CLI_SCHEMA_URL = "https://hajimism.github.io/dek/cli.schema.json";
+export const CLI_SCHEMA_URL = "https://hajimism.github.io/dekc/cli.schema.json";
 
 /**
  * The contract as a JSON Schema 2020-12 document: each command's envelope under `$defs`, by name,
@@ -436,9 +436,9 @@ export function cliJsonSchema(): object {
   return {
     $schema: "https://json-schema.org/draft/2020-12/schema",
     $id: CLI_SCHEMA_URL,
-    title: "dek --json",
+    title: "dekc --json",
     description:
-      "What each dek command prints with --json, one JSON object per line. $defs holds one schema per command, and `failure` for a command line that could not run. While dek is 0.x the shape may change between releases.",
+      "What each dekc command prints with --json, one JSON object per line. $defs holds one schema per command, and `failure` for a command line that could not run. While dekc is 0.x the shape may change between releases.",
     $defs: { ...generated.properties, ...generated.$defs },
   };
 }

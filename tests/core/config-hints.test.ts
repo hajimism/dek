@@ -6,7 +6,7 @@ import { loadVoiceSettings } from "../../src/core/voice.ts";
 import { configHint } from "../../src/core/zod.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
-const docs = "https://hajimism.github.io/dek/reference/config.html";
+const docs = "https://hajimism.github.io/dekc/reference/config.html";
 
 async function voiceError(toml: string): Promise<unknown> {
   return withTempDir(async (dir) => {
@@ -35,12 +35,12 @@ describe("config errors", () => {
     expect(error.hint).toBe(`see ${docs}#voice-voice-toml`);
   });
 
-  test("dek.toml errors point at its section of the reference", async () => {
+  test("dekc.toml errors point at its section of the reference", async () => {
     await withTempDir(async (dir) => {
-      const path = join(dir, "dek.toml");
+      const path = join(dir, "dekc.toml");
       await writeFile(path, 'max_classes = "many"\n');
       expect(() => loadConfig(path)).toThrow(
-        expect.objectContaining({ hint: `see ${docs}#dek-toml` }),
+        expect.objectContaining({ hint: `see ${docs}#dekc-toml` }),
       );
     });
   });
@@ -63,7 +63,7 @@ describe("configHint", () => {
       ),
     );
     for (const anchor of [
-      "dek-toml",
+      "dekc-toml",
       "frontmatter",
       "voice-voice-toml",
       "voice-dict-toml",

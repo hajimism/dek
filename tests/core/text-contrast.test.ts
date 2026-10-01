@@ -400,8 +400,10 @@ describe("textLayerCss", () => {
 
   test("the bare layer also drops backgrounds that are clipped to the text", () => {
     expect(textLayerCss("bare")).toContain("-webkit-text-fill-color: transparent !important");
-    expect(textLayerCss("bare")).toContain("[data-dek-clip-text] { background: none !important; }");
-    expect(textLayerCss("black")).not.toContain("data-dek-clip-text");
+    expect(textLayerCss("bare")).toContain(
+      "[data-dekc-clip-text] { background: none !important; }",
+    );
+    expect(textLayerCss("black")).not.toContain("data-dekc-clip-text");
   });
 
   test("the shadowless layer is the bare layer with no text casting a shadow", () => {
@@ -414,19 +416,19 @@ describe("textLayerCss", () => {
   // The masks only find where glyphs are; a blend mode would scale white and black by what is
   // under them. The shown and bare layers keep it, so the text is read as the audience sees it.
   test("the white and black layers draw text unblended, the others as shown", () => {
-    const unblended = "[data-dek-blend] { mix-blend-mode: normal !important; }";
+    const unblended = "[data-dekc-blend] { mix-blend-mode: normal !important; }";
     expect(textLayerCss("white")).toContain(unblended);
     expect(textLayerCss("black")).toContain(unblended);
-    expect(textLayerCss("bare")).not.toContain("data-dek-blend");
-    expect(textLayerCss("shadowless")).not.toContain("data-dek-blend");
+    expect(textLayerCss("bare")).not.toContain("data-dekc-blend");
+    expect(textLayerCss("shadowless")).not.toContain("data-dekc-blend");
   });
 });
 
 describe("textContrastScript", () => {
   test("defines the in-page sampler from self-contained source", () => {
-    const scope: { __dekTextContrast?: unknown } = {};
+    const scope: { __dekcTextContrast?: unknown } = {};
     new Function("window", textContrastScript())(scope);
-    expect(typeof scope.__dekTextContrast).toBe("function");
+    expect(typeof scope.__dekcTextContrast).toBe("function");
   });
 });
 

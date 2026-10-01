@@ -9,7 +9,7 @@ import { slideSelector } from "./live.ts";
 import { createMotion, drawAtEnd, type MotionMode, type SlideModule } from "./motion.ts";
 import { waitForPlaybackSettle } from "./settle.ts";
 import { applyIsShown, applyMorphNames, clearMorphNames, shouldUseViewTransition } from "./step.ts";
-import type { DekMotionHandle } from "./window.ts";
+import type { DekcMotionHandle } from "./window.ts";
 
 export type Stage = {
   slideEl(slug: string | undefined): HTMLElement | undefined;
@@ -32,7 +32,7 @@ export type Stage = {
   /** Fit the deck to its stage. */
   fit(): void;
   /** What the video recorder seeks. */
-  motion: DekMotionHandle;
+  motion: DekcMotionHandle;
 };
 
 /** How the script draws a move: one beat forward animates, anything else jumps to its end. */
@@ -70,7 +70,7 @@ export function isFinishable(animation: {
   return animation.playState === "running" && typeof end === "number" && Number.isFinite(end);
 }
 
-const slideModules = (): Record<string, SlideModule> => window.__dekSlides ?? {};
+const slideModules = (): Record<string, SlideModule> => window.__dekcSlides ?? {};
 
 function slideEl(slug: string | undefined): HTMLElement | undefined {
   if (!slug) {
@@ -111,7 +111,7 @@ function renderSlides(slides: PresenterSlide[], pos: Position): void {
   }
 }
 
-/** Each slide at its last beat, as `dek pdf` gives it a page. */
+/** Each slide at its last beat, as `dekc pdf` gives it a page. */
 function drawPrintPages(slides: PresenterSlide[]): void {
   for (const slide of slides) {
     const el = slideEl(slide.slug);
@@ -204,7 +204,7 @@ export function createStage(options: {
   }
 
   /**
-   * Print gives each slide a page at its last beat, as `dek pdf` does, so each slide's script
+   * Print gives each slide a page at its last beat, as `dekc pdf` does, so each slide's script
    * draws that beat's end the way the PDF page draws it. Once printed, the stage draws its own
    * beat again. The browser tells of a print twice (beforeprint and the print media query), and
    * a PDF export only the second way; each change is drawn once.

@@ -22,12 +22,12 @@ export function addressHint(hint: string, deck: HintDeck | undefined, cwd: strin
     if (!DECK_COMMANDS.has(command) || namesDeck(rest, deck.name)) {
       return whole;
     }
-    return `\`dek ${command} ${naming}${rest}\``;
+    return `\`dekc ${command} ${naming}${rest}\``;
   });
 }
 
-/** A backquoted command: `dek`, a command word, and what follows it up to the closing quote. */
-const COMMAND_RE = /`dek ([a-z]+)((?: [^`]*)?)`/g;
+/** A backquoted command: `dekc`, a command word, and what follows it up to the closing quote. */
+const COMMAND_RE = /`dekc ([a-z]+)((?: [^`]*)?)`/g;
 
 const DECK_COMMANDS = new Set(
   Object.entries(COMMANDS).flatMap(([name, spec]) => ("scope" in spec && spec.scope ? [name] : [])),
@@ -40,12 +40,12 @@ function namesDeck(rest: string, name: string): boolean {
 
 /**
  * The deck `path` lies in: the directory under a project's `decks/`, found from the path alone.
- * A source path dek reports is absolute, so no project needs to be resolved to address it.
+ * A source path dekc reports is absolute, so no project needs to be resolved to address it.
  */
 export function deckAround(path: string): HintDeck | undefined {
   for (let dir = path; dirname(dir) !== dir; dir = dirname(dir)) {
     const parent = dirname(dir);
-    if (basename(parent) === "decks" && existsSync(join(dirname(parent), "dek.toml"))) {
+    if (basename(parent) === "decks" && existsSync(join(dirname(parent), "dekc.toml"))) {
       return { name: basename(dir), dir };
     }
   }

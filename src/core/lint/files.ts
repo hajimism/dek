@@ -3,7 +3,7 @@ import { either } from "../prose.ts";
 import { listSlideFiles, SLIDE_SIDECARS } from "../resolve.ts";
 import type { LintContext } from "./context.ts";
 
-/** DEK001 for a section without slides/<slug>.html; DEK002 for a slide file without its section. */
+/** DEKC001 for a section without slides/<slug>.html; DEKC002 for a slide file without its section. */
 export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const section of ctx.deck.deck.sections) {
@@ -11,12 +11,12 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
       continue;
     }
     diagnostics.push(
-      diag("DEK001", {
+      diag("DEKC001", {
         message: `missing slide HTML for "${section.slug}"`,
         path: ctx.deck.scriptPath,
         line: section.line,
         slug: section.slug,
-        hint: "run `dek sync` to create the skeleton",
+        hint: "run `dekc sync` to create the skeleton",
         data: { expected: `slides/${section.slug}.html` },
       }),
     );
@@ -27,7 +27,7 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
       continue;
     }
     diagnostics.push(
-      diag("DEK002", {
+      diag("DEKC002", {
         message: `slide HTML has no section "${slide.slug}"`,
         path: slide.path,
         slug: slide.slug,
@@ -40,12 +40,12 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
   for (const ext of SLIDE_SIDECARS) {
     const kind = ext === ".css" ? "stylesheet" : "script";
     for (const file of listSlideFiles(ctx.deck.dir, ext)) {
-      // A sidecar next to an orphaned HTML file travels with it; DEK002 already names the slug.
+      // A sidecar next to an orphaned HTML file travels with it; DEKC002 already names the slug.
       if (ctx.sectionsBySlug.has(file.slug) || ctx.slidesBySlug.has(file.slug)) {
         continue;
       }
       diagnostics.push(
-        diag("DEK002", {
+        diag("DEKC002", {
           message: `slide ${kind} has no section "${file.slug}"`,
           path: file.path,
           slug: file.slug,
@@ -69,15 +69,15 @@ function orphanHint(slug: string, file: string): string {
 
 /**
  * An orphaned HTML file beside sections without their own slide (missing, or still the skeleton
- * the dev server generated on save) looks like a heading renamed in script.md first. `dek mv`
- * finishes that rename from either state, so each orphan's hint names a `dek mv` for every such
+ * the dev server generated on save) looks like a heading renamed in script.md first. `dekc mv`
+ * finishes that rename from either state, so each orphan's hint names a `dekc mv` for every such
  * section, in script order, rather than asking to delete a slide someone wrote. With one of each
  * the pairing is certain, and both diagnostics also offer the rename the other way.
  */
 export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diagnostic[] {
   const orphans = new Set(
     diagnostics.filter(
-      (diagnostic) => diagnostic.id === "DEK002" && diagnostic.path?.endsWith(".html"),
+      (diagnostic) => diagnostic.id === "DEKC002" && diagnostic.path?.endsWith(".html"),
     ),
   );
   const targets = ctx.deck.deck.sections
@@ -94,11 +94,11 @@ export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diag
   if (orphans.size === 1 && targets.length === 1 && orphan?.slug && target) {
     // An orphan beside a section without its own slide is a rename, made in the script or in the
     // files: which one is the author's to say, and each command finishes it from this state.
-    const hint = `run \`dek mv ${orphan.slug} ${target}\` to move the files to the script's id, or \`dek mv ${target} ${orphan.slug}\` to give the section the files' id`;
+    const hint = `run \`dekc mv ${orphan.slug} ${target}\` to move the files to the script's id, or \`dekc mv ${target} ${orphan.slug}\` to give the section the files' id`;
     return diagnostics.map((diagnostic) =>
       diagnostic === orphan
         ? { ...diagnostic, hint, data: { ...diagnostic.data, renames: targets } }
-        : diagnostic.id === "DEK001" && diagnostic.slug === target
+        : diagnostic.id === "DEKC001" && diagnostic.slug === target
           ? { ...diagnostic, hint }
           : diagnostic,
     );
@@ -107,7 +107,7 @@ export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diag
     if (!orphans.has(diagnostic) || !diagnostic.slug) {
       return diagnostic;
     }
-    const commands = targets.map((slug) => `\`dek mv ${diagnostic.slug} ${slug}\``);
+    const commands = targets.map((slug) => `\`dekc mv ${diagnostic.slug} ${slug}\``);
     return {
       ...diagnostic,
       hint: `run ${either(commands)} to move the files to the section they now belong to`,

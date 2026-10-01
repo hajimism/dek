@@ -39,10 +39,10 @@ export type SarifLog = {
   }>;
 };
 
-const RULES_URI = "https://hajimism.github.io/dek/reference/lint.html";
+const RULES_URI = "https://hajimism.github.io/dekc/reference/lint.html";
 
 /**
- * dek's own diagnostics as one SARIF run. The message stays as written; the hint, slug, and data
+ * dekc's own diagnostics as one SARIF run. The message stays as written; the hint, slug, and data
  * go in `properties`, the bag SARIF leaves to the tool. A check that did not run is a tool
  * execution notification, so a log without results never reads as a pass for it.
  */
@@ -58,8 +58,8 @@ export function toSarif(
       {
         tool: {
           driver: {
-            name: "dek",
-            informationUri: "https://hajimism.github.io/dek/",
+            name: "dekc",
+            informationUri: "https://hajimism.github.io/dekc/",
             rules: Object.entries(RULES).map(([id, rule]) => ({
               id,
               defaultConfiguration: { level: rule.severity },
@@ -126,10 +126,10 @@ function sarifResult(diagnostic: Diagnostic): SarifLog["runs"][number]["results"
   };
 }
 
-export function mergeSarif(dek: SarifLog, rumdl?: SarifLog): SarifLog {
+export function mergeSarif(dekc: SarifLog, rumdl?: SarifLog): SarifLog {
   return {
     version: "2.1.0",
-    $schema: dek.$schema,
-    runs: [...dek.runs, ...(rumdl?.runs ?? [])],
+    $schema: dekc.$schema,
+    runs: [...dekc.runs, ...(rumdl?.runs ?? [])],
   };
 }

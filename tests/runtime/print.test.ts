@@ -10,7 +10,7 @@ afterAll(async () => {
 });
 
 describe("printing the player", () => {
-  test("draws each slide at its last beat, as dek pdf does, then the stage's beat again", () => {
+  test("draws each slide at its last beat, as dekc pdf does, then the stage's beat again", () => {
     expect(bar()).toBe("1:base:0");
     window.dispatchEvent(new Event("beforeprint"));
     expect(bar()).toBe("2:growth:40");

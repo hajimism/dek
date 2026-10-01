@@ -7,7 +7,7 @@ import type { Position } from "../../src/core/step.ts";
 import type { Timeline } from "../../src/core/timeline.ts";
 import {
   currentSlug,
-  dekLive,
+  dekcLive,
   mountPlayer,
   playerChannelName,
   pressKey,
@@ -96,7 +96,7 @@ const realFetch = globalThis.fetch;
 const realAudio = globalThis.Audio;
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
   await writeProject(root, {
     decks: [
       {
@@ -204,7 +204,7 @@ describe("rehearse mode", () => {
   test.serial("a new timeline stops the old voice track before the new one plays", async () => {
     await mount("#intro", { audio: true });
     expect(FakeAudio.made.length).toBe(1);
-    await dekLive({ type: "timeline" });
+    await dekcLive({ type: "timeline" });
     await loaded(4);
     expect(FakeAudio.made.length).toBe(2);
     expect(FakeAudio.made.map((audio) => audio.playing)).toEqual([false, true]);

@@ -84,7 +84,7 @@ export function createProjectWatch(options: {
       }
       reconcileWatchers();
     } catch {
-      // dek.toml may disappear mid-write; keep the last known project.
+      // dekc.toml may disappear mid-write; keep the last known project.
     }
   };
 

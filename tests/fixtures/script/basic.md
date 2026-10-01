@@ -1,5 +1,5 @@
 ---
-# yaml-language-server: $schema=../../.dek/schema.json
+# yaml-language-server: $schema=../../.dekc/schema.json
 title: HTML スライドツールを作った話
 event: Tokyo Frontend Meetup #42
 date: 2026-04-18

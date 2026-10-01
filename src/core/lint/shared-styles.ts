@@ -57,7 +57,7 @@ function alsoReaches(ctx: LintContext, selector: string, setters: string[]): str
 }
 
 /**
- * DEK026: the same declaration under the same selector in the stylesheets of SHARED_BY slides
+ * DEKC026: the same declaration under the same selector in the stylesheets of SHARED_BY slides
  * or more. Each slide fixed alike on its own, as agents working on one slide each will, is one
  * fix the theme is missing. Each slide hears of it in its own check, once per selector: what it
  * shares there, and every slide it shares any of that with.
@@ -146,7 +146,7 @@ export function sharedStyleDiagnostics(ctx: LintContext): Diagnostic[] {
                 .join(
                   "",
                 )} without it, so check ${reaches.length === 1 ? "that slide" : "those slides"} after the move`;
-        return diag("DEK026", {
+        return diag("DEKC026", {
           message: `${rule} is also in ${listed(others)}`,
           path: paths.slide(slug, ".css"),
           line,

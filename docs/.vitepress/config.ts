@@ -1,7 +1,7 @@
 import { defineConfig, type DefaultTheme } from "vitepress";
 
-const site = "https://hajimism.github.io/dek/";
-const repo = "https://github.com/hajimism/dek";
+const site = "https://hajimism.github.io/dekc/";
+const repo = "https://github.com/hajimism/dekc";
 
 function guide(p: string, t: Record<string, string>): DefaultTheme.SidebarItem[] {
   return [
@@ -58,7 +58,7 @@ function reference(p: string, t: Record<string, string>): DefaultTheme.SidebarIt
 
 const en = {
   start: "Start",
-  why: "Why dek",
+  why: "Why dekc",
   gettingStarted: "Getting Started",
   tutorial: "Tutorial",
   concepts: "Concepts",
@@ -84,7 +84,7 @@ const en = {
 
 const ja = {
   start: "はじめに",
-  why: "dek の設計思想",
+  why: "dekc の設計思想",
   gettingStarted: "はじめる",
   tutorial: "チュートリアル",
   concepts: "コンセプト",
@@ -109,24 +109,24 @@ const ja = {
 };
 
 export default defineConfig({
-  title: "dek",
-  base: "/dek/",
+  title: "dekc",
+  base: "/dekc/",
   srcDir: ".",
   lastUpdated: true,
   cleanUrls: false,
   sitemap: { hostname: site },
   head: [
     ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:title", content: "dek" }],
+    ["meta", { property: "og:title", content: "dekc" }],
     ["meta", { property: "og:url", content: site }],
     ["meta", { name: "twitter:card", content: "summary" }],
-    ["meta", { name: "twitter:title", content: "dek" }],
+    ["meta", { name: "twitter:title", content: "dekc" }],
   ],
   locales: {
     root: {
       label: "English",
       lang: "en-US",
-      description: "A build system for talks. Write what you will say; dek builds, measures, and ships the rest.",
+      description: "A build system for talks. Write what you will say; dekc builds, measures, and ships the rest.",
       themeConfig: {
         nav: [
           { text: "Guide", link: "/guide/why", activeMatch: "/guide/" },
@@ -143,14 +143,14 @@ export default defineConfig({
         },
         footer: {
           message: "Released under the MIT License.",
-          copyright: `Copyright © <a href="${repo}">dek</a>`,
+          copyright: `Copyright © <a href="${repo}">dekc</a>`,
         },
       },
     },
     ja: {
       label: "日本語",
       lang: "ja",
-      description: "発表のビルドシステム。喋ることを書けば、あとは dek が組み立て、測り、届ける。",
+      description: "発表のビルドシステム。喋ることを書けば、あとは dekc が組み立て、測り、届ける。",
       themeConfig: {
         nav: [
           { text: "ガイド", link: "/ja/guide/why", activeMatch: "/ja/guide/" },
@@ -174,13 +174,13 @@ export default defineConfig({
         langMenuLabel: "言語",
         footer: {
           message: "MIT License",
-          copyright: `Copyright © <a href="${repo}">dek</a>`,
+          copyright: `Copyright © <a href="${repo}">dekc</a>`,
         },
       },
     },
   },
   themeConfig: {
-    siteTitle: "dek",
+    siteTitle: "dekc",
     socialLinks: [{ icon: "github", link: repo }],
     outline: { level: [2, 3] },
     search: {

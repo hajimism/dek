@@ -1,9 +1,9 @@
 ---
 layout: home
 hero:
-  name: dek
+  name: dekc
   text: 発表のビルドシステム
-  tagline: 喋ることを書けば、あとは dek が組み立て、測り、届ける。
+  tagline: 喋ることを書けば、あとは dekc が組み立て、測り、届ける。
   actions:
     - theme: brand
       text: はじめる
@@ -16,7 +16,7 @@ hero:
       link: /ja/samples
     - theme: alt
       text: GitHub
-      link: https://github.com/hajimism/dek
+      link: https://github.com/hajimism/dekc
 features:
   - title: 台本が親
     details: 順序も尺も喋る言葉も、Markdown ファイルひとつが持ちます。スライドはその見出しにぶら下がる。箱を先に置くと、立派だが喋り切れない資料ができます。
@@ -25,18 +25,18 @@ features:
   - title: lint が測り、あなたが決める
     details: 使えるクラス、自己完結、はみ出し、コントラスト。規約は文章ではなくルールとして実装します。lint が通れば測れる問題はなく、残りはあなたが判断します。
   - title: USB に 1 ファイル
-    details: dek build がトーク全体を HTML 1 ファイルにまとめます。サーバも通信も要りません。開発サーバを使うのは、スマホをリモコンにしたいときだけ。
+    details: dekc build がトーク全体を HTML 1 ファイルにまとめます。サーバも通信も要りません。開発サーバを使うのは、スマホをリモコンにしたいときだけ。
 ---
 
 ```bash
-bunx github:hajimism/dek init my-talks --deck 2026-04-vite
-cd my-talks && bun add -d github:hajimism/dek
+bunx github:hajimism/dekc init my-talks --deck 2026-04-vite
+cd my-talks && bun add -d github:hajimism/dekc
 cd decks/2026-04-vite
 $EDITOR script.md   # 喋ることを書く
-bunx dek            # 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
-bunx dek build      # dist/2026-04-vite.html — トーク全体がこの 1 ファイル
+bunx dekc            # 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
+bunx dekc build      # dist/2026-04-vite.html — トーク全体がこの 1 ファイル
 ```
 
-`bunx dek` はプロジェクトの中で実行してください。npm の `dek` は無関係の別パッケージで、dek を入れていない場所ではそちらが動きます。
+打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージです。dekc が npm に公開されるまでは、`bunx dekc` はプロジェクトの中で実行してください。
 
 HTML はまだ一行も書いていません。それでもう発表できます。まずは[はじめる](/ja/guide/getting-started)から。台本から単一ファイルのビルドまでを通しで体験するなら[チュートリアル](/ja/guide/tutorial)へ。

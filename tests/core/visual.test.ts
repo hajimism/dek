@@ -37,7 +37,7 @@ describe("runVisualDeck screenshot", () => {
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         const deckDir = join(root, "decks", "demo");
-        const outside = await mkdtemp(join(tmpdir(), "dek-outside-"));
+        const outside = await mkdtemp(join(tmpdir(), "dekc-outside-"));
         try {
           await mkdir(join(deckDir, ".cache"), { recursive: true });
           await symlink(outside, join(deckDir, ".cache", "shots"));
@@ -68,7 +68,7 @@ describe("lintVisualDeck", () => {
     fontWeight: 400,
   };
 
-  test("emits DEK030 when the runner reports overflow", async () => {
+  test("emits DEKC030 when the runner reports overflow", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -78,15 +78,15 @@ describe("lintVisualDeck", () => {
             contrasts: [],
           }),
         });
-        expect(diagnostics?.some((d) => d.id === "DEK030")).toBe(true);
-        const dek030 = diagnostics?.find((d) => d.id === "DEK030");
-        expect(dek030?.path).toContain("slides/intro.html");
-        expect(dek030?.message).toContain("1");
+        expect(diagnostics?.some((d) => d.id === "DEKC030")).toBe(true);
+        const dekc030 = diagnostics?.find((d) => d.id === "DEKC030");
+        expect(dekc030?.path).toContain("slides/intro.html");
+        expect(dekc030?.message).toContain("1");
       },
     );
   });
 
-  test("emits DEK032 once per error when a slide's draw throws, naming every beat", async () => {
+  test("emits DEKC032 once per error when a slide's draw throws, naming every beat", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -101,9 +101,9 @@ describe("lintVisualDeck", () => {
             ],
           }),
         });
-        expect(diagnostics?.filter((d) => d.id === "DEK032")).toEqual([
+        expect(diagnostics?.filter((d) => d.id === "DEKC032")).toEqual([
           {
-            id: "DEK032",
+            id: "DEKC032",
             severity: "error",
             message: "draw threw TypeError: x is null at the end of steps 1, 2",
             path: join(deckDir, "slides", "intro.ts"),
@@ -116,7 +116,7 @@ describe("lintVisualDeck", () => {
     );
   });
 
-  test("emits DEK032 for a draw that reaches outside its slide or keeps state", async () => {
+  test("emits DEKC032 for a draw that reaches outside its slide or keeps state", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -138,7 +138,7 @@ describe("lintVisualDeck", () => {
         });
         expect(
           diagnostics
-            ?.filter((d) => d.id === "DEK032")
+            ?.filter((d) => d.id === "DEKC032")
             .map(({ message, hint }) => ({ message, hint })),
         ).toEqual([
           {
@@ -154,7 +154,7 @@ describe("lintVisualDeck", () => {
     );
   });
 
-  test("emits DEK030 for text an ancestor cuts off, and DEK033 for texts drawn over each other", async () => {
+  test("emits DEKC030 for text an ancestor cuts off, and DEKC033 for texts drawn over each other", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -194,22 +194,22 @@ describe("lintVisualDeck", () => {
         });
         expect(
           diagnostics
-            ?.filter((d) => d.id === "DEK030" || d.id === "DEK033")
+            ?.filter((d) => d.id === "DEKC030" || d.id === "DEKC033")
             .map(({ id, message, hint }) => ({ id, message, hint })),
         ).toEqual([
           {
-            id: "DEK030",
+            id: "DEKC030",
             message:
               'p.note "many words" is cut off by div.card past its bottom edge by 40px at step 1',
             hint: "let div.card grow to fit it in slides/intro.css, or cut the text: div.card hides what does not fit",
           },
           {
-            id: "DEK033",
+            id: "DEKC033",
             message: 'p.a "first" and p.b "second" are drawn over each other at step 1',
             hint: "move one of them, or give the layout room for both, in slides/intro.css",
           },
           {
-            id: "DEK033",
+            id: "DEKC033",
             message:
               'p.c "corner" and section.slide::after "3" are drawn over each other at step 1',
             hint: "keep the slide's content clear of what theme.css draws there, a folio or a running head: move it, or give it room in slides/intro.css",
@@ -219,7 +219,7 @@ describe("lintVisualDeck", () => {
     );
   });
 
-  test("emits DEK031 when the runner reports low contrast", async () => {
+  test("emits DEKC031 when the runner reports low contrast", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -229,11 +229,11 @@ describe("lintVisualDeck", () => {
             contrasts: [{ ...sample, ratio: 2.1, fontSize: 16 }],
           }),
         });
-        expect(diagnostics?.some((d) => d.id === "DEK031")).toBe(true);
-        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
-        expect(dek031?.path).toContain("slides/intro.html");
-        expect(dek031?.message).toContain("2.1");
-        expect(dek031?.data).toEqual({
+        expect(diagnostics?.some((d) => d.id === "DEKC031")).toBe(true);
+        const dekc031 = diagnostics?.find((d) => d.id === "DEKC031");
+        expect(dekc031?.path).toContain("slides/intro.html");
+        expect(dekc031?.message).toContain("2.1");
+        expect(dekc031?.data).toEqual({
           box: "p",
           ratio: 2.1,
           threshold: 4.5,
@@ -245,7 +245,7 @@ describe("lintVisualDeck", () => {
     );
   });
 
-  test("sends a DEK031 the theme alone causes to theme.css", async () => {
+  test("sends a DEKC031 the theme alone causes to theme.css", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -255,17 +255,17 @@ describe("lintVisualDeck", () => {
             contrasts: [{ ...sample, ratio: 2.1, fontSize: 16, origin: "theme" }],
           }),
         });
-        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
-        expect(dek031?.hint).toBe(
+        const dekc031 = diagnostics?.find((d) => d.id === "DEKC031");
+        expect(dekc031?.hint).toBe(
           "theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it",
         );
-        expect(dek031?.data).toMatchObject({ origin: "theme" });
-        expect(dek031?.path).toBe(join(root, "decks", "demo", "theme.css"));
+        expect(dekc031?.data).toMatchObject({ origin: "theme" });
+        expect(dekc031?.path).toBe(join(root, "decks", "demo", "theme.css"));
       },
     );
   });
 
-  test("keeps a DEK031 the slide's own stylesheet causes on that slide", async () => {
+  test("keeps a DEKC031 the slide's own stylesheet causes on that slide", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -275,17 +275,17 @@ describe("lintVisualDeck", () => {
             contrasts: [{ ...sample, ratio: 2.1, fontSize: 16, origin: "slide" }],
           }),
         });
-        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
-        expect(dek031?.hint).toBe(
+        const dekc031 = diagnostics?.find((d) => d.id === "DEKC031");
+        expect(dekc031?.hint).toBe(
           "slides/intro.css brings it below 4.5:1, which theme.css alone does not: raise its contrast in slides/intro.css",
         );
-        expect(dek031?.data).toMatchObject({ origin: "slide" });
-        expect(dek031?.path).toBe(join(root, "decks", "demo", "slides", "intro.css"));
+        expect(dekc031?.data).toMatchObject({ origin: "slide" });
+        expect(dekc031?.path).toBe(join(root, "decks", "demo", "slides", "intro.css"));
       },
     );
   });
 
-  test("sends a DEK031 a slide script's draw causes to the script", async () => {
+  test("sends a DEKC031 a slide script's draw causes to the script", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
@@ -295,11 +295,11 @@ describe("lintVisualDeck", () => {
             contrasts: [{ ...sample, ratio: 2.1, fontSize: 16, origin: "script" }],
           }),
         });
-        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
-        expect(dek031?.hint).toBe(
+        const dekc031 = diagnostics?.find((d) => d.id === "DEKC031");
+        expect(dekc031?.hint).toBe(
           "slides/intro.ts draws it below 4.5:1, and a color draw sets inline wins over any stylesheet: raise the contrast of the color it sets in slides/intro.ts",
         );
-        expect(dek031?.path).toBe(join(root, "decks", "demo", "slides", "intro.ts"));
+        expect(dekc031?.path).toBe(join(root, "decks", "demo", "slides", "intro.ts"));
       },
     );
   });
@@ -314,7 +314,7 @@ describe("lintVisualDeck", () => {
             contrasts: [{ ...sample, ratio: 3.2, fontSize: 32 }],
           }),
         });
-        expect(passing?.some((d) => d.id === "DEK031")).toBe(false);
+        expect(passing?.some((d) => d.id === "DEKC031")).toBe(false);
 
         // The same pages answer differently here, which only a fresh measure can hear.
         const fresh = () =>
@@ -326,10 +326,10 @@ describe("lintVisualDeck", () => {
             contrasts: [{ ...sample, ratio: 2.8, fontSize: 32 }],
           }),
         });
-        const dek031 = failing?.find((d) => d.id === "DEK031");
-        expect(dek031?.message).toContain("2.8");
-        expect(dek031?.message).toContain("3:1");
-        expect(dek031?.message).toContain("large text");
+        const dekc031 = failing?.find((d) => d.id === "DEKC031");
+        expect(dekc031?.message).toContain("2.8");
+        expect(dekc031?.message).toContain("3:1");
+        expect(dekc031?.message).toContain("large text");
 
         await fresh();
         const small = await lintVisualDeck(join(root, "decks", "demo"), {
@@ -338,7 +338,7 @@ describe("lintVisualDeck", () => {
             contrasts: [{ ...sample, ratio: 3.2, fontSize: 20 }],
           }),
         });
-        expect(small?.find((d) => d.id === "DEK031")?.message).toContain("4.5:1");
+        expect(small?.find((d) => d.id === "DEKC031")?.message).toContain("4.5:1");
       },
     );
   });
@@ -354,7 +354,7 @@ describe("lintVisualDeck", () => {
     );
   });
 
-  test("leaves a missing slide HTML to lint (DEK001) and still checks the other slides", async () => {
+  test("leaves a missing slide HTML to lint (DEKC001) and still checks the other slides", async () => {
     const twoSections = "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n## missing\n\nbye\n";
     await withTempProject(
       { decks: [{ name: "demo", script: twoSections, slides: { intro: introHtml } }] },
@@ -372,7 +372,7 @@ describe("lintVisualDeck", () => {
     );
   });
 
-  test("a broken slide script is left to DEK016 and every beat is still checked", async () => {
+  test("a broken slide script is left to DEKC016 and every beat is still checked", async () => {
     const twoBeats = `---
 title: Demo
 ---
@@ -496,9 +496,9 @@ describe("lintVisualDeck messages", () => {
       ],
       contrasts: [],
     });
-    expect(diagnostics.filter((d) => d.id === "DEK030")).toEqual([
+    expect(diagnostics.filter((d) => d.id === "DEKC030")).toEqual([
       {
-        id: "DEK030",
+        id: "DEKC030",
         severity: "error",
         message:
           'li[data-step="vague"] "https://example.com/very…" overflows the right edge by 412px at steps slow, vague',
@@ -523,11 +523,11 @@ describe("lintVisualDeck messages", () => {
       ],
       contrasts: [],
     });
-    const dek030 = diagnostics.find((d) => d.id === "DEK030");
-    expect(dek030?.message).toBe(
+    const dekc030 = diagnostics.find((d) => d.id === "DEKC030");
+    expect(dekc030?.message).toBe(
       "ul overflows the right edge by 3px and the bottom edge by 180px at steps 1, 2",
     );
-    expect(dek030?.hint).toBe(
+    expect(dekc030?.hint).toBe(
       'shorten it, or let it wrap with overflow-wrap: anywhere in slides/intro.css; cut it, split it across beats or slides, or give it a smaller size in slides/intro.css; if it is decoration meant to bleed off the slide, mark it aria-hidden="true"',
     );
   });
@@ -546,7 +546,7 @@ describe("lintVisualDeck messages", () => {
     });
     expect(
       diagnostics
-        .filter((d) => d.id === "DEK030")
+        .filter((d) => d.id === "DEKC030")
         .map(({ path, hint, data }) => ({
           path: path?.split("/").slice(-2).join("/"),
           hint,
@@ -580,7 +580,7 @@ describe("lintVisualDeck messages", () => {
       contrasts: [],
     });
     expect(
-      diagnostics.filter((d) => d.id === "DEK030").map(({ message, hint }) => ({ message, hint })),
+      diagnostics.filter((d) => d.id === "DEKC030").map(({ message, hint }) => ({ message, hint })),
     ).toEqual([
       { message: "content overflows the slide at step 1", hint: undefined },
       { message: 'p "late" overflows the slide at step 1', hint: undefined },
@@ -596,7 +596,7 @@ describe("lintVisualDeck messages", () => {
       ],
       contrasts: [],
     });
-    expect(diagnostics.filter((d) => d.id === "DEK030").map((d) => d.message)).toEqual([
+    expect(diagnostics.filter((d) => d.id === "DEKC030").map((d) => d.message)).toEqual([
       "ul overflows the bottom edge by 30px at steps 1, 3",
       "ul overflows the right edge by 4px at step 2",
     ]);
@@ -621,7 +621,7 @@ describe("lintVisualDeck messages", () => {
         { ...sample, step: "5", ratio: 4.6 },
       ],
     });
-    expect(diagnostics.filter((d) => d.id === "DEK031").map((d) => d.message)).toEqual([
+    expect(diagnostics.filter((d) => d.id === "DEKC031").map((d) => d.message)).toEqual([
       "p has contrast 2.1 (#777777 on #ffffff), below 4.5:1 at steps 1, 2",
       "p has contrast 2.4 (#777777 on #ffffff), below 4.5:1 at step 3",
       "p has contrast 2.1 (#777777 on #ffffff), below 4.5:1 at step 4",
@@ -646,9 +646,9 @@ describe("lintVisualDeck messages", () => {
         { ...sample, step: "2" },
       ],
     });
-    expect(diagnostics.filter((d) => d.id === "DEK031")).toEqual([
+    expect(diagnostics.filter((d) => d.id === "DEKC031")).toEqual([
       {
-        id: "DEK031",
+        id: "DEKC031",
         severity: "error",
         message:
           'p.stat-label "手戻りの減少" has contrast 1.9 (#444444 on #111111), below 4.5:1 at steps 1, 2',
@@ -732,13 +732,13 @@ describe("lintVisualDeck cache", () => {
           runner: shot.runner,
         });
         expect(shot.asked).toEqual(["plan@two"]);
-        expect(result?.diagnostics.map((d) => d.id)).toEqual(["DEK030"]);
+        expect(result?.diagnostics.map((d) => d.id)).toEqual(["DEKC030"]);
       },
     );
   });
 });
 
-// How much of the frame a slide fills, as `dek shot` and the sheet show it: at its last beat.
+// How much of the frame a slide fills, as `dekc shot` and the sheet show it: at its last beat.
 describe("runVisualDeck fill", () => {
   const script = "---\ntitle: Demo\n---\n\n## intro\n\n## plan\n\n### one\n\n### two\n";
   const plan = slideDocument(
@@ -846,7 +846,7 @@ describe("lintVisualDeck and the whole deck", () => {
           },
         });
         expect(wholeDeck).toHaveLength(1);
-        expect(diagnostics?.find((d) => d.id === "DEK032")?.message).toBe(
+        expect(diagnostics?.find((d) => d.id === "DEKC032")?.message).toBe(
           `draw changes the "intro" slide's <h2> outside its slide at the end of step 0`,
         );
       },

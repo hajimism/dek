@@ -1,4 +1,4 @@
-/* Real `dek lint --visual` output from the scratch project: premise.html's title set
+/* Real `dekc lint --visual` output from the scratch project: premise.html's title set
    five times too large, then two. The preview on the right redraws that slide in miniature. */
 .slide {
   --at: 0.5556;

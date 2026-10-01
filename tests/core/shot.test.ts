@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import type { VisualRequest } from "../../src/core/playwright.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { shotMorph } from "../../src/core/shot/morph.ts";
@@ -78,7 +78,7 @@ describe("shotDeck", () => {
           await writeRequested(request);
           return { overflows: [], contrasts: [] };
         };
-        await expect(shotDeck(resolved.deck.dir, { runner })).rejects.toThrow(DekError);
+        await expect(shotDeck(resolved.deck.dir, { runner })).rejects.toThrow(DekcError);
         const shots = await shotDeck(resolved, { runner });
         expect(shots.map((shot) => shot.slug)).toEqual(["intro"]);
       },
@@ -96,7 +96,7 @@ describe("shotDeck", () => {
             runner: async () => ({ overflows: [], contrasts: [] }),
           }),
         ).rejects.toMatchObject({
-          name: "DekError",
+          name: "DekcError",
           message: 'step "2" not found in "intro"',
           hint: "this slide has no beats; use 0, or leave out --step",
         });
@@ -378,7 +378,7 @@ body
         const deckDir = join(root, "decks", "demo");
         await expect(
           shotMorph(deckDir, { from: "problem", to: "nope", at: 0.5, playerScript: "", runner }),
-        ).rejects.toMatchObject({ name: "DekError", message: 'section "nope" not found' });
+        ).rejects.toMatchObject({ name: "DekcError", message: 'section "nope" not found' });
         await expect(
           shotMorph(deckDir, {
             from: "problem",
@@ -387,7 +387,7 @@ body
             playerScript: "",
             runner,
           }),
-        ).rejects.toMatchObject({ name: "DekError", message: expect.stringContaining("--at") });
+        ).rejects.toMatchObject({ name: "DekcError", message: expect.stringContaining("--at") });
       },
     );
   });
@@ -488,7 +488,7 @@ describe("shotSheet", () => {
   test("refuses a sheet folder that links out of the project", async () => {
     await withTempProject(deck, async (root) => {
       const dir = join(root, "decks", "demo");
-      const outside = await mkdtemp(join(tmpdir(), "dek-outside-"));
+      const outside = await mkdtemp(join(tmpdir(), "dekc-outside-"));
       try {
         const first = await shotSheet(dir, { runner: writingRunner([]) });
         const sheetDir = dirname(first.sheets[0] ?? "");
@@ -645,7 +645,7 @@ second
   test("refuses a cache folder that links out of the project, and writes nothing there", async () => {
     await withTempProject(deck, async (root) => {
       const dir = join(root, "decks", "demo");
-      const outside = await mkdtemp(join(tmpdir(), "dek-outside-"));
+      const outside = await mkdtemp(join(tmpdir(), "dekc-outside-"));
       try {
         const options = { slug: "timing", playerScript: "/* player */" };
         const first = await shotMotion(dir, { ...options, runner: writingRunner([]) });
@@ -667,7 +667,7 @@ second
   test("trusts no path a manifest names outside its own folder, and removes nothing there", async () => {
     await withTempProject(deck, async (root) => {
       const dir = join(root, "decks", "demo");
-      const outside = await mkdtemp(join(tmpdir(), "dek-outside-"));
+      const outside = await mkdtemp(join(tmpdir(), "dekc-outside-"));
       try {
         const options = { slug: "timing", playerScript: "/* player */" };
         const first = await shotMotion(dir, { ...options, runner: writingRunner([]) });
@@ -764,7 +764,7 @@ describe("the still cache", () => {
     );
   });
 
-  test("lets dek shot reuse the still dek build took for the link preview", async () => {
+  test("lets dekc shot reuse the still dekc build took for the link preview", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {

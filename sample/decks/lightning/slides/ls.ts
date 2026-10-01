@@ -1,4 +1,4 @@
-// `dek ls` types itself and prints; the next beat marks the section that ran long.
+// `dekc ls` types itself and prints; the next beat marks the section that ran long.
 // A terminal session drawn from t. In each [data-scene], [data-type] text is typed
 // a character at a time, then each [data-out] line prints after its delay (ms in the
 // attribute). A [data-caret] right after a command blinks only while it is typed.
@@ -54,4 +54,4 @@ export default {
   draw(slide, { step, t }) {
     scenes(slide, step, t, MOTION);
   },
-} satisfies DekSlide;
+} satisfies DekcSlide;

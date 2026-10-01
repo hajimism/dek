@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@hajimism/dek",
+      "name": "dekc",
       "dependencies": {
         "zod": "^4.6.5",
       },

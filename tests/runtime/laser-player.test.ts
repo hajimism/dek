@@ -32,7 +32,7 @@ there
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
   await writeProject(root, {
     decks: [
       {
@@ -57,9 +57,9 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-const stage = (): HTMLElement => document.getElementById("dek-current-stage") as HTMLElement;
-const dot = (): HTMLElement | null => document.getElementById("dek-laser");
-const toggle = (): HTMLElement | null => document.getElementById("dek-laser-toggle");
+const stage = (): HTMLElement => document.getElementById("dekc-current-stage") as HTMLElement;
+const dot = (): HTMLElement | null => document.getElementById("dekc-laser");
+const toggle = (): HTMLElement | null => document.getElementById("dekc-laser-toggle");
 
 function pointer(type: string, x: number, y: number, pointerType = "mouse"): void {
   stage().dispatchEvent(

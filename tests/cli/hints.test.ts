@@ -4,7 +4,7 @@ import { formatError } from "../../src/cli/format.ts";
 import { lsCommand } from "../../src/cli/ls.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { showCommand } from "../../src/cli/show.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -23,20 +23,20 @@ function errorOf(run: () => unknown): ErrorJson["error"] {
   throw new Error("expected the command to fail");
 }
 
-describe("dek error hints", () => {
+describe("dekc error hints", () => {
   // One run through the real binary: the error reaches stdout as JSON with a failing exit.
   test("suggests the command a typo was probably meant to be", async () => {
-    const result = await runDek(["biuld", "--json"]);
+    const result = await runDekc(["biuld", "--json"]);
     expect(result).toMatchObject({ exitCode: 1 });
     const json = jsonStdout<ErrorJson>(result);
     expect(json.ok).toBe(false);
-    expect(json.error.hint).toBe("did you mean `dek build`?");
+    expect(json.error.hint).toBe("did you mean `dekc build`?");
   });
 
   test("tells the next command outside a project", async () => {
     await withTempDir(async (dir) => {
       expect(errorOf(() => lsCommand(resolveTarget(dir, "decks", { refs: true }))).hint).toContain(
-        "dek init",
+        "dekc init",
       );
     });
   });
@@ -49,21 +49,21 @@ describe("dek error hints", () => {
     });
   });
 
-  test("suggests dek ls when a section is missing", async () => {
+  test("suggests dekc ls when a section is missing", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const cwd = join(root, "decks", "demo");
       expect(
         errorOf(() => showCommand(resolveTarget(cwd, "deck", { refs: true }), "missing")).hint,
-      ).toContain("dek ls");
+      ).toContain("dekc ls");
     });
   });
 
-  test("suggests dek ls when a deck is missing", async () => {
+  test("suggests dekc ls when a deck is missing", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const error = errorOf(() =>
         showCommand(resolveTarget(root, "deck", { refs: true, deck: "nope" }), "intro"),
       );
-      expect(error.hint).toContain("dek ls");
+      expect(error.hint).toContain("dekc ls");
     });
   });
 });
@@ -75,10 +75,10 @@ describe("typos in names", () => {
       const deck = errorOf(() =>
         showCommand(resolveTarget(root, "deck", { refs: true, deck: "2026-10-tlak" }), "intro"),
       );
-      expect(deck.hint).toBe("did you mean `2026-10-talk`? run `dek ls` for every deck");
+      expect(deck.hint).toBe("did you mean `2026-10-talk`? run `dekc ls` for every deck");
       const cwd = join(root, "decks", "2026-10-talk");
       const slide = errorOf(() => showCommand(resolveTarget(cwd, "deck", { refs: true }), "intor"));
-      expect(slide.hint).toBe("did you mean `intro`? run `dek ls` for every slide");
+      expect(slide.hint).toBe("did you mean `intro`? run `dekc ls` for every slide");
     });
   });
 });

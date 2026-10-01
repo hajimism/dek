@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { writeInside } from "../core/safe-fs.ts";
 
 export type DevServerLock = {
@@ -12,7 +12,7 @@ export type DevServerLock = {
 };
 
 function serverLockPath(root: string): string {
-  return join(root, ".dek", "server.json");
+  return join(root, ".dekc", "server.json");
 }
 
 export function isPidAlive(pid: number): boolean {
@@ -54,7 +54,7 @@ export function assertNoDevServer(root: string): void {
   const running =
     claimedRoots.get(root) ?? (existing && isPidAlive(existing.pid) ? existing.url : undefined);
   if (running !== undefined) {
-    throw new DekError(`dev server already running at ${running}`, {
+    throw new DekcError(`dev server already running at ${running}`, {
       path: serverLockPath(root),
       hint: `open ${running}`,
     });

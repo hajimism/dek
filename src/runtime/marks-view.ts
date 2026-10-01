@@ -13,7 +13,7 @@ export type MarksView = {
 
 /**
  * The marks the speaker leaves while rehearsing on beats that want rewriting, kept by the dev
- * server in a file an agent reads with `dek marks`. Only a page whose presenter bar has the mark
+ * server in a file an agent reads with `dekc marks`. Only a page whose presenter bar has the mark
  * button has marks, so a built file never tries to reach a server it does not have.
  */
 export function createMarksView(options: {

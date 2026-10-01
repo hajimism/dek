@@ -240,10 +240,10 @@ describe("sliceWav", () => {
 });
 
 describe("defaultVideoRunner", () => {
-  test.serial("throws when Playwright is missing and DEK_VIDEO is unset", async () => {
+  test.serial("throws when Playwright is missing and DEKC_VIDEO is unset", async () => {
     await withTempDir(async (dir) => {
-      const previous = process.env.DEK_VIDEO;
-      delete process.env.DEK_VIDEO;
+      const previous = process.env.DEKC_VIDEO;
+      delete process.env.DEKC_VIDEO;
       try {
         if (playwrightResolved()) {
           return;
@@ -257,25 +257,25 @@ describe("defaultVideoRunner", () => {
             outDir: dir,
           }),
         ).rejects.toMatchObject({
-          name: "DekError",
+          name: "DekcError",
           message: "video capture failed",
         });
       } finally {
         if (previous === undefined) {
-          delete process.env.DEK_VIDEO;
+          delete process.env.DEKC_VIDEO;
         } else {
-          process.env.DEK_VIDEO = previous;
+          process.env.DEKC_VIDEO = previous;
         }
       }
     });
   });
 
   test.serial(
-    "fails when the worker runs past timeoutMs, so a hung browser cannot hang dek",
+    "fails when the worker runs past timeoutMs, so a hung browser cannot hang dekc",
     async () => {
       await withTempDir(async (dir) => {
-        const previous = process.env.DEK_VIDEO;
-        process.env.DEK_VIDEO = join(import.meta.dir, "../helpers/fake-video-slow.ts");
+        const previous = process.env.DEKC_VIDEO;
+        process.env.DEKC_VIDEO = join(import.meta.dir, "../helpers/fake-video-slow.ts");
         try {
           await expect(
             defaultVideoRunner(
@@ -289,15 +289,15 @@ describe("defaultVideoRunner", () => {
               { timeoutMs: 20 },
             ),
           ).rejects.toMatchObject({
-            name: "DekError",
+            name: "DekcError",
             message: "video capture failed",
             hint: expect.stringContaining("did not finish"),
           });
         } finally {
           if (previous === undefined) {
-            delete process.env.DEK_VIDEO;
+            delete process.env.DEKC_VIDEO;
           } else {
-            process.env.DEK_VIDEO = previous;
+            process.env.DEKC_VIDEO = previous;
           }
         }
       });
@@ -306,8 +306,8 @@ describe("defaultVideoRunner", () => {
 
   test.serial("throws when the worker exits non-zero", async () => {
     await withTempDir(async (dir) => {
-      const previous = process.env.DEK_VIDEO;
-      process.env.DEK_VIDEO = join(import.meta.dir, "../helpers/fake-video-fail.ts");
+      const previous = process.env.DEKC_VIDEO;
+      process.env.DEKC_VIDEO = join(import.meta.dir, "../helpers/fake-video-fail.ts");
       try {
         await expect(
           defaultVideoRunner({
@@ -318,14 +318,14 @@ describe("defaultVideoRunner", () => {
             outDir: dir,
           }),
         ).rejects.toMatchObject({
-          name: "DekError",
+          name: "DekcError",
           message: "video capture failed",
         });
       } finally {
         if (previous === undefined) {
-          delete process.env.DEK_VIDEO;
+          delete process.env.DEKC_VIDEO;
         } else {
-          process.env.DEK_VIDEO = previous;
+          process.env.DEKC_VIDEO = previous;
         }
       }
     });
@@ -369,8 +369,8 @@ describe("muxVideo", () => {
       const wav = join(dir, "audio.wav");
       writeFileSync(wav, silentWav(200));
       const out = join(dir, "out.mp4");
-      const previous = process.env.DEK_FFMPEG;
-      process.env.DEK_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
+      const previous = process.env.DEKC_FFMPEG;
+      process.env.DEKC_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
       try {
         const started = Date.now();
         await Promise.race([
@@ -387,23 +387,23 @@ describe("muxVideo", () => {
         expect(await Bun.file(out).exists()).toBe(true);
       } finally {
         if (previous === undefined) {
-          delete process.env.DEK_FFMPEG;
+          delete process.env.DEKC_FFMPEG;
         } else {
-          process.env.DEK_FFMPEG = previous;
+          process.env.DEKC_FFMPEG = previous;
         }
       }
     });
   });
 
   test.serial(
-    "stops an ffmpeg that runs past timeoutMs, so a hung encode cannot hang dek",
+    "stops an ffmpeg that runs past timeoutMs, so a hung encode cannot hang dekc",
     async () => {
       await withTempDir(async (dir) => {
         const a = join(dir, "a.png");
         writeFileSync(a, PNG);
         const started = Date.now();
         await withEnv(
-          { DEK_FFMPEG: join(import.meta.dir, "../helpers/fake-ffmpeg-slow.ts") },
+          { DEKC_FFMPEG: join(import.meta.dir, "../helpers/fake-ffmpeg-slow.ts") },
           async () => {
             await expect(
               muxVideo({
@@ -413,7 +413,7 @@ describe("muxVideo", () => {
                 timeoutMs: 50,
               }),
             ).rejects.toMatchObject({
-              name: "DekError",
+              name: "DekcError",
               message: "ffmpeg failed",
               hint: expect.stringContaining("did not finish"),
             });
@@ -440,7 +440,7 @@ describe("muxVideo", () => {
             outPath: join(dir, "out.mp4"),
           }),
         ),
-      ).rejects.toMatchObject({ name: "DekError" });
+      ).rejects.toMatchObject({ name: "DekcError" });
       expect(readdirSync(tmp)).toEqual([]);
     });
   });

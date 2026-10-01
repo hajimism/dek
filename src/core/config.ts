@@ -10,7 +10,7 @@ export const Voice = z.object({
   speed: z.number().optional(),
 });
 
-export const DekToml = z.object({
+export const DekcToml = z.object({
   url: z
     .string()
     .refine((value) => parsePublicUrl(value) !== undefined, {
@@ -32,7 +32,7 @@ export const DekToml = z.object({
           ctx.addIssue({
             code: "custom",
             path: [name],
-            message: `pin a ref to a 40-character commit sha; run \`dek ref ${name}\` to pin one`,
+            message: `pin a ref to a 40-character commit sha; run \`dekc ref ${name}\` to pin one`,
           });
         }
       }
@@ -46,7 +46,7 @@ type VoiceDefaults = {
   speed: number;
 };
 
-export type DekConfig = {
+export type DekcConfig = {
   /** Where dist/ is served from, ending in a slash; link previews need it for og:image. */
   url?: string;
   maxClasses: number;
@@ -57,16 +57,16 @@ export type DekConfig = {
   refs?: Record<string, string>;
 };
 
-export const DEFAULT_CONFIG: DekConfig = {
+export const DEFAULT_CONFIG: DekcConfig = {
   maxClasses: 40,
   cjkPerMinute: 300,
   latinPerMinute: 130,
 };
 
-export function parseDekToml(source: string, path?: string): DekConfig {
-  const data = parseTomlWith(DekToml, source, {
-    label: "dek.toml",
-    anchor: "dek-toml",
+export function parseDekcToml(source: string, path?: string): DekcConfig {
+  const data = parseTomlWith(DekcToml, source, {
+    label: "dekc.toml",
+    anchor: "dekc-toml",
     ...(path === undefined ? {} : { path }),
   });
   const voice = data.voice
@@ -87,9 +87,9 @@ export function parseDekToml(source: string, path?: string): DekConfig {
   };
 }
 
-export function loadConfig(configPath: string): DekConfig {
+export function loadConfig(configPath: string): DekcConfig {
   if (!existsSync(configPath)) {
     return { ...DEFAULT_CONFIG };
   }
-  return parseDekToml(readFileSync(configPath, "utf8"), configPath);
+  return parseDekcToml(readFileSync(configPath, "utf8"), configPath);
 }

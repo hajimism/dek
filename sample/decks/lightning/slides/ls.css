@@ -1,4 +1,4 @@
-/* `dek ls` on a draft of this very script, run for real: the lint section had grown to 0:55.
+/* `dekc ls` on a draft of this very script, run for real: the lint section had grown to 0:55.
    Columns are laid out as a grid, since CJK glyphs are not two monospace cells wide. */
 .slide {
   --at: 0.3778;

@@ -1,30 +1,30 @@
 # Projects and Decks
 
-A **project** holds many **decks**. This page explains the boundary between the two, why the theme is copied rather than shared, and how dek decides which deck a command applies to.
+A **project** holds many **decks**. This page explains the boundary between the two, why the theme is copied rather than shared, and how dekc decides which deck a command applies to.
 
 ## One project, many decks
 
 ```
-my-talks/                       # project (dek init)
-├── dek.toml                    # lint thresholds, speaking rate, voice defaults
-├── .gitignore                  # dist/, .cache/, .dek/server.json, refs/
+my-talks/                       # project (dekc init)
+├── dekc.toml                    # lint thresholds, speaking rate, voice defaults
+├── .gitignore                  # dist/, .cache/, .dekc/server.json, refs/
 ├── .rumdl.toml                 # Markdown rules for script.md
 ├── theme.css                   # the starting point for new decks
-├── AGENTS.md                   # conventions for agents (dek keeps its marked block; the rest is yours)
-├── tsconfig.json               # editor types for slide scripts (written by dek init)
+├── AGENTS.md                   # conventions for agents (dekc keeps its marked block; the rest is yours)
+├── tsconfig.json               # editor types for slide scripts (written by dekc init)
 ├── assets/                     # shared source material; decks copy what they use
-├── refs/                       # other people's decks to read, fetched from dek.toml [refs]
+├── refs/                       # other people's decks to read, fetched from dekc.toml [refs]
 ├── decks/
-│   └── 2026-04-vite/           # deck (dek new)
+│   └── 2026-04-vite/           # deck (dekc new)
 │       ├── script.md           # the single source of truth
 │       ├── theme.css           # this deck's own copy
 │       ├── slides/             # one HTML file per section, plus optional .css / .ts
 │       ├── assets/             # everything the slides reference
 │       ├── dist/               # build, pdf, and video output
 │       └── .cache/             # screenshots, voice, and video intermediates
-└── .dek/
+└── .dekc/
     ├── schema.json             # frontmatter schema, regenerated on sync
-    └── slide.d.ts              # the DekSlide type, regenerated on sync
+    └── slide.d.ts              # the DekcSlide type, regenerated on sync
 ```
 
 The `decks/` directory always exists, even with one deck. The CLI, the dev server, and any agent resolve paths the same way in every project.
@@ -33,11 +33,11 @@ A deck is self-contained. Nothing inside `decks/2026-04-vite/` refers to anythin
 
 ## Themes are copied, not shared
 
-The project's `theme.css` is a template. `dek new` copies it into the new deck, and from then on the deck owns its copy.
+The project's `theme.css` is a template. `dekc new` copies it into the new deck, and from then on the deck owns its copy.
 
 ```bash
-dek new 2026-09-dek
-dek new 2026-09-dek --theme-from 2026-04-vite
+dekc new 2026-09-dekc
+dekc new 2026-09-dekc --theme-from 2026-04-vite
 ```
 
 Consider the alternative. If decks shared one theme, polishing it in September would change how April's deck renders. A heading that used to fit on one line would wrap, and lint would start warning about a talk you gave five months ago. A finished talk should stay finished. A physical copy is the most reliable way to guarantee that.
@@ -45,29 +45,29 @@ Consider the alternative. If decks shared one theme, polishing it in September w
 When a deck's theme is worth keeping, promote it with `cp`. There is no dedicated command.
 
 ```bash
-cp decks/2026-09-dek/theme.css theme.css
+cp decks/2026-09-dekc/theme.css theme.css
 ```
 
 Your past decks are a theme library you never have to maintain.
 
-The same rule applies to `assets/` and to voice. The project's `assets/` holds source material; a deck copies what it uses into its own `assets/`. When `dek.toml` has a `[voice]` table, `dek new` copies it into the deck as `voice/voice.toml`, so changing the speaker in September leaves April's narration alone.
+The same rule applies to `assets/` and to voice. The project's `assets/` holds source material; a deck copies what it uses into its own `assets/`. When `dekc.toml` has a `[voice]` table, `dekc new` copies it into the deck as `voice/voice.toml`, so changing the speaker in September leaves April's narration alone.
 
 ## Other people's decks are read, not borrowed
 
-A deck you want to learn from, yours or someone else's, is a ref. `dek ref hajimism/dek/why-dek` pins it in `dek.toml` `[refs]` and fetches a snapshot into `refs/`, laid out as the project it came from.
+A deck you want to learn from, yours or someone else's, is a ref. `dekc ref hajimism/dekc/why-dekc` pins it in `dekc.toml` `[refs]` and fetches a snapshot into `refs/`, laid out as the project it came from.
 
 ```bash
-dek ref hajimism/dek/why-dek
-dek show hajimism/dek/why-dek timing
+dekc ref hajimism/dekc/why-dekc
+dekc show hajimism/dekc/why-dekc timing
 ```
 
 A ref is read-only. `ls`, `show`, `theme`, and `shot` read it; nothing writes it. To use a slide, copy what you need into your own deck and rewrite it in your theme. Your deck never refers to a ref, so it stays self-contained.
 
-The pin in `dek.toml` is the ref; the snapshot is only a copy of that commit. `refs/` is gitignored, and deleting it, or cloning the project somewhere new, loses nothing: the next read fetches the pinned commit again. `dek` never looks in `refs/` when it lints or builds your decks.
+The pin in `dekc.toml` is the ref; the snapshot is only a copy of that commit. `refs/` is gitignored, and deleting it, or cloning the project somewhere new, loses nothing: the next read fetches the pinned commit again. `dekc` never looks in `refs/` when it lints or builds your decks.
 
 ## Where you run a command decides its scope
 
-dek finds the project root by walking up from the current directory until it finds `dek.toml`, the same way Cargo finds a workspace.
+dekc finds the project root by walking up from the current directory until it finds `dekc.toml`, the same way Cargo finds a workspace.
 
 | Where you run it | What it applies to |
 | --- | --- |
@@ -75,9 +75,9 @@ dek finds the project root by walking up from the current directory until it fin
 | Inside a deck | That deck |
 | Anywhere, with a deck name or `--deck <name>` | The named deck |
 
-From the project root, `dek lint` lints every deck and `dek build` builds every deck. Commands that need exactly one deck, such as `dek show intro`, ask you to name it. The deck name can be a positional argument: `dek show 2026-04-vite intro`, `dek lint 2026-04-vite`, `dek 2026-04-vite`.
+From the project root, `dekc lint` lints every deck and `dekc build` builds every deck. Commands that need exactly one deck, such as `dekc show intro`, ask you to name it. The deck name can be a positional argument: `dekc show 2026-04-vite intro`, `dekc lint 2026-04-vite`, `dekc 2026-04-vite`.
 
-Running `dek new` outside any project stops and points you at `dek init`. A command run inside `refs/` stops too, and points you back at your project.
+Running `dekc new` outside any project stops and points you at `dekc init`. A command run inside `refs/` stops too, and points you back at your project.
 
 ## Next
 

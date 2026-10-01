@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { cacheDir, type DistOptions, distDir, distFile } from "../core/path.ts";
 import {
   asResolvedDeck,
@@ -64,9 +64,9 @@ async function bakeProjectDeck(
   const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
   const loaded = loadCachedTimeline(deck.dir);
   if (!loaded) {
-    throw new DekError("Timeline not found", {
+    throw new DekcError("Timeline not found", {
       path: timelinePath,
-      hint: "run `dek voice`",
+      hint: "run `dekc voice`",
     });
   }
   let timeline = { ...loaded, audio: resolveTimelineAudio(loaded, timelinePath) };
@@ -133,14 +133,14 @@ export function sliceTimelineAudio(
 ): Timeline {
   const range = slideTimeRange(timeline, slideIndex);
   if (!range) {
-    throw new DekError(`no timeline beats for slide ${slideIndex}`, {
-      hint: "run `dek voice`",
+    throw new DekcError(`no timeline beats for slide ${slideIndex}`, {
+      hint: "run `dekc voice`",
     });
   }
   if (!existsSync(timeline.audio)) {
-    throw new DekError("audio not found", {
+    throw new DekcError("audio not found", {
       path: timeline.audio,
-      hint: "run `dek voice`",
+      hint: "run `dekc voice`",
     });
   }
   const sliced = sliceTimeline(timeline, slideIndex);

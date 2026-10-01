@@ -1,10 +1,10 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
-import type { DekError } from "../error.ts";
+import type { DekcError } from "../error.ts";
 import { ScriptError } from "../parse.ts";
 import { scriptLines } from "../script-lines.ts";
 import type { LintContext } from "./context.ts";
 
-/** DEK004: a section id or a beat id used twice. */
+/** DEKC004: a section id or a beat id used twice. */
 export function duplicateIdDiagnostics(ctx: LintContext): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const scriptPath = ctx.deck.scriptPath;
@@ -12,7 +12,7 @@ export function duplicateIdDiagnostics(ctx: LintContext): Diagnostic[] {
   for (const section of ctx.deck.deck.sections) {
     if (seenSlugs.has(section.slug)) {
       diagnostics.push(
-        diag("DEK004", {
+        diag("DEKC004", {
           message: `duplicate section id "${section.slug}"`,
           path: scriptPath,
           line: section.line,
@@ -31,7 +31,7 @@ export function duplicateIdDiagnostics(ctx: LintContext): Diagnostic[] {
       }
       if (seenBeats.has(beat.id)) {
         diagnostics.push(
-          diag("DEK004", {
+          diag("DEKC004", {
             message: `duplicate beat id "${beat.id}" in "${section.slug}"`,
             path: scriptPath,
             line: beat.line,
@@ -48,7 +48,7 @@ export function duplicateIdDiagnostics(ctx: LintContext): Diagnostic[] {
 }
 
 /**
- * DEK044: a `#` or `####` heading. Only `##` (slide) and `###` (beat) mean anything, so any
+ * DEKC044: a `#` or `####` heading. Only `##` (slide) and `###` (beat) mean anything, so any
  * other level is read out as part of the script, `#` and all.
  */
 export function strayHeadingDiagnostics(ctx: LintContext): Diagnostic[] {
@@ -68,7 +68,7 @@ export function strayHeadingDiagnostics(ctx: LintContext): Diagnostic[] {
     // Under a slide heading it belongs to that slide; above the first, to the deck.
     const slug = starts.filter((start) => start.line < line).at(-1)?.slug;
     diagnostics.push(
-      diag("DEK044", {
+      diag("DEKC044", {
         message: `${"#".repeat(level)} heading is not a slide or a beat; it is read as spoken text`,
         path: deck.scriptPath,
         line,
@@ -82,17 +82,17 @@ export function strayHeadingDiagnostics(ctx: LintContext): Diagnostic[] {
 }
 
 /**
- * DEK027: a script.md that cannot be read, one finding for each problem that stops it. Nothing
+ * DEKC027: a script.md that cannot be read, one finding for each problem that stops it. Nothing
  * else in the deck can be checked against a script that does not read, so these are its findings.
  */
 export function unreadableScriptDiagnostics(deck: {
   scriptPath: string;
-  error: DekError;
+  error: DekcError;
 }): Diagnostic[] {
   const { error } = deck;
   const problems = error instanceof ScriptError ? error.problems : [error];
   return problems.map(({ message, line, hint }) =>
-    diag("DEK027", {
+    diag("DEKC027", {
       message,
       path: error.path ?? deck.scriptPath,
       ...(line !== undefined ? { line } : {}),

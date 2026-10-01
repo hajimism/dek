@@ -16,7 +16,7 @@ export type PageFindings = Required<PagesResponse>;
 
 /**
  * The code that decides what a page's findings are. A change to any of it can change them, so
- * its source is part of every key, and a cache written by another dek is never read.
+ * its source is part of every key, and a cache written by another dekc is never read.
  */
 const MEASURERS = [
   "playwright-visual.ts",

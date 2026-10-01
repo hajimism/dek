@@ -1,4 +1,4 @@
-import type { DekConfig } from "./config.ts";
+import type { DekcConfig } from "./config.ts";
 
 type SectionBodies = {
   body: string;
@@ -28,7 +28,7 @@ function speechChars(text: string): number {
   return stripBlockquotes(text).replace(/\s+/g, "").length;
 }
 
-function estimateSeconds(text: string, config: DekConfig): number {
+function estimateSeconds(text: string, config: DekcConfig): number {
   const stripped = stripBlockquotes(text);
   const cjk = [...stripped.matchAll(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu)]
     .length;
@@ -65,7 +65,7 @@ export type TimedSection = {
 export function sectionTiming(
   sections: Array<{ slug: string; body: string; beats: Array<{ body: string }> }>,
   duration: string | undefined,
-  config: DekConfig,
+  config: DekcConfig,
 ): TimedSection[] {
   const rows = sections.map((section) => {
     const text = speechText(section);

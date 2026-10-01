@@ -1,30 +1,30 @@
 # プロジェクトとデッキ
 
-**プロジェクト** は複数の **デッキ** を入れる場所です。このページでは、その境界、テーマを共有ではなくコピーにしている理由、そして dek がどのデッキを対象にするかを決める仕組みを説明します。
+**プロジェクト** は複数の **デッキ** を入れる場所です。このページでは、その境界、テーマを共有ではなくコピーにしている理由、そして dekc がどのデッキを対象にするかを決める仕組みを説明します。
 
 ## 1 プロジェクト、N デッキ
 
 ```
-my-talks/                       # プロジェクト（dek init）
-├── dek.toml                    # lint の閾値、話速、声の既定値
-├── .gitignore                  # dist/ .cache/ .dek/server.json refs/
+my-talks/                       # プロジェクト（dekc init）
+├── dekc.toml                    # lint の閾値、話速、声の既定値
+├── .gitignore                  # dist/ .cache/ .dekc/server.json refs/
 ├── .rumdl.toml                 # script.md 用の Markdown ルール
 ├── theme.css                   # 新しいデッキの出発点
-├── AGENTS.md                   # エージェント向けの規約（dek は印の付いたブロックだけを書く。残りはあなたのもの）
-├── tsconfig.json               # スライドのスクリプト用のエディタ設定（dek init が書く）
+├── AGENTS.md                   # エージェント向けの規約（dekc は印の付いたブロックだけを書く。残りはあなたのもの）
+├── tsconfig.json               # スライドのスクリプト用のエディタ設定（dekc init が書く）
 ├── assets/                     # 素材置き場。デッキは使うものをコピーする
-├── refs/                       # 見本として読む他人のデッキ。dek.toml の [refs] から取得する
+├── refs/                       # 見本として読む他人のデッキ。dekc.toml の [refs] から取得する
 ├── decks/
-│   └── 2026-04-vite/           # デッキ（dek new）
+│   └── 2026-04-vite/           # デッキ（dekc new）
 │       ├── script.md           # 唯一の真実
 │       ├── theme.css           # このデッキ専用のコピー
 │       ├── slides/             # セクションごとに 1 HTML。任意で .css / .ts
 │       ├── assets/             # スライドが参照するものすべて
 │       ├── dist/               # build / pdf / video の成果物
 │       └── .cache/             # スクショ、声、動画の中間物
-└── .dek/
+└── .dekc/
     ├── schema.json             # frontmatter スキーマ。sync のたびに再生成
-    └── slide.d.ts              # DekSlide の型。sync のたびに再生成
+    └── slide.d.ts              # DekcSlide の型。sync のたびに再生成
 ```
 
 デッキが 1 つでも `decks/` は必ずあります。CLI も開発サーバもエージェントも、どのプロジェクトでも同じやり方でパスを解決します。
@@ -33,11 +33,11 @@ my-talks/                       # プロジェクト（dek init）
 
 ## テーマは共有せず、コピーする
 
-プロジェクト直下の `theme.css` はテンプレートです。`dek new` がそれを新しいデッキへコピーし、以降はデッキがそのコピーを所有します。
+プロジェクト直下の `theme.css` はテンプレートです。`dekc new` がそれを新しいデッキへコピーし、以降はデッキがそのコピーを所有します。
 
 ```bash
-dek new 2026-09-dek
-dek new 2026-09-dek --theme-from 2026-04-vite
+dekc new 2026-09-dekc
+dekc new 2026-09-dekc --theme-from 2026-04-vite
 ```
 
 共有にした場合を考えてみてください。9 月にテーマを磨いた結果、4 月のデッキの描画が変わります。1 行に収まっていた見出しが折り返し、5 か月前に終えたトークに対して lint が警告を出しはじめる。終わったトークは終わった状態で固定されるべきで、それをいちばん確実に保証するのが物理的なコピーです。
@@ -45,29 +45,29 @@ dek new 2026-09-dek --theme-from 2026-04-vite
 デッキのテーマが残す価値のあるものになったら、`cp` で昇格させます。専用のコマンドはありません。
 
 ```bash
-cp decks/2026-09-dek/theme.css theme.css
+cp decks/2026-09-dekc/theme.css theme.css
 ```
 
 過去のデッキが、保守の要らないテーマライブラリになります。
 
-同じルールが `assets/` と声にも当てはまります。プロジェクト直下の `assets/` は素材置き場で、デッキは使うものを自分の `assets/` へコピーします。`dek.toml` に `[voice]` テーブルがあれば、`dek new` はそれをデッキの `voice/voice.toml` としてコピーするので、9 月に話者を変えても 4 月のナレーションは変わりません。
+同じルールが `assets/` と声にも当てはまります。プロジェクト直下の `assets/` は素材置き場で、デッキは使うものを自分の `assets/` へコピーします。`dekc.toml` に `[voice]` テーブルがあれば、`dekc new` はそれをデッキの `voice/voice.toml` としてコピーするので、9 月に話者を変えても 4 月のナレーションは変わりません。
 
 ## 他人のデッキは読むだけで、借りない
 
-見本にしたいデッキは、自分のものでも他人のものでも ref にします。`dek ref hajimism/dek/why-dek` は、`dek.toml` の `[refs]` に固定し、`refs/` に実体を取ってきます。実体は、元のプロジェクトと同じ配置です。
+見本にしたいデッキは、自分のものでも他人のものでも ref にします。`dekc ref hajimism/dekc/why-dekc` は、`dekc.toml` の `[refs]` に固定し、`refs/` に実体を取ってきます。実体は、元のプロジェクトと同じ配置です。
 
 ```bash
-dek ref hajimism/dek/why-dek
-dek show hajimism/dek/why-dek timing
+dekc ref hajimism/dekc/why-dekc
+dekc show hajimism/dekc/why-dekc timing
 ```
 
 ref は読み取り専用です。`ls`・`show`・`theme`・`shot` で読めますが、書き換えるコマンドはありません。スライドを使いたいときは、必要な部分を自分のデッキにコピーして、自分のテーマで書き直します。自分のデッキが ref を参照することはないので、デッキは自己完結したままです。
 
-ref の本体は `dek.toml` の固定で、実体はそのコミットのコピーにすぎません。`refs/` は gitignore されます。消しても、別の場所に clone しても、何も失いません。次に読むときに、固定したコミットを取り直します。自分のデッキを lint やビルドするとき、`dek` が `refs/` を見ることはありません。
+ref の本体は `dekc.toml` の固定で、実体はそのコミットのコピーにすぎません。`refs/` は gitignore されます。消しても、別の場所に clone しても、何も失いません。次に読むときに、固定したコミットを取り直します。自分のデッキを lint やビルドするとき、`dekc` が `refs/` を見ることはありません。
 
 ## 実行場所がスコープを決める
 
-dek はカレントディレクトリから上へ `dek.toml` を探してプロジェクトルートを決めます。Cargo がワークスペースを見つけるのと同じ方法です。
+dekc はカレントディレクトリから上へ `dekc.toml` を探してプロジェクトルートを決めます。Cargo がワークスペースを見つけるのと同じ方法です。
 
 | どこで実行したか | 対象 |
 | --- | --- |
@@ -75,9 +75,9 @@ dek はカレントディレクトリから上へ `dek.toml` を探してプロ�
 | デッキの中 | そのデッキ |
 | どこからでも、デッキ名か `--deck <name>` を付けて | 指定したデッキ |
 
-プロジェクト直下の `dek lint` は全デッキを lint し、`dek build` は全デッキをビルドします。`dek show intro` のようにデッキが 1 つに決まる必要のあるコマンドは、名前を求めます。デッキ名は位置引数でも渡せます。たとえば `dek show 2026-04-vite intro`、`dek lint 2026-04-vite`、`dek 2026-04-vite` です。
+プロジェクト直下の `dekc lint` は全デッキを lint し、`dekc build` は全デッキをビルドします。`dekc show intro` のようにデッキが 1 つに決まる必要のあるコマンドは、名前を求めます。デッキ名は位置引数でも渡せます。たとえば `dekc show 2026-04-vite intro`、`dekc lint 2026-04-vite`、`dekc 2026-04-vite` です。
 
-プロジェクトの外で `dek new` を叩くと、`dek init` を案内して止まります。`refs/` の中でコマンドを叩いたときも止まり、自分のプロジェクトに戻るよう案内します。
+プロジェクトの外で `dekc new` を叩くと、`dekc init` を案内して止まります。`refs/` の中でコマンドを叩いたときも止まり、自分のプロジェクトに戻るよう案内します。
 
 ## 次
 

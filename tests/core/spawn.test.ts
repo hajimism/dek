@@ -38,7 +38,7 @@ describe("runJsonWorker", () => {
         timeoutMs: 20,
       }),
     ).rejects.toMatchObject({
-      name: "DekError",
+      name: "DekcError",
       message: "Playwright worker failed",
       hint: expect.stringContaining("did not finish"),
     });
@@ -48,7 +48,7 @@ describe("runJsonWorker", () => {
     await expect(
       runJsonWorker(workerCommand(join(helpers, "fake-playwright-fail.ts")), {}, parse, options),
     ).rejects.toMatchObject({
-      name: "DekError",
+      name: "DekcError",
       hint: expect.stringContaining("intentional playwright worker failure"),
     });
   });
@@ -56,7 +56,7 @@ describe("runJsonWorker", () => {
   test("a worker that prints something else fails as invalid JSON", async () => {
     await expect(
       runJsonWorker(["bun", "-e", "console.log('nope')"], {}, parse, options),
-    ).rejects.toMatchObject({ name: "DekError", hint: "worker returned invalid JSON" });
+    ).rejects.toMatchObject({ name: "DekcError", hint: "worker returned invalid JSON" });
   });
 });
 
@@ -82,7 +82,7 @@ describe("runPiped", () => {
         timeoutMs: 50,
       }),
     ).rejects.toMatchObject({
-      name: "DekError",
+      name: "DekcError",
       message: "ffmpeg failed",
       hint: expect.stringContaining("did not finish"),
     });
@@ -96,6 +96,10 @@ describe("runPiped", () => {
         hint: "install ffmpeg",
         timeoutMs: 1000,
       }),
-    ).rejects.toMatchObject({ name: "DekError", message: "ffmpeg failed", hint: "install ffmpeg" });
+    ).rejects.toMatchObject({
+      name: "DekcError",
+      message: "ffmpeg failed",
+      hint: "install ffmpeg",
+    });
   });
 });

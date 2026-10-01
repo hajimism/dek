@@ -1,4 +1,4 @@
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
 import { type ShotFile, shotDeck, shotSheet } from "../core/shot/still.ts";
@@ -23,7 +23,7 @@ type ShotCommandOptions = {
   motion?: boolean;
 };
 
-/** What `dek shot` was asked to take, once its flags are known to fit together. */
+/** What `dekc shot` was asked to take, once its flags are known to fit together. */
 export type ShotMode =
   | { kind: "still"; slug?: string; step?: string }
   | { kind: "sheet" }
@@ -66,7 +66,7 @@ export async function shotCommand(
 }
 
 function refuse(message: string, hint: string): never {
-  throw new DekError(message, { hint });
+  throw new DekcError(message, { hint });
 }
 
 /**
@@ -91,7 +91,7 @@ export function parseShotMode(options: ShotCommandOptions): ShotMode {
     if (slug) {
       refuse(
         "--sheet with a slug",
-        `--sheet tiles every slide; for one slide's beats, run \`dek shot ${slug} --motion\``,
+        `--sheet tiles every slide; for one slide's beats, run \`dekc shot ${slug} --motion\``,
       );
     }
     return { kind: "sheet" };
@@ -100,7 +100,7 @@ export function parseShotMode(options: ShotCommandOptions): ShotMode {
     if (to !== undefined) {
       refuse(
         "--motion with --to",
-        "the move from the slide before is row 1 of --motion; for a jump to any slide, use `dek shot <a> --to <b>`",
+        "the move from the slide before is row 1 of --motion; for a jump to any slide, use `dekc shot <a> --to <b>`",
       );
     }
     if (at !== undefined) {

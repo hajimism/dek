@@ -2,11 +2,11 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "why-dek",
+      "name": "why-dekc",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd sample && bunx dek why-dek --port 4777"
+        "cd sample && bunx dekc why-dekc --port 4777"
       ],
       "port": 4777
     },
@@ -15,7 +15,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd sample && bunx dek lightning --port 4778"
+        "cd sample && bunx dekc lightning --port 4778"
       ],
       "port": 4778
     },
@@ -24,7 +24,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd sample && bunx dek with-agents --port 4779"
+        "cd sample && bunx dekc with-agents --port 4779"
       ],
       "port": 4779
     },

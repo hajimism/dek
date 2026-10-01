@@ -3,12 +3,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { videoCommand } from "../../src/cli/video.ts";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import type { Timeline } from "../../src/core/timeline.ts";
 import { VOICE_SETUP_HINT } from "../../src/core/voice.ts";
 import { writeVideoSidecars } from "../../src/video/sidecar.ts";
 import { silentWav } from "../../src/voice/wav.ts";
-import { runDek } from "../helpers/cli.ts";
+import { runDekc } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -93,15 +93,15 @@ describe("sidecars", () => {
   });
 });
 
-describe("dek video", () => {
+describe("dekc video", () => {
   test("errors when Timeline is missing", async () => {
     await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, "voice"), { recursive: true });
       await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
-      const result = await runDek(["video", "--json"], { cwd: deckDir });
+      const result = await runDekc(["video", "--json"], { cwd: deckDir });
       expect(result).toMatchObject({ exitCode: 1 });
-      expect(result.stdout).toContain("dek voice");
+      expect(result.stdout).toContain("dekc voice");
     });
   });
 
@@ -135,9 +135,9 @@ describe("dek video", () => {
             ],
           } satisfies Timeline)}\n`,
         );
-        const result = await runDek(["video", "--json"], {
+        const result = await runDekc(["video", "--json"], {
           cwd: deckDir,
-          env: { DEK_VIDEO: "" },
+          env: { DEKC_VIDEO: "" },
         });
         expect(result).toMatchObject({ exitCode: 1 });
         expect(`${result.stdout}${result.stderr}`).toContain("Playwright");
@@ -167,14 +167,14 @@ describe("videoCommand", () => {
       await mkdir(cacheDir, { recursive: true });
       await writeFile(join(cacheDir, "timeline.json"), '{"ok":true}\n');
       await expect(videoCommand(requireDeckFromCwd(deckDir))).rejects.toMatchObject({
-        name: "DekError",
+        name: "DekcError",
         message: expect.stringMatching(/invalid/i),
       });
       try {
         await videoCommand(requireDeckFromCwd(deckDir));
       } catch (error) {
-        expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message.toLowerCase()).not.toContain("not found");
+        expect(error).toBeInstanceOf(DekcError);
+        expect((error as DekcError).message.toLowerCase()).not.toContain("not found");
       }
     });
   });

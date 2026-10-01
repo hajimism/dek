@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import { dirname, join, relative } from "node:path";
 import { bundledTheme } from "../core/bundled-theme.ts";
 import { deckPaths } from "../core/deck-paths.ts";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
 import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
 import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
@@ -13,17 +13,17 @@ export function defaultTheme(): string {
 }
 
 export function defaultToml(): string {
-  return "# dek project\n";
+  return "# dekc project\n";
 }
 
 /**
- * What dek keeps for itself under .dek/ while it runs: the dev server's lock, and the marks left
+ * What dekc keeps for itself under .dekc/ while it runs: the dev server's lock, and the marks left
  * while rehearsing. Neither belongs in the repository.
  */
-const LOCAL_STATE = [".dek/server.json", ".dek/marks.json"];
+const LOCAL_STATE = [".dekc/server.json", ".dekc/marks.json"];
 
 export function defaultGitignore(): string {
-  return `# dek
+  return `# dekc
 dist/
 .cache/
 ${LOCAL_STATE.join("\n")}
@@ -32,12 +32,12 @@ refs/
 `;
 }
 
-/** The lines that ignore `entry` whole or through .dek/, with or without a leading slash. */
+/** The lines that ignore `entry` whole or through .dekc/, with or without a leading slash. */
 const ignores = (entry: string): string[] =>
-  [entry, ".dek", ".dek/", ".dek/*", ".dek/**"].flatMap((line) => [line, `/${line}`]);
+  [entry, ".dekc", ".dekc/", ".dekc/*", ".dekc/**"].flatMap((line) => [line, `/${line}`]);
 
 /**
- * Add what dek keeps for itself to the project's .gitignore, for a project made before dek kept
+ * Add what dekc keeps for itself to the project's .gitignore, for a project made before dekc kept
  * it; whether the file changed. A project with no .gitignore is left without one.
  */
 export function ignoreLocalState(root: string): boolean {
@@ -64,17 +64,17 @@ disable = ["MD041"]
 `;
 }
 
-/** How to install dek into a project, until it is published to npm as `@hajimism/dek`. */
-const INSTALL_DEK = "bun add -d github:hajimism/dek";
+/** How to install dekc into a project, until it is published to npm as `dekc`. */
+const INSTALL_DEKC = "bun add -d github:hajimism/dekc";
 
 /**
- * The starter script: short, but a real talk, so the first `dek ls` already
+ * The starter script: short, but a real talk, so the first `dekc ls` already
  * shows sections, beats, and an estimate against the budget. A deck with a
- * voice starts in Japanese, the language dek's voice reads; any other in English.
+ * voice starts in Japanese, the language dekc's voice reads; any other in English.
  */
 export function defaultScript(title: string, lang: "en" | "ja" = "en"): string {
   return `---
-# yaml-language-server: $schema=../../.dek/schema.json
+# yaml-language-server: $schema=../../.dekc/schema.json
 title: ${JSON.stringify(title)}
 duration: 1m
 ---
@@ -106,9 +106,9 @@ a pause in the speaking, and a moment where the screen can move on.
 
 ## The clock {#timing}
 
-dek estimates how long the talk takes from these words,
+dekc estimates how long the talk takes from these words,
 and checks the estimate against the duration at the top of this file.
-Run \`dek ls\` to see the budget and the estimate side by side.
+Run \`dekc ls\` to see the budget and the estimate side by side.
 
 ## Your turn {#next}
 
@@ -143,7 +143,7 @@ The dev server keeps the slides in step every time you save.
 話にかかる時間は、ここに書いた言葉から見積もられます。
 その見積もりを、ファイルの先頭にある持ち時間と照らし合わせます。
 
-> \`dek ls\` で持ち時間と見積もりを並べて見る。
+> \`dekc ls\` で持ち時間と見積もりを並べて見る。
 
 ## あなたの番です {#next}
 
@@ -200,7 +200,7 @@ function pathState(entry: PlannedPath): "missing" | "same" | "kept" {
 
 /**
  * Checks that each file can be written where it goes, before anything is: for
- * files dek refreshes on every run, which a plan does not hold.
+ * files dekc refreshes on every run, which a plan does not hold.
  */
 export function checkFileSlots(paths: string[]): void {
   for (const path of paths) {
@@ -215,13 +215,13 @@ function placeable(path: string, kind: "file" | "directory"): boolean {
   }
   const isDir = statSync(path).isDirectory();
   if (kind === "directory" && !isDir) {
-    throw new DekError("a file is in the way of a directory", {
+    throw new DekcError("a file is in the way of a directory", {
       path,
       hint: "move the file aside and run again",
     });
   }
   if (kind === "file" && isDir) {
-    throw new DekError("a directory is in the way of a file", {
+    throw new DekcError("a directory is in the way of a file", {
       path,
       hint: "move the directory aside and run again",
     });
@@ -258,7 +258,7 @@ export function deckPlan(
 }
 
 /**
- * The commands to run next, from `cwd`, exactly as they can be pasted: dek
+ * The commands to run next, from `cwd`, exactly as they can be pasted: dekc
  * installed into the project unless it already resolves there, then into the
  * deck to write the script and start the dev server, or a first deck to add.
  */
@@ -272,25 +272,25 @@ export function nextSteps(cwd: string, root: string, deckDir?: string): string[]
     }
     at = dir;
   };
-  if (!hasLocalDek(root)) {
+  if (!hasLocalDekc(root)) {
     go(root);
-    steps.push(INSTALL_DEK);
+    steps.push(INSTALL_DEKC);
   }
   if (!deckDir) {
-    return [...steps, "bunx dek new <name>"];
+    return [...steps, "bunx dekc new <name>"];
   }
   go(deckDir);
-  return [...steps, "$EDITOR script.md", "bunx dek"];
+  return [...steps, "$EDITOR script.md", "bunx dekc"];
 }
 
-/** Whether `bunx dek` in the project runs this dek: bunx looks in node_modules/.bin up the tree. */
-function hasLocalDek(root: string): boolean {
-  return inNodeModules(root, ".bin", "dek");
+/** Whether `bunx dekc` in the project runs this dekc: bunx looks in node_modules/.bin up the tree. */
+function hasLocalDekc(root: string): boolean {
+  return inNodeModules(root, ".bin", "dekc");
 }
 
 /**
  * The Playwright install, until the project has it: shots, the PDF, and the rendered lint rules
- * need it, and dek does not bring it along.
+ * need it, and dekc does not bring it along.
  */
 export function playwrightStep(root: string): string | undefined {
   return inNodeModules(root, "playwright", "package.json") ? undefined : PLAYWRIGHT_INSTALL;

@@ -15,7 +15,7 @@ export type DeckRoute =
   | { kind: "theme" }
   | { kind: "slide"; slug: string }
   | { kind: "voice"; file: VoiceFile }
-  /** `dek current` and `dek goto`. */
+  /** `dekc current` and `dekc goto`. */
   | { kind: "current" }
   | { kind: "goto" }
   /** The beats the presenter marked to rewrite: listed, and one marked or unmarked. */
@@ -138,5 +138,5 @@ export function liveTokenQuery(token: string | undefined): string {
  * deck follow each other, and two decks open side by side do not.
  */
 export function deckChannelName(deck: string | undefined, slugs: readonly string[]): string {
-  return `dek:${deck ?? ""}:${slugs.join(",")}`;
+  return `dekc:${deck ?? ""}:${slugs.join(",")}`;
 }

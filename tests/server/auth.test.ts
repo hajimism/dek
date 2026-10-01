@@ -8,7 +8,7 @@ import {
   requestGuard,
 } from "../../src/server/auth.ts";
 
-const basic = (password: string) => `Basic ${Buffer.from(`dek:${password}`).toString("base64")}`;
+const basic = (password: string) => `Basic ${Buffer.from(`dekc:${password}`).toString("base64")}`;
 
 describe("clearance", () => {
   test("clears every request for the presenter when no password is set", () => {
@@ -104,7 +104,7 @@ describe("requestGuard", () => {
     ).toBe(403);
   });
 
-  test("allows the deck's own page, and dek goto, which sends no Origin", () => {
+  test("allows the deck's own page, and dekc goto, which sends no Origin", () => {
     const local = { remote: false };
     expect(
       requestGuard(

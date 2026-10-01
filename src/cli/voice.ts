@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { deckProjectRoot } from "../core/path.ts";
 import { isCachedFile, writeInside } from "../core/safe-fs.ts";
 import { loadVoiceDict, loadVoiceSettings, voiceCacheFile, writeVoiceDict } from "../core/voice.ts";
@@ -29,7 +29,7 @@ export type VoiceCliResult =
   | { action: "dict"; path: string; key: string; kana: string }
   | { action: "pin"; timelinePath: string; audioPath: string };
 
-/** `dek voice`: synthesize the sentences that changed. */
+/** `dekc voice`: synthesize the sentences that changed. */
 export async function synthVoice(target: DeckTarget): Promise<VoiceCliResult> {
   return { action: "synth", ...(await synthDeck(target)) };
 }
@@ -80,11 +80,11 @@ export function addReading(
 export function pinVoice({ deck }: DeckTarget): VoiceCliResult {
   const timelinePath = voiceCacheFile(deck.dir, "timeline.json");
   const audioPath = voiceCacheFile(deck.dir, "audio.wav");
-  // What is pinned is committed; only what `dek voice` wrote, never a link planted in the cache.
+  // What is pinned is committed; only what `dekc voice` wrote, never a link planted in the cache.
   if (!isCachedFile(timelinePath) || !isCachedFile(audioPath)) {
-    throw new DekError("Timeline not found", {
+    throw new DekcError("Timeline not found", {
       path: timelinePath,
-      hint: "run `dek voice`",
+      hint: "run `dekc voice`",
     });
   }
   const root = deckProjectRoot(deck.dir);
@@ -97,7 +97,7 @@ export function pinVoice({ deck }: DeckTarget): VoiceCliResult {
 }
 
 async function playWav(path: string): Promise<void> {
-  if (process.env.DEK_VOICE_PLAY === "0") {
+  if (process.env.DEKC_VOICE_PLAY === "0") {
     return;
   }
   const bin =

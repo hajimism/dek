@@ -1,4 +1,4 @@
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { moduleFilePath } from "../core/path.ts";
 import { playwrightResolved } from "../core/playwright.ts";
 import { runJsonWorker, workerCommand } from "../core/spawn.ts";
@@ -64,15 +64,15 @@ export async function defaultVideoRunner(
   request: VideoCaptureRequest,
   options: { timeoutMs?: number } = {},
 ): Promise<VideoCaptureResponse> {
-  const bin = process.env.DEK_VIDEO;
+  const bin = process.env.DEKC_VIDEO;
   if (bin) {
     return spawnVideoRunner(bin, request, options);
   }
   if (playwrightResolved()) {
     return spawnVideoRunner(workerPath(), request, options);
   }
-  throw new DekError("video capture failed", {
-    hint: "install Playwright or set DEK_VIDEO",
+  throw new DekcError("video capture failed", {
+    hint: "install Playwright or set DEKC_VIDEO",
   });
 }
 
@@ -87,7 +87,7 @@ function spawnVideoRunner(
 ): Promise<VideoCaptureResponse> {
   return runJsonWorker(workerCommand(bin), request, parseVideoResponse, {
     label: "video capture failed",
-    hint: "install Playwright or set DEK_VIDEO",
+    hint: "install Playwright or set DEKC_VIDEO",
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
   });
 }

@@ -8,7 +8,7 @@ import type { Section } from "./schema.ts";
 import { lastStop, stepKey } from "./step.ts";
 
 /**
- * Every capture dek caches lives under `.cache/shots`, named by what it is and a hash of what it
+ * Every capture dekc caches lives under `.cache/shots`, named by what it is and a hash of what it
  * shows. The parts of a name are joined with "~", which no slug, beat id or number can contain,
  * so no two captures share a name, and pruning one never reaches another.
  */
@@ -49,7 +49,7 @@ export function shotName(parts: string[], content: string): string {
 
 /**
  * The still of `section` at `beatIndex`. It is named by the beat's own key, so `--step hook`,
- * `--step 2` and a still at the last beat, `dek build`'s link preview included, are one file.
+ * `--step 2` and a still at the last beat, `dekc build`'s link preview included, are one file.
  */
 export function stillEntry(
   deckDir: string,

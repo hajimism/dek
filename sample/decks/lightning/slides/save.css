@@ -1,4 +1,4 @@
-/* Saving script.md makes one skeleton per heading: the real `dek sync` file list,
+/* Saving script.md makes one skeleton per heading: the real `dekc sync` file list,
    and the real skeleton it wrote for ls.html (wrapped to fit). */
 .slide {
   --at: 0.3056;

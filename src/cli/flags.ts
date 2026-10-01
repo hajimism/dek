@@ -1,8 +1,8 @@
 import { parseArgs } from "node:util";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { acceptedFlags, isTypedCommand, subcommandAt } from "./commands.ts";
 
-/** A flag's shape: a switch, a string, or a value dek checks before any command runs. */
+/** A flag's shape: a switch, a string, or a value dekc checks before any command runs. */
 type FlagSpec = { text: string } & (
   | { type: "boolean"; short?: string }
   | { type: "string"; value: string }
@@ -12,13 +12,13 @@ type FlagSpec = { text: string } & (
 );
 
 /**
- * Every flag dek has: its type, the placeholder for its value, and what it means. Each command
+ * Every flag dekc has: its type, the placeholder for its value, and what it means. Each command
  * names the ones it takes; help, parsing, and the checks on a value all read this one table.
  */
 export const FLAGS = {
   json: { type: "boolean", text: "print the result, or the error, as JSON" },
-  help: { type: "boolean", short: "h", text: "show help; dek help <command> for one command" },
-  version: { type: "boolean", short: "v", text: "print the dek version" },
+  help: { type: "boolean", short: "h", text: "show help; dekc help <command> for one command" },
+  version: { type: "boolean", short: "v", text: "print the dekc version" },
   agent: { type: "boolean", text: "the compact reference for agents" },
   deck: { type: "string", value: "NAME", text: "target a deck by name from the project root" },
   "theme-from": {
@@ -28,14 +28,14 @@ export const FLAGS = {
   },
   remote: {
     type: "boolean",
-    text: "serve on the LAN; the presenter view needs the password dek prints",
+    text: "serve on the LAN; the presenter view needs the password dekc prints",
   },
   port: {
     type: "int",
     value: "N",
     min: 1,
     max: 65_535,
-    example: "dek --port 3030",
+    example: "dekc --port 3030",
     text: "listen on this port (the OS picks one when omitted)",
   },
   fix: { type: "boolean", text: "create missing skeleton slides before linting" },
@@ -48,7 +48,7 @@ export const FLAGS = {
   format: {
     type: "enum",
     choices: ["sarif"],
-    example: "dek lint --format sarif",
+    example: "dekc lint --format sarif",
     note: "for JSON, pass --json",
     text: "print diagnostics as SARIF",
   },
@@ -71,21 +71,21 @@ export const FLAGS = {
     type: "int",
     value: "N",
     min: 0,
-    example: "dek voice dict add dek デック --accent 1",
+    example: "dekc voice dict add dekc デック --accent 1",
     text: "the accent position of the reading",
   },
   fps: {
     type: "number",
     value: "N",
     above: 0,
-    example: "dek video --fps 30",
+    example: "dekc video --fps 30",
     text: "frames per second",
   },
   "root-dist": { type: "boolean", text: "write to <root>/dist/ instead of the deck's dist/" },
   url: {
     type: "string",
     value: "<url>",
-    text: "the URL dist/ is served from, over url in dek.toml",
+    text: "the URL dist/ is served from, over url in dekc.toml",
   },
   public: {
     type: "boolean",
@@ -136,9 +136,9 @@ function parseOptions(names: readonly FlagName[]): ParseOptions {
 const ALL_FLAGS = Object.keys(FLAGS) as FlagName[];
 
 export type CommandLine = {
-  /** The first word: a command, a deck name, or nothing for the bare `dek`. */
+  /** The first word: a command, a deck name, or nothing for the bare `dekc`. */
   command?: string;
-  /** The subcommand named, such as `dict add` for `dek voice dict add`. */
+  /** The subcommand named, such as `dict add` for `dekc voice dict add`. */
   subcommand?: string;
   /** Every word that is no flag, the command word first. */
   positionals: string[];
@@ -171,7 +171,7 @@ export function wantsJson(argv: string[]): boolean {
 }
 
 /**
- * argv after `dek`, checked against the flags its command takes. Two passes:
+ * argv after `dekc`, checked against the flags its command takes. Two passes:
  * a lenient one only to find the command word (value flags must consume their
  * value first, or `--deck talk ls` would read `talk` as the command), then a
  * strict one with that command's flags, so a typo or a flag from another
@@ -181,7 +181,7 @@ export function wantsJson(argv: string[]): boolean {
 export function parseCommandLine(argv: string[]): CommandLine {
   const lenient = lenientParse(argv);
   const command = lenient.positionals[0];
-  // An unknown word, `serve` included, is parsed as the bare `dek [deck]` and judged later.
+  // An unknown word, `serve` included, is parsed as the bare `dekc [deck]` and judged later.
   const name =
     lenient.values.help === true && !isTypedCommand(command)
       ? "help"
@@ -190,10 +190,10 @@ export function parseCommandLine(argv: string[]): CommandLine {
         : "serve";
   const sub = subcommandAt(name, lenient.positionals);
   const names = [...acceptedFlags(name, sub?.name), ...GLOBAL_FLAGS];
-  const label = [command === undefined ? "dek" : `dek ${command}`, sub?.name]
+  const label = [command === undefined ? "dekc" : `dekc ${command}`, sub?.name]
     .filter(Boolean)
     .join(" ");
-  const hint = `${label} takes ${names.map((flag) => `--${flag}`).join(", ")}; run \`dek help ${name}\``;
+  const hint = `${label} takes ${names.map((flag) => `--${flag}`).join(", ")}; run \`dekc help ${name}\``;
 
   let parsed: ReturnType<typeof parseArgs>;
   try {
@@ -263,33 +263,33 @@ function typedValue(name: FlagName, value: string): string | number {
   }
 }
 
-function invalid(name: FlagName, value: string, takes: string): DekError {
-  return new DekError(`invalid --${name} "${value}"`, { hint: `--${name} takes ${takes}` });
+function invalid(name: FlagName, value: string, takes: string): DekcError {
+  return new DekcError(`invalid --${name} "${value}"`, { hint: `--${name} takes ${takes}` });
 }
 
 /** parseArgs' own messages, reworded around what the user typed. */
 function describeParseError(
   error: unknown,
   { argv, label, hint }: { argv: string[]; label: string; hint: string },
-): DekError {
+): DekcError {
   const message = error instanceof Error ? error.message : String(error);
   const unknown = message.match(/^Unknown option '([^']+)'/);
   if (unknown) {
-    return new DekError(`unknown flag ${unknown[1]} for ${label}`, { hint });
+    return new DekcError(`unknown flag ${unknown[1]} for ${label}`, { hint });
   }
   const missing = message.match(/^Option '(--[^ ']+)(?: <value>)?' argument missing/);
   if (missing) {
-    return new DekError(`${missing[1]} needs a value`, { hint });
+    return new DekcError(`${missing[1]} needs a value`, { hint });
   }
   // `--to --deck`: parseArgs refuses to guess; say what it saw instead of a value.
   const ambiguous = message.match(/^Option '(--[^']+)' argument is ambiguous/);
   if (ambiguous) {
     const next = argv[argv.indexOf(ambiguous[1] ?? "") + 1];
-    return new DekError(`${ambiguous[1]} needs a value, got ${next}`, { hint });
+    return new DekcError(`${ambiguous[1]} needs a value, got ${next}`, { hint });
   }
   const extra = message.match(/^Option '(--[^']+)' does not take an argument/);
   if (extra) {
-    return new DekError(`${extra[1]} takes no value`, { hint });
+    return new DekcError(`${extra[1]} takes no value`, { hint });
   }
-  return new DekError(message, { hint });
+  return new DekcError(message, { hint });
 }

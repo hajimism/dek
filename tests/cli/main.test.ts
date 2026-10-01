@@ -39,17 +39,17 @@ describe("main", () => {
   );
 
   test.serial(
-    "serve is no command word: dek serve says the dev server is the bare dek",
+    "serve is no command word: dekc serve says the dev server is the bare dekc",
     async () => {
       await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
         const error = await failure(["serve", "--port", "3"], root);
         expect(error.message).toBe("unknown command: serve");
-        expect(error.hint).toBe("the dev server is the bare `dek [deck]`: drop `serve`");
+        expect(error.hint).toBe("the dev server is the bare `dekc [deck]`: drop `serve`");
       });
     },
   );
 
-  test.serial("prints a result as text, its paths relative to where dek runs", async () => {
+  test.serial("prints a result as text, its paths relative to where dekc runs", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await run(["sync", "demo"], root);
       expect(result.stdout).toStartWith("synced ");
@@ -65,7 +65,7 @@ describe("main", () => {
         expect(result.stdout).toStartWith("wrote ");
         expect(result.stdout).not.toContain("preview");
         expect(result.stderr).toContain("preview: skipped (url is not set)");
-        expect(result.stderr).toContain("help: set url in dek.toml");
+        expect(result.stderr).toContain("help: set url in dekc.toml");
       });
     },
   );
@@ -76,14 +76,14 @@ describe("main", () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const deck = join(root, "decks", "demo");
       for (const [argv, name] of [
-        [[], "dek"],
-        [["demo"], "dek"],
-        [["rehearse"], "dek rehearse"],
+        [[], "dekc"],
+        [["demo"], "dekc"],
+        [["rehearse"], "dekc rehearse"],
       ] as const) {
         const error = await failure([...argv], argv.length === 1 ? root : deck);
         expect(error.message).toBe(`${name} keeps running until stopped and prints no JSON`);
         expect(error.hint).toBe(
-          `start it without --json and leave it running; for a result, run \`dek lint --json\` or \`dek check <slug> --json\``,
+          `start it without --json and leave it running; for a result, run \`dekc lint --json\` or \`dekc check <slug> --json\``,
         );
       }
     });
@@ -119,22 +119,22 @@ describe("main", () => {
           diagnostics: Array<{ id: string; line?: number; hint?: string }>;
         };
         expect(json.ok).toBe(false);
-        expect(json.diagnostics.filter((d) => d.id === "DEK027").map((d) => d.line)).toEqual([
+        expect(json.diagnostics.filter((d) => d.id === "DEKC027").map((d) => d.line)).toEqual([
           5, 7,
         ]);
       }
       const sarif = JSON.parse((await run(["lint", "--format", "sarif"], deck)).stdout) as {
         runs: Array<{ results: Array<{ ruleId: string }> }>;
       };
-      expect(sarif.runs[0]?.results.map((r) => r.ruleId)).toEqual(["DEK027", "DEK027"]);
+      expect(sarif.runs[0]?.results.map((r) => r.ruleId)).toEqual(["DEKC027", "DEKC027"]);
     });
   });
 
   test.serial("a malformed command line still answers in JSON when --json is on it", async () => {
     await withTempProject(decks, async (root) => {
       const error = await failure(["lint", "--fixx"], root);
-      expect(error.message).toBe("unknown flag --fixx for dek lint");
-      expect(error.hint).toContain("dek help lint");
+      expect(error.message).toBe("unknown flag --fixx for dekc lint");
+      expect(error.hint).toContain("dekc help lint");
     });
   });
 });
@@ -143,12 +143,12 @@ describe("positional arguments", () => {
   test.serial("an argument past what the command takes is an error, not ignored", async () => {
     await withTempProject(decks, async (root) => {
       const ls = await failure(["ls", "demo", "bogus", "extra"], root);
-      expect(ls.message).toBe('unexpected argument "bogus" for dek ls');
-      expect(ls.hint).toBe("usage: dek ls [deck]; run `dek help ls`");
+      expect(ls.message).toBe('unexpected argument "bogus" for dekc ls');
+      expect(ls.hint).toBe("usage: dekc ls [deck]; run `dekc help ls`");
       const theme = await failure(["theme", "demo", "cover", "bogus"], root);
-      expect(theme.message).toBe('unexpected argument "bogus" for dek theme');
+      expect(theme.message).toBe('unexpected argument "bogus" for dekc theme');
       expect((await failure(["new", "talk", "more"], root)).message).toBe(
-        'unexpected argument "more" for dek new',
+        'unexpected argument "more" for dekc new',
       );
     });
   });
@@ -156,13 +156,13 @@ describe("positional arguments", () => {
   test.serial("a missing argument is named, with the usage from the spec", async () => {
     await withTempProject(decks, async (root) => {
       const show = await failure(["show"], join(root, "decks", "demo"));
-      expect(show.message).toBe("missing <slug> for dek show");
-      expect(show.hint).toBe("usage: dek show [deck] <slug>; run `dek help show`");
+      expect(show.message).toBe("missing <slug> for dekc show");
+      expect(show.hint).toBe("usage: dekc show [deck] <slug>; run `dekc help show`");
       // At the root, a lone deck name is the deck, so what is missing is still the slug.
-      expect((await failure(["show", "demo"], root)).message).toBe("missing <slug> for dek show");
-      expect((await failure(["new"], root)).message).toBe("missing <name> for dek new");
-      expect((await failure(["new", "  "], root)).message).toBe("missing <name> for dek new");
-      expect((await failure(["ref", "rm"], root)).message).toBe("missing <ref> for dek ref rm");
+      expect((await failure(["show", "demo"], root)).message).toBe("missing <slug> for dekc show");
+      expect((await failure(["new"], root)).message).toBe("missing <name> for dekc new");
+      expect((await failure(["new", "  "], root)).message).toBe("missing <name> for dekc new");
+      expect((await failure(["ref", "rm"], root)).message).toBe("missing <ref> for dekc ref rm");
     });
   });
 
@@ -179,8 +179,8 @@ describe("positional arguments", () => {
   test.serial("mv names what is missing for a rename", async () => {
     await withTempProject(decks, async (root) => {
       const error = await failure(["mv", "intro"], join(root, "decks", "demo"));
-      expect(error.message).toBe("missing <new> for dek mv");
-      expect(error.hint).toBe("usage: dek mv [deck] <old> <new>; run `dek help mv`");
+      expect(error.message).toBe("missing <new> for dekc mv");
+      expect(error.hint).toBe("usage: dekc mv [deck] <old> <new>; run `dekc help mv`");
     });
   });
 });
@@ -189,22 +189,22 @@ describe("subcommands", () => {
   test.serial("an unknown voice subcommand is named, with the likeliest one", async () => {
     await withTempProject(decks, async (root) => {
       const error = await failure(["voice", "speakr"], join(root, "decks", "demo"));
-      expect(error.message).toBe('unknown subcommand "speakr" for dek voice');
-      expect(error.hint).toBe("did you mean `dek voice speakers`?");
+      expect(error.message).toBe('unknown subcommand "speakr" for dekc voice');
+      expect(error.hint).toBe("did you mean `dekc voice speakers`?");
       const far = await failure(["voice", "deploy"], join(root, "decks", "demo"));
-      expect(far.hint).toBe("dek voice takes speakers, say, dict add, pin; run `dek help voice`");
+      expect(far.hint).toBe("dekc voice takes speakers, say, dict add, pin; run `dekc help voice`");
     });
   });
 
   test.serial("a subcommand's own arguments are checked", async () => {
     await withTempProject(decks, async (root) => {
       const say = await failure(["voice", "say"], join(root, "decks", "demo"));
-      expect(say.message).toBe("missing <text> for dek voice say");
-      expect(say.hint).toBe("usage: dek voice [deck] say <text>; run `dek help voice`");
-      const dict = await failure(["voice", "dict", "add", "dek"], join(root, "decks", "demo"));
-      expect(dict.message).toBe("missing <kana> for dek voice dict add");
+      expect(say.message).toBe("missing <text> for dekc voice say");
+      expect(say.hint).toBe("usage: dekc voice [deck] say <text>; run `dekc help voice`");
+      const dict = await failure(["voice", "dict", "add", "dekc"], join(root, "decks", "demo"));
+      expect(dict.message).toBe("missing <kana> for dekc voice dict add");
       const pin = await failure(["voice", "pin", "now"], join(root, "decks", "demo"));
-      expect(pin.message).toBe('unexpected argument "now" for dek voice pin');
+      expect(pin.message).toBe('unexpected argument "now" for dekc voice pin');
     });
   });
 
@@ -253,7 +253,7 @@ describe("deck scope", () => {
     async () => {
       await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
         const error = await failure(["--shot", "check", "intro"], root);
-        expect(error.hint).toBe("run `dek check demo --shot intro --json`");
+        expect(error.hint).toBe("run `dekc check demo --shot intro --json`");
       });
     },
   );
@@ -261,8 +261,10 @@ describe("deck scope", () => {
   test.serial("each deck gets its command, and the command runs as written", async () => {
     await withTempProject(decks, async (root) => {
       const error = await failure(["show", "intro"], root);
-      expect(error.hint).toBe("run `dek show demo intro --json` or `dek show other intro --json`");
-      const [first] = [...(error.hint ?? "").matchAll(/`dek ([^`]+)`/g)].map((m) =>
+      expect(error.hint).toBe(
+        "run `dekc show demo intro --json` or `dekc show other intro --json`",
+      );
+      const [first] = [...(error.hint ?? "").matchAll(/`dekc ([^`]+)`/g)].map((m) =>
         (m[1] ?? "").split(" "),
       );
       expect((await run(first ?? [], root)).exitCode).toBe(0);
@@ -272,7 +274,7 @@ describe("deck scope", () => {
   test.serial("a deck the command line names before a subcommand goes there", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const error = await failure(["marks", "clear"], root);
-      expect(error.hint).toBe("run `dek marks demo clear --json`");
+      expect(error.hint).toBe("run `dekc marks demo clear --json`");
     });
   });
 
@@ -281,7 +283,7 @@ describe("deck scope", () => {
     await withTempProject(many, async (root) => {
       const error = await failure(["theme"], root);
       expect(error.hint).toBe(
-        "run `dek theme a --json`, or name another deck in place of a; `dek ls` lists them",
+        "run `dekc theme a --json`, or name another deck in place of a; `dekc ls` lists them",
       );
     });
   });
@@ -289,7 +291,7 @@ describe("deck scope", () => {
   test.serial("a project with no deck yet is told to make one", async () => {
     await withTempProject({}, async (root) => {
       const error = await failure(["theme"], root);
-      expect(error.hint).toBe("run `dek new <name>` to make a deck");
+      expect(error.hint).toBe("run `dekc new <name>` to make a deck");
     });
   });
 });

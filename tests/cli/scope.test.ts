@@ -10,7 +10,7 @@ import {
   resolveDecks,
   resolveScope,
 } from "../../src/cli/scope.ts";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import { resolveProject } from "../../src/core/resolve.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -37,12 +37,12 @@ describe("resolveScope", () => {
   test("surfaces the parse error when cwd is a broken deck", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       await writeFile(join(root, "decks", "demo", "script.md"), "this is not a deck\n");
-      expect(() => resolveScope(join(root, "decks", "demo"))).toThrow(DekError);
+      expect(() => resolveScope(join(root, "decks", "demo"))).toThrow(DekcError);
       try {
         resolveScope(join(root, "decks", "demo"));
       } catch (error) {
-        expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toContain("frontmatter");
+        expect(error).toBeInstanceOf(DekcError);
+        expect((error as DekcError).message).toContain("frontmatter");
       }
     });
   });
@@ -58,13 +58,13 @@ describe("requireDeckFromCwd", () => {
 
   test("throws from the project root without --deck", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      expect(() => requireDeckFromCwd(root)).toThrow(DekError);
+      expect(() => requireDeckFromCwd(root)).toThrow(DekcError);
       try {
         requireDeckFromCwd(root);
       } catch (error) {
-        expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toBe("not inside a deck directory; pass a deck name");
-        expect((error as DekError).hint).toBe("pass a deck name or --deck <name>");
+        expect(error).toBeInstanceOf(DekcError);
+        expect((error as DekcError).message).toBe("not inside a deck directory; pass a deck name");
+        expect((error as DekcError).hint).toBe("pass a deck name or --deck <name>");
       }
     });
   });
@@ -89,14 +89,14 @@ describe("requireSection", () => {
   test("throws when the slug is missing", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const { deck } = requireDeckFromCwd(join(root, "decks", "demo"));
-      expect(() => requireSection(deck, "missing")).toThrow(DekError);
+      expect(() => requireSection(deck, "missing")).toThrow(DekcError);
       try {
         requireSection(deck, "missing");
       } catch (error) {
-        expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toBe('section "missing" not found');
-        expect((error as DekError).path).toBe(deck.scriptPath);
-        expect((error as DekError).hint).toBe("run `dek ls`");
+        expect(error).toBeInstanceOf(DekcError);
+        expect((error as DekcError).message).toBe('section "missing" not found');
+        expect((error as DekcError).path).toBe(deck.scriptPath);
+        expect((error as DekcError).hint).toBe("run `dekc ls`");
       }
     });
   });

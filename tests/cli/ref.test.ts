@@ -8,7 +8,7 @@ import { resolveTarget } from "../../src/cli/scope.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { loadConfig } from "../../src/core/config.ts";
 import { readRefMeta, refDir } from "../../src/core/ref.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import {
   deckRepoFiles,
   type FakeRepo,
@@ -18,7 +18,7 @@ import {
 } from "../helpers/fake-github.ts";
 import { withTempProject } from "../helpers/project.ts";
 
-const REF = "someone/talks/why-dek";
+const REF = "someone/talks/why-dekc";
 
 /**
  * Serial because each test points process.env at its own fake GitHub; the
@@ -34,8 +34,8 @@ function talks(): Record<string, FakeRepo> {
       head: SHA_A,
       revs: { v1: SHA_B, main: SHA_A },
       commits: {
-        [SHA_A]: { ...deckRepoFiles("why-dek", { title: "Why dek" }), LICENSE: "MIT" },
-        [SHA_B]: { ...deckRepoFiles("why-dek", { title: "Why dek v1" }), LICENSE: "MIT" },
+        [SHA_A]: { ...deckRepoFiles("why-dekc", { title: "Why dekc" }), LICENSE: "MIT" },
+        [SHA_B]: { ...deckRepoFiles("why-dekc", { title: "Why dekc v1" }), LICENSE: "MIT" },
       },
     },
   };
@@ -47,16 +47,16 @@ function tarballRequests(fake: { requests: Array<{ path: string }> }): number {
   return fake.requests.filter((request) => request.path.includes("/tarball/")).length;
 }
 
-describe("dek ref <source>", () => {
+describe("dekc ref <source>", () => {
   refTest("pins the default branch, fetches the snapshot, and ignores refs/ in git", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async (fake) => {
-        const result = await runDek(["ref", REF, "--json"], { cwd: root, env: fake.env });
+        const result = await runDekc(["ref", REF, "--json"], { cwd: root, env: fake.env });
         expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<{ name: string; rev: string; changed: boolean }>(result);
         expect(json).toMatchObject({ name: REF, rev: SHA_A, changed: true });
 
-        const toml = await readFile(join(root, "dek.toml"), "utf8");
+        const toml = await readFile(join(root, "dekc.toml"), "utf8");
         expect(toml).toBe(`# my talks\nmax_classes = 40\n\n[refs]\n"${REF}" = "${SHA_A}"\n`);
         expect(readRefMeta(refDir(root, REF))?.rev).toBe(SHA_A);
         expect(await readFile(join(root, ".gitignore"), "utf8")).toContain("refs/\n");
@@ -66,7 +66,7 @@ describe("dek ref <source>", () => {
           data: listRefs(root),
         });
         expect(list).toContain(REF);
-        expect(list).toContain("Why dek");
+        expect(list).toContain("Why dekc");
       });
     });
   });
@@ -91,7 +91,7 @@ describe("dek ref <source>", () => {
         fake.repos["someone/talks"] = { ...talks()["someone/talks"], head: SHA_B } as FakeRepo;
         const moved = await addRef(root, REF);
         expect(moved).toMatchObject({ rev: SHA_B, from: SHA_A, changed: true });
-        expect(loadConfig(join(root, "dek.toml")).refs).toEqual({ [REF]: SHA_B });
+        expect(loadConfig(join(root, "dekc.toml")).refs).toEqual({ [REF]: SHA_B });
         expect(formatText({ command: "ref", data: moved })).toContain("bbbbbbb (was aaaaaaa)");
       });
     });
@@ -101,7 +101,7 @@ describe("dek ref <source>", () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
         expect(await addRef(root, `${REF}@v1`)).toMatchObject({ rev: SHA_B });
-        const link = "https://github.com/someone/talks/tree/main/decks/why-dek";
+        const link = "https://github.com/someone/talks/tree/main/decks/why-dekc";
         expect(await addRef(root, link)).toMatchObject({
           name: REF,
           rev: SHA_A,
@@ -113,7 +113,7 @@ describe("dek ref <source>", () => {
   refTest("warns when the source has no license", async () => {
     await withTempProject(project, async (root) => {
       const repos = {
-        "someone/talks": { head: SHA_A, commits: { [SHA_A]: deckRepoFiles("why-dek") } },
+        "someone/talks": { head: SHA_A, commits: { [SHA_A]: deckRepoFiles("why-dekc") } },
       };
       await withFakeGithub(repos, async () => {
         const result = await addRef(root, REF);
@@ -129,14 +129,14 @@ describe("dek ref <source>", () => {
         await addRef(root, REF);
         const agents = await readFile(join(root, "AGENTS.md"), "utf8");
         expect(agents).toContain("## References");
-        expect(agents).toContain(`- \`${REF}\`: Why dek`);
-        expect(agents).toContain("dek show <ref> <slug>");
+        expect(agents).toContain(`- \`${REF}\`: Why dekc`);
+        expect(agents).toContain("dekc show <ref> <slug>");
       });
     });
   });
 });
 
-describe("dek ref (list) and dek ref rm", () => {
+describe("dekc ref (list) and dekc ref rm", () => {
   refTest("lists each pinned ref and says which are not fetched", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
@@ -155,7 +155,7 @@ describe("dek ref (list) and dek ref rm", () => {
   refTest("with no refs, points to how to add one", async () => {
     await withTempProject(project, async (root) => {
       const list = listRefs(root);
-      expect(formatText({ command: "ref", data: list })).toContain("dek ref owner/repo/deck");
+      expect(formatText({ command: "ref", data: list })).toContain("dekc ref owner/repo/deck");
     });
   });
 
@@ -165,7 +165,7 @@ describe("dek ref (list) and dek ref rm", () => {
         await addRef(root, REF);
         const result = await removeRef(root, REF);
         expect(result).toMatchObject({ action: "rm", name: REF });
-        expect(await readFile(join(root, "dek.toml"), "utf8")).toBe(
+        expect(await readFile(join(root, "dekc.toml"), "utf8")).toBe(
           "# my talks\nmax_classes = 40\n",
         );
         expect(existsSync(join(root, "refs"))).toBe(false);
@@ -179,7 +179,7 @@ describe("dek ref (list) and dek ref rm", () => {
       expect(() => removeRef(root, REF)).toThrow(
         expect.objectContaining({
           message: `ref "${REF}" is not added`,
-          hint: expect.stringContaining("dek ref"),
+          hint: expect.stringContaining("dekc ref"),
         }),
       );
     });
@@ -221,8 +221,8 @@ describe("restoring a snapshot", () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {
         await addRef(root, REF);
-        const toml = await readFile(join(root, "dek.toml"), "utf8");
-        await writeFile(join(root, "dek.toml"), toml.replace(SHA_A, SHA_B));
+        const toml = await readFile(join(root, "dekc.toml"), "utf8");
+        await writeFile(join(root, "dekc.toml"), toml.replace(SHA_A, SHA_B));
         await restoreRef(root, REF);
         expect(readRefMeta(refDir(root, REF))?.rev).toBe(SHA_B);
       });

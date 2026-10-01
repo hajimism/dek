@@ -94,28 +94,28 @@ describe("applyLiveEvent", () => {
       {
         type: "diagnostics",
         diagnostics: [
-          { id: "DEK040", severity: "warning", message: "dictionary is missing English word: AI" },
-          { id: "DEK010", severity: "error", message: 'class "x"' },
+          { id: "DEKC040", severity: "warning", message: "dictionary is missing English word: AI" },
+          { id: "DEKC010", severity: "error", message: 'class "x"' },
         ],
       },
       fakeHost(doc),
     );
     expect(doc.diagnostics).toBe(
-      'DEK040 warning: dictionary is missing English word: AI\nDEK010: class "x"',
+      'DEKC040 warning: dictionary is missing English word: AI\nDEKC010: class "x"',
     );
   });
 
   test("updates diagnostics and removes the overlay when empty", () => {
-    const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: "DEK001: missing" };
+    const doc: FakeDoc = { slides: new Map(), theme: "", diagnostics: "DEKC001: missing" };
     const host = fakeHost(doc);
     applyLiveEvent(
       {
         type: "diagnostics",
-        diagnostics: [{ id: "DEK003", severity: "error", message: "bad step" }],
+        diagnostics: [{ id: "DEKC003", severity: "error", message: "bad step" }],
       },
       host,
     );
-    expect(doc.diagnostics).toBe("DEK003: bad step");
+    expect(doc.diagnostics).toBe("DEKC003: bad step");
     applyLiveEvent({ type: "diagnostics", diagnostics: [] }, host);
     expect(doc.diagnostics).toBeNull();
   });

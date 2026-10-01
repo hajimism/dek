@@ -3,8 +3,8 @@ import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { pdfCommand } from "../../src/cli/pdf.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
-import { DekError } from "../../src/core/error.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { DekcError } from "../../src/core/error.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -20,7 +20,7 @@ type PdfOk = {
   outs: string[];
 };
 
-describe("dek pdf", () => {
+describe("dekc pdf", () => {
   test("writes dist/<deck>.pdf and returns the path as JSON", async () => {
     await withTempProject(
       {
@@ -28,9 +28,9 @@ describe("dek pdf", () => {
       },
       async (root) => {
         await chmod(fakePlaywright, 0o755);
-        const result = await runDek(["pdf", "--json"], {
+        const result = await runDekc(["pdf", "--json"], {
           cwd: join(root, "decks", "demo"),
-          env: { DEK_PLAYWRIGHT: fakePlaywright },
+          env: { DEKC_PLAYWRIGHT: fakePlaywright },
         });
         expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<PdfOk>(result);
@@ -47,13 +47,13 @@ describe("pdfCommand", () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+        await withEnv({ DEKC_PLAYWRIGHT: "/no/such/playwright" }, async () => {
           try {
             await pdfCommand(resolveDecks(join(root, "decks", "demo")));
-            throw new Error("expected DekError");
+            throw new Error("expected DekcError");
           } catch (error) {
-            expect(error).toBeInstanceOf(DekError);
-            expect((error as DekError).hint).toContain("playwright install");
+            expect(error).toBeInstanceOf(DekcError);
+            expect((error as DekcError).hint).toContain("playwright install");
           }
         });
       },

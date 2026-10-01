@@ -1,5 +1,5 @@
 /**
- * The one way dek steps through CSS text: strings and comments are opaque, and a newline ends an
+ * The one way dekc steps through CSS text: strings and comments are opaque, and a newline ends an
  * unclosed string, as the CSS tokenizer reads it. Every scanner in css.ts and lint/tokens.ts is built on
  * these, so none of them can disagree about where a string or a block ends.
  */

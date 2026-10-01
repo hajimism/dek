@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import { parseScript } from "../../src/core/parse.ts";
 import { DEFAULT_LEAD_MS } from "../../src/core/timeline.ts";
 import {
@@ -27,7 +27,7 @@ title: Demo
 
 ## intro
 
-hello dek
+hello dekc
 `;
 
 const voiceToml = `engine = "voicevox"
@@ -47,8 +47,8 @@ describe("loadVoiceSettings", () => {
         }),
       );
       expect(VOICE_SETUP_HINT).toContain("voice/voice.toml");
-      expect(VOICE_SETUP_HINT).toContain("https://hajimism.github.io/dek/guide/voice.html#setup");
-      expect(VOICE_SETUP_HINT).not.toContain("dek new");
+      expect(VOICE_SETUP_HINT).toContain("https://hajimism.github.io/dekc/guide/voice.html#setup");
+      expect(VOICE_SETUP_HINT).not.toContain("dekc new");
     });
   });
 
@@ -245,13 +245,13 @@ describe("loadCachedTimeline", () => {
     await withTempDir(async (dir) => {
       await mkdir(join(dir, ".cache", "voice"), { recursive: true });
       await writeFile(join(dir, ".cache", "voice", "timeline.json"), '{"ok":true}\n');
-      expect(() => loadCachedTimeline(dir)).toThrow(DekError);
+      expect(() => loadCachedTimeline(dir)).toThrow(DekcError);
       try {
         loadCachedTimeline(dir);
       } catch (error) {
-        expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toContain("invalid");
-        expect((error as DekError).message.toLowerCase()).not.toContain("not found");
+        expect(error).toBeInstanceOf(DekcError);
+        expect((error as DekcError).message).toContain("invalid");
+        expect((error as DekcError).message.toLowerCase()).not.toContain("not found");
       }
     });
   });
@@ -261,7 +261,7 @@ describe("synthDeck timeline audio", () => {
   test.serial("writes a portable audio filename and restores pin next to the cache", async () => {
     const fake = await startFakeVoicevox();
     try {
-      await withEnv({ DEK_VOICE_URL: fake.url }, () =>
+      await withEnv({ DEKC_VOICE_URL: fake.url }, () =>
         withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
           const deckDir = join(root, "decks", "demo");
           await mkdir(join(deckDir, "voice"), { recursive: true });
@@ -299,7 +299,7 @@ describe("synthDeck timeline audio", () => {
   test.serial("bakes voice.toml lead and beat pauses into timeline.json", async () => {
     const fake = await startFakeVoicevox();
     try {
-      await withEnv({ DEK_VOICE_URL: fake.url }, () =>
+      await withEnv({ DEKC_VOICE_URL: fake.url }, () =>
         withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
           const deckDir = join(root, "decks", "demo");
           await mkdir(join(deckDir, "voice"), { recursive: true });
@@ -322,7 +322,7 @@ describe("synthDeck timeline audio", () => {
   test.serial("treats a corrupt utterance cache as a miss", async () => {
     const fake = await startFakeVoicevox();
     try {
-      await withEnv({ DEK_VOICE_URL: fake.url }, () =>
+      await withEnv({ DEKC_VOICE_URL: fake.url }, () =>
         withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
           const deckDir = join(root, "decks", "demo");
           await mkdir(join(deckDir, "voice"), { recursive: true });
@@ -354,14 +354,14 @@ describe("synthDeck timeline audio", () => {
     const fake = await startFakeVoicevox();
     fake.failWith = { path: "/speakers", status: 500 };
     try {
-      await withEnv({ DEK_VOICE_URL: fake.url }, () =>
+      await withEnv({ DEKC_VOICE_URL: fake.url }, () =>
         withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
           const deckDir = join(root, "decks", "demo");
           await mkdir(join(deckDir, "voice"), { recursive: true });
           await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
           const { synthDeck } = await import("../../src/voice/synth.ts");
           await expect(synthDeck(deckDir)).rejects.toMatchObject({
-            name: "DekError",
+            name: "DekcError",
             message: expect.stringContaining("500"),
           });
           await expect(synthDeck(deckDir)).rejects.not.toMatchObject({
@@ -385,7 +385,7 @@ describe("synthDeck timeline audio", () => {
       await writeFile(join(deckDir, "voice", "pin", "master.wav"), silentWav(50));
       const { synthDeck } = await import("../../src/voice/synth.ts");
       await expect(synthDeck(deckDir)).rejects.toMatchObject({
-        name: "DekError",
+        name: "DekcError",
         message: "invalid timeline.json",
       });
       expect(existsSync(voiceCacheFile(deckDir, "timeline.json"))).toBe(false);

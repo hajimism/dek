@@ -1,7 +1,7 @@
-# dek
+# dekc
 dist/
 .cache/
-.dek/server.json
-.dek/marks.json
+.dekc/server.json
+.dekc/marks.json
 node_modules/
 refs/

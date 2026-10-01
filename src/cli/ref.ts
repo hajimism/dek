@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { loadConfig } from "../core/config.ts";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { downloadTarball, resolveRev } from "../core/github.ts";
 import {
   installSnapshot,
@@ -61,7 +61,7 @@ async function fetchSnapshot(root: string, source: RefSource, sha: string) {
   return installSnapshot(root, source, sha, files);
 }
 
-/** `dek ref <source>`: pin and fetch, or move the pin to the latest or to the rev after `@`. */
+/** `dekc ref <source>`: pin and fetch, or move the pin to the latest or to the rev after `@`. */
 export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
   const source = parseRefSource(arg);
   const project = requireProject(cwd);
@@ -118,9 +118,9 @@ export function removeRef(cwd: string, arg: string): RefRmResult {
   const project = requireProject(cwd);
   const { pinned, dir } = refState(project, source.name);
   if (pinned === undefined && !existsSync(dir)) {
-    throw new DekError(`ref "${source.name}" is not added`, {
+    throw new DekcError(`ref "${source.name}" is not added`, {
       path: project.configPath,
-      hint: "run `dek ref` to list refs",
+      hint: "run `dekc ref` to list refs",
     });
   }
   if (pinned !== undefined) {
@@ -153,7 +153,7 @@ function removeEmptyParents(dir: string, root: string): void {
   }
 }
 
-/** Snapshots are fetched again from dek.toml, so git never needs them. */
+/** Snapshots are fetched again from dekc.toml, so git never needs them. */
 function ignoreRefs(root: string): void {
   const path = join(root, ".gitignore");
   const current = readSourceIfExists(path, root) ?? "";

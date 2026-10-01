@@ -5,7 +5,7 @@ import { deckChannelName } from "../../src/runtime/routes.ts";
 
 /** The channel the mounted player posts on, so a test can play another window of the deck. */
 export function playerChannelName(): string {
-  const slides = JSON.parse(document.getElementById("dek-data")?.textContent ?? "[]") as {
+  const slides = JSON.parse(document.getElementById("dekc-data")?.textContent ?? "[]") as {
     slug: string;
   }[];
   return deckChannelName(
@@ -40,7 +40,7 @@ export async function mountPlayer(
     .replace(/<\/html>\s*$/, "");
   (document as { getAnimations?: () => Animation[] }).getAnimations ??= () => [];
   // innerHTML does not run scripts; slide scripts must register before the player starts.
-  for (const el of document.querySelectorAll("script[data-dek-slides]")) {
+  for (const el of document.querySelectorAll("script[data-dekc-slides]")) {
     // biome-ignore lint/security/noGlobalEval: slide scripts must see happy-dom globals
     // biome-ignore lint/complexity/noCommaOperator: indirect eval
     (0, eval)(el.textContent ?? "");
@@ -83,7 +83,7 @@ export function pressKey(
 export const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 export const currentSlug = (): string | null | undefined =>
   document.querySelector("#deck > .slide.is-current")?.getAttribute("data-slug");
-export const dekGo = (pos: { slideIndex: number; beatIndex: number }): Promise<void> =>
-  (window as unknown as { dekGo: (p: unknown) => Promise<void> }).dekGo(pos);
-export const dekLive = (event: unknown): Promise<void> =>
-  (window as unknown as { dekLive: (e: unknown) => Promise<void> }).dekLive(event);
+export const dekcGo = (pos: { slideIndex: number; beatIndex: number }): Promise<void> =>
+  (window as unknown as { dekcGo: (p: unknown) => Promise<void> }).dekcGo(pos);
+export const dekcLive = (event: unknown): Promise<void> =>
+  (window as unknown as { dekcLive: (e: unknown) => Promise<void> }).dekcLive(event);

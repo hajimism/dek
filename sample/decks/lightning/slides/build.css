@@ -1,4 +1,4 @@
-/* Real `dek build` in the scratch project; the byte count is `wc -c` of that file. */
+/* Real `dekc build` in the scratch project; the byte count is `wc -c` of that file. */
 .slide {
   --at: 0.7111;
   --fold: 44px;

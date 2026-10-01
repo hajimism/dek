@@ -10,7 +10,7 @@ export type FakeRepo = {
 export type FakeGithub = {
   url: string;
   /**
-   * The variables that point dek at this server. A spawned dek needs them
+   * The variables that point dekc at this server. A spawned dekc needs them
    * passed: Bun.spawn without `env` does not see withEnv's changes.
    */
   env: Record<string, string>;
@@ -19,15 +19,15 @@ export type FakeGithub = {
   repos: Record<string, FakeRepo>;
   /** Answer every request with this status, as GitHub does when rate limited. */
   failWith?: { status: number; headers?: Record<string, string>; body?: string };
-  /** Never answer, the way a stalled connection looks to dek. */
+  /** Never answer, the way a stalled connection looks to dekc. */
   hang?: boolean;
   /** Serve this as every tarball body instead of the archive, streamed without a content-length. */
   tarballBytes?: () => ReadableStream<Uint8Array>;
 };
 
 /**
- * Serves the two GitHub endpoints dek ref uses, and points dek at it through
- * DEK_GITHUB_API. `gh` and GITHUB_TOKEN are cleared so a test never reaches
+ * Serves the two GitHub endpoints dekc ref uses, and points dekc at it through
+ * DEKC_GITHUB_API. `gh` and GITHUB_TOKEN are cleared so a test never reaches
  * the real GitHub or the developer's credentials.
  */
 export async function withFakeGithub<T>(
@@ -94,7 +94,7 @@ export async function withFakeGithub<T>(
     },
   });
   fake.url = `http://127.0.0.1:${server.port}`;
-  fake.env = { DEK_GITHUB_API: fake.url, DEK_GH: "/nonexistent/gh", GITHUB_TOKEN: "" };
+  fake.env = { DEKC_GITHUB_API: fake.url, DEKC_GH: "/nonexistent/gh", GITHUB_TOKEN: "" };
   try {
     return await withEnv({ ...fake.env, GITHUB_TOKEN: undefined, ...env }, () => fn(fake));
   } finally {
@@ -105,14 +105,14 @@ export async function withFakeGithub<T>(
 export const SHA_A = "a".repeat(40);
 export const SHA_B = "b".repeat(40);
 
-/** A dek project's files with one deck, as a repository holds them. */
+/** A dekc project's files with one deck, as a repository holds them. */
 export function deckRepoFiles(
   deck: string,
   options: { prefix?: string; title?: string; extra?: Record<string, string> } = {},
 ): Record<string, string> {
   const prefix = options.prefix ?? "";
   return {
-    [`${prefix}dek.toml`]: "cjk_per_minute = 60\n",
+    [`${prefix}dekc.toml`]: "cjk_per_minute = 60\n",
     [`${prefix}decks/${deck}/script.md`]: `---\ntitle: ${options.title ?? deck}\n---\n\n## intro\n\nhello\n`,
     [`${prefix}decks/${deck}/theme.css`]: ".slide { --fg: #111; color: var(--fg); }\n",
     [`${prefix}decks/${deck}/slides/intro.html`]:

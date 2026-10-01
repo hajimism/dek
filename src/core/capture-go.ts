@@ -10,7 +10,7 @@ import {
 import type { MorphSpec } from "./playwright.ts";
 import type { Position } from "./step.ts";
 
-/** Loads the video document with motion on, the way `dek video` plays it. */
+/** Loads the video document with motion on, the way `dekc video` plays it. */
 export async function loadVideoDoc(
   page: Pick<Page, "emulateMedia" | "setContent">,
   html: string,
@@ -21,7 +21,7 @@ export async function loadVideoDoc(
 
 /** Goes to `position` and ends that beat, as the page stands when the talk moves on. */
 export async function settleAt(page: EvaluatingPage, position: Position): Promise<void> {
-  await page.evaluate((to) => window.dekGo?.(to), position);
+  await page.evaluate((to) => window.dekcGo?.(to), position);
   await page.evaluate(finishBeat);
 }
 
@@ -68,5 +68,5 @@ export async function freezeTransition(page: EvaluatingPage, morph: MorphSpec): 
 /** Ends the go `startGoPaused` began, as a still of its beat ends it, and waits for it to return. */
 async function endGo(page: EvaluatingPage): Promise<void> {
   await page.evaluate(finishBeat);
-  await page.evaluate(() => window.__dekPendingGo);
+  await page.evaluate(() => window.__dekcPendingGo);
 }

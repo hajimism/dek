@@ -6,7 +6,7 @@ import { formatText } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
 import { cssClassNames, cssLayoutNames, parseCss } from "../../src/core/css.ts";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import { themeFacts } from "../../src/core/theme-facts.ts";
 
 const themeLayouts = (css: string) => themeFacts(parseCss(css)).layouts;
@@ -106,7 +106,7 @@ describe("themeCommand", () => {
       } catch (caught) {
         error = caught;
       }
-      expect(error).toBeInstanceOf(DekError);
+      expect(error).toBeInstanceOf(DekcError);
       expect(error).toMatchObject({ hint: "use one of: bare, split" });
     });
   });
@@ -125,7 +125,7 @@ describe("the theme's tokens", () => {
 ::view-transition-group(*) { --morph: 0.5s; }
 `;
 
-  test("dek theme lists the tokens the bare .slide rule gives every slide", async () => {
+  test("dekc theme lists the tokens the bare .slide rule gives every slide", async () => {
     await withTempProject({ decks: [{ name: "demo", theme: tokenTheme }] }, async (root) => {
       const result = themeCommand(
         resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
@@ -141,7 +141,7 @@ describe("the theme's tokens", () => {
 describe("bundled and sample themes", () => {
   const themes: Array<[string, string]> = [
     ["src/theme/default.css", defaultTheme()],
-    ...["sample/theme.css", "sample/decks/why-dek/theme.css"].map((path): [string, string] => [
+    ...["sample/theme.css", "sample/decks/why-dekc/theme.css"].map((path): [string, string] => [
       path,
       readFileSync(join(repo, path), "utf8"),
     ]),

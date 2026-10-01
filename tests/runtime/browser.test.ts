@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { decodePosition } from "../../src/core/live-protocol.ts";
 import {
   currentSlug,
-  dekGo,
-  dekLive,
+  dekcGo,
+  dekcLive,
   mountPlayer,
   playerChannelName,
   pressKey,
@@ -55,7 +55,7 @@ const lastHtml = slideDocument(`<section class="slide"><h2>last</h2></section>`)
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
   await writeProject(root, {
     decks: [
       {
@@ -76,17 +76,17 @@ afterAll(async () => {
 describe("player runtime in happy-dom", () => {
   test.serial("marks slide 0 current and renders the page counter", () => {
     expect(currentSlug()).toBe("intro");
-    expect(document.getElementById("dek-page")?.textContent?.replace(/\s+/g, " ")).toBe("1 / 3");
+    expect(document.getElementById("dekc-page")?.textContent?.replace(/\s+/g, " ")).toBe("1 / 3");
   });
 
   test.serial("shows the key hint until the first key", async () => {
     // The hash the first render writes echoes back; that is not a move.
     window.dispatchEvent(new Event("hashchange"));
     await settle();
-    expect(document.getElementById("dek-hint")).not.toBeNull();
+    expect(document.getElementById("dekc-hint")).not.toBeNull();
     pressKey("Shift");
     await settle();
-    expect(document.getElementById("dek-hint")).toBeNull();
+    expect(document.getElementById("dekc-hint")).toBeNull();
   });
 
   test.serial("ArrowRight walks beats, then slides, and writes the hash", async () => {
@@ -130,8 +130,8 @@ describe("player runtime in happy-dom", () => {
     pressKey("p");
     await settle();
     expect(document.body.classList.contains("is-presenter")).toBe(true);
-    expect(document.getElementById("dek-presenter")?.hidden).toBe(false);
-    expect(document.getElementById("dek-script")?.textContent).toContain("body");
+    expect(document.getElementById("dekc-presenter")?.hidden).toBe(false);
+    expect(document.getElementById("dekc-script")?.textContent).toContain("body");
     expect(location.search).toContain("presenter");
     pressKey("p");
     await settle();
@@ -143,19 +143,19 @@ describe("player runtime in happy-dom", () => {
     pressKey("s");
     await settle();
     expect(document.body.classList.contains("is-rail-hidden")).toBe(true);
-    expect(localStorage.getItem("dek.railVisible")).toBe("0");
+    expect(localStorage.getItem("dekc.railVisible")).toBe("0");
     pressKey("s");
     await settle();
     expect(document.body.classList.contains("is-rail-hidden")).toBe(false);
   });
 
-  test.serial("dekGo moves the deck and the rail's aria-current", async () => {
-    await dekGo({ slideIndex: 2, beatIndex: 0 });
+  test.serial("dekcGo moves the deck and the rail's aria-current", async () => {
+    await dekcGo({ slideIndex: 2, beatIndex: 0 });
     expect(currentSlug()).toBe("last");
     expect(
-      document.querySelector('.dek-thumb[aria-current="page"]')?.getAttribute("data-slide-index"),
+      document.querySelector('.dekc-thumb[aria-current="page"]')?.getAttribute("data-slide-index"),
     ).toBe("2");
-    expect(document.getElementById("dek-next-end")?.hidden).toBe(false);
+    expect(document.getElementById("dekc-next-end")?.hidden).toBe(false);
   });
 
   test.serial("hashchange navigates to the slug in the hash", async () => {
@@ -168,14 +168,14 @@ describe("player runtime in happy-dom", () => {
     );
   });
 
-  test.serial("dekLive reload-slide swaps the fragment and re-applies is-shown", async () => {
+  test.serial("dekcLive reload-slide swaps the fragment and re-applies is-shown", async () => {
     const original = globalThis.fetch;
     globalThis.fetch = (async () =>
       new Response(
         '<section class="slide" data-slug="steps"><ul><li data-step="1">A</li><li data-step="2">B</li></ul></section>',
       )) as unknown as typeof fetch;
     try {
-      await dekLive({ type: "reload-slide", slug: "steps" });
+      await dekcLive({ type: "reload-slide", slug: "steps" });
     } finally {
       globalThis.fetch = original;
     }
@@ -186,14 +186,14 @@ describe("player runtime in happy-dom", () => {
     expect(currentSlug()).toBe("steps");
   });
 
-  test.serial("dekLive diagnostics shows the banner and clears it when empty", async () => {
-    await dekLive({
+  test.serial("dekcLive diagnostics shows the banner and clears it when empty", async () => {
+    await dekcLive({
       type: "diagnostics",
-      diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
+      diagnostics: [{ id: "DEKC001", severity: "error", message: "missing" }],
     });
-    expect(document.querySelector(".dek-diagnostics")?.textContent).toContain("DEK001");
-    await dekLive({ type: "diagnostics", diagnostics: [] });
-    expect(document.querySelector(".dek-diagnostics")).toBeNull();
+    expect(document.querySelector(".dekc-diagnostics")?.textContent).toContain("DEKC001");
+    await dekcLive({ type: "diagnostics", diagnostics: [] });
+    expect(document.querySelector(".dekc-diagnostics")).toBeNull();
   });
 
   test.serial("a position from a peer moves the deck without being echoed back", async () => {
@@ -219,7 +219,7 @@ describe("player runtime in happy-dom", () => {
   test.serial("a window of another deck on the same origin does not move this one", async () => {
     const before = location.hash;
     const other = new BroadcastChannel(`${playerChannelName()}-other`);
-    const legacy = new BroadcastChannel("dek");
+    const legacy = new BroadcastChannel("dekc");
     try {
       other.postMessage({ slideIndex: 0, beatIndex: 0 });
       legacy.postMessage({ slideIndex: 0, beatIndex: 0 });

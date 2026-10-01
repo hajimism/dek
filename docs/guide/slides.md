@@ -18,24 +18,24 @@ A slide is one file in `slides/`, named after its section id, with a single root
 
 ## The rules
 
-- **One root.** The file is a `<section class="slide">` fragment. A file with none draws nothing (`DEK007`), and a second one is dropped (`DEK009`). Its id comes from the file name; `dek build` injects `data-slug` for you. If you write `data-slug` yourself it must match the section id (`DEK006`).
+- **One root.** The file is a `<section class="slide">` fragment. A file with none draws nothing (`DEKC007`), and a second one is dropped (`DEKC009`). Its id comes from the file name; `dekc build` injects `data-slug` for you. If you write `data-slug` yourself it must match the section id (`DEKC006`).
 - **Write HTML your way.** Close tags or leave them open, quote attributes or do not. Anything that is valid HTML5 is accepted, and a full document with `<html>` and `<body>` around the section works too. Minification happens once, at build time.
-- **Pick a layout with `data-layout`.** The bundled theme ships `title`, `default`, `two-col`, `full-bleed`, and `quote`; a layout that neither the theme nor the slide's own stylesheet defines is `DEK019`. `default` is top-aligned, so the heading stays put as beats add elements below it; that matters when the deck becomes a video.
+- **Pick a layout with `data-layout`.** The bundled theme ships `title`, `default`, `two-col`, `full-bleed`, and `quote`; a layout that neither the theme nor the slide's own stylesheet defines is `DEKC019`. `default` is top-aligned, so the heading stays put as beats add elements below it; that matters when the deck becomes a video.
 - **The canvas is 1280 × 720.** A `4:3` deck is 1024 × 768. The player scales the whole slide with `transform: scale()` to fit the viewport.
-- **Only theme classes, or the slide's own.** A class that neither the theme nor the slide's `slides/<id>.css` defines is `DEK010`. Inline `<style>`, `style=` attributes, `<script>`, event handlers such as `onclick=`, and `javascript:` URLs are `DEK011`.
+- **Only theme classes, or the slide's own.** A class that neither the theme nor the slide's `slides/<id>.css` defines is `DEKC010`. Inline `<style>`, `style=` attributes, `<script>`, event handlers such as `onclick=`, and `javascript:` URLs are `DEKC011`.
 - **Change appearance through tokens.** Colors, type, spacing, and motion come from `var(--*)`, in the theme or in the slide's own stylesheet. Never write raw values.
 - **Scripts sit beside the slide, not inside it.** Motion that CSS cannot express goes in `slides/<id>.ts`; see [Scripted motion](./steps#scripted-motion).
-- **Stay inside the deck.** Reference images as `assets/name.png`, never through `../`. Remote URLs are `DEK020`, a missing file is `DEK021`, a path that leaves the deck directory is `DEK022`, and a local file that does not start with `assets/` is `DEK023`. `srcset`, `poster`, and `<video>`, `<audio>`, `<source>`, `<track>`, and `<iframe>` sources are checked the same way as `<img src>`.
+- **Stay inside the deck.** Reference images as `assets/name.png`, never through `../`. Remote URLs are `DEKC020`, a missing file is `DEKC021`, a path that leaves the deck directory is `DEKC022`, and a local file that does not start with `assets/` is `DEKC023`. `srcset`, `poster`, and `<video>`, `<audio>`, `<source>`, `<track>`, and `<iframe>` sources are checked the same way as `<img src>`.
 
 The document shell, the `lang` attribute from the script's frontmatter, and the player are added by the renderer. Check your work with the dev server or with one command:
 
 ```bash
-dek check architecture --shot
+dekc check architecture --shot
 ```
 
 ## Skeletons
 
-`dek sync`, and the dev server on every save, generates a skeleton for any section that has no HTML. The skeleton is not an empty file. It puts the heading text in an `<h2>` and lists the beats with `data-step` already bound.
+`dekc sync`, and the dev server on every save, generates a skeleton for any section that has no HTML. The skeleton is not an empty file. It puts the heading text in an `<h2>` and lists the beats with `data-step` already bound.
 
 ```html
 <section class="slide" data-layout="default">
@@ -50,11 +50,11 @@ dek check architecture --shot
 
 A section without beats gets `data-layout="title"`; with beats, `default`. Each is used only when the deck's `theme.css` lays it out; otherwise the skeleton names no layout, so a new deck passes lint in any theme. Beats with an id are bound by id; beats without one are bound by their 1-based position.
 
-A heading that is only an id, such as `## recap`, has no display text, so its skeleton `<h2>` is empty. The first section is the exception: it takes the deck `title`. This keeps an English slug from ending up on a projected slide by accident. Lint warns about the empty heading as `DEK024`. If you want words there, write `## Recap {#recap}`.
+A heading that is only an id, such as `## recap`, has no display text, so its skeleton `<h2>` is empty. The first section is the exception: it takes the deck `title`. This keeps an English slug from ending up on a projected slide by accident. Lint warns about the empty heading as `DEKC024`. If you want words there, write `## Recap {#recap}`.
 
-Sync never touches a slide you have edited. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide. A number you write by hand for a beat that has an id is `DEK025`, a warning whose hint names the id.
+Sync never touches a slide you have edited. Adding a beat to the script does not update HTML you already wrote; the binding is the job of `data-step`. Because the skeleton uses beat ids, giving beats `{#id}` names before you start hand-writing HTML means later insertions never break a slide. A number you write by hand for a beat that has an id is `DEKC025`, a warning whose hint names the id.
 
-A skeleton nobody has edited yet is different: it is still sync's output, so sync rewrites it when the script moves on. Change the deck `title` or add a beat, and the untouched skeleton follows; the first edit you make to the file ends that, even one that only retypes the heading. `dek sync` lists such files as `(updated)`.
+A skeleton nobody has edited yet is different: it is still sync's output, so sync rewrites it when the script moves on. Change the deck `title` or add a beat, and the untouched skeleton follows; the first edit you make to the file ends that, even one that only retypes the heading. `dekc sync` lists such files as `(updated)`.
 
 Sync knows a skeleton is untouched because it remembers the exact bytes it wrote, as hashes in the deck's `.cache/skeletons`. The shape of a file is no proof: a retyped heading keeps the shape. The record is a cache like the rest of `.cache/`. Without it, a slide that is exactly the skeleton sync would write now is still sync's, and every other slide is left as yours, so losing it costs refreshes, never edits.
 
@@ -74,11 +74,11 @@ The renderer scopes every rule to that slide. `.usb-mark` becomes `.slide:where(
 
 `pop` gives only its `from`: the rule for `.usb-mark` is the end state, and the animation starts somewhere else and arrives there. Write entry animations that way, and wherever the animation does not run, the finished slide is what shows. The rail's thumbnails and the presenter's preview are copies with `.is-current`, so they play it once and settle in the same place. An animation whose `to` holds the finished look instead depends on `forwards`, and on the animation running at all.
 
-The theme's rules still apply. Values come from tokens (`DEK014`). A value only this slide uses can be a token of the slide's own, as `--mark-size` is above; the `DEK014` hint for a slide stylesheet offers that. A class defined here counts as defined for this slide only (`DEK010`) and does not count toward `max_classes` (`DEK013`). Rules that reach past the slide stay in `theme.css` (`DEK012`): `::view-transition-*`, `@font-face`, `@import`, and `:root`, `html`, or `body`, which never match inside a slide. `url()` follows the slide HTML's asset rules: `assets/...`, relative to the deck, and nothing remote (`DEK020`, `DEK023`). `dek mv` moves the stylesheet along with the HTML, and a stylesheet with no section is `DEK002`. Once a class shows up on several slides, move it into `theme.css`.
+The theme's rules still apply. Values come from tokens (`DEKC014`). A value only this slide uses can be a token of the slide's own, as `--mark-size` is above; the `DEKC014` hint for a slide stylesheet offers that. A class defined here counts as defined for this slide only (`DEKC010`) and does not count toward `max_classes` (`DEKC013`). Rules that reach past the slide stay in `theme.css` (`DEKC012`): `::view-transition-*`, `@font-face`, `@import`, and `:root`, `html`, or `body`, which never match inside a slide. `url()` follows the slide HTML's asset rules: `assets/...`, relative to the deck, and nothing remote (`DEKC020`, `DEKC023`). `dekc mv` moves the stylesheet along with the HTML, and a stylesheet with no section is `DEKC002`. Once a class shows up on several slides, move it into `theme.css`.
 
 ## Density is the theme's job
 
-How much fits on a slide is decided by font sizes and spacing in `theme.css`, not by a rule about word counts. Set the type large, and a crowded slide overflows the canvas the moment you cram it. `dek lint --visual` measures the overflow and reports it as `DEK030`, a verdict that comes from geometry rather than opinion. If you want denser slides, make the type smaller in the theme. That decision then lives in a diff where it can be reviewed.
+How much fits on a slide is decided by font sizes and spacing in `theme.css`, not by a rule about word counts. Set the type large, and a crowded slide overflows the canvas the moment you cram it. `dekc lint --visual` measures the overflow and reports it as `DEKC030`, a verdict that comes from geometry rather than opinion. If you want denser slides, make the type smaller in the theme. That decision then lives in a diff where it can be reviewed.
 
 ## Next
 

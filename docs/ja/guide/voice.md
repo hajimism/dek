@@ -13,14 +13,14 @@ script.md → Deck → Cue → Synth → Timeline → schedule
 ## 喋りになるのは段落だけ
 
 ```bash
-dek cues
+dekc cues
 ```
 
-各ビートで喋られる Cue を出力します。エンジンは要りません。引用、リスト、コード、表は落とされ、インラインの強調、リンク、コードスパンは装飾を外したテキストになります。見える内容はあるのに段落がないビートは、Cue と一緒に `DEK042` として報告されるので、台本を書いている段階で気づけます。
+各ビートで喋られる Cue を出力します。エンジンは要りません。引用、リスト、コード、表は落とされ、インラインの強調、リンク、コードスパンは装飾を外したテキストになります。見える内容はあるのに段落がないビートは、Cue と一緒に `DEKC042` として報告されるので、台本を書いている段階で気づけます。
 
 ## セットアップ
 
-`dek.toml` に `[voice]` テーブルを書くと、`dek new` がそれを新しいデッキへ `voice/voice.toml` としてコピーします。既存のデッキには、自分でファイルを書いてください。
+`dekc.toml` に `[voice]` テーブルを書くと、`dekc new` がそれを新しいデッキへ `voice/voice.toml` としてコピーします。既存のデッキには、自分でファイルを書いてください。
 
 ```toml
 # decks/<deck>/voice/voice.toml
@@ -30,48 +30,48 @@ speed   = 1
 pause   = { sentence = 350, beat = 700 }
 ```
 
-`dek voice` には起動中の VOICEVOX 互換エンジンが必要です。`rehearse` と `video` に要るのは、それが書く Timeline だけです。エンジンが見つからなければ、それを必要とするコマンドだけが失敗し、hint にインストール方法が表示されます。
+`dekc voice` には起動中の VOICEVOX 互換エンジンが必要です。`rehearse` と `video` に要るのは、それが書く Timeline だけです。エンジンが見つからなければ、それを必要とするコマンドだけが失敗し、hint にインストール方法が表示されます。
 
 - **VOICEVOX**（ポート 50021）: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/) か `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
 - **AivisSpeech**（ポート 10101、`engine = "aivis"`）: [aivis-project.com](https://aivis-project.com/) か `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`
 - COEIROINK と SHAREVOX は名前で認識します。
-- 別の場所で動いている互換エンジンは、`engine` に URL を書くか `DEK_VOICE_URL` を設定します。
+- 別の場所で動いている互換エンジンは、`engine` に URL を書くか `DEKC_VOICE_URL` を設定します。
 
 ## 合成
 
 ```bash
-dek voice
-dek voice speakers
-dek voice say "こんにちは"
-dek voice dict add dek デック
-dek voice pin
+dekc voice
+dekc voice speakers
+dekc voice say "こんにちは"
+dekc voice dict add dekc デック
+dekc voice pin
 ```
 
-`dek voice` は変わった文だけを合成し、音声、文ごとのキャッシュ、`timeline.json` を `.cache/voice/` に書きます。開発サーバも保存時に同じことをします。`voice/dict.toml` にない ASCII の単語は `DEK040`（警告）で、`dict add` で読みを足します。`dek voice pin` はマスター音声と Timeline を `voice/pin/` にコピーします。キャッシュを消しても残る、持ち運べるスナップショットです。pin があるあいだ、`dek voice` と開発サーバは合成せずに pin を戻すので、台本や `voice.toml` を直しても音声には反映されません。合成し直すときは `voice/pin/` を消してください。
+`dekc voice` は変わった文だけを合成し、音声、文ごとのキャッシュ、`timeline.json` を `.cache/voice/` に書きます。開発サーバも保存時に同じことをします。`voice/dict.toml` にない ASCII の単語は `DEKC040`（警告）で、`dict add` で読みを足します。`dekc voice pin` はマスター音声と Timeline を `voice/pin/` にコピーします。キャッシュを消しても残る、持ち運べるスナップショットです。pin があるあいだ、`dekc voice` と開発サーバは合成せずに pin を戻すので、台本や `voice.toml` を直しても音声には反映されません。合成し直すときは `voice/pin/` を消してください。
 
-カナと尺は機械可読です。dek はクラウド TTS を既定にしません。
+カナと尺は機械可読です。dekc はクラウド TTS を既定にしません。
 
 ## リハーサル
 
 ```bash
-dek rehearse
+dekc rehearse
 ```
 
-Timeline を時計にして開発サーバが起動し、ブラウザが音声に合わせて時間どおりにビートを送ります。何も録画しません。`Space` で再生と停止。矢印キーと `dek goto` でシークし、音声が追従します。手書きの `timeline.json` があれば、エンジンなしでもリハーサルできます。
+Timeline を時計にして開発サーバが起動し、ブラウザが音声に合わせて時間どおりにビートを送ります。何も録画しません。`Space` で再生と停止。矢印キーと `dekc goto` でシークし、音声が追従します。手書きの `timeline.json` があれば、エンジンなしでもリハーサルできます。
 
 ## 動画
 
 ```bash
-dek video
-dek video architecture
-dek video --fps 30 --root-dist
+dekc video
+dekc video architecture
+dekc video --fps 30 --root-dist
 ```
 
-デッキ全体は `dist/<deck>.mp4`、`--root-dist` なら `<root>/dist/<deck>.mp4` になります。1 枚だけなら `.cache/video/<slug>.mp4` です。Playwright、ffmpeg、Timeline が必要で、Timeline がなければ hint が先に `dek voice` を実行するよう案内します。MP4 と並んで、`.vtt` の字幕、`.chapters.txt` のチャプター一覧、話者を記した `.credits.txt` が書き出されます。クレジットは映像には焼き込みません。
+デッキ全体は `dist/<deck>.mp4`、`--root-dist` なら `<root>/dist/<deck>.mp4` になります。1 枚だけなら `.cache/video/<slug>.mp4` です。Playwright、ffmpeg、Timeline が必要で、Timeline がなければ hint が先に `dekc voice` を実行するよう案内します。MP4 と並んで、`.vtt` の字幕、`.chapters.txt` のチャプター一覧、話者を記した `.credits.txt` が書き出されます。クレジットは映像には焼き込みません。
 
 焼く時間はトークの実時間ではありません。各ビートは静止フレーム 1 枚と、遷移に必要なぶんだけです。
 
-Timeline があるとき、`dek ls` は字数からの見積もりの隣にナレーションの実尺を並べ、`duration` の予算から大きく外れていれば `DEK041`（警告）を出します。台本には無音の時間を表す記法はありません。段落のないビートは、遷移と `pause.beat` を通過するだけです。間合いは次の `voice.toml` で決めます。
+Timeline があるとき、`dekc ls` は字数からの見積もりの隣にナレーションの実尺を並べ、`duration` の予算から大きく外れていれば `DEKC041`（警告）を出します。台本には無音の時間を表す記法はありません。段落のないビートは、遷移と `pause.beat` を通過するだけです。間合いは次の `voice.toml` で決めます。
 
 ## タイミング
 
@@ -88,15 +88,15 @@ pause = 1200                # 最後のビートの後
 pause = 1500                # 直後の無音。pause.beat の代わり
 ```
 
-スライドは `slug`、ビートは `slug/beat-id` か `slug/2` がキーです。位置で書く `slug/2` は URL のハッシュと同じ形です。スライドのキーはその枚の前と後ろの両方を調整します。`lead` は枚が出るところ（最初の `###` より前の段落を喋るところ）に入るときに、`pause` は最後のビートの後に適用されます。ビートのキーはスライドのキーより優先されます。`dek mv` はスライドと一緒にキーも書き換えます。どれにも一致しないキーは `DEK043` です。開発サーバは保存のたびにキャッシュ済みの音声から組み直し、`dek voice pin` は音声と一緒にタイミングも固定します。
+スライドは `slug`、ビートは `slug/beat-id` か `slug/2` がキーです。位置で書く `slug/2` は URL のハッシュと同じ形です。スライドのキーはその枚の前と後ろの両方を調整します。`lead` は枚が出るところ（最初の `###` より前の段落を喋るところ）に入るときに、`pause` は最後のビートの後に適用されます。ビートのキーはスライドのキーより優先されます。`dekc mv` はスライドと一緒にキーも書き換えます。どれにも一致しないキーは `DEKC043` です。開発サーバは保存のたびにキャッシュ済みの音声から組み直し、`dekc voice pin` は音声と一緒にタイミングも固定します。
 
 ## 日常の 4 手
 
 ```bash
 $EDITOR script.md
-dek
-dek rehearse
-dek video
+dekc
+dekc rehearse
+dekc video
 ```
 
 ライブ専用なら、[はじめる](./getting-started)の 3 手がすべてです。

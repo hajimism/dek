@@ -1,4 +1,4 @@
-import { DekError } from "./error.ts";
+import { DekcError } from "./error.ts";
 
 export async function awaitPiped(proc: {
   stdout: ReadableStream<Uint8Array> | number;
@@ -18,7 +18,7 @@ export function workerCommand(bin: string, args: string[] = []): string[] {
   return bin.endsWith(".ts") ? ["bun", "--no-install", bin, ...args] : [bin, ...args];
 }
 
-/** A browser that hangs must not hang dek; a whole visual run or capture fits well inside this. */
+/** A browser that hangs must not hang dekc; a whole visual run or capture fits well inside this. */
 const DEFAULT_WORKER_TIMEOUT_MS = 10 * 60 * 1000;
 
 type PipedOptions = {
@@ -36,14 +36,14 @@ type Piped = { stdout: string; stderr: string; exitCode: number };
 
 /**
  * Runs `cmd` to its exit with its output piped back. A command that cannot start, or runs past
- * `timeoutMs` and is killed, is a DekError named `label`; any exit code is the caller's to judge.
+ * `timeoutMs` and is killed, is a DekcError named `label`; any exit code is the caller's to judge.
  */
 export async function runPiped(cmd: string[], options: PipedOptions): Promise<Piped> {
   let proc: Bun.Subprocess<"pipe", "pipe", "pipe">;
   try {
     proc = Bun.spawn(cmd, { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
   } catch (error) {
-    throw new DekError(options.label, { hint: options.hint, cause: error });
+    throw new DekcError(options.label, { hint: options.hint, cause: error });
   }
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -59,16 +59,16 @@ export async function runPiped(cmd: string[], options: PipedOptions): Promise<Pi
     await proc.stdin.end();
     const result = await piped;
     if (timedOut) {
-      throw new DekError(options.label, {
+      throw new DekcError(options.label, {
         hint: `it did not finish within ${Math.round(options.timeoutMs / 1000)}s and was stopped`,
       });
     }
     return result;
   } catch (error) {
-    if (error instanceof DekError) {
+    if (error instanceof DekcError) {
       throw error;
     }
-    throw new DekError(options.label, { hint: options.hint, cause: error });
+    throw new DekcError(options.label, { hint: options.hint, cause: error });
   } finally {
     clearTimeout(timer);
   }
@@ -85,7 +85,7 @@ type JsonWorkerOptions = {
 
 /**
  * Runs a worker that takes one JSON request on stdin and answers with JSON on
- * stdout. Every failure is a DekError named `label`: a worker that exits
+ * stdout. Every failure is a DekcError named `label`: a worker that exits
  * non-zero contributes its stderr as the hint, one that overruns the timeout
  * is killed and says so, and output `parse` rejects is invalid JSON.
  */
@@ -102,11 +102,11 @@ export async function runJsonWorker<T>(
     timeoutMs: options.timeoutMs ?? DEFAULT_WORKER_TIMEOUT_MS,
   });
   if (exitCode !== 0) {
-    throw new DekError(options.label, { hint: stderr.trim().slice(0, 200) || options.hint });
+    throw new DekcError(options.label, { hint: stderr.trim().slice(0, 200) || options.hint });
   }
   const parsed = parse(stdout);
   if (parsed === null) {
-    throw new DekError(options.label, { hint: "worker returned invalid JSON" });
+    throw new DekcError(options.label, { hint: "worker returned invalid JSON" });
   }
   return parsed;
 }

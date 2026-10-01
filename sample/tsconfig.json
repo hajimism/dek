@@ -13,7 +13,7 @@
     "noEmit": true
   },
   "include": [
-    ".dek/*.d.ts",
+    ".dekc/*.d.ts",
     "decks/*/slides/*.ts"
   ]
 }

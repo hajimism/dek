@@ -29,4 +29,4 @@ export default {
     const readout = slide.querySelector<HTMLElement>("[data-total]");
     if (readout) readout.textContent = clock(Math.floor(reach));
   },
-} satisfies DekSlide;
+} satisfies DekcSlide;

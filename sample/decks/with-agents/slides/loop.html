@@ -12,7 +12,7 @@
       <p class="node node-check" data-node="1"><span class="node-num">02</span>確かめる</p>
       <p class="node node-fix" data-node="2"><span class="node-num">03</span>直す</p>
       <p class="hub">
-        <span class="hub-state" data-hub="0"><span class="cmd">dek check</span></span>
+        <span class="hub-state" data-hub="0"><span class="cmd">dekc check</span></span>
         <span class="hub-state hub-ok" data-hub="1"><span class="pill pill-ok">ok: true</span></span>
       </p>
     </div>
@@ -28,9 +28,9 @@
     </figure>
     <figure class="window" data-step="loop-check">
       <div class="window-bar"><p class="window-title">terminal</p><span class="pill pill-err">02 check · 1 error</span></div>
-<pre class="code"><span class="tok-c">$ dek check how-it-works --shot --json</span>
+<pre class="code"><span class="tok-c">$ dekc check how-it-works --shot --json</span>
 <span class="tok-p">{</span> <span class="tok-k">"ok"</span>: <span class="tok-n">false</span>, <span class="tok-p">…</span>
-  <span class="tok-k">"diagnostics"</span>: [{ <span class="tok-k">"id"</span>: <span class="tok-s">"DEK030"</span>, <span class="tok-p">…</span> <span class="tok-hot">"bottom": 69</span> <span class="tok-p">…</span> }],
+  <span class="tok-k">"diagnostics"</span>: [{ <span class="tok-k">"id"</span>: <span class="tok-s">"DEKC030"</span>, <span class="tok-p">…</span> <span class="tok-hot">"bottom": 69</span> <span class="tok-p">…</span> }],
   <span class="tok-k">"shot"</span>: <span class="tok-s">"…/.cache/shots/how-it-works~beats.b8fd120c.png"</span> <span class="tok-p">}</span></pre>
     </figure>
     <figure class="window" data-step="loop-fix">
@@ -38,7 +38,7 @@
       <div class="fix">
         <p class="bubble bubble-agent">hint は “cut it”。リストを 3 項目削って、もう一度確かめます。</p>
       </div>
-<pre class="code"><span class="tok-c">$ dek check how-it-works --shot --json</span>
+<pre class="code"><span class="tok-c">$ dekc check how-it-works --shot --json</span>
 <span class="tok-p">{</span> <span class="tok-k">"ok"</span>: <span class="tok-n">true</span>, <span class="tok-k">"slug"</span>: <span class="tok-s">"how-it-works"</span>, <span class="tok-k">"diagnostics"</span>: [],
   <span class="tok-k">"shot"</span>: <span class="tok-s">"…/.cache/shots/how-it-works~beats.75435466.png"</span> <span class="tok-p">}</span></pre>
     </figure>

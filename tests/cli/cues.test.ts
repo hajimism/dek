@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { cuesCommand } from "../../src/cli/cues.ts";
 import { formatText } from "../../src/cli/result.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 type CuesOk = {
@@ -18,7 +18,7 @@ type CuesOk = {
   diagnostics: Array<{ id: string; message: string; line?: number }>;
 };
 
-describe("dek cues", () => {
+describe("dekc cues", () => {
   test("returns Cue[] as JSON without a TTS engine", async () => {
     await withTempProject(
       {
@@ -43,13 +43,13 @@ hello
 
 ### hook
 
-Use \`dek\`.
+Use \`dekc\`.
 `,
           },
         ],
       },
       async (root) => {
-        const result = await runDek(["cues", "--json"], {
+        const result = await runDekc(["cues", "--json"], {
           cwd: join(root, "decks", "demo"),
         });
         expect(result).toMatchObject({ exitCode: 0 });
@@ -73,7 +73,7 @@ Use \`dek\`.
             position: { slideIndex: 1, beatIndex: 1 },
             slug: "architecture",
             line: 17,
-            paragraphs: ["Use dek."],
+            paragraphs: ["Use dekc."],
           },
         ]);
         expect(json.diagnostics).toEqual([]);
@@ -141,11 +141,11 @@ spoken
       async (root) => {
         const data = cuesCommand(requireDeckFromCwd(join(root, "decks", "demo")));
         expect(data.diagnostics).toHaveLength(1);
-        expect(data.diagnostics[0]?.id).toBe("DEK042");
+        expect(data.diagnostics[0]?.id).toBe("DEKC042");
         expect(data.diagnostics[0]?.line).toBe(13);
         const text = formatText({ command: "cues", data });
         expect(text).toContain("intro #2");
-        expect(text).toContain("DEK042");
+        expect(text).toContain("DEKC042");
       },
     );
   });

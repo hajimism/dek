@@ -4,18 +4,18 @@ import { deckProjectRoot } from "./path.ts";
 import { readSourceIfExists, writeInside } from "./safe-fs.ts";
 
 /**
- * Which slides are still dek's own: the skeletons dek wrote that nobody has touched since, kept as
+ * Which slides are still dekc's own: the skeletons dekc wrote that nobody has touched since, kept as
  * hashes of their bytes in `.cache/skeletons`. The shape of a skeleton proves nothing, since an
- * author who retypes its heading keeps the shape; only the bytes dek wrote do.
+ * author who retypes its heading keeps the shape; only the bytes dekc wrote do.
  *
  * The record is a cache, and anyone may delete it. Without it, a slide that is exactly the
- * skeleton dek would write now is still provably dek's, and every other slide is the author's, so
+ * skeleton dekc would write now is still provably dekc's, and every other slide is the author's, so
  * a lost record costs refreshes, never edits.
  */
 export type SkeletonRecord = {
-  /** Whether `html` is dek's: what it wrote before, or byte for byte what it would write now. */
+  /** Whether `html` is dekc's: what it wrote before, or byte for byte what it would write now. */
   owns(html: string, now: string | undefined): boolean;
-  /** Notes `html` as dek's for the next run; what is not kept is forgotten on `save`. */
+  /** Notes `html` as dekc's for the next run; what is not kept is forgotten on `save`. */
   keep(html: string): void;
   /** Writes what was kept, when that differs from what was read. */
   save(): void;

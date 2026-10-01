@@ -16,9 +16,9 @@
       <text x="170" y="40" text-anchor="middle">書く</text>
       <text x="300" y="40" text-anchor="middle">測る</text>
       <text x="440" y="40" text-anchor="middle">直す</text>
-      <text class="cmd" x="40" y="104" text-anchor="middle">dek show</text>
+      <text class="cmd" x="40" y="104" text-anchor="middle">dekc show</text>
       <text class="cmd" x="170" y="104" text-anchor="middle">HTML・CSS</text>
-      <text class="cmd" x="300" y="170" text-anchor="middle">dek check</text>
+      <text class="cmd" x="300" y="170" text-anchor="middle">dekc check</text>
       <text class="cmd" x="440" y="170" text-anchor="middle">もう一度測る</text>
     </svg>
     <p class="note">測ると直すの往復は、人が画面を確かめる前に片付く。</p>
@@ -26,7 +26,7 @@
   <div class="stage">
     <figure class="step" data-step="agents-read">
       <p class="label"><span class="signal">1</span>一枚ぶんを、まとめて読む</p>
-      <p class="cmdline">$ dek show why-dek timing</p>
+      <p class="cmdline">$ dekc show why-dekc timing</p>
       <table class="bundle">
         <tbody>
           <tr><th>script</th><td>台本のその節</td><td class="lines" data-real="show-script">8 行</td></tr>
@@ -39,18 +39,18 @@
     </figure>
     <figure class="step" data-step="agents-check">
       <p class="label"><span class="signal">2</span>描いて、測って、直す</p>
-      <pre class="code"><span class="code-head"><span>$ dek check objection --shot --json</span><span>捨てデッキ</span></span>{
+      <pre class="code"><span class="code-head"><span>$ dekc check objection --shot --json</span><span>捨てデッキ</span></span>{
   "ok": false,
   "slug": "objection",
   "diagnostics": [{
-    "id": "DEK030",
+    "id": "DEKC030",
     <span class="mark">"hint": "shorten it, or let it wrap with overflow-wrap: …"</span>,
     "data": { "edges": { "right": 41 }, "steps": ["slow", "vague"] }
-  }, { "id": "DEK031", … }],
+  }, { "id": "DEKC031", … }],
   "shot": ".cache/shots/objection~vague.b5ae5c96.png"
 }</pre>
       <p class="after"><span class="label">直して、もう一度</span><span class="chip">{ "ok": true, "slug": "objection", "diagnostics": [] }</span></p>
     </figure>
   </div>
-  <p class="source">行数は dek show why-dek timing --json の各部の行数。JSON は dek check の実際の出力の抜粋。</p>
+  <p class="source">行数は dekc show why-dekc timing --json の各部の行数。JSON は dekc check の実際の出力の抜粋。</p>
 </section>

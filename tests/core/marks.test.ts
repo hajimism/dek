@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import {
   clearMarks,
   listMarks,
@@ -149,8 +149,8 @@ describe("marks", () => {
   test("marks nothing past the deck", async () => {
     await withTempProject(spec, async (root) => {
       const { deck } = resolveDeck(join(root, "decks", "demo"));
-      expect(() => toggleMark(root, deck, at(0, 3), NOW)).toThrow(DekError);
-      expect(() => toggleMark(root, deck, at(2, 0), NOW)).toThrow(DekError);
+      expect(() => toggleMark(root, deck, at(0, 3), NOW)).toThrow(DekcError);
+      expect(() => toggleMark(root, deck, at(2, 0), NOW)).toThrow(DekcError);
       expect(existsSync(marksPath(root))).toBe(false);
     });
   });
@@ -164,7 +164,7 @@ describe("marks", () => {
       try {
         listMarks(root, deck);
       } catch (error) {
-        expect((error as DekError).hint).toContain("delete .dek/marks.json");
+        expect((error as DekcError).hint).toContain("delete .dekc/marks.json");
       }
       expect(await readFile(marksPath(root), "utf8")).toBe("{ not json");
     });

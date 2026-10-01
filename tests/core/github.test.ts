@@ -10,7 +10,7 @@ const repos = {
   "someone/talks": {
     head: SHA_A,
     revs: { v1: SHA_B },
-    commits: { [SHA_A]: deckRepoFiles("why-dek"), [SHA_B]: deckRepoFiles("why-dek") },
+    commits: { [SHA_A]: deckRepoFiles("why-dekc"), [SHA_B]: deckRepoFiles("why-dekc") },
   },
 };
 
@@ -61,7 +61,7 @@ describe("resolveRev", () => {
       await expect(
         resolveRev("someone", "talks", undefined, { timeoutMs: 50 }),
       ).rejects.toMatchObject({
-        name: "DekError",
+        name: "DekcError",
         message: "GitHub timed out after 0.05s while fetching someone/talks",
         hint: expect.stringContaining("run the command again"),
       });
@@ -70,7 +70,7 @@ describe("resolveRev", () => {
 
   test.serial("an unreachable GitHub says so instead of failing silently", async () => {
     await withFakeGithub(repos, async () => {
-      await withEnv({ DEK_GITHUB_API: "http://127.0.0.1:1" }, async () => {
+      await withEnv({ DEKC_GITHUB_API: "http://127.0.0.1:1" }, async () => {
         await expect(resolveRev("someone", "talks")).rejects.toMatchObject({
           message: expect.stringContaining("could not reach GitHub"),
           hint: expect.stringContaining("network"),
@@ -103,7 +103,7 @@ describe("authentication", () => {
           await resolveRev("someone", "talks");
           expect(fake.requests[0]?.authorization).toBe("Bearer from-gh");
         },
-        { DEK_GH: gh },
+        { DEKC_GH: gh },
       );
     });
     await withFakeGithub(repos, async (fake) => {
@@ -117,7 +117,7 @@ describe("downloadTarball", () => {
   test.serial("follows the redirect and returns the repository at that commit", async () => {
     await withFakeGithub(repos, async () => {
       const files = await new Bun.Archive(await downloadTarball("someone", "talks", SHA_A)).files();
-      expect([...files.keys()]).toContain(`someone-talks-aaaaaaa/decks/why-dek/script.md`);
+      expect([...files.keys()]).toContain(`someone-talks-aaaaaaa/decks/why-dekc/script.md`);
     });
   });
 
@@ -138,7 +138,7 @@ describe("downloadTarball", () => {
       await expect(
         downloadTarball("someone", "talks", SHA_A, { maxBytes: 4096 }),
       ).rejects.toMatchObject({
-        name: "DekError",
+        name: "DekcError",
         message: expect.stringContaining("is larger than"),
         hint: expect.stringContaining("smaller repository"),
       });
@@ -156,7 +156,7 @@ describe("downloadTarball", () => {
       await expect(
         downloadTarball("someone", "talks", SHA_A, { timeoutMs: 50 }),
       ).rejects.toMatchObject({
-        name: "DekError",
+        name: "DekcError",
         message: "GitHub timed out after 0.05s while fetching someone/talks@aaaaaaa",
       });
     });

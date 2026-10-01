@@ -6,7 +6,7 @@ import { displayPaths, formatText } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { toggleMark } from "../../src/core/marks.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 const script = `---
@@ -33,7 +33,7 @@ function markBoth(root: string): void {
 
 const target = (root: string) => resolveTarget(join(root, "decks", "demo"), "deck", {});
 
-describe("dek marks", () => {
+describe("dekc marks", () => {
   test("lists each marked beat by its place in script.md, from the project root too", async () => {
     await withTempProject(spec, async (root) => {
       markBoth(root);
@@ -41,7 +41,7 @@ describe("dek marks", () => {
         join(root, "decks", "demo", "script.md"),
         script.replace("二つ目です。", "二つ目を言い直す。"),
       );
-      const result = await runDek(["marks", "demo", "--json"], { cwd: root });
+      const result = await runDekc(["marks", "demo", "--json"], { cwd: root });
       expect(result.exitCode).toBe(0);
       expect(jsonStdout(result)).toMatchObject({
         ok: true,

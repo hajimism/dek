@@ -1,12 +1,12 @@
 # Configuration
 
-There are three places to configure dek: the project's `dek.toml`, the frontmatter of each deck's `script.md`, and the optional `voice/` files inside a deck.
+There are three places to configure dekc: the project's `dekc.toml`, the frontmatter of each deck's `script.md`, and the optional `voice/` files inside a deck.
 
 ## Directory layout
 
 ```
 my-talks/
-├── dek.toml
+├── dekc.toml
 ├── .gitignore
 ├── .rumdl.toml
 ├── theme.css
@@ -37,7 +37,7 @@ my-talks/
 │           ├── voice/
 │           ├── video/
 │           └── shots/
-└── .dek/
+└── .dekc/
     ├── schema.json
     ├── slide.d.ts
     └── server.json                # while the dev server runs
@@ -45,10 +45,10 @@ my-talks/
 
 The boundary between project and deck is explained in [Projects and Decks](/guide/structure).
 
-## `dek.toml`
+## `dekc.toml`
 
 ```toml
-# dek project
+# dekc project
 url = "https://example.com/talks/"
 max_classes = 40
 cjk_per_minute = 300
@@ -60,29 +60,29 @@ speaker = "ずんだもん/ノーマル"
 speed = 1.0
 
 [refs]
-"hajimism/dek/why-dek" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
+"hajimism/dekc/why-dekc" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
 ```
 
 | Key | Default | Purpose |
 | --- | --- | --- |
-| `url` | none | The absolute http(s) URL `dist/` is served from. With it, `dek build` writes `og:url` and a first-slide `og:image`; `--url` overrides it. See [On the web](/guide/present#on-the-web) |
-| `max_classes` | `40` | Upper bound for `DEK013` |
+| `url` | none | The absolute http(s) URL `dist/` is served from. With it, `dekc build` writes `og:url` and a first-slide `og:image`; `--url` overrides it. See [On the web](/guide/present#on-the-web) |
+| `max_classes` | `40` | Upper bound for `DEKC013` |
 | `cjk_per_minute` | `300` | Speaking rate for CJK text, in characters |
 | `latin_per_minute` | `130` | Speaking rate for other text, in words |
 | `voice.engine` | `"voicevox"` | Engine name (`voicevox`, `aivis`, `coeiroink`, `sharevox`), a name and a local port (`voicevox:50021`), or a base URL |
 | `voice.speaker` | required when `[voice]` is present | Speaker, as `name/style` |
 | `voice.speed` | `1.0` | Speaking speed |
-| `refs` | none | Each ref (`owner/repo/deck`) and the 40-character commit it is pinned to. `dek ref` writes it; see [Refs](/reference/cli#refs) |
+| `refs` | none | Each ref (`owner/repo/deck`) and the 40-character commit it is pinned to. `dekc ref` writes it; see [Refs](/reference/cli#refs) |
 
-dek ignores keys it does not know, and lint names each one as `DEK008`, with the key it most likely meant. When `[voice]` is present, `dek new` copies it into the new deck as `voice/voice.toml`.
+dekc ignores keys it does not know, and lint names each one as `DEKC008`, with the key it most likely meant. When `[voice]` is present, `dekc new` copies it into the new deck as `voice/voice.toml`.
 
 ## Frontmatter
 
-The schema is defined with Zod and written to `.dek/schema.json` on every sync. The `$schema` comment on the first line lets yaml-language-server validate as you type.
+The schema is defined with Zod and written to `.dekc/schema.json` on every sync. The `$schema` comment on the first line lets yaml-language-server validate as you type.
 
 ```yaml
 ---
-# yaml-language-server: $schema=../../.dek/schema.json
+# yaml-language-server: $schema=../../.dekc/schema.json
 title: How I Built an HTML Slide Tool
 description: What a build system for talks looks like, and why the script comes first.
 event: Tokyo Frontend Meetup #42
@@ -97,13 +97,13 @@ lang: en
 | --- | --- | --- |
 | `title` | yes | String. Used as the heading of the first skeleton slide when its `##` heading is only an id |
 | `description` | no | String. The description a shared link shows; without it, `event` and `date` stand in |
-| `event` | no | String. Shown by `dek ls`; not placed on any slide |
+| `event` | no | String. Shown by `dekc ls`; not placed on any slide |
 | `date` | no | `YYYY-MM-DD` |
 | `duration` | no | `<n>m`, such as `20m`. The talk's budget |
 | `ratio` | no | `16:9` (default, 1280 × 720) or `4:3` (1024 × 768) |
-| `lang` | no | BCP 47 tag. Becomes `<html lang>` in the player, screenshots, and PDF. Omit it and dek reads the script: kana means `ja`, then Hangul `ko`, then Han `zh`, and anything else `en` |
+| `lang` | no | BCP 47 tag. Becomes `<html lang>` in the player, screenshots, and PDF. Omit it and dekc reads the script: kana means `ja`, then Hangul `ko`, then Han `zh`, and anything else `en` |
 
-Any other key is ignored, and lint names it as `DEK008`.
+Any other key is ignored, and lint names it as `DEKC008`.
 
 Section and beat ids match `[a-z0-9-]+` and contain at least one letter. Digits-only ids would collide with numeric `data-step` values.
 
@@ -118,8 +118,8 @@ pause   = { sentence = 350, beat = 700 }
 
 | Key | Purpose |
 | --- | --- |
-| `engine` | Engine name or base URL. Default `voicevox`. `DEK_VOICE_URL` overrides it |
-| `speaker` | `name/style`. `dek voice speakers` lists what the engine offers |
+| `engine` | Engine name or base URL. Default `voicevox`. `DEKC_VOICE_URL` overrides it |
+| `speaker` | `name/style`. `dekc voice speakers` lists what the engine offers |
 | `speed` | Speaking speed. Default 1 |
 | `pause.sentence` | Silence between sentences, in milliseconds. Default 350 |
 | `pause.beat` | Silence at a beat boundary, in milliseconds. Default 700 |
@@ -132,14 +132,14 @@ pause   = { sentence = 350, beat = 700 }
 Readings for words the engine would otherwise mispronounce. Keys are matched as whole ASCII words, longest first.
 
 ```toml
-[dek]
+[dekc]
 kana = "デック"
 
 ["script.md"]
 kana = "スクリプトエムディー"
 ```
 
-`dek voice dict add <word> <kana>` appends an entry. A word not in the dictionary is `DEK040`.
+`dekc voice dict add <word> <kana>` appends an entry. A word not in the dictionary is `DEKC040`.
 
 ## Theme tokens
 

@@ -5,8 +5,8 @@ import { readDeckFile } from "./resolve.ts";
 import type { Deck, Section } from "./schema.ts";
 import { beatStep } from "./step.ts";
 
-// The slide HTML `dek sync` writes for a section nobody has written yet. Rendering, lint, and
-// `dek mv` read it too, so it lives apart from the writes in sync.ts.
+// The slide HTML `dekc sync` writes for a section nobody has written yet. Rendering, lint, and
+// `dekc mv` read it too, so it lives apart from the writes in sync.ts.
 
 /**
  * The layouts a deck's theme.css lays out. A skeleton names a layout only from these, so a new
@@ -22,7 +22,7 @@ export function deckLayouts(deckDir: string): SkeletonLayouts {
 /**
  * A heading that is only an id (`## intro`) has no display text. The first
  * section takes the deck title; later ones stay empty so the slug never ends
- * up on a published slide. Lint reports the empty heading (DEK024) with the
+ * up on a published slide. Lint reports the empty heading (DEKC024) with the
  * fix: a title in script.md, which the next sync writes here.
  */
 function skeletonHeading(
@@ -36,7 +36,7 @@ function skeletonHeading(
   return index === 0 ? deckTitle : "";
 }
 
-/** The HTML `dek sync` would generate for `slug`, or undefined when the deck has no such section. */
+/** The HTML `dekc sync` would generate for `slug`, or undefined when the deck has no such section. */
 export function skeletonHtml(
   deck: Deck,
   slug: string,

@@ -1,4 +1,4 @@
-/* This deck's own estimates, section by section, from `bunx dek ls lightning --json`:
+/* This deck's own estimates, section by section, from `bunx dekc ls lightning --json`:
    they add up to 2:42 against the 3:00 budget. The track is the whole budget. */
 .slide {
   --at: 0.7778;

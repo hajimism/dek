@@ -47,7 +47,7 @@ describe("routeRequest", () => {
 });
 
 describe("the goto route", () => {
-  // `dek goto` checks its own arguments; the server answers the request, not a command line.
+  // `dekc goto` checks its own arguments; the server answers the request, not a command line.
   test("says a request without a slug names none, not how to type a command", async () => {
     const req = new Request("http://127.0.0.1/decks/talk/goto", { method: "POST", body: "{}" });
     const response = await routeRequest(req, context()).respond("presenter");

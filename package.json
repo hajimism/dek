@@ -1,11 +1,11 @@
 {
-  "name": "@hajimism/dek",
+  "name": "dekc",
   "version": "0.0.0",
   "description": "A build system for talks.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "dek": "src/cli.ts"
+    "dekc": "src/cli.ts"
   },
   "files": [
     "src",
@@ -15,12 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hajimism/dek.git"
+    "url": "git+https://github.com/hajimism/dekc.git"
   },
   "bugs": {
-    "url": "https://github.com/hajimism/dek/issues"
+    "url": "https://github.com/hajimism/dekc/issues"
   },
-  "homepage": "https://hajimism.github.io/dek/",
+  "homepage": "https://hajimism.github.io/dekc/",
   "publishConfig": {
     "access": "public"
   },

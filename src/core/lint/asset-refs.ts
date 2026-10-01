@@ -6,7 +6,7 @@ import type { HtmlRef } from "../html-scan.ts";
 import { isInside } from "../path.ts";
 
 /**
- * DEK020 to DEK023 for one reference, whether it comes from a slide's markup
+ * DEKC020 to DEKC023 for one reference, whether it comes from a slide's markup
  * or a stylesheet's `url()`. A resource the page loads must exist and be written
  * as `assets/...`; a link must only stay local and inside the deck.
  */
@@ -32,7 +32,7 @@ export function assetRefDiagnostics(
   }
   if (kind === "remote") {
     return [
-      diag("DEK020", {
+      diag("DEKC020", {
         message: `remote URL "${ref.value}"`,
         ...location,
         hint: remoteHint(ref.value),
@@ -42,7 +42,7 @@ export function assetRefDiagnostics(
   }
   if (kind === "escape") {
     return [
-      diag("DEK022", {
+      diag("DEKC022", {
         message: `path "${ref.value}" is outside the deck directory`,
         ...location,
         data: { path: ref.value },
@@ -54,7 +54,7 @@ export function assetRefDiagnostics(
   }
   if (kind === "missing") {
     return [
-      diag("DEK021", {
+      diag("DEKC021", {
         message: `missing ${ref.tag === "img" ? "image" : "file"} "${ref.value}"`,
         ...location,
         ...missingImageHint(ref.value, deckDir),
@@ -64,7 +64,7 @@ export function assetRefDiagnostics(
   }
   if (!isCanonicalAssetPath(ref.value)) {
     return [
-      diag("DEK023", {
+      diag("DEKC023", {
         message: `asset "${ref.value}" must be referenced as assets/${posix.basename(ref.value.trim())}`,
         ...location,
         data: { src: ref.value },
@@ -101,7 +101,7 @@ function missingImageHint(value: string, deckDir: string): { hint?: string } {
 function remoteHint(value: string): string {
   let name = "";
   try {
-    name = posix.basename(new URL(value.trim(), "https://dek.invalid").pathname);
+    name = posix.basename(new URL(value.trim(), "https://dekc.invalid").pathname);
   } catch {}
   return name
     ? `download it into assets/ and use assets/${name}`

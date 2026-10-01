@@ -81,7 +81,7 @@ describe("slide stylesheets in the page", () => {
     });
   });
 
-  test("dek build carries slide stylesheets into the single file", async () => {
+  test("dekc build carries slide stylesheets into the single file", async () => {
     await withTempProject(
       deck({ styles: { usb: ".usb-mark { color: var(--accent); }\n" } }),
       async (root) => {
@@ -95,32 +95,32 @@ describe("slide stylesheets in the page", () => {
 });
 
 describe("slide stylesheet lint", () => {
-  test("DEK010: a class defined in the slide's stylesheet is defined for that slide only", async () => {
+  test("DEKC010: a class defined in the slide's stylesheet is defined for that slide only", async () => {
     const leaky = slideDocument(`<section class="slide">
   <h2 class="slide-title usb-mark">intro</h2>
 </section>`);
     await withTempProject(
       deck({ styles: { usb: ".usb-mark { color: var(--accent); }\n" }, slides: { intro: leaky } }),
       async (root) => {
-        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK010");
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEKC010");
         expect(found).toHaveLength(1);
         expect(found[0]?.path).toBe(join(root, "decks", "demo", "slides", "intro.html"));
       },
     );
   });
 
-  test("DEK013: slide classes do not count toward the theme's class budget", async () => {
+  test("DEKC013: slide classes do not count toward the theme's class budget", async () => {
     const many = Array.from({ length: 50 }, (_, i) => `.local-${i} { opacity: 0; }`).join("\n");
     await withTempProject(deck({ styles: { usb: many } }), async (root) => {
-      expect(lintDeck(join(root, "decks", "demo")).some((d) => d.id === "DEK013")).toBe(false);
+      expect(lintDeck(join(root, "decks", "demo")).some((d) => d.id === "DEKC013")).toBe(false);
     });
   });
 
-  test("DEK014: raw values in a slide stylesheet are reported against that file", async () => {
+  test("DEKC014: raw values in a slide stylesheet are reported against that file", async () => {
     await withTempProject(
       deck({ styles: { usb: ".slide { --local: 12px; }\n.usb-mark { margin-top: 12px; }\n" } }),
       async (root) => {
-        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK014");
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEKC014");
         expect(found).toHaveLength(1);
         expect(found[0]?.path).toBe(join(root, "decks", "demo", "slides", "usb.css"));
         expect(found[0]?.line).toBe(2);
@@ -128,18 +128,18 @@ describe("slide stylesheet lint", () => {
     );
   });
 
-  test("DEK012: view transitions stay in theme.css", async () => {
+  test("DEKC012: view transitions stay in theme.css", async () => {
     await withTempProject(
       deck({ styles: { usb: "::view-transition-old(root) { animation: none; }\n" } }),
       async (root) => {
-        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK012");
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEKC012");
         expect(found).toHaveLength(1);
         expect(found[0]?.path).toBe(join(root, "decks", "demo", "slides", "usb.css"));
       },
     );
   });
 
-  test("DEK012: page-wide rules do not belong in a slide stylesheet", async () => {
+  test("DEKC012: page-wide rules do not belong in a slide stylesheet", async () => {
     await withTempProject(
       deck({
         styles: {
@@ -153,7 +153,7 @@ describe("slide stylesheet lint", () => {
         },
       }),
       async (root) => {
-        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK012");
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEKC012");
         expect(found.map(({ message, line, hint }) => ({ message, line, hint }))).toEqual([
           {
             message: '":root" never matches inside a slide',
@@ -176,7 +176,7 @@ describe("slide stylesheet lint", () => {
     );
   });
 
-  test("DEK020 / DEK021 / DEK023: url() in a slide stylesheet follows the slide HTML's asset rules", async () => {
+  test("DEKC020 / DEKC021 / DEKC023: url() in a slide stylesheet follows the slide HTML's asset rules", async () => {
     await withTempProject(
       {
         decks: deck({
@@ -193,28 +193,28 @@ describe("slide stylesheet lint", () => {
       },
       async (root) => {
         const found = lintDeck(join(root, "decks", "demo")).filter(
-          (d) => d.id === "DEK020" || d.id === "DEK021" || d.id === "DEK023",
+          (d) => d.id === "DEKC020" || d.id === "DEKC021" || d.id === "DEKC023",
         );
         expect(found.map((d) => [d.id, d.message, d.line])).toEqual([
-          ["DEK023", 'asset "../assets/up.svg" must be referenced as assets/up.svg', 2],
-          ["DEK020", 'remote URL "https://cdn.example.com/x.png"', 3],
-          ["DEK021", 'missing file "assets/gone.svg"', 5],
+          ["DEKC023", 'asset "../assets/up.svg" must be referenced as assets/up.svg', 2],
+          ["DEKC020", 'remote URL "https://cdn.example.com/x.png"', 3],
+          ["DEKC021", 'missing file "assets/gone.svg"', 5],
         ]);
         expect(found[0]?.path).toBe(join(root, "decks", "demo", "slides", "usb.css"));
       },
     );
   });
 
-  test("DEK002: a slide stylesheet with no section is reported", async () => {
+  test("DEKC002: a slide stylesheet with no section is reported", async () => {
     await withTempProject(deck({ styles: { gone: ".x { opacity: 0; }\n" } }), async (root) => {
-      const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK002");
+      const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEKC002");
       expect(found).toHaveLength(1);
       expect(found[0]?.path).toBe(join(root, "decks", "demo", "slides", "gone.css"));
     });
   });
 });
 
-describe("dek mv", () => {
+describe("dekc mv", () => {
   test("moves the slide's stylesheet with its HTML", async () => {
     await withTempProject(
       deck({ styles: { usb: ".usb-mark { opacity: 0; }\n" } }),

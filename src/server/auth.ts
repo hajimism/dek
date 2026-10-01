@@ -7,7 +7,7 @@ import type { LiveEventType } from "../core/live-protocol.ts";
  * so a page on another site cannot reach it by pointing its own name at 127.0.0.1 (DNS
  * rebinding); a --remote one also to an address or this machine's own name, which is what the
  * audience types, and to no other DNS name, which could be an attacker's. Anything that moves the deck, a WebSocket or a POST, must come from the deck's own
- * origin or from no browser at all: `dek goto` sends no Origin. A path that does not decode names
+ * origin or from no browser at all: `dekc goto` sends no Origin. A path that does not decode names
  * nothing, so no route has to guard its own decodeURIComponent.
  */
 export function requestGuard(req: Request, options: { remote: boolean }): Response | undefined {
@@ -178,7 +178,7 @@ export function clearance(
 export function pairingResponse(url: URL, redeemed: boolean, session: PresenterSession): Response {
   if (!redeemed) {
     return new Response(
-      "This QR code was used already or has expired; press Enter in the terminal where dek runs for a new one.\n",
+      "This QR code was used already or has expired; press Enter in the terminal where dekc runs for a new one.\n",
       { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } },
     );
   }
@@ -198,7 +198,7 @@ export function pairingResponse(url: URL, redeemed: boolean, session: PresenterS
 export function unauthorized(): Response {
   return new Response("Unauthorized\n", {
     status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="dek presenter"' },
+    headers: { "WWW-Authenticate": 'Basic realm="dekc presenter"' },
   });
 }
 

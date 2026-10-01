@@ -30,7 +30,7 @@ end
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
   await writeProject(root, {
     decks: [
       {
@@ -59,7 +59,7 @@ function mount(hash = "", beforeStart?: () => void): Promise<void> {
 }
 
 const thumb = (index: number): HTMLElement => {
-  const el = document.querySelector<HTMLElement>(`.dek-thumb[data-slide-index="${index}"]`);
+  const el = document.querySelector<HTMLElement>(`.dekc-thumb[data-slide-index="${index}"]`);
   if (!el) {
     throw new Error(`no thumb ${index}`);
   }
@@ -67,14 +67,14 @@ const thumb = (index: number): HTMLElement => {
 };
 
 const handle = (): HTMLElement => {
-  const el = document.getElementById("dek-rail-resize");
+  const el = document.getElementById("dekc-rail-resize");
   if (!el) {
     throw new Error("no handle");
   }
   return el;
 };
 
-const railWidth = (): string => document.documentElement.style.getPropertyValue("--dek-rail-w");
+const railWidth = (): string => document.documentElement.style.getPropertyValue("--dekc-rail-w");
 
 describe("the rail", () => {
   afterEach(async () => {
@@ -83,7 +83,7 @@ describe("the rail", () => {
 
   test.serial("draws each thumbnail at the deck's size and marks the current one", async () => {
     await mount("#middle");
-    const stages = [...document.querySelectorAll<HTMLElement>("#dek-rail .dek-thumb-stage")];
+    const stages = [...document.querySelectorAll<HTMLElement>("#dekc-rail .dekc-thumb-stage")];
     expect(stages.map((el) => [el.style.width, el.style.height])).toEqual(
       Array(3).fill(["1280px", "720px"]),
     );
@@ -117,7 +117,7 @@ describe("the rail", () => {
     "dragging the handle resizes the rail and remembers the width on release",
     async () => {
       await mount("#intro");
-      localStorage.removeItem("dek.railWidth");
+      localStorage.removeItem("dekc.railWidth");
       const el = handle();
       el.dispatchEvent(new PointerEvent("pointerdown", { clientX: 250, pointerId: 1 }));
       expect(el.hasAttribute("data-dragging")).toBe(true);
@@ -125,10 +125,10 @@ describe("the rail", () => {
       el.dispatchEvent(new PointerEvent("pointermove", { clientX: 1000, pointerId: 1 }));
       expect(railWidth()).toBe("360px");
       expect(el.getAttribute("aria-valuenow")).toBe("360");
-      expect(localStorage.getItem("dek.railWidth")).toBeNull();
+      expect(localStorage.getItem("dekc.railWidth")).toBeNull();
       el.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
       expect(el.hasAttribute("data-dragging")).toBe(false);
-      expect(localStorage.getItem("dek.railWidth")).toBe("360");
+      expect(localStorage.getItem("dekc.railWidth")).toBe("360");
       // Released: a stray move no longer resizes.
       el.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, pointerId: 1 }));
       expect(railWidth()).toBe("360px");
@@ -136,10 +136,10 @@ describe("the rail", () => {
   );
 
   test.serial("opens at the remembered width, and the arrow keys remember theirs", async () => {
-    await mount("#intro", () => localStorage.setItem("dek.railWidth", "300"));
+    await mount("#intro", () => localStorage.setItem("dekc.railWidth", "300"));
     expect(railWidth()).toBe("300px");
     pressKey("ArrowLeft", {}, handle());
-    expect(localStorage.getItem("dek.railWidth")).toBe("284");
+    expect(localStorage.getItem("dekc.railWidth")).toBe("284");
   });
 });
 

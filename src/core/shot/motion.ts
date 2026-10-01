@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import pkg from "../../../package.json";
-import { DekError } from "../error.ts";
+import { DekcError } from "../error.ts";
 import { deckProjectRoot } from "../path.ts";
 import { type PlaywrightRunner, requirePlaywright } from "../playwright.ts";
 import { deckStops, retreat } from "../position.ts";
@@ -78,8 +78,8 @@ export function planMotion(section: Section, sections: Section[], step?: string)
  * A slide's beats in motion, each played the way the talk reaches it: the first from the slide
  * before (or the beat before, with a step), each after from the one it follows. Every go is held
  * at a few moments of everything it starts, the view transition, the slide's CSS animations and
- * transitions, and its script, then ended as `dek shot` ends it. The page is the video document,
- * so this is the motion the talk and `dek video` show.
+ * transitions, and its script, then ended as `dekc shot` ends it. The page is the video document,
+ * so this is the motion the talk and `dekc video` show.
  */
 export async function shotMotion(dir: string, options: ShotMotionOptions): Promise<ShotMotion>;
 export async function shotMotion(
@@ -130,8 +130,8 @@ export async function shotMotion(
     options.runner,
   );
   if (response.motion.length !== beats.length) {
-    throw new DekError("the Playwright worker returned the wrong number of beats", {
-      hint: `asked for ${beats.length}, got ${response.motion.length}; check DEK_PLAYWRIGHT`,
+    throw new DekcError("the Playwright worker returned the wrong number of beats", {
+      hint: `asked for ${beats.length}, got ${response.motion.length}; check DEKC_PLAYWRIGHT`,
     });
   }
   const result: ShotMotion = {
@@ -148,7 +148,7 @@ export async function shotMotion(
 }
 
 /**
- * A motion answered before, while every file it names is still there. The cache is dek's own
+ * A motion answered before, while every file it names is still there. The cache is dekc's own
  * output, but a manifest that does not read back whole, or names a file outside its own folder,
  * is taken again rather than trusted.
  */

@@ -24,14 +24,14 @@ export { unreadableScriptDiagnostics } from "./lint/script.ts";
 export { silentCueDiagnostics } from "./lint/voice.ts";
 
 export type LintDeckOptions = {
-  /** Only this slide's findings: the ones that name it. Deck findings are `dek lint`'s. */
+  /** Only this slide's findings: the ones that name it. Deck findings are `dekc lint`'s. */
   slug?: string;
 };
 
 type DeckInput = string | { project: Project; deck: ProjectDeck };
 
 /**
- * The project's own findings (DEK008 on dek.toml): the same for every deck, so a command that
+ * The project's own findings (DEKC008 on dekc.toml): the same for every deck, so a command that
  * covers several decks reports them once, beside each deck's `lintDeck`.
  */
 export function lintProject(project: Project): Diagnostic[] {

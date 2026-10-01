@@ -18,7 +18,7 @@ export function liveReloadScript(): string {
       location.reload();
       return;
     }
-    const live = window["dekLive"];
+    const live = window["dekcLive"];
     if (typeof live === "function") {
       await live(event);
       return;

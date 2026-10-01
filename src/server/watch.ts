@@ -2,7 +2,7 @@ import { existsSync, watch } from "node:fs";
 import { basename } from "node:path";
 import { deckPaths } from "../core/deck-paths.ts";
 import { type Diagnostic, errorDiagnostic } from "../core/diagnostic.ts";
-import { DekError, errorFields } from "../core/error.ts";
+import { DekcError, errorFields } from "../core/error.ts";
 import { lintDeckAsync, lintProject, unreadableScriptDiagnostics } from "../core/lint.ts";
 import type { LiveEvent } from "../core/live-protocol.ts";
 import { ScriptError } from "../core/parse.ts";
@@ -272,7 +272,7 @@ function syncQuietly(deckDir: string): SyncResult {
       updated: [],
       removed: [],
       kept: [],
-      dekFiles: { created: [], updated: [] },
+      dekcFiles: { created: [], updated: [] },
     };
   }
 }
@@ -302,7 +302,7 @@ export function voiceFailureLine(error: unknown): string {
   return `voice: ${message}${hint ? ` (${hint})` : ""}`;
 }
 
-/** A failure while watching, as the diagnostic a page shows: a DekError keeps its hint. */
+/** A failure while watching, as the diagnostic a page shows: a DekcError keeps its hint. */
 export function watchErrorDiagnostic(error: unknown): Diagnostic {
-  return errorDiagnostic(error instanceof DekError ? "parse" : "error", errorFields(error));
+  return errorDiagnostic(error instanceof DekcError ? "parse" : "error", errorFields(error));
 }

@@ -4,7 +4,7 @@ import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
 import { deckPaths } from "./deck-paths.ts";
-import { DekError } from "./error.ts";
+import { DekcError } from "./error.ts";
 import { cacheDir, deckProjectRoot } from "./path.ts";
 import { readDeckFile } from "./resolve.ts";
 import { writeInside } from "./safe-fs.ts";
@@ -76,13 +76,13 @@ export function hasVoice(deckDir: string): boolean {
 
 /**
  * How to give an existing deck a voice; every command that needs one and finds none says this.
- * `dek new` copies dek.toml `[voice]` only into decks it creates, so it is not the fix here.
+ * `dekc new` copies dekc.toml `[voice]` only into decks it creates, so it is not the fix here.
  */
 export const VOICE_SETUP_HINT =
-  'create voice/voice.toml in the deck with a speaker, like speaker = "ずんだもん/ノーマル" (engine defaults to voicevox); see https://hajimism.github.io/dek/guide/voice.html#setup';
+  'create voice/voice.toml in the deck with a speaker, like speaker = "ずんだもん/ノーマル" (engine defaults to voicevox); see https://hajimism.github.io/dekc/guide/voice.html#setup';
 
-export function voiceMissingError(deckDir: string): DekError {
-  return new DekError("voice.toml not found", {
+export function voiceMissingError(deckDir: string): DekcError {
+  return new DekcError("voice.toml not found", {
     path: deckPaths(deckDir).voiceToml,
     hint: VOICE_SETUP_HINT,
   });
@@ -255,15 +255,15 @@ export function parseTimelineJson(text: string, path?: string): Timeline {
       return result.data;
     }
   } catch (error) {
-    throw new DekError("invalid timeline.json", {
+    throw new DekcError("invalid timeline.json", {
       path,
-      hint: "run `dek voice`",
+      hint: "run `dekc voice`",
       cause: error,
     });
   }
-  throw new DekError("invalid timeline.json", {
+  throw new DekcError("invalid timeline.json", {
     path,
-    hint: "run `dek voice`",
+    hint: "run `dekc voice`",
   });
 }
 
@@ -279,7 +279,7 @@ export function tryLoadCachedTimeline(deckDir: string): Timeline | undefined {
   try {
     return loadCachedTimeline(deckDir);
   } catch (error) {
-    if (error instanceof DekError) {
+    if (error instanceof DekcError) {
       return undefined;
     }
     throw error;

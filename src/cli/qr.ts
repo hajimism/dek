@@ -1,6 +1,6 @@
 /**
  * A QR code for a short URL, drawn in the terminal: byte mode, error correction level M,
- * versions 1 to 10 (up to 213 bytes). dek needs one only for `--remote`'s pairing link, which
+ * versions 1 to 10 (up to 213 bytes). dekc needs one only for `--remote`'s pairing link, which
  * is far shorter, so it carries its own encoder rather than a dependency. It follows ISO/IEC
  * 18004 as laid out by Project Nayuki's reference implementation.
  */

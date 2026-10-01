@@ -3,8 +3,8 @@ import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { parseShotMode, shotCommand } from "../../src/cli/shot.ts";
-import { DekError } from "../../src/core/error.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { DekcError } from "../../src/core/error.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -20,15 +20,15 @@ type ShotOk = {
   shots: Array<{ slug: string; step: string; path: string }>;
 };
 
-describe("dek shot", () => {
+describe("dekc shot", () => {
   test("writes a screenshot for one slug and returns its path", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await chmod(fakePlaywright, 0o755);
-        const result = await runDek(["shot", "intro", "--json"], {
+        const result = await runDekc(["shot", "intro", "--json"], {
           cwd: join(root, "decks", "demo"),
-          env: { DEK_PLAYWRIGHT: fakePlaywright },
+          env: { DEKC_PLAYWRIGHT: fakePlaywright },
         });
         expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<ShotOk>(result);
@@ -51,8 +51,8 @@ describe("shotCommand", () => {
         await expect(
           shotCommand(resolveTarget(cwd, "deck", { refs: true }), { to: "intro" }),
         ).rejects.toMatchObject({
-          name: "DekError",
-          hint: expect.stringContaining("dek shot [deck] <a> --to <b>"),
+          name: "DekcError",
+          hint: expect.stringContaining("dekc shot [deck] <a> --to <b>"),
         });
         await expect(
           shotCommand(resolveTarget(cwd, "deck", { refs: true }), {
@@ -61,7 +61,7 @@ describe("shotCommand", () => {
             step: "1",
           }),
         ).rejects.toMatchObject({
-          name: "DekError",
+          name: "DekcError",
           hint: expect.stringContaining("--step"),
         });
         await expect(
@@ -71,13 +71,13 @@ describe("shotCommand", () => {
             at: "2",
           }),
         ).rejects.toMatchObject({
-          name: "DekError",
+          name: "DekcError",
           hint: expect.stringContaining("0 and 1"),
         });
         await expect(
           shotCommand(resolveTarget(cwd, "deck", { refs: true }), { slug: "intro", at: "0.3" }),
         ).rejects.toMatchObject({
-          name: "DekError",
+          name: "DekcError",
           hint: expect.stringContaining("--to"),
         });
       },
@@ -92,13 +92,13 @@ describe("shotCommand", () => {
         const target = resolveTarget(cwd, "deck");
         const refused = (options: Parameters<typeof shotCommand>[1], hint: string) =>
           expect(shotCommand(target, options)).rejects.toMatchObject({
-            name: "DekError",
+            name: "DekcError",
             hint: expect.stringContaining(hint),
           });
-        await refused({ slug: "intro", sheet: true }, "dek shot intro --motion");
+        await refused({ slug: "intro", sheet: true }, "dekc shot intro --motion");
         await refused({ sheet: true, step: "1" }, "every slide at its last beat");
         await refused({ slug: "intro", sheet: true, to: "intro" }, "--to");
-        await refused({ motion: true }, "dek shot [deck] <slug> --motion");
+        await refused({ motion: true }, "dekc shot [deck] <slug> --motion");
         await refused({ slug: "intro", motion: true, to: "intro" }, "row 1 of --motion");
         await refused({ slug: "intro", motion: true, at: "0.5" }, "--at");
         await refused({ sheet: true, motion: true }, "one of --sheet and --motion");
@@ -112,7 +112,7 @@ describe("shotCommand", () => {
       async (root) => {
         await chmod(fakePlaywright, 0o755);
         const target = resolveTarget(join(root, "decks", "demo"), "deck", { refs: true });
-        await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
+        await withEnv({ DEKC_PLAYWRIGHT: fakePlaywright }, async () => {
           const sheet = await shotCommand(target, { sheet: true });
           expect(sheet.shots.map((shot) => shot.slug)).toEqual(["intro"]);
           expect(sheet.sheets).toHaveLength(1);
@@ -130,7 +130,7 @@ describe("shotCommand", () => {
           `const request = JSON.parse(await new Response(Bun.stdin).text());
 process.stdout.write(JSON.stringify({ sheets: [], motion: request.motion.beats.map(({ label }) => ({ label, frames: [] })) }) + "\\n");\n`,
         );
-        await withEnv({ DEK_PLAYWRIGHT: motionWorker }, async () => {
+        await withEnv({ DEKC_PLAYWRIGHT: motionWorker }, async () => {
           const motion = await shotCommand(target, { slug: "intro", motion: true });
           expect(motion).toEqual({ shots: [], sheets: [], motion: [{ step: "0", frames: [] }] });
         });
@@ -142,15 +142,15 @@ process.stdout.write(JSON.stringify({ sheets: [], motion: request.motion.beats.m
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+        await withEnv({ DEKC_PLAYWRIGHT: "/no/such/playwright" }, async () => {
           try {
             await shotCommand(resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }), {
               slug: "intro",
             });
-            throw new Error("expected DekError");
+            throw new Error("expected DekcError");
           } catch (error) {
-            expect(error).toBeInstanceOf(DekError);
-            expect((error as DekError).hint).toContain("playwright install");
+            expect(error).toBeInstanceOf(DekcError);
+            expect((error as DekcError).hint).toContain("playwright install");
           }
         });
       },
@@ -190,7 +190,7 @@ describe("parseShotMode", () => {
     expect(() => parseShotMode({ to: "intro" })).toThrow(
       expect.objectContaining({
         message: "--to needs the slide it starts from",
-        hint: "usage: dek shot [deck] <a> --to <b> [--at 0..1]; run `dek help shot`",
+        hint: "usage: dekc shot [deck] <a> --to <b> [--at 0..1]; run `dekc help shot`",
       }),
     );
   });

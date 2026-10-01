@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { dekGo, mountPlayer, pressKey, unmountPlayer } from "../helpers/dom.ts";
+import { dekcGo, mountPlayer, pressKey, unmountPlayer } from "../helpers/dom.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
 import { waitFor } from "../helpers/wait.ts";
@@ -52,7 +52,7 @@ async function marksServer(input: RequestInfo | URL, init?: RequestInit): Promis
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
   await writeProject(root, {
     decks: [
       {
@@ -87,9 +87,9 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-const button = (): HTMLElement | null => document.getElementById("dek-mark-toggle");
+const button = (): HTMLElement | null => document.getElementById("dekc-mark-toggle");
 const beatItem = (n: number): Element | null =>
-  document.querySelector(`#dek-beats [data-beat-index="${n}"]`);
+  document.querySelector(`#dekc-beats [data-beat-index="${n}"]`);
 
 describe("marks in the presenter view", () => {
   test.serial("shows the marks the deck already has as the page opens", async () => {
@@ -100,7 +100,7 @@ describe("marks in the presenter view", () => {
   });
 
   test.serial("`m` marks the beat on screen, and says so on its button", async () => {
-    await dekGo({ slideIndex: 0, beatIndex: 1 });
+    await dekcGo({ slideIndex: 0, beatIndex: 1 });
     expect(pressKey("m")).toBe(true);
     await waitFor(() => button()?.getAttribute("aria-pressed") === "true");
     expect(sent.at(-1)).toEqual({
@@ -112,9 +112,9 @@ describe("marks in the presenter view", () => {
   });
 
   test.serial("follows the beat on screen, and unmarks it from the button", async () => {
-    await dekGo({ slideIndex: 0, beatIndex: 0 });
+    await dekcGo({ slideIndex: 0, beatIndex: 0 });
     expect(button()?.getAttribute("aria-pressed")).toBe("false");
-    await dekGo({ slideIndex: 0, beatIndex: 1 });
+    await dekcGo({ slideIndex: 0, beatIndex: 1 });
     expect(button()?.getAttribute("aria-pressed")).toBe("true");
     button()?.click();
     await waitFor(() => button()?.getAttribute("aria-pressed") === "false");

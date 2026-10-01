@@ -15,10 +15,10 @@ import { writeProject } from "../helpers/project.ts";
 
 // The player in a real Chromium: print media, the accessibility tree, and view transitions are
 // what happy-dom does not have. Run from sample/, where playwright is installed.
-const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
+const skip = !playwrightResolved() || Boolean(process.env.DEKC_PLAYWRIGHT);
 const browserTest = test.serial.skipIf(skip);
 
-/** The part of Playwright's page these tests drive; dek's own typing covers only what dek calls. */
+/** The part of Playwright's page these tests drive; dekc's own typing covers only what dekc calls. */
 type Page = {
   goto(url: string): Promise<unknown>;
   route(url: string, handler: (route: Route) => unknown): Promise<void>;
@@ -83,7 +83,7 @@ beforeAll(async () => {
   if (skip) {
     return;
   }
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
   await writeProject(root, {
     decks: [
       {
@@ -197,7 +197,7 @@ describe("printing the player", () => {
   );
 });
 
-describe("printing with dek pdf", () => {
+describe("printing with dekc pdf", () => {
   browserTest("keeps each slide in its theme's layout", async () => {
     const page = await newPage();
     try {
@@ -230,7 +230,7 @@ describe("the player's accessibility", () => {
       const page = await openPlayer();
       try {
         // From the first rail link, Tab should meet the others and then the slide, nothing between.
-        await page.evaluate(() => document.querySelector<HTMLElement>(".dek-thumb")?.focus());
+        await page.evaluate(() => document.querySelector<HTMLElement>(".dekc-thumb")?.focus());
         const stops: string[] = [];
         for (let i = 0; i < 2 + extra.length; i++) {
           await page.keyboard.press("Tab");

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
-import { DekError } from "./error.ts";
+import { DekcError } from "./error.ts";
 import type { Fill } from "./fill.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
@@ -166,19 +166,19 @@ type SpawnTimeoutOptions = {
   timeoutMs?: number;
 };
 
-const requireFromDek = createRequire(import.meta.url);
+const requireFromDekc = createRequire(import.meta.url);
 
 export function resolvePlaywrightModule(): string | undefined {
-  // From dek's own install only: a repository someone else wrote can commit a node_modules.
+  // From dekc's own install only: a repository someone else wrote can commit a node_modules.
   try {
-    return requireFromDek.resolve("playwright");
+    return requireFromDekc.resolve("playwright");
   } catch {
     return undefined;
   }
 }
 
 export function playwrightResolved(): boolean {
-  const bin = process.env.DEK_PLAYWRIGHT;
+  const bin = process.env.DEKC_PLAYWRIGHT;
   if (bin) {
     return bin.endsWith(".ts") || existsSync(bin);
   }
@@ -193,8 +193,8 @@ export function playwrightReady(runner?: PlaywrightRunner): boolean {
 /** The module comes first; `playwright install` alone only fetches browsers. */
 export const PLAYWRIGHT_INSTALL = "bun add -d playwright && bunx playwright install chromium";
 
-export function playwrightMissingError(): DekError {
-  return new DekError("Playwright is not installed", { hint: PLAYWRIGHT_INSTALL });
+export function playwrightMissingError(): DekcError {
+  return new DekcError("Playwright is not installed", { hint: PLAYWRIGHT_INSTALL });
 }
 
 /**
@@ -262,7 +262,7 @@ export async function defaultPlaywrightRunner(
   if (!playwrightResolved()) {
     return null;
   }
-  return spawnRunner(workerCommand(process.env.DEK_PLAYWRIGHT || workerPath()), request, options);
+  return spawnRunner(workerCommand(process.env.DEKC_PLAYWRIGHT || workerPath()), request, options);
 }
 
 function workerPath(): string {
@@ -276,7 +276,7 @@ function spawnRunner(
 ): Promise<VisualResponse> {
   return runJsonWorker(cmd, request, (text) => parseVisualResponse(text, request.kind), {
     label: "Playwright worker failed",
-    hint: `${PLAYWRIGHT_INSTALL} or check DEK_PLAYWRIGHT`,
+    hint: `${PLAYWRIGHT_INSTALL} or check DEKC_PLAYWRIGHT`,
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
   });
 }

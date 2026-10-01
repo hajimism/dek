@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { mvCommand } from "../../src/cli/mv.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
-import { DekError } from "../../src/core/error.ts";
-import { runDek } from "../helpers/cli.ts";
+import { DekcError } from "../../src/core/error.ts";
+import { runDekc } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -30,7 +30,7 @@ hello
 body
 `;
 
-describe("dek mv", () => {
+describe("dekc mv", () => {
   test("accepts a positional deck name from the project root", async () => {
     await withTempProject(
       {
@@ -43,9 +43,12 @@ describe("dek mv", () => {
         ],
       },
       async (root) => {
-        const result = await runDek(["mv", "demo", "architecture", "--before", "intro", "--json"], {
-          cwd: root,
-        });
+        const result = await runDekc(
+          ["mv", "demo", "architecture", "--before", "intro", "--json"],
+          {
+            cwd: root,
+          },
+        );
         expect(result).toMatchObject({ exitCode: 0 });
         const script = await readFile(join(root, "decks", "demo", "script.md"), "utf8");
         expect(script.indexOf("## architecture")).toBeLessThan(script.indexOf("## intro"));
@@ -69,7 +72,7 @@ describe("mvCommand", () => {
       async (root) => {
         expect(() =>
           mvCommand(requireDeckFromCwd(root), { slug: "architecture", before: "intro" }),
-        ).toThrow(DekError);
+        ).toThrow(DekcError);
 
         const result = mvCommand(requireDeckFromCwd(root, "demo"), {
           slug: "architecture",
@@ -104,7 +107,7 @@ describe("mvCommand", () => {
         ).toThrow(
           expect.objectContaining({
             message: "use only one of --before or --after",
-            hint: expect.stringContaining("run `dek help mv`"),
+            hint: expect.stringContaining("run `dekc help mv`"),
           }),
         );
       },

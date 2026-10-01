@@ -8,7 +8,7 @@ import type { MotionBeat, MotionFrame } from "./sheet.ts";
 /**
  * Plays each beat of the request in the video document `html` the way the talk reaches it, from the
  * beat before. Each go is held at `fractions` of how long it runs, then ended the way a still
- * of that beat ends it, so the last frame is the beat as `dek shot` shows it. A go that moves
+ * of that beat ends it, so the last frame is the beat as `dekc shot` shows it. A go that moves
  * nothing is that last frame alone.
  */
 export async function captureMotion(

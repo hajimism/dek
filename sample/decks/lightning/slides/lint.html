@@ -4,15 +4,15 @@
     <figcaption class="chrome">zsh — ~/my-talks</figcaption>
     <div class="screen">
       <div data-scene="lint-fail">
-        <span class="line"><span class="prompt">~/my-talks</span><span data-type>bunx dek lint lightning --visual</span><span class="cursor" data-caret></span></span>
-        <span class="line err" data-out="900">decks/lightning/slides/premise.css: <strong>DEK030</strong> h2.slide-title "最初に書くのは、スライドではない" overflows the top edge by <strong>132px</strong> and the bottom edge by <strong>108px</strong> at step 0</span>
+        <span class="line"><span class="prompt">~/my-talks</span><span data-type>bunx dekc lint lightning --visual</span><span class="cursor" data-caret></span></span>
+        <span class="line err" data-out="900">decks/lightning/slides/premise.css: <strong>DEKC030</strong> h2.slide-title "最初に書くのは、スライドではない" overflows the top edge by <strong>132px</strong> and the bottom edge by <strong>108px</strong> at step 0</span>
         <span class="line dim" data-out>  help: slides/premise.css puts it past the edge, which the theme alone does not: fix its position or size in slides/premise.css</span>
-        <span class="line err" data-out>1 error: DEK030 ×1</span>
+        <span class="line err" data-out>1 error: DEKC030 ×1</span>
       </div>
       <div data-scene="lint-pass" data-step="lint-pass">
         <span class="line"> </span>
         <span class="line dim"># premise.css: calc(var(--size-title) * <span class="err">5</span>) → <span class="ok">2</span></span>
-        <span class="line"><span class="prompt">~/my-talks</span><span data-type>bunx dek lint lightning --visual</span><span class="cursor" data-caret></span></span>
+        <span class="line"><span class="prompt">~/my-talks</span><span data-type>bunx dekc lint lightning --visual</span><span class="cursor" data-caret></span></span>
         <span class="line ok" data-out="900">no diagnostics</span>
         <span class="line" data-out="200"><span class="prompt">~/my-talks</span><span class="cursor"></span></span>
       </div>
@@ -27,5 +27,5 @@
     <p class="verdict" data-verdict="fail">上に 132px
 下に 108px</p>
   </aside>
-  <footer class="hud"><span>dek · lightning</span><span class="hud-track"><span class="hud-fill" data-morph="clock"></span></span><span class="hud-clock">est 01:40 / 03:00</span></footer>
+  <footer class="hud"><span>dekc · lightning</span><span class="hud-track"><span class="hud-fill" data-morph="clock"></span></span><span class="hud-clock">est 01:40 / 03:00</span></footer>
 </section>

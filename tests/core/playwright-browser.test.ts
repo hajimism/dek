@@ -23,8 +23,8 @@ import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 // What the Playwright worker measures, in a real Chromium. They live apart from the runner's own
-// tests, which swap DEK_PLAYWRIGHT while tests in one file run at once.
-const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
+// tests, which swap DEKC_PLAYWRIGHT while tests in one file run at once.
+const skip = !playwrightResolved() || Boolean(process.env.DEKC_PLAYWRIGHT);
 // One page set at a time: concurrent tests would crowd the machine past the timeout.
 const browserTest = test.serial.skipIf(skip);
 
@@ -226,7 +226,7 @@ describe("playwright worker overflow origin", () => {
   const measure = async (body: string, slideCss = "", draw = "") => {
     const { stillPageScript } = await import("../../src/core/slide-script.ts");
     const script = draw
-      ? `<script>(window.__dekSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
+      ? `<script>(window.__dekcSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
       : "";
     const response = await render({
       kind: "pages",
@@ -237,7 +237,7 @@ describe("playwright worker overflow origin", () => {
           html: `<html><head><style>
 body { margin: 0 }
 .slide { position: relative; width: 1280px; height: 720px; font: 400 24px sans-serif }
-</style><style id="dek-slide-css">${slideCss}</style></head><body><section class="slide" data-slug="intro" data-dek-step="1" data-dek-beat="0">${body}</section>${script}</body></html>`,
+</style><style id="dekc-slide-css">${slideCss}</style></head><body><section class="slide" data-slug="intro" data-dekc-step="1" data-dekc-beat="0">${body}</section>${script}</body></html>`,
           slug: "intro",
           step: "1",
         },
@@ -287,7 +287,7 @@ describe("playwright worker collisions", () => {
 body { margin: 0; background: #fff }
 .slide { position: relative; width: 1280px; height: 720px; background: #fff; color: #111; font: 400 24px sans-serif; counter-reset: folio 3 }
 p { margin: 0 }
-</style><style id="dek-slide-css">${css}</style></head><body><section class="slide">${body}</section></body></html>`,
+</style><style id="dekc-slide-css">${css}</style></head><body><section class="slide">${body}</section></body></html>`,
           slug: "intro",
           step: "1",
         },
@@ -386,7 +386,7 @@ describe("playwright worker files", () => {
   browserTest(
     "shoots a page that names a screenshotPath, and measures nothing unasked",
     async () => {
-      const dir = await mkdtemp(join(tmpdir(), "dek-shoot-"));
+      const dir = await mkdtemp(join(tmpdir(), "dekc-shoot-"));
       try {
         const screenshotPath = join(dir, "intro.png");
         const response = await render({
@@ -417,7 +417,7 @@ describe("playwright worker files", () => {
   );
 
   browserTest("prints a pdf request to its pdfPath", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "dek-pdf-"));
+    const dir = await mkdtemp(join(tmpdir(), "dekc-pdf-"));
     try {
       const pdfPath = join(dir, "demo.pdf");
       const response = await render({
@@ -540,9 +540,9 @@ describe("playwright worker slide scripts", () => {
       actions: ["contrast"],
       pages: [
         {
-          html: `<html><body style="margin:0"><section class="slide" data-slug="intro" data-dek-step="turn" data-dek-beat="1">
+          html: `<html><body style="margin:0"><section class="slide" data-slug="intro" data-dekc-step="turn" data-dekc-beat="1">
   <p>hello</p>
-</section><script>(window.__dekSlides ||= {}).intro = { motion: { turn: 400 }, draw(slide, frame) { if (frame.t >= 400) throw new TypeError("no bar at " + frame.t); } };</script>${stillPageScript([])}</body></html>`,
+</section><script>(window.__dekcSlides ||= {}).intro = { motion: { turn: 400 }, draw(slide, frame) { if (frame.t >= 400) throw new TypeError("no bar at " + frame.t); } };</script>${stillPageScript([])}</body></html>`,
           slug: "intro",
           step: "turn",
         },
@@ -562,11 +562,11 @@ describe("playwright worker slide scripts that break seeking or reach out", () =
     const html = `<html><body style="margin:0">${slides
       .map(
         ({ slug, body }) =>
-          `<section class="slide" data-slug="${slug}" data-dek-step="0" data-dek-beat="0">${body}</section>`,
+          `<section class="slide" data-slug="${slug}" data-dekc-step="0" data-dekc-beat="0">${body}</section>`,
       )
       .join("")}<script>${slides
       .map(
-        ({ slug, script }) => `(window.__dekSlides ||= {})[${JSON.stringify(slug)}] = ${script};`,
+        ({ slug, script }) => `(window.__dekcSlides ||= {})[${JSON.stringify(slug)}] = ${script};`,
       )
       .join("\n")}</script>${stillPageScript([])}</body></html>`;
     const response = await render({
@@ -838,10 +838,10 @@ ${css}
 
 describe("playwright worker contrast origin", () => {
   const measure = async (slideCss: string | undefined, draw = "") => {
-    const own = slideCss === undefined ? "" : `<style id="dek-slide-css">${slideCss}</style>`;
+    const own = slideCss === undefined ? "" : `<style id="dekc-slide-css">${slideCss}</style>`;
     const { stillPageScript } = await import("../../src/core/slide-script.ts");
     const script = draw
-      ? `<script>(window.__dekSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
+      ? `<script>(window.__dekcSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
       : "";
     const response = await render({
       kind: "pages",
@@ -854,7 +854,7 @@ body { margin: 0; background: #fff }
 .slide { width: 1280px; height: 720px; background: #fff; color: #111; font: 400 24px sans-serif }
 .card { background: #111; padding: 16px }
 .note { color: #555 }
-</style>${own}</head><body><section class="slide" data-slug="intro" data-dek-step="1" data-dek-beat="0">
+</style>${own}</head><body><section class="slide" data-slug="intro" data-dekc-step="1" data-dekc-beat="0">
   <p class="card"><span class="note">theme pair</span></p>
   <p class="faint">slide color</p>
   <p class="fine">fine</p>
@@ -970,7 +970,7 @@ p { opacity: 1; }
 </style><svg><path d="M0 0L100 100" stroke="red"/></svg><p>beat two</p>`);
         await page.evaluate(finishBeat);
         await page.evaluate(() => {
-          window.dekGo = async () => {
+          window.dekcGo = async () => {
             document.body.classList.add("two");
           };
         });
@@ -1001,7 +1001,7 @@ describe("a skipped view transition in a real Chromium", () => {
       await page.setContent(`<style>.dup { view-transition-name: dup; }</style>
 <p class="dup">a</p><p class="dup">b</p>`);
       await page.evaluate(() => {
-        window.dekGo = async () => {
+        window.dekcGo = async () => {
           const transition = document.startViewTransition(() => {
             document.body.classList.add("two");
           });
@@ -1009,7 +1009,7 @@ describe("a skipped view transition in a real Chromium", () => {
         };
       });
       expect(await page.evaluate(startGoPaused, { slideIndex: 0, beatIndex: 1 })).toBe(false);
-      await page.evaluate(() => window.__dekPendingGo);
+      await page.evaluate(() => window.__dekcPendingGo);
       expect(await page.evaluate(() => document.body.classList.contains("two"))).toBe(true);
     } finally {
       await page.close();
@@ -1031,7 +1031,7 @@ describe("ending a seeked go in a real Chromium", () => {
 </style><p class="a">a</p><p class="b">b</p>`);
       await page.evaluate(finishBeat);
       await page.evaluate(() => {
-        window.dekGo = async () => {
+        window.dekcGo = async () => {
           document.body.classList.add("two");
           await Promise.all(document.getAnimations().map((animation) => animation.finished));
         };
@@ -1042,7 +1042,7 @@ describe("ending a seeked go in a real Chromium", () => {
       await page.evaluate(finishBeat);
       const settled = await page.evaluate(() =>
         Promise.race([
-          window.__dekPendingGo?.then(() => true),
+          window.__dekcPendingGo?.then(() => true),
           new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
         ]),
       );
@@ -1059,7 +1059,7 @@ describe("holding a go at its start in a real Chromium", () => {
       throw new Error("no browser");
     }
     const page = await browser.newPage({ viewport: { width: 200, height: 200 } });
-    const dir = await mkdtemp(join(tmpdir(), "dek-hold-"));
+    const dir = await mkdtemp(join(tmpdir(), "dekc-hold-"));
     try {
       await page.setContent(`<style>
 body { margin: 0; background: #fff; }
@@ -1068,7 +1068,7 @@ div { width: 200px; height: 200px; background: #000; opacity: 0; transition: opa
 </style><div></div>`);
       await page.evaluate(finishBeat);
       await page.evaluate(() => {
-        window.dekGo = async () => {
+        window.dekcGo = async () => {
           document.body.classList.add("two");
         };
       });
@@ -1113,7 +1113,7 @@ async function pixelAt(path: string, x: number, y: number): Promise<number[]> {
 
 describe("contact sheets in a real Chromium", () => {
   browserTest("draws each capture in its box, on a sheet the size of its layout", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "dek-sheet-"));
+    const dir = await mkdtemp(join(tmpdir(), "dekc-sheet-"));
     try {
       const shots = ["#ff0000", "#0000ff"].map((color, i) => ({
         html: `<html><body style="margin:0;background:${color}"></body></html>`,
@@ -1167,7 +1167,7 @@ describe("contact sheets in a real Chromium", () => {
 
 describe("shot --motion in a real Chromium", () => {
   browserTest(
-    "holds the slide's entrance at each moment, and ends where dek shot does",
+    "holds the slide's entrance at each moment, and ends where dekc shot does",
     async () => {
       const script = "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n## grow\n\nbody\n";
       const plain = (title: string) =>

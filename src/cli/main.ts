@@ -1,4 +1,4 @@
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { either } from "../core/prose.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { resolveProject } from "../core/resolve.ts";
@@ -73,7 +73,7 @@ function bindArgs(
   words: string[],
   { name, subcommand }: { name: CommandName; subcommand?: string },
 ): Record<string, string | undefined> {
-  const label = ["dek", name === "serve" ? undefined : name, subcommand].filter(Boolean).join(" ");
+  const label = ["dekc", name === "serve" ? undefined : name, subcommand].filter(Boolean).join(" ");
   const args: Record<string, string | undefined> = {};
   let next = 0;
   for (const arg of formOf(name, subcommand).args) {
@@ -100,7 +100,7 @@ function bindArgs(
 
 /**
  * The command a line runs, the deck it names, and its arguments. A first word that is no command
- * is a deck for the bare `dek [deck]`, or a mistake. A deck comes before a subcommand.
+ * is a deck for the bare `dekc [deck]`, or a mistake. A deck comes before a subcommand.
  */
 export function bindCommandLine(cwd: string, line: CommandLine): Call {
   const { command, values, positionals } = line;
@@ -119,7 +119,7 @@ export function bindCommandLine(cwd: string, line: CommandLine): Call {
     words = positionals.slice(sub.at + sub.name.split(" ").length);
     if (before[0] !== undefined) {
       if (deck !== undefined) {
-        throw usageError(command, `unexpected argument "${before[0]}" for dek ${command}`, {
+        throw usageError(command, `unexpected argument "${before[0]}" for dekc ${command}`, {
           subcommand: sub.name,
         });
       }
@@ -150,7 +150,7 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
   const call = bindCommandLine(cwd, line);
   const spec = COMMANDS[call.name] as AnySpec;
   if (spec.kind === "session" && line.values.json === true) {
-    throw sessionJsonError(spec.bare ? "dek" : `dek ${call.name}`);
+    throw sessionJsonError(spec.bare ? "dekc" : `dekc ${call.name}`);
   }
   if (spec.refs && call.deck !== undefined && isRefName(call.deck)) {
     const { restoreRef } = await import("./ref.ts");
@@ -195,21 +195,21 @@ function retypedWithDeck<T>(line: CommandLine, cwd: string, resolve: () => T): T
     if (!(error instanceof DeckRequiredError)) {
       throw error;
     }
-    const typed = `\`dek ${line.typed.map(shellQuote).join(" ")}\``;
+    const typed = `\`dekc ${line.typed.map(shellQuote).join(" ")}\``;
     const [first] = error.decks;
     const hint = !first
-      ? "run `dek new <name>` to make a deck"
+      ? "run `dekc new <name>` to make a deck"
       : error.decks.length > NAMED_DECKS
-        ? `run ${addressHint(typed, first, cwd)}, or name another deck in place of ${first.name}; \`dek ls\` lists them`
+        ? `run ${addressHint(typed, first, cwd)}, or name another deck in place of ${first.name}; \`dekc ls\` lists them`
         : `run ${either(error.decks.map((deck) => addressHint(typed, deck, cwd)))}`;
-    throw new DekError(error.message, { hint, cause: error });
+    throw new DekcError(error.message, { hint, cause: error });
   }
 }
 
 /** A session prints no result, so --json has nothing to shape, and a reader would wait forever. */
-function sessionJsonError(name: string): DekError {
-  return new DekError(`${name} keeps running until stopped and prints no JSON`, {
-    hint: "start it without --json and leave it running; for a result, run `dek lint --json` or `dek check <slug> --json`",
+function sessionJsonError(name: string): DekcError {
+  return new DekcError(`${name} keeps running until stopped and prints no JSON`, {
+    hint: "start it without --json and leave it running; for a result, run `dekc lint --json` or `dekc check <slug> --json`",
   });
 }
 

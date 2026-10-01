@@ -102,7 +102,7 @@ describe("frontmatterJsonSchema describes what a script may write", () => {
     }
   });
 
-  test("the frontmatter `dek init` writes validates", () => {
+  test("the frontmatter `dekc init` writes validates", () => {
     const yaml = defaultScript("Talk").split("---")[1] ?? "";
     const frontmatter = Bun.YAML.parse(yaml) as Record<string, unknown>;
     for (const key of schema.required ?? []) {
@@ -113,7 +113,7 @@ describe("frontmatterJsonSchema describes what a script may write", () => {
     }
   });
 
-  test("still flags a key dek does not read, as DEK008 does", () => {
+  test("still flags a key dekc does not read, as DEKC008 does", () => {
     expect(schema.additionalProperties).toBe(false);
   });
 });

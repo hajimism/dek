@@ -46,8 +46,8 @@ describe("rumdlDiagnostics", () => {
 });
 
 describe("resolveRumdlBin", () => {
-  test.serial("prefers DEK_RUMDL over PATH and local bins", async () => {
-    await withEnv({ DEK_RUMDL: "/tmp/custom-rumdl" }, async () => {
+  test.serial("prefers DEKC_RUMDL over PATH and local bins", async () => {
+    await withEnv({ DEKC_RUMDL: "/tmp/custom-rumdl" }, async () => {
       expect(resolveRumdlBin()).toBe("/tmp/custom-rumdl");
     });
   });
@@ -59,14 +59,14 @@ describe("resolveRumdlBin", () => {
       const rumdl = join(binDir, "rumdl");
       await writeFile(rumdl, "#!/bin/sh\necho ok\n");
       await chmod(rumdl, 0o755);
-      const nested = join(dir, "decks", "why-dek");
+      const nested = join(dir, "decks", "why-dekc");
       await mkdir(nested, { recursive: true });
       // An empty PATH entry keeps Bun.which from finding a machine-wide rumdl. A repository
-      // someone else wrote can commit node_modules/.bin; dek looks only beside its own install.
+      // someone else wrote can commit node_modules/.bin; dekc looks only beside its own install.
       const emptyPath = join(dir, "empty-path");
       await mkdir(emptyPath, { recursive: true });
       const cwd = process.cwd();
-      await withEnv({ DEK_RUMDL: undefined, PATH: emptyPath }, async () => {
+      await withEnv({ DEKC_RUMDL: undefined, PATH: emptyPath }, async () => {
         try {
           process.chdir(nested);
           expect(Bun.which("rumdl", { PATH: emptyPath })).toBeNull();
@@ -85,7 +85,7 @@ describe("defaultRumdlRunner", () => {
     await withTempDir(async (dir) => {
       const scriptPath = join(dir, "script.md");
       await writeFile(scriptPath, "# demo\n");
-      await withEnv({ DEK_RUMDL: noisy }, async () => {
+      await withEnv({ DEKC_RUMDL: noisy }, async () => {
         // A full stderr pipe would hang for good; the bound only has to beat the test timeout.
         const stdout = await Promise.race([
           defaultRumdlRunner(scriptPath),
@@ -105,7 +105,7 @@ describe("defaultRumdlRunner", () => {
       const scriptPath = join(dir, "script.md");
       await writeFile(scriptPath, "# demo\n");
       await withEnv(
-        { DEK_RUMDL: fake, RUMDL_SARIF: "set after start", RUMDL_EXIT: "0" },
+        { DEKC_RUMDL: fake, RUMDL_SARIF: "set after start", RUMDL_EXIT: "0" },
         async () => {
           expect(await defaultRumdlRunner(scriptPath)).toBe("set after start\n");
         },

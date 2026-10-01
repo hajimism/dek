@@ -21,9 +21,9 @@ function script(id: string): string {
 
 /** The command inside the first backticks of a hint, as argv. */
 function commandOf(hint: string | undefined): string[] {
-  const match = hint?.match(/`dek ([^`]+)`/);
+  const match = hint?.match(/`dekc ([^`]+)`/);
   if (!match?.[1]) {
-    throw new Error(`no dek command in hint: ${hint}`);
+    throw new Error(`no dekc command in hint: ${hint}`);
   }
   return match[1].split(" ");
 }
@@ -33,7 +33,7 @@ async function lint(deck: string): Promise<{ ok: boolean; diagnostics: Diagnosti
   return { ok: diagnostics.length === 0, diagnostics };
 }
 
-/** Runs the `dek mv` or `dek sync` a hint names, the way the CLI would. */
+/** Runs the `dekc mv` or `dekc sync` a hint names, the way the CLI would. */
 function run(argv: string[], cwd: string): void {
   const [command, ...args] = argv;
   if (command === "mv") {
@@ -70,14 +70,14 @@ describe("renaming after editing script.md first", () => {
     ["the new HTML is missing", false],
     ["the dev server already made a skeleton", true],
   ] as const) {
-    test(`lint's dek mv hint works as written when ${state}`, async () => {
+    test(`lint's dekc mv hint works as written when ${state}`, async () => {
       await withScriptRenamed(
         async (deck) => {
           const before = await lint(deck);
           expect(before.ok).toBe(false);
-          const orphan = before.diagnostics.find((d) => d.id === "DEK002");
+          const orphan = before.diagnostics.find((d) => d.id === "DEKC002");
           expect(orphan?.hint).toBe(
-            "run `dek mv before after` to move the files to the script's id, or `dek mv after before` to give the section the files' id",
+            "run `dekc mv before after` to move the files to the script's id, or `dekc mv after before` to give the section the files' id",
           );
 
           run(commandOf(orphan?.hint), deck);
@@ -100,7 +100,7 @@ describe("renaming after editing script.md first", () => {
         written.replace("hand-written", "edited"),
       );
       const lintResult = await lint(deck);
-      expect(lintResult.diagnostics.find((d) => d.id === "DEK002")?.hint).not.toContain("dek mv");
+      expect(lintResult.diagnostics.find((d) => d.id === "DEKC002")?.hint).not.toContain("dekc mv");
       expect(() => run(["mv", "before", "after"], deck)).toThrow(
         "slides/before.html and slides/after.html both hold a slide you wrote",
       );
@@ -133,7 +133,7 @@ describe("renaming after moving the files first", () => {
     ["the old HTML is gone", false],
     ["the dev server already made a skeleton for the old id", true],
   ] as const) {
-    test(`dek mv gives the section the files' id when ${state}`, async () => {
+    test(`dekc mv gives the section the files' id when ${state}`, async () => {
       await withFilesRenamed(
         async (deck) => {
           run(["mv", "before", "after"], deck);
@@ -151,8 +151,8 @@ describe("renaming after moving the files first", () => {
     test(`lint offers the rename the files already made when ${state}`, async () => {
       await withFilesRenamed(
         async (deck) => {
-          const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEK002");
-          const [, second] = [...(orphan?.hint ?? "").matchAll(/`dek ([^`]+)`/g)].map((m) =>
+          const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEKC002");
+          const [, second] = [...(orphan?.hint ?? "").matchAll(/`dekc ([^`]+)`/g)].map((m) =>
             (m[1] ?? "").split(" "),
           );
           expect(second).toEqual(["mv", "before", "after"]);
@@ -179,7 +179,7 @@ describe("renaming after moving the files first", () => {
       }
       expect(error).toMatchObject({
         message: "slides/before.html and slides/after.html both hold a slide you wrote",
-        hint: "merge them into slides/after.html and remove slides/before.html, then run `dek mv before after` again",
+        hint: "merge them into slides/after.html and remove slides/before.html, then run `dekc mv before after` again",
       });
       expect(await readFile(join(deck, "slides", "before.html"), "utf8")).toBe(other);
       expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
@@ -189,9 +189,9 @@ describe("renaming after moving the files first", () => {
 });
 
 describe("rename hints", () => {
-  /** Every `dek ...` command a hint names, as argv. */
+  /** Every `dekc ...` command a hint names, as argv. */
   function commandsOf(hint: string | undefined): string[][] {
-    return [...(hint ?? "").matchAll(/`dek ([^`]+)`/g)].map((m) => (m[1] ?? "").split(" "));
+    return [...(hint ?? "").matchAll(/`dekc ([^`]+)`/g)].map((m) => (m[1] ?? "").split(" "));
   }
 
   test("name every section the orphan could be when more than one could, and never the delete", async () => {
@@ -200,9 +200,9 @@ describe("rename hints", () => {
       await writeFile(join(deck, "script.md"), `${script("after")}\n## 質疑応答 {#qa}\n\nthanks\n`);
       syncDeck(deck);
 
-      const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEK002");
+      const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEKC002");
       expect(orphan?.hint).toBe(
-        "run `dek mv before after` or `dek mv before qa` to move the files to the section they now belong to",
+        "run `dekc mv before after` or `dekc mv before qa` to move the files to the section they now belong to",
       );
       expect(orphan?.data).toMatchObject({ renames: ["after", "qa"] });
 
@@ -228,14 +228,14 @@ describe("rename hints", () => {
       async (root) => {
         const deck = join(root, "decks", "demo");
         const diagnostics = (await lint(deck)).diagnostics;
-        const orphan = diagnostics.find((d) => d.id === "DEK002");
+        const orphan = diagnostics.find((d) => d.id === "DEKC002");
         expect(commandsOf(orphan?.hint)).toEqual([
           ["mv", "leftover", "a"],
           ["mv", "leftover", "b"],
         ]);
         // Each section still gets its own skeleton if it was not a rename.
-        for (const missing of diagnostics.filter((d) => d.id === "DEK001")) {
-          expect(missing.hint).toBe("run `dek sync` to create the skeleton");
+        for (const missing of diagnostics.filter((d) => d.id === "DEKC001")) {
+          expect(missing.hint).toBe("run `dekc sync` to create the skeleton");
         }
       },
     );
@@ -257,7 +257,7 @@ describe("rename hints", () => {
       async (root) => {
         const deck = join(root, "decks", "demo");
         syncDeck(deck);
-        const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEK002");
+        const orphan = (await lint(deck)).diagnostics.find((d) => d.id === "DEKC002");
         expect(orphan?.hint).toBe(
           "add a section for it to script.md, like `## Leftover {#leftover}`, or remove slides/leftover.html if the slide is gone from the talk",
         );
@@ -267,13 +267,13 @@ describe("rename hints", () => {
   });
 });
 
-describe("DEK001 hints", () => {
-  test("a missing slide on its own suggests dek sync", async () => {
+describe("DEKC001 hints", () => {
+  test("a missing slide on its own suggests dekc sync", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const deck = join(root, "decks", "demo");
-      const dek001 = (await lint(deck)).diagnostics.find((d) => d.id === "DEK001");
-      expect(dek001?.hint).toBe("run `dek sync` to create the skeleton");
-      run(commandOf(dek001?.hint), deck);
+      const dekc001 = (await lint(deck)).diagnostics.find((d) => d.id === "DEKC001");
+      expect(dekc001?.hint).toBe("run `dekc sync` to create the skeleton");
+      run(commandOf(dekc001?.hint), deck);
       expect((await lint(deck)).diagnostics).toEqual([]);
     });
   });

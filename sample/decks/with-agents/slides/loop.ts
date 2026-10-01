@@ -1,5 +1,5 @@
 // One lap of the ring across three beats: the dot rests on 書く, runs to 確かめる, then through 直す
-// and home, where the hub turns from `dek check` to `ok: true`.
+// and home, where the hub turns from `dekc check` to `ok: true`.
 const STOPS = [0, 1 / 3, 2 / 3];
 // Each beat runs the dot one leg of the lap, keyed by beat id.
 const LEGS: Record<string, { from: number; to: number; ms: number }> = {
@@ -37,4 +37,4 @@ export default {
       state.style.visibility = (state.dataset.hub === "1") === home ? "visible" : "hidden";
     }
   },
-} satisfies DekSlide;
+} satisfies DekcSlide;

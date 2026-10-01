@@ -17,7 +17,7 @@ describe("liveReloadScript", () => {
   test("listens for SSE without reloading on every event", () => {
     const live = liveReloadScript();
     expect(live).toContain("EventSource");
-    expect(live).toContain("dekLive");
+    expect(live).toContain("dekcLive");
     expect(live).not.toMatch(/onmessage = \(\) => location\.reload\(\)/);
   });
 

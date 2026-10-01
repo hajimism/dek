@@ -9,16 +9,16 @@ import { requireProject, resolveScope, resolveTarget } from "../../src/cli/scope
 import { shotCommand } from "../../src/cli/shot.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDekc } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { REF_SHA, type RefSpec, withTempProject } from "../helpers/project.ts";
 
-const REF = "someone/talks/why-dek";
+const REF = "someone/talks/why-dekc";
 const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.ts");
 
 const refScript = `---
-title: Why dek
+title: Why dekc
 ---
 
 ## timing
@@ -44,13 +44,13 @@ const ref: RefSpec = {
 const project = { decks: [{ name: "mine" }], refs: [ref] };
 
 function snapshotDir(root: string): string {
-  return join(root, "refs", "someone", "talks", "why-dek");
+  return join(root, "refs", "someone", "talks", "why-dekc");
 }
 
 describe("reading a ref", () => {
-  test("dek show takes a ref name as its deck and says where the slide came from", async () => {
+  test("dekc show takes a ref name as its deck and says where the slide came from", async () => {
     await withTempProject(project, async (root) => {
-      const result = await runDek(["show", REF, "timing", "--json"], { cwd: root });
+      const result = await runDekc(["show", REF, "timing", "--json"], { cwd: root });
       expect(result).toMatchObject({ exitCode: 0 });
       const json = jsonStdout<{
         slug: string;
@@ -86,14 +86,14 @@ describe("reading a ref", () => {
       if (result.kind !== "deck") {
         throw new Error("expected one deck");
       }
-      expect(result.title).toBe("Why dek");
+      expect(result.title).toBe("Why dekc");
       expect(result.estimateSeconds).toBe(120);
       expect(result.skipped).toEqual([
         { check: "lint", reason: "a ref is read-only; its problems are not yours to fix" },
       ]);
       expect(result.ref?.name).toBe(REF);
       const text = formatText({ command: "ls", data: result });
-      expect(text).toContain(`${REF}  Why dek`);
+      expect(text).toContain(`${REF}  Why dekc`);
       expect(text).toContain(
         "lint: skipped (a ref is read-only; its problems are not yours to fix)",
       );
@@ -103,7 +103,7 @@ describe("reading a ref", () => {
   test("theme returns the ref's theme.css", async () => {
     await withTempProject(project, async (root) => {
       const result = themeCommand(resolveTarget(root, "deck", { refs: true, deck: REF }));
-      expect(result.path).toBe(join(snapshotDir(root), "decks", "why-dek", "theme.css"));
+      expect(result.path).toBe(join(snapshotDir(root), "decks", "why-dekc", "theme.css"));
       expect(result.classes).toContain("card");
       expect(result.ref?.name).toBe(REF);
     });
@@ -112,14 +112,14 @@ describe("reading a ref", () => {
   test.serial("shot renders a ref's slide", async () => {
     await withTempProject(project, async (root) => {
       await chmod(fakePlaywright, 0o755);
-      const result = await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, () =>
+      const result = await withEnv({ DEKC_PLAYWRIGHT: fakePlaywright }, () =>
         shotCommand(resolveTarget(root, "deck", { refs: true, deck: REF }), { slug: "timing" }),
       );
       expect(result.shots[0]?.slug).toBe("timing");
     });
   });
 
-  test("a ref that dek.toml does not pin points to dek ref", async () => {
+  test("a ref that dekc.toml does not pin points to dekc ref", async () => {
     await withTempProject(
       { decks: [{ name: "mine" }], refs: [{ ...ref, declared: false }] },
       async (root) => {
@@ -128,18 +128,18 @@ describe("reading a ref", () => {
         ).toThrow(
           expect.objectContaining({
             message: `ref "${REF}" is not added`,
-            hint: expect.stringContaining(`dek ref ${REF}`),
+            hint: expect.stringContaining(`dekc ref ${REF}`),
           }),
         );
       },
     );
   });
 
-  test("a rev on a read that is not the pinned one points to dek ref with that rev", async () => {
+  test("a rev on a read that is not the pinned one points to dekc ref with that rev", async () => {
     await withTempProject(project, async (root) => {
       expect(() =>
         showCommand(resolveTarget(root, "deck", { refs: true, deck: `${REF}@v2` }), "timing"),
-      ).toThrow(expect.objectContaining({ hint: expect.stringContaining(`dek ref ${REF}@v2`) }));
+      ).toThrow(expect.objectContaining({ hint: expect.stringContaining(`dekc ref ${REF}@v2`) }));
       expect(
         showCommand(
           resolveTarget(root, "deck", { refs: true, deck: `${REF}@${REF_SHA}` }),
@@ -167,7 +167,7 @@ describe("refs are read-only", () => {
       expect(() => resolveScope(root, { deck: REF })).toThrow(
         expect.objectContaining({
           message: `"${REF}" is a ref; refs are read-only`,
-          hint: expect.stringContaining(`dek show ${REF} <slug>`),
+          hint: expect.stringContaining(`dekc show ${REF} <slug>`),
         }),
       );
       expect(() => resolveScope(root, { deck: REF })).toThrow("read-only");
@@ -176,11 +176,11 @@ describe("refs are read-only", () => {
 
   test("a directory inside a ref is not a project to run commands in", async () => {
     await withTempProject(project, async (root) => {
-      const inside = join(snapshotDir(root), "decks", "why-dek");
+      const inside = join(snapshotDir(root), "decks", "why-dekc");
       expect(() => requireProject(inside)).toThrow(
         expect.objectContaining({
           message: "this directory is inside a ref; refs are read-only",
-          hint: expect.stringContaining(`dek show ${REF} <slug>`),
+          hint: expect.stringContaining(`dekc show ${REF} <slug>`),
         }),
       );
     });

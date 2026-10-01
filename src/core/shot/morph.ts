@@ -1,4 +1,4 @@
-import { DekError } from "../error.ts";
+import { DekcError } from "../error.ts";
 import { type PlaywrightRunner, requirePlaywright } from "../playwright.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection } from "../resolve.ts";
 import { morphEntry } from "../shot-cache.ts";
@@ -28,7 +28,7 @@ export function parseMorphAt(value: string | undefined): number {
 
 function requireMorphAt(at: number, written: string = String(at)): number {
   if (!Number.isFinite(at) || at < 0 || at > 1) {
-    throw new DekError(`invalid --at "${written}"`, {
+    throw new DekcError(`invalid --at "${written}"`, {
       hint: "use a number between 0 and 1, e.g. --at 0.5",
     });
   }
@@ -38,7 +38,7 @@ function requireMorphAt(at: number, written: string = String(at)): number {
 /**
  * Screenshot the view transition from the last beat of `from` into beat 0 of
  * `to`, frozen at `at`. The page is the video document (all slides plus the
- * player runtime), so morphs and theme transitions run exactly as in `dek video`.
+ * player runtime), so morphs and theme transitions run exactly as in `dekc video`.
  */
 export async function shotMorph(dir: string, options: ShotMorphOptions): Promise<ShotFile[]>;
 export async function shotMorph(

@@ -19,7 +19,7 @@ const EVAL_BUDGET_MS = 5000;
  * What stops each `slides/<slug>.ts` from running as a slide script. A script is one
  * self-contained module whose only export is the default object. Given the slide's step keys,
  * the module is also evaluated so `motion` can be checked against the beats it names.
- * Evaluation happens in one child process that cannot reach dek's globals and is killed if it
+ * Evaluation happens in one child process that cannot reach dekc's globals and is killed if it
  * hangs; this waits for it. Scripts evaluated before are answered from a cache.
  */
 export function slideScriptsProblems(scripts: ScriptInput[]): SlideScriptProblem[][] {
@@ -208,7 +208,7 @@ function moduleProblems(
       {
         message: "export default must be an object like { motion, draw }",
         ...at(exported),
-        hint: "export default { motion: { <step>: ms }, draw(slide, { t }) {} } satisfies DekSlide",
+        hint: "export default { motion: { <step>: ms }, draw(slide, { t }) {} } satisfies DekcSlide",
       },
     ];
   }

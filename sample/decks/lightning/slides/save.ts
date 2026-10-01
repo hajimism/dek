@@ -14,4 +14,4 @@ export default {
       el.style.transform = `translateX(${(1 - p) * -0.6}em)`;
     });
   },
-} satisfies DekSlide;
+} satisfies DekcSlide;

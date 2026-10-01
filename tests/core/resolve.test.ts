@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { realpathSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import { resolveDeck, resolveProject } from "../../src/core/resolve.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { projectFixturesDir } from "../helpers/paths.ts";
@@ -10,10 +10,10 @@ import { projectFixturesDir } from "../helpers/paths.ts";
 const simpleRoot = realpathSync(join(projectFixturesDir, "simple"));
 
 describe("resolveProject", () => {
-  test("walks up from a deck directory to dek.toml", () => {
+  test("walks up from a deck directory to dekc.toml", () => {
     const project = resolveProject(join(simpleRoot, "decks", "demo"));
     expect(project.root).toBe(simpleRoot);
-    expect(project.configPath).toBe(join(simpleRoot, "dek.toml"));
+    expect(project.configPath).toBe(join(simpleRoot, "dekc.toml"));
   });
 
   test("walks up from slides/ as well", () => {
@@ -33,7 +33,7 @@ describe("resolveProject", () => {
 
   test("returns an empty decks list when decks/ is empty", async () => {
     await withTempDir(async (dir) => {
-      await writeFile(join(dir, "dek.toml"), "# empty\n");
+      await writeFile(join(dir, "dekc.toml"), "# empty\n");
       await mkdir(join(dir, "decks"));
       const project = resolveProject(dir);
       expect(project.root).toBe(dir);
@@ -41,13 +41,13 @@ describe("resolveProject", () => {
     });
   });
 
-  test("errors when dek.toml is not found", async () => {
+  test("errors when dekc.toml is not found", async () => {
     await withTempDir(async (dir) => {
-      expect(() => resolveProject(dir)).toThrow(DekError);
+      expect(() => resolveProject(dir)).toThrow(DekcError);
       expect(() => resolveProject(dir)).toThrow(
         expect.objectContaining({
-          message: "not a dek project",
-          hint: "run `dek init` to create one here, or cd into a project",
+          message: "not a dekc project",
+          hint: "run `dekc init` to create one here, or cd into a project",
         }),
       );
     });
@@ -55,7 +55,7 @@ describe("resolveProject", () => {
 
   test("skips a deck directory with no script.md", async () => {
     await withTempDir(async (dir) => {
-      await writeFile(join(dir, "dek.toml"), "# empty\n");
+      await writeFile(join(dir, "dekc.toml"), "# empty\n");
       await mkdir(join(dir, "decks", "orphan"), { recursive: true });
       await mkdir(join(dir, "decks", "demo"), { recursive: true });
       await writeFile(
@@ -74,7 +74,7 @@ hello
       expect(project.decks[0]?.name).toBe("demo");
       expect(project.failed).toHaveLength(1);
       expect(project.failed[0]?.name).toBe("orphan");
-      expect(project.failed[0]?.error).toBeInstanceOf(DekError);
+      expect(project.failed[0]?.error).toBeInstanceOf(DekcError);
     });
   });
 });
@@ -82,7 +82,7 @@ hello
 describe("resolveDeck", () => {
   test("parses only the requested deck", async () => {
     await withTempDir(async (dir) => {
-      await writeFile(join(dir, "dek.toml"), "# empty\n");
+      await writeFile(join(dir, "dekc.toml"), "# empty\n");
       await mkdir(join(dir, "decks", "alpha"), { recursive: true });
       await mkdir(join(dir, "decks", "beta"), { recursive: true });
       await writeFile(
@@ -106,23 +106,23 @@ hello
 
   test("throws the parse error instead of 'not a deck directory'", async () => {
     await withTempDir(async (dir) => {
-      await writeFile(join(dir, "dek.toml"), "# empty\n");
+      await writeFile(join(dir, "dekc.toml"), "# empty\n");
       await mkdir(join(dir, "decks", "demo"), { recursive: true });
       await writeFile(join(dir, "decks", "demo", "script.md"), "this is not a deck\n");
-      expect(() => resolveDeck(join(dir, "decks", "demo"))).toThrow(DekError);
+      expect(() => resolveDeck(join(dir, "decks", "demo"))).toThrow(DekcError);
       try {
         resolveDeck(join(dir, "decks", "demo"));
       } catch (error) {
-        expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).not.toBe("not a deck directory");
-        expect((error as DekError).message).toContain("frontmatter");
+        expect(error).toBeInstanceOf(DekcError);
+        expect((error as DekcError).message).not.toBe("not a deck directory");
+        expect((error as DekcError).message).toContain("frontmatter");
       }
     });
   });
 
   test("throws not a deck directory from the project root", async () => {
     await withTempDir(async (dir) => {
-      await writeFile(join(dir, "dek.toml"), "# empty\n");
+      await writeFile(join(dir, "dekc.toml"), "# empty\n");
       await mkdir(join(dir, "decks"));
       expect(() => resolveDeck(dir)).toThrow("not a deck directory");
     });

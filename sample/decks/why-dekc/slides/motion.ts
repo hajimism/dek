@@ -26,4 +26,4 @@ export default {
     const live = slide.querySelector("[data-live]");
     if (live) paint(live, t);
   },
-} satisfies DekSlide;
+} satisfies DekcSlide;

@@ -43,7 +43,7 @@
 
 /* The signal block at the top right: pure decoration, drawn as a pseudo-element. */
 .slide[data-layout="cover"]::before {
-  content: "dek — 台本を先に書く、スライドの道具";
+  content: "dekc — 台本を先に書く、スライドの道具";
 }
 
 .slide[data-layout="cover"] > .label::after {
@@ -58,7 +58,7 @@
 
 /* The wordmark sits in the block, at its foot. */
 .slide[data-layout="cover"] > .lede::after {
-  content: "dek";
+  content: "dekc";
   position: absolute;
   top: calc(var(--head-rule) + var(--gap) * 1.5 + var(--track) * 2.4 - var(--size-hero) * 0.95);
   right: calc(var(--margin) + var(--gap) * 0.6);

@@ -120,7 +120,7 @@ describe("default theme", () => {
     expect(REQUIRED_TOKENS.filter((name) => !published.includes(name))).toEqual([]);
   });
 
-  test("passes DEK014 and DEK015", async () => {
+  test("passes DEKC014 and DEKC015", async () => {
     await withTempProject(
       {
         decks: [
@@ -137,7 +137,7 @@ describe("default theme", () => {
       },
       async (root) => {
         const diagnostics = lintDeck(join(root, "decks", "demo"));
-        expect(diagnostics.filter((d) => d.id === "DEK014" || d.id === "DEK015")).toEqual([]);
+        expect(diagnostics.filter((d) => d.id === "DEKC014" || d.id === "DEKC015")).toEqual([]);
       },
     );
   });

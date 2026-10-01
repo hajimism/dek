@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { DekError } from "../../src/core/error.ts";
+import { DekcError } from "../../src/core/error.ts";
 import { parseScript, ScriptError } from "../../src/core/parse.ts";
 import { scriptFixturesDir } from "../helpers/paths.ts";
 
@@ -89,12 +89,14 @@ title: Talk
 
 body
 `;
-    expect(() => parseScript(source)).toThrow(DekError);
+    expect(() => parseScript(source)).toThrow(DekcError);
     try {
       parseScript(source);
     } catch (error) {
-      expect(error).toBeInstanceOf(DekError);
-      expect((error as DekError).line).toBe(headingLine(source, "## 発表の前日に何をしていますか"));
+      expect(error).toBeInstanceOf(DekcError);
+      expect((error as DekcError).line).toBe(
+        headingLine(source, "## 発表の前日に何をしていますか"),
+      );
     }
   });
 
@@ -102,9 +104,9 @@ body
     try {
       parseScript(`---\ntitle: Talk\n---\n\n${heading}\n\nbody\n`);
     } catch (error) {
-      return (error as DekError).hint;
+      return (error as DekcError).hint;
     }
-    throw new Error("expected DekError");
+    throw new Error("expected DekcError");
   }
 
   test("shows how to add an id to a heading that has none", () => {
@@ -114,7 +116,7 @@ body
   });
 
   test("suggests an id from the ASCII words in the heading", () => {
-    expect(hintFor("## Why dek?")).toBe("write it as `## Why dek? {#why-dek}`");
+    expect(hintFor("## Why dekc?")).toBe("write it as `## Why dekc? {#why-dekc}`");
     expect(hintFor("## Vite 8 の新機能")).toBe("write it as `## Vite 8 の新機能 {#vite-8}`");
   });
 
@@ -132,7 +134,7 @@ title: Talk
 
 body
 `;
-    expect(() => parseScript(source)).toThrow(DekError);
+    expect(() => parseScript(source)).toThrow(DekcError);
   });
 
   test("rejects key=value attributes", () => {
@@ -144,7 +146,7 @@ title: Talk
 
 body
 `;
-    expect(() => parseScript(source)).toThrow(DekError);
+    expect(() => parseScript(source)).toThrow(DekcError);
   });
 
   test("leaves a beat without an id as number-only", () => {
@@ -168,10 +170,10 @@ body
   test("reports a missing title as 'title: ...' not as JSON", () => {
     try {
       parseScript("---\nevent: x\n---\n\n## intro\n");
-      throw new Error("expected DekError");
+      throw new Error("expected DekcError");
     } catch (error) {
-      expect(error).toBeInstanceOf(DekError);
-      const message = (error as DekError).message;
+      expect(error).toBeInstanceOf(DekcError);
+      const message = (error as DekcError).message;
       expect(message.startsWith("title: ")).toBe(true);
       expect(message).not.toMatch(/^\s*\[/);
     }
@@ -216,7 +218,7 @@ describe("parseScript errors", () => {
     try {
       parseScript(source, "script.md");
     } catch (error) {
-      const { message, hint, line } = error as DekError;
+      const { message, hint, line } = error as DekcError;
       return { message, ...(hint ? { hint } : {}), ...(line ? { line } : {}) };
     }
     throw new Error("expected parseScript to fail");

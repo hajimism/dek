@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { outputOf } from "../../src/cli/commands.ts";
 import { currentCommand, gotoCommand } from "../../src/cli/goto.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
-import { DekError } from "../../src/core/error.ts";
-import { jsonStdout, runDek, spawnDekServer } from "../helpers/cli.ts";
+import { DekcError } from "../../src/core/error.ts";
+import { jsonStdout, runDekc, spawnDekcServer } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { withDevServer } from "../helpers/server.ts";
@@ -39,15 +39,15 @@ body
   slides: { intro: introHtml, architecture: architectureHtml },
 };
 
-describe("dek goto / current", () => {
-  test("fails with a run dek hint when the server is not running", async () => {
+describe("dekc goto / current", () => {
+  test("fails with a run dekc hint when the server is not running", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const result = await runDek(["current", "--json"], { cwd: join(root, "decks", "demo") });
+        const result = await runDekc(["current", "--json"], { cwd: join(root, "decks", "demo") });
         expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<ErrorJson>(result);
-        expect(json.error.hint).toContain("run `dek`");
+        expect(json.error.hint).toContain("run `dekc`");
       },
     );
   });
@@ -55,7 +55,7 @@ describe("dek goto / current", () => {
   test("goto and current talk to the running server", async () => {
     await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
-      const { stop } = await spawnDekServer(deckDir);
+      const { stop } = await spawnDekcServer(deckDir);
       try {
         const gotoResult = await gotoCommand(requireDeckFromCwd(deckDir), "architecture");
         expect(gotoResult).toMatchObject({
@@ -88,7 +88,7 @@ describe("gotoCommand", () => {
           beatIndex: 0,
           viewers: 0,
         });
-        // With no page open, the position is where the next one lands, and dek says so.
+        // With no page open, the position is where the next one lands, and dekc says so.
         expect(outputOf("goto").notes?.(gotoResult, false)).toBe(
           "no browser shows the deck: the next page opened on the dev server shows architecture",
         );
@@ -111,11 +111,11 @@ describe("gotoCommand against a server for another deck", () => {
         const error = await gotoCommand(requireDeckFromCwd(root, "other"), "intro").catch(
           (caught: unknown) => caught,
         );
-        expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toBe(
+        expect(error).toBeInstanceOf(DekcError);
+        expect((error as DekcError).message).toBe(
           'the running dev server serves deck "demo", not "other"',
         );
-        expect((error as DekError).hint).toContain("--deck demo");
+        expect((error as DekcError).hint).toContain("--deck demo");
       });
     });
   });

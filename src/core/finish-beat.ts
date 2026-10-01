@@ -10,7 +10,7 @@
 export function finishBeat(): void {
   // A paused animation seeked past its own end has no effect, so `getAnimations()` leaves it
   // out, yet it never finishes: the go that started it would wait on it forever.
-  const held = (window.__dekStarted ?? []).filter((animation) => animation.playState === "paused");
+  const held = (window.__dekcStarted ?? []).filter((animation) => animation.playState === "paused");
   for (const animation of new Set([...document.getAnimations(), ...held])) {
     const end = animation.effect?.getComputedTiming().endTime;
     if (typeof end === "number" && Number.isFinite(end)) {
@@ -23,8 +23,8 @@ export function finishBeat(): void {
   // Chromium never reports the end of a transition whose animations were paused and
   // seeked, even once they finish; its animations are over, so the transition is too.
   document.activeViewTransition?.skipTransition();
-  const motion = window.dekMotion;
+  const motion = window.dekcMotion;
   motion?.seek(motion.duration());
   // What the next go finds already here is this beat's, and seeking that go leaves it alone.
-  window.__dekSettled = new Set(document.getAnimations());
+  window.__dekcSettled = new Set(document.getAnimations());
 }

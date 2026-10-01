@@ -1,4 +1,4 @@
-import { DekError } from "../error.ts";
+import { DekcError } from "../error.ts";
 import {
   askPlaywright,
   type PagesRequest,
@@ -102,7 +102,7 @@ export async function shotSheet(
 
 /**
  * The first slide at its last beat, as a link preview shows the talk. The shot is the one
- * `dek shot` takes of that slide, cached by the rendered HTML, so a build only starts Chromium
+ * `dekc shot` takes of that slide, cached by the rendered HTML, so a build only starts Chromium
  * when the first slide changed. Returns undefined when Playwright is not installed.
  */
 export async function coverShot(
@@ -127,7 +127,7 @@ export type Still = {
   entry: CacheEntry;
 };
 
-/** One slide at one beat as `dek shot` takes it: its page, and the cached shot it is named by. */
+/** One slide at one beat as `dekc shot` takes it: its page, and the cached shot it is named by. */
 export function still(
   deck: ResolvedDeck["deck"],
   section: Section,
@@ -199,7 +199,7 @@ function shotOf(still: Still): ShotFile {
 export function resolveBeat(section: Section, step?: string): { index: number; label: string } {
   const index = step === undefined ? lastStop(section.beats) : resolveStop(section.beats, step);
   if (index === undefined) {
-    throw new DekError(`step "${step}" not found in "${section.slug}"`, {
+    throw new DekcError(`step "${step}" not found in "${section.slug}"`, {
       hint: stepNotFoundHint(section),
     });
   }

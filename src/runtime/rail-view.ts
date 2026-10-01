@@ -54,7 +54,7 @@ function persist(key: string, value: string): void {
 
 function setWidth(handle: HTMLElement | null, px: number): number {
   const width = clampRailWidth(px);
-  document.documentElement.style.setProperty("--dek-rail-w", `${width}px`);
+  document.documentElement.style.setProperty("--dekc-rail-w", `${width}px`);
   handle?.setAttribute("aria-valuenow", String(width));
   return width;
 }
@@ -66,7 +66,7 @@ function fillThumbs(railEl: HTMLElement, slides: PresenterSlide[], stage: Stage)
   }
   const size = deckSize(deckEl);
   for (const [index, slide] of slides.entries()) {
-    const frame = railEl.querySelector(`[data-slide-index="${index}"] .dek-thumb-frame`);
+    const frame = railEl.querySelector(`[data-slide-index="${index}"] .dekc-thumb-frame`);
     if (!(frame instanceof HTMLElement)) {
       continue;
     }
@@ -76,7 +76,7 @@ function fillThumbs(railEl: HTMLElement, slides: PresenterSlide[], stage: Stage)
       frame.replaceChildren();
       continue;
     }
-    const thumbStage = stillFrame("dek-thumb-stage", clone, size);
+    const thumbStage = stillFrame("dekc-thumb-stage", clone, size);
     frame.replaceChildren(thumbStage);
     // Drawn once in the document, so a script that measures its slide gets real boxes. The
     // rail shows every beat's elements, so the script draws the last beat to match them.
@@ -89,8 +89,8 @@ function fitThumbs(railEl: HTMLElement): void {
   if (railEl.offsetParent === null) {
     return;
   }
-  for (const frame of railEl.querySelectorAll(".dek-thumb-frame")) {
-    const thumbStage = frame.querySelector(".dek-thumb-stage");
+  for (const frame of railEl.querySelectorAll(".dekc-thumb-frame")) {
+    const thumbStage = frame.querySelector(".dekc-thumb-stage");
     if (frame instanceof HTMLElement && thumbStage instanceof HTMLElement) {
       fitStage(thumbStage, frame);
     }
@@ -98,7 +98,7 @@ function fitThumbs(railEl: HTMLElement): void {
 }
 
 function markCurrent(railEl: HTMLElement, slideIndex: number): void {
-  for (const el of railEl.querySelectorAll(".dek-thumb")) {
+  for (const el of railEl.querySelectorAll(".dekc-thumb")) {
     const current = Number(el.getAttribute("data-slide-index")) === slideIndex;
     el.classList.toggle("is-current", current);
     if (current) {
@@ -119,7 +119,7 @@ function bindThumbKeys(
   railEl.addEventListener("keydown", (event) => {
     const step = thumbStep(event.key);
     const thumb = event.target;
-    if (!step || !(thumb instanceof HTMLElement) || !thumb.classList.contains("dek-thumb")) {
+    if (!step || !(thumb instanceof HTMLElement) || !thumb.classList.contains("dekc-thumb")) {
       return;
     }
     event.preventDefault();

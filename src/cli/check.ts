@@ -1,5 +1,5 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import type { Fill } from "../core/fill.ts";
 import { lintDeck } from "../core/lint.ts";
 import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
@@ -53,7 +53,7 @@ export async function checkCommand(
 
   const skipped: SkippedCheck[] = visual
     ? []
-    : [visualSkipped(`dek check ${slug}`, { reason: "Playwright is not installed" })];
+    : [visualSkipped(`dekc check ${slug}`, { reason: "Playwright is not installed" })];
 
   // A live-only deck is done without voice, so asking for it skips the check rather than failing,
   // the way a missing Playwright skips visual.
@@ -69,8 +69,8 @@ export async function checkCommand(
     await synthDeck({ project, deck });
     const timeline = loadCachedTimeline(deck.dir);
     if (!timeline) {
-      throw new DekError("Timeline not found", {
-        hint: "run `dek voice`",
+      throw new DekcError("Timeline not found", {
+        hint: "run `dekc voice`",
       });
     }
     const slideIndex = deck.deck.sections.findIndex((entry) => entry.slug === slug);

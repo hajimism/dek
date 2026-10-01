@@ -1,24 +1,24 @@
 # Working with AI Agents
 
-Agents use the same CLI you do. There is no MCP server and no tool schema to install. A coding agent already has a shell and a file editor; a slide is a forty-line HTML file, so the agent's own editor is the most precise and cheapest way to change it. dek adds only what an agent cannot do well on its own: seeing how the slide renders, hearing how it reads, and the fragile operations of renaming and reordering.
+Agents use the same CLI you do. There is no MCP server and no tool schema to install. A coding agent already has a shell and a file editor; a slide is a forty-line HTML file, so the agent's own editor is the most precise and cheapest way to change it. dekc adds only what an agent cannot do well on its own: seeing how the slide renders, hearing how it reads, and the fragile operations of renaming and reordering.
 
 ## What the agent reads
 
-`dek init` writes a short `AGENTS.md` at the project root, and `dek new`, `dek ref`, and `dek sync` keep it current: the principles, the conventions, what to check before reporting a deck as done, and a pointer to the CLI's own reference. It names no class, token, or layout: each deck owns its theme, so the agent reads the deck's own with `dek theme`. It stays under a hundred lines. Anything more detailed is pulled from the CLI when needed.
+`dekc init` writes a short `AGENTS.md` at the project root, and `dekc new`, `dekc ref`, and `dekc sync` keep it current: the principles, the conventions, what to check before reporting a deck as done, and a pointer to the CLI's own reference. It names no class, token, or layout: each deck owns its theme, so the agent reads the deck's own with `dekc theme`. It stays under a hundred lines. Anything more detailed is pulled from the CLI when needed.
 
-dek owns only the block between `<!-- dek:begin … -->` and `<!-- dek:end -->`, and rewrites it in place. Write your team's own notes for agents above or below it; they stay. An `AGENTS.md` you already had keeps its text and gets dek's block appended.
+dekc owns only the block between `<!-- dekc:begin … -->` and `<!-- dekc:end -->`, and rewrites it in place. Write your team's own notes for agents above or below it; they stay. An `AGENTS.md` you already had keeps its text and gets dekc's block appended.
 
 ```bash
-dek help --agent
+dekc help --agent
 ```
 
-That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a dek project with no extra configuration.
+That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a dekc project with no extra configuration.
 
 ## What the CLI promises
 
-1. **Every result command accepts `--json`, and every result has one shape.** An agent branches on `ok`, reads `error` when it is `false`, and works through `diagnostics`. `dek` and `dek rehearse` stay running and are the only exceptions: given `--json`, they refuse at once rather than start a server a JSON reader would wait on forever. Nothing forces an agent to parse prose; the contract is [below](#the-json-contract).
-2. **Every error names the next command.** "`slides/intro.html` is missing; run `dek sync`." The hint is something you can run as-is, from wherever you ran the command: a command that takes a deck names it when you are not inside that deck, as `dek theme demo` at the project root. Diagnostics carry a hint too when the fix is known, such as `use hook, turn, or 1-2` for a `data-step` that names no beat.
-3. **`dek help --agent` is a few hundred tokens.** The CLI documents itself.
+1. **Every result command accepts `--json`, and every result has one shape.** An agent branches on `ok`, reads `error` when it is `false`, and works through `diagnostics`. `dekc` and `dekc rehearse` stay running and are the only exceptions: given `--json`, they refuse at once rather than start a server a JSON reader would wait on forever. Nothing forces an agent to parse prose; the contract is [below](#the-json-contract).
+2. **Every error names the next command.** "`slides/intro.html` is missing; run `dekc sync`." The hint is something you can run as-is, from wherever you ran the command: a command that takes a deck names it when you are not inside that deck, as `dekc theme demo` at the project root. Diagnostics carry a hint too when the fix is known, such as `use hook, turn, or 1-2` for a `data-step` that names no beat.
+3. **`dekc help --agent` is a few hundred tokens.** The CLI documents itself.
 4. **`AGENTS.md` stays short.**
 
 ## The JSON contract
@@ -26,16 +26,16 @@ That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a
 Success is `{ "ok": true, ... }` with exit code 0. Failure is `{ "ok": false, "error": { ... }, ... }` with exit code 1, whether the command could not run or lint and check found an error:
 
 ```json
-{ "ok": false, "error": { "message": "deck \"nope\" not found", "path": "decks/nope", "hint": "run `dek ls`" } }
+{ "ok": false, "error": { "message": "deck \"nope\" not found", "path": "decks/nope", "hint": "run `dekc ls`" } }
 ```
 
 ```json
 {
   "ok": false,
-  "error": { "message": "lint found 1 error", "hint": "fix each error in diagnostics, then run `dek lint` again" },
+  "error": { "message": "lint found 1 error", "hint": "fix each error in diagnostics, then run `dekc lint` again" },
   "diagnostics": [
     {
-      "id": "DEK011",
+      "id": "DEKC011",
       "severity": "error",
       "message": "slide contains an onclick attribute",
       "path": "slides/intro.html",
@@ -49,27 +49,27 @@ Success is `{ "ok": true, ... }` with exit code 0. Failure is `{ "ok": false, "e
 }
 ```
 
-- `error` always has a `message`, a `hint` whenever dek knows the next step, and `path` and `line` when the failure has a place.
+- `error` always has a `message`, a `hint` whenever dekc knows the next step, and `path` and `line` when the failure has a place.
 - Commands that report diagnostics (`lint`, `check`, `build`, `ls`, `cues`) always carry a `diagnostics` array, pass or fail. Each diagnostic has its `severity`, a `path`, `line`, and `column` when it has a place, a `hint` when the fix is known, and the values its message names as `data`. Only errors fail; warnings alone are `"ok": true`.
-- A check that did not run is an entry in `skipped`, never an empty pass: `{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }`. The field is absent when everything ran. `dek lint` without `--visual`, and `dek build`, always list `visual`: they did not measure overflow or contrast, and the hint is the command that does.
+- A check that did not run is an entry in `skipped`, never an empty pass: `{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }`. The field is absent when everything ran. `dekc lint` without `--visual`, and `dekc build`, always list `visual`: they did not measure overflow or contrast, and the hint is the command that does.
 - A command that writes files for every deck in scope returns a list, one deck or many: `build` and `pdf` return `outs`.
-- `dek lint --format sarif` returns the same diagnostics as SARIF 2.1.0.
-- Every command's shape is published as a JSON Schema at [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json): one entry under `$defs` per command, plus `failure` for a line that could not run. Every object is closed, so a field it does not name is a change to the contract. The schema, the CLI's own types, and what dek prints in its tests are checked against one definition, so they cannot drift apart.
+- `dekc lint --format sarif` returns the same diagnostics as SARIF 2.1.0.
+- Every command's shape is published as a JSON Schema at [`cli.schema.json`](https://hajimism.github.io/dekc/cli.schema.json): one entry under `$defs` per command, plus `failure` for a line that could not run. Every object is closed, so a field it does not name is a change to the contract. The schema, the CLI's own types, and what dekc prints in its tests are checked against one definition, so they cannot drift apart.
 
-While dek is 0.x, the `--json` shape and the rule ids may still change between releases. A rule id is never reused: a retired id stays retired.
+While dekc is 0.x, the `--json` shape and the rule ids may still change between releases. A rule id is never reused: a retired id stays retired.
 
 ## One round trip
 
 ```bash
-dek check architecture --shot
-dek check architecture --voice
+dekc check architecture --shot
+dekc check architecture --voice
 ```
 
 `check` lints one slide, including the rendering rules when Playwright is available, writes a screenshot, and returns the diagnostics and the image path. The path contains a hash of the rendered content, so an agent that opens the returned path never sees a stale image. `--voice` returns the kana reading and duration for each sentence. Write the HTML, run `check`, look at the picture, read the pronunciation, fix. Write, see, hear, fix: one loop, closed.
 
 ```bash
-dek shot --sheet
-dek shot architecture --motion
+dekc shot --sheet
+dekc shot architecture --motion
 ```
 
 Two views no single shot gives. `--sheet` puts the whole deck on one image, for the balance across slides. `--motion` spreads a slide's beats across time, each held at a few moments through everything it moves, so an entrance that hides text or a line that never draws shows up in stills. Both images are sized to be read whole without being scaled down, and both are cached by what they show.
@@ -81,69 +81,69 @@ Anything geometry can decide is a lint rule. Overflow and contrast have definite
 ## Pointing goes both ways
 
 ```bash
-dek goto architecture
-dek current
+dekc goto architecture
+dekc current
 ```
 
-After editing a slide, the agent can jump the human's browser to it. When the human says "make the figure on this slide smaller", the agent runs `dek current`, learns the slug, and fixes it without asking which slide.
+After editing a slide, the agent can jump the human's browser to it. When the human says "make the figure on this slide smaller", the agent runs `dekc current`, learns the slug, and fixes it without asking which slide.
 
 ## After a rehearsal
 
 ```bash
-dek marks
-dek marks clear
+dekc marks
+dekc marks clear
 ```
 
-Rehearse aloud on the dev server and press `m` on each beat whose words trip you up. `dek marks` then hands the agent what it needs to rewrite them: the heading's `line` in `script.md`, `was` (what the beat said when you marked it), and `text` (what it says now). A mark follows its beat by id, or by title, so beats added before it do not move it, and `status` turns `edited` once the words change, or `gone` if the beat itself went away. Say the new words aloud before you run `dek marks clear`: only that tells whether they work.
+Rehearse aloud on the dev server and press `m` on each beat whose words trip you up. `dekc marks` then hands the agent what it needs to rewrite them: the heading's `line` in `script.md`, `was` (what the beat said when you marked it), and `text` (what it says now). A mark follows its beat by id, or by title, so beats added before it do not move it, and `status` turns `edited` once the words change, or `gone` if the beat itself went away. Say the new words aloud before you run `dekc marks clear`: only that tells whether they work.
 
 ## Using a slide as a model
 
 ```bash
-dek show why-dek timing
+dekc show why-dekc timing
 ```
 
 `show` returns everything one slide is made of in one call, each part labeled with its file: the section's script, the slide's HTML, CSS, and TS, the rules of `theme.css` the slide actually uses with only the tokens and keyframes they reach, and the assets it references. An agent learns how the slide is built without reading the whole theme, then writes its own slide in its own deck's theme. Lint catches any class or token it carried over by mistake.
 
-The model can be someone else's deck. `dek ref owner/repo/deck` pins it, and `ls`, `show`, `theme`, and `shot` then take `owner/repo/deck` as the deck. AGENTS.md lists the pinned refs, so the agent knows which decks it may learn from. A ref is read-only; the agent copies what it needs into its own deck.
+The model can be someone else's deck. `dekc ref owner/repo/deck` pins it, and `ls`, `show`, `theme`, and `shot` then take `owner/repo/deck` as the deck. AGENTS.md lists the pinned refs, so the agent knows which decks it may learn from. A ref is read-only; the agent copies what it needs into its own deck.
 
 ## Prompts that work
 
 ```
 Shrink the right column of architecture.html, then run
-dek check architecture --shot and confirm nothing overflows.
+dekc check architecture --shot and confirm nothing overflows.
 ```
 
 ```
-On the slide from dek current, reveal the elements beat by beat with
+On the slide from dekc current, reveal the elements beat by beat with
 data-step, following the script's ### headings.
 ```
 
 ```
-I added ## recap {#recap} to script.md. Do not run dek sync;
+I added ## recap {#recap} to script.md. Do not run dekc sync;
 the dev server will generate the skeleton. Fill it in.
 ```
 
 ```
 Carry the figure from problem into architecture with data-morph.
-Run dek shot problem --to architecture --at 0.5 and check the
+Run dekc shot problem --to architecture --at 0.5 and check the
 interpolated position looks right.
 ```
 
 ```
 Make the number on files count up as the slide enters. Put it in
-slides/files.ts, drawing from t alone, then run dek check files --shot.
+slides/files.ts, drawing from t alone, then run dekc check files --shot.
 ```
 
 ```
-Use hajimism/dek/why-dek as a model. Find the slide closest to what
-the budget section needs with dek ls, read it with dek show, and write
+Use hajimism/dekc/why-dekc as a model. Find the slide closest to what
+the budget section needs with dekc ls, read it with dekc show, and write
 budget in this deck's theme.
 ```
 
 ```
-Make a slide like timing in why-dek for this deck's budget section.
-Read it with dek show why-dek timing, write it with this deck's
-theme, then run dek check budget --shot.
+Make a slide like timing in why-dekc for this deck's budget section.
+Read it with dekc show why-dekc timing, write it with this deck's
+theme, then run dekc check budget --shot.
 ```
 
 To hand the whole documentation site to an agent, give it [`/llms.txt`](/llms.txt).

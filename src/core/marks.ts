@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
-import { DekError } from "./error.ts";
+import { DekcError } from "./error.ts";
 import type { ProjectDeck } from "./resolve.ts";
 import { readSourceIfExists, writeInside } from "./safe-fs.ts";
 import type { Section } from "./schema.ts";
@@ -31,7 +31,7 @@ type MarksFile = z.infer<typeof MarksFile>;
 
 /** Where the marks are kept: beside the dev server's lock, out of every deck. */
 export function marksPath(root: string): string {
-  return join(root, ".dek", "marks.json");
+  return join(root, ".dekc", "marks.json");
 }
 
 /**
@@ -59,7 +59,7 @@ export function toggleMark(
 ): { marked: boolean; positions: Position[] } {
   const beat = beatAt(deck.deck.sections, position);
   if (!beat) {
-    throw new DekError(
+    throw new DekcError(
       `no beat ${position.beatIndex} on slide ${position.slideIndex + 1} of deck "${deck.name}"`,
       { hint: "reload the presenter view: the script changed since it opened" },
     );
@@ -184,10 +184,10 @@ function readMarksFile(root: string): MarksFile {
   return parsed.data;
 }
 
-function unreadable(path: string, why: string): DekError {
-  return new DekError(`.dek/marks.json does not read: ${why}`, {
+function unreadable(path: string, why: string): DekcError {
+  return new DekcError(`.dekc/marks.json does not read: ${why}`, {
     path,
-    hint: "delete .dek/marks.json to start over; every deck's marks go with it",
+    hint: "delete .dekc/marks.json to start over; every deck's marks go with it",
   });
 }
 

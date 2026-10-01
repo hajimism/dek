@@ -17,7 +17,7 @@ export async function rehearseCommand(
   );
 }
 
-/** What `dek rehearse` prints once up: the deck in rehearsal, at `slug` when one is named. */
+/** What `dekc rehearse` prints once up: the deck in rehearsal, at `slug` when one is named. */
 export function rehearseSessionView(
   server: Pick<DevServer, "url" | "remoteUrls">,
   password: string | undefined,

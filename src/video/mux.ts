@@ -1,12 +1,12 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DekError } from "../core/error.ts";
+import { DekcError } from "../core/error.ts";
 import { runPiped, workerCommand } from "../core/spawn.ts";
 import type { VideoFrame } from "./recorder.ts";
 
 export function ffmpegResolved(): boolean {
-  if (process.env.DEK_FFMPEG) {
+  if (process.env.DEKC_FFMPEG) {
     return true;
   }
   try {
@@ -18,7 +18,7 @@ export function ffmpegResolved(): boolean {
 }
 
 function ffmpegCommand(args: string[]): string[] {
-  const bin = process.env.DEK_FFMPEG;
+  const bin = process.env.DEKC_FFMPEG;
   if (bin) {
     return workerCommand(bin, args);
   }
@@ -36,21 +36,21 @@ export async function muxVideo(options: {
   timeoutMs?: number;
 }): Promise<string> {
   if (!ffmpegResolved()) {
-    throw new DekError("ffmpeg not found", {
+    throw new DekcError("ffmpeg not found", {
       hint: "install ffmpeg and ensure it is on PATH",
     });
   }
   if (options.frames.length === 0) {
-    throw new DekError("no frames to mux", { hint: "run `dek voice` then `dek video`" });
+    throw new DekcError("no frames to mux", { hint: "run `dekc voice` then `dekc video`" });
   }
-  const dir = mkdtempSync(join(tmpdir(), "dek-mux-"));
+  const dir = mkdtempSync(join(tmpdir(), "dekc-mux-"));
   try {
     const listPath = join(dir, "frames.txt");
     const lines: string[] = [];
     // ffmpeg reads the list line by line; a path with a line break in it would add directives.
     const broken = options.frames.find((frame) => /[\r\n]/.test(frame.path));
     if (broken) {
-      throw new DekError("a frame path holds a line break", {
+      throw new DekcError("a frame path holds a line break", {
         path: broken.path,
         hint: "rename the folder so its name has no line break",
       });
@@ -94,7 +94,7 @@ export async function muxVideo(options: {
       timeoutMs: options.timeoutMs ?? FFMPEG_TIMEOUT_MS,
     });
     if (exitCode !== 0) {
-      throw new DekError("ffmpeg failed", { hint: stderr.slice(0, 200) || "check ffmpeg output" });
+      throw new DekcError("ffmpeg failed", { hint: stderr.slice(0, 200) || "check ffmpeg output" });
     }
     return options.outPath;
   } finally {

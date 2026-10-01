@@ -11,20 +11,20 @@ export function documentLiveHost(): LiveHost {
       }
     },
     setTheme(css) {
-      const el = document.querySelector("style[data-dek-theme]");
+      const el = document.querySelector("style[data-dekc-theme]");
       if (el) {
         el.textContent = css;
       }
     },
     setDiagnostics(text) {
-      let el = document.querySelector(".dek-diagnostics");
+      let el = document.querySelector(".dekc-diagnostics");
       if (!text) {
         el?.remove();
         return;
       }
       if (!el) {
         el = document.createElement("div");
-        el.className = "dek-diagnostics";
+        el.className = "dekc-diagnostics";
         document.body.prepend(el);
       }
       el.textContent = text;
