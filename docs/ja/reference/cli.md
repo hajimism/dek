@@ -1,6 +1,6 @@
 # CLI
 
-`bunx github:hajimism/dekc init` でプロジェクトを作り、その中で `bun add -d github:hajimism/dekc` と dekc を入れます。[はじめる](/ja/guide/getting-started)を参照してください。以下の例では `dekc` と書きますが、実体はそのプロジェクトの中での `bunx dekc`、入れる前なら `bunx github:hajimism/dekc` です。dekc が npm に公開されるまでは、dekc を入れていない場所での `bunx dekc` は失敗します。`bunx dek` と打つと、npm の無関係な `dek` が動きます。
+`bunx dekc init` でプロジェクトを作り、その中で `bun add -d dekc` と dekc を入れます。[はじめる](/ja/guide/getting-started)を参照してください。以下の例では `dekc` と書きますが、実体は `bunx dekc` です。`dek` と打たないでください。`bunx dek` は npm の無関係な `dek` を動かします。
 
 ## 規約
 
@@ -32,7 +32,7 @@
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dekc.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dekc/schema.json`、`.dekc/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dekc sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dekc 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dekc のブロックを足す。既にある `theme.css` も残し、どのデッキもそれをコピーする。そこにどのデッキにも要るトークンが欠けていれば、init は最初の lint がそれを `DEKC015` として報告する前に、標準エラーに挙げる（`--json` では `missingTokens`）。`DEKC015` の hint は dekc 自身のテーマが使う値を示す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dekc new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dekc が入るまでは `bun add -d github:hajimism/dekc` も含める |
+| `dekc init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dekc.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dekc/schema.json`、`.dekc/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dekc sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dekc 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dekc のブロックを足す。既にある `theme.css` も残し、どのデッキもそれをコピーする。そこにどのデッキにも要るトークンが欠けていれば、init は最初の lint がそれを `DEKC015` として報告する前に、標準エラーに挙げる（`--json` では `missingTokens`）。`DEKC015` の hint は dekc 自身のテーマが使う値を示す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dekc new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dekc が入るまでは `bun add -d dekc` も含める |
 | `dekc new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る。sync と同じく dekc 自身のファイルを更新し、更新したものを一覧する（`--json` では `updated`）。次に打つコマンドも表示する（`--json` では `next`） |
 | `dekc ls [deck]` | デッキ一覧、または 1 つの概要。セクション数、枚数、診断、予算、見積もり、Timeline があれば実尺。診断は rumdl を除いた dekc 自身のルールの結果。一覧では各デッキの指摘をその行に、プロジェクトの指摘（`dekc.toml`）を `project` 行と `--json` の最上位の `diagnostics` に 1 回だけ数える |
 

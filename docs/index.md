@@ -29,14 +29,14 @@ features:
 ---
 
 ```bash
-bunx github:hajimism/dekc init my-talks --deck 2026-04-vite
-cd my-talks && bun add -d github:hajimism/dekc
+bunx dekc init my-talks --deck 2026-04-vite
+cd my-talks && bun add -d dekc
 cd decks/2026-04-vite
 $EDITOR script.md   # write what you will say
-bunx dekc            # dev server: skeleton slides, live reload, lint on save
-bunx dekc build      # dist/2026-04-vite.html — the whole talk in one file
+bunx dekc           # dev server: skeleton slides, live reload, lint on save
+bunx dekc build     # dist/2026-04-vite.html — the whole talk in one file
 ```
 
-Type `dekc`, not `dek`: the `dek` package on npm is unrelated. Until dekc is on npm, run `bunx dekc` inside the project.
+Type `dekc`, not `dek`: the `dek` package on npm is unrelated.
 
 You have not written a line of HTML yet, and you can already give the talk. Start with the [Getting Started](/guide/getting-started) guide, or read the [Tutorial](/guide/tutorial) to build a real deck from script to single-file build.

@@ -41,7 +41,7 @@ bun run build          # 各 decks/<deck>/dist/<deck>.html
 
 ## 構成
 
-dekc は `dekc` として `file:..`、つまりこのリポジトリ自身から入り、Playwright と rumdl と並んで sample の `devDependencies` にあります。自分のプロジェクトでは代わりに `bun add -d github:hajimism/dekc` で入れます。
+dekc は `file:..`、つまりこのリポジトリ自身から入り、Playwright と rumdl と並んで sample の `devDependencies` にあります。自分のプロジェクトでは代わりに `bun add -d dekc` で入れます。
 
 `dekc.toml` の `[voice]` は、`dekc new` が新しいデッキへコピーする既定値です。各デッキの実際の設定はそれぞれの `voice/` にあり、`voice.toml` と、ASCII 語の読みを収めた `dict.toml` です。エンジンが止まっていても開発サーバは動き続けます。合成だけが失敗します。
 

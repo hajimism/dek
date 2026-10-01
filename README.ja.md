@@ -20,24 +20,24 @@ dekc は、ビルドシステムがコードを扱うように発表を扱う CL
 
 ## クイックスタート
 
-[Bun](https://bun.sh) 1.4 以上。dekc はまだ npm になく、GitHub から入れます。
+[Bun](https://bun.sh) 1.4 以上。
 
 ```bash
-bunx github:hajimism/dekc init my-talks --deck 2026-04-vite
+bunx dekc init my-talks --deck 2026-04-vite
 cd my-talks
-bun add -d github:hajimism/dekc
+bun add -d dekc
 cd decks/2026-04-vite
 ```
 
 `init` は終わりに同じ手順を表示します。プロジェクトを作るのは最初の一度だけです。dekc をプロジェクトの開発依存に入れたあとは `bunx dekc` で動きます。残るのは 3 手で、ライブ発表ならこれがすべてです。
 
 > [!WARNING]
-> 打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。dekc が npm に公開されるまでは、`bunx dekc` が動くのは dekc を入れたプロジェクトの中だけで、それ以外の場所では失敗します。公開したあとは `bun add -d dekc` が GitHub からのインストールに代わり、`bunx dekc` はどこでも動きます。
+> 打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。
 
 ```bash
 $EDITOR script.md   # 1. 喋ることを書く。時間をかけるのはここ
-bunx dekc            # 2. 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
-bunx dekc build      # 3. dist/2026-04-vite.html — トーク全体がこの 1 ファイル
+bunx dekc           # 2. 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
+bunx dekc build     # 3. dist/2026-04-vite.html — トーク全体がこの 1 ファイル
 ```
 
 台本を書いて `dekc` を叩けば、HTML を一行も書かずに同梱テーマで発表できます。

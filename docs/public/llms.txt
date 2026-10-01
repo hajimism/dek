@@ -6,7 +6,7 @@ Site: https://hajimism.github.io/dekc/
 Japanese: https://hajimism.github.io/dekc/ja/
 Repo: https://github.com/hajimism/dekc
 
-Install dekc into the project with `bun add -d github:hajimism/dekc` and run it as `bunx dekc` from inside it; the command is `dekc`, not `dek`: `dek` on npm is an unrelated package, which `bunx dek` downloads and runs.
+Install dekc into the project with `bun add -d dekc` and run it as `bunx dekc`; the command is `dekc`, not `dek`: `dek` on npm is an unrelated package, which `bunx dek` downloads and runs.
 
 Agents use the same CLI as humans. Run `dekc help --agent`, or `dekc help <command>` for one command's flags. Result commands accept `--json`: branch on `ok`; every `"ok": false` carries `error` (`message`, `hint`, optional `path`/`line`), and lint, check, build, ls, and cues always carry `diagnostics` (with `line`/`column` and `data`). A check that did not run is in `skipped` with its `reason` and `hint`. 0.x: the JSON shape and DEKC ids may change; DEKC ids are never reused. Diagnostics: `dekc lint --format sarif`. Do not parse human-oriented text output.
 

@@ -9,9 +9,9 @@ You need [Bun](https://bun.sh) 1.4 or later. Voice, video, and Playwright are no
 ## 1. Create the project
 
 ```bash
-bunx github:hajimism/dekc init lightning --deck postmortem
+bunx dekc init lightning --deck postmortem
 cd lightning
-bun add -d github:hajimism/dekc
+bun add -d dekc
 cd decks/postmortem
 ```
 

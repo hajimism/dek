@@ -2,11 +2,11 @@
 
 ## どうやって入れますか
 
-dekc はまだ npm にありません。`bunx github:hajimism/dekc init` で GitHub から直接プロジェクトを作り、その中で `bun add -d github:hajimism/dekc` と入れてから `bunx dekc` を使います。公開後は `bun add -d dekc` で入ります。手順は[はじめる](./getting-started)にあります。
+`bunx dekc init` でプロジェクトを作り、その中で `bun add -d dekc` と入れてから `bunx dekc` を使います。手順は[はじめる](./getting-started)にあります。
 
 ## `bunx dek` で別のものが動きます
 
-コマンドは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。dekc が npm に公開されるまでは、`bunx dekc` は dekc を入れたプロジェクトの中で使い、それ以外の場所では `bunx github:hajimism/dekc` を使ってください。
+コマンドは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。
 
 ## Slidev を使うべきなのはどんなときですか
 

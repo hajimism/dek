@@ -40,18 +40,18 @@ describe("initCommand", () => {
     await withTempDir(async (dir) => {
       expect(initCommand({ cwd: dir, dir: "my-talks", deck: "demo" }).next).toEqual([
         "cd my-talks",
-        "bun add -d github:hajimism/dekc",
+        "bun add -d dekc",
         "cd decks/demo",
         "$EDITOR script.md",
         "bunx dekc",
       ]);
       expect(initCommand({ cwd: dir, dir: "bare" }).next).toEqual([
         "cd bare",
-        "bun add -d github:hajimism/dekc",
+        "bun add -d dekc",
         "bunx dekc new <name>",
       ]);
       expect(initCommand({ cwd: join(dir, "bare") }).next).toEqual([
-        "bun add -d github:hajimism/dekc",
+        "bun add -d dekc",
         "bunx dekc new <name>",
       ]);
     });
@@ -82,7 +82,7 @@ describe("initCommand", () => {
     await withTempDir(async (dir) => {
       expect(initCommand({ cwd: dir, dir: "My Talks", deck: "it's" }).next).toEqual([
         "cd 'My Talks'",
-        "bun add -d github:hajimism/dekc",
+        "bun add -d dekc",
         "cd 'decks/it'\\''s'",
         "$EDITOR script.md",
         "bunx dekc",

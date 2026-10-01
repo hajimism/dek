@@ -64,8 +64,8 @@ disable = ["MD041"]
 `;
 }
 
-/** How to install dekc into a project, until it is published to npm as `dekc`. */
-const INSTALL_DEKC = "bun add -d github:hajimism/dekc";
+/** How to install dekc into a project. */
+const INSTALL_DEKC = "bun add -d dekc";
 
 /**
  * The starter script: short, but a real talk, so the first `dekc ls` already

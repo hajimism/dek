@@ -29,14 +29,14 @@ features:
 ---
 
 ```bash
-bunx github:hajimism/dekc init my-talks --deck 2026-04-vite
-cd my-talks && bun add -d github:hajimism/dekc
+bunx dekc init my-talks --deck 2026-04-vite
+cd my-talks && bun add -d dekc
 cd decks/2026-04-vite
 $EDITOR script.md   # 喋ることを書く
-bunx dekc            # 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
-bunx dekc build      # dist/2026-04-vite.html — トーク全体がこの 1 ファイル
+bunx dekc           # 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
+bunx dekc build     # dist/2026-04-vite.html — トーク全体がこの 1 ファイル
 ```
 
-打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージです。dekc が npm に公開されるまでは、`bunx dekc` はプロジェクトの中で実行してください。
+打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージです。
 
 HTML はまだ一行も書いていません。それでもう発表できます。まずは[はじめる](/ja/guide/getting-started)から。台本から単一ファイルのビルドまでを通しで体験するなら[チュートリアル](/ja/guide/tutorial)へ。

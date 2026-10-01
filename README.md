@@ -20,24 +20,24 @@ The three principles and the comparison with Slidev are in [Why dekc](https://ha
 
 ## Quick start
 
-[Bun](https://bun.sh) 1.4 or later. dekc is not on npm yet; it installs from GitHub.
+[Bun](https://bun.sh) 1.4 or later.
 
 ```bash
-bunx github:hajimism/dekc init my-talks --deck 2026-04-vite
+bunx dekc init my-talks --deck 2026-04-vite
 cd my-talks
-bun add -d github:hajimism/dekc
+bun add -d dekc
 cd decks/2026-04-vite
 ```
 
 `init` prints these same steps as it finishes. You create the project once. Once dekc is a dev dependency of the project, `bunx dekc` runs it. Three commands remain, and for a live talk that is all there is.
 
 > [!WARNING]
-> Type `dekc`, not `dek`: `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Until dekc is on npm, `bunx dekc` runs dekc only inside a project that has it installed, and fails anywhere else. Once it is on npm, `bun add -d dekc` replaces the GitHub install and `bunx dekc` works anywhere.
+> Type `dekc`, not `dek`: `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it.
 
 ```bash
 $EDITOR script.md   # 1. write what you will say — spend your time here
-bunx dekc            # 2. dev server: skeleton slides, live reload, lint on save
-bunx dekc build      # 3. dist/2026-04-vite.html — the whole talk in one file
+bunx dekc           # 2. dev server: skeleton slides, live reload, lint on save
+bunx dekc build     # 3. dist/2026-04-vite.html — the whole talk in one file
 ```
 
 Write the script, run `dekc`, and you can present with the bundled theme without writing a line of HTML.
