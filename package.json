@@ -1,6 +1,6 @@
 {
   "name": "@hajimism/dek",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A build system for talks.",
   "license": "MIT",
   "author": "Hajime Nakagawa (https://github.com/hajimism)",
