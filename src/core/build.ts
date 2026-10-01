@@ -49,7 +49,6 @@ export async function buildDeck(
     removeInside(imagePath, project.root);
   }
   const html = renderDeckDocument(deck, {
-    config,
     playerScript: options.playerScript,
     target: {
       kind: "build",

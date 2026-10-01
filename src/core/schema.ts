@@ -52,6 +52,25 @@ export function inferLang(text: string): string {
   return "en";
 }
 
+/**
+ * How a deck is judged: the theme's class budget and the speaking rate the estimate reads. A deck
+ * owns them in its frontmatter, so a project that changes later leaves a finished talk as it was;
+ * dek.toml may set the same keys, and `dekc new` copies them into the deck it makes.
+ */
+export const DeckSettings = z.object({
+  max_classes: z.number().describe("The most classes theme.css may define (DEK013)."),
+  cjk_per_minute: z.number().describe("Speaking rate for CJK text, in characters a minute."),
+  latin_per_minute: z.number().describe("Speaking rate for other text, in words a minute."),
+});
+
+export type DeckSettings = z.infer<typeof DeckSettings>;
+
+export const DECK_SETTING_DEFAULTS: DeckSettings = {
+  max_classes: 40,
+  cjk_per_minute: 300,
+  latin_per_minute: 130,
+};
+
 /** Frontmatter fields written to `.dek/schema.json` for yaml-language-server. */
 export const Frontmatter = z.object({
   title: z.string(),
@@ -68,6 +87,11 @@ export const Frontmatter = z.object({
   ratio: z.enum(["16:9", "4:3"]).default("16:9"),
   lang: Lang.optional().describe(
     "BCP 47 tag for the page. Omit it to follow the script: kana → ja, Hangul → ko, Han → zh, else en.",
+  ),
+  max_classes: DeckSettings.shape.max_classes.default(DECK_SETTING_DEFAULTS.max_classes),
+  cjk_per_minute: DeckSettings.shape.cjk_per_minute.default(DECK_SETTING_DEFAULTS.cjk_per_minute),
+  latin_per_minute: DeckSettings.shape.latin_per_minute.default(
+    DECK_SETTING_DEFAULTS.latin_per_minute,
   ),
 });
 

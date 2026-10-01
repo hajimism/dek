@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
-import { loadConfig } from "../../src/core/config.ts";
 import { renderDeckDocument, renderDeckHtml, renderRailHtml } from "../../src/core/document.ts";
 import { extractSlideSection, htmlShell, stampSlide } from "../../src/core/html.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
@@ -192,9 +191,8 @@ describe("renderDeckDocument", () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const { project, deck } = resolveDeck(join(root, "decks", "demo"));
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
         const html = renderDeckDocument(deck, {
-          config: loadConfig(project.configPath),
           playerScript: "/* injected-player */",
           target: { kind: "build" },
         });
@@ -223,9 +221,8 @@ hello
         ],
       },
       async (root) => {
-        const { project, deck } = resolveDeck(join(root, "decks", "demo"));
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
         const html = renderDeckDocument(deck, {
-          config: loadConfig(project.configPath),
           playerScript: "",
           target: { kind: "build" },
         });
@@ -247,9 +244,8 @@ hello
         ],
       },
       async (root) => {
-        const { project, deck } = resolveDeck(join(root, "decks", "demo"));
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
         const html = renderDeckDocument(deck, {
-          config: loadConfig(project.configPath),
           playerScript: "",
           target: { kind: "build" },
         });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_CONFIG } from "../../src/core/config.ts";
+import { DECK_SETTING_DEFAULTS } from "../../src/core/schema.ts";
 import {
   formatClock,
   formatSectionScript,
@@ -39,14 +39,13 @@ describe("formatClock", () => {
 
 describe("sectionTiming", () => {
   test("estimates CJK at 300 chars/min and latin at 130 words/min without a budget", () => {
-    const rows = sectionTiming(
-      [
+    const rows = sectionTiming({
+      ...DECK_SETTING_DEFAULTS,
+      sections: [
         { slug: "intro", body: "あいうえお", beats: [] },
         { slug: "architecture", body: "a b c d e f g h i j k l m", beats: [] },
       ],
-      undefined,
-      DEFAULT_CONFIG,
-    );
+    });
     expect(rows).toEqual([
       { slug: "intro", estimateSeconds: 1 },
       { slug: "architecture", estimateSeconds: 6 },
@@ -54,17 +53,32 @@ describe("sectionTiming", () => {
   });
 
   test("ignores blockquotes and splits duration by character count", () => {
-    const rows = sectionTiming(
-      [
+    const rows = sectionTiming({
+      ...DECK_SETTING_DEFAULTS,
+      duration: "10m",
+      sections: [
         { slug: "intro", body: "あいうえお\n\n> これは数えない", beats: [] },
         { slug: "architecture", body: "かきくけこさしすせそ", beats: [] },
       ],
-      "10m",
-      DEFAULT_CONFIG,
-    );
+    });
     expect(rows).toEqual([
       { slug: "intro", estimateSeconds: 1, budgetSeconds: 200 },
       { slug: "architecture", estimateSeconds: 2, budgetSeconds: 400 },
+    ]);
+  });
+
+  test("reads the deck's own speaking rate", () => {
+    const rows = sectionTiming({
+      cjk_per_minute: 5,
+      latin_per_minute: 13,
+      sections: [
+        { slug: "intro", body: "あいうえお", beats: [] },
+        { slug: "architecture", body: "a b c d e f g h i j k l m", beats: [] },
+      ],
+    });
+    expect(rows).toEqual([
+      { slug: "intro", estimateSeconds: 60 },
+      { slug: "architecture", estimateSeconds: 60 },
     ]);
   });
 });

@@ -6,7 +6,7 @@ A **project** holds many **decks**. This page explains the boundary between the 
 
 ```
 my-talks/                       # project (dekc init)
-├── dek.toml                    # lint thresholds, speaking rate, voice defaults
+├── dek.toml                    # seeds for new decks: class budget, speaking rate, voice
 ├── .gitignore                  # dist/, .cache/, .dek/server.json, refs/
 ├── .rumdl.toml                 # Markdown rules for script.md
 ├── theme.css                   # the starting point for new decks
@@ -50,7 +50,7 @@ cp decks/2026-09-dek/theme.css theme.css
 
 Your past decks are a theme library you never have to maintain.
 
-The same rule applies to `assets/` and to voice. The project's `assets/` holds source material; a deck copies what it uses into its own `assets/`. When `dek.toml` has a `[voice]` table, `dekc new` copies it into the deck as `voice/voice.toml`, so changing the speaker in September leaves April's narration alone.
+The same rule applies to `assets/` and to voice. The project's `assets/` holds source material; a deck copies what it uses into its own `assets/`. When `dek.toml` has a `[voice]` table, `dekc new` copies it into the deck as `voice/voice.toml`, so changing the speaker in September leaves April's narration alone. The class budget and the speaking rate in `dek.toml` go the same way, into the new deck's frontmatter, so a stricter `max_classes` in September does not fail April's deck.
 
 ## Other people's decks are read, not borrowed
 

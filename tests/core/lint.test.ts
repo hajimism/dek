@@ -309,8 +309,40 @@ describe("lintDeck", () => {
             message: "unknown key venue in the frontmatter; dek ignores it",
             path: script,
             line: 4,
-            hint: "the keys are title, description, event, date, duration, ratio, lang; see https://hajimism.github.io/dek/reference/config.html#frontmatter",
+            hint: "the keys are title, description, event, date, duration, ratio, lang, max_classes, cjk_per_minute, latin_per_minute; see https://hajimism.github.io/dek/reference/config.html#frontmatter",
             data: { file: "frontmatter", key: "venue" },
+          },
+        ]);
+      },
+    );
+  });
+
+  // dek.toml only seeds `dekc new`, so a deck made before it, or without the key, does not
+  // follow it. Said once per key the deck leaves out, where the deck would keep it.
+  test("DEK008: a dek.toml setting a deck leaves out is a warning that names the line to add", async () => {
+    await withTempProject(
+      {
+        toml: "max_classes = 50\ncjk_per_minute = 300\nlatin_per_minute = 150\n",
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\nlatin_per_minute: 140\n---\n\n## intro\n\nhello\n",
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK008");
+        // cjk_per_minute is the default and latin_per_minute is the deck's own: neither changes.
+        expect(found).toEqual([
+          {
+            id: "DEK008",
+            severity: "warning",
+            message: "dek.toml sets max_classes = 50, which this deck does not follow; it uses 40",
+            path: join(root, "decks", "demo", "script.md"),
+            line: 4,
+            hint: "to keep 50, add `max_classes: 50` to the frontmatter; dek.toml only seeds `dekc new`",
+            data: { file: "frontmatter", key: "max_classes", value: 50 },
           },
         ]);
       },
@@ -897,7 +929,28 @@ ${body}
     );
   });
 
-  test("DEK013: max_classes in dek.toml raises the limit", async () => {
+  test("DEK013: max_classes in the frontmatter raises the limit", async () => {
+    const classes = Array.from({ length: 41 }, (_, i) => `.slide .c${i} {}`).join("\n");
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\nmax_classes: 50\n---\n\n## intro\n\nhello\n",
+            theme: `.slide {}\n${classes}\n`,
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        expect(diagnostics.some((d) => d.id === "DEK013")).toBe(false);
+      },
+    );
+  });
+
+  // A deck owns its limit: changing dek.toml later must not pass or fail a finished deck.
+  test("DEK013: max_classes in dek.toml leaves a deck's limit alone", async () => {
     const classes = Array.from({ length: 41 }, (_, i) => `.slide .c${i} {}`).join("\n");
     await withTempProject(
       {
@@ -911,8 +964,8 @@ ${body}
         ],
       },
       async (root) => {
-        const diagnostics = lintDeck(join(root, "decks", "demo"));
-        expect(diagnostics.some((d) => d.id === "DEK013")).toBe(false);
+        const found = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK013");
+        expect(found?.data).toMatchObject({ limit: 40 });
       },
     );
   });
@@ -2175,12 +2228,12 @@ describe("every diagnostic that names a value carries it in data", () => {
   test("structure, theme, and script rules expose what their messages say", async () => {
     await withTempProject(
       {
-        toml: "max_classes = 1\n",
         decks: [
           {
             name: "demo",
             script: `---
 title: Demo
+max_classes: 1
 ---
 
 ## intro

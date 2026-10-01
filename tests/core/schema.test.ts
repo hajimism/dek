@@ -13,8 +13,14 @@ describe("Id", () => {
 });
 
 describe("Frontmatter", () => {
-  test("defaults ratio to 16:9 and leaves lang for the script to decide", () => {
-    expect(Frontmatter.parse({ title: "Talk" })).toEqual({ title: "Talk", ratio: "16:9" });
+  test("defaults ratio to 16:9 and the deck settings, and leaves lang for the script to decide", () => {
+    expect(Frontmatter.parse({ title: "Talk" })).toEqual({
+      title: "Talk",
+      ratio: "16:9",
+      max_classes: 40,
+      cjk_per_minute: 300,
+      latin_per_minute: 130,
+    });
   });
 
   test("accepts a BCP 47 language tag", () => {

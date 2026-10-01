@@ -1,17 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DEFAULT_CONFIG, loadConfig, parseDekToml } from "../../src/core/config.ts";
+import { loadConfig, parseDekToml } from "../../src/core/config.ts";
 import { unknownFrontmatterKeys } from "../../src/core/config-keys.ts";
 import { DekError } from "../../src/core/error.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 describe("parseDekToml", () => {
-  test("returns defaults for comments-only input", () => {
-    expect(parseDekToml("# dek project\n")).toEqual(DEFAULT_CONFIG);
+  test("reads nothing from comments-only input", () => {
+    expect(parseDekToml("# dek project\n")).toEqual({});
   });
 
-  test("reads the three known keys", () => {
+  // A deck reads these from its own frontmatter; dek.toml holds them for `dekc new` to copy.
+  test("reads the deck settings as the seed for a new deck", () => {
     expect(
       parseDekToml(`
 max_classes = 12
@@ -19,18 +20,12 @@ cjk_per_minute = 250
 latin_per_minute = 100
 `),
     ).toEqual({
-      maxClasses: 12,
-      cjkPerMinute: 250,
-      latinPerMinute: 100,
+      seed: { max_classes: 12, cjk_per_minute: 250, latin_per_minute: 100 },
     });
   });
 
-  test("ignores unknown keys and fills missing ones from defaults", () => {
-    expect(parseDekToml("max_classes = 8\nunknown = 1\n")).toEqual({
-      maxClasses: 8,
-      cjkPerMinute: DEFAULT_CONFIG.cjkPerMinute,
-      latinPerMinute: DEFAULT_CONFIG.latinPerMinute,
-    });
+  test("ignores unknown keys and seeds only the settings it sets", () => {
+    expect(parseDekToml("max_classes = 8\nunknown = 1\n")).toEqual({ seed: { max_classes: 8 } });
   });
 
   test("throws DekError for invalid TOML", () => {
@@ -77,19 +72,15 @@ describe("url", () => {
 });
 
 describe("loadConfig", () => {
-  test("returns defaults when the file is missing", () => {
-    expect(loadConfig("/tmp/dek-missing-config.toml")).toEqual(DEFAULT_CONFIG);
+  test("reads nothing when the file is missing", () => {
+    expect(loadConfig("/tmp/dek-missing-config.toml")).toEqual({});
   });
 
   test("reads dek.toml from disk", async () => {
     await withTempDir(async (dir) => {
       const path = join(dir, "dek.toml");
       await writeFile(path, "cjk_per_minute = 200\n");
-      expect(loadConfig(path)).toEqual({
-        maxClasses: DEFAULT_CONFIG.maxClasses,
-        cjkPerMinute: 200,
-        latinPerMinute: DEFAULT_CONFIG.latinPerMinute,
-      });
+      expect(loadConfig(path)).toEqual({ seed: { cjk_per_minute: 200 } });
     });
   });
 });
@@ -120,5 +111,11 @@ describe("unknownFrontmatterKeys", () => {
 
   test("reads every key the schema knows as known", () => {
     expect(unknownFrontmatterKeys("title: Demo\nratio: 4:3\nlang: en\n", 2)).toEqual([]);
+    expect(
+      unknownFrontmatterKeys(
+        "title: Demo\nmax_classes: 30\ncjk_per_minute: 280\nlatin_per_minute: 120\n",
+        2,
+      ),
+    ).toEqual([]);
   });
 });

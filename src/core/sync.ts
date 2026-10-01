@@ -252,7 +252,7 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - One \`##\` heading is one slide. HTML lives in \`slides/<id>.html\`.
 - Each deck owns its \`theme.css\`. Before writing a slide, run \`dekc theme\` in the deck for the classes, tokens, and layouts it defines, and \`dekc theme <layout>\` for a layout's markup.
 - Shared look lives in \`theme.css\`. Decoration only one slide uses lives in \`slides/<id>.css\`, which is scoped to that slide.
-- Use only classes defined in \`theme.css\` or in that slide's own \`slides/<id>.css\`. The theme holds at most \`max_classes\` in \`dek.toml\`, 40 by default (\`DEK013\`); classes in \`slides/<id>.css\` do not count, so keep a class only one slide uses there.
+- Use only classes defined in \`theme.css\` or in that slide's own \`slides/<id>.css\`. The theme holds at most \`max_classes\` in the frontmatter of \`script.md\`, 40 by default (\`DEK013\`); classes in \`slides/<id>.css\` do not count, so keep a class only one slide uses there.
 - A rule in \`slides/<id>.css\` weighs as if it were written at the end of \`theme.css\`: it beats the theme's \`.slide .x\`, but not a more specific rule such as a layout's \`.slide[data-layout="split"] .x\` or the beat state \`.slide.is-current [data-step]\`. To override one of those, write the same selector.
 - Color, type, space, radius, and motion in either stylesheet use token \`var()\` only. A value only one slide uses can be a token of its own on that slide's \`.slide\` rule in \`slides/<id>.css\`.
 - Do not add \`<style>\`, \`style=\`, \`<script>\`, event handler attributes (\`onclick=\` and the like), or \`javascript:\` URLs inside slide HTML.

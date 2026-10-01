@@ -23,12 +23,12 @@ lint がワークフローにどう組み込まれるかは [Lint](/ja/guide/lin
 | `DEK005` | `slide` | 同じ枚に `data-morph` 名が重複、または予約された名前（`slide`、`root`、`none`、`auto`、`match-element`） | — |
 | `DEK006` | `slide` | `data-slug` がセクション id と一致しない | — |
 | `DEK007` | `slide` | `slides/` のファイルに `<section class="slide">` がなく、何も描かれない | — |
-| `DEK008` | `project`, `deck` | `dek.toml`（`voice = { … }` のようなインラインテーブルも含む）や frontmatter にある、dek が読まないキー。hint がおそらく意図したキーを示す。警告 | — |
+| `DEK008` | `project`, `deck` | `dek.toml`（`voice = { … }` のようなインラインテーブルも含む）や frontmatter にある、dek が読まないキー。または `dek.toml` が設定しているのにデッキが持たず、従っていないデッキ設定。hint がおそらく意図したキー、または frontmatter に足す行を示す。警告 | — |
 | `DEK009` | `slide` | `slides/` の 1 ファイルに `<section class="slide">` が 2 つ以上ある。表示されるのは最初の 1 つだけ | — |
 | `DEK010` | `slide` | テーマにも、その枚のスタイルシートにも定義のないクラス | — |
 | `DEK011` | `slide` | スライド内の `<style>`、`style=`、`<script>`、スライドの中の `<link>`（完全な文書の head にあるものは head ごと捨てられる）、イベントハンドラ属性（`onclick=` など）、スクリプトが動く URL（`javascript:`、`vbscript:`、HTML を入れた `data:`、`<iframe>` や `<object>` に入れた SVG） | — |
 | `DEK012` | `deck`, `slide` | テーマに `.slide` の下にないセレクタ（トップレベルでも、`@media` などのアットルールの中でも。`.slide` のルールに入れ子にしたルールはその下にある）、またはスライドのスタイルシートにスライドの外まで届くルール（`::view-transition-*`、`:root`、`html`、`body`、`.slide` から `~` や `+` で兄弟へ進むもの、ページ全体に何かを登録するアットルール `@font-face`・`@import`・`@property`・`@counter-style`・`@page`・`@font-palette-values`・`@font-feature-values`）。どの指摘も行番号と、そのルールを置くべき場所を示す | — |
-| `DEK013` | `deck` | テーマのクラス数が `max_classes`（既定 40）を超過 | — |
+| `DEK013` | `deck` | テーマのクラス数が frontmatter の `max_classes`（既定 40）を超過 | — |
 | `DEK014` | `deck`, `slide` | トークンの外に書いた生のデザインの値。色（16 進、関数、色名、システムカラー）、フォントファミリー（`font-family` でも `font` ショートハンドでも）、絶対・ビューポート・コンテナ・ルート基準の単位の長さ、時間、書き下したイージング。テーマでもスライドのスタイルシートでも、入れ子のルールも含む。カスタムプロパティがトークンになるのは、トークンを置く場所、つまり `.slide` かビュー遷移の上だけ。`content: "#fff"` のような文字列はテキストで、値ではない。スライドの表示属性（`fill`、`stroke`、`color`、`stop-color`、`font-family`、`<font face>`、`bgcolor`）に書いた生の色やファミリーも対象。属性は `var()` を取れないので、hint は `slides/<id>.css` へ移すよう案内する。`fill="none"` と `currentColor` は通る | — |
 | `DEK015` | `deck` | 必須トークンが `.slide` に無い | — |
 | `DEK016` | `slide` | 動かせないスライドのスクリプト。import、名前付き export、default export がないかオブジェクトでない、関数でない `draw`、構文エラー、トップレベルの await や例外、スライドのビートにない `motion` のキーや 0 以上のミリ秒でない値、終わらないトップレベル、`.ts` ではなく `.js` で置かれたスクリプト | — |

@@ -290,6 +290,6 @@ function themeScopeHint(selector: string): string {
 /** The theme's own findings, or DEK018 when there is no theme. */
 export function themeDiagnostics(ctx: LintContext): Diagnostic[] {
   return ctx.theme
-    ? lintTheme(ctx.theme, { maxClasses: ctx.config.maxClasses, deckDir: ctx.deck.dir })
+    ? lintTheme(ctx.theme, { maxClasses: ctx.deck.deck.max_classes, deckDir: ctx.deck.dir })
     : [missingThemeDiagnostic(ctx)];
 }

@@ -1,4 +1,4 @@
-import type { DekConfig } from "./config.ts";
+import type { Deck } from "./schema.ts";
 
 type SectionBodies = {
   body: string;
@@ -28,14 +28,23 @@ function speechChars(text: string): number {
   return stripBlockquotes(text).replace(/\s+/g, "").length;
 }
 
-function estimateSeconds(text: string, config: DekConfig): number {
+/** The rate a deck is spoken at, from its own frontmatter. */
+type SpeakingRate = Pick<Deck, "cjk_per_minute" | "latin_per_minute">;
+
+/** What timing reads of a deck: its sections, its budget, and the rate it is spoken at. */
+type TimedDeck = SpeakingRate & {
+  sections: Array<{ slug: string } & SectionBodies>;
+  duration?: string | undefined;
+};
+
+function estimateSeconds(text: string, rate: SpeakingRate): number {
   const stripped = stripBlockquotes(text);
   const cjk = [...stripped.matchAll(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu)]
     .length;
   const rest = stripped.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu, " ");
   const words = rest.split(/\s+/).filter(Boolean).length;
-  const cjkMinutes = config.cjkPerMinute > 0 ? cjk / config.cjkPerMinute : 0;
-  const latinMinutes = config.latinPerMinute > 0 ? words / config.latinPerMinute : 0;
+  const cjkMinutes = rate.cjk_per_minute > 0 ? cjk / rate.cjk_per_minute : 0;
+  const latinMinutes = rate.latin_per_minute > 0 ? words / rate.latin_per_minute : 0;
   return Math.round((cjkMinutes + latinMinutes) * 60);
 }
 
@@ -62,21 +71,17 @@ export type TimedSection = {
   budgetSeconds?: number;
 };
 
-export function sectionTiming(
-  sections: Array<{ slug: string; body: string; beats: Array<{ body: string }> }>,
-  duration: string | undefined,
-  config: DekConfig,
-): TimedSection[] {
-  const rows = sections.map((section) => {
+export function sectionTiming(deck: TimedDeck): TimedSection[] {
+  const rows = deck.sections.map((section) => {
     const text = speechText(section);
     return {
       slug: section.slug,
       chars: speechChars(text),
-      estimateSeconds: estimateSeconds(text, config),
+      estimateSeconds: estimateSeconds(text, deck),
     };
   });
   const totalChars = rows.reduce((sum, row) => sum + row.chars, 0);
-  const durationSeconds = parseDurationSeconds(duration);
+  const durationSeconds = parseDurationSeconds(deck.duration);
 
   return rows.map((row) => ({
     slug: row.slug,

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { parsePublicUrl } from "./ogp.ts";
 import { isPinnedRev, isPlainRefName } from "./ref-name.ts";
+import { DeckSettings } from "./schema.ts";
 import { parseTomlWith } from "./zod.ts";
 
 export const Voice = z.object({
@@ -18,9 +19,7 @@ export const DekToml = z.object({
         "write the absolute http(s) URL dist/ is served from, like https://example.com/talks/",
     })
     .optional(),
-  max_classes: z.number().optional(),
-  cjk_per_minute: z.number().optional(),
-  latin_per_minute: z.number().optional(),
+  ...DeckSettings.partial().shape,
   voice: Voice.optional(),
   refs: z
     .record(z.string(), z.string())
@@ -49,18 +48,14 @@ type VoiceDefaults = {
 export type DekConfig = {
   /** Where dist/ is served from, ending in a slash; link previews need it for og:image. */
   url?: string;
-  maxClasses: number;
-  cjkPerMinute: number;
-  latinPerMinute: number;
+  /**
+   * The deck settings `dekc new` writes into a new deck's frontmatter. Nothing else reads them: a
+   * deck is judged by its own, so changing dek.toml leaves the decks already made as they were.
+   */
+  seed?: Partial<DeckSettings>;
   voice?: VoiceDefaults;
   /** `[refs]`: each ref name and the commit it is pinned to. */
   refs?: Record<string, string>;
-};
-
-export const DEFAULT_CONFIG: DekConfig = {
-  maxClasses: 40,
-  cjkPerMinute: 300,
-  latinPerMinute: 130,
 };
 
 export function parseDekToml(source: string, path?: string): DekConfig {
@@ -77,11 +72,10 @@ export function parseDekToml(source: string, path?: string): DekConfig {
       }
     : undefined;
   const url = data.url === undefined ? undefined : parsePublicUrl(data.url);
+  const seed = DeckSettings.partial().parse(data);
   return {
     ...(url ? { url } : {}),
-    maxClasses: data.max_classes ?? DEFAULT_CONFIG.maxClasses,
-    cjkPerMinute: data.cjk_per_minute ?? DEFAULT_CONFIG.cjkPerMinute,
-    latinPerMinute: data.latin_per_minute ?? DEFAULT_CONFIG.latinPerMinute,
+    ...(Object.keys(seed).length > 0 ? { seed } : {}),
     ...(voice ? { voice } : {}),
     ...(data.refs && Object.keys(data.refs).length > 0 ? { refs: data.refs } : {}),
   };
@@ -89,7 +83,7 @@ export function parseDekToml(source: string, path?: string): DekConfig {
 
 export function loadConfig(configPath: string): DekConfig {
   if (!existsSync(configPath)) {
-    return { ...DEFAULT_CONFIG };
+    return {};
   }
   return parseDekToml(readFileSync(configPath, "utf8"), configPath);
 }

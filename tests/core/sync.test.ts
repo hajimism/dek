@@ -574,7 +574,9 @@ c
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       syncDeck(join(root, "decks", "demo"));
       const agents = await readFile(join(root, "AGENTS.md"), "utf8");
-      expect(agents).toContain("`max_classes` in `dek.toml`, 40 by default (`DEK013`)");
+      expect(agents).toContain(
+        "`max_classes` in the frontmatter of `script.md`, 40 by default (`DEK013`)",
+      );
       expect(agents).toContain("as if it were written at the end of `theme.css`");
       expect(agents).toContain('`.slide[data-layout="split"] .x`');
       expect(agents).toContain("Never reuse a shot's path from before an edit");

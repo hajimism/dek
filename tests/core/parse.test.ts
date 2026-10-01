@@ -23,6 +23,9 @@ describe("parseScript", () => {
     expect(deck.duration).toBe("20m");
     expect(deck.ratio).toBe("16:9");
     expect(deck.lang).toBe("ja");
+    expect(deck.max_classes).toBe(40);
+    expect(deck.cjk_per_minute).toBe(300);
+    expect(deck.latin_per_minute).toBe(130);
     expect(deck.sections).toHaveLength(3);
 
     const intro = deck.sections[0];

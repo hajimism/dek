@@ -48,8 +48,9 @@ export function newCommand(options: { cwd: string; name: string; themeFrom?: str
   }
 
   const theme = readFileSync(themeSource, "utf8");
-  const voice = loadConfig(project.configPath).voice;
-  const { created } = applyPlan(deckPlan(project.root, name, theme, voice));
+  const { created } = applyPlan(
+    deckPlan(project.root, name, theme, loadConfig(project.configPath)),
+  );
   // As sync would. AGENTS.md and .dek/ follow the project theme and dek, so they change here
   // only when either moved on since the last command that wrote them: say which.
   const synced = syncDeck(dir);

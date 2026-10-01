@@ -1,4 +1,3 @@
-import type { DekConfig } from "../config.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import type { ProjectDeck } from "../resolve.ts";
 import type { Timeline } from "../timeline.ts";
@@ -13,7 +12,7 @@ const ESTIMATE_DRIFT_RATIO = 0.35;
 /** DEK041 against the voice timeline when there is one, else against the reading-time estimate. */
 export function timingDiagnostics(ctx: LintContext): Diagnostic[] {
   const timeline = tryLoadCachedTimeline(ctx.deck.dir);
-  return timeline ? lintDuration(ctx.deck, timeline) : lintEstimate(ctx.deck, ctx.config);
+  return timeline ? lintDuration(ctx.deck, timeline) : lintEstimate(ctx.deck);
 }
 
 function lintDuration(deck: ProjectDeck, timeline: Timeline): Diagnostic[] {
@@ -37,15 +36,12 @@ function lintDuration(deck: ProjectDeck, timeline: Timeline): Diagnostic[] {
 }
 
 /** DEK041 before any voice: the reading-time estimate `dekc ls` shows, against the budget. */
-function lintEstimate(deck: ProjectDeck, config: DekConfig): Diagnostic[] {
+function lintEstimate(deck: ProjectDeck): Diagnostic[] {
   const budget = parseDurationSeconds(deck.deck.duration);
   if (budget === undefined || budget <= 0) {
     return [];
   }
-  const estimate = sectionTiming(deck.deck.sections, deck.deck.duration, config).reduce(
-    (sum, row) => sum + row.estimateSeconds,
-    0,
-  );
+  const estimate = sectionTiming(deck.deck).reduce((sum, row) => sum + row.estimateSeconds, 0);
   if (Math.abs(estimate - budget) / budget < ESTIMATE_DRIFT_RATIO) {
     return [];
   }

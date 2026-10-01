@@ -66,15 +66,17 @@ speed = 1.0
 | キー | 既定 | 役割 |
 | --- | --- | --- |
 | `url` | なし | `dist/` を公開する http(s) の絶対 URL。あれば `dekc build` が `og:url` と 1 枚目のスライドの `og:image` を書く。`--url` が優先される。[Web で公開する](/ja/guide/present#web-で公開する)を参照 |
-| `max_classes` | `40` | `DEK013` の上限 |
-| `cjk_per_minute` | `300` | CJK テキストの話速（字/分） |
-| `latin_per_minute` | `130` | それ以外のテキストの話速（語/分） |
+| `max_classes` | なし | 新しいデッキの `max_classes` の初期値。[frontmatter](#frontmatter) を参照 |
+| `cjk_per_minute` | なし | 新しいデッキの `cjk_per_minute` の初期値 |
+| `latin_per_minute` | なし | 新しいデッキの `latin_per_minute` の初期値 |
 | `voice.engine` | `"voicevox"` | エンジン名（`voicevox`、`aivis`、`coeiroink`、`sharevox`）、エンジン名とローカルのポート（`voicevox:50021`）、またはベース URL |
 | `voice.speaker` | `[voice]` があるとき必須 | 話者。`名前/スタイル` の形 |
 | `voice.speed` | `1.0` | 話速 |
 | `refs` | なし | ref（`owner/repo/deck`）ごとに、固定したコミットの40桁の sha。`dekc ref` が書く。[ref](/ja/reference/cli#ref) を参照 |
 
-dek は知らないキーを無視し、lint がそれぞれを `DEK008` として、おそらく意図したキーと一緒に示します。`[voice]` があるとき、`dekc new` はそれを新しいデッキへ `voice/voice.toml` としてコピーします。
+dek は知らないキーを無視し、lint がそれぞれを `DEK008` として、おそらく意図したキーと一緒に示します。
+
+`max_classes`、`cjk_per_minute`、`latin_per_minute`、`[voice]` は初期値です。`dekc new` は前の 3 つを新しいデッキの frontmatter へ、`[voice]` を `voice/voice.toml` へコピーし、以後デッキは自分のコピーだけを読みます。`dek.toml` で変えても、作成済みのデッキは変わりません。`dek.toml` が既定と異なる値を設定しているのにデッキがそのキーを持たないときは `DEK008` の警告になり、hint が足すべき行を示します。
 
 ## frontmatter
 
@@ -102,6 +104,9 @@ lang: ja
 | `duration` | いいえ | `<n>m`（例: `20m`）。トークの予算 |
 | `ratio` | いいえ | `16:9`（既定、1280 × 720）または `4:3`（1024 × 768） |
 | `lang` | いいえ | BCP 47 タグ。プレイヤー、スクリーンショット、PDF の `<html lang>` になる。省くと台本から決める。かながあれば `ja`、次にハングルなら `ko`、漢字なら `zh`、それ以外は `en` |
+| `max_classes` | いいえ | `theme.css` が定義してよいクラス数の上限（`DEK013`）。既定 `40` |
+| `cjk_per_minute` | いいえ | CJK テキストの話速（字/分）。既定 `300` |
+| `latin_per_minute` | いいえ | それ以外のテキストの話速（語/分）。既定 `130` |
 
 これ以外のキーは無視され、lint が `DEK008` として示します。
 

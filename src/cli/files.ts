@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { bundledTheme } from "../core/bundled-theme.ts";
+import type { DekConfig } from "../core/config.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { walkUp } from "../core/optional.ts";
@@ -72,12 +73,17 @@ const INSTALL_DEK = "bun add -d @hajimism/dek";
  * shows sections, beats, and an estimate against the budget. A deck with a
  * voice starts in Japanese, the language dek's voice reads; any other in English.
  */
-export function defaultScript(title: string, lang: "en" | "ja" = "en"): string {
+export function defaultScript(
+  title: string,
+  lang: "en" | "ja" = "en",
+  settings: DekConfig["seed"] = {},
+): string {
+  const lines = Object.entries(settings).map(([key, value]) => `${key}: ${value}\n`);
   return `---
 # yaml-language-server: $schema=../../.dek/schema.json
 title: ${JSON.stringify(title)}
 duration: 1m
----
+${lines.join("")}---
 ${STARTER_BODY[lang]}`;
 }
 
@@ -230,18 +236,19 @@ function placeable(path: string, kind: "file" | "directory"): boolean {
 }
 
 /**
- * A deck's files: its directories, the starter script, the theme it starts
- * from, and voice settings when the project has a voice. The skeleton slides
- * are sync's to write, once the theme they are drawn in is in place.
+ * A new deck's files: its directories, the starter script, the theme it starts from, and what the
+ * project's dek.toml seeds, its deck settings and `[voice]`. From then on the deck owns them: a
+ * later change to dek.toml leaves it alone. The skeleton slides are sync's to write, once the
+ * theme they are drawn in is in place.
  */
 export function deckPlan(
   root: string,
   name: string,
   theme: string,
-  voice?: { engine: string; speaker: string; speed?: number },
+  { seed, voice }: Pick<DekConfig, "seed" | "voice"> = {},
 ): PlannedPath[] {
   const paths = deckPaths(join(root, "decks", name));
-  const script = defaultScript(name, voice ? "ja" : "en");
+  const script = defaultScript(name, voice ? "ja" : "en", seed);
   const plan: PlannedPath[] = [
     { path: paths.slides },
     { path: paths.assets },

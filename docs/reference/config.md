@@ -66,15 +66,17 @@ speed = 1.0
 | Key | Default | Purpose |
 | --- | --- | --- |
 | `url` | none | The absolute http(s) URL `dist/` is served from. With it, `dekc build` writes `og:url` and a first-slide `og:image`; `--url` overrides it. See [On the web](/guide/present#on-the-web) |
-| `max_classes` | `40` | Upper bound for `DEK013` |
-| `cjk_per_minute` | `300` | Speaking rate for CJK text, in characters |
-| `latin_per_minute` | `130` | Speaking rate for other text, in words |
+| `max_classes` | none | Seed for a new deck's `max_classes`; see [Frontmatter](#frontmatter) |
+| `cjk_per_minute` | none | Seed for a new deck's `cjk_per_minute` |
+| `latin_per_minute` | none | Seed for a new deck's `latin_per_minute` |
 | `voice.engine` | `"voicevox"` | Engine name (`voicevox`, `aivis`, `coeiroink`, `sharevox`), a name and a local port (`voicevox:50021`), or a base URL |
 | `voice.speaker` | required when `[voice]` is present | Speaker, as `name/style` |
 | `voice.speed` | `1.0` | Speaking speed |
 | `refs` | none | Each ref (`owner/repo/deck`) and the 40-character commit it is pinned to. `dekc ref` writes it; see [Refs](/reference/cli#refs) |
 
-dek ignores keys it does not know, and lint names each one as `DEK008`, with the key it most likely meant. When `[voice]` is present, `dekc new` copies it into the new deck as `voice/voice.toml`.
+dek ignores keys it does not know, and lint names each one as `DEK008`, with the key it most likely meant.
+
+`max_classes`, `cjk_per_minute`, `latin_per_minute`, and `[voice]` are seeds: `dekc new` copies the first three into the new deck's frontmatter and `[voice]` into `voice/voice.toml`, and from then on the deck reads only its own copy. Changing them in `dek.toml` leaves the decks already made as they were. A deck that leaves out a key `dek.toml` sets to something other than the default is a `DEK008` warning whose hint names the line to add.
 
 ## Frontmatter
 
@@ -102,6 +104,9 @@ lang: en
 | `duration` | no | `<n>m`, such as `20m`. The talk's budget |
 | `ratio` | no | `16:9` (default, 1280 × 720) or `4:3` (1024 × 768) |
 | `lang` | no | BCP 47 tag. Becomes `<html lang>` in the player, screenshots, and PDF. Omit it and dek reads the script: kana means `ja`, then Hangul `ko`, then Han `zh`, and anything else `en` |
+| `max_classes` | no | The most classes `theme.css` may define (`DEK013`). Default `40` |
+| `cjk_per_minute` | no | Speaking rate for CJK text, in characters a minute. Default `300` |
+| `latin_per_minute` | no | Speaking rate for other text, in words a minute. Default `130` |
 
 Any other key is ignored, and lint names it as `DEK008`.
 

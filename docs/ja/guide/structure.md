@@ -6,7 +6,7 @@
 
 ```
 my-talks/                       # プロジェクト（dekc init）
-├── dek.toml                    # lint の閾値、話速、声の既定値
+├── dek.toml                    # 新しいデッキの初期値：クラス数の上限、話速、声
 ├── .gitignore                  # dist/ .cache/ .dek/server.json refs/
 ├── .rumdl.toml                 # script.md 用の Markdown ルール
 ├── theme.css                   # 新しいデッキの出発点
@@ -50,7 +50,7 @@ cp decks/2026-09-dek/theme.css theme.css
 
 過去のデッキが、保守の要らないテーマライブラリになります。
 
-同じルールが `assets/` と声にも当てはまります。プロジェクト直下の `assets/` は素材置き場で、デッキは使うものを自分の `assets/` へコピーします。`dek.toml` に `[voice]` テーブルがあれば、`dekc new` はそれをデッキの `voice/voice.toml` としてコピーするので、9 月に話者を変えても 4 月のナレーションは変わりません。
+同じルールが `assets/` と声にも当てはまります。プロジェクト直下の `assets/` は素材置き場で、デッキは使うものを自分の `assets/` へコピーします。`dek.toml` に `[voice]` テーブルがあれば、`dekc new` はそれをデッキの `voice/voice.toml` としてコピーするので、9 月に話者を変えても 4 月のナレーションは変わりません。`dek.toml` のクラス数の上限と話速も同じように新しいデッキの frontmatter へコピーされるので、9 月に `max_classes` を厳しくしても 4 月のデッキは落ちません。
 
 ## 他人のデッキは読むだけで、借りない
 

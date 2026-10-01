@@ -1,6 +1,5 @@
 import { readTheme } from "./assets.ts";
 import { playerChromeCss } from "./chrome.ts";
-import { type DekConfig, loadConfig } from "./config.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { collectSlidesHtml, htmlShell } from "./html.ts";
 import { type OgpImage, ogpHead } from "./ogp.ts";
@@ -50,13 +49,12 @@ export function renderDeckHtml(
   dir: string,
   options: { playerScript: string; target: PageTarget },
 ): string {
-  const { project, deck } = resolveDeck(dir);
-  return renderDeckDocument(deck, { ...options, config: loadConfig(project.configPath) });
+  return renderDeckDocument(resolveDeck(dir).deck, options);
 }
 
 export function renderDeckDocument(
   deck: ProjectDeck,
-  options: { config: DekConfig; playerScript: string; target: PageTarget },
+  options: { playerScript: string; target: PageTarget },
 ): string {
   const { target } = options;
   const mode: PageMode =
@@ -69,7 +67,7 @@ export function renderDeckDocument(
   const standalone = !live;
   const strictScripts = target.kind === "video";
   const includeNotes = target.kind === "dev" ? target.includeNotes : target.kind === "build";
-  const data = presenterSlides(deck, options.config, scriptReader(target)).map((slide) =>
+  const data = presenterSlides(deck, scriptReader(target)).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
   const slidesHtml = collectSlidesHtml(deck, { inline: standalone });

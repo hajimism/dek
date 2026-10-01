@@ -247,15 +247,39 @@ duration: 10m
     );
   });
 
-  test("uses cjk_per_minute and latin_per_minute from dek.toml", async () => {
+  test("leaves the estimate alone when dek.toml sets the speaking rate", async () => {
     await withTempProject(
       {
         toml: "cjk_per_minute = 5\nlatin_per_minute = 13\n",
         decks: [
           {
             name: "demo",
+            script: "---\ntitle: Demo\n---\n\n## intro\n\nあいうえお\n",
+            slides: { intro: introHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const result = lsCommand(resolveTarget(root, "decks", { refs: true, deck: "demo" }));
+        if (result.kind !== "deck") {
+          throw new Error("expected deck");
+        }
+        // Five characters at the default 300 a minute.
+        expect(result.estimateSeconds).toBe(1);
+      },
+    );
+  });
+
+  test("uses cjk_per_minute and latin_per_minute from the frontmatter", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
             script: `---
 title: Demo
+cjk_per_minute: 5
+latin_per_minute: 13
 ---
 
 ## intro

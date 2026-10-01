@@ -1,4 +1,3 @@
-import type { DekConfig } from "./config.ts";
 import type { PresenterSlide } from "./presenter-state.ts";
 import type { ProjectDeck } from "./resolve.ts";
 import { type ScriptLine, scriptLines } from "./script-lines.ts";
@@ -18,10 +17,9 @@ export type ScriptReader = "speaker" | "audience";
 
 export function presenterSlides(
   deck: ProjectDeck,
-  config: DekConfig,
   reader: ScriptReader = "speaker",
 ): PresenterSlide[] {
-  const timing = sectionTiming(deck.deck.sections, deck.deck.duration, config);
+  const timing = sectionTiming(deck.deck);
   const budgetBySlug = new Map(timing.map((row) => [row.slug, row.budgetSeconds]));
   return deck.deck.sections.map((section) => {
     const script = formatSectionScript(section);

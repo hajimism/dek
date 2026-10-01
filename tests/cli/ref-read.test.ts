@@ -19,6 +19,7 @@ const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.t
 
 const refScript = `---
 title: Why dek
+cjk_per_minute: 60
 ---
 
 ## timing
@@ -32,7 +33,6 @@ const timingHtml = slideDocument(`<section class="slide" data-layout="title">
 
 const ref: RefSpec = {
   name: REF,
-  toml: "cjk_per_minute = 60\n",
   license: "MIT",
   deck: {
     script: refScript,

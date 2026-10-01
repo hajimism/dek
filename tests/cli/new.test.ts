@@ -80,6 +80,28 @@ describe("dekc new", () => {
       },
     );
   });
+  // dek.toml seeds a new deck the way [voice] does; from then on the deck owns its copy.
+  test("copies the deck settings dek.toml sets into the new deck's frontmatter", async () => {
+    await withTempProject(
+      { toml: "max_classes = 30\nlatin_per_minute = 140\n", theme: defaultTheme() },
+      async (root) => {
+        newCommand({ cwd: root, name: "talk" });
+        const deckDir = join(root, "decks", "talk");
+        const script = await readFile(join(deckDir, "script.md"), "utf8");
+        expect(script).toContain("\nduration: 1m\nmax_classes: 30\nlatin_per_minute: 140\n---\n");
+        expect(script).not.toContain("cjk_per_minute");
+        expect(lintDeck(deckDir)).toEqual([]);
+      },
+    );
+  });
+
+  test("writes no deck settings when dek.toml sets none", async () => {
+    await withTempProject({ theme: defaultTheme() }, async (root) => {
+      newCommand({ cwd: root, name: "talk" });
+      const script = await readFile(join(root, "decks", "talk", "script.md"), "utf8");
+      expect(script).not.toMatch(/max_classes|per_minute/);
+    });
+  });
 });
 
 describe("newCommand", () => {

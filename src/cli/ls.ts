@@ -1,4 +1,3 @@
-import { type DekConfig, loadConfig } from "../core/config.ts";
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { lintDeck, lintProject } from "../core/lint.ts";
 import { listSlides, type Project, type ProjectDeck } from "../core/resolve.ts";
@@ -54,7 +53,7 @@ export function lsCommand(target: DecksTarget): LsListResult | LsDeckResult {
   const { project, deck, ref } = target;
   if (deck && ref) {
     return {
-      ...formatDeck(deck, loadConfig(project.configPath), project, { lint: false }),
+      ...formatDeck(deck, project, { lint: false }),
       ...skippedChecks([
         { check: "lint", reason: "a ref is read-only; its problems are not yours to fix" },
       ]),
@@ -62,7 +61,7 @@ export function lsCommand(target: DecksTarget): LsListResult | LsDeckResult {
     };
   }
   if (deck) {
-    return formatDeck(deck, loadConfig(project.configPath), project);
+    return formatDeck(deck, project);
   }
   return {
     kind: "list",
@@ -85,11 +84,10 @@ function summarizeDeck(deck: ProjectDeck, project: Project): LsListResult["decks
 
 function formatDeck(
   deck: ProjectDeck,
-  config: DekConfig,
   project: Project,
   options: { lint: boolean } = { lint: true },
 ): LsDeckResult {
-  const timing = sectionTiming(deck.deck.sections, deck.deck.duration, config);
+  const timing = sectionTiming(deck.deck);
   const estimateTotal = timing.reduce((sum, row) => sum + row.estimateSeconds, 0);
   const timeline = tryLoadCachedTimeline(deck.dir);
 
