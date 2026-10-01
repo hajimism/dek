@@ -89,12 +89,14 @@
 }
 
 .tiles {
+  counter-reset: row;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: var(--gap);
 }
 
 .tiles li {
+  counter-increment: row;
   display: grid;
   grid-template-columns: var(--k-w) minmax(0, 1fr) var(--n-w);
   align-items: center;
@@ -117,6 +119,11 @@
   margin-right: 0.6em;
   color: var(--muted);
   font-weight: 400;
+}
+
+/* Rows are in script order, so a row's count is its slide's number. */
+.no::before {
+  content: counter(row, decimal-leading-zero);
 }
 
 .k {

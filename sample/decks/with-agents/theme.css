@@ -84,6 +84,8 @@
   font-feature-settings: "palt";
   word-break: auto-phrase;
   -webkit-font-smoothing: antialiased;
+  /* The slide's place in script.md, so the badge and the folio follow the script as slides move. */
+  counter-reset: folio var(--dek-slide-number) folios var(--dek-slide-count);
 }
 
 .slide *,
@@ -151,6 +153,11 @@
   font-size: var(--size-caption);
   font-weight: 700;
   line-height: 1;
+}
+
+/* An empty badge prints the slide's number; one with text, like the cover's, keeps it. */
+.slide .badge:empty::before {
+  content: counter(folio, decimal-leading-zero);
 }
 
 .slide .slide-title {
@@ -434,10 +441,15 @@
   color: var(--muted);
 }
 
+/* The folio, from the slide's place in script.md: never written by hand. */
+.slide .meta::after {
+  content: counter(folio, decimal-leading-zero) " / " counter(folios);
+}
+
 /* @layout title
 <section class="slide" data-layout="title">
   <div class="col">
-    <p class="kicker"><span class="badge">01</span>dek sample</p>
+    <p class="kicker"><span class="badge"></span>dek sample</p>
     <h2 class="slide-title">The talk in one line</h2>
     <p class="lede">One sentence on what the audience leaves with.</p>
   </div>
@@ -462,7 +474,7 @@
 
 /* @layout default
 <section class="slide" data-layout="default">
-  <p class="kicker"><span class="badge">02</span>Problem</p>
+  <p class="kicker"><span class="badge"></span>Problem</p>
   <h2 class="slide-title">A heading that stays put</h2>
   <div class="stage cards">
     <article class="card" data-step="1">First</article>
@@ -484,7 +496,7 @@
 /* @layout split
 <section class="slide" data-layout="split">
   <div class="col">
-    <p class="kicker"><span class="badge">04</span>Measure</p>
+    <p class="kicker"><span class="badge"></span>Measure</p>
     <h2 class="slide-title">The claim on the left</h2>
     <p class="lede">A sentence that explains it.</p>
   </div>
@@ -503,7 +515,7 @@
 
 /* @layout statement
 <section class="slide" data-layout="statement">
-  <p class="kicker"><span class="badge">12</span>Close</p>
+  <p class="kicker"><span class="badge"></span>Close</p>
   <h2 class="slide-title">One line to remember.</h2>
   <p class="lede">What follows from it.</p>
 </section>

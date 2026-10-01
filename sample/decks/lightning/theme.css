@@ -103,13 +103,15 @@
   text-shadow: var(--bloom);
 }
 
-.slide .num {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+/* The folio, from the slide's place in script.md: "# 03" before the heading. */
+.slide {
+  counter-reset: folio var(--dek-slide-number);
 }
 
-.slide .num::before {
-  content: "# ";
+.slide .slide-title::before {
+  content: "# " counter(folio, decimal-leading-zero);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .slide .display {
@@ -340,7 +342,7 @@
 
 /* @layout statement
 <section class="slide" data-layout="statement">
-  <h2 class="slide-title"><span class="num">02</span>premise</h2>
+  <h2 class="slide-title">premise</h2>
   <p class="display">最初に書くのは、<span class="hl">喋る言葉</span>。</p>
 </section>
 */
@@ -354,7 +356,7 @@
 
 /* @layout term
 <section class="slide" data-layout="term">
-  <h2 class="slide-title"><span class="num">03</span>プロジェクトを作る</h2>
+  <h2 class="slide-title">プロジェクトを作る</h2>
   <figure class="window" data-morph="window">
     <figcaption class="chrome">zsh — ~/</figcaption>
     <div class="screen"><span class="line"><span class="prompt">~</span>bunx dek ls</span></div>
@@ -372,7 +374,7 @@
 
 /* @layout split
 <section class="slide" data-layout="split">
-  <h2 class="slide-title"><span class="num">04</span>台本を書く</h2>
+  <h2 class="slide-title">台本を書く</h2>
   <figure class="window" data-morph="window">
     <figcaption class="chrome">script.md</figcaption>
     <div class="screen"><span class="line"><span class="gutter">1</span>## 見出し</span></div>

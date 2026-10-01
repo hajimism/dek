@@ -146,6 +146,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Left empty, a numeral prints the slide's place in script.md, so it follows the script as slides move. */
+.slide .numeral:empty::before {
+  content: counter(folio, decimal-leading-zero);
+}
+
 .slide .lede {
   font-size: var(--size-lede);
   line-height: 1.7;
@@ -326,7 +331,7 @@
 
 /* @layout page
 <section class="slide" data-layout="page">
-  <p class="numeral">02</p>
+  <p class="numeral"></p>
   <h2 class="slide-title">The point, as a full sentence</h2>
   <p class="lede">One or two sentences that explain the figure.</p>
   <div class="stage">
@@ -371,7 +376,7 @@
 /* @layout split
 <section class="slide" data-layout="split">
   <div class="col">
-    <p class="numeral">03</p>
+    <p class="numeral"></p>
     <h2 class="slide-title">Text on the left</h2>
     <p class="lede">The claim, explained.</p>
     <p class="note" data-step="1">A detail that arrives on a beat.</p>

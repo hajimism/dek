@@ -76,7 +76,12 @@
   border-bottom: var(--rule) solid var(--line);
 }
 
+.bars {
+  counter-reset: row;
+}
+
 .bars li {
+  counter-increment: row;
   display: grid;
   grid-template-columns: var(--n-w) var(--slug-w) minmax(0, 1fr) var(--time-w);
   align-items: center;
@@ -90,6 +95,11 @@
 .n {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
+}
+
+/* Rows are in script order, so a row's count is its slide's number. */
+.n::before {
+  content: counter(row, decimal-leading-zero);
 }
 
 .slug {
