@@ -1,0 +1,38 @@
+name: Bug report
+description: dek did something wrong or failed
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got instead. Paste the output.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The smallest script.md or slide that shows it, or the steps from `bunx @hajimism/dek init`.
+    validations:
+      required: true
+  - type: input
+    id: dek
+    attributes:
+      label: dek version
+      description: "`dekc --version`"
+    validations:
+      required: true
+  - type: input
+    id: bun
+    attributes:
+      label: Bun version and OS
+      description: "`bun --version`, and macOS / Linux / Windows"
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: JSON output (optional)
+      description: The same command with `--json`, if it takes one.
+      render: json

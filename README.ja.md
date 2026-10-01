@@ -1,5 +1,7 @@
 # dek
 
+[![npm](https://img.shields.io/npm/v/@hajimism/dek)](https://www.npmjs.com/package/@hajimism/dek) [![CI](https://github.com/hajimism/dek/actions/workflows/ci.yml/badge.svg)](https://github.com/hajimism/dek/actions/workflows/ci.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hajimism/dek/badge)](https://scorecard.dev/viewer/?uri=github.com/hajimism/dek)
+
 **発表のビルドシステム。** 喋ることを書けば、あとは dek が組み立て、測り、届ける。
 
 [ドキュメント](https://hajimism.github.io/dek/ja/) · [English README](./README.md)
@@ -20,7 +22,7 @@ dek は、ビルドシステムがコードを扱うように発表を扱う CLI
 
 ## クイックスタート
 
-[Bun](https://bun.sh) 1.4 以上。
+[Bun](https://bun.sh) 1.4 以上が必要です。dek は Bun でだけ動き、Node では動きません。`npx` ではなく `bunx` を使ってください。
 
 ```bash
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
@@ -66,9 +68,11 @@ bun run check             # Biome の format + lint
 bun run docs:dev          # VitePress
 ```
 
-CI では `biome ci`、`typecheck`、全テスト（ブラウザを使うものは Chromium で）、`docs:build` を走らせます。
+CI では `biome ci`、`typecheck`、`knip`、全テスト（ブラウザを使うものは Chromium で）、`docs:build`、`scripts/check-package.sh`（npm に出す tarball を入れて動かす）を走らせます。
 
 ドキュメントサイトは GitHub Actions 経由で GitHub Pages に出します。初回だけ、リポジトリの設定で **Pages → Source** を **GitHub Actions** にしてください。
+
+プルリクエストで通すチェックは [CONTRIBUTING.md](./CONTRIBUTING.md)、リリースごとの変更は [CHANGELOG.md](./CHANGELOG.md) にあります。脆弱性は [SECURITY.md](./SECURITY.md) のとおり非公開で報告してください。
 
 ## ライセンス
 

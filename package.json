@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "A build system for talks.",
   "license": "MIT",
+  "author": "Hajime Nakagawa (https://github.com/hajimism)",
   "type": "module",
   "bin": {
     "dekc": "src/cli.ts"
@@ -11,7 +12,8 @@
     "src",
     "LICENSE",
     "README.md",
-    "README.ja.md"
+    "README.ja.md",
+    "CHANGELOG.md"
   ],
   "repository": {
     "type": "git",
@@ -31,9 +33,12 @@
     "slides",
     "presentation",
     "talk",
+    "markdown",
     "build",
     "cli",
-    "html"
+    "html",
+    "bun",
+    "ai-agents"
   ],
   "scripts": {
     "test": "bun test --parallel=4",

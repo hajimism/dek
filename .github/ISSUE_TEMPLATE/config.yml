@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://hajimism.github.io/dek/
+    about: Guides, the CLI reference, and the FAQ.
+  - name: Report a vulnerability
+    url: https://github.com/hajimism/dek/security/advisories/new
+    about: Report security issues privately, not as an issue.

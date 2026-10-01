@@ -1,5 +1,7 @@
 # dek
 
+[![npm](https://img.shields.io/npm/v/@hajimism/dek)](https://www.npmjs.com/package/@hajimism/dek) [![CI](https://github.com/hajimism/dek/actions/workflows/ci.yml/badge.svg)](https://github.com/hajimism/dek/actions/workflows/ci.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hajimism/dek/badge)](https://scorecard.dev/viewer/?uri=github.com/hajimism/dek)
+
 **A build system for talks.** Write what you will say; dek builds, measures, and ships the rest.
 
 [Documentation](https://hajimism.github.io/dek/) · [日本語 README](./README.ja.md)
@@ -20,7 +22,7 @@ The three principles and the comparison with Slidev are in [Why dek](https://haj
 
 ## Quick start
 
-[Bun](https://bun.sh) 1.4 or later.
+Requires [Bun](https://bun.sh) 1.4 or later. dek runs on Bun only: it does not run on Node, so use `bunx`, not `npx`.
 
 ```bash
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
@@ -66,9 +68,11 @@ bun run check             # Biome format + lint
 bun run docs:dev          # VitePress
 ```
 
-CI runs `biome ci`, `typecheck`, the full test suite (the browser tests in Chromium), and `docs:build`.
+CI runs `biome ci`, `typecheck`, `knip`, the full test suite (the browser tests in Chromium), `docs:build`, and `scripts/check-package.sh`, which installs the packed tarball and runs it.
 
 The documentation site deploys to GitHub Pages through Actions. Once, in the repository settings, set **Pages → Source** to **GitHub Actions**.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the checks a pull request runs, and [CHANGELOG.md](./CHANGELOG.md) for what each release changed. Report security issues privately, as [SECURITY.md](./SECURITY.md) describes.
 
 ## License
 
