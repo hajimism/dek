@@ -61,7 +61,7 @@ Each finding is about one of three things, and the command that reports it follo
 - `DEK030` through `DEK033` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
 - `DEK040`, `DEK042`, `DEK043`, and `DEK045` apply only to decks with `voice/`; `DEK044` applies to every deck. `dek cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin). `data` carries `actualSeconds`, `budgetSeconds`, and `source` (`timeline` or `estimate`).
-- `DEK008`, `DEK024` through `DEK026`, `DEK028`, and `DEK040` through `DEK045` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
+- `DEK008`, `DEK024` through `DEK026`, `DEK028`, `DEK029`, and `DEK040` through `DEK045` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
 
 ## Notes
 
