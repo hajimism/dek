@@ -1,0 +1,11 @@
+# adrs (https://github.com/joshrotenberg/adrs) keeps the decision records in adr/.
+adr_dir = "adr"
+no_edit = true
+default_status = "accepted"
+
+[generate]
+toc_prefix = "./"
+
+[doctor]
+# Warnings fail CI too, not only a malformed record.
+warnings_as_errors = true

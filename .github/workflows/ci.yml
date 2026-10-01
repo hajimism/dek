@@ -57,3 +57,29 @@ jobs:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
       - run: bash scripts/check-package.sh
+
+  # The decision records, checked by the adrs that mise.toml pins.
+  adr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install adrs
+        env:
+          ADRS_VERSION: 0.12.1
+          ADRS_SHA256: 1e0dda183f38eeff44a6dd82d688df4a0f3a655396fcc72cdbc31de753d88419
+        run: |
+          curl -fsSL -o adrs.tar.xz "https://github.com/joshrotenberg/adrs/releases/download/v$ADRS_VERSION/adrs-x86_64-unknown-linux-gnu.tar.xz"
+          echo "$ADRS_SHA256  adrs.tar.xz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xJf adrs.tar.xz -C "$HOME/.local/bin" --strip-components=1 adrs-x86_64-unknown-linux-gnu/adrs
+          rm adrs.tar.xz
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: adrs doctor
+      # doctor does not see a Nygard section left as the template's question.
+      - name: No template text left in a record
+        run: |
+          if grep -nE "What is the issue that we're seeing|What is the change that we're proposing|What becomes easier or more difficult" adr/*.md; then
+            echo "::error::Fill every section of the ADRs above."
+            exit 1
+          fi

@@ -39,6 +39,10 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 While dek is 0.x, a breaking change bumps the minor version and anything else bumps the patch.
 
+## Decision records
+
+A design decision that bears on a release, such as a name, a command or its `--json`, a lint rule, a config key, or anything breaking, gets an Architecture Decision Record in [`adr/`](./adr) in the same pull request. `mise install` brings in [adrs](https://github.com/joshrotenberg/adrs); write one with `mise exec -- adrs new "Title"` and check them with `mise exec -- adrs doctor`. [ADR 1](./adr/0001-record-architecture-decisions.md) says what counts.
+
 ## Conduct
 
 Everyone taking part is expected to follow the [Code of Conduct](./CODE_OF_CONDUCT.md). Security issues go through [SECURITY.md](./SECURITY.md), not public issues.
