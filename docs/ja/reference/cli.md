@@ -4,35 +4,35 @@
 
 ## 規約
 
-- **スコープは実行場所で決まる。** プロジェクト直下なら全デッキ、デッキの中ならそのデッキ。どこからでも、最初の引数か `--deck <name>` でデッキを指定できます: `dek lint why-dek`、`dek show why-dek intro`、`dek why-dek`。詳細は[プロジェクトとデッキ](/ja/guide/structure#実行場所がスコープを決める)。
-- **結果を返すコマンドは `--json` を受け付け、包みは一つ。** 成功は `{ "ok": true, ... }`。失敗は `{ "ok": false, "error": { "message", "hint", "path", "line" }, ... }` で終了コード 1。コマンドが実行できなかった場合も、`lint` や `check` が error を見つけた場合も同じです。`hint` は dek が次の一手を知っていれば、`path` と `line` は失敗に場所があれば付きます。診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は成否に関わらず `diagnostics` を持つので、読み手は `ok` で分岐し、`error` を読み、診断を読みます。起動し続ける `dek` と `dek rehearse` は `--json` を取りません。[JSON の約束](/ja/guide/ai#json-の約束)を参照してください。
-- **各コマンドの形は JSON Schema。** [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しており、`$defs` にコマンドごとの定義がある。
+- **スコープは実行場所で決まる。** プロジェクト直下なら全デッキ、デッキの中ならそのデッキ。どこからでも、最初の引数か `--deck <name>` でデッキを指定できます。たとえば `dek lint why-dek`、`dek show why-dek intro`、`dek why-dek` です。詳細は[プロジェクトとデッキ](/ja/guide/structure#実行場所がスコープを決める)。
+- **結果を返すコマンドは `--json` を受け付け、外側の形は共通。** 成功は `{ "ok": true, ... }`。失敗は `{ "ok": false, "error": { "message", "hint", "path", "line" }, ... }` で終了コード 1。コマンドが実行できなかった場合も、`lint` や `check` が error を見つけた場合も同じです。`hint` は dek が次の一手を知っていれば、`path` と `line` は失敗に場所があれば付きます。診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は成否に関わらず `diagnostics` を持つので、読み手は `ok` で分岐し、`error` を読み、診断を読みます。起動し続ける `dek` と `dek rehearse` は `--json` を取りません。[JSON の約束](/ja/guide/ai#json-の約束)を参照してください。
+- **各コマンドの形は JSON Schema。** [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しており、`$defs` にコマンドごとの定義があります。
 - **形はまだ固まっていない。** dek が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID を別のルールに使い回すことはありません。
 - **診断は SARIF。** `dek lint --format sarif`。URI は `file://`、位置は行と列、hint・slug・data は `properties` に入り、飛ばしたチェックは tool execution notification になります。既定は ESLint 風のテキスト `path:line:column: id message` です。
 - **失敗になるのは error だけ。** 各診断は `severity` を持ちます。error が残っていれば `lint` と `check` は `"ok": false` と終了コード 1 を返し、warning だけなら終了コード 0 です。
 - **`init` と `sync` はあなたの作業を上書きしない。** 足りないものを作り、余ったものを警告します。sync が書き直したり消したりするスライドは、誰も手を入れていない骨格だけです。元になった台本が変われば書き直し、セクションがなくなって横にスタイルシートもスクリプトもなければ消します。`AGENTS.md` で dek が持つのは `<!-- dek:begin … -->` から `<!-- dek:end -->` までのブロックだけです。リネームもしません。
-- **すべてのエラーが hint を持つ。** 次に叩くコマンドを名指しします。直し方が決まっている診断にも hint が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。
+- **すべてのエラーが hint を持つ。** hint は次に叩くコマンドを示します。直し方が決まっている診断にも hint が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。
 - **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dek が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
 - **実行しなかったチェックは `"skipped"` に並びます。** 各要素は `check`、`reason`、実行する方法があれば `hint` を持ちます。Playwright がない `dek check` は `visual` を、`voice/` のないデッキでの `dek check --voice` は `voice` を、rumdl がない `dek lint` は `rumdl` を、URL か Playwright がない `dek build` は `preview`（リンクプレビュー画像）を、ref に対する `dek ls` は `lint` を飛ばします。テキストでは `<check>: skipped (<reason>)` と出て、hint が `help:` 行に続きます。`lint`、`check`、`build` はこれを標準エラーに出すので、標準出力には結果だけが残ります。すべて実行できたときはこのフィールド自体がありません。
 - **デッキごとにファイルを書くコマンドはリストを返す。** `build` と `pdf` は、1 デッキでも対象のデッキごとのパスを `outs` で返します。
 - **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`）を受け取ります。それ以外のコマンドは ref を受け取りません。[ref](#ref) を参照してください。
 - **ヘルプはコマンドごとに出る。** `dek help <command>`、`dek <command> --help`、`-h` で、そのコマンドの使い方、やること、受け付けるフラグをすべて表示します。`dek --version`（`-v`）はバージョンを表示します。コマンド名やデッキ名を打ち間違えると `did you mean …?` で候補を示します。
-- **フラグはコマンドごとに確かめる。** `--json`、`--help`、`--version` はどこでも使えます。それ以外のフラグは受け付けるコマンドでだけ使え、`--deck` は `new`・`ref`・`help` 以外のすべてで使えます。綴りを間違えたフラグや別のコマンドのフラグは黙って無視されず、エラーになります。hint にはそのコマンドが受け付けるフラグと `dek help <command>` が並びます。値も何かを実行する前に確かめます。`--port` は 1 から 65535 の整数、`--fps` は 0 より大きい数、`--accent` は 0 以上の整数、`--format` は `sarif` だけを受け付け、それ以外は空の値も含めて `invalid --<flag> "<value>"` になり、hint にそのフラグが受け付ける値が出ます。
+- **フラグはコマンドごとに確かめる。** `--json`、`--help`、`--version` はどこでも使えます。それ以外のフラグは受け付けるコマンドでだけ使え、`--deck` は `new`・`ref`・`help` 以外のすべてで使えます。綴りを間違えたフラグや別のコマンドのフラグは知らないうちに無視されることはなく、エラーになります。hint にはそのコマンドが受け付けるフラグと `dek help <command>` が並びます。値も何かを実行する前に確かめます。`--port` は 1 から 65535 の整数、`--fps` は 0 より大きい数、`--accent` は 0 以上の整数、`--format` は `sarif` だけを受け付け、それ以外は空の値も含めて `invalid --<flag> "<value>"` になり、hint にそのフラグが受け付ける値が出ます。
 - **引数もコマンドごとに確かめる。** 足りない引数は `missing <slug> for dek show`、コマンドが受け付ける数を超えた引数は `unexpected argument "extra" for dek ls` になり、どちらも hint にそのコマンドの使い方と `dek help <command>` が出ます。サブコマンドを打ち間違えると `did you mean …?` で候補を示します。`dek voice speakr` なら `dek voice speakers` です。
 
 ## 開発
 
 | コマンド | 役割 |
 | --- | --- |
-| `dek [deck] [--visual] [--port N] [--remote]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、プレゼンタービュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出しとコントラストも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
-| `dek --remote` | LAN に公開。プレゼンタービュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断は、起動のたびに dek が作って表示する 10 文字のパスワードが必要。ターミナルではその下の QR コードでスマホからプレゼンタービューを開ける（1 回だけ、5 分以内。Enter で新しいコード） |
+| `dek [deck] [--visual] [--port N] [--remote]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、発表者ビュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出しとコントラストも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
+| `dek --remote` | LAN に公開。発表者ビュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断は、起動のたびに dek が作って表示する 10 文字のパスワードが必要。ターミナルではその下の QR コードでスマホから発表者ビューを開ける（1 回だけ、5 分以内。Enter で新しいコード） |
 | `dek rehearse [deck] [slug] [--remote]` | Timeline に沿って自走。何も録画しない。`--remote` を付けると `dek --remote` と同じく LAN に公開する |
 
 ## プロジェクト
 
 | コマンド | 役割 |
 | --- | --- |
-| `dek init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dek/schema.json`、`.dek/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dek sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dek 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dek のブロックを足す。既にある `theme.css` も残し、どのデッキもそれをコピーする。そこにどのデッキにも要るトークンが欠けていれば、init はそれを標準エラーに挙げる（`--json` では `missingTokens`）。最初の lint がそれを `DEK015` として報告する前にで、`DEK015` の hint は dek 自身のテーマが使う値を示す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dek new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dek が入るまでは `bun add -d github:hajimism/dek` も含める |
+| `dek init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dek/schema.json`、`.dek/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dek sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dek 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dek のブロックを足す。既にある `theme.css` も残し、どのデッキもそれをコピーする。そこにどのデッキにも要るトークンが欠けていれば、init は最初の lint がそれを `DEK015` として報告する前に、標準エラーに挙げる（`--json` では `missingTokens`）。`DEK015` の hint は dek 自身のテーマが使う値を示す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dek new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dek が入るまでは `bun add -d github:hajimism/dek` も含める |
 | `dek new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る。sync と同じく dek 自身のファイルを更新し、更新したものを一覧する（`--json` では `updated`）。次に打つコマンドも表示する（`--json` では `next`） |
 | `dek ls [deck]` | デッキ一覧、または 1 つの概要。セクション数、枚数、診断、予算、見積もり、Timeline があれば実尺。診断は rumdl を除いた dek 自身のルールの結果。一覧では各デッキの指摘をその行に、プロジェクトの指摘（`dek.toml`）を `project` 行と `--json` の最上位の `diagnostics` に 1 回だけ数える |
 
@@ -58,9 +58,9 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dek check [deck] <slug> [--shot] [--voice]` | 1 枚を lint。その枚のスコープの指摘だけを返し、Playwright があれば描画系ルールも含む。デッキ（`theme.css`、フロントマター、尺）やプロジェクトについての指摘は `dek lint` が報告する。[スコープ](/ja/reference/lint#スコープ)を参照。`--shot` はスクリーンショットを書いてパスを返す。Playwright があれば、最終ビートでその枚が枠をどれだけ埋めているかを `fill` に返す。`coverage` は中身が覆う枠の割合、`box` はそれを収める最小の箱、`rows` と `columns` は枠を上から下、左から右に 10 等分したそれぞれの割合で、どれも 0 から 1。数えるのは聞き手が読むか見るもの、つまり文字の行、絵（画像、SVG、動画、canvas、`url()` の背景画像）、そしてグラフの棒や色見本のように何も入れていない塗った箱。カードや窓のように中身を入れた塗った箱は、中身の分だけを数えるので、上半分に文字を置いたカードは下半分が空と出る。`aria-hidden` の付いた装飾も、聞き手には場所を取って見えるので数える。`::before` と `::after` の文字、そのビートでまだ出ていないものは数えない。判断には `rows`・`columns`・`box` を使い、空いた帯は 0 の並びとして読む。`coverage` だけでは判断できない。大きな文字の章扉と、文字の詰まったスライドが同じ値になることがある。テキストの出力には、空いた帯を、端の余白か中身の途中の空きかを分けて書く。`--voice` はカナと尺を返す。`voice/` のないデッキでは `skipped` に `voice` を設定方法つきで入れ、残りのチェックは実行する |
 | `dek shot [deck] [slug] [--step ID\|N]` | 1 枚、または全枚のスクリーンショット。既定は最終ビート。`--step 0` はビートに入る前、枚が出たところ。ファイルは `.cache/shots/<slug>~<step>.<hash>.png`。`<step>` は撮ったビートの id か番号（既定は最終ビート）で、`--step hook`・`--step 1`・既定が同じビートを指すなら 1 つのファイルになる。hash は描画内容から決まり、テーマや HTML が変われば別パスになり、古い画像は消える。変わっていないスライドは撮り直さない |
 | `dek shot [deck] --sheet` | 全枚を最終ビートで撮り、コンタクトシートに並べる。`.cache/shots/sheets/<hash>/sheet-<n>.png` に書く。タイルは、デッキ全体が 1 枚に収まる範囲で最大の大きさにする。1 枚は一辺 1568 px 以下・115 万画素以下で、ビジョンモデルが縮小せずに読める大きさ。長いデッキは複数枚になる。タイルは各枚のショットそのものなので、変更のないデッキではブラウザを起動しない。`--json` は各ショットも返す |
-| `dek shot [deck] <slug> --motion [--step ID\|N]` | その枚が出たところと各ビートを 1 行ずつ並べる。各行は直前のビートまたは前の枚から再生し、その移動が始めたもの全体の 0・25・50・75% と、終わり（`dek shot` の静止画と同じ）で止める。`.cache/shots/motion/<slug>.<hash>/` に、シートを `sheet-<n>.png`、コマを `frames/` の下に書く。`--json` は各コマのパスと ms を返す。`--step` はそのビートだけを再生する |
+| `dek shot [deck] <slug> --motion [--step ID\|N]` | その枚が出たところと各ビートを 1 行ずつ並べる。各行は直前のビートまたは前の枚から再生し、その移動で始まったもの全体の 0・25・50・75% と、終わり（`dek shot` の静止画と同じ）で止める。`.cache/shots/motion/<slug>.<hash>/` に、シートを `sheet-<n>.png`、コマを `frames/` の下に書く。`--json` は各コマのパスと ms を返す。`--step` はそのビートだけを再生する |
 | `dek shot [deck] <a> --to <b> [--at 0..1]` | `a` の最終ビートから `b` へ移る View Transition を、遷移の長さに対する `--at`（既定 0.5）で止めた 1 フレーム。`b` の入りのアニメーションは `--at 1` でもまだ動いていることがあり、それは `--motion` で見る。`.cache/shots/<a>~<b>~<at>.<hash>.png` に書く。`--step` とは併用できない |
-| `dek mv [deck] <old> <new>` | セクション id、HTML ファイルと `data-slug`、あれば `.css` と `.ts`、`voice/voice.toml` のキーを改名。見出しの文言は触らない。宛先がひとつでもあれば拒否し、すべて変わるかどれも変わらないかのどちらか |
+| `dek mv [deck] <old> <new>` | セクション id、HTML ファイルと `data-slug`、あれば `.css` と `.ts`、`voice/voice.toml` のキーを改名。見出しの文言は触らない。宛先がひとつでも既にあれば拒否し、すべて変わるかどれも変わらないかのどちらか |
 | `dek mv [deck] <slug> --before\|--after <slug>` | `script.md` の中でセクションを並べ替える |
 | `dek goto [deck] <slug>` | 開いているブラウザを飛ばす。開発サーバが必要。`--json` の `viewers` はそのデッキを表示しているページの数。0 のときは、次に開いたページがその位置に着き、そのことを標準エラーで伝える |
 | `dek current [deck]` | いま表示中の枚を出力。開発サーバが必要。`viewers` は表示しているページの数。0 のときは何も表示されておらず、出力した枚は次に開くページが着く位置で、そのことを標準エラーで伝える |
@@ -80,7 +80,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dek voice [deck] dict add <word> <kana> [--accent N]` | `voice/dict.toml` に読みを追加。`--accent` でアクセント位置も指定する |
 | `dek voice [deck] pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
 | `dek build [deck] [--root-dist] [--url <url>] [--public]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dek lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。`--public` はリンクを知る誰もが開くページを作り、発表者ビューから台本のト書きと HTML コメントを外す。付けなければ、URL の有無にかかわらず発表者ビューに台本がすべて入る。 |
-| `dek video [deck] [slug] [--fps N] [--root-dist]` | `dek voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` を添える。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
+| `dek video [deck] [slug] [--fps N] [--root-dist]` | `dek voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` も書く。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
 | `dek pdf [deck] [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く。動かないスライドスクリプトがあると `dek video` と同じく止まる。どちらも診断を返す場所がなく、スクリプトが走らなかったかのような枚を出してしまうから |
 
 ## ヘルプ
