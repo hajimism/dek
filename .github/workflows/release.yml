@@ -50,10 +50,11 @@ jobs:
           bun-version: 1.4.0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
+          # Trusted publishing needs npm 11.5.1 or later; the latest Node 24 bundles it, so take
+          # the latest rather than whatever older 24 the runner has cached.
           node-version: 24
+          check-latest: true
           registry-url: https://registry.npmjs.org
-      # Trusted publishing needs npm 11.5.1 or later.
-      - run: npm install -g npm@11
       - run: bun install --frozen-lockfile
       - run: bash scripts/check-package.sh
       - run: npm publish
