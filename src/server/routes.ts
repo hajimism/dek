@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileInside, readTheme } from "../core/assets.ts";
-import { DekcError, errorFields } from "../core/error.ts";
+import { DekError, errorFields } from "../core/error.ts";
 import { escapeAttr, escapeHtml } from "../core/escape.ts";
 import { deckSlides, htmlShell, slidePlace, stampSlide } from "../core/html.ts";
 import { decodePosition } from "../core/live-protocol.ts";
@@ -204,7 +204,7 @@ async function marksResponse(req: Request, root: string, deck: ProjectDeck): Pro
   try {
     return jsonResponse({ ok: true, ...toggleMark(root, deck, position) });
   } catch (error) {
-    if (!(error instanceof DekcError)) {
+    if (!(error instanceof DekError)) {
       throw error;
     }
     return jsonResponse({ ok: false, error: errorFields(error) }, 404);
@@ -241,7 +241,7 @@ export function htmlResponse(html: string, status = 200): Response {
 export function errorPage(error: unknown): string {
   const { message, hint } = errorFields(error);
   return htmlShell({
-    title: "dekc",
+    title: "dek",
     body: `<pre>${escapeHtml(hint ? `${message}\n${hint}` : message)}</pre>`,
   });
 }
@@ -260,7 +260,7 @@ export function renderIndexHtml(
   const failedItems = failed.map((entry) => `<li>${escapeHtml(entry.name)}</li>`).join("");
   const failedBlock = failed.length > 0 ? `<h2>failed</h2><ul>${failedItems}</ul>` : "";
   return htmlShell({
-    title: "dekc",
+    title: "dek",
     body: `<h1>decks</h1>
   <ul>${items}</ul>
   ${failedBlock}`,

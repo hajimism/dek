@@ -2,15 +2,15 @@
 
 ## How do I install it?
 
-Create a project with `bunx @hajimism/dekc init`, then install dekc inside it with `bun add -d @hajimism/dekc` and use `bunx dekc` from there. See [Getting Started](./getting-started).
+Create a project with `bunx @hajimism/dek init`, then install dek inside it with `bun add -d @hajimism/dek` and use `bunx dekc` from there. See [Getting Started](./getting-started).
 
 ## Why does `bunx dek` run something else?
 
-The command is `dekc`, not `dek`. `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Outside a project, `bunx dekc` finds nothing to run; use `bunx @hajimism/dekc`.
+The package is `@hajimism/dek`; the command it installs is `dekc`, not `dek`. `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Inside a project, `bunx dekc` runs the dek installed there; outside one, use `bunx @hajimism/dek`.
 
 ## When should I use Slidev instead?
 
-When you need live coding, Vue components inside slides, npm themes, or an embedded editor. dekc is for talks where the speaking carries the weight, and it keeps plain HTML and CSS as its whole surface. The comparison is in [Why dekc](./why#how-dekc-compares).
+When you need live coding, Vue components inside slides, npm themes, or an embedded editor. dek is for talks where the speaking carries the weight, and it keeps plain HTML and CSS as its whole surface. The comparison is in [Why dek](./why#how-dek-compares).
 
 ## Do I have to write HTML?
 
@@ -18,7 +18,7 @@ No. Write `script.md`, run `dekc`, and the skeleton slides in the bundled theme 
 
 ## Do I have to use voice?
 
-No. A deck without `voice/` fails lint for exactly the same reasons as one with it. Voice adds warnings (`DEKC040`, `DEKC042`, and `DEKC043`) only to decks that opt in. `DEKC041`, the check against `duration`, applies to every deck that sets one.
+No. A deck without `voice/` fails lint for exactly the same reasons as one with it. Voice adds warnings (`DEK040`, `DEK042`, and `DEK043`) only to decks that opt in. `DEK041`, the check against `duration`, applies to every deck that sets one.
 
 ## Why do slide files have no numbers?
 
@@ -26,7 +26,7 @@ Only one file may know the order, and that file is `script.md`. Numbered file na
 
 ## Does `sync` overwrite my HTML?
 
-Never once you have edited it. It creates skeletons for missing slides, rewrites a skeleton nobody has edited yet when its section changes, and removes such a skeleton when its section is gone. A file you have edited is never touched; if its section is gone, lint flags it as an orphan (`DEKC002`). It does not rename either. Renaming is `dekc mv`.
+Never once you have edited it. It creates skeletons for missing slides, rewrites a skeleton nobody has edited yet when its section changes, and removes such a skeleton when its section is gone. A file you have edited is never touched; if its section is gone, lint flags it as an orphan (`DEK002`). It does not rename either. Renaming is `dekc mv`.
 
 ## What does an agent call?
 
@@ -46,7 +46,7 @@ Not in the script. A beat with no paragraph passes through the transition and th
 
 ## Can a slide run JavaScript?
 
-Not inside its HTML: `<script>` there is `DEKC011`. Motion that CSS cannot express, such as a counter or a chart that draws itself, goes in `slides/<id>.ts` as a `draw` function of time. The runtime owns the clock, so the same script plays live, seeks frame by frame in `dekc video`, and shows its end state in `dekc shot` and the PDF. Clickable demos are out of scope. See [Scripted motion](./steps#scripted-motion).
+Not inside its HTML: `<script>` there is `DEK011`. Motion that CSS cannot express, such as a counter or a chart that draws itself, goes in `slides/<id>.ts` as a `draw` function of time. The runtime owns the clock, so the same script plays live, seeks frame by frame in `dekc video`, and shows its end state in `dekc shot` and the PDF. Clickable demos are out of scope. See [Scripted motion](./steps#scripted-motion).
 
 ## Where does CSS for one slide go?
 

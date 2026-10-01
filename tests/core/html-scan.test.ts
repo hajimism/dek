@@ -121,7 +121,7 @@ describe("scanSlideHtml finds empty headings", () => {
     ["<h3><span></span></h3>", true],
     ["<h2>Title</h2>", false],
     ["<h2><span>Title</span></h2>", false],
-    ['<h2><img src="assets/logo.png" alt="dekc"></h2>', false],
+    ['<h2><img src="assets/logo.png" alt="dek"></h2>', false],
     ['<h2 aria-label="Title"></h2>', false],
   ])("%s", (heading, empty) => {
     const scan = scanSlideHtml(`<section class="slide">\n  ${heading}\n</section>`);

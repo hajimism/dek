@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import pkg from "../../../package.json";
-import { DekcError } from "../error.ts";
+import { DekError } from "../error.ts";
 import { deckProjectRoot } from "../path.ts";
 import { type PlaywrightRunner, requirePlaywright } from "../playwright.ts";
 import { deckStops, retreat } from "../position.ts";
@@ -130,8 +130,8 @@ export async function shotMotion(
     options.runner,
   );
   if (response.motion.length !== beats.length) {
-    throw new DekcError("the Playwright worker returned the wrong number of beats", {
-      hint: `asked for ${beats.length}, got ${response.motion.length}; check DEKC_PLAYWRIGHT`,
+    throw new DekError("the Playwright worker returned the wrong number of beats", {
+      hint: `asked for ${beats.length}, got ${response.motion.length}; check DEK_PLAYWRIGHT`,
     });
   }
   const result: ShotMotion = {
@@ -148,7 +148,7 @@ export async function shotMotion(
 }
 
 /**
- * A motion answered before, while every file it names is still there. The cache is dekc's own
+ * A motion answered before, while every file it names is still there. The cache is dek's own
  * output, but a manifest that does not read back whole, or names a file outside its own folder,
  * is taken again rather than trusted.
  */

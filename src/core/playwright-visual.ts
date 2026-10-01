@@ -237,7 +237,7 @@ async function visitPage(
   const crossing: Crossing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
   const { slug, step } = pageReq;
-  response.drawErrors = await page.evaluate(() => window.__dekcDrawErrors ?? []);
+  response.drawErrors = await page.evaluate(() => window.__dekDrawErrors ?? []);
   if (actions.length > 0) {
     const measured = await page.evaluate(measureSlideInPage);
     const texts = await pageTexts(page, measured);
@@ -375,7 +375,7 @@ const LAYERS: Array<{
   {
     origin: "script",
     strip: () => {
-      const undo = window.__dekcUndoDraw;
+      const undo = window.__dekUndoDraw;
       undo?.();
       return undo !== undefined;
     },

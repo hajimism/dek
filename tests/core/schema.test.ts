@@ -113,7 +113,7 @@ describe("frontmatterJsonSchema describes what a script may write", () => {
     }
   });
 
-  test("still flags a key dekc does not read, as DEKC008 does", () => {
+  test("still flags a key dek does not read, as DEK008 does", () => {
     expect(schema.additionalProperties).toBe(false);
   });
 });

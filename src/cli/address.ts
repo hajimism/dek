@@ -40,12 +40,12 @@ function namesDeck(rest: string, name: string): boolean {
 
 /**
  * The deck `path` lies in: the directory under a project's `decks/`, found from the path alone.
- * A source path dekc reports is absolute, so no project needs to be resolved to address it.
+ * A source path dek reports is absolute, so no project needs to be resolved to address it.
  */
 export function deckAround(path: string): HintDeck | undefined {
   for (let dir = path; dirname(dir) !== dir; dir = dirname(dir)) {
     const parent = dirname(dir);
-    if (basename(parent) === "decks" && existsSync(join(dirname(parent), "dekc.toml"))) {
+    if (basename(parent) === "decks" && existsSync(join(dirname(parent), "dek.toml"))) {
       return { name: basename(dir), dir };
     }
   }

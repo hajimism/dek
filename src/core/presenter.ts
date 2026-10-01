@@ -1,4 +1,4 @@
-import type { DekcConfig } from "./config.ts";
+import type { DekConfig } from "./config.ts";
 import type { PresenterSlide } from "./presenter-state.ts";
 import type { ProjectDeck } from "./resolve.ts";
 import { type ScriptLine, scriptLines } from "./script-lines.ts";
@@ -18,7 +18,7 @@ export type ScriptReader = "speaker" | "audience";
 
 export function presenterSlides(
   deck: ProjectDeck,
-  config: DekcConfig,
+  config: DekConfig,
   reader: ScriptReader = "speaker",
 ): PresenterSlide[] {
   const timing = sectionTiming(deck.deck.sections, deck.deck.duration, config);

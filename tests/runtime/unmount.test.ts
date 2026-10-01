@@ -4,7 +4,7 @@ import { playerChannelName, settle } from "../helpers/dom.ts";
 
 // Bun shares BroadcastChannel across the whole test process, so a player left
 // listening would touch `document` after happy-dom is gone.
-test("an unmounted player no longer hears the dekc channel", async () => {
+test("an unmounted player no longer hears the dek channel", async () => {
   await mountChartDeck("player");
   const name = playerChannelName();
   await unmountChartDeck();

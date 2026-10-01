@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import {
   defaultPlaywrightRunner,
   type PagesRequest,
@@ -27,14 +27,14 @@ const request: PagesRequest = {
 
 describe("defaultPlaywrightRunner", () => {
   test("returns null when the runner is missing", async () => {
-    await withEnv({ DEKC_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+    await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
       expect(playwrightResolved()).toBe(false);
       expect(await defaultPlaywrightRunner(request)).toBeNull();
     });
   });
 
   test("returns null quickly when the playwright package is not installed", async () => {
-    await withEnv({ DEKC_PLAYWRIGHT: undefined }, async () => {
+    await withEnv({ DEK_PLAYWRIGHT: undefined }, async () => {
       if (!playwrightResolved()) {
         const started = Date.now();
         expect(await defaultPlaywrightRunner(request)).toBeNull();
@@ -43,9 +43,9 @@ describe("defaultPlaywrightRunner", () => {
     });
   });
 
-  test("returns JSON from DEKC_PLAYWRIGHT stdin/stdout", async () => {
+  test("returns JSON from DEK_PLAYWRIGHT stdin/stdout", async () => {
     await chmod(fakePlaywright, 0o755);
-    await withEnv({ DEKC_PLAYWRIGHT: fakePlaywright }, async () => {
+    await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
       const response = await defaultPlaywrightRunner(request);
       expect(response).toEqual({
         overflows: [],
@@ -61,7 +61,7 @@ describe("defaultPlaywrightRunner", () => {
     await chmod(fakePlaywright, 0o755);
     await withTempDir(async (dir) => {
       const pdfPath = join(dir, "demo.pdf");
-      await withEnv({ DEKC_PLAYWRIGHT: fakePlaywright }, async () => {
+      await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
         const response = await defaultPlaywrightRunner({
           kind: "pdf",
           viewport: { width: 1280, height: 720 },
@@ -75,12 +75,12 @@ describe("defaultPlaywrightRunner", () => {
   });
 
   test.serial(
-    "fails when the worker runs past timeoutMs, so a hung browser cannot hang dekc",
+    "fails when the worker runs past timeoutMs, so a hung browser cannot hang dek",
     async () => {
       const slow = join(import.meta.dir, "..", "helpers", "fake-playwright-slow.ts");
-      await withEnv({ DEKC_PLAYWRIGHT: slow }, async () => {
+      await withEnv({ DEK_PLAYWRIGHT: slow }, async () => {
         await expect(defaultPlaywrightRunner(request, { timeoutMs: 20 })).rejects.toMatchObject({
-          name: "DekcError",
+          name: "DekError",
           message: "Playwright worker failed",
           hint: expect.stringContaining("did not finish"),
         });
@@ -90,9 +90,9 @@ describe("defaultPlaywrightRunner", () => {
 
   test.serial("throws when an installed worker exits non-zero", async () => {
     const fail = join(import.meta.dir, "..", "helpers", "fake-playwright-fail.ts");
-    await withEnv({ DEKC_PLAYWRIGHT: fail }, async () => {
+    await withEnv({ DEK_PLAYWRIGHT: fail }, async () => {
       await expect(defaultPlaywrightRunner(request)).rejects.toMatchObject({
-        name: "DekcError",
+        name: "DekError",
         message: "Playwright worker failed",
       });
     });
@@ -100,10 +100,10 @@ describe("defaultPlaywrightRunner", () => {
 
   test.serial("throws when spawn fails for a resolved runner", async () => {
     await withEnv(
-      { DEKC_PLAYWRIGHT: join(import.meta.dir, "missing-playwright-worker.ts") },
+      { DEK_PLAYWRIGHT: join(import.meta.dir, "missing-playwright-worker.ts") },
       async () => {
         expect(playwrightResolved()).toBe(true);
-        await expect(defaultPlaywrightRunner(request)).rejects.toBeInstanceOf(DekcError);
+        await expect(defaultPlaywrightRunner(request)).rejects.toBeInstanceOf(DekError);
       },
     );
   });
@@ -120,13 +120,13 @@ describe("resolvePlaywrightModule", () => {
         `${JSON.stringify({ name: "playwright", main: "index.js" })}\n`,
       );
       await writeFile(join(pkg, "index.js"), "module.exports = {}\n");
-      const nested = join(dir, "decks", "why-dekc");
+      const nested = join(dir, "decks", "why-dek");
       await mkdir(nested, { recursive: true });
       const cwd = process.cwd();
-      await withEnv({ DEKC_PLAYWRIGHT: undefined }, async () => {
+      await withEnv({ DEK_PLAYWRIGHT: undefined }, async () => {
         try {
           process.chdir(nested);
-          // It resolves from dekc's own install, as `bun add -d playwright` beside dekc puts it.
+          // It resolves from dek's own install, as `bun add -d playwright` beside dek puts it.
           expect(resolvePlaywrightModule()).not.toBe(join(pkg, "index.js"));
         } finally {
           process.chdir(cwd);
@@ -253,7 +253,7 @@ describe("requirePlaywright", () => {
 
   test("throws the install hint when the runner finds no Playwright", async () => {
     await expect(requirePlaywright(request, async () => null)).rejects.toMatchObject({
-      name: "DekcError",
+      name: "DekError",
       message: "Playwright is not installed",
       hint: PLAYWRIGHT_INSTALL,
     });

@@ -6,7 +6,7 @@
  * The id of a still page's `<style>` holding the slide's own CSS, apart from the theme, so a
  * measurement can take it away and see what the theme alone draws.
  */
-export const SLIDE_CSS_ID = "dekc-slide-css";
+export const SLIDE_CSS_ID = "dek-slide-css";
 
 /** A rectangle in viewport pixels. */
 export type Box = {
@@ -58,7 +58,7 @@ export type MeasuredElement = {
  * gives no box for it; the worker asks Chromium for one, by the mark this leaves on its host.
  */
 type PseudoText = {
-  /** The host's mark, `data-dekc-text` on the element, shared by both of its pseudo-elements. */
+  /** The host's mark, `data-dek-text` on the element, shared by both of its pseudo-elements. */
   host: string;
   pseudo: "before" | "after";
   /** The host's short selector with the pseudo-element, as `section.slide::after`. */
@@ -71,7 +71,7 @@ type PseudoText = {
 };
 
 /** The attribute a pseudo text's host carries while it is measured; see `PseudoText`. */
-export const PSEUDO_TEXT_HOST = "data-dekc-text";
+export const PSEUDO_TEXT_HOST = "data-dek-text";
 
 export type SlideMeasure = {
   slideBox: Box | undefined;
@@ -81,7 +81,7 @@ export type SlideMeasure = {
 
 /**
  * Measures the first `.slide` in the current document, and marks each element that draws a pseudo
- * text with `data-dekc-text` (and `data-dekc-text-before` or `-after`) for the worker to find. It runs
+ * text with `data-dek-text` (and `data-dek-text-before` or `-after`) for the worker to find. It runs
  * inside the page through `page.evaluate`, which serializes only this function, so it must not
  * reference anything outside its own body.
  */
@@ -244,8 +244,8 @@ export function measureSlideInPage(): SlideMeasure {
         continue;
       }
       const host = String(index);
-      el.setAttribute("data-dekc-text", host);
-      el.setAttribute(`data-dekc-text-${pseudo}`, "");
+      el.setAttribute("data-dek-text", host);
+      el.setAttribute(`data-dek-text-${pseudo}`, "");
       const own = Number.parseFloat(style.opacity);
       pseudoTexts.push({
         host,
@@ -264,8 +264,8 @@ export function measureSlideInPage(): SlideMeasure {
 
 /** Runs in the page: takes away the marks `measureSlideInPage` left for pseudo texts. */
 export function unmarkPseudoTextsInPage(): void {
-  for (const el of document.querySelectorAll("[data-dekc-text]")) {
-    for (const name of ["data-dekc-text", "data-dekc-text-before", "data-dekc-text-after"]) {
+  for (const el of document.querySelectorAll("[data-dek-text]")) {
+    for (const name of ["data-dek-text", "data-dek-text-before", "data-dek-text-after"]) {
       el.removeAttribute(name);
     }
   }

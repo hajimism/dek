@@ -19,11 +19,11 @@ id を使うことを勧めます。セクションの途中に `###` を挿す�
 .slide.is-current [data-step].is-shown { opacity: 1; transform: none; }
 ```
 
-フェードでもスライドインでも、CSS で書けるものなら何でも。選ぶのはテーマを書く人です。dekc は独自の語彙を足しません。
+フェードでもスライドインでも、CSS で書けるものなら何でも。選ぶのはテーマを書く人です。dek は独自の語彙を足しません。
 
 同梱テーマは要素を `display: none` ではなく `opacity` と `transform` で隠します。だからどのビートでもレイアウトが同じで、`lint --visual` はどのビートを測っても同じはみ出し判定を返します。
 
-要素の結ばれていないビートがあっても構いません。それは喋りの間です。番号が連続している必要もありません。エラーになるのは、何にも解決できない `data-step` だけで、[DEKC003](/ja/reference/lint#dekc003) として報告されます。
+要素の結ばれていないビートがあっても構いません。それは喋りの間です。番号が連続している必要もありません。エラーになるのは、何にも解決できない `data-step` だけで、[DEK003](/ja/reference/lint#dek003) として報告されます。
 
 ## View Transitions
 
@@ -35,7 +35,7 @@ id を使うことを勧めます。セクションの途中に `###` を挿す�
 ::view-transition-new(slide) { animation: fade-in var(--step-transition); }
 ```
 
-遷移の疑似要素はスライドではなくページにぶら下がるので、そのままではテーマのトークンが見えません。dekc はテーマを配るときに、`.slide` に置かれたトークンを `::view-transition` にも同じように置きます。だからここでの `var(--step-transition)` はスライドと同じ値を読み、`@media` の中の値も使われます。`[data-layout]` の下やスライドのスタイルシートのように、一部のスライドにだけ置いたトークンは、そのスライドの中だけで有効です。
+遷移の疑似要素はスライドではなくページにぶら下がるので、そのままではテーマのトークンが見えません。dek はテーマを配るときに、`.slide` に置かれたトークンを `::view-transition` にも同じように置きます。だからここでの `var(--step-transition)` はスライドと同じ値を読み、`@media` の中の値も使われます。`[data-layout]` の下やスライドのスタイルシートのように、一部のスライドにだけ置いたトークンは、そのスライドの中だけで有効です。
 
 プレイヤーはスライドの枠に `slide` という名前を付けているので、動くのはスライドだけです。スライド一覧、発表者ビュー、スライドまわりの余白は止まったままで、端から入ってくる動きもスライドの枠で切り取られます。ページ全体を表す `root` はアニメーションしません。
 
@@ -53,7 +53,7 @@ id を使うことを勧めます。セクションの途中に `###` を挿す�
 
 ランタイムが `data-morph` を `view-transition-name` に変換し、ブラウザが 2 枚の間で位置とサイズを補間します。次の話題が始まるのに合わせて図が隅へ小さく退く、という表現が属性 1 つで書け、どちらの枚も素の `<section class="slide">` フラグメントのままです。
 
-同じ枚に同じ `data-morph` 名が 2 つあると [DEKC005](/ja/reference/lint#dekc005) です。`slide` のようにプレイヤーが使う名前を付けた場合も DEKC005 です。前後どちらのスライドにもない名前は何とも morph せず、[DEKC028](/ja/reference/lint#dekc028) の警告になります。hint にはいちばんありそうな相手が出ます。
+同じ枚に同じ `data-morph` 名が 2 つあると [DEK005](/ja/reference/lint#dek005) です。`slide` のようにプレイヤーが使う名前を付けた場合も DEK005 です。前後どちらのスライドにもない名前は何とも morph せず、[DEK028](/ja/reference/lint#dek028) の警告になります。hint にはいちばんありそうな相手が出ます。
 
 モーフは静止画では見えません。判断するには遷移を途中で止めて見ます。
 
@@ -78,12 +78,12 @@ export default {
     const bar = slide.querySelector<HTMLElement>("[data-bar]");
     if (bar) bar.style.width = `${p * 80}%`;
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;
 ```
 
-要素はクラスではなく、`<div data-bar>` のような `data-*` 属性で探します。クラスはスタイルを当てるためのものなので、目印としてだけ使ったクラスは、どこかのスタイルシートで定義するまで `DEKC010` になり、`querySelector`、`closest`、`matches`、`getElementsByClassName` に書いたクラスは `DEKC017` になります。
+要素はクラスではなく、`<div data-bar>` のような `data-*` 属性で探します。クラスはスタイルを当てるためのものなので、目印としてだけ使ったクラスは、どこかのスタイルシートで定義するまで `DEK010` になり、`querySelector`、`closest`、`matches`、`getElementsByClassName` に書いたクラスは `DEK017` になります。
 
-`DekcSlide` は import せずに使えます。`dekc init` と `dekc sync` がその定義を `.dekc/slide.d.ts` に書き、`dekc init` はエディタがそれを読むための `tsconfig.json` も置きます。これで `slide` は `HTMLElement`、`t` は数値になり、フィールド名の打ち間違いや `process` のような Node のグローバルは書いた時点で赤線になります。`dekc sync` は `tsconfig.json` を作りも書き換えもしないので、自前の `tsconfig.json` がある場合はその `include` に `".dekc/*.d.ts"` を足してください。dekc はビルド時に型を消すだけで `tsc` は走らせず、実行時に影響する誤りは lint が検査します。
+`DekSlide` は import せずに使えます。`dekc init` と `dekc sync` がその定義を `.dek/slide.d.ts` に書き、`dekc init` はエディタがそれを読むための `tsconfig.json` も置きます。これで `slide` は `HTMLElement`、`t` は数値になり、フィールド名の打ち間違いや `process` のような Node のグローバルは書いた時点で赤線になります。`dekc sync` は `tsconfig.json` を作りも書き換えもしないので、自前の `tsconfig.json` がある場合はその `include` に `".dek/*.d.ts"` を足してください。dek はビルド時に型を消すだけで `tsc` は走らせず、実行時に影響する誤りは lint が検査します。
 
 `draw` は時間の関数で、時計はランタイムが持ちます。
 
@@ -94,7 +94,7 @@ export default {
 
 レールや次のプレビューも含めて、スライドの複製はどれも文書に入ってから描かれるので、`draw` の中でスライドを測っても構いません。測るときは `offsetWidth` のような、transform で拡縮されないレイアウトの寸法を使ってください。`getBoundingClientRect` はウィンドウの大きさで変わります。
 
-なので、描画は `t` だけから決め、触る要素は毎回すべて書き直してください。ジャンプや一歩戻る操作では新しいビートの終わりだけを描くので、同じ `(index, t)` なら直前に何を描いていても同じ見た目になる必要があります。タイマー、`requestAnimationFrame`、呼び出しをまたいで持ち越す状態を使うと、動画が正しく録れません。録画は実時間で待たないからです。lint はタイマー、`requestAnimationFrame`、`Date`、`performance.now`、`Math.random` を、その行を指して `DEKC017` として報告します。スクリプトは自己完結させます。`export default` だけを持つ 1 つのモジュールで、import はできず、トップレベルでは定義だけを行い、スライドに触るのは `draw` の中です。それ以外は `DEKC016` で、スライドのビートにない `motion` のキーも `DEKC016` です。lint はトップレベルを Node や Bun のグローバルがない別のワーカーで評価し、1 秒で打ち切ります。間違いが dekc に及ばないようにするためで、安全を保証する境界ではありません。dekc が読むのは `.ts` だけで、`slides/<id>.js` は名前を変えるよう `DEKC016` で知らせます。`dekc build` はスクリプトをインライン化し、`dekc mv` は一緒に動かし、開発サーバでは保存するとページを読み直します。
+なので、描画は `t` だけから決め、触る要素は毎回すべて書き直してください。ジャンプや一歩戻る操作では新しいビートの終わりだけを描くので、同じ `(index, t)` なら直前に何を描いていても同じ見た目になる必要があります。タイマー、`requestAnimationFrame`、呼び出しをまたいで持ち越す状態を使うと、動画が正しく録れません。録画は実時間で待たないからです。lint はタイマー、`requestAnimationFrame`、`Date`、`performance.now`、`Math.random` を、その行を指して `DEK017` として報告します。スクリプトは自己完結させます。`export default` だけを持つ 1 つのモジュールで、import はできず、トップレベルでは定義だけを行い、スライドに触るのは `draw` の中です。それ以外は `DEK016` で、スライドのビートにない `motion` のキーも `DEK016` です。lint はトップレベルを Node や Bun のグローバルがない別のワーカーで評価し、1 秒で打ち切ります。間違いが dek に及ばないようにするためで、安全を保証する境界ではありません。dek が読むのは `.ts` だけで、`slides/<id>.js` は名前を変えるよう `DEK016` で知らせます。`dekc build` はスクリプトをインライン化し、`dekc mv` は一緒に動かし、開発サーバでは保存するとページを読み直します。
 
 ## 静止画に写るもの
 

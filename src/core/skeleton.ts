@@ -22,7 +22,7 @@ export function deckLayouts(deckDir: string): SkeletonLayouts {
 /**
  * A heading that is only an id (`## intro`) has no display text. The first
  * section takes the deck title; later ones stay empty so the slug never ends
- * up on a published slide. Lint reports the empty heading (DEKC024) with the
+ * up on a published slide. Lint reports the empty heading (DEK024) with the
  * fix: a title in script.md, which the next sync writes here.
  */
 function skeletonHeading(

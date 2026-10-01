@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hajimism.github.io/dekc/cli.schema.json",
+  "$id": "https://hajimism.github.io/dek/cli.schema.json",
   "title": "dekc --json",
-  "description": "What each dekc command prints with --json, one JSON object per line. $defs holds one schema per command, and `failure` for a command line that could not run. While dekc is 0.x the shape may change between releases.",
+  "description": "What each dek command prints with --json, one JSON object per line. $defs holds one schema per command, and `failure` for a command line that could not run. While dek is 0.x the shape may change between releases.",
   "$defs": {
     "init": {
       "anyOf": [
@@ -23,7 +23,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "dekc's own files, already there, brought up to date."
+              "description": "dek's own files, already there, brought up to date."
             },
             "kept": {
               "type": "array",
@@ -2114,7 +2114,7 @@
           "maximum": 9007199254740991
         },
         "hint": {
-          "description": "The next step, whenever dekc knows it.",
+          "description": "The next step, whenever dek knows it.",
           "type": "string"
         }
       },
@@ -2128,7 +2128,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "DEKCnnn for dekc's own rules; another tool's id for its findings."
+          "description": "DEKnnn for dek's own rules; another tool's id for its findings."
         },
         "severity": {
           "type": "string",

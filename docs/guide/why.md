@@ -1,34 +1,34 @@
-# Why dekc
+# Why dek
 
 Slides exist so that you can talk. Every mainstream tool forgets this. PowerPoint, Keynote, Google Slides, Marp, Slidev: all of them start with an empty box and ask you to fill it. You add a heading, then a diagram, then an animation. The deck grows more polished, and the talk grows harder to deliver. On the day, you watch the clock, skip three slides, and leave out the one thing you came to say.
 
-dekc starts from the other end. You write what you will say, in what order, and for how long. Only then do you ask what should be on screen at each moment. The script is the parent. Slides are derived from it.
+dek starts from the other end. You write what you will say, in what order, and for how long. Only then do you ask what should be on screen at each moment. The script is the parent. Slides are derived from it.
 
-Put another way, dekc is a build system for talks. `script.md` is the source. `dekc sync` generates skeleton slides from it, the way a build generates code. `dekc lint` checks every slide against the theme's vocabulary the way a compiler checks types, and `--visual` renders and measures it the way a test would. `dekc build`, `dekc pdf`, and `dekc video` are the targets. A clean build says the deck is not broken; whether it is good is still the author's call.
+Put another way, dek is a build system for talks. `script.md` is the source. `dekc sync` generates skeleton slides from it, the way a build generates code. `dekc lint` checks every slide against the theme's vocabulary the way a compiler checks types, and `--visual` renders and measures it the way a test would. `dekc build`, `dekc pdf`, and `dekc video` are the targets. A clean build says the deck is not broken; whether it is good is still the author's call.
 
-## Three problems dekc exists to solve
+## Three problems dek exists to solve
 
 ### A talk is not a one-off
 
 Most slide tools treat a deck as a project. Every talk gets a fresh repository, a fresh theme, a fresh set of conventions, and everything you learned last time stays behind.
 
-dekc treats a **project** as a place that holds many **decks**. Conventions belong to the project. The look carries forward from your last deck. Each deck owns its script and slides. Your past talks are the starting point for the next one.
+dek treats a **project** as a place that holds many **decks**. Conventions belong to the project. The look carries forward from your last deck. Each deck owns its script and slides. Your past talks are the starting point for the next one.
 
 ### Agents need small files
 
 Fixing slide seven in a 3,000-line `slides.md` is an oddly hard task for a language model. The context is enormous, the diff is noisy, and one bad edit can break the whole deck.
 
-In dekc, one slide is one HTML file of roughly forty lines. The edit target is small, the diff is readable, and if something breaks it breaks one slide. This is the single biggest reason dekc exists as a separate tool rather than a Slidev theme.
+In dek, one slide is one HTML file of roughly forty lines. The edit target is small, the diff is readable, and if something breaks it breaks one slide. This is the single biggest reason dek exists as a separate tool rather than a Slidev theme.
 
 ### Agents cannot see what they render
 
 An agent that writes HTML has no idea whether the text fits in the box. The markup looks perfect as text. A human notices the overflow thirty minutes before going on stage.
 
-dekc renders the slide and reports what it sees as machine-readable diagnostics: overflow, contrast, missing images. The agent writes, checks, reads the result, and fixes its own mistake. The loop closes without a human in it.
+dek renders the slide and reports what it sees as machine-readable diagnostics: overflow, contrast, missing images. The agent writes, checks, reads the result, and fixes its own mistake. The loop closes without a human in it.
 
 ## Three principles
 
-Everything in dekc follows from three rules. Each one is enforced by structure or by lint, not by documentation.
+Everything in dek follows from three rules. Each one is enforced by structure or by lint, not by documentation.
 
 ### 1. `script.md` is the single source of truth
 
@@ -44,15 +44,15 @@ The same property scales up to the deck directory. A deck never references anyth
 
 ### 3. Conventions are enforced by lint
 
-"Only use these CSS classes." "No raw values outside tokens." "Never reference a file outside the deck." Rules like these are not kept by writing them down. dekc implements every one as a lint rule and reports them as SARIF.
+"Only use these CSS classes." "No raw values outside tokens." "Never reference a file outside the deck." Rules like these are not kept by writing them down. dek implements every one as a lint rule and reports them as SARIF.
 
-**Lint decides what can be measured, and nothing more.** A deck is not done while lint fails, and passing lint means nothing a rule can decide is wrong. The dev server lints on every save, so a deck you are working on is always either passing or telling you exactly why not. What lint cannot decide, the balance of the slides and whether the talk holds, is left to you, and dekc hands you the sheet and the script to judge it by. Voice adds diagnostics; it never turns a passing deck into a failing one.
+**Lint decides what can be measured, and nothing more.** A deck is not done while lint fails, and passing lint means nothing a rule can decide is wrong. The dev server lints on every save, so a deck you are working on is always either passing or telling you exactly why not. What lint cannot decide, the balance of the slides and whether the talk holds, is left to you, and dek hands you the sheet and the script to judge it by. Voice adds diagnostics; it never turns a passing deck into a failing one.
 
 Voice and video are derived from the script. The script itself knows nothing about how it looks or sounds.
 
-## How dekc compares
+## How dek compares
 
-|  | PowerPoint / Keynote | Marp | Slidev | dekc |
+|  | PowerPoint / Keynote | Marp | Slidev | dek |
 | --- | --- | --- | --- | --- |
 | Authoring order | Slides first | Slides first | Slides first | Script first |
 | Unit of work | One file, one deck | One file, one deck | One repo, one deck | One project, many decks |
@@ -64,21 +64,21 @@ Voice and video are derived from the script. The script itself knows nothing abo
 | Agent interface | Weak | Text | MCP server | CLI + `AGENTS.md` |
 | Best for | General use | Simple Markdown decks | Technical talks with live demos | Talks where the speaking matters most |
 
-Slidev is the most mature tool in this space, and dekc borrows from it freely: presenter sync, optional Playwright, scoped CSS conventions. The decisive differences are file granularity, where the script sits in the hierarchy, and what counts as the unit of work.
+Slidev is the most mature tool in this space, and dek borrows from it freely: presenter sync, optional Playwright, scoped CSS conventions. The decisive differences are file granularity, where the script sits in the hierarchy, and what counts as the unit of work.
 
-dekc carries no Vue, UnoCSS, Monaco, or Mermaid. That keeps lint and build simple, and it keeps plain HTML and CSS as a strength rather than a limitation.
+dek carries no Vue, UnoCSS, Monaco, or Mermaid. That keeps lint and build simple, and it keeps plain HTML and CSS as a strength rather than a limitation.
 
-## What dekc is not for
+## What dek is not for
 
 Use Slidev if you need any of the following.
 
-- Interactive slides: clickable demos, or code that reacts to the audience. A slide script in dekc only draws a function of time.
+- Interactive slides: clickable demos, or code that reacts to the audience. A slide script in dek only draws a function of time.
 - Live coding or an embedded editor
 - A gallery of npm themes
 - An animation DSL beyond CSS and a seekable `draw(t)`
 - PPTX or Keynote export, or a WYSIWYG editor
 
-dekc stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
+dek stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
 
 ## Next
 

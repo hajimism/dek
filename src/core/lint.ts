@@ -31,7 +31,7 @@ export type LintDeckOptions = {
 type DeckInput = string | { project: Project; deck: ProjectDeck };
 
 /**
- * The project's own findings (DEKC008 on dekc.toml): the same for every deck, so a command that
+ * The project's own findings (DEK008 on dek.toml): the same for every deck, so a command that
  * covers several decks reports them once, beside each deck's `lintDeck`.
  */
 export function lintProject(project: Project): Diagnostic[] {

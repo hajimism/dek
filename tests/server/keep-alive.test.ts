@@ -72,7 +72,7 @@ describe("stopOnce", () => {
   });
 });
 
-describe("dekc dev server lifetime", () => {
+describe("dek dev server lifetime", () => {
   test("exits when the process that started it dies without cleaning up", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       // A parent that starts `dekc`, names its pid, and is then SIGKILLed like a timed-out test run.

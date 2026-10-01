@@ -52,7 +52,7 @@ export function inferLang(text: string): string {
   return "en";
 }
 
-/** Frontmatter fields written to `.dekc/schema.json` for yaml-language-server. */
+/** Frontmatter fields written to `.dek/schema.json` for yaml-language-server. */
 export const Frontmatter = z.object({
   title: z.string(),
   description: z
@@ -82,7 +82,7 @@ export type Deck = z.infer<typeof Deck>;
 
 /**
  * What a script may write, not what parsing returns: a field with a default is optional. Unknown
- * keys stay flagged, as DEKC008 flags them, although parsing drops them rather than failing.
+ * keys stay flagged, as DEK008 flags them, although parsing drops them rather than failing.
  */
 export function frontmatterJsonSchema(): unknown {
   return { ...z.toJSONSchema(Frontmatter, { io: "input" }), additionalProperties: false };

@@ -9,7 +9,7 @@ import { slideSelector } from "./live.ts";
 import { createMotion, drawAtEnd, type MotionMode, type SlideModule } from "./motion.ts";
 import { waitForPlaybackSettle } from "./settle.ts";
 import { applyIsShown, applyMorphNames, clearMorphNames, shouldUseViewTransition } from "./step.ts";
-import type { DekcMotionHandle } from "./window.ts";
+import type { DekMotionHandle } from "./window.ts";
 
 export type Stage = {
   slideEl(slug: string | undefined): HTMLElement | undefined;
@@ -32,7 +32,7 @@ export type Stage = {
   /** Fit the deck to its stage. */
   fit(): void;
   /** What the video recorder seeks. */
-  motion: DekcMotionHandle;
+  motion: DekMotionHandle;
 };
 
 /** How the script draws a move: one beat forward animates, anything else jumps to its end. */
@@ -70,7 +70,7 @@ export function isFinishable(animation: {
   return animation.playState === "running" && typeof end === "number" && Number.isFinite(end);
 }
 
-const slideModules = (): Record<string, SlideModule> => window.__dekcSlides ?? {};
+const slideModules = (): Record<string, SlideModule> => window.__dekSlides ?? {};
 
 function slideEl(slug: string | undefined): HTMLElement | undefined {
   if (!slug) {

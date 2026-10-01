@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { locateDeck, type Project, resolveProject } from "../core/resolve.ts";
 import { liveReloadScript, playerScript } from "../runtime/player.ts";
@@ -41,7 +41,7 @@ export type DevServerOptions = {
   visual?: boolean;
   visualRunner?: PlaywrightRunner;
   remote?: boolean;
-  /** The --remote password, which dekc makes; never taken from the user, so never weak. */
+  /** The --remote password, which dek makes; never taken from the user, so never weak. */
   password?: string;
   /** How long a pairing code stays good; see PAIRING_TTL_MS. */
   pairingTtlMs?: number;
@@ -160,7 +160,7 @@ function assertKnownDeck(project: Project, name: string): void {
     project.decks.some((entry) => entry.name === name) ||
     project.failed.some((entry) => entry.name === name);
   if (!known) {
-    throw new DekcError(`deck "${name}" not found`, {
+    throw new DekError(`deck "${name}" not found`, {
       path: join(project.root, "decks", name),
       hint: "run `dekc ls`",
     });
@@ -202,8 +202,8 @@ function answer(req: Request, server: Bun.Server<WsData>, access: Access, routes
   if (refused) {
     return refused;
   }
-  // Per port: a phone may pair with two dekc servers on one machine.
-  const session = { name: `dekc-presenter-${server.port}`, secret: access.sessionSecret };
+  // Per port: a phone may pair with two dek servers on one machine.
+  const session = { name: `dek-presenter-${server.port}`, secret: access.sessionSecret };
   const { pairings } = access;
   const code = pairings && new URL(req.url).searchParams.get("pair");
   if (pairings && typeof code === "string") {
@@ -243,7 +243,7 @@ function roomSockets(rooms: RouteContext["rooms"]): Bun.WebSocketHandler<WsData>
 
 function listenError(error: unknown, port: number | undefined): unknown {
   if (port && (error as { code?: string } | null)?.code === "EADDRINUSE") {
-    return new DekcError(`port ${port} is already in use`, {
+    return new DekError(`port ${port} is already in use`, {
       hint: "pass another --port, or omit it to let the OS choose",
     });
   }

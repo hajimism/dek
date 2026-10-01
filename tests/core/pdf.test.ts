@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { copyFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import { pdfDeck, renderPdfHtml } from "../../src/core/pdf.ts";
 import type { PlaywrightRunner, VisualRequest } from "../../src/core/playwright.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
@@ -156,7 +156,7 @@ second
         // The browser's default body margin would push the first slide over its page.
         expect(html).toContain("html, body { margin: 0;");
         expect(html).toContain("#deck > .slide:not(:last-child) { break-after: page; }");
-        expect(html).not.toContain("dekc-presenter");
+        expect(html).not.toContain("dek-presenter");
         expect(html).not.toContain("startViewTransition");
         expect(html).not.toContain("BroadcastChannel");
 
@@ -173,9 +173,9 @@ second
           await pdfDeck(join(root, "decks", "demo"), { runner: async () => null });
           throw new Error("expected pdfDeck to fail");
         } catch (error) {
-          expect(error).toBeInstanceOf(DekcError);
-          expect((error as DekcError).message).toContain("Playwright is not installed");
-          expect((error as DekcError).hint).toContain("playwright install");
+          expect(error).toBeInstanceOf(DekError);
+          expect((error as DekError).message).toContain("Playwright is not installed");
+          expect((error as DekError).hint).toContain("playwright install");
         }
       },
     );
@@ -191,7 +191,7 @@ second
           await writeRequested(request);
           return {};
         };
-        await expect(pdfDeck(resolved.deck.dir, { runner })).rejects.toThrow(DekcError);
+        await expect(pdfDeck(resolved.deck.dir, { runner })).rejects.toThrow(DekError);
         const result = await pdfDeck(resolved, { runner });
         expect(result.outPath).toBe(join(root, "decks", "demo", "dist", "demo.pdf"));
       },

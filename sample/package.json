@@ -1,5 +1,5 @@
 {
-  "name": "dekc-sample",
+  "name": "dek-sample",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
     "video": "dekc video"
   },
   "devDependencies": {
-    "@hajimism/dekc": "file:..",
+    "@hajimism/dek": "file:..",
     "playwright": "^1.63.0",
     "rumdl": "^0.2.73"
   }

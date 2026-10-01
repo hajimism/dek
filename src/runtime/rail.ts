@@ -1,8 +1,8 @@
 import { RAIL_WIDTH_DEFAULT, RAIL_WIDTH_MAX, RAIL_WIDTH_MIN } from "../core/rail-width.ts";
 import { isLetterKey } from "./step.ts";
 
-export const RAIL_WIDTH_KEY = "dekc.railWidth";
-export const RAIL_VISIBLE_KEY = "dekc.railVisible";
+export const RAIL_WIDTH_KEY = "dek.railWidth";
+export const RAIL_VISIBLE_KEY = "dek.railVisible";
 
 export function isRailToggleKey(event: Parameters<typeof isLetterKey>[0]): boolean {
   return isLetterKey(event, "s");

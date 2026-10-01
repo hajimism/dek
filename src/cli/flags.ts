@@ -1,8 +1,8 @@
 import { parseArgs } from "node:util";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { acceptedFlags, isTypedCommand, subcommandAt } from "./commands.ts";
 
-/** A flag's shape: a switch, a string, or a value dekc checks before any command runs. */
+/** A flag's shape: a switch, a string, or a value dek checks before any command runs. */
 type FlagSpec = { text: string } & (
   | { type: "boolean"; short?: string }
   | { type: "string"; value: string }
@@ -12,13 +12,13 @@ type FlagSpec = { text: string } & (
 );
 
 /**
- * Every flag dekc has: its type, the placeholder for its value, and what it means. Each command
+ * Every flag dek has: its type, the placeholder for its value, and what it means. Each command
  * names the ones it takes; help, parsing, and the checks on a value all read this one table.
  */
 export const FLAGS = {
   json: { type: "boolean", text: "print the result, or the error, as JSON" },
   help: { type: "boolean", short: "h", text: "show help; dekc help <command> for one command" },
-  version: { type: "boolean", short: "v", text: "print the dekc version" },
+  version: { type: "boolean", short: "v", text: "print the dek version" },
   agent: { type: "boolean", text: "the compact reference for agents" },
   deck: { type: "string", value: "NAME", text: "target a deck by name from the project root" },
   "theme-from": {
@@ -28,7 +28,7 @@ export const FLAGS = {
   },
   remote: {
     type: "boolean",
-    text: "serve on the LAN; the presenter view needs the password dekc prints",
+    text: "serve on the LAN; the presenter view needs the password dek prints",
   },
   port: {
     type: "int",
@@ -71,7 +71,7 @@ export const FLAGS = {
     type: "int",
     value: "N",
     min: 0,
-    example: "dekc voice dict add dekc デック --accent 1",
+    example: "dekc voice dict add dek デック --accent 1",
     text: "the accent position of the reading",
   },
   fps: {
@@ -85,7 +85,7 @@ export const FLAGS = {
   url: {
     type: "string",
     value: "<url>",
-    text: "the URL dist/ is served from, over url in dekc.toml",
+    text: "the URL dist/ is served from, over url in dek.toml",
   },
   public: {
     type: "boolean",
@@ -263,33 +263,33 @@ function typedValue(name: FlagName, value: string): string | number {
   }
 }
 
-function invalid(name: FlagName, value: string, takes: string): DekcError {
-  return new DekcError(`invalid --${name} "${value}"`, { hint: `--${name} takes ${takes}` });
+function invalid(name: FlagName, value: string, takes: string): DekError {
+  return new DekError(`invalid --${name} "${value}"`, { hint: `--${name} takes ${takes}` });
 }
 
 /** parseArgs' own messages, reworded around what the user typed. */
 function describeParseError(
   error: unknown,
   { argv, label, hint }: { argv: string[]; label: string; hint: string },
-): DekcError {
+): DekError {
   const message = error instanceof Error ? error.message : String(error);
   const unknown = message.match(/^Unknown option '([^']+)'/);
   if (unknown) {
-    return new DekcError(`unknown flag ${unknown[1]} for ${label}`, { hint });
+    return new DekError(`unknown flag ${unknown[1]} for ${label}`, { hint });
   }
   const missing = message.match(/^Option '(--[^ ']+)(?: <value>)?' argument missing/);
   if (missing) {
-    return new DekcError(`${missing[1]} needs a value`, { hint });
+    return new DekError(`${missing[1]} needs a value`, { hint });
   }
   // `--to --deck`: parseArgs refuses to guess; say what it saw instead of a value.
   const ambiguous = message.match(/^Option '(--[^']+)' argument is ambiguous/);
   if (ambiguous) {
     const next = argv[argv.indexOf(ambiguous[1] ?? "") + 1];
-    return new DekcError(`${ambiguous[1]} needs a value, got ${next}`, { hint });
+    return new DekError(`${ambiguous[1]} needs a value, got ${next}`, { hint });
   }
   const extra = message.match(/^Option '(--[^']+)' does not take an argument/);
   if (extra) {
-    return new DekcError(`${extra[1]} takes no value`, { hint });
+    return new DekError(`${extra[1]} takes no value`, { hint });
   }
-  return new DekcError(message, { hint });
+  return new DekError(message, { hint });
 }

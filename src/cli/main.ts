@@ -1,4 +1,4 @@
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { either } from "../core/prose.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { resolveProject } from "../core/resolve.ts";
@@ -202,13 +202,13 @@ function retypedWithDeck<T>(line: CommandLine, cwd: string, resolve: () => T): T
       : error.decks.length > NAMED_DECKS
         ? `run ${addressHint(typed, first, cwd)}, or name another deck in place of ${first.name}; \`dekc ls\` lists them`
         : `run ${either(error.decks.map((deck) => addressHint(typed, deck, cwd)))}`;
-    throw new DekcError(error.message, { hint, cause: error });
+    throw new DekError(error.message, { hint, cause: error });
   }
 }
 
 /** A session prints no result, so --json has nothing to shape, and a reader would wait forever. */
-function sessionJsonError(name: string): DekcError {
-  return new DekcError(`${name} keeps running until stopped and prints no JSON`, {
+function sessionJsonError(name: string): DekError {
+  return new DekError(`${name} keeps running until stopped and prints no JSON`, {
     hint: "start it without --json and leave it running; for a result, run `dekc lint --json` or `dekc check <slug> --json`",
   });
 }

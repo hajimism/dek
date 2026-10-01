@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { rehearseCommand, rehearseSessionView } from "../../src/cli/rehearse.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
-import { spawnDekcServer } from "../helpers/cli.ts";
+import { spawnDekServer } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { withDevServer } from "../helpers/server.ts";
@@ -17,14 +17,14 @@ describe("dekc rehearse", () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const { url, stdout, stop } = await spawnDekcServer(join(root, "decks", "demo"), {
+        const { url, stdout, stop } = await spawnDekServer(join(root, "decks", "demo"), {
           args: ["rehearse"],
         });
         try {
           expect(stdout).toContain("rehearse");
           const page = await fetch(url);
           expect(page.ok).toBe(true);
-          expect(await page.text()).toContain("dekc-data");
+          expect(await page.text()).toContain("dek-data");
         } finally {
           await stop();
         }
@@ -58,7 +58,7 @@ describe("dekc rehearse", () => {
         await expect(
           rehearseCommand(requireDeckFromCwd(join(root, "decks", "demo")), { slug: "intr" }),
         ).rejects.toMatchObject({
-          name: "DekcError",
+          name: "DekError",
           message: 'section "intr" not found',
           hint: "did you mean `intro`? run `dekc ls` for every slide",
         });

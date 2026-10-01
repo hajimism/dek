@@ -197,14 +197,14 @@ export function measureTextContrast(
 export function textLayerCss(layer: TextLayer): string {
   const glyphless = layer === "bare" || layer === "shadowless";
   const fill = glyphless ? "transparent" : { white: "#fff", black: "#000" }[layer];
-  const clipped = glyphless ? "\n[data-dekc-clip-text] { background: none !important; }" : "";
-  const unblended = glyphless ? "" : "\n[data-dekc-blend] { mix-blend-mode: normal !important; }";
+  const clipped = glyphless ? "\n[data-dek-clip-text] { background: none !important; }" : "";
+  const unblended = glyphless ? "" : "\n[data-dek-blend] { mix-blend-mode: normal !important; }";
   const unshadowed =
     layer === "shadowless" ? "\n*, *::before, *::after { text-shadow: none !important; }" : "";
   return `*, *::before, *::after { transition: none !important; }
 * { -webkit-text-fill-color: ${fill} !important; }
 *::before, *::after { -webkit-text-fill-color: initial !important; }
-[data-dekc-text-before]::before, [data-dekc-text-after]::after { -webkit-text-fill-color: ${fill} !important; }
+[data-dek-text-before]::before, [data-dek-text-after]::after { -webkit-text-fill-color: ${fill} !important; }
 svg text, svg tspan, svg textPath { fill: ${fill} !important; stroke: transparent !important; }${clipped}${unblended}${unshadowed}`;
 }
 
@@ -218,10 +218,10 @@ function markTextLayers(): { shadowed: boolean } {
   for (const el of document.querySelectorAll("*")) {
     const style = getComputedStyle(el);
     if (style.backgroundClip === "text") {
-      el.setAttribute("data-dekc-clip-text", "");
+      el.setAttribute("data-dek-clip-text", "");
     }
     if (style.mixBlendMode !== "normal" && el.textContent?.trim()) {
-      el.setAttribute("data-dekc-blend", "");
+      el.setAttribute("data-dek-blend", "");
     }
     shadowed ||= [style, getComputedStyle(el, "::before"), getComputedStyle(el, "::after")].some(
       (drawn) => drawn.textShadow !== "none",
@@ -275,9 +275,9 @@ async function sampleTextContrasts({
   return texts.map((text) => measureTextContrast(decoded, text) ?? null);
 }
 
-/** Defines `window.__dekcTextContrast`, the in-page sampler, from this file's own source. */
+/** Defines `window.__dekTextContrast`, the in-page sampler, from this file's own source. */
 export function textContrastScript(): string {
-  return `window.__dekcTextContrast = (function () {
+  return `window.__dekTextContrast = (function () {
 ${relativeLuminance}
 ${contrastRatio}
 ${measureTextContrast}
@@ -321,9 +321,9 @@ export async function measurePageTextContrasts(
     (input) =>
       (
         window as unknown as {
-          __dekcTextContrast: (arg: SamplerInput) => Promise<Array<TextContrast | null>>;
+          __dekTextContrast: (arg: SamplerInput) => Promise<Array<TextContrast | null>>;
         }
-      ).__dekcTextContrast(input),
+      ).__dekTextContrast(input),
     { layers, texts: withOverlaps(texts) },
   );
 }
@@ -338,7 +338,7 @@ function layerDrawer(page: LayerPage) {
     Buffer.from(await page.screenshot({ type: "png" })).toString("base64");
   const setLayer = (css: string | null): Promise<void> =>
     page.evaluate((text) => {
-      let style = document.getElementById("dekc-text-layer");
+      let style = document.getElementById("dek-text-layer");
       if (text === null) {
         if (style) {
           style.textContent = "*, *::before, *::after { transition: none !important; }";
@@ -350,7 +350,7 @@ function layerDrawer(page: LayerPage) {
       }
       if (!style) {
         style = document.createElement("style");
-        style.id = "dekc-text-layer";
+        style.id = "dek-text-layer";
         document.head.append(style);
       }
       style.textContent = text;
@@ -369,7 +369,7 @@ export type GlyphTarget = { rects: Box[] } & (
 );
 
 /** The attribute that marks an element whose own text is drawn alone. */
-const GLYPHS_MARK = "data-dekc-glyphs";
+const GLYPHS_MARK = "data-dek-glyphs";
 
 /**
  * The box each text's glyphs show in, inside its own boxes. Each is drawn alone, every other glyph
@@ -402,7 +402,7 @@ svg text, svg tspan, svg textPath { fill: transparent !important; stroke: transp
 ${
   "element" in target
     ? `[${GLYPHS_MARK}="${target.element}"] { -webkit-text-fill-color: ${fill} !important; fill: ${fill} !important; }`
-    : `[data-dekc-text="${target.host}"][data-dekc-text-${target.pseudo}]::${target.pseudo} { -webkit-text-fill-color: ${fill} !important; }`
+    : `[data-dek-text="${target.host}"][data-dek-text-${target.pseudo}]::${target.pseudo} { -webkit-text-fill-color: ${fill} !important; }`
 }`;
   const pairs: Array<{ white: string; black: string; rects: Box[] }> = [];
   for (const target of targets) {

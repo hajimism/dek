@@ -48,7 +48,7 @@ describe("addressHint", () => {
       "run `dekc theme demo`",
       "run `dekc show owner/repo/deck intro`",
       "run `dekc check --deck demo intro`",
-      "use `dekc`-style names",
+      "use `dek`-style names",
     ]) {
       expect(addressHint(hint, demo, root)).toBe(hint);
     }
@@ -65,7 +65,7 @@ describe("deckAround", () => {
       const dir = join(root, "decks", "demo");
       expect(deckAround(join(dir, "slides", "intro.html"))).toEqual({ name: "demo", dir });
       expect(deckAround(join(dir, "theme.css"))).toEqual({ name: "demo", dir });
-      expect(deckAround(join(root, "dekc.toml"))).toBeUndefined();
+      expect(deckAround(join(root, "dek.toml"))).toBeUndefined();
     });
   });
 });
@@ -94,7 +94,7 @@ describe("addressResult", () => {
         if (addressed.command !== "lint") {
           throw new Error("expected a lint result");
         }
-        const layout = addressed.data.diagnostics.find((d) => d.id === "DEKC019");
+        const layout = addressed.data.diagnostics.find((d) => d.id === "DEK019");
         expect(layout?.hint).toContain("`dekc theme demo`");
         expect(addressed.data.skipped?.find((s) => s.check === "visual")?.hint).toBe(
           "run `dekc lint demo --visual` to measure overflow and contrast",

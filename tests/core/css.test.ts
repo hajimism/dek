@@ -90,7 +90,7 @@ describe("cssClassNames", () => {
   });
 });
 
-describe("DEKC013", () => {
+describe("DEK013", () => {
   test("does not count font filenames toward the class limit", async () => {
     const classes = Array.from({ length: 39 }, (_, i) => `.slide .c${i} {}`).join("\n");
     await withTempProject(
@@ -105,7 +105,7 @@ describe("DEKC013", () => {
       },
       async (root) => {
         const diagnostics = lintDeck(join(root, "decks", "demo"));
-        expect(diagnostics.some((d) => d.id === "DEKC013")).toBe(false);
+        expect(diagnostics.some((d) => d.id === "DEK013")).toBe(false);
       },
     );
   });

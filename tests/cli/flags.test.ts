@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseCommandLine } from "../../src/cli/flags.ts";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 
 describe("parseCommandLine", () => {
   test("names the command and keeps its flags and positionals", () => {
@@ -18,8 +18,8 @@ describe("parseCommandLine", () => {
     });
   });
 
-  test("rejects a flag dekc does not have", () => {
-    expect(() => parseCommandLine(["lint", "--fixx"])).toThrow(DekcError);
+  test("rejects a flag dek does not have", () => {
+    expect(() => parseCommandLine(["lint", "--fixx"])).toThrow(DekError);
     expect(() => parseCommandLine(["lint", "--fixx"])).toThrow("unknown flag --fixx for dekc lint");
   });
 
@@ -30,9 +30,9 @@ describe("parseCommandLine", () => {
     } catch (caught) {
       error = caught;
     }
-    expect(error).toBeInstanceOf(DekcError);
-    expect((error as DekcError).message).toBe("unknown flag --port for dekc rehearse");
-    expect((error as DekcError).hint).toContain("--remote");
+    expect(error).toBeInstanceOf(DekError);
+    expect((error as DekError).message).toBe("unknown flag --port for dekc rehearse");
+    expect((error as DekError).hint).toContain("--remote");
   });
 
   test("rejects a value flag with nothing after it", () => {
@@ -61,7 +61,7 @@ describe("parseCommandLine", () => {
       command: "talk",
       values: { remote: true },
     });
-    // dekc makes the password, so none is ever too short, empty, or left in shell history.
+    // dek makes the password, so none is ever too short, empty, or left in shell history.
     expect(() => parseCommandLine(["--remote", "--password", "pw"])).toThrow(
       "unknown flag --password",
     );
@@ -92,11 +92,11 @@ describe("parseCommandLine", () => {
 });
 
 describe("flag values", () => {
-  const errorOf = (argv: string[]): DekcError => {
+  const errorOf = (argv: string[]): DekError => {
     try {
       parseCommandLine(argv);
     } catch (error) {
-      return error as DekcError;
+      return error as DekError;
     }
     throw new Error("expected the command line to be refused");
   };
@@ -105,7 +105,7 @@ describe("flag values", () => {
     expect(parseCommandLine(["--port", "3030"]).values.port).toBe(3030);
     expect(parseCommandLine(["video", "--fps", "29.97"]).values.fps).toBe(29.97);
     expect(
-      parseCommandLine(["voice", "dict", "add", "dekc", "デック", "--accent", "0"]).values.accent,
+      parseCommandLine(["voice", "dict", "add", "dek", "デック", "--accent", "0"]).values.accent,
     ).toBe(0);
   });
 
@@ -118,12 +118,12 @@ describe("flag values", () => {
     [["video", "--fps", ""], "fps"],
     [["video", "--fps", "0"], "fps"],
     [["video", "--fps", "fast"], "fps"],
-    [["voice", "dict", "add", "dekc", "デック", "--accent", "abc"], "accent"],
-    [["voice", "dict", "add", "dekc", "デック", "--accent", "1.5"], "accent"],
+    [["voice", "dict", "add", "dek", "デック", "--accent", "abc"], "accent"],
+    [["voice", "dict", "add", "dek", "デック", "--accent", "1.5"], "accent"],
     [["lint", "--format", "json"], "format"],
   ])("refuses %p before any command runs", (argv, flag) => {
     const error = errorOf(argv);
-    expect(error).toBeInstanceOf(DekcError);
+    expect(error).toBeInstanceOf(DekError);
     const value = argv.at(-1)?.replace(/^--port=/, "");
     expect(error.message).toBe(`invalid --${flag} "${value}"`);
     expect(error.hint).toStartWith(`--${flag} takes `);

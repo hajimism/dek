@@ -5,12 +5,12 @@
  * Draws slide scripts' frames. The player calls these directly; pages without
  * the player (shots, lint --visual, PDF) embed the same functions as source
  * via `stillDrawScript`, so they reference nothing outside this file and use
- * only the global `DekcSlide` types.
+ * only the global `DekSlide` types.
  */
 import { finishBeat } from "./finish-beat.ts";
 
 /** A beat's motion in ms, keyed like `data-step`; 0 when it has none or it is not positive. */
-export function stepMotionMs(module: DekcSlide | undefined, step: string): number {
+export function stepMotionMs(module: DekSlide | undefined, step: string): number {
   const ms = module?.motion?.[step];
   return typeof ms === "number" && ms > 0 ? ms : 0;
 }
@@ -20,9 +20,9 @@ export function stepMotionMs(module: DekcSlide | undefined, step: string): numbe
  * player, which keeps presenting whatever a slide does.
  */
 export function drawFrame(
-  module: DekcSlide | undefined,
+  module: DekSlide | undefined,
   slide: HTMLElement,
-  frame: DekcMotionFrame,
+  frame: DekMotionFrame,
 ): { error: unknown } | undefined {
   if (!module || typeof module.draw !== "function") {
     return undefined;
@@ -38,7 +38,7 @@ export function drawFrame(
 
 /** Draws a beat as it ends, for pages that show a still: thumbnails, previews, shots, PDF. */
 export function drawAtEnd(
-  module: DekcSlide | undefined,
+  module: DekSlide | undefined,
   slide: HTMLElement,
   index: number,
   step: string,
@@ -53,14 +53,14 @@ export function drawAtEnd(
  * draw that throws leaves the slide as it was before; one that changes the page outside its slide
  * reaches another slide in the built deck; and one that draws the end of its beat differently after
  * drawing its start keeps state between calls, which a seek in video and shots cannot replay. Each
- * is kept in `window.__dekcDrawErrors` for whoever measures the page. What the draws change in
- * attributes, inline styles above all, can be taken back with `window.__dekcUndoDraw`, so a
+ * is kept in `window.__dekDrawErrors` for whoever measures the page. What the draws change in
+ * attributes, inline styles above all, can be taken back with `window.__dekUndoDraw`, so a
  * measurement can tell what the script draws from what CSS does.
  */
 function drawMarkedSlides(): void {
-  const modules = window.__dekcSlides ?? {};
-  const errors: NonNullable<Window["__dekcDrawErrors"]> = [];
-  window.__dekcDrawErrors = errors;
+  const modules = window.__dekSlides ?? {};
+  const errors: NonNullable<Window["__dekDrawErrors"]> = [];
+  window.__dekDrawErrors = errors;
   const observer = new window.MutationObserver(() => {});
   observer.observe(document.documentElement, {
     attributes: true,
@@ -84,13 +84,13 @@ function drawMarkedSlides(): void {
   };
   for (const el of document.querySelectorAll<HTMLElement>(".slide[data-slug]")) {
     // markBeat writes the step key, so this page never derives one itself.
-    const step = el.getAttribute("data-dekc-step");
+    const step = el.getAttribute("data-dek-step");
     if (step === null) {
       continue;
     }
     const slug = el.getAttribute("data-slug") ?? "";
     const module = modules[slug];
-    const index = Number(el.getAttribute("data-dekc-beat") || 0);
+    const index = Number(el.getAttribute("data-dek-beat") || 0);
     taken();
     const failed = drawAtEnd(module, el, index, step);
     const t = stepMotionMs(module, step);
@@ -128,7 +128,7 @@ function drawMarkedSlides(): void {
   observer.disconnect();
   const attributeChanges = changes.filter((change) => change.type === "attributes");
   if (attributeChanges.length > 0) {
-    window.__dekcUndoDraw = () => {
+    window.__dekUndoDraw = () => {
       // The first old value of each attribute is what it held before any draw ran.
       const before = new Map<Element, Map<string, string | null>>();
       for (const change of attributeChanges) {

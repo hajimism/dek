@@ -4,7 +4,7 @@
 
 ## Thirteen tokens
 
-If class names are the contract between HTML and theme, custom properties are the surface where appearance is swapped. Every theme publishes these thirteen tokens on `.slide`. They live on `.slide`, not `:root`, so they never leak into the presenter chrome. That is the same reason top-level selectors are forbidden (`DEKC012`). The view transition sits outside every slide, so dekc hands it the tokens set on `.slide` as well; see [View Transitions](./steps#view-transitions).
+If class names are the contract between HTML and theme, custom properties are the surface where appearance is swapped. Every theme publishes these thirteen tokens on `.slide`. They live on `.slide`, not `:root`, so they never leak into the presenter chrome. That is the same reason top-level selectors are forbidden (`DEK012`). The view transition sits outside every slide, so dek hands it the tokens set on `.slide` as well; see [View Transitions](./steps#view-transitions).
 
 | Token | Role |
 | --- | --- |
@@ -15,19 +15,19 @@ If class names are the contract between HTML and theme, custom properties are th
 | `--radius` | Corners |
 | `--step-transition` | Motion |
 
-The color tokens are all meant for text. In the bundled theme, `--fg`, `--muted`, and `--accent` each reach 4.5:1 against `--bg`, so any of them passes `DEKC031` as body text. Keep that true when you change them.
+The color tokens are all meant for text. In the bundled theme, `--fg`, `--muted`, and `--accent` each reach 4.5:1 against `--bg`, so any of them passes `DEK031` as body text. Keep that true when you change them.
 
-Raw colors, `font-family` values, and absolute units may appear only when assigning a `--*` property. Everywhere else, use `var()` or `calc(var() …)`. Unitless `0`, `thin`, and `em` are allowed. A `var()` with a raw fallback, such as `var(--fg, #fff)`, counts as a raw value. A missing token is `DEKC015`; a raw value outside a token is `DEKC014`. You may add as many deck-specific tokens as you like.
+Raw colors, `font-family` values, and absolute units may appear only when assigning a `--*` property. Everywhere else, use `var()` or `calc(var() …)`. Unitless `0`, `thin`, and `em` are allowed. A `var()` with a raw fallback, such as `var(--fg, #fff)`, counts as a raw value. A missing token is `DEK015`; a raw value outside a token is `DEK014`. You may add as many deck-specific tokens as you like.
 
 Every selector must sit under `.slide`. `::view-transition-*` pseudo-elements and at-rules such as `@keyframes` and `@media` are the only exceptions.
 
 ## Growing the vocabulary
 
-A class the theme does not define is `DEKC010`. You clear it by adding the class to `theme.css`. That is intentional: extending the vocabulary is a design decision, and lint should not forbid it. Lint's job is to make the decision cost one deliberate step and to leave a reviewable diff. `DEKC013` caps the total class count (40 by default) so that step is not repeated forever.
+A class the theme does not define is `DEK010`. You clear it by adding the class to `theme.css`. That is intentional: extending the vocabulary is a design decision, and lint should not forbid it. Lint's job is to make the decision cost one deliberate step and to leave a reviewable diff. `DEK013` caps the total class count (40 by default) so that step is not repeated forever.
 
 New classes land in the deck's own `theme.css`, so no other deck is affected. When a class earns its place, lift it into the project theme with `cp`.
 
-Not every class deserves that step. Decoration that one slide uses goes in that slide's own stylesheet instead, where it neither counts toward `DEKC013` nor leaks into other slides. See [Slide stylesheets](./slides#slide-stylesheets).
+Not every class deserves that step. Decoration that one slide uses goes in that slide's own stylesheet instead, where it neither counts toward `DEK013` nor leaks into other slides. See [Slide stylesheets](./slides#slide-stylesheets).
 
 ## Layout examples
 
@@ -49,13 +49,13 @@ A layout is a promise about markup: `split` expects a parent node and two result
 
 ## Slide numbers
 
-Every slide carries its place in `script.md`: `--dekc-slide-number` counts from 1, and `--dekc-slide-count` is how many slides the deck has. The build, the dev server, shots, and the PDF all set them the same way, so a folio printed from them follows the script whenever a slide is added, removed, or moved with `dekc mv`. Nothing in the slide's HTML holds a number.
+Every slide carries its place in `script.md`: `--dek-slide-number` counts from 1, and `--dek-slide-count` is how many slides the deck has. The build, the dev server, shots, and the PDF all set them the same way, so a folio printed from them follows the script whenever a slide is added, removed, or moved with `dekc mv`. Nothing in the slide's HTML holds a number.
 
 Pass them to a CSS counter to print them in any counter style:
 
 ```css
 .slide {
-  counter-reset: folio var(--dekc-slide-number) folios var(--dekc-slide-count);
+  counter-reset: folio var(--dek-slide-number) folios var(--dek-slide-count);
 }
 
 .slide::after {
@@ -70,9 +70,9 @@ Which slides show a folio is the theme's call, as it is in a book: hide it on th
 The project's `theme.css` is the starting point for new decks. Edits flow in one direction: down into a new deck on creation, and back up by hand when you decide something is worth keeping.
 
 ```bash
-dekc new 2026-09-dekc
-dekc new 2026-09-dekc --theme-from 2026-04-vite
-cp decks/2026-09-dekc/theme.css theme.css
+dekc new 2026-09-dek
+dekc new 2026-09-dek --theme-from 2026-04-vite
+cp decks/2026-09-dek/theme.css theme.css
 ```
 
 The reasoning is in [Projects and Decks](./structure#themes-are-copied-not-shared).

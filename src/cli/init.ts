@@ -2,17 +2,17 @@ import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { parseCss, publishedTokens } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { readTextIfExists } from "../core/resolve.ts";
 import {
   defaultTsconfig,
-  dekcFilePaths,
+  dekFilePaths,
   type FileChanges,
   syncDeck,
-  writeDekcFiles,
+  writeDekFiles,
 } from "../core/sync.ts";
 import {
   applyPlan,
@@ -32,7 +32,7 @@ export type InitResult = {
   root: string;
   /** Paths init wrote. */
   created: string[];
-  /** dekc's own files, already there, that init brought up to date. */
+  /** dek's own files, already there, that init brought up to date. */
   updated: string[];
   /** Files that were already there and differ from what init would write; left as they are. */
   kept: string[];
@@ -54,26 +54,26 @@ export type InitResult = {
 export function initCommand(options: { cwd: string; dir?: string; deck?: string }): InitResult {
   const root = resolve(options.cwd, options.dir ?? ".");
   if (options.deck !== undefined && !isDeckName(options.deck)) {
-    throw new DekcError(`invalid deck name "${options.deck}"`, {
+    throw new DekError(`invalid deck name "${options.deck}"`, {
       hint: DECK_NAME_HINT,
     });
   }
   checkTarget(root);
-  checkFileSlots(dekcFilePaths(root));
+  checkFileSlots(dekFilePaths(root));
 
   const { created, kept } = applyPlan(projectPlan(root, options.deck));
   const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
   // A starter script init just wrote gets its skeletons as sync writes them; a script that was
   // already there is the author's, and so is whether it parses.
   const started = deckDir !== undefined && created.includes(deckPaths(deckDir).script);
-  const dekcFiles = started ? syncDeckFiles(deckDir, created) : writeDekcFiles(root);
-  created.push(...dekcFiles.created);
+  const dekFiles = started ? syncDeckFiles(deckDir, created) : writeDekFiles(root);
+  created.push(...dekFiles.created);
   const playwright = playwrightStep(root);
   const missingTokens = kept.includes(join(root, "theme.css")) ? missingThemeTokens(root) : [];
   return {
     root,
     created,
-    updated: dekcFiles.updated,
+    updated: dekFiles.updated,
     kept,
     next: nextSteps(options.cwd, root, deckDir),
     ...(playwright ? { playwright } : {}),
@@ -94,16 +94,16 @@ function missingThemeTokens(root: string): string[] {
 function syncDeckFiles(deckDir: string, created: string[]): FileChanges {
   const synced = syncDeck(deckDir);
   created.push(...synced.created);
-  return synced.dekcFiles;
+  return synced.dekFiles;
 }
 
-/** Everything init writes but `.dekc/` and AGENTS.md, in the order a reader meets it. */
+/** Everything init writes but `.dek/` and AGENTS.md, in the order a reader meets it. */
 function projectPlan(root: string, deck: string | undefined): PlannedPath[] {
   const themePath = join(root, "theme.css");
-  // A first deck is drawn in the theme that will be there: the one kept, or dekc's.
+  // A first deck is drawn in the theme that will be there: the one kept, or dek's.
   const theme = readTextIfExists(themePath) ?? defaultTheme();
   return [
-    { path: join(root, "dekc.toml"), contents: defaultToml() },
+    { path: join(root, "dek.toml"), contents: defaultToml() },
     { path: themePath, contents: defaultTheme() },
     { path: join(root, ".rumdl.toml"), contents: defaultRumdl() },
     { path: join(root, ".gitignore"), contents: defaultGitignore() },
@@ -121,15 +121,15 @@ function projectPlan(root: string, deck: string | undefined): PlannedPath[] {
  */
 function checkTarget(root: string): void {
   if (existsSync(root) && !statSync(root).isDirectory()) {
-    throw new DekcError("not a directory", { path: root, hint: "pass a directory to init" });
+    throw new DekError("not a directory", { path: root, hint: "pass a directory to init" });
   }
   const outer = walkUp(root, (dir) => {
-    const config = join(dir, "dekc.toml");
+    const config = join(dir, "dek.toml");
     return existsSync(config) && statSync(config).isFile() ? dir : undefined;
   });
   if (outer !== undefined && outer !== root) {
-    throw new DekcError(`already inside the dekc project at ${outer}`, {
-      path: join(outer, "dekc.toml"),
+    throw new DekError(`already inside the dek project at ${outer}`, {
+      path: join(outer, "dek.toml"),
       hint: `add a deck to that project with \`dekc new ${shellQuote(basename(root))}\`, or run init outside it`,
     });
   }

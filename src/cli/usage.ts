@@ -1,5 +1,5 @@
 import pkg from "../../package.json";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { suggest } from "../core/suggest.ts";
 import {
   allSpecs,
@@ -53,11 +53,11 @@ export function helpText(): string {
       overviewLine([`dekc ${refReaders().join("|")} <ref> ...`, "read a ref as you would a deck"]),
     );
   const body = [...groups].map(([group, lines]) => [GROUP_TITLES[group], ...lines].join("\n"));
-  return `dekc — a build system for talks
+  return `dek — a build system for talks
 
 ${body.join("\n\n")}
 
-Commands that print a result accept --json. dekc and dekc rehearse stay running.
+Commands that print a result accept --json. dek and dekc rehearse stay running.
 Pass a deck name or --deck <name> to target a deck from the project root.
 Flags are checked per command: an unknown flag is an error, not ignored.
 dekc <command> --help  one command's usage and flags; dekc --version prints the version
@@ -75,7 +75,7 @@ export function agentHelpText(): string {
         ]
       : spec.agent,
   );
-  return `dekc — agent interface
+  return `dek — agent interface
 Result commands accept --json. dekc / rehearse do not (long-running). Diagnostics: dekc lint --format sarif.
 Each command's --json shape: ${CLI_SCHEMA_URL}
 Each diagnostic has severity (error | warning) and data; only errors exit 1.
@@ -87,7 +87,7 @@ Errors include hint with the next command to run.
 `;
 }
 
-const DOCS_URL = "https://hajimism.github.io/dekc/reference/cli.html";
+const DOCS_URL = "https://hajimism.github.io/dek/reference/cli.html";
 
 /** `dekc help <command>`: its usage, what it does, and every flag it takes. */
 export function commandHelp(command: CommandName): string {
@@ -154,9 +154,9 @@ export function versionText(): string {
 }
 
 /** A word the user typed that is neither a command nor a deck, with the likeliest fix. */
-export function unknownCommandError(word: string, decks: string[]): DekcError {
+export function unknownCommandError(word: string, decks: string[]): DekError {
   if (word === "serve") {
-    return new DekcError("unknown command: serve", {
+    return new DekError("unknown command: serve", {
       hint: "the dev server is the bare `dekc [deck]`: drop `serve`",
     });
   }
@@ -164,7 +164,7 @@ export function unknownCommandError(word: string, decks: string[]): DekcError {
     .map(([name]) => name)
     .filter(isTypedCommand);
   const guess = suggest(word, [...commands, ...decks]);
-  return new DekcError(`unknown command: ${word}`, {
+  return new DekError(`unknown command: ${word}`, {
     hint: guess ? `did you mean \`dekc ${guess}\`?` : "run `dekc help` to see the commands",
   });
 }
@@ -177,20 +177,20 @@ export function usageError(
   command: CommandName,
   message: string,
   options: { subcommand?: string; match?: string } = {},
-): DekcError {
+): DekError {
   const lines = formOf(command, options.subcommand).usage.filter(
     (line) => options.match === undefined || line.includes(options.match),
   );
-  return new DekcError(message, {
+  return new DekError(message, {
     hint: `usage: ${lines.join(" | ")}; run \`dekc help ${command}\``,
   });
 }
 
 /** A word where a command takes a subcommand, with the likeliest one. */
-export function unknownSubcommandError(command: CommandName, word: string): DekcError {
+export function unknownSubcommandError(command: CommandName, word: string): DekError {
   const subs = Object.keys(subcommandsOf(COMMANDS[command]));
   const guess = suggest(word, subs);
-  return new DekcError(`unknown subcommand "${word}" for dekc ${command}`, {
+  return new DekError(`unknown subcommand "${word}" for dekc ${command}`, {
     hint: guess
       ? `did you mean \`dekc ${command} ${guess}\`?`
       : `dekc ${command} takes ${subs.join(", ")}; run \`dekc help ${command}\``,

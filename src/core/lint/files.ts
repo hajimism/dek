@@ -3,7 +3,7 @@ import { either } from "../prose.ts";
 import { listSlideFiles, SLIDE_SIDECARS } from "../resolve.ts";
 import type { LintContext } from "./context.ts";
 
-/** DEKC001 for a section without slides/<slug>.html; DEKC002 for a slide file without its section. */
+/** DEK001 for a section without slides/<slug>.html; DEK002 for a slide file without its section. */
 export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const section of ctx.deck.deck.sections) {
@@ -11,7 +11,7 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
       continue;
     }
     diagnostics.push(
-      diag("DEKC001", {
+      diag("DEK001", {
         message: `missing slide HTML for "${section.slug}"`,
         path: ctx.deck.scriptPath,
         line: section.line,
@@ -27,7 +27,7 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
       continue;
     }
     diagnostics.push(
-      diag("DEKC002", {
+      diag("DEK002", {
         message: `slide HTML has no section "${slide.slug}"`,
         path: slide.path,
         slug: slide.slug,
@@ -40,12 +40,12 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
   for (const ext of SLIDE_SIDECARS) {
     const kind = ext === ".css" ? "stylesheet" : "script";
     for (const file of listSlideFiles(ctx.deck.dir, ext)) {
-      // A sidecar next to an orphaned HTML file travels with it; DEKC002 already names the slug.
+      // A sidecar next to an orphaned HTML file travels with it; DEK002 already names the slug.
       if (ctx.sectionsBySlug.has(file.slug) || ctx.slidesBySlug.has(file.slug)) {
         continue;
       }
       diagnostics.push(
-        diag("DEKC002", {
+        diag("DEK002", {
           message: `slide ${kind} has no section "${file.slug}"`,
           path: file.path,
           slug: file.slug,
@@ -77,7 +77,7 @@ function orphanHint(slug: string, file: string): string {
 export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diagnostic[] {
   const orphans = new Set(
     diagnostics.filter(
-      (diagnostic) => diagnostic.id === "DEKC002" && diagnostic.path?.endsWith(".html"),
+      (diagnostic) => diagnostic.id === "DEK002" && diagnostic.path?.endsWith(".html"),
     ),
   );
   const targets = ctx.deck.deck.sections
@@ -98,7 +98,7 @@ export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diag
     return diagnostics.map((diagnostic) =>
       diagnostic === orphan
         ? { ...diagnostic, hint, data: { ...diagnostic.data, renames: targets } }
-        : diagnostic.id === "DEKC001" && diagnostic.slug === target
+        : diagnostic.id === "DEK001" && diagnostic.slug === target
           ? { ...diagnostic, hint }
           : diagnostic,
     );

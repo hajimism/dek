@@ -16,11 +16,11 @@ script.md → Deck → Cue → Synth → Timeline → schedule
 dekc cues
 ```
 
-This prints the spoken cues for every beat and needs no engine. Blockquotes, lists, code, and tables are dropped; inline emphasis, links, and code spans are flattened to text. A beat with visible content but no paragraph is reported as `DEKC042` alongside the cues, so you notice it while you are still writing.
+This prints the spoken cues for every beat and needs no engine. Blockquotes, lists, code, and tables are dropped; inline emphasis, links, and code spans are flattened to text. A beat with visible content but no paragraph is reported as `DEK042` alongside the cues, so you notice it while you are still writing.
 
 ## Setup
 
-Add a `[voice]` table to `dekc.toml`, and `dekc new` copies it into each new deck as `voice/voice.toml`. For an existing deck, write the file yourself.
+Add a `[voice]` table to `dek.toml`, and `dekc new` copies it into each new deck as `voice/voice.toml`. For an existing deck, write the file yourself.
 
 ```toml
 # decks/<deck>/voice/voice.toml
@@ -35,7 +35,7 @@ pause   = { sentence = 350, beat = 700 }
 - **VOICEVOX** at port 50021: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/), or `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
 - **AivisSpeech** at port 10101 with `engine = "aivis"`: [aivis-project.com](https://aivis-project.com/), or `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`
 - COEIROINK and SHAREVOX are recognized by name.
-- Any compatible engine elsewhere: set `engine` to its URL, or export `DEKC_VOICE_URL`.
+- Any compatible engine elsewhere: set `engine` to its URL, or export `DEK_VOICE_URL`.
 
 ## Synthesis
 
@@ -43,13 +43,13 @@ pause   = { sentence = 350, beat = 700 }
 dekc voice
 dekc voice speakers
 dekc voice say "Hello"
-dekc voice dict add dekc デック
+dekc voice dict add dek デック
 dekc voice pin
 ```
 
-`dekc voice` synthesizes only the sentences that changed and writes the audio, the per-sentence cache, and `timeline.json` under `.cache/voice/`. The dev server does the same on save. An ASCII word missing from `voice/dict.toml` is `DEKC040`, a warning; add readings with `dict add`. `dekc voice pin` copies the master audio and Timeline into `voice/pin/`, a portable snapshot that survives a cleared cache. While the pin exists, `dekc voice` and the dev server restore it instead of synthesizing, so edits to the script or to `voice.toml` do not reach the audio; delete `voice/pin/` to synthesize again.
+`dekc voice` synthesizes only the sentences that changed and writes the audio, the per-sentence cache, and `timeline.json` under `.cache/voice/`. The dev server does the same on save. An ASCII word missing from `voice/dict.toml` is `DEK040`, a warning; add readings with `dict add`. `dekc voice pin` copies the master audio and Timeline into `voice/pin/`, a portable snapshot that survives a cleared cache. While the pin exists, `dekc voice` and the dev server restore it instead of synthesizing, so edits to the script or to `voice.toml` do not reach the audio; delete `voice/pin/` to synthesize again.
 
-Kana and durations are machine-readable. dekc does not default to a cloud TTS.
+Kana and durations are machine-readable. dek does not default to a cloud TTS.
 
 ## Rehearsal
 
@@ -67,11 +67,11 @@ dekc video architecture
 dekc video --fps 30 --root-dist
 ```
 
-A whole deck becomes `dist/<deck>.mp4`, or `<root>/dist/<deck>.mp4` with `--root-dist`. A single slide goes to `.cache/video/<slug>.mp4`. Requires Playwright, ffmpeg, and a Timeline; without a Timeline the hint says to run `dekc voice` first. Alongside the MP4, dekc writes `.vtt` captions, a `.chapters.txt` chapter list, and a `.credits.txt` file naming the speaker. Credits are not burned into the picture.
+A whole deck becomes `dist/<deck>.mp4`, or `<root>/dist/<deck>.mp4` with `--root-dist`. A single slide goes to `.cache/video/<slug>.mp4`. Requires Playwright, ffmpeg, and a Timeline; without a Timeline the hint says to run `dekc voice` first. Alongside the MP4, dek writes `.vtt` captions, a `.chapters.txt` chapter list, and a `.credits.txt` file naming the speaker. Credits are not burned into the picture.
 
 Baking does not replay the talk in real time. Each beat is one held frame plus whatever the transition needs.
 
-When a Timeline exists, `dekc ls` shows the narrated length next to the word-count estimate, and a large gap from the `duration` budget is `DEKC041`, a warning. The script has no notation for silent time: a beat with no paragraph passes through the transition and `pause.beat`, and nothing else. Timing lives in `voice.toml`, below.
+When a Timeline exists, `dekc ls` shows the narrated length next to the word-count estimate, and a large gap from the `duration` budget is `DEK041`, a warning. The script has no notation for silent time: a beat with no paragraph passes through the transition and `pause.beat`, and nothing else. Timing lives in `voice.toml`, below.
 
 ## Timing
 
@@ -88,7 +88,7 @@ pause = 1200                # after its last beat
 pause = 1500                # silence after it, instead of pause.beat
 ```
 
-Keys name a slide as `slug` and a beat as `slug/beat-id` or `slug/2`, the position the URL hash takes. A slide key frames the slide: its `lead` runs into the slide's arrival, where the paragraphs before its first `###` are spoken, and its `pause` follows the last beat. A beat key wins over its slide key. `dekc mv` rewrites the keys along with the slide. A key that matches nothing is `DEKC043`. On save, the dev server re-times the deck from cached clips, and `dekc voice pin` freezes the timing together with the audio.
+Keys name a slide as `slug` and a beat as `slug/beat-id` or `slug/2`, the position the URL hash takes. A slide key frames the slide: its `lead` runs into the slide's arrival, where the paragraphs before its first `###` are spoken, and its `pause` follows the last beat. A beat key wins over its slide key. `dekc mv` rewrites the keys along with the slide. A key that matches nothing is `DEK043`. On save, the dev server re-times the deck from cached clips, and `dekc voice pin` freezes the timing together with the audio.
 
 ## The daily four
 

@@ -8,7 +8,7 @@ import {
   requestGuard,
 } from "../../src/server/auth.ts";
 
-const basic = (password: string) => `Basic ${Buffer.from(`dekc:${password}`).toString("base64")}`;
+const basic = (password: string) => `Basic ${Buffer.from(`dek:${password}`).toString("base64")}`;
 
 describe("clearance", () => {
   test("clears every request for the presenter when no password is set", () => {

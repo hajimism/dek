@@ -480,7 +480,7 @@ export const COMMANDS = {
     summary: "Move the open browser to a slide. Needs a running dev server.",
     group: "Slide",
     overview: [["dekc goto <slug>", "jump the open browser"]],
-    agent: ["dekc goto <slug>     requires running dekc"],
+    agent: ["dekc goto <slug>     requires running dek"],
     run: async ({ target, args }) => {
       const { gotoCommand } = await import("./goto.ts");
       return gotoCommand(target, args.slug);
@@ -495,7 +495,7 @@ export const COMMANDS = {
     summary: "Print the slide on screen. Needs a running dev server.",
     group: "Slide",
     overview: [["dekc current", "print the slide on screen"]],
-    agent: ["dekc current         requires running dekc"],
+    agent: ["dekc current         requires running dek"],
     run: async ({ target }) => {
       const { currentCommand } = await import("./goto.ts");
       return currentCommand(target);
@@ -592,8 +592,8 @@ export const COMMANDS = {
       paths: withDisplayDiagnostics,
       failure: (data) => diagnosticFailure("lint", data, "dekc lint"),
       sarif: (data) => {
-        const dekc = data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEKC"));
-        return mergeSarif(toSarif(dekc, { skipped: data.skipped ?? [] }), data.rumdlSarif);
+        const dek = data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEK"));
+        return mergeSarif(toSarif(dek, { skipped: data.skipped ?? [] }), data.rumdlSarif);
       },
     },
   }),

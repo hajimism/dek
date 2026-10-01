@@ -1,6 +1,6 @@
 # Agent Usability Criteria
 
-dekc is built to be used by coding agents. This page is the yardstick for that: what a change must not break, and what an improvement should move. Use it when you design a command, a diagnostic, or a convention, and when you review one.
+dek is built to be used by coding agents. This page is the yardstick for that: what a change must not break, and what an improvement should move. Use it when you design a command, a diagnostic, or a convention, and when you review one.
 
 An agent works in a loop: learn the project, write a slide, check the result, fix what is wrong, and decide when to hand the deck back. Each criterion below covers one place where that loop can stall.
 
@@ -18,7 +18,7 @@ An agent works in a loop: learn the project, write a slide, check the result, fi
 
 Every convention written for agents is enforced by a lint rule. A deck that passes lint does not violate a documented convention.
 
-Lint checks what a cooperating agent writes, not input built to slip past it. An agent that means to follow the conventions and gets one wrong is caught; markup contrived to hide a violation, such as a script tucked into `<iframe srcdoc>` or `globalThis["Da" + "te"]`, is out of scope. dekc builds decks you wrote or asked an agent to write, not decks from strangers, so the checks are a convention checker and not a sandbox.
+Lint checks what a cooperating agent writes, not input built to slip past it. An agent that means to follow the conventions and gets one wrong is caught; markup contrived to hide a violation, such as a script tucked into `<iframe srcdoc>` or `globalThis["Da" + "te"]`, is out of scope. dek builds decks you wrote or asked an agent to write, not decks from strangers, so the checks are a convention checker and not a sandbox.
 
 - Each convention in `AGENTS.md` maps to a rule id.
 - A convention that cannot be checked is either made checkable or removed from the list.
@@ -71,7 +71,7 @@ Commands that change files work from any state an agent naturally reaches, and l
 
 The same kind of information looks the same in every command.
 
-- Source paths are relative to the working directory everywhere they are printed. Artifacts dekc writes, such as builds and screenshots, stay absolute so they can be opened as-is.
+- Source paths are relative to the working directory everywhere they are printed. Artifacts dek writes, such as builds and screenshots, stay absolute so they can be opened as-is.
 - Tables stay aligned with CJK text.
 - An error and its hint do not repeat each other.
 

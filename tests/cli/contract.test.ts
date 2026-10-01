@@ -13,7 +13,7 @@ import {
 import { repoRoot } from "../helpers/paths.ts";
 
 const diagnostic = {
-  id: "DEKC011",
+  id: "DEK011",
   severity: "error",
   message: "slide contains an onclick attribute",
   path: "slides/intro.html",

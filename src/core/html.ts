@@ -82,7 +82,7 @@ export type DeckSlides = {
   written(slug: string): string | undefined;
   /**
    * The slide section to show: the written one, or the skeleton `dekc sync` would write when the
-   * file is missing or holds no slide. Lint reports those as DEKC001 and DEKC007; rendering never
+   * file is missing or holds no slide. Lint reports those as DEK001 and DEK007; rendering never
    * stops on them, because at the venue a deck that shows beats one that does not.
    */
   section(slug: string): string;
@@ -144,7 +144,7 @@ export type SlideStamp = {
 
 /**
  * One slide section with what the page needs on it, in one parser pass: its `data-slug` unless
- * it names its own, its place as `--dekc-slide-number` and `--dekc-slide-count`, and for a still
+ * it names its own, its place as `--dek-slide-number` and `--dek-slide-count`, and for a still
  * page the classes and beat the player would have set.
  */
 export function stampSlide(html: string, stamp: SlideStamp): string {
@@ -160,15 +160,15 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
           el.setAttribute("data-slug", stamp.slug);
         }
         // Ahead of the author's own style, so a slide can still set its own.
-        const place = `--dekc-slide-number: ${stamp.place.number}; --dekc-slide-count: ${stamp.place.count}`;
+        const place = `--dek-slide-number: ${stamp.place.number}; --dek-slide-count: ${stamp.place.count}`;
         const own = el.getAttribute("style")?.trim();
         el.setAttribute("style", own ? `${place}; ${own}` : place);
         if (stamp.shown) {
           addClass(el, "is-current");
         }
         if (stamp.beat) {
-          el.setAttribute("data-dekc-beat", String(stamp.beat.index));
-          el.setAttribute("data-dekc-step", stamp.beat.step);
+          el.setAttribute("data-dek-beat", String(stamp.beat.index));
+          el.setAttribute("data-dek-step", stamp.beat.step);
         }
       },
     });

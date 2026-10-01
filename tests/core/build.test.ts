@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { type BuildOptions, buildDeck } from "../../src/core/build.ts";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import type { VisualRequest } from "../../src/core/playwright.ts";
 import { playerEmbed } from "../helpers/embed.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -42,7 +42,7 @@ function fakeRunner() {
 }
 
 const previewScript = `---
-title: Why dekc
+title: Why dek
 description: Slides as a build.
 ---
 
@@ -227,7 +227,7 @@ more
       },
       async (root) => {
         const html = await readFile((await build(join(root, "decks", "demo"))).outPath, "utf8");
-        expect(html).not.toContain('class="dekc-diagnostics"');
+        expect(html).not.toContain('class="dek-diagnostics"');
         expect(html).toContain('data-slug="intro"');
       },
     );
@@ -257,7 +257,7 @@ more
       },
       async (root) => {
         // A deck that shows beats none: the section falls back to the skeleton sync would write,
-        // and lint's DEKC001 still tells the author the file is missing.
+        // and lint's DEK001 still tells the author the file is missing.
         const html = await readFile((await build(join(root, "decks", "demo"))).outPath, "utf8");
         expect(html).toContain('data-slug="extra"');
         expect(html).not.toContain("data-missing");
@@ -295,7 +295,7 @@ describe("buildDeck link preview", () => {
       ]);
 
       const html = await readFile(result.outPath, "utf8");
-      expect(html).toContain('<meta property="og:title" content="Why dekc">');
+      expect(html).toContain('<meta property="og:title" content="Why dek">');
       expect(html).toContain('<meta property="og:description" content="Slides as a build.">');
       expect(html).toContain(
         '<meta property="og:url" content="https://example.com/talks/demo.html">',
@@ -307,7 +307,7 @@ describe("buildDeck link preview", () => {
     });
   });
 
-  test("takes the URL from the build over dekc.toml", async () => {
+  test("takes the URL from the build over dek.toml", async () => {
     await withTempProject(spec('url = "https://example.com/talks/"\n'), async (root) => {
       const deckDir = join(root, "decks", "demo");
       await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
@@ -346,7 +346,7 @@ describe("buildDeck link preview", () => {
       expect(result).toEqual({ outPath: result.outPath, imageSkipped: "no-url" });
       expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(false);
       const html = await readFile(result.outPath, "utf8");
-      expect(html).toContain('<meta property="og:title" content="Why dekc">');
+      expect(html).toContain('<meta property="og:title" content="Why dek">');
       expect(html).not.toContain("og:image");
       expect(html).not.toContain("og:url");
     });
@@ -371,7 +371,7 @@ describe("buildDeck link preview", () => {
       await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
       await build(deckDir, { runner: fakeRunner().runner });
       expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(true);
-      await writeFile(join(root, "dekc.toml"), "# no url\n");
+      await writeFile(join(root, "dek.toml"), "# no url\n");
       await build(deckDir, { runner: fakeRunner().runner });
       expect(existsSync(join(deckDir, "dist", "demo.png"))).toBe(false);
     });
@@ -408,7 +408,7 @@ describe("buildDeck on a repository with hostile links", () => {
         await rm(join(deckDir, file), { force: true });
         await symlink(secret, join(deckDir, file));
         const error = await build(deckDir).catch((caught: unknown) => caught);
-        expect(error).toBeInstanceOf(DekcError);
+        expect(error).toBeInstanceOf(DekError);
         expect(existsSync(join(deckDir, "dist", "demo.html"))).toBe(false);
       });
     },
@@ -458,7 +458,7 @@ describe("buildDeck on a repository with hostile links", () => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, ".cache"), { recursive: true });
       await symlink(dirname(secret), join(deckDir, ".cache", "shots"));
-      await expect(build(deckDir, { runner: fakeRunner().runner })).rejects.toThrow(DekcError);
+      await expect(build(deckDir, { runner: fakeRunner().runner })).rejects.toThrow(DekError);
     });
   });
 
@@ -502,7 +502,7 @@ test("keeps og:url on the served origin whatever the deck is called", async () =
 
 describe("buildDeck notes", () => {
   const directedScript = `---
-title: Why dekc
+title: Why dek
 ---
 
 ## intro

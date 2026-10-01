@@ -4,7 +4,7 @@ import { formatError } from "../../src/cli/format.ts";
 import { lsCommand } from "../../src/cli/ls.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { showCommand } from "../../src/cli/show.ts";
-import { jsonStdout, runDekc } from "../helpers/cli.ts";
+import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -23,10 +23,10 @@ function errorOf(run: () => unknown): ErrorJson["error"] {
   throw new Error("expected the command to fail");
 }
 
-describe("dekc error hints", () => {
+describe("dek error hints", () => {
   // One run through the real binary: the error reaches stdout as JSON with a failing exit.
   test("suggests the command a typo was probably meant to be", async () => {
-    const result = await runDekc(["biuld", "--json"]);
+    const result = await runDek(["biuld", "--json"]);
     expect(result).toMatchObject({ exitCode: 1 });
     const json = jsonStdout<ErrorJson>(result);
     expect(json.ok).toBe(false);

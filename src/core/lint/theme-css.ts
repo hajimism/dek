@@ -17,18 +17,18 @@ import type { LintContext } from "./context.ts";
 import { isRawThemeValue, isRawTokenValue, REQUIRED_TOKENS, tokenSuggestion } from "./tokens.ts";
 
 /**
- * DEKC018: no theme.css beside script.md. The deck would show unstyled, and
- * every theme rule (DEKC010, DEKC012 to DEKC015) is silent until one exists.
+ * DEK018: no theme.css beside script.md. The deck would show unstyled, and
+ * every theme rule (DEK010, DEK012 to DEK015) is silent until one exists.
  */
 function missingThemeDiagnostic(ctx: LintContext): Diagnostic {
-  return diag("DEKC018", {
+  return diag("DEK018", {
     message: "theme.css not found",
     path: deckPaths(ctx.deck.dir).theme,
     hint: "copy theme.css from the project root or another deck into the deck directory",
   });
 }
 
-/** DEKC012, DEKC013, DEKC015, DEKC014, and what its `url()`s load (DEKC020 to DEKC023) for theme.css. */
+/** DEK012, DEK013, DEK015, DEK014, and what its `url()`s load (DEK020 to DEK023) for theme.css. */
 function lintTheme(
   { path, sheet, classes, tokens }: NonNullable<LintContext["theme"]>,
   { maxClasses, deckDir }: { maxClasses: number; deckDir: string },
@@ -40,7 +40,7 @@ function lintTheme(
       continue;
     }
     diagnostics.push(
-      diag("DEKC012", {
+      diag("DEK012", {
         message: `theme selector "${selector}" must be scoped under .slide`,
         path,
         line,
@@ -53,7 +53,7 @@ function lintTheme(
   const classCount = classes.size;
   if (classCount > maxClasses) {
     diagnostics.push(
-      diag("DEKC013", {
+      diag("DEK013", {
         message: `theme.css has ${classCount} classes; limit is ${maxClasses}`,
         path,
         data: { classes: classCount, limit: maxClasses },
@@ -66,7 +66,7 @@ function lintTheme(
       continue;
     }
     diagnostics.push(
-      diag("DEKC015", {
+      diag("DEK015", {
         message: `theme.css is missing required token "${name}"`,
         path,
         hint: missingTokenHint(name),
@@ -105,7 +105,7 @@ export function lintSlideStyle(
     hint: string,
     data: Record<string, string>,
   ): void => {
-    diagnostics.push(diag("DEKC012", { message, path, line, slug, hint, data }));
+    diagnostics.push(diag("DEK012", { message, path, line, slug, hint, data }));
   };
   for (const { selector, line } of cssStyleSelectors(sheet)) {
     const parts = splitSelectorList(selector).map((part) => part.trim());
@@ -165,7 +165,7 @@ function setsTokens(selector: string): boolean {
   });
 }
 
-/** DEKC014 for theme.css and slide stylesheets alike: design values come from tokens. */
+/** DEK014 for theme.css and slide stylesheets alike: design values come from tokens. */
 function rawValueDiagnostics(
   sheet: Stylesheet,
   path: string,
@@ -188,7 +188,7 @@ function rawValueDiagnostics(
             (other) => other.property === decl.property && setsTokens(other.selector),
           ));
       const token = changes ? `${decl.property}-${partName(decl.selector)}` : undefined;
-      return diag("DEKC014", {
+      return diag("DEK014", {
         message: `raw value in "${decl.property}: ${decl.value}"; use a theme token`,
         path,
         line: decl.line,
@@ -228,15 +228,15 @@ function partTokenHint(
 }
 
 /**
- * DEKC014's hint. theme.css gains a token; a slide stylesheet may name the value on its own
+ * DEK014's hint. theme.css gains a token; a slide stylesheet may name the value on its own
  * `.slide` instead, since a value one slide uses need not join the theme.
  */
-/** The line to add, with the value dekc's own theme gives the token. */
+/** The line to add, with the value dek's own theme gives the token. */
 function missingTokenHint(name: string): string {
   const value = bundledTokenValue(name);
   return value === undefined
     ? `add ${name} to the .slide rule in theme.css`
-    : `add ${name}: ${value}; to the .slide rule in theme.css, as dekc's own theme sets it`;
+    : `add ${name}: ${value}; to the .slide rule in theme.css, as dek's own theme sets it`;
 }
 
 /** A raw custom property set off the slide belongs on it, where a token is set and published. */
@@ -287,7 +287,7 @@ function themeScopeHint(selector: string): string {
   return `write it as ${scoped.join(", ")}`;
 }
 
-/** The theme's own findings, or DEKC018 when there is no theme. */
+/** The theme's own findings, or DEK018 when there is no theme. */
 export function themeDiagnostics(ctx: LintContext): Diagnostic[] {
   return ctx.theme
     ? lintTheme(ctx.theme, { maxClasses: ctx.config.maxClasses, deckDir: ctx.deck.dir })

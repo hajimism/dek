@@ -37,4 +37,4 @@ export default {
       state.style.visibility = (state.dataset.hub === "1") === home ? "visible" : "hidden";
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

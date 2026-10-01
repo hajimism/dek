@@ -14,7 +14,7 @@ import {
 import { extname, join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { newCommand } from "../../src/cli/new.ts";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { syncDeck } from "../../src/core/sync.ts";
@@ -111,7 +111,7 @@ more
           updated: [],
           removed: [],
           kept: [],
-          dekcFiles: { created: [], updated: [] },
+          dekFiles: { created: [], updated: [] },
         });
       },
     );
@@ -138,7 +138,7 @@ more
     );
   });
 
-  // A skeleton is dekc's to rewrite only while it is byte for byte what dekc last wrote there. The
+  // A skeleton is dek's to rewrite only while it is byte for byte what dek last wrote there. The
   // shape of one is no proof: an author who retypes the heading or a beat keeps the shape.
   test("keeps a skeleton whose heading the author retyped", async () => {
     await withTempProject(
@@ -211,8 +211,8 @@ more
     });
   });
 
-  // What dekc wrote is kept under .cache, which anyone may delete. Losing it costs only refreshes:
-  // a slide that is exactly today's skeleton is dekc's all the same, and anything else stays.
+  // What dek wrote is kept under .cache, which anyone may delete. Losing it costs only refreshes:
+  // a slide that is exactly today's skeleton is dek's all the same, and anything else stays.
   test("without its record, rewrites only what it can prove is its own", async () => {
     await withTempProject(
       {
@@ -249,7 +249,7 @@ more
     );
   });
 
-  test("a skeleton dekc mv moved is still dekc's to refresh", async () => {
+  test("a skeleton dekc mv moved is still dek's to refresh", async () => {
     await withTempProject(
       {
         decks: [
@@ -295,7 +295,7 @@ more
         const plan = await readFile(join(deckDir, "slides", "plan.html"), "utf8");
         expect(intro.startsWith('<section class="slide">\n')).toBe(true);
         expect(plan.startsWith('<section class="slide" data-layout="default">\n')).toBe(true);
-        expect(lintDeck(deckDir).filter((d) => d.id === "DEKC019")).toEqual([]);
+        expect(lintDeck(deckDir).filter((d) => d.id === "DEK019")).toEqual([]);
       },
     );
   });
@@ -355,7 +355,7 @@ bye
         expect(extractSlide(close)).toContain('<h2 class="slide-title">締め</h2>');
         // The empty heading is a warning that says how to title it, not a silent pass.
         expect(lintDeck(deckDir).map((d) => [d.id, d.severity, d.slug])).toEqual([
-          ["DEKC024", "warning", "recap"],
+          ["DEK024", "warning", "recap"],
         ]);
       },
     );
@@ -415,10 +415,10 @@ c
     );
   });
 
-  test("writes .dekc/schema.json at the project root", async () => {
+  test("writes .dek/schema.json at the project root", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       syncDeck(join(root, "decks", "demo"));
-      const schemaPath = join(root, ".dekc", "schema.json");
+      const schemaPath = join(root, ".dek", "schema.json");
       expect(existsSync(schemaPath)).toBe(true);
       const schema = JSON.parse(await readFile(schemaPath, "utf8")) as {
         required?: string[];
@@ -448,13 +448,13 @@ c
         expect(result.removed).toEqual([join(slidesDir, "plan.html")]);
         expect(result.created).toEqual([join(slidesDir, "mine.html")]);
         expect(existsSync(join(slidesDir, "plan.html"))).toBe(false);
-        expect(lintDeck(deckDir).filter((d) => d.id === "DEKC002")).toEqual([]);
+        expect(lintDeck(deckDir).filter((d) => d.id === "DEK002")).toEqual([]);
         expect(syncDeck(deckDir)).toEqual({
           created: [],
           updated: [],
           removed: [],
           kept: [],
-          dekcFiles: { created: [], updated: [] },
+          dekFiles: { created: [], updated: [] },
         });
       },
     );
@@ -554,7 +554,7 @@ c
       expect(agents).toContain("self-contained");
       expect(agents).toContain("slides/<id>.css");
       expect(agents).toContain("slides/<id>.ts");
-      expect(agents).toContain("satisfies DekcSlide");
+      expect(agents).toContain("satisfies DekSlide");
       expect(agents).toContain("find elements by data-* attributes");
       expect(agents).toContain("`onclick=`");
       expect(agents).toContain("`javascript:` URLs");
@@ -562,10 +562,10 @@ c
       expect(agents).toContain("dekc shot --sheet");
       expect(agents).toContain("dekc shot <slug> --motion");
       expect(agents).toContain("dekc shot <a> --to <b> --at 0.5");
-      expect(agents).toContain("`--dekc-slide-number` and `--dekc-slide-count`");
+      expect(agents).toContain("`--dek-slide-number` and `--dek-slide-count`");
       expect(agents).toContain("never by hand");
       expect(agents).toContain("When a hint sends a fix to `theme.css`, make it there");
-      expect(agents).toContain("`DEKC029` warns of text under it");
+      expect(agents).toContain("`DEK029` warns of text under it");
     });
   });
 
@@ -574,7 +574,7 @@ c
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       syncDeck(join(root, "decks", "demo"));
       const agents = await readFile(join(root, "AGENTS.md"), "utf8");
-      expect(agents).toContain("`max_classes` in `dekc.toml`, 40 by default (`DEKC013`)");
+      expect(agents).toContain("`max_classes` in `dek.toml`, 40 by default (`DEK013`)");
       expect(agents).toContain("as if it were written at the end of `theme.css`");
       expect(agents).toContain('`.slide[data-layout="split"] .x`');
       expect(agents).toContain("Never reuse a shot's path from before an edit");
@@ -616,7 +616,7 @@ c
         expect(agents).toContain("dekc theme <layout>");
 
         await writeFile(join(root, "theme.css"), ".slide .changed { display: block; }\n");
-        expect(syncDeck(join(root, "decks", "demo")).dekcFiles).toEqual({
+        expect(syncDeck(join(root, "decks", "demo")).dekFiles).toEqual({
           created: [],
           updated: [],
         });
@@ -625,49 +625,49 @@ c
     );
   });
 
-  test("rewrites only dekc's block in AGENTS.md and keeps the author's notes around it", async () => {
+  test("rewrites only dek's block in AGENTS.md and keeps the author's notes around it", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
       const path = join(root, "AGENTS.md");
       await writeFile(path, "# Our team\n\nWrite in Japanese.\n");
       syncDeck(deckDir);
       const first = await readFile(path, "utf8");
-      expect(first.startsWith("# Our team\n\nWrite in Japanese.\n\n<!-- dekc:begin")).toBe(true);
-      expect(first.endsWith("<!-- dekc:end -->\n")).toBe(true);
+      expect(first.startsWith("# Our team\n\nWrite in Japanese.\n\n<!-- dek:begin")).toBe(true);
+      expect(first.endsWith("<!-- dek:end -->\n")).toBe(true);
 
-      // An older dekc's block, followed by notes the author added after it.
-      const stale = first.replace("## Principles", "## An older dekc's principles");
+      // An older dek's block, followed by notes the author added after it.
+      const stale = first.replace("## Principles", "## An older dek's principles");
       await writeFile(path, `${stale}\n## After\n\nMore notes.\n`);
       syncDeck(deckDir);
       const second = await readFile(path, "utf8");
       expect(second).toBe(`${first}\n## After\n\nMore notes.\n`);
-      expect(second.match(/<!-- dekc:begin/g)).toHaveLength(1);
+      expect(second.match(/<!-- dek:begin/g)).toHaveLength(1);
     });
   });
 
-  test("replaces an AGENTS.md that is exactly dekc's own unmarked output", async () => {
+  test("replaces an AGENTS.md that is exactly dek's own unmarked output", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const path = join(root, "AGENTS.md");
       syncDeck(join(root, "decks", "demo"));
       const marked = await readFile(path, "utf8");
       const unmarked = marked
-        .replace(/^<!-- dekc:begin.*-->\n/, "")
-        .replace(/<!-- dekc:end -->\n$/, "");
+        .replace(/^<!-- dek:begin.*-->\n/, "")
+        .replace(/<!-- dek:end -->\n$/, "");
       await writeFile(path, unmarked);
       syncDeck(join(root, "decks", "demo"));
       expect(await readFile(path, "utf8")).toBe(marked);
     });
   });
 
-  test("appends dekc's block after a begin marker that has no end", async () => {
+  test("appends dek's block after a begin marker that has no end", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const path = join(root, "AGENTS.md");
-      await writeFile(path, "<!-- dekc:begin -->\nmine\n");
+      await writeFile(path, "<!-- dek:begin -->\nmine\n");
       syncDeck(join(root, "decks", "demo"));
       syncDeck(join(root, "decks", "demo"));
       const agents = await readFile(path, "utf8");
-      expect(agents.startsWith("<!-- dekc:begin -->\nmine\n\n<!-- dekc:begin")).toBe(true);
-      expect(agents.match(/<!-- dekc:end -->/g)).toHaveLength(1);
+      expect(agents.startsWith("<!-- dek:begin -->\nmine\n\n<!-- dek:begin")).toBe(true);
+      expect(agents.match(/<!-- dek:end -->/g)).toHaveLength(1);
     });
   });
 
@@ -706,7 +706,7 @@ more
       async (root) => {
         const resolved = resolveDeck(join(root, "decks", "demo"));
         await writeFile(join(root, "decks", "demo", "script.md"), "this is not a deck\n");
-        expect(() => syncDeck(resolved.deck.dir)).toThrow(DekcError);
+        expect(() => syncDeck(resolved.deck.dir)).toThrow(DekError);
         const result = syncDeck(resolved);
         expect(result.created.some((path) => path.endsWith("slides/intro.html"))).toBe(true);
         expect(result.created.some((path) => path.endsWith("slides/extra.html"))).toBe(true);
@@ -715,24 +715,24 @@ more
   });
 });
 
-describe("syncDeck and dekc's own files", () => {
-  const dekcFiles = (root: string) => [
-    join(root, ".dekc", "schema.json"),
-    join(root, ".dekc", "slide.d.ts"),
+describe("syncDeck and dek's own files", () => {
+  const dekFiles = (root: string) => [
+    join(root, ".dek", "schema.json"),
+    join(root, ".dek", "slide.d.ts"),
     join(root, "AGENTS.md"),
   ];
 
   test("creates them the first time, and leaves them alone once they are current", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const dir = join(root, "decks", "demo");
-      expect(syncDeck(dir).dekcFiles).toEqual({ created: dekcFiles(root), updated: [] });
+      expect(syncDeck(dir).dekFiles).toEqual({ created: dekFiles(root), updated: [] });
 
       const old = new Date("2020-01-01T00:00:00Z");
-      for (const path of dekcFiles(root)) {
+      for (const path of dekFiles(root)) {
         await utimes(path, old, old);
       }
-      expect(syncDeck(dir).dekcFiles).toEqual({ created: [], updated: [] });
-      for (const path of dekcFiles(root)) {
+      expect(syncDeck(dir).dekFiles).toEqual({ created: [], updated: [] });
+      for (const path of dekFiles(root)) {
         expect((await stat(path)).mtime).toEqual(old);
       }
     });
@@ -742,28 +742,28 @@ describe("syncDeck and dekc's own files", () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const dir = join(root, "decks", "demo");
       syncDeck(dir);
-      await writeFile(join(root, ".dekc", "slide.d.ts"), "// an older dekc's types\n");
+      await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
       await writeFile(
         join(root, "AGENTS.md"),
-        "<!-- dekc:begin -->\nan older dekc's block\n<!-- dekc:end -->\n",
+        "<!-- dek:begin -->\nan older dek's block\n<!-- dek:end -->\n",
       );
-      expect(syncDeck(dir).dekcFiles).toEqual({
+      expect(syncDeck(dir).dekFiles).toEqual({
         created: [],
-        updated: [join(root, ".dekc", "slide.d.ts"), join(root, "AGENTS.md")],
+        updated: [join(root, ".dek", "slide.d.ts"), join(root, "AGENTS.md")],
       });
     });
   });
 });
 
 describe("syncDeck on a repository with hostile links", () => {
-  test.each([".dekc/schema.json", "AGENTS.md"])(
+  test.each([".dek/schema.json", "AGENTS.md"])(
     "refuses a %s linked out of the project, leaving the file it points at",
     async (file) => {
       await withTempDir(async (outside) => {
         const victim = join(outside, `victim${extname(file)}`);
         await writeFile(victim, "mine");
         await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-          await mkdir(join(root, ".dekc"), { recursive: true });
+          await mkdir(join(root, ".dek"), { recursive: true });
           await rm(join(root, file), { force: true });
           await symlink(victim, join(root, file));
           expect(() => syncDeck(join(root, "decks", "demo"))).toThrow("leads outside the project");
@@ -779,7 +779,7 @@ describe("syncDeck on a repository with hostile links", () => {
       await rm(join(root, "AGENTS.md"), { force: true });
       await symlink("CLAUDE.md", join(root, "AGENTS.md"));
       syncDeck(join(root, "decks", "demo"));
-      expect(await readFile(join(root, "CLAUDE.md"), "utf8")).toContain("<!-- dekc:begin");
+      expect(await readFile(join(root, "CLAUDE.md"), "utf8")).toContain("<!-- dek:begin");
       expect((await lstat(join(root, "AGENTS.md"))).isSymbolicLink()).toBe(true);
     });
   });

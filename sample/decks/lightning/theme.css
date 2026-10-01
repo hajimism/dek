@@ -105,7 +105,7 @@
 
 /* The folio, from the slide's place in script.md: "# 03" before the heading. */
 .slide {
-  counter-reset: folio var(--dekc-slide-number);
+  counter-reset: folio var(--dek-slide-number);
 }
 
 .slide .slide-title::before {
@@ -329,7 +329,7 @@
 <section class="slide" data-layout="boot">
   <p class="line"><span class="prompt">~</span><span class="cursor"></span></p>
   <h1 class="display">三分で、発表をひとつ作る</h1>
-  <p class="lede">dekc sample · 3:00</p>
+  <p class="lede">dek sample · 3:00</p>
 </section>
 */
 .slide[data-layout="boot"] {

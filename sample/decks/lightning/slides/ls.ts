@@ -54,4 +54,4 @@ export default {
   draw(slide, { step, t }) {
     scenes(slide, step, t, MOTION);
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

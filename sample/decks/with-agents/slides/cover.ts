@@ -19,4 +19,4 @@ export default {
       tool.style.opacity = String(clamp((t - TOOL_AT) / (TOTAL - TOOL_AT)));
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

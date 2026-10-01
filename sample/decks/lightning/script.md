@@ -1,8 +1,8 @@
 ---
-# yaml-language-server: $schema=../../.dekc/schema.json
+# yaml-language-server: $schema=../../.dek/schema.json
 title: 三分で、発表をひとつ作る
-description: ターミナルとテキストエディタと dekc だけで、三分で発表をひとつ作ってみせるライトニングトーク。
-event: dekc sample
+description: ターミナルとテキストエディタと dek だけで、三分で発表をひとつ作ってみせるライトニングトーク。
+event: dek sample
 date: 2026-09-25
 duration: 3m
 ---
@@ -10,7 +10,7 @@ duration: 3m
 ## 三分で、発表をひとつ作る {#cover}
 
 三分だけください。この三分で、発表をひとつ作ってみせます。使うのは、
-ターミナルと、テキストエディタと、dekc という道具だけです。
+ターミナルと、テキストエディタと、dek という道具だけです。
 
 > 画面は黒のまま。カーソルが点滅してから話し始める。
 

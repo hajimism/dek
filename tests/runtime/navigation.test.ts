@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { decodePosition } from "../../src/core/live-protocol.ts";
 import {
   currentSlug,
-  dekcGo,
+  dekGo,
   mountPlayer,
   playerChannelName,
   pressKey,
@@ -58,7 +58,7 @@ const stepsHtml = slideDocument(`<section class="slide">
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
   await writeProject(root, {
     decks: [
       {
@@ -115,7 +115,7 @@ function runningAnimation(): { finish: () => void; finished: Promise<void>; call
 
 /** A press and release on the slide stage, as a mouse, pen, or finger makes it. */
 function click(x: number, init: PointerEventInit & { pointerType?: string } = {}): void {
-  const stage = document.getElementById("dekc-current-stage");
+  const stage = document.getElementById("dek-current-stage");
   if (!stage) {
     throw new Error("no stage");
   }
@@ -161,7 +161,7 @@ describe("clicking the slide", () => {
 
   test.serial("a touch still swipes, where a mouse drag would select", async () => {
     await mount("#steps/1");
-    const stage = document.getElementById("dekc-current-stage");
+    const stage = document.getElementById("dek-current-stage");
     if (!stage) {
       throw new Error("no stage");
     }
@@ -216,14 +216,14 @@ describe("navigation", () => {
     }
   });
 
-  test.serial("a move capture makes through dekcGo tells no other window", async () => {
+  test.serial("a move capture makes through dekGo tells no other window", async () => {
     await mount("#intro");
     const peer = new BroadcastChannel(playerChannelName());
     const heard: unknown[] = [];
     peer.addEventListener("message", (event: MessageEvent) => heard.push(event.data));
     try {
-      await dekcGo({ slideIndex: 1, beatIndex: 0 });
-      // A key press after it is heard, so anything dekcGo had posted would have arrived first.
+      await dekGo({ slideIndex: 1, beatIndex: 0 });
+      // A key press after it is heard, so anything dekGo had posted would have arrived first.
       pressKey("ArrowRight");
       await waitFor(() => heard.length > 0);
       expect(heard.map(decodePosition)).toEqual([{ slideIndex: 1, beatIndex: 1 }]);
@@ -306,7 +306,7 @@ describe("navigation", () => {
 
   test.serial("announces each new slide to screen readers, not each beat", async () => {
     await mount("#intro");
-    const announce = document.getElementById("dekc-announce");
+    const announce = document.getElementById("dek-announce");
     expect(announce?.getAttribute("aria-live")).toBe("polite");
     pressKey("ArrowRight");
     await settle();
@@ -321,13 +321,13 @@ describe("navigation", () => {
 
   test.serial("the presenter keeps its beat list while the beats advance", async () => {
     await mount("?presenter#steps/1");
-    const items = (): Element[] => [...document.querySelectorAll("#dekc-beats li")];
+    const items = (): Element[] => [...document.querySelectorAll("#dek-beats li")];
     const before = items();
     expect(before.map((li) => li.textContent)).toEqual(["one", "two", "three"]);
     pressKey("ArrowRight");
     await settle();
     expect(items().every((li, i) => li === before[i])).toBe(true);
-    expect(document.querySelector("#dekc-beats .is-current-beat")?.textContent).toBe("two");
+    expect(document.querySelector("#dek-beats .is-current-beat")?.textContent).toBe("two");
     pressKey("ArrowRight");
     pressKey("ArrowRight");
     await waitFor(() => currentSlug() === "last");
@@ -336,7 +336,7 @@ describe("navigation", () => {
 
   test.serial("the rail's resize handle reports its width and moves with arrow keys", async () => {
     await mount("#intro");
-    const handle = document.getElementById("dekc-rail-resize");
+    const handle = document.getElementById("dek-rail-resize");
     expect(handle?.getAttribute("aria-valuemin")).toBe("120");
     expect(handle?.getAttribute("aria-valuemax")).toBe("360");
     expect(handle?.getAttribute("aria-valuenow")).toBe("188");

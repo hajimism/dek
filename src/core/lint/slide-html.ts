@@ -96,7 +96,7 @@ const PRESENTATION_ATTRIBUTES: Record<string, string> = {
 };
 
 /**
- * DEKC014: a raw color or font family in a presentation attribute, which styles the element where
+ * DEK014: a raw color or font family in a presentation attribute, which styles the element where
  * no var() can reach. `fill="none"` and `currentColor` take nothing from the theme and pass.
  */
 function presentationDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
@@ -109,7 +109,7 @@ function presentationDiagnostics({ section, path, scan }: SlideHtml): Diagnostic
       }
       const token = property === "font-family" ? "var(--font-body)" : "var(--accent)";
       return [
-        diag("DEKC014", {
+        diag("DEK014", {
           message: `raw value in ${attribute.name}="${attribute.value}"; use a theme token`,
           path,
           ...spotOf(attribute),
@@ -122,9 +122,9 @@ function presentationDiagnostics({ section, path, scan }: SlideHtml): Diagnostic
   );
 }
 
-/** DEKC007: the file is there, but nothing in it is a slide, so build and show draw nothing for it. */
+/** DEK007: the file is there, but nothing in it is a slide, so build and show draw nothing for it. */
 function missingSectionDiagnostic({ section, path }: SlideHtml): Diagnostic {
-  return diag("DEKC007", {
+  return diag("DEK007", {
     message: `slides/${section.slug}.html has no <section class="slide">`,
     path,
     slug: section.slug,
@@ -132,14 +132,14 @@ function missingSectionDiagnostic({ section, path }: SlideHtml): Diagnostic {
   });
 }
 
-/** DEKC009: more than one slide in a file; the player shows the first and drops the rest. */
+/** DEK009: more than one slide in a file; the player shows the first and drops the rest. */
 function extraSectionDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
   const [, second] = scan.slides;
   if (!second) {
     return [];
   }
   return [
-    diag("DEKC009", {
+    diag("DEK009", {
       message: `slides/${section.slug}.html has ${scan.slides.length} <section class="slide">; only the first is shown`,
       path,
       ...spotOf(second),
@@ -150,7 +150,7 @@ function extraSectionDiagnostics({ section, path, scan }: SlideHtml): Diagnostic
   ];
 }
 
-/** DEKC019: a data-layout that neither the theme nor the slide's stylesheet lays out. */
+/** DEK019: a data-layout that neither the theme nor the slide's stylesheet lays out. */
 function layoutDiagnostics({ section, path, scan }: SlideHtml, layouts: Set<string>): Diagnostic[] {
   const attribute = scan.slides[0]?.attributes.find((entry) => entry.name === "data-layout");
   if (scan.layout === undefined || !attribute || layouts.has(scan.layout)) {
@@ -159,7 +159,7 @@ function layoutDiagnostics({ section, path, scan }: SlideHtml, layouts: Set<stri
   const known = [...layouts].sort();
   const guess = suggest(scan.layout, known);
   return [
-    diag("DEKC019", {
+    diag("DEK019", {
       message: `data-layout "${scan.layout}" is not a layout of the theme`,
       path,
       ...spotOf(attribute),
@@ -170,7 +170,7 @@ function layoutDiagnostics({ section, path, scan }: SlideHtml, layouts: Set<stri
   ];
 }
 
-/** DEKC006: the slide's data-slug names another section. */
+/** DEK006: the slide's data-slug names another section. */
 function slugDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
   const found = scan.slides
     .flatMap((element) => element.attributes)
@@ -179,7 +179,7 @@ function slugDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
     return [];
   }
   return [
-    diag("DEKC006", {
+    diag("DEK006", {
       message: `data-slug "${found.value}" does not match section "${section.slug}"`,
       path,
       ...spotOf(found),
@@ -190,7 +190,7 @@ function slugDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
 }
 
 /**
- * DEKC003: a data-step that is neither a beat id nor a beat index. DEKC025: a beat index where
+ * DEK003: a data-step that is neither a beat id nor a beat index. DEK025: a beat index where
  * that beat has an id, which silently binds the next beat over once one is inserted before it.
  */
 function stepDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
@@ -199,7 +199,7 @@ function stepDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
     const beatIndex = resolveStep(section.beats, step);
     if (beatIndex === undefined) {
       return [
-        diag("DEKC003", {
+        diag("DEK003", {
           message: `data-step "${step}" is not a beat id or index in "${section.slug}"`,
           path,
           ...spotOf(attribute),
@@ -214,7 +214,7 @@ function stepDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
       return [];
     }
     return [
-      diag("DEKC025", {
+      diag("DEK025", {
         message: `data-step "${step}" is beat "${id}" by position; it moves if a beat is inserted before it`,
         path,
         ...spotOf(attribute),
@@ -226,7 +226,7 @@ function stepDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
   });
 }
 
-/** DEKC005: a data-morph used twice, or one the player or CSS already means something by. */
+/** DEK005: a data-morph used twice, or one the player or CSS already means something by. */
 function morphDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const first = new Map<string, HtmlAttribute>();
@@ -242,7 +242,7 @@ function morphDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
     }
     reported.add(morph);
     diagnostics.push(
-      diag("DEKC005", {
+      diag("DEK005", {
         message: `duplicate data-morph "${morph}"`,
         path,
         ...spotOf(attribute),
@@ -256,7 +256,7 @@ function morphDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
       continue;
     }
     diagnostics.push(
-      diag("DEKC005", {
+      diag("DEK005", {
         message: `data-morph "${morph}" is reserved`,
         path,
         ...spotOf(attribute),
@@ -270,7 +270,7 @@ function morphDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
 }
 
 /**
- * DEKC011: style or script inside the markup, which belongs in the slide's own .css or .ts. Every
+ * DEK011: style or script inside the markup, which belongs in the slide's own .css or .ts. Every
  * occurrence is its own finding: a `<style>` or `<script>` element, a `style` attribute, an event
  * handler attribute, and a `javascript:` URL.
  */
@@ -291,7 +291,7 @@ function inlineCodeDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[]
     .flatMap(({ spot, found, data }) =>
       found
         ? [
-            diag("DEKC011", {
+            diag("DEK011", {
               message: found.message,
               path,
               ...spotOf(spot),
@@ -368,7 +368,7 @@ function isJavascriptUrl(value: string): boolean {
 }
 
 /**
- * DEKC024: a heading with nothing in it, which the audience sees as a gap where a title should
+ * DEK024: a heading with nothing in it, which the audience sees as a gap where a title should
  * be. An id-only `##` heading after the first slide makes one: sync never puts the id on a slide.
  * Such a heading may also mean the slide has no title, as a quote's does, so its skeleton's hint
  * offers both: a title for sync to write, or the element gone, which sync then leaves alone.
@@ -378,7 +378,7 @@ function emptyHeadingDiagnostics({ section, path, scan, skeleton }: SlideHtml): 
     ? `give the slide a title in script.md, like \`## Your title {#${section.slug}}\`, then run \`dekc sync\`; for a slide with no title, such as a quote, remove the element from slides/${section.slug}.html`
     : `write the heading's text in slides/${section.slug}.html, or remove the element`;
   return scan.emptyHeadings.map((element) =>
-    diag("DEKC024", {
+    diag("DEK024", {
       message: `<${element.tag}> is empty, so the slide shows no heading`,
       path,
       ...spotOf(element),
@@ -393,7 +393,7 @@ function emptyHeadingDiagnostics({ section, path, scan, skeleton }: SlideHtml): 
 const HIDDEN_SNIPPET_CHARS = 24;
 
 /**
- * DEKC029: text under `aria-hidden="true"`. That is how a slide marks decoration, and lint
+ * DEK029: text under `aria-hidden="true"`. That is how a slide marks decoration, and lint
  * measures neither the contrast nor the overflow of anything under it, so a labeled figure
  * marked that way is text the audience reads and no check sees. Right only on a sample the talk
  * shows as unreadable, so it warns.
@@ -407,7 +407,7 @@ function hiddenTextDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[]
         : text;
     const svg =
       element.tag === "svg" ? '; an SVG can take role="img" and an aria-label instead' : "";
-    return diag("DEKC029", {
+    return diag("DEK029", {
       message: `<${element.tag} aria-hidden="true"> holds text the audience reads, "${quoted}", which lint does not measure`,
       path,
       ...spotOf(element),
@@ -418,7 +418,7 @@ function hiddenTextDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[]
   });
 }
 
-/** DEKC010: a class neither theme.css nor the slide's own stylesheet defines. */
+/** DEK010: a class neither theme.css nor the slide's own stylesheet defines. */
 function unknownClassDiagnostics(
   { section, path, scan }: SlideHtml,
   classes: Set<string>,
@@ -445,7 +445,7 @@ function unknownClassDiagnostics(
   }
   return [...unknown].map(([name, attribute]) => {
     const suggestion = suggest(name, known);
-    return diag("DEKC010", {
+    return diag("DEK010", {
       message: `class "${name}" is not defined in theme.css`,
       path,
       ...spotOf(attribute),

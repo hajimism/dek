@@ -38,7 +38,7 @@ let root = "";
 
 /** Mounts a two-slide deck whose `chart` slide has a script that writes each frame into `.bar`. */
 export async function mountChartDeck(mode: "player" | "video", url?: string): Promise<void> {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
   await writeProject(root, {
     decks: [
       {

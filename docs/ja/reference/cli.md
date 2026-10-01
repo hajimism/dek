@@ -1,18 +1,18 @@
 # CLI
 
-`bunx @hajimism/dekc init` でプロジェクトを作り、その中で `bun add -d @hajimism/dekc` と dekc を入れます。[はじめる](/ja/guide/getting-started)を参照してください。以下の例では `dekc` と書きますが、実体はそのプロジェクトの中での `bunx dekc`、プロジェクトの外なら `bunx @hajimism/dekc` です。`dek` と打たないでください。`bunx dek` は npm の無関係な `dek` を動かします。
+`bunx @hajimism/dek init` でプロジェクトを作り、その中で `bun add -d @hajimism/dek` と dek を入れます。[はじめる](/ja/guide/getting-started)を参照してください。以下の例では `dekc` と書きますが、実体はそのプロジェクトの中での `bunx dekc`、プロジェクトの外なら `bunx @hajimism/dek` です。`dek` と打たないでください。`bunx dek` は npm の無関係な `dek` を動かします。
 
 ## 規約
 
-- **スコープは実行場所で決まる。** プロジェクト直下なら全デッキ、デッキの中ならそのデッキ。どこからでも、最初の引数か `--deck <name>` でデッキを指定できます。たとえば `dekc lint why-dekc`、`dekc show why-dekc intro`、`dekc why-dekc` です。詳細は[プロジェクトとデッキ](/ja/guide/structure#実行場所がスコープを決める)。
-- **結果を返すコマンドは `--json` を受け付け、外側の形は共通。** 成功は `{ "ok": true, ... }`。失敗は `{ "ok": false, "error": { "message", "hint", "path", "line" }, ... }` で終了コード 1。コマンドが実行できなかった場合も、`lint` や `check` が error を見つけた場合も同じです。`hint` は dekc が次の一手を知っていれば、`path` と `line` は失敗に場所があれば付きます。診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は成否に関わらず `diagnostics` を持つので、読み手は `ok` で分岐し、`error` を読み、診断を読みます。起動し続ける `dekc` と `dekc rehearse` は `--json` を取りません。[JSON の約束](/ja/guide/ai#json-の約束)を参照してください。
-- **各コマンドの形は JSON Schema。** [`cli.schema.json`](https://hajimism.github.io/dekc/cli.schema.json) で公開しており、`$defs` にコマンドごとの定義があります。
-- **形はまだ固まっていない。** dekc が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID を別のルールに使い回すことはありません。
+- **スコープは実行場所で決まる。** プロジェクト直下なら全デッキ、デッキの中ならそのデッキ。どこからでも、最初の引数か `--deck <name>` でデッキを指定できます。たとえば `dekc lint why-dek`、`dekc show why-dek intro`、`dek why-dek` です。詳細は[プロジェクトとデッキ](/ja/guide/structure#実行場所がスコープを決める)。
+- **結果を返すコマンドは `--json` を受け付け、外側の形は共通。** 成功は `{ "ok": true, ... }`。失敗は `{ "ok": false, "error": { "message", "hint", "path", "line" }, ... }` で終了コード 1。コマンドが実行できなかった場合も、`lint` や `check` が error を見つけた場合も同じです。`hint` は dek が次の一手を知っていれば、`path` と `line` は失敗に場所があれば付きます。診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は成否に関わらず `diagnostics` を持つので、読み手は `ok` で分岐し、`error` を読み、診断を読みます。起動し続ける `dekc` と `dekc rehearse` は `--json` を取りません。[JSON の約束](/ja/guide/ai#json-の約束)を参照してください。
+- **各コマンドの形は JSON Schema。** [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しており、`$defs` にコマンドごとの定義があります。
+- **形はまだ固まっていない。** dek が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID を別のルールに使い回すことはありません。
 - **診断は SARIF。** `dekc lint --format sarif`。URI は `file://`、位置は行と列、hint・slug・data は `properties` に入り、飛ばしたチェックは tool execution notification になります。既定は ESLint 風のテキスト `path:line:column: id message` です。
 - **失敗になるのは error だけ。** 各診断は `severity` を持ちます。error が残っていれば `lint` と `check` は `"ok": false` と終了コード 1 を返し、warning だけなら終了コード 0 です。
-- **`init` と `sync` はあなたの作業を上書きしない。** 足りないものを作り、余ったものを警告します。sync が書き直したり消したりするスライドは、誰も手を入れていない骨格だけです。元になった台本が変われば書き直し、セクションがなくなって横にスタイルシートもスクリプトもなければ消します。`AGENTS.md` で dekc が持つのは `<!-- dekc:begin … -->` から `<!-- dekc:end -->` までのブロックだけです。リネームもしません。
+- **`init` と `sync` はあなたの作業を上書きしない。** 足りないものを作り、余ったものを警告します。sync が書き直したり消したりするスライドは、誰も手を入れていない骨格だけです。元になった台本が変われば書き直し、セクションがなくなって横にスタイルシートもスクリプトもなければ消します。`AGENTS.md` で dek が持つのは `<!-- dek:begin … -->` から `<!-- dek:end -->` までのブロックだけです。リネームもしません。
 - **すべてのエラーが hint を持つ。** hint は次に叩くコマンドを示します。直し方が決まっている診断にも hint が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。
-- **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dekc が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
+- **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dek が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
 - **実行しなかったチェックは `"skipped"` に並びます。** 各要素は `check`、`reason`、実行する方法があれば `hint` を持ちます。Playwright がない `dekc check` は `visual` を、`voice/` のないデッキでの `dekc check --voice` は `voice` を、rumdl がない `dekc lint` は `rumdl` を、URL か Playwright がない `dekc build` は `preview`（リンクプレビュー画像）を、ref に対する `dekc ls` は `lint` を飛ばします。テキストでは `<check>: skipped (<reason>)` と出て、hint が `help:` 行に続きます。`lint`、`check`、`build` はこれを標準エラーに出すので、標準出力には結果だけが残ります。すべて実行できたときはこのフィールド自体がありません。
 - **デッキごとにファイルを書くコマンドはリストを返す。** `build` と `pdf` は、1 デッキでも対象のデッキごとのパスを `outs` で返します。
 - **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`）を受け取ります。それ以外のコマンドは ref を受け取りません。[ref](#ref) を参照してください。
@@ -25,20 +25,20 @@
 | コマンド | 役割 |
 | --- | --- |
 | `dekc [deck] [--visual] [--port N] [--remote]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、発表者ビュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出しとコントラストも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
-| `dekc --remote` | LAN に公開。発表者ビュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断は、起動のたびに dekc が作って表示する 10 文字のパスワードが必要。ターミナルではその下の QR コードでスマホから発表者ビューを開ける（1 回だけ、5 分以内。Enter で新しいコード） |
+| `dekc --remote` | LAN に公開。発表者ビュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断は、起動のたびに dek が作って表示する 10 文字のパスワードが必要。ターミナルではその下の QR コードでスマホから発表者ビューを開ける（1 回だけ、5 分以内。Enter で新しいコード） |
 | `dekc rehearse [deck] [slug] [--remote]` | Timeline に沿って自走。何も録画しない。`--remote` を付けると `dekc --remote` と同じく LAN に公開する |
 
 ## プロジェクト
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dekc.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dekc/schema.json`、`.dekc/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dekc sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dekc 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dekc のブロックを足す。既にある `theme.css` も残し、どのデッキもそれをコピーする。そこにどのデッキにも要るトークンが欠けていれば、init は最初の lint がそれを `DEKC015` として報告する前に、標準エラーに挙げる（`--json` では `missingTokens`）。`DEKC015` の hint は dekc 自身のテーマが使う値を示す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dekc new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dekc が入るまでは `bun add -d @hajimism/dekc` も含める |
-| `dekc new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る。sync と同じく dekc 自身のファイルを更新し、更新したものを一覧する（`--json` では `updated`）。次に打つコマンドも表示する（`--json` では `next`） |
-| `dekc ls [deck]` | デッキ一覧、または 1 つの概要。セクション数、枚数、診断、予算、見積もり、Timeline があれば実尺。診断は rumdl を除いた dekc 自身のルールの結果。一覧では各デッキの指摘をその行に、プロジェクトの指摘（`dekc.toml`）を `project` 行と `--json` の最上位の `diagnostics` に 1 回だけ数える |
+| `dekc init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dek/schema.json`、`.dek/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dekc sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dek 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dek のブロックを足す。既にある `theme.css` も残し、どのデッキもそれをコピーする。そこにどのデッキにも要るトークンが欠けていれば、init は最初の lint がそれを `DEK015` として報告する前に、標準エラーに挙げる（`--json` では `missingTokens`）。`DEK015` の hint は dek 自身のテーマが使う値を示す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dekc new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dek が入るまでは `bun add -d @hajimism/dek` も含める |
+| `dekc new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る。sync と同じく dek 自身のファイルを更新し、更新したものを一覧する（`--json` では `updated`）。次に打つコマンドも表示する（`--json` では `next`） |
+| `dekc ls [deck]` | デッキ一覧、または 1 つの概要。セクション数、枚数、診断、予算、見積もり、Timeline があれば実尺。診断は rumdl を除いた dek 自身のルールの結果。一覧では各デッキの指摘をその行に、プロジェクトの指摘（`dek.toml`）を `project` 行と `--json` の最上位の `diagnostics` に 1 回だけ数える |
 
 ## ref
 
-ref は、見本として読むために `dekc.toml` の `[refs]` に固定した、他人のデッキです。`refs/` にある実体は gitignore されます。実体が無いときや別のコミットにあるときは、次に読むときに固定したコミットを取り直します。公開リポジトリならトークンは要りません。非公開なら `GITHUB_TOKEN` を設定するか、`gh auth login` でサインインしてください。
+ref は、見本として読むために `dek.toml` の `[refs]` に固定した、他人のデッキです。`refs/` にある実体は gitignore されます。実体が無いときや別のコミットにあるときは、次に読むときに固定したコミットを取り直します。公開リポジトリならトークンは要りません。非公開なら `GITHUB_TOKEN` を設定するか、`gh auth login` でサインインしてください。
 
 | コマンド | 役割 |
 | --- | --- |
@@ -64,9 +64,9 @@ ref は、見本として読むために `dekc.toml` の `[refs]` に固定し�
 | `dekc mv [deck] <slug> --before\|--after <slug>` | `script.md` の中でセクションを並べ替える |
 | `dekc goto [deck] <slug>` | 開いているブラウザを飛ばす。開発サーバが必要。`--json` の `viewers` はそのデッキを表示しているページの数。0 のときは、次に開いたページがその位置に着き、そのことを標準エラーで伝える |
 | `dekc current [deck]` | いま表示中の枚を出力。開発サーバが必要。`viewers` は表示しているページの数。0 のときは何も表示されておらず、出力した枚は次に開くページが着く位置で、そのことを標準エラーで伝える |
-| `dekc marks [deck]` | リハーサル中に直したいと印を付けたビートを一覧する。発表者ビューで `m` を押すか、バーの印ボタンで、言いよどんだビートに印を付ける。印ごとに、`script.md` での見出しの `line`、`was`（印を付けたときのビートの文面）、`text`（いまの文面）、`status` を返す。`status` は `open`、文面が変わると `edited`、その名前のビートがなくなると `gone`。印はビートの id か、なければタイトルで追いかけるので、前にビートを足しても動かない。印は `.dekc/marks.json` に保存される。印を付けるには開発サーバが必要。 |
+| `dekc marks [deck]` | リハーサル中に直したいと印を付けたビートを一覧する。発表者ビューで `m` を押すか、バーの印ボタンで、言いよどんだビートに印を付ける。印ごとに、`script.md` での見出しの `line`、`was`（印を付けたときのビートの文面）、`text`（いまの文面）、`status` を返す。`status` は `open`、文面が変わると `edited`、その名前のビートがなくなると `gone`。印はビートの id か、なければタイトルで追いかけるので、前にビートを足しても動かない。印は `.dek/marks.json` に保存される。印を付けるには開発サーバが必要。 |
 | `dekc marks [deck] clear` | デッキの印を消す。`--json` の `cleared` は消した数。 |
-| `dekc sync [deck]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、dekc 自身のファイル（`AGENTS.md` の dekc のブロック、`.dekc/schema.json`、`.dekc/slide.d.ts`）を更新する。これらはデッキではなく、入っている dekc とプロジェクトの ref に従うので、どちらかが変わった後にだけ変わる。そのとき最初に走ったコマンドが、どれであれ更新したと表示する。`.gitignore` が dekc 自身のためのファイル（`.dekc/server.json`、`.dekc/marks.json`）を無視していなければ末尾に書き足し、更新したと表示する。`.gitignore` のないプロジェクトには作らない。手を入れたスライド、`AGENTS.md` の dekc のブロックの外に書いたこと、`tsconfig.json` には触れない。セクションがなくなっても手が入っているスライドは残し、どうすればよいかと一緒に標準エラーに名前を出す。lint はそれを `DEKC002` として報告する。`--json` は `created`、`updated`、`removed`、`kept` を返す |
+| `dekc sync [deck]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、dek 自身のファイル（`AGENTS.md` の dek のブロック、`.dek/schema.json`、`.dek/slide.d.ts`）を更新する。これらはデッキではなく、入っている dek とプロジェクトの ref に従うので、どちらかが変わった後にだけ変わる。そのとき最初に走ったコマンドが、どれであれ更新したと表示する。`.gitignore` が dek 自身のためのファイル（`.dek/server.json`、`.dek/marks.json`）を無視していなければ末尾に書き足し、更新したと表示する。`.gitignore` のないプロジェクトには作らない。手を入れたスライド、`AGENTS.md` の dek のブロックの外に書いたこと、`tsconfig.json` には触れない。セクションがなくなっても手が入っているスライドは残し、どうすればよいかと一緒に標準エラーに名前を出す。lint はそれを `DEK002` として報告する。`--json` は `created`、`updated`、`removed`、`kept` を返す |
 
 ## 成果物
 
@@ -79,7 +79,7 @@ ref は、見本として読むために `dekc.toml` の `[refs]` に固定し�
 | `dekc voice [deck] say <text>` | 1 文を再生 |
 | `dekc voice [deck] dict add <word> <kana> [--accent N]` | `voice/dict.toml` に読みを追加。`--accent` でアクセント位置も指定する |
 | `dekc voice [deck] pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
-| `dekc build [deck] [--root-dist] [--url <url>] [--public]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEKC016`）は外して、その枚を動きなしでビルドする。dekc 自身のルールが何か見つければ件数を表示し（rumdl は `dekc lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dekc.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。`--public` はリンクを知る誰もが開くページを作り、発表者ビューから台本のト書きと HTML コメントを外す。付けなければ、URL の有無にかかわらず発表者ビューに台本がすべて入る。 |
+| `dekc build [deck] [--root-dist] [--url <url>] [--public]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dekc lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。`--public` はリンクを知る誰もが開くページを作り、発表者ビューから台本のト書きと HTML コメントを外す。付けなければ、URL の有無にかかわらず発表者ビューに台本がすべて入る。 |
 | `dekc video [deck] [slug] [--fps N] [--root-dist]` | `dekc voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` も書く。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
 | `dekc pdf [deck] [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く。動かないスライドスクリプトがあると `dekc video` と同じく止まる。どちらも診断を返す場所がなく、スクリプトが走らなかったかのような枚を出してしまうから |
 
@@ -93,15 +93,15 @@ ref は、見本として読むために `dekc.toml` の `[refs]` に固定し�
 
 | 変数 | 役割 |
 | --- | --- |
-| `DEKC_FFMPEG` | `dekc video` が mux に使う ffmpeg バイナリのパス。`PATH` の `ffmpeg` より優先 |
-| `DEKC_GH` | `GITHUB_TOKEN` が無いときに `dekc ref` がトークンを尋ねる `gh` CLI のパス |
-| `DEKC_GITHUB_API` | `dekc ref` が取得に使う GitHub API のベース URL |
-| `DEKC_PLAYWRIGHT` | 代わりの Playwright ワーカースクリプトのパス |
+| `DEK_FFMPEG` | `dekc video` が mux に使う ffmpeg バイナリのパス。`PATH` の `ffmpeg` より優先 |
+| `DEK_GH` | `GITHUB_TOKEN` が無いときに `dekc ref` がトークンを尋ねる `gh` CLI のパス |
+| `DEK_GITHUB_API` | `dekc ref` が取得に使う GitHub API のベース URL |
+| `DEK_PLAYWRIGHT` | 代わりの Playwright ワーカースクリプトのパス |
 | `GITHUB_TOKEN` | `dekc ref` が GitHub に送るトークン。非公開リポジトリと、rate limit の引き上げに使う |
-| `DEKC_RUMDL` | rumdl バイナリのパス。`PATH` と、dekc 本体のインストール先の `node_modules/.bin` より優先 |
-| `DEKC_VIDEO` | 代わりの動画キャプチャワーカーのパス。Playwright ワーカーの代わりに使う |
-| `DEKC_VOICE_PLAY` | `0` にすると `dekc voice say` が合成した音声を再生しない |
-| `DEKC_VOICE_URL` | 音声エンジンのベース URL。`voice.toml` より優先 |
+| `DEK_RUMDL` | rumdl バイナリのパス。`PATH` と、dek 本体のインストール先の `node_modules/.bin` より優先 |
+| `DEK_VIDEO` | 代わりの動画キャプチャワーカーのパス。Playwright ワーカーの代わりに使う |
+| `DEK_VOICE_PLAY` | `0` にすると `dekc voice say` が合成した音声を再生しない |
+| `DEK_VOICE_URL` | 音声エンジンのベース URL。`voice.toml` より優先 |
 | `NO_COLOR` | 設定すると出力に色を付けない。`FORCE_COLOR` と `CI` より優先 |
 | `FORCE_COLOR` | 設定すると端末でなくても出力に色を付ける |
 | `CI` | CI サービスが設定する変数。`NO_COLOR` と `FORCE_COLOR` が無いとき、設定されていれば出力に色を付けない |

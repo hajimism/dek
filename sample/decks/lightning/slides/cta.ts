@@ -26,4 +26,4 @@ export default {
       type.textContent = full.slice(0, Math.max(0, Math.min(full.length, Math.floor((t - TYPE_AT) / CHAR_MS))));
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

@@ -3,7 +3,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
-import { DekcError } from "./error.ts";
+import { DekError } from "./error.ts";
 import { parseRefSource, type RefSource } from "./ref-name.ts";
 import { listSlides, resolveProject } from "./resolve.ts";
 import { outputDir } from "./safe-fs.ts";
@@ -39,7 +39,7 @@ export function refDir(root: string, name: string): string {
   return join(root, "refs", owner, repo, deck);
 }
 
-/** The marker of a snapshot, or nothing when it is missing or not one dekc wrote. */
+/** The marker of a snapshot, or nothing when it is missing or not one dek wrote. */
 export function readRefMeta(dir: string): RefMeta | undefined {
   const path = join(dir, REF_MARKER);
   if (!existsSync(path)) {
@@ -60,10 +60,10 @@ export function refLicense(dir: string): string | null {
   return LICENSE_NAMES.find((name) => existsSync(join(dir, name))) ?? null;
 }
 
-/** What the project knows about one ref: its pin in dekc.toml and whether the snapshot matches it. */
+/** What the project knows about one ref: its pin in dek.toml and whether the snapshot matches it. */
 export type RefState = {
   name: string;
-  /** The commit dekc.toml pins, or nothing when the ref is not added. */
+  /** The commit dek.toml pins, or nothing when the ref is not added. */
   pinned?: string;
   /** The snapshot directory, whether or not anything is there. */
   dir: string;
@@ -110,12 +110,12 @@ export async function readTarball(bytes: Uint8Array): Promise<RepoFiles> {
 
 const DECK_SCRIPT_RE = /^(?:(.*)\/)?decks\/([^/]+)\/script\.md$/;
 
-/** The decks in a repository: each `decks/<name>/script.md` beside its project's dekc.toml. */
+/** The decks in a repository: each `decks/<name>/script.md` beside its project's dek.toml. */
 function repoDecks(files: RepoFiles): Array<{ name: string; prefix: string }> {
   return [...files.keys()].flatMap((path) => {
     const match = path.match(DECK_SCRIPT_RE);
     const prefix = match?.[1] ? `${match[1]}/` : "";
-    return match?.[2] && files.has(`${prefix}dekc.toml`) ? [{ name: match[2], prefix }] : [];
+    return match?.[2] && files.has(`${prefix}dek.toml`) ? [{ name: match[2], prefix }] : [];
   });
 }
 
@@ -131,16 +131,16 @@ export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
   const [match, ...others] = matches;
   if (!match) {
     const names = [...new Set(decks.map((deck) => deck.name))].sort();
-    throw new DekcError(`${repo} has no deck "${source.deck}"`, {
+    throw new DekError(`${repo} has no deck "${source.deck}"`, {
       hint:
         names.length > 0
           ? `decks in ${repo}: ${names.join(", ")}`
-          : `${repo} holds no dekc project (decks/<name>/script.md beside a dekc.toml)`,
+          : `${repo} holds no dek project (decks/<name>/script.md beside a dek.toml)`,
     });
   }
   if (others.length > 0) {
     const paths = matches.map((deck) => `${deck.prefix}decks/${deck.name}`).sort();
-    throw new DekcError(`${repo} has more than one deck named "${source.deck}"`, {
+    throw new DekError(`${repo} has more than one deck named "${source.deck}"`, {
       hint: `pass the GitHub link to the one you mean; they are at ${paths.join(", ")}`,
     });
   }
@@ -159,7 +159,7 @@ function keepsInDeck(path: string): boolean {
 
 /**
  * Writes the snapshot of one deck at one commit under refs/, laid out as the
- * project it came from so it resolves like any dekc project. It is written
+ * project it came from so it resolves like any dek project. It is written
  * beside the old one and swapped in, so a failure leaves the old one whole.
  */
 export async function installSnapshot(
@@ -174,7 +174,7 @@ export async function installSnapshot(
     LICENSE_NAMES.find((name) => files.has(name)) ??
     LICENSE_NAMES.find((name) => files.has(`${prefix}${name}`));
   const picked = new Map<string, Blob>();
-  picked.set("dekc.toml", files.get(`${prefix}dekc.toml`) ?? new Blob([]));
+  picked.set("dek.toml", files.get(`${prefix}dek.toml`) ?? new Blob([]));
   for (const [path, blob] of files) {
     const inDeck = path.startsWith(deckPrefix) ? path.slice(deckPrefix.length) : undefined;
     if (inDeck !== undefined && keepsInDeck(inDeck)) {
@@ -186,12 +186,12 @@ export async function installSnapshot(
   }
   const size = [...picked.values()].reduce((sum, blob) => sum + blob.size, 0);
   if (size > MAX_SNAPSHOT_BYTES) {
-    throw new DekcError(`${source.name} is larger than ${MAX_SNAPSHOT_BYTES / 1024 / 1024} MB`, {
+    throw new DekError(`${source.name} is larger than ${MAX_SNAPSHOT_BYTES / 1024 / 1024} MB`, {
       hint: "a deck to read as a model should be far smaller; check its assets",
     });
   }
 
-  // refs/ is dekc's; a link on the way would aim the swap below, and its delete, elsewhere.
+  // refs/ is dek's; a link on the way would aim the swap below, and its delete, elsewhere.
   const refsDir = join(root, "refs");
   const dir = refDir(root, source.name);
   outputDir(dirname(dir), root);

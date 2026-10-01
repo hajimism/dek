@@ -65,4 +65,4 @@ export default {
       verdict.style.opacity = String(fade);
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

@@ -138,5 +138,5 @@ export function liveTokenQuery(token: string | undefined): string {
  * deck follow each other, and two decks open side by side do not.
  */
 export function deckChannelName(deck: string | undefined, slugs: readonly string[]): string {
-  return `dekc:${deck ?? ""}:${slugs.join(",")}`;
+  return `dek:${deck ?? ""}:${slugs.join(",")}`;
 }

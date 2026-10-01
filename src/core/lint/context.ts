@@ -1,4 +1,4 @@
-import { type DekcConfig, loadConfig } from "../config.ts";
+import { type DekConfig, loadConfig } from "../config.ts";
 import { cssLayoutNames, parseCss, type Stylesheet } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import type { Diagnostic } from "../diagnostic.ts";
@@ -24,7 +24,7 @@ type SlideSource = { html: string; scan: HtmlScan; skeleton: boolean };
  * slide; `lintDeck` narrows their findings to one slide when asked.
  */
 export type LintContext = DeckFiles & {
-  /** DEKC016 and DEKC017 of each slide script, by slug: evaluated before the rules run. */
+  /** DEK016 and DEK017 of each slide script, by slug: evaluated before the rules run. */
   scripts: Map<string, Diagnostic[]>;
 };
 
@@ -32,10 +32,10 @@ export type LintContext = DeckFiles & {
 export type DeckFiles = {
   project: Project;
   deck: ProjectDeck;
-  config: DekcConfig;
+  config: DekConfig;
   /** script.md, read once and cut at its frontmatter; none when it cannot be cut. */
   script?: ScriptParts;
-  /** The first section of each slug, in script order; a second one is DEKC004. */
+  /** The first section of each slug, in script order; a second one is DEK004. */
   sectionsBySlug: Map<string, Section>;
   slidesBySlug: Map<string, SlideFile>;
   stylesBySlug: Map<string, SlideFile>;

@@ -28,4 +28,4 @@ export default {
       el.style.opacity = String(p);
     });
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

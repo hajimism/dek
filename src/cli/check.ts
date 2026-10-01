@@ -1,5 +1,5 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import type { Fill } from "../core/fill.ts";
 import { lintDeck } from "../core/lint.ts";
 import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
@@ -69,7 +69,7 @@ export async function checkCommand(
     await synthDeck({ project, deck });
     const timeline = loadCachedTimeline(deck.dir);
     if (!timeline) {
-      throw new DekcError("Timeline not found", {
+      throw new DekError("Timeline not found", {
         hint: "run `dekc voice`",
       });
     }

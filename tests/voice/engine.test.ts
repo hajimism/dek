@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import {
   engineBaseUrl,
   engineMissingError,
@@ -20,31 +20,31 @@ const speakers = [
 
 describe("engineBaseUrl", () => {
   test.serial("maps engine names and host:port overrides", () => {
-    const previous = process.env.DEKC_VOICE_URL;
-    delete process.env.DEKC_VOICE_URL;
+    const previous = process.env.DEK_VOICE_URL;
+    delete process.env.DEK_VOICE_URL;
     try {
       expect(engineBaseUrl("aivis")).toBe("http://127.0.0.1:10101");
       expect(engineBaseUrl("voicevox:9")).toBe("http://127.0.0.1:9");
       expect(engineBaseUrl("http://127.0.0.1:50021/")).toBe("http://127.0.0.1:50021");
     } finally {
       if (previous === undefined) {
-        delete process.env.DEKC_VOICE_URL;
+        delete process.env.DEK_VOICE_URL;
       } else {
-        process.env.DEKC_VOICE_URL = previous;
+        process.env.DEK_VOICE_URL = previous;
       }
     }
   });
 
-  test.serial("DEKC_VOICE_URL wins over the engine name", () => {
-    const previous = process.env.DEKC_VOICE_URL;
-    process.env.DEKC_VOICE_URL = "http://127.0.0.1:9999/";
+  test.serial("DEK_VOICE_URL wins over the engine name", () => {
+    const previous = process.env.DEK_VOICE_URL;
+    process.env.DEK_VOICE_URL = "http://127.0.0.1:9999/";
     try {
       expect(engineBaseUrl("aivis")).toBe("http://127.0.0.1:9999");
     } finally {
       if (previous === undefined) {
-        delete process.env.DEKC_VOICE_URL;
+        delete process.env.DEK_VOICE_URL;
       } else {
-        process.env.DEKC_VOICE_URL = previous;
+        process.env.DEK_VOICE_URL = previous;
       }
     }
   });
@@ -57,7 +57,7 @@ describe("engineSetupHint", () => {
     expect(hint).toContain(
       "docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest",
     );
-    expect(hint).toContain("DEKC_VOICE_URL");
+    expect(hint).toContain("DEK_VOICE_URL");
   });
 
   test("points AivisSpeech users at its page and image on port 10101", () => {
@@ -91,7 +91,7 @@ describe("engineNameForUrl", () => {
 describe("engineMissingError", () => {
   test("names the engine, the URL, and the setup hint", () => {
     const error = engineMissingError("voicevox", "http://127.0.0.1:50021");
-    expect(error).toBeInstanceOf(DekcError);
+    expect(error).toBeInstanceOf(DekError);
     expect(error.message).toBe("voicevox was not found at http://127.0.0.1:50021");
     expect(error.hint).toContain("https://voicevox.hiroshiba.jp/");
   });
@@ -103,14 +103,14 @@ describe("resolveStyleId", () => {
     expect(resolveStyleId(speakers, "ずんだもん")).toBe(3);
   });
 
-  test("throws DekcError with a hint when the speaker is missing", () => {
+  test("throws DekError with a hint when the speaker is missing", () => {
     try {
       resolveStyleId(speakers, "missing/ノーマル");
       throw new Error("expected resolveStyleId to fail");
     } catch (error) {
-      expect(error).toBeInstanceOf(DekcError);
-      expect((error as DekcError).message).toContain("missing");
-      expect((error as DekcError).hint).toContain("dekc voice speakers");
+      expect(error).toBeInstanceOf(DekError);
+      expect((error as DekError).message).toContain("missing");
+      expect((error as DekError).hint).toContain("dekc voice speakers");
     }
   });
 });

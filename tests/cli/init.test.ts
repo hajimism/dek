@@ -7,10 +7,10 @@ import { initCommand } from "../../src/cli/init.ts";
 import { type LsDeckResult, lsCommand } from "../../src/cli/ls.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { formatInit } from "../../src/cli/text.ts";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { PLAYWRIGHT_INSTALL } from "../../src/core/playwright.ts";
-import { jsonStdout, runDekc } from "../helpers/cli.ts";
+import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 type InitOk = {
@@ -24,40 +24,40 @@ describe("dekc init", () => {
   test("creates a project and returns JSON", async () => {
     await withTempDir(async (dir) => {
       const target = join(dir, "my-talks");
-      const result = await runDekc(["init", target, "--json"], { cwd: dir });
+      const result = await runDek(["init", target, "--json"], { cwd: dir });
       expect(result).toMatchObject({ exitCode: 0 });
       const json = jsonStdout<InitOk>(result);
       expect(json.ok).toBe(true);
       expect(json.root).toBe(target);
-      expect(json.created).toContain("my-talks/dekc.toml");
+      expect(json.created).toContain("my-talks/dek.toml");
       expect(json.kept).toEqual([]);
     });
   });
 });
 
 describe("initCommand", () => {
-  test("names next commands that run as printed, installing dekc first when it is not local", async () => {
+  test("names next commands that run as printed, installing dek first when it is not local", async () => {
     await withTempDir(async (dir) => {
       expect(initCommand({ cwd: dir, dir: "my-talks", deck: "demo" }).next).toEqual([
         "cd my-talks",
-        "bun add -d @hajimism/dekc",
+        "bun add -d @hajimism/dek",
         "cd decks/demo",
         "$EDITOR script.md",
         "bunx dekc",
       ]);
       expect(initCommand({ cwd: dir, dir: "bare" }).next).toEqual([
         "cd bare",
-        "bun add -d @hajimism/dekc",
+        "bun add -d @hajimism/dek",
         "bunx dekc new <name>",
       ]);
       expect(initCommand({ cwd: join(dir, "bare") }).next).toEqual([
-        "bun add -d @hajimism/dekc",
+        "bun add -d @hajimism/dek",
         "bunx dekc new <name>",
       ]);
     });
   });
 
-  test("skips the install step when the project already has dekc in node_modules", async () => {
+  test("skips the install step when the project already has dek in node_modules", async () => {
     await withTempDir(async (dir) => {
       await mkdir(join(dir, "node_modules", ".bin"), { recursive: true });
       await writeFile(join(dir, "node_modules", ".bin", "dekc"), "");
@@ -82,7 +82,7 @@ describe("initCommand", () => {
     await withTempDir(async (dir) => {
       expect(initCommand({ cwd: dir, dir: "My Talks", deck: "it's" }).next).toEqual([
         "cd 'My Talks'",
-        "bun add -d @hajimism/dekc",
+        "bun add -d @hajimism/dek",
         "cd 'decks/it'\\''s'",
         "$EDITOR script.md",
         "bunx dekc",
@@ -109,7 +109,7 @@ describe("initCommand", () => {
     });
   });
 
-  test("checks the files dekc refreshes, too, before it writes anything", async () => {
+  test("checks the files dek refreshes, too, before it writes anything", async () => {
     await withTempDir(async (dir) => {
       const target = join(dir, "newproj");
       await mkdir(join(target, "AGENTS.md"), { recursive: true });
@@ -117,11 +117,11 @@ describe("initCommand", () => {
         initCommand({ cwd: dir, dir: target, deck: "demo" });
         throw new Error("expected init to refuse");
       } catch (error) {
-        expect(error).toBeInstanceOf(DekcError);
-        expect((error as DekcError).message).toBe("a directory is in the way of a file");
-        expect((error as DekcError).path).toBe(join(target, "AGENTS.md"));
+        expect(error).toBeInstanceOf(DekError);
+        expect((error as DekError).message).toBe("a directory is in the way of a file");
+        expect((error as DekError).path).toBe(join(target, "AGENTS.md"));
       }
-      expect(existsSync(join(target, "dekc.toml"))).toBe(false);
+      expect(existsSync(join(target, "dek.toml"))).toBe(false);
     });
   });
 
@@ -133,9 +133,9 @@ describe("initCommand", () => {
         initCommand({ cwd: inner });
         throw new Error("expected init to refuse");
       } catch (error) {
-        expect(error).toBeInstanceOf(DekcError);
-        expect((error as DekcError).message).toContain("inside the dekc project");
-        expect((error as DekcError).hint).toContain("dekc new talk2");
+        expect(error).toBeInstanceOf(DekError);
+        expect((error as DekError).message).toContain("inside the dek project");
+        expect((error as DekError).hint).toContain("dekc new talk2");
       }
       expect(existsSync(inner)).toBe(false);
     });
@@ -151,7 +151,7 @@ describe("initCommand", () => {
       expect(result.missingTokens).toHaveLength(13);
       expect(result.missingTokens?.[0]).toBe("--fg");
       expect(outputOf("init").notes?.(result, false)).toBe(
-        `${join(dir, "theme.css")} was kept and lacks 13 tokens every deck needs (--fg, --bg, --accent, …)\n  help: add them to its .slide rule, or move it aside and run \`dekc init\` again for dekc's own theme`,
+        `${join(dir, "theme.css")} was kept and lacks 13 tokens every deck needs (--fg, --bg, --accent, …)\n  help: add them to its .slide rule, or move it aside and run \`dekc init\` again for dek's own theme`,
       );
     });
   });
@@ -164,9 +164,9 @@ describe("initCommand", () => {
       await writeFile(join(dir, "decks", "demo", "script.md"), "## mine\n");
 
       const again = initCommand({ cwd: dir, deck: "demo" });
-      // AGENTS.md is shared: the author's notes stay, and dekc's block follows them.
+      // AGENTS.md is shared: the author's notes stay, and dek's block follows them.
       const agents = await readFile(join(dir, "AGENTS.md"), "utf8");
-      expect(agents.startsWith("# my own notes\n\n<!-- dekc:begin")).toBe(true);
+      expect(agents.startsWith("# my own notes\n\n<!-- dek:begin")).toBe(true);
       expect(agents).toContain("dekc help --agent");
       expect(await readFile(join(dir, "decks", "demo", "script.md"), "utf8")).toBe("## mine\n");
       expect(again.created).toEqual([]);
@@ -217,7 +217,7 @@ describe("initCommand", () => {
       const result = initCommand({ cwd: dir, dir: target, deck: "demo" });
       expect(result.root).toBe(target);
 
-      expect(existsSync(join(target, "dekc.toml"))).toBe(true);
+      expect(existsSync(join(target, "dek.toml"))).toBe(true);
       expect(existsSync(join(target, "theme.css"))).toBe(true);
       expect(existsSync(join(target, "assets"))).toBe(true);
       expect(existsSync(join(target, "decks"))).toBe(true);
@@ -225,7 +225,7 @@ describe("initCommand", () => {
       expect(existsSync(join(target, "decks", "demo", "theme.css"))).toBe(true);
       expect(existsSync(join(target, "decks", "demo", "slides"))).toBe(true);
       expect(existsSync(join(target, "decks", "demo", "assets"))).toBe(true);
-      expect(existsSync(join(target, ".dekc", "schema.json"))).toBe(true);
+      expect(existsSync(join(target, ".dek", "schema.json"))).toBe(true);
       expect(existsSync(join(target, ".rumdl.toml"))).toBe(true);
       const rumdl = await readFile(join(target, ".rumdl.toml"), "utf8");
       expect(rumdl).toContain("MD041");
@@ -244,7 +244,7 @@ describe("initCommand", () => {
       const gitignore = await readFile(join(target, ".gitignore"), "utf8");
       expect(gitignore).toContain("dist/");
       expect(gitignore).toContain(".cache/");
-      expect(gitignore).toContain(".dekc/server.json");
+      expect(gitignore).toContain(".dek/server.json");
       expect(gitignore).toContain("node_modules/");
       expect(gitignore).not.toContain("schema.json");
     });
@@ -264,12 +264,12 @@ describe("initCommand", () => {
   test("rejects a deck name with path separators", async () => {
     await withTempDir(async (dir) => {
       const target = join(dir, "my-talks");
-      expect(() => initCommand({ cwd: dir, dir: target, deck: "../evil" })).toThrow(DekcError);
+      expect(() => initCommand({ cwd: dir, dir: target, deck: "../evil" })).toThrow(DekError);
       try {
         initCommand({ cwd: dir, dir: target, deck: "../evil" });
       } catch (error) {
-        expect(error).toBeInstanceOf(DekcError);
-        expect((error as DekcError).message).toContain("invalid deck name");
+        expect(error).toBeInstanceOf(DekError);
+        expect((error as DekError).message).toContain("invalid deck name");
       }
       expect(existsSync(join(dir, "evil"))).toBe(false);
     });
@@ -280,7 +280,7 @@ describe("initCommand", () => {
       const target = join(dir, "my-talks");
       initCommand({ cwd: dir, dir: target });
       expect(existsSync(join(target, "decks"))).toBe(true);
-      expect(existsSync(join(target, "dekc.toml"))).toBe(true);
+      expect(existsSync(join(target, "dek.toml"))).toBe(true);
     });
   });
 
@@ -298,7 +298,7 @@ describe("initCommand", () => {
     await withTempDir(async (dir) => {
       const result = initCommand({ cwd: dir });
       expect(result.root).toBe(dir);
-      expect(existsSync(join(dir, "dekc.toml"))).toBe(true);
+      expect(existsSync(join(dir, "dek.toml"))).toBe(true);
     });
   });
 

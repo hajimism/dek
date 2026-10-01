@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { bar, mountChartDeck, unmountChartDeck } from "../helpers/chart-deck.ts";
-import { dekcGo, pressKey } from "../helpers/dom.ts";
+import { dekGo, pressKey } from "../helpers/dom.ts";
 
 beforeAll(async () => {
   await mountChartDeck("player", "file:///deck.html#chart/1");
@@ -17,9 +17,9 @@ describe("slide scripts in the player", () => {
     const seen: number[] = [];
     const module = (
       window as unknown as {
-        __dekcSlides: Record<string, { draw: (slide: Element, frame: { t: number }) => void }>;
+        __dekSlides: Record<string, { draw: (slide: Element, frame: { t: number }) => void }>;
       }
-    ).__dekcSlides.chart;
+    ).__dekSlides.chart;
     const draw = module?.draw;
     if (!module || !draw) {
       throw new Error("chart script not registered");
@@ -46,14 +46,14 @@ describe("slide scripts in the player", () => {
   });
 
   test.serial("a jump draws the beat's end state", async () => {
-    await dekcGo({ slideIndex: 0, beatIndex: 0 });
-    await dekcGo({ slideIndex: 1, beatIndex: 2 });
+    await dekGo({ slideIndex: 0, beatIndex: 0 });
+    await dekGo({ slideIndex: 1, beatIndex: 2 });
     expect(bar()).toBe("2:growth:40");
   });
 
   test.serial("the rail thumbnail is drawn at its last beat's end, as print draws it", () => {
     expect(
-      document.querySelector('#dekc-rail [data-slide-index="1"] .slide .bar')?.textContent,
+      document.querySelector('#dek-rail [data-slide-index="1"] .slide .bar')?.textContent,
     ).toBe("2:growth:40");
   });
 });

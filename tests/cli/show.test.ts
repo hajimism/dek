@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { formatText } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { showCommand } from "../../src/cli/show.ts";
-import { jsonStdout, runDekc } from "../helpers/cli.ts";
+import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -32,7 +32,7 @@ describe("dekc show", () => {
         decks: [{ name: "demo", slides: { intro: introHtml } }],
       },
       async (root) => {
-        const result = await runDekc(["show", "intro", "--json"], {
+        const result = await runDek(["show", "intro", "--json"], {
           cwd: join(root, "decks", "demo"),
         });
         expect(result).toMatchObject({ exitCode: 0 });
@@ -175,7 +175,7 @@ describe("show as a reading entry point", () => {
         styles: {
           intro: '.slide .mine { color: var(--bg); background: url("../assets/bg.svg"); }',
         },
-        scripts: { intro: "export default { draw() {} } satisfies DekcSlide;\n" },
+        scripts: { intro: "export default { draw() {} } satisfies DekSlide;\n" },
         assets: { "chart.png": "png", "bg.svg": "<svg/>", "unused.png": "png" },
       },
     ],
@@ -188,7 +188,7 @@ describe("show as a reading entry point", () => {
         "intro",
       );
       expect(result.css).toContain(".slide .mine");
-      expect(result.ts).toContain("satisfies DekcSlide");
+      expect(result.ts).toContain("satisfies DekSlide");
       expect(result.theme).toContain(".slide .card {");
       expect(result.theme).toContain('.slide[data-layout="title"] {');
       expect(result.theme).toContain("--bg: #fff;");

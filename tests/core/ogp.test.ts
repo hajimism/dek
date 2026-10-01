@@ -3,10 +3,10 @@ import { ogpHead, parsePublicUrl } from "../../src/core/ogp.ts";
 
 describe("ogpHead", () => {
   test("describes the page with title, description, and locale", () => {
-    const head = ogpHead({ title: "Why dekc", description: "Slides as a build.", lang: "ja" });
+    const head = ogpHead({ title: "Why dek", description: "Slides as a build.", lang: "ja" });
     expect(head).toContain('<meta name="description" content="Slides as a build.">');
     expect(head).toContain('<meta property="og:type" content="website">');
-    expect(head).toContain('<meta property="og:title" content="Why dekc">');
+    expect(head).toContain('<meta property="og:title" content="Why dek">');
     expect(head).toContain('<meta property="og:description" content="Slides as a build.">');
     expect(head).toContain('<meta property="og:locale" content="ja_JP">');
     expect(head).toContain('<meta name="twitter:card" content="summary">');
@@ -26,21 +26,21 @@ describe("ogpHead", () => {
 
   test("points og:url and a large card at absolute URLs", () => {
     const head = ogpHead({
-      title: "Why dekc",
+      title: "Why dek",
       lang: "en",
-      url: "https://example.com/talks/why-dekc.html",
-      image: { url: "https://example.com/talks/why-dekc.png", width: 1280, height: 720 },
+      url: "https://example.com/talks/why-dek.html",
+      image: { url: "https://example.com/talks/why-dek.png", width: 1280, height: 720 },
     });
     expect(head).toContain(
-      '<meta property="og:url" content="https://example.com/talks/why-dekc.html">',
+      '<meta property="og:url" content="https://example.com/talks/why-dek.html">',
     );
-    expect(head).toContain('<link rel="canonical" href="https://example.com/talks/why-dekc.html">');
+    expect(head).toContain('<link rel="canonical" href="https://example.com/talks/why-dek.html">');
     expect(head).toContain(
-      '<meta property="og:image" content="https://example.com/talks/why-dekc.png">',
+      '<meta property="og:image" content="https://example.com/talks/why-dek.png">',
     );
     expect(head).toContain('<meta property="og:image:width" content="1280">');
     expect(head).toContain('<meta property="og:image:height" content="720">');
-    expect(head).toContain('<meta property="og:image:alt" content="Why dekc">');
+    expect(head).toContain('<meta property="og:image:alt" content="Why dek">');
     expect(head).toContain('<meta name="twitter:card" content="summary_large_image">');
   });
 

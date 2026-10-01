@@ -2,7 +2,7 @@
 
 このページでは、何もない状態から発表できるデッキまでを作ります。やることは 3 つです。
 
-1. プロジェクトと最初のデッキを作り、dekc をそこに入れる
+1. プロジェクトと最初のデッキを作り、dek をそこに入れる
 2. 台本を書き、生成されたスライドをブラウザで送る
 3. 会場用の HTML を 1 ファイル書き出す
 
@@ -14,10 +14,10 @@ HTML は書きません。声も動画も触りません。ゴールは、同梱
 
 ## プロジェクトを作る
 
-dekc のリポジトリの外に、トーク用のプロジェクトを作ります。
+dek のリポジトリの外に、トーク用のプロジェクトを作ります。
 
 ```bash
-bunx @hajimism/dekc init my-talks --deck 2026-04-vite
+bunx @hajimism/dek init my-talks --deck 2026-04-vite
 ```
 
 `init` は書いたファイルを並べ、最後に次に打つコマンドを表示します。
@@ -25,16 +25,16 @@ bunx @hajimism/dekc init my-talks --deck 2026-04-vite
 ```
 next:
   cd my-talks
-  bun add -d @hajimism/dekc
+  bun add -d @hajimism/dek
   cd decks/2026-04-vite
   $EDITOR script.md
   bunx dekc
 ```
 
-上から順に実行します。`bun add -d` で dekc をプロジェクトに入れ、以降の `bunx dekc` はその dekc を動かします。固定されるのは CLI のバージョンだけで、デッキの HTML が `node_modules` を見ることはありません。
+上から順に実行します。`bun add -d` で dek をプロジェクトに入れ、以降の `bunx dekc` はその dek を動かします。固定されるのは CLI のバージョンだけで、デッキの HTML が `node_modules` を見ることはありません。
 
-::: warning 打つのは `dek` ではなく `dekc`
-打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。プロジェクトの外では `bunx dekc` は何も見つけられないので、`bunx @hajimism/dekc` を使ってください。
+::: warning コマンドは `dek` ではなく `dekc`
+パッケージは `@hajimism/dek` で、入るコマンドは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。プロジェクトの中では `bunx dekc` がそこに入れた dek を動かします。プロジェクトの外では `bunx @hajimism/dek` を使ってください。
 :::
 
 プロジェクトを作るのは最初の一度だけです。最初のデッキも一緒にでき、以降は `dekc new <name>` で足します。`init` をもう一度実行しても安全です。足りないものだけを書き、あるファイルはすべて残し、`init` の内容と違うものには `(kept)` と表示します。プロジェクトの中では 2 つ目のプロジェクトを作らず、`dekc new` を案内します。
@@ -43,10 +43,10 @@ next:
 
 ```
 my-talks/
-├── package.json        # `bun add` が作り、dekc のバージョンを固定する
-├── dekc.toml            # プロジェクトの設定。既定値を変えるまでは空
+├── package.json        # `bun add` が作り、dek のバージョンを固定する
+├── dek.toml            # プロジェクトの設定。既定値を変えるまでは空
 ├── AGENTS.md           # AI エージェント向けの規約。sync のたびに書き直す
-├── .gitignore          # dist/ .cache/ .dekc/server.json node_modules/ refs/
+├── .gitignore          # dist/ .cache/ .dek/server.json node_modules/ refs/
 ├── .rumdl.toml         # script.md 用の Markdown ルール
 ├── theme.css           # 新しいデッキの出発点
 ├── tsconfig.json       # スライドのスクリプト用のエディタ設定
@@ -57,9 +57,9 @@ my-talks/
 │       ├── theme.css   # このデッキ専用のコピー
 │       ├── slides/     # 1 スライド 1 HTML。最初は骨格
 │       └── assets/
-└── .dekc/
+└── .dek/
     ├── schema.json     # frontmatter のスキーマ（エディタ用）
-    └── slide.d.ts      # スライドのスクリプト用の DekcSlide 型
+    └── slide.d.ts      # スライドのスクリプト用の DekSlide 型
 ```
 
 デッキが 1 つでも `decks/` は必ずあります。プロジェクト直下の `theme.css` はテンプレートで、`dekc init` と `dekc new` が新しいデッキの中へコピーします。
@@ -70,7 +70,7 @@ my-talks/
 
 ```markdown
 ---
-# yaml-language-server: $schema=../../.dekc/schema.json
+# yaml-language-server: $schema=../../.dek/schema.json
 title: HTML スライドツールを作った話
 event: Tokyo Frontend Meetup #42
 date: 2026-04-18

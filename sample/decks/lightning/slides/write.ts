@@ -21,4 +21,4 @@ export default {
       line.toggleAttribute("data-lit", lit);
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { checkCommand } from "../../src/cli/check.ts";
 import { requireDeckFromCwd } from "../../src/cli/scope.ts";
 import { addReading, listSpeakers, pinVoice, sayVoice, synthVoice } from "../../src/cli/voice.ts";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import { loadVoiceDict } from "../../src/core/voice.ts";
-import { jsonStdout, runDekc } from "../helpers/cli.ts";
+import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { type FakeVoicevox, startFakeVoicevox } from "../helpers/fake-voicevox.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -17,7 +17,7 @@ title: Demo
 
 ## intro
 
-hello dekc
+hello dek
 `;
 
 const voiceToml = `engine = "voicevox"
@@ -35,7 +35,7 @@ async function withVoiceDeck(
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, "voice"), { recursive: true });
       await writeFile(join(deckDir, "voice", "voice.toml"), toml);
-      await withEnv({ DEKC_VOICE_URL: fake.url, DEKC_VOICE_PLAY: "0" }, () =>
+      await withEnv({ DEK_VOICE_URL: fake.url, DEK_VOICE_PLAY: "0" }, () =>
         fn(root, deckDir, fake),
       );
     });
@@ -50,9 +50,9 @@ describe("dekc voice", () => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, "voice"), { recursive: true });
       await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
-      const result = await runDekc(["voice", "--json"], {
+      const result = await runDek(["voice", "--json"], {
         cwd: deckDir,
-        env: { DEKC_VOICE_URL: "http://127.0.0.1:9" },
+        env: { DEK_VOICE_URL: "http://127.0.0.1:9" },
       });
       expect(result).toMatchObject({ exitCode: 1 });
       const json = jsonStdout<{ ok: false; error: { message: string; hint?: string } }>(result);
@@ -67,13 +67,13 @@ describe("dekc voice", () => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(deckDir, "voice"), { recursive: true });
       await writeFile(join(deckDir, "voice", "voice.toml"), voiceToml);
-      const result = await runDekc(
-        ["voice", "dict", "add", "dekc", "デック", "--accent", "1", "--json"],
+      const result = await runDek(
+        ["voice", "dict", "add", "dek", "デック", "--accent", "1", "--json"],
         { cwd: deckDir },
       );
       expect(result).toMatchObject({ exitCode: 0 });
       const json = jsonStdout<{ ok: true; key: string; kana: string; path: string }>(result);
-      expect(json.key).toBe("dekc");
+      expect(json.key).toBe("dek");
       expect(json.kana).toBe("デック");
       expect(await Bun.file(json.path).text()).toContain("accent = 1");
     });
@@ -124,7 +124,7 @@ describe("dekc voice and its subcommands", () => {
       expect(pin.audioPath.endsWith("voice/pin/master.wav")).toBe(true);
       expect(await Bun.file(pin.audioPath).exists()).toBe(true);
       expect(await Bun.file(pin.timelinePath).exists()).toBe(true);
-      await withEnv({ DEKC_VOICE_URL: "http://127.0.0.1:9", DEKC_VOICE_PLAY: "0" }, async () => {
+      await withEnv({ DEK_VOICE_URL: "http://127.0.0.1:9", DEK_VOICE_PLAY: "0" }, async () => {
         const again = await synthVoice(requireDeckFromCwd(deckDir));
         expect(again.action).toBe("synth");
       });
@@ -154,7 +154,7 @@ describe("dekc voice and its subcommands", () => {
   test.serial("adds a reading beside the others, and a new one replaces the old", async () => {
     await withVoiceDeck(async (_root, deckDir) => {
       const target = requireDeckFromCwd(deckDir);
-      addReading(target, { word: "dekc", kana: "デック", accent: 1 });
+      addReading(target, { word: "dek", kana: "デック", accent: 1 });
       const result = addReading(target, { word: "TOML", kana: "トムル" });
       expect(result).toEqual({
         action: "dict",
@@ -162,8 +162,8 @@ describe("dekc voice and its subcommands", () => {
         key: "TOML",
         kana: "トムル",
       });
-      addReading(target, { word: "dekc", kana: "デク" });
-      expect(loadVoiceDict(deckDir)).toEqual({ TOML: { kana: "トムル" }, dekc: { kana: "デク" } });
+      addReading(target, { word: "dek", kana: "デク" });
+      expect(loadVoiceDict(deckDir)).toEqual({ TOML: { kana: "トムル" }, dek: { kana: "デク" } });
     });
   });
 
@@ -196,14 +196,14 @@ describe("dekc voice and its subcommands", () => {
         join(deckDir, "voice", "voice.toml"),
         voiceToml.replace('"voicevox"', '"aivis"'),
       );
-      await withEnv({ DEKC_VOICE_URL: "http://127.0.0.1:9" }, async () => {
+      await withEnv({ DEK_VOICE_URL: "http://127.0.0.1:9" }, async () => {
         try {
           await listSpeakers(requireDeckFromCwd(deckDir));
-          throw new Error("expected DekcError");
+          throw new Error("expected DekError");
         } catch (error) {
-          expect(error).toBeInstanceOf(DekcError);
-          expect((error as DekcError).message).toContain("aivis");
-          expect((error as DekcError).hint).toContain("https://aivis-project.com/");
+          expect(error).toBeInstanceOf(DekError);
+          expect((error as DekError).message).toContain("aivis");
+          expect((error as DekError).hint).toContain("https://aivis-project.com/");
         }
       });
     });
@@ -218,7 +218,7 @@ describe("checkCommand --voice", () => {
         voice: true,
       });
       expect(result.voice?.beats[0]?.sentences[0]?.kana).toContain("カナ");
-      expect(result.diagnostics.some((diagnostic) => diagnostic.id === "DEKC040")).toBe(true);
+      expect(result.diagnostics.some((diagnostic) => diagnostic.id === "DEK040")).toBe(true);
     });
   });
 });

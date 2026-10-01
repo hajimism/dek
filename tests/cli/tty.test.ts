@@ -59,7 +59,7 @@ describe("ansi", () => {
 });
 
 describe("terminalSafe", () => {
-  test("keeps dekc's colors, newlines, and tabs", () => {
+  test("keeps dek's colors, newlines, and tabs", () => {
     const text = "\x1b[31merror\x1b[0m\tscript.md\n  \x1b[2mhint\x1b[0m";
     expect(terminalSafe(text)).toBe(text);
   });

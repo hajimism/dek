@@ -19,7 +19,7 @@ const measuringScript = `export default {
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
   await writeProject(root, {
     decks: [
       {
@@ -47,23 +47,23 @@ afterAll(async () => {
 describe("slide copies outside the stage", () => {
   test("a rail thumbnail is drawn once it is in the document", () => {
     expect(
-      document.querySelector('#dekc-rail [data-slide-index="1"] [data-seen]')?.textContent,
+      document.querySelector('#dek-rail [data-slide-index="1"] [data-seen]')?.textContent,
     ).toBe("true");
   });
 
   test("a rail thumbnail draws the last beat, which the rail shows every step of", () => {
     expect(
-      document.querySelector('#dekc-rail [data-slide-index="1"] [data-drawn]')?.textContent,
+      document.querySelector('#dek-rail [data-slide-index="1"] [data-drawn]')?.textContent,
     ).toBe("grow");
   });
 
   test("the presenter's next preview is drawn once it is in the document", () => {
-    expect(document.querySelector("#dekc-next-stage [data-seen]")?.textContent).toBe("true");
+    expect(document.querySelector("#dek-next-stage [data-seen]")?.textContent).toBe("true");
   });
 
   test("keeps both copies out of focus and the accessibility tree", () => {
     const copies = [
-      ...document.querySelectorAll<HTMLElement>("#dekc-rail .slide, #dekc-next-stage .slide"),
+      ...document.querySelectorAll<HTMLElement>("#dek-rail .slide, #dek-next-stage .slide"),
     ];
     expect(copies.length).toBe(3);
     for (const copy of copies) {
@@ -72,7 +72,7 @@ describe("slide copies outside the stage", () => {
     }
     // The rail's links name their slide themselves.
     expect(
-      document.querySelector('#dekc-rail [data-slide-index="1"]')?.getAttribute("aria-label"),
+      document.querySelector('#dek-rail [data-slide-index="1"]')?.getAttribute("aria-label"),
     ).toBe("2. chart");
   });
 

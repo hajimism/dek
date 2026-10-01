@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import {
   isRefName,
   parseRefSource,
@@ -55,9 +55,9 @@ export function requireProject(cwd: string): Project {
   const project = resolveProject(cwd);
   if (existsSync(join(project.root, REF_MARKER))) {
     const name = readRefMeta(project.root)?.name ?? "<ref>";
-    throw new DekcError("this directory is inside a ref; refs are read-only", {
+    throw new DekError("this directory is inside a ref; refs are read-only", {
       path: project.root,
-      hint: `run dekc from your own project instead: \`dekc show ${name} <slug>\``,
+      hint: `run dek from your own project instead: \`dekc show ${name} <slug>\``,
     });
   }
   return project;
@@ -85,7 +85,7 @@ function isKnownDeckName(project: Project, name: string): boolean {
  * The deck a command's words name first, and the words left for the command. `max` is how many
  * words the command takes without a deck. A ref name is always a deck. More words than the
  * command takes make the first one a deck, found or not, so a typo in it is reported as a deck
- * not found. Otherwise the first word is a deck when it names one of the project's and dekc does
+ * not found. Otherwise the first word is a deck when it names one of the project's and dek does
  * not run inside a deck, where it names something in that deck instead. A command with
  * subcommands takes a word that is no deck as a mistyped subcommand, never as a deck.
  */
@@ -119,7 +119,7 @@ export function peelDeckArg(
     : { rest: words };
 }
 
-/** Whether a word names a deck of the project dekc runs in, or a ref. */
+/** Whether a word names a deck of the project dek runs in, or a ref. */
 export function namesDeck(cwd: string, word: string): boolean {
   if (isRefName(word)) {
     return true;
@@ -138,7 +138,7 @@ export function resolveScope(cwd: string, options: { deck?: string } = {}): Scop
     return { project };
   }
   if (isRefName(name)) {
-    throw new DekcError(`"${name}" is a ref; refs are read-only`, {
+    throw new DekError(`"${name}" is a ref; refs are read-only`, {
       hint: `read it with \`dekc show ${name} <slug>\`, then copy what you need into your own deck and rewrite it in your theme`,
     });
   }
@@ -152,7 +152,7 @@ export function resolveScope(cwd: string, options: { deck?: string } = {}): Scop
       ...project.decks.map((entry) => entry.name),
       ...project.failed.map((entry) => entry.name),
     ]);
-    throw new DekcError(`deck "${name}" not found`, {
+    throw new DekError(`deck "${name}" not found`, {
       path: join(project.root, "decks", name),
       hint: guess ? `did you mean \`${guess}\`? run \`dekc ls\` for every deck` : "run `dekc ls`",
     });
@@ -197,7 +197,7 @@ function unreadableInScope(
  * A deck command run where no deck is in scope. It carries the project's decks, so the CLI, which
  * knows the command line, can hint that line with each one named.
  */
-export class DeckRequiredError extends DekcError {
+export class DeckRequiredError extends DekError {
   readonly decks: ProjectDeck[];
 
   constructor(cwd: string, decks: ProjectDeck[]) {
@@ -271,19 +271,19 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
   const project = requireProject(cwd);
   const { pinned, dir, fetched } = refState(project, source.name);
   if (pinned === undefined) {
-    throw new DekcError(`ref "${source.name}" is not added`, {
+    throw new DekError(`ref "${source.name}" is not added`, {
       path: project.configPath,
       hint: `run \`dekc ref ${arg}\``,
     });
   }
   if (source.rev !== undefined && source.rev !== pinned) {
-    throw new DekcError(`"${arg}" is not the pinned version, ${pinned.slice(0, 7)}`, {
+    throw new DekError(`"${arg}" is not the pinned version, ${pinned.slice(0, 7)}`, {
       path: project.configPath,
       hint: `run \`dekc ref ${arg}\` to pin that version, or drop @${source.rev}`,
     });
   }
   if (!fetched) {
-    throw new DekcError(`ref "${source.name}" is not fetched`, {
+    throw new DekError(`ref "${source.name}" is not fetched`, {
       path: dir,
       hint: `run \`dekc ref ${source.name}@${pinned}\``,
     });
@@ -295,7 +295,7 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
     if (failed) {
       throw failed.error;
     }
-    throw new DekcError(`ref "${source.name}" has no deck "${source.deck}"`, {
+    throw new DekError(`ref "${source.name}" has no deck "${source.deck}"`, {
       path: dir,
       hint: `run \`dekc ref ${source.name}@${pinned}\` to fetch it again`,
     });

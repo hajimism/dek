@@ -1,4 +1,4 @@
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
 import { type ShotFile, shotDeck, shotSheet } from "../core/shot/still.ts";
@@ -66,7 +66,7 @@ export async function shotCommand(
 }
 
 function refuse(message: string, hint: string): never {
-  throw new DekcError(message, { hint });
+  throw new DekError(message, { hint });
 }
 
 /**

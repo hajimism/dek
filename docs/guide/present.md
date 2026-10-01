@@ -24,7 +24,7 @@ On every save:
 - **`voice/voice.toml`** — the deck is re-timed from cached clips.
 - With `--visual` and Playwright installed, the saved slide is also measured for overflow and contrast.
 
-Only one server runs per project. A second `dekc` finds the first one's lock in `.dekc/server.json` and tells you where it is.
+Only one server runs per project. A second `dekc` finds the first one's lock in `.dek/server.json` and tells you where it is.
 
 ## The presenter view
 
@@ -61,7 +61,7 @@ Tap or click the slide to go forward, and its left third to go back. On a phone 
 
 Press `l`, or the round button at the end of the presenter view's bar, for a laser pointer. Where the mouse or a finger rests on the slide, a red dot shows in every window of the deck, at the same place on the slide whatever the window's size: the projector, the presenter view, and a phone. While the laser is on, the slide is for pointing, so a tap or a click on it moves nothing; the keys still do. The dot goes when the pointer leaves the slide, the finger lifts, the deck moves to another slide, or the laser is turned off, and on its own a few seconds after its window stops saying where it is, so a closed laptop leaves no dot on the projector. On the dev server only the presenter may point: a laser in an audience window shows on that window alone. A video and a PDF have no dot.
 
-Rehearsing aloud on the dev server, press `m`, or the pencil button in the presenter view's bar, on a beat whose words you stumble over. The beat gets a pencil in the beat list, and the mark is kept in `.dekc/marks.json` until you clear it. Afterwards `dekc marks` lists each marked beat with its line in `script.md` and what it said, for you or an agent to rewrite; see [After a rehearsal](./ai#after-a-rehearsal). A built file has no server to keep marks, so it has no button.
+Rehearsing aloud on the dev server, press `m`, or the pencil button in the presenter view's bar, on a beat whose words you stumble over. The beat gets a pencil in the beat list, and the mark is kept in `.dek/marks.json` until you clear it. Afterwards `dekc marks` lists each marked beat with its line in `script.md` and what it said, for you or an agent to rewrite; see [After a rehearsal](./ai#after-a-rehearsal). A built file has no server to keep marks, so it has no button.
 
 The URL follows the deck: `#<slug>` for a slide, `#<slug>/<n>` for its nth beat. Each slide is one history entry, so Back leaves the slide rather than stepping back through its beats. A beat number past the slide's last opens at the last beat and rewrites the URL to say so.
 
@@ -73,22 +73,22 @@ dekc build
 
 You get `decks/<deck>/dist/<deck>.html`: every slide, the theme, the images as data URIs, and the player runtime, minified into one file. Open it in a browser and present. Use `--root-dist` to collect every deck's build under the project's `dist/`.
 
-Build does four things: extracts each `<section class="slide">` and tags it with `data-slug`, minifies the theme, inlines `assets/` as data URIs, and embeds the runtime. It uses no external HTML minifier, so the output has one shape regardless of how the input was written. A section with no HTML yet is built from the skeleton `dekc sync` would write, and lint's `DEKC001` says so; a build never stops on lint.
+Build does four things: extracts each `<section class="slide">` and tags it with `data-slug`, minifies the theme, inlines `assets/` as data URIs, and embeds the runtime. It uses no external HTML minifier, so the output has one shape regardless of how the input was written. A section with no HTML yet is built from the skeleton `dekc sync` would write, and lint's `DEK001` says so; a build never stops on lint.
 
 Open the file with `?presenter`, or press `p`, for the presenter view. A second window of the same file follows the first through `BroadcastChannel`: the audience view on the projector, the presenter view on your laptop, with no server and no network. Another deck's file open at the same time does not follow. The audience view has a slide rail on the left; click a thumbnail to jump, press `s` to hide it, and drag its edge to resize it. When the file opens, a short hint naming `s` and `p` fades in at the bottom and fades out on its own, or at the first key. The dev server does not show it, since it reloads on every save.
 
 ## On the web
 
-The same file works on any static host. For a shared link to show a card with the title, description, and a picture, tell dekc where `dist/` is served from:
+The same file works on any static host. For a shared link to show a card with the title, description, and a picture, tell dek where `dist/` is served from:
 
 ```toml
-# dekc.toml
+# dek.toml
 url = "https://example.com/talks/"
 ```
 
 The build then writes Open Graph and Twitter card tags into the page, and the first slide, at its last beat, as `dist/<deck>.png` beside it. Upload both. `og:url` and `og:image` are that URL plus each file name, because crawlers fetch only an absolute image URL. The title comes from the frontmatter `title`, and the description from `description`, or from `event` and `date` when there is none. Taking the picture needs Playwright; without it, or without a URL, the page still gets its title and description, and the build output says what is missing.
 
-A host that makes a new URL for each deploy, such as a preview deployment, cannot be named in `dekc.toml`. Pass it at build time instead, from whatever variable the host sets, since `--url` wins over `dekc.toml`:
+A host that makes a new URL for each deploy, such as a preview deployment, cannot be named in `dek.toml`. Pass it at build time instead, from whatever variable the host sets, since `--url` wins over `dek.toml`:
 
 ```bash
 dekc build --root-dist --url "https://$DEPLOY_HOST/"
@@ -108,9 +108,9 @@ Use the dev server at the venue only when you want to control the deck from anot
 dekc --remote
 ```
 
-This serves on the LAN. Everything made from the script is behind HTTP Basic authentication: the presenter view, `goto` and `current`, the voice timeline and audio, and the lint diagnostics the dev server streams. The audience view, the slides, and their assets are open. dekc makes a new 10-letter password each time and prints it with the URLs; when the browser asks, enter any user name and that password. You cannot choose the password, so none is ever weak, empty, or left in your shell history.
+This serves on the LAN. Everything made from the script is behind HTTP Basic authentication: the presenter view, `goto` and `current`, the voice timeline and audio, and the lint diagnostics the dev server streams. The audience view, the slides, and their assets are open. dek makes a new 10-letter password each time and prints it with the URLs; when the browser asks, enter any user name and that password. You cannot choose the password, so none is ever weak, empty, or left in your shell history.
 
-To skip typing it on a phone, scan the QR code dekc prints under the password: it opens the presenter view signed in. The code in it works once and for five minutes, so a photo of a projected terminal is useless by the time anyone tries it. Press Enter in the terminal for a new code for the next device. With several decks, the code opens the deck list, where each deck has a presenter link. The phone stays signed in until the server stops.
+To skip typing it on a phone, scan the QR code dek prints under the password: it opens the presenter view signed in. The code in it works once and for five minutes, so a photo of a projected terminal is useless by the time anyone tries it. Press Enter in the terminal for a new code for the next device. With several decks, the code opens the deck list, where each deck has a presenter link. The phone stays signed in until the server stops.
 
 The server answers only to its IP addresses and this machine's own name, so a web page cannot reach it under a name of its own (DNS rebinding). `dekc <deck> --remote` shares that deck and no other deck in the project. The password travels over plain HTTP, so use a network you trust.
 

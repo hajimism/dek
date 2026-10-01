@@ -1,4 +1,4 @@
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 
 export type VoiceSpeaker = {
   name: string;
@@ -25,7 +25,7 @@ const ENGINE_PORTS: Record<string, number> = {
 };
 
 export function engineBaseUrl(engine: string): string {
-  const override = process.env.DEKC_VOICE_URL;
+  const override = process.env.DEK_VOICE_URL;
   if (override) {
     return override.replace(/\/$/, "");
   }
@@ -78,13 +78,13 @@ export function resolveStyleId(speakers: VoiceSpeaker[], speaker: string): numbe
   const [name, styleName] = speaker.split("/");
   const found = speakers.find((entry) => entry.name === name);
   if (!found) {
-    throw new DekcError(`speaker "${speaker}" not found`, {
+    throw new DekError(`speaker "${speaker}" not found`, {
       hint: "run `dekc voice speakers`",
     });
   }
   const style = found.styles.find((entry) => entry.name === (styleName ?? found.styles[0]?.name));
   if (!style) {
-    throw new DekcError(`style "${speaker}" not found`, {
+    throw new DekError(`style "${speaker}" not found`, {
       hint: "run `dekc voice speakers`",
     });
   }
@@ -118,7 +118,7 @@ export function engineNameForUrl(baseUrl: string): string | undefined {
 }
 
 export function engineSetupHint(engine: string): string {
-  const fallback = "or point DEKC_VOICE_URL or voice.toml engine at a running engine";
+  const fallback = "or point DEK_VOICE_URL or voice.toml engine at a running engine";
   if (/^https?:\/\//i.test(engine)) {
     return `start the engine at ${engine}, ${fallback}`;
   }
@@ -130,14 +130,14 @@ export function engineSetupHint(engine: string): string {
   return `install ${setup.label} from ${setup.url}${docker}, ${fallback}`;
 }
 
-class EngineMissingError extends DekcError {
+class EngineMissingError extends DekError {
   constructor(engine: string, baseUrl: string) {
     super(`${engine} was not found at ${baseUrl}`, { hint: engineSetupHint(engine) });
-    this.name = "DekcError";
+    this.name = "DekError";
   }
 }
 
-export function engineMissingError(engine: string, baseUrl: string): DekcError {
+export function engineMissingError(engine: string, baseUrl: string): DekError {
   return new EngineMissingError(engine, baseUrl);
 }
 
@@ -169,7 +169,7 @@ async function engineFetch(baseUrl: string, path: string, init?: RequestInit): P
     throw engineMissingError(engineNameForUrl(baseUrl) ?? "voice engine", baseUrl);
   }
   if (!res.ok) {
-    throw new DekcError(`voice engine returned ${res.status} for ${path}`, {
+    throw new DekError(`voice engine returned ${res.status} for ${path}`, {
       hint: "check the engine log",
     });
   }

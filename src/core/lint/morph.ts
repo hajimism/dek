@@ -7,7 +7,7 @@ import type { LintContext } from "./context.ts";
 export const RESERVED_MORPHS = new Set(["slide", "root", "none", "auto", "match-element"]);
 
 /**
- * DEKC028: a data-morph that no slide beside it names. The browser morphs an element only into
+ * DEK028: a data-morph that no slide beside it names. The browser morphs an element only into
  * the element of the same name on the slide it goes to, so a name with no partner on the slide
  * before or after is a plain fade, however it is spelled. A partner that is one typo away is the
  * likeliest fix; otherwise the hint names the files a partner could go in.
@@ -31,7 +31,7 @@ export function unpairedMorphDiagnostics(ctx: LintContext): Diagnostic[] {
         return [];
       }
       return [
-        diag("DEKC028", {
+        diag("DEK028", {
           message: `data-morph "${morph}" is on neither slide beside it, so nothing morphs`,
           path,
           line: attribute.line,
@@ -45,7 +45,7 @@ export function unpairedMorphDiagnostics(ctx: LintContext): Diagnostic[] {
   });
 }
 
-/** Each data-morph a slide names, at its first use; reserved names are DEKC005's. */
+/** Each data-morph a slide names, at its first use; reserved names are DEK005's. */
 function morphsOf(ctx: LintContext, slug: string): Map<string, HtmlAttribute> | undefined {
   const scan = ctx.slideSource(slug)?.scan;
   if (!scan) {

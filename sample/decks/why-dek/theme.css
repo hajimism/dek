@@ -1,5 +1,5 @@
 /*
- * why-dekc — a Swiss handout.
+ * why-dek — a Swiss handout.
  * Light paper, near-black ink, one signal colour (cobalt) and one highlighter (yellow).
  * A 12-column grid, visible as ticks under the running head. Every page states its point
  * as its heading and carries its own figure, so the PDF reads without the talk.
@@ -81,7 +81,7 @@
 
 /* Running head: the talk on the left, the folio on the right, over a ruled line. */
 .slide {
-  counter-reset: folio var(--dekc-slide-number) folios var(--dekc-slide-count);
+  counter-reset: folio var(--dek-slide-number) folios var(--dek-slide-count);
 }
 
 .slide::before,
@@ -95,7 +95,7 @@
 }
 
 .slide::before {
-  content: "台本から、発表まで\3000—\3000 dekc sample 2026";
+  content: "台本から、発表まで\3000—\3000 dek sample 2026";
   left: var(--margin);
   right: var(--margin);
   height: calc(var(--head-rule) - var(--head-top));

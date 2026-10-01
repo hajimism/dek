@@ -60,7 +60,7 @@ function fakePage(starts: Record<number, FakeAnimation[]>, running: FakeAnimatio
     update();
     return { ready: Promise.resolve(), finished: Promise.resolve() };
   }) as unknown as typeof document.startViewTransition;
-  window.dekcGo = async (next) => {
+  window.dekGo = async (next) => {
     const started = starts[next?.slideIndex ?? -1] ?? [];
     live.push(...started);
     if (started.some((animation) => animation.effect.pseudoElement)) {
@@ -75,7 +75,7 @@ describe("freezeTransition", () => {
     fakePage({ 1: [morph] });
     const seeks: number[] = [];
     // The script's own motion is longer than the morph; it must not be scaled to it.
-    window.dekcMotion = { duration: () => 900, seek: (t) => seeks.push(t) };
+    window.dekMotion = { duration: () => 900, seek: (t) => seeks.push(t) };
 
     await freezeTransition(page, { from, to, at: 0.5 });
 
@@ -92,7 +92,7 @@ describe("freezeTransition", () => {
       const entrance = fakeAnimation(2000);
       fakePage({ 1: [morph, fade, entrance] });
       const seeks: number[] = [];
-      window.dekcMotion = { duration: () => 900, seek: (t) => seeks.push(t) };
+      window.dekMotion = { duration: () => 900, seek: (t) => seeks.push(t) };
 
       await freezeTransition(page, { from, to, at: 0.5 });
 
@@ -108,7 +108,7 @@ describe("freezeTransition", () => {
       const left = fakeAnimation(400);
       const morph = fakeAnimation(400, "::view-transition-new(slide)");
       fakePage({ 0: [left], 1: [morph] });
-      window.dekcMotion = { duration: () => 0, seek: () => {} };
+      window.dekMotion = { duration: () => 0, seek: () => {} };
 
       await freezeTransition(page, { from, to, at: 0.5 });
 
@@ -124,7 +124,7 @@ describe("freezeTransition", () => {
       const entrance = fakeAnimation(400);
       fakePage({ 1: [entrance] });
       const seeks: number[] = [];
-      window.dekcMotion = { duration: () => 900, seek: (t) => seeks.push(t) };
+      window.dekMotion = { duration: () => 900, seek: (t) => seeks.push(t) };
 
       await freezeTransition(page, { from, to, at: 0.5 });
 
@@ -140,7 +140,7 @@ describe("freezeTransition", () => {
     }) as unknown as typeof document.startViewTransition;
     document.startViewTransition = original;
     (document as { getAnimations: () => unknown[] }).getAnimations = () => [];
-    window.dekcGo = async () => {
+    window.dekGo = async () => {
       document.startViewTransition(() => {});
     };
 
@@ -158,11 +158,11 @@ describe("holdStarted and seekStarted", () => {
       const reveal = fakeAnimation(300);
       const pulse = fakeAnimation(Number.POSITIVE_INFINITY);
       fakePage({ 1: [reveal, pulse] }, [earlier]);
-      window.dekcMotion = undefined;
+      window.dekMotion = undefined;
       finishBeat();
       earlier.currentTime = null;
       const seeks: number[] = [];
-      window.dekcMotion = { duration: () => 500, seek: (t) => seeks.push(t) };
+      window.dekMotion = { duration: () => 500, seek: (t) => seeks.push(t) };
 
       await startGoPaused(to);
       // The longest finite end, the slide script's motion included; a loop has no end.
@@ -185,8 +185,8 @@ describe("holdStarted and seekStarted", () => {
       const entrance = fakeAnimation(800);
       const reveal = fakeAnimation(300);
       fakePage({ 1: [reveal] }, [entrance]);
-      window.__dekcSettled = undefined;
-      window.dekcMotion = undefined;
+      window.__dekSettled = undefined;
+      window.dekMotion = undefined;
 
       await startGoPaused(to);
 
@@ -198,8 +198,8 @@ describe("holdStarted and seekStarted", () => {
   test.serial("count every animation on the page as started when no go ran", () => {
     const entrance = fakeAnimation(800);
     fakePage({}, [entrance]);
-    window.__dekcStarted = undefined;
-    window.dekcMotion = undefined;
+    window.__dekStarted = undefined;
+    window.dekMotion = undefined;
 
     expect(holdStarted()).toBe(800);
   });
@@ -221,7 +221,7 @@ describe("startGoPaused", () => {
         };
       }) as unknown as typeof document.startViewTransition;
       const seen: unknown[] = [];
-      window.dekcGo = async (next) => {
+      window.dekGo = async (next) => {
         seen.push(next);
         document.startViewTransition(() => {});
       };
@@ -229,13 +229,13 @@ describe("startGoPaused", () => {
       expect(await startGoPaused(to)).toBe(true);
       expect(ready).toBe(true);
       expect(seen).toEqual([to]);
-      expect(window.__dekcPendingGo).toBeInstanceOf(Promise);
+      expect(window.__dekPendingGo).toBeInstanceOf(Promise);
     },
   );
 
   test.serial("reports a go that opens no transition", async () => {
     fakePage({});
-    window.dekcGo = async () => {};
+    window.dekGo = async () => {};
     expect(await startGoPaused(to)).toBe(false);
   });
 });
@@ -244,8 +244,8 @@ describe("captureGo", () => {
   test.serial("shoots the go at each stop of its span, then at its settled end", async () => {
     const reveal = fakeAnimation(400);
     fakePage({ 1: [reveal] });
-    window.__dekcSettled = new Set();
-    window.dekcMotion = undefined;
+    window.__dekSettled = new Set();
+    window.dekMotion = undefined;
     const shots: Array<[number, boolean, number | null]> = [];
 
     const span = await captureGo(
@@ -268,10 +268,10 @@ describe("captureGo", () => {
 
   test.serial("shoots the end only once the go it ended has returned", async () => {
     fakePage({});
-    window.__dekcSettled = new Set();
-    window.dekcMotion = undefined;
+    window.__dekSettled = new Set();
+    window.dekMotion = undefined;
     let returned = false;
-    window.dekcGo = async () => {
+    window.dekGo = async () => {
       await Bun.sleep(20);
       returned = true;
     };
@@ -291,8 +291,8 @@ describe("captureGo", () => {
 
   test.serial("shoots only the end of a go that moves nothing", async () => {
     fakePage({});
-    window.__dekcSettled = new Set();
-    window.dekcMotion = undefined;
+    window.__dekSettled = new Set();
+    window.dekMotion = undefined;
     const shots: number[] = [];
 
     await captureGo(

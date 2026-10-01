@@ -9,21 +9,21 @@ describe("formatText", () => {
         command: "init",
         data: {
           root: "/tmp/talks",
-          created: ["dekc.toml"],
+          created: ["dek.toml"],
           updated: [],
           kept: [],
           next: ["cd talks", "bunx dekc new <name>"],
         },
       }),
     ).toBe(
-      "created project at /tmp/talks\n  dekc.toml\n\nnext:\n  cd talks\n  bunx dekc new <name>",
+      "created project at /tmp/talks\n  dek.toml\n\nnext:\n  cd talks\n  bunx dekc new <name>",
     );
     expect(
       formatText({
         command: "init",
         data: {
           root: "/tmp/talks",
-          created: ["dekc.toml"],
+          created: ["dek.toml"],
           updated: [],
           kept: [],
           next: ["bunx dekc new <name>"],
@@ -31,7 +31,7 @@ describe("formatText", () => {
         },
       }),
     ).toBe(
-      "created project at /tmp/talks\n  dekc.toml\n\nnext:\n  bunx dekc new <name>\n\nfor dekc shot, dekc pdf, and --visual:\n  bun add -d playwright",
+      "created project at /tmp/talks\n  dek.toml\n\nnext:\n  bunx dekc new <name>\n\nfor dekc shot, dekc pdf, and --visual:\n  bun add -d playwright",
     );
     expect(
       formatText({
@@ -66,7 +66,7 @@ describe("formatText", () => {
               title: "Demo",
               sections: 2,
               slides: 2,
-              diagnostics: [{ id: "DEKC001", severity: "error", message: "missing" }],
+              diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
             },
           ],
           failed: [],
@@ -90,7 +90,7 @@ demo  Demo          2       2            1`);
               title: "HTML スライドツールを作った話",
               sections: 2,
               slides: 1,
-              diagnostics: [{ id: "DEKC001", severity: "error", message: "missing" }],
+              diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
             },
             {
               name: "demo",
@@ -130,7 +130,7 @@ demo   Demo                                  1       1            0`);
               budgetSeconds: 1000,
             },
           ],
-          diagnostics: [{ id: "DEKC001", severity: "error", message: "missing" }],
+          diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
         },
       }),
     ).toBe(`demo  Demo
@@ -328,13 +328,13 @@ describe("displayPaths", () => {
           slug: "intro",
           diagnostics: [
             {
-              id: "DEKC011",
+              id: "DEK011",
               severity: "error",
               message: "style",
               path: "/p/decks/demo/slides/intro.html",
             },
-            { id: "DEKC012", severity: "error", message: "raw", path: "/p/theme.css" },
-            { id: "DEKC099", severity: "error", message: "no path" },
+            { id: "DEK012", severity: "error", message: "raw", path: "/p/theme.css" },
+            { id: "DEK099", severity: "error", message: "no path" },
           ],
           shot: "/p/decks/demo/.cache/shots/intro.png",
         },
@@ -353,7 +353,7 @@ describe("displayPaths", () => {
 
   test("covers lint, cues, and both ls shapes", () => {
     const diagnostics: Diagnostic[] = [
-      { id: "DEKC001", severity: "error", message: "missing", path: "/p/decks/demo/script.md" },
+      { id: "DEK001", severity: "error", message: "missing", path: "/p/decks/demo/script.md" },
     ];
     const cwd = "/p";
     const lint = displayPaths({ command: "lint", data: { diagnostics } }, cwd);
@@ -389,7 +389,7 @@ describe("displayPaths", () => {
 });
 
 describe("displayPaths created files", () => {
-  test("prints files dekc created in the source tree relative to cwd", () => {
+  test("prints files dek created in the source tree relative to cwd", () => {
     const cwd = "/p/decks/demo";
     const sync = displayPaths(
       {
@@ -441,7 +441,7 @@ describe("writeSuccess", () => {
       writeSuccess(
         {
           command: "lint",
-          data: { diagnostics: [{ id: "DEKC001", severity: "error", message: "missing" }] },
+          data: { diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }] },
         },
         { json: true },
       );
@@ -453,7 +453,7 @@ describe("writeSuccess", () => {
           message: "lint found 1 error",
           hint: "fix each error in diagnostics, then run `dekc lint` again",
         },
-        diagnostics: [{ id: "DEKC001", severity: "error", message: "missing" }],
+        diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
       });
     } finally {
       // Bun keeps a 1 when handed undefined, which would fail the whole run.
@@ -494,8 +494,8 @@ describe("writeSuccess", () => {
           data: {
             slug: "intro",
             diagnostics: [
-              { id: "DEKC030", severity: "error", message: "overflow" },
-              { id: "DEKC024", severity: "warning", message: "empty" },
+              { id: "DEK030", severity: "error", message: "overflow" },
+              { id: "DEK024", severity: "warning", message: "empty" },
             ],
           },
         },
@@ -515,14 +515,14 @@ describe("writeSuccess", () => {
       writeSuccess(
         {
           command: "lint",
-          data: { diagnostics: [{ id: "DEKC024", severity: "warning", message: "empty" }] },
+          data: { diagnostics: [{ id: "DEK024", severity: "warning", message: "empty" }] },
         },
         { json: true },
       ),
     );
     expect(JSON.parse(stdout)).toEqual({
       ok: true,
-      diagnostics: [{ id: "DEKC024", severity: "warning", message: "empty" }],
+      diagnostics: [{ id: "DEK024", severity: "warning", message: "empty" }],
     });
   });
 

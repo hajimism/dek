@@ -109,7 +109,7 @@ function renderPage(slideNumber: number, slideCount: number): void {
     return;
   }
   const total = document.createElement("span");
-  total.className = "dekc-page-total";
+  total.className = "dek-page-total";
   total.textContent = `/ ${slideCount}`;
   pageEl.replaceChildren(document.createTextNode(`${slideNumber} `), total);
 }
@@ -140,7 +140,7 @@ function renderProgress(progressEl: HTMLElement, deck: DeckStops, pos: Position)
         span.className = className;
       }
       if (fill) {
-        span.style.setProperty("--dekc-fill", fill);
+        span.style.setProperty("--dek-fill", fill);
       }
       return span;
     }),
@@ -168,7 +168,7 @@ function renderNextPreview(
     [...clone.querySelectorAll("[data-step]")],
     stepValuesForBeat(slide.beats, beatIndex),
   );
-  const frame = stillFrame("dekc-preview-frame", clone, deckSize(deckEl));
+  const frame = stillFrame("dek-preview-frame", clone, deckSize(deckEl));
   previewStage.replaceChildren(frame);
   stage.drawStill(clone, slide, beatIndex);
   fitStage(frame, previewStage);
@@ -279,7 +279,7 @@ export function createPresenterView(options: {
       }
     },
     fit() {
-      const preview = document.querySelector(`#${PAGE_ID.nextStage} .dekc-preview-frame`);
+      const preview = document.querySelector(`#${PAGE_ID.nextStage} .dek-preview-frame`);
       const nextStage = document.getElementById(PAGE_ID.nextStage);
       if (preview instanceof HTMLElement && nextStage && isOpen()) {
         fitStage(preview, nextStage);

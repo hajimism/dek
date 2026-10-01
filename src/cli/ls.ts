@@ -1,4 +1,4 @@
-import { type DekcConfig, loadConfig } from "../core/config.ts";
+import { type DekConfig, loadConfig } from "../core/config.ts";
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { lintDeck, lintProject } from "../core/lint.ts";
 import { listSlides, type Project, type ProjectDeck } from "../core/resolve.ts";
@@ -11,7 +11,7 @@ import type { DecksTarget, RefInfo } from "./scope.ts";
 export type LsListResult = {
   kind: "list";
   root: string;
-  /** The project's own findings (dekc.toml), once: no deck's row repeats them. */
+  /** The project's own findings (dek.toml), once: no deck's row repeats them. */
   diagnostics: Diagnostic[];
   decks: Array<{
     name: string;
@@ -85,7 +85,7 @@ function summarizeDeck(deck: ProjectDeck, project: Project): LsListResult["decks
 
 function formatDeck(
   deck: ProjectDeck,
-  config: DekcConfig,
+  config: DekConfig,
   project: Project,
   options: { lint: boolean } = { lint: true },
 ): LsDeckResult {

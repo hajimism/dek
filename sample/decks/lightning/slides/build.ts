@@ -62,4 +62,4 @@ export default {
       el.style.transform = `translateY(${(1 - e) * 1.2}em) scale(${0.94 + 0.06 * e})`;
     });
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

@@ -9,18 +9,18 @@ import { type Project, readTextIfExists } from "../resolve.ts";
 import type { LintContext } from "./context.ts";
 
 /*
- * DEKC008: a key in dekc.toml or the frontmatter that dekc does not read. Parsing drops it
+ * DEK008: a key in dek.toml or the frontmatter that dek does not read. Parsing drops it
  * without a word, so a typo leaves the default in place and nobody knows why.
  */
 
-/** DEKC008 for dekc.toml: a project finding, the same for every deck. */
+/** DEK008 for dek.toml: a project finding, the same for every deck. */
 export function tomlKeyDiagnostics(project: Project): Diagnostic[] {
   return unknownTomlKeys(readTextIfExists(project.configPath) ?? "").map((key) =>
-    unknownKeyDiagnostic(key, { file: "dekc.toml", path: project.configPath }),
+    unknownKeyDiagnostic(key, { file: "dek.toml", path: project.configPath }),
   );
 }
 
-/** DEKC008 for the deck's frontmatter. */
+/** DEK008 for the deck's frontmatter. */
 export function frontmatterKeyDiagnostics({ deck, script }: LintContext): Diagnostic[] {
   return (script ? unknownFrontmatterKeys(script.yaml, 2) : []).map((key) =>
     unknownKeyDiagnostic(key, { file: "frontmatter", path: deck.scriptPath }),
@@ -29,15 +29,15 @@ export function frontmatterKeyDiagnostics({ deck, script }: LintContext): Diagno
 
 function unknownKeyDiagnostic(
   { key, line, suggestion }: UnknownKey,
-  where: { file: "dekc.toml" | "frontmatter"; path: string },
+  where: { file: "dek.toml" | "frontmatter"; path: string },
 ): Diagnostic {
-  const place = where.file === "dekc.toml" ? "dekc.toml" : "the frontmatter";
+  const place = where.file === "dek.toml" ? "dek.toml" : "the frontmatter";
   const known =
-    where.file === "dekc.toml"
-      ? `see ${REFERENCE_URL}#dekc-toml`
+    where.file === "dek.toml"
+      ? `see ${REFERENCE_URL}#dek-toml`
       : `the keys are ${FRONTMATTER_KEYS.join(", ")}; see ${REFERENCE_URL}#frontmatter`;
-  return diag("DEKC008", {
-    message: `unknown key ${key} in ${place}; dekc ignores it`,
+  return diag("DEK008", {
+    message: `unknown key ${key} in ${place}; dek ignores it`,
     path: where.path,
     line,
     hint: suggestion ? `did you mean ${suggestion}?` : known,
@@ -45,4 +45,4 @@ function unknownKeyDiagnostic(
   });
 }
 
-const REFERENCE_URL = "https://hajimism.github.io/dekc/reference/config.html";
+const REFERENCE_URL = "https://hajimism.github.io/dek/reference/config.html";

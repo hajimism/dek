@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { renameSection, reorderSection } from "../../src/core/mv.ts";
 import { slideDocument } from "../helpers/html.ts";
@@ -72,8 +72,8 @@ body
           renameSection(deckDir, "problem", "the-problem");
           throw new Error("expected renameSection to fail");
         } catch (error) {
-          expect(error).toBeInstanceOf(DekcError);
-          expect((error as DekcError).message).toBe(
+          expect(error).toBeInstanceOf(DekError);
+          expect((error as DekError).message).toBe(
             "slides/problem.html and slides/the-problem.html both hold a slide you wrote",
           );
         }
@@ -84,7 +84,7 @@ body
     );
   });
 
-  test("rewrites data-slug in the moved HTML so DEKC006 does not fire", async () => {
+  test("rewrites data-slug in the moved HTML so DEK006 does not fire", async () => {
     await withTempProject(
       {
         decks: [
@@ -232,7 +232,7 @@ describe("renameSection and voice.toml", () => {
       const source = "beats = { intro = { lead = 1 } }\n";
       await Bun.write(voiceToml, source);
       expect(() => renameSection(deckDir, "intro", "cover")).toThrow(
-        expect.objectContaining({ name: "DekcError", path: voiceToml }),
+        expect.objectContaining({ name: "DekError", path: voiceToml }),
       );
       expect(await readFile(voiceToml, "utf8")).toBe(source);
       expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);

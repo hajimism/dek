@@ -20,4 +20,4 @@ export default {
       fill.style.width = `${pct * ease((t - SHOW_MS) / FILL_MS)}%`;
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

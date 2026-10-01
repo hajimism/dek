@@ -1,9 +1,9 @@
 ---
 layout: home
 hero:
-  name: dekc
+  name: dek
   text: 発表のビルドシステム
-  tagline: 喋ることを書けば、あとは dekc が組み立て、測り、届ける。
+  tagline: 喋ることを書けば、あとは dek が組み立て、測り、届ける。
   actions:
     - theme: brand
       text: はじめる
@@ -16,7 +16,7 @@ hero:
       link: /ja/samples
     - theme: alt
       text: GitHub
-      link: https://github.com/hajimism/dekc
+      link: https://github.com/hajimism/dek
 features:
   - title: 台本が親
     details: 順序も尺も喋る言葉も、Markdown ファイルひとつが持ちます。スライドはその見出しにぶら下がる。箱を先に置くと、立派だが喋り切れない資料ができます。
@@ -29,14 +29,14 @@ features:
 ---
 
 ```bash
-bunx @hajimism/dekc init my-talks --deck 2026-04-vite
-cd my-talks && bun add -d @hajimism/dekc
+bunx @hajimism/dek init my-talks --deck 2026-04-vite
+cd my-talks && bun add -d @hajimism/dek
 cd decks/2026-04-vite
 $EDITOR script.md   # 喋ることを書く
 bunx dekc           # 開発サーバ。骨格スライドが生え、保存のたびに描画と lint
 bunx dekc build     # dist/2026-04-vite.html — トーク全体がこの 1 ファイル
 ```
 
-打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージです。
+コマンドは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージです。`bunx dekc` はプロジェクトの中で実行してください。
 
 HTML はまだ一行も書いていません。それでもう発表できます。まずは[はじめる](/ja/guide/getting-started)から。台本から単一ファイルのビルドまでを通しで体験するなら[チュートリアル](/ja/guide/tutorial)へ。

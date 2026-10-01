@@ -8,7 +8,7 @@ import { resolveDecks } from "../../src/cli/scope.ts";
 import { syncCommand } from "../../src/cli/sync.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { listSlides } from "../../src/core/resolve.ts";
-import { jsonStdout, runDekc } from "../helpers/cli.ts";
+import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { extractSlide } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -57,7 +57,7 @@ more
       },
       async (root) => {
         const deckDir = join(root, "decks", "demo");
-        const result = await runDekc(["sync", "--json"], { cwd: deckDir });
+        const result = await runDek(["sync", "--json"], { cwd: deckDir });
         expect(result).toMatchObject({ exitCode: 0 });
 
         const json = jsonStdout<SyncOk>(result);
@@ -69,7 +69,7 @@ more
         expect(extra).not.toContain("<!DOCTYPE html>");
         expect(extra.trimStart().startsWith('<section class="slide"')).toBe(true);
         expect(extractSlide(extra)).toContain('data-layout="title"');
-        expect(existsSync(join(root, ".dekc", "schema.json"))).toBe(true);
+        expect(existsSync(join(root, ".dek", "schema.json"))).toBe(true);
       },
     );
   });
@@ -111,12 +111,12 @@ more
     );
   });
 
-  test("lists dekc's own files it updated, once however many decks it syncs", async () => {
+  test("lists dek's own files it updated, once however many decks it syncs", async () => {
     await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
       syncCommand(resolveDecks(root));
-      await writeFile(join(root, ".dekc", "slide.d.ts"), "// an older dekc's types\n");
+      await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
       const result = syncCommand(resolveDecks(root));
-      expect(result.updated).toEqual([join(root, ".dekc", "slide.d.ts")]);
+      expect(result.updated).toEqual([join(root, ".dek", "slide.d.ts")]);
     });
   });
 
@@ -162,26 +162,26 @@ describe("dekc sync and slides the script no longer names", () => {
 });
 
 describe("syncCommand and .gitignore", () => {
-  test("adds the files dekc keeps for itself to a .gitignore that lacks them, once", async () => {
+  test("adds the files dek keeps for itself to a .gitignore that lacks them, once", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const path = join(root, ".gitignore");
-      await writeFile(path, "# mine\ndist/\n.dekc/server.json");
+      await writeFile(path, "# mine\ndist/\n.dek/server.json");
       const first = syncCommand(resolveDecks(root));
       expect(first.updated).toContain(path);
       expect(await readFile(path, "utf8")).toBe(
-        "# mine\ndist/\n.dekc/server.json\n.dekc/marks.json\n",
+        "# mine\ndist/\n.dek/server.json\n.dek/marks.json\n",
       );
       const second = syncCommand(resolveDecks(root));
       expect(second.updated).not.toContain(path);
     });
   });
 
-  test("leaves a .gitignore alone that ignores them through .dekc/", async () => {
+  test("leaves a .gitignore alone that ignores them through .dek/", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const path = join(root, ".gitignore");
-      await writeFile(path, "/.dekc/\n");
+      await writeFile(path, "/.dek/\n");
       expect(syncCommand(resolveDecks(root)).updated).not.toContain(path);
-      expect(await readFile(path, "utf8")).toBe("/.dekc/\n");
+      expect(await readFile(path, "utf8")).toBe("/.dek/\n");
     });
   });
 

@@ -1,18 +1,18 @@
 # AI エージェントと作る
 
-エージェントは、あなたと同じ CLI を使います。MCP サーバも、インストールするツール定義もありません。コーディングエージェントはすでにシェルとファイルエディタを持っていて、スライドは 40 行の HTML ファイルです。エージェント自身のエディタで直接書くのが、いちばん正確で、いちばん安い。dekc が足すのは、エージェントが単独ではうまくできないことだけです。描画結果を見ること、読み上げを聞くこと、そして改名と並べ替えという、間違いが起きやすい操作。
+エージェントは、あなたと同じ CLI を使います。MCP サーバも、インストールするツール定義もありません。コーディングエージェントはすでにシェルとファイルエディタを持っていて、スライドは 40 行の HTML ファイルです。エージェント自身のエディタで直接書くのが、いちばん正確で、いちばん安い。dek が足すのは、エージェントが単独ではうまくできないことだけです。描画結果を見ること、読み上げを聞くこと、そして改名と並べ替えという、間違いが起きやすい操作。
 
 ## エージェントが読むもの
 
 `dekc init` はプロジェクト直下に短い `AGENTS.md` を書き、`dekc new`・`dekc ref`・`dekc sync` がそれを最新に保ちます。原則、規約、完成を報告する前に確かめること、そして CLI 自身のリファレンスへのポインタ。クラス・トークン・レイアウトは載せません。テーマはデッキごとに持つので、エージェントは `dekc theme` でそのデッキのテーマを読みます。100 行に収まります。それより細かいことは、必要になったときに CLI から引きます。
 
-dekc が持つのは `<!-- dekc:begin … -->` から `<!-- dekc:end -->` までのブロックだけで、その場で書き直します。チーム独自のエージェント向けメモは、その上か下に書けば残ります。もともとあった `AGENTS.md` は、文面をそのままに、末尾へ dekc のブロックが足されます。
+dek が持つのは `<!-- dek:begin … -->` から `<!-- dek:end -->` までのブロックだけで、その場で書き直します。チーム独自のエージェント向けメモは、その上か下に書けば残ります。もともとあった `AGENTS.md` は、文面をそのままに、末尾へ dek のブロックが足されます。
 
 ```bash
 dekc help --agent
 ```
 
-これだけで、Claude Code でも Codex でも OpenCode でも、追加設定なしに dekc のプロジェクトで作業できます。
+これだけで、Claude Code でも Codex でも OpenCode でも、追加設定なしに dek のプロジェクトで作業できます。
 
 ## CLI が約束すること
 
@@ -35,7 +35,7 @@ dekc help --agent
   "error": { "message": "lint found 1 error", "hint": "fix each error in diagnostics, then run `dekc lint` again" },
   "diagnostics": [
     {
-      "id": "DEKC011",
+      "id": "DEK011",
       "severity": "error",
       "message": "slide contains an onclick attribute",
       "path": "slides/intro.html",
@@ -49,14 +49,14 @@ dekc help --agent
 }
 ```
 
-- `error` は必ず `message` を持ち、dekc が次の一手を知っていれば `hint` を、失敗に場所があれば `path` と `line` を持ちます。
+- `error` は必ず `message` を持ち、dek が次の一手を知っていれば `hint` を、失敗に場所があれば `path` と `line` を持ちます。
 - 診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は、成否に関わらず必ず `diagnostics` 配列を持ちます。各診断は `severity`、場所があれば `path`・`line`・`column`、直し方が決まっていれば `hint`、メッセージに含まれる値を `data` として持ちます。失敗になるのは error だけで、warning だけなら `"ok": true` です。
 - 実行しなかったチェックは `skipped` の要素になり、空の合格にはなりません。`{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }` のような形です。すべて実行できたときはこのフィールド自体がありません。`--visual` を付けない `dekc lint` と `dekc build` は、必ず `visual` を載せます。はみ出しもコントラストも測っていないからで、hint は測るためのコマンドです。
 - 対象のデッキごとにファイルを書くコマンドは、1 デッキでもリストを返します。`build` と `pdf` は `outs` を返します。
 - `dekc lint --format sarif` は同じ診断を SARIF 2.1.0 で返します。
-- 各コマンドの形は JSON Schema として [`cli.schema.json`](https://hajimism.github.io/dekc/cli.schema.json) で公開しています。`$defs` にコマンドごとの定義があり、実行できなかった行は `failure` です。どのオブジェクトも閉じているので、名前のないフィールドが増えるのは契約の変更です。スキーマ、CLI 自身の型、テストで dekc が出力するものは 1 つの定義に対して検査されるので、互いにずれることはありません。
+- 各コマンドの形は JSON Schema として [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しています。`$defs` にコマンドごとの定義があり、実行できなかった行は `failure` です。どのオブジェクトも閉じているので、名前のないフィールドが増えるのは契約の変更です。スキーマ、CLI 自身の型、テストで dek が出力するものは 1 つの定義に対して検査されるので、互いにずれることはありません。
 
-dekc が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID は再利用しません。廃止した ID は廃止のままです。
+dek が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID は再利用しません。廃止した ID は廃止のままです。
 
 ## 一往復で直す
 
@@ -99,7 +99,7 @@ dekc marks clear
 ## スライドを見本にする
 
 ```bash
-dekc show why-dekc timing
+dekc show why-dek timing
 ```
 
 `show` は、1枚のスライドを作っているものを1回で、ファイルごとに見出しを付けて返します。セクションの台本、スライドの HTML・CSS・TS、`theme.css` のうちそのスライドが実際に使うルール（たどれるトークンと `@keyframes` だけを含む）、参照している assets です。エージェントは theme を全部読まずにそのスライドの組み方を知り、自分のデッキのテーマで書けます。見本のクラスやトークンをうっかり持ち込んでも、lint が拾います。
@@ -136,13 +136,13 @@ dekc check files --shot で確かめて。
 ```
 
 ```
-hajimism/dekc/why-dekc を見本にして。dekc ls で budget に一番近い枚を探し、
+hajimism/dek/why-dek を見本にして。dekc ls で budget に一番近い枚を探し、
 dekc show で読んで、このデッキのテーマで budget を書いて。
 ```
 
 ```
-why-dekc の timing みたいなスライドを、このデッキの budget に作って。
-dekc show why-dekc timing で読んで、このデッキのテーマで書いて、
+why-dek の timing みたいなスライドを、このデッキの budget に作って。
+dekc show why-dek timing で読んで、このデッキのテーマで書いて、
 dekc check budget --shot で確かめて。
 ```
 

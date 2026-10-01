@@ -22,11 +22,11 @@ async function typecheck(root: string): Promise<{ ok: boolean; output: string }>
 }
 
 describe("editor types for slide scripts", () => {
-  test("dekc sync writes .dekc/slide.d.ts but leaves tsconfig.json to init", async () => {
+  test("dekc sync writes .dek/slide.d.ts but leaves tsconfig.json to init", async () => {
     await withTempProject(project, async (root) => {
       syncDeck(join(root, "decks", "demo"));
-      const types = await readFile(join(root, ".dekc", "slide.d.ts"), "utf8");
-      expect(types).toContain("interface DekcSlide");
+      const types = await readFile(join(root, ".dek", "slide.d.ts"), "utf8");
+      expect(types).toContain("interface DekSlide");
       // Someone who deleted tsconfig.json on purpose should not see it come back.
       expect(existsSync(join(root, "tsconfig.json"))).toBe(false);
     });
@@ -37,13 +37,13 @@ describe("editor types for slide scripts", () => {
       await writeFile(join(root, "tsconfig.json"), "{}\n");
       syncDeck(join(root, "decks", "demo"));
       expect(await readFile(join(root, "tsconfig.json"), "utf8")).toBe("{}\n");
-      expect(existsSync(join(root, ".dekc", "slide.d.ts"))).toBe(true);
+      expect(existsSync(join(root, ".dek", "slide.d.ts"))).toBe(true);
     });
   });
 
   test("dekc sync leaves an up-to-date slide.d.ts alone, so the editor's TS server does not reload", async () => {
     await withTempProject(project, async (root) => {
-      const typesPath = join(root, ".dekc", "slide.d.ts");
+      const typesPath = join(root, ".dek", "slide.d.ts");
       syncDeck(join(root, "decks", "demo"));
       const past = new Date(Date.now() - 60_000);
       utimesSync(typesPath, past, past);
@@ -54,11 +54,11 @@ describe("editor types for slide scripts", () => {
 
   test("dekc sync refreshes a stale slide.d.ts", async () => {
     await withTempProject(project, async (root) => {
-      const typesPath = join(root, ".dekc", "slide.d.ts");
+      const typesPath = join(root, ".dek", "slide.d.ts");
       syncDeck(join(root, "decks", "demo"));
       await writeFile(typesPath, "// old\n");
       syncDeck(join(root, "decks", "demo"));
-      expect(await readFile(typesPath, "utf8")).toContain("interface DekcSlide");
+      expect(await readFile(typesPath, "utf8")).toContain("interface DekSlide");
     });
   });
 
@@ -66,9 +66,9 @@ describe("editor types for slide scripts", () => {
     await withTempDir(async (dir) => {
       const result = initCommand({ cwd: dir, dir: "talks" });
       expect(result.created).toContain(join(dir, "talks", "tsconfig.json"));
-      expect(result.created).toContain(join(dir, "talks", ".dekc", "slide.d.ts"));
+      expect(result.created).toContain(join(dir, "talks", ".dek", "slide.d.ts"));
       const tsconfig = JSON.parse(await readFile(join(dir, "talks", "tsconfig.json"), "utf8"));
-      expect(tsconfig.include).toEqual([".dekc/*.d.ts", "decks/*/slides/*.ts"]);
+      expect(tsconfig.include).toEqual([".dek/*.d.ts", "decks/*/slides/*.ts"]);
       expect(tsconfig.compilerOptions.allowJs).toBeUndefined();
       expect(tsconfig.compilerOptions.types).toEqual([]);
     });
@@ -76,7 +76,7 @@ describe("editor types for slide scripts", () => {
 });
 
 describe("a TypeScript slide type-checks with only the generated files", () => {
-  test("satisfies DekcSlide types draw's arguments without any import", async () => {
+  test("satisfies DekSlide types draw's arguments without any import", async () => {
     await withTempProject(project, async (root) => {
       syncDeck(join(root, "decks", "demo"));
       await writeFile(
@@ -89,7 +89,7 @@ export default {
       el.textContent = \`\${index}:\${step}:\${Math.round(Number(el.dataset.count) * (t / MS))}\`;
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;
 `,
       );
       const { ok, output } = await typecheck(root);
@@ -108,7 +108,7 @@ export default {
   draw(slide, frame) {
     slide.textContent = String(frame.time) + process.env.HOME;
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;
 `,
       );
       const { ok, output } = await typecheck(root);

@@ -34,7 +34,7 @@ describe("resolveBinFromAncestors", () => {
       const rumdl = join(binDir, "rumdl");
       await writeFile(rumdl, "#!/bin/sh\necho ok\n");
       await chmod(rumdl, 0o755);
-      const nested = join(dir, "decks", "why-dekc");
+      const nested = join(dir, "decks", "why-dek");
       await mkdir(nested, { recursive: true });
       expect(resolveBinFromAncestors("rumdl", nested)).toBe(rumdl);
     });

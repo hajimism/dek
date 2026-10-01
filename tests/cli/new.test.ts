@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { newCommand } from "../../src/cli/new.ts";
 import { formatNew } from "../../src/cli/text.ts";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
-import { jsonStdout, runDekc } from "../helpers/cli.ts";
+import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -28,7 +28,7 @@ describe("dekc new", () => {
       async (root) => {
         const result = newCommand({ cwd: root, name: "talk" });
         expect(result.next).toEqual([
-          "bun add -d @hajimism/dekc",
+          "bun add -d @hajimism/dek",
           "cd decks/talk",
           "$EDITOR script.md",
           "bunx dekc",
@@ -64,17 +64,17 @@ describe("dekc new", () => {
         decks: [{ name: "demo", theme: "/* project theme */\n" }],
       },
       async (root) => {
-        const result = await runDekc(["new", "2026-09-dekc", "--json"], { cwd: root });
+        const result = await runDek(["new", "2026-09-dek", "--json"], { cwd: root });
         expect(result).toMatchObject({ exitCode: 0 });
 
         const json = jsonStdout<NewOk>(result);
         expect(json.ok).toBe(true);
-        expect(json.name).toBe("2026-09-dekc");
-        expect(json.dir).toBe(join(root, "decks", "2026-09-dekc"));
+        expect(json.name).toBe("2026-09-dek");
+        expect(json.dir).toBe(join(root, "decks", "2026-09-dek"));
 
-        expect(existsSync(join(root, "decks", "2026-09-dekc", "script.md"))).toBe(true);
-        expect(existsSync(join(root, "decks", "2026-09-dekc", "slides"))).toBe(true);
-        expect(await readFile(join(root, "decks", "2026-09-dekc", "theme.css"), "utf8")).toBe(
+        expect(existsSync(join(root, "decks", "2026-09-dek", "script.md"))).toBe(true);
+        expect(existsSync(join(root, "decks", "2026-09-dek", "slides"))).toBe(true);
+        expect(await readFile(join(root, "decks", "2026-09-dek", "theme.css"), "utf8")).toBe(
           "/* project theme */\n",
         );
       },
@@ -90,8 +90,8 @@ describe("newCommand", () => {
         decks: [{ name: "old", theme: "/* from-old */\n" }],
       },
       async (root) => {
-        newCommand({ cwd: root, name: "2026-09-dekc", themeFrom: "old" });
-        expect(await readFile(join(root, "decks", "2026-09-dekc", "theme.css"), "utf8")).toBe(
+        newCommand({ cwd: root, name: "2026-09-dek", themeFrom: "old" });
+        expect(await readFile(join(root, "decks", "2026-09-dek", "theme.css"), "utf8")).toBe(
           "/* from-old */\n",
         );
       },
@@ -100,12 +100,12 @@ describe("newCommand", () => {
 
   test("fails on a name with path separators", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      expect(() => newCommand({ cwd: root, name: "../evil" })).toThrow(DekcError);
+      expect(() => newCommand({ cwd: root, name: "../evil" })).toThrow(DekError);
       try {
         newCommand({ cwd: root, name: "../evil" });
       } catch (error) {
-        expect(error).toBeInstanceOf(DekcError);
-        expect((error as DekcError).message).toContain("invalid deck name");
+        expect(error).toBeInstanceOf(DekError);
+        expect((error as DekError).message).toContain("invalid deck name");
       }
     });
   });
@@ -124,7 +124,7 @@ describe("newCommand", () => {
       const inDeck = join(root, "decks", "demo");
       expect(newCommand({ cwd: inDeck, name: "My Talk" }).next).toEqual([
         "cd ../..",
-        "bun add -d @hajimism/dekc",
+        "bun add -d @hajimism/dek",
         "cd 'decks/My Talk'",
         "$EDITOR script.md",
         "bunx dekc",
@@ -139,21 +139,21 @@ describe("newCommand", () => {
     });
   });
 
-  test("says which of dekc's own files it brought up to date", async () => {
+  test("says which of dek's own files it brought up to date", async () => {
     await withTempProject({ theme: defaultTheme() }, async (root) => {
       newCommand({ cwd: root, name: "first" });
-      await writeFile(join(root, ".dekc", "slide.d.ts"), "// an older dekc's types\n");
+      await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
 
       const result = newCommand({ cwd: root, name: "second" });
-      expect(result.updated).toEqual([join(root, ".dekc", "slide.d.ts")]);
-      expect(result.created).not.toContain(join(root, ".dekc", "slide.d.ts"));
+      expect(result.updated).toEqual([join(root, ".dek", "slide.d.ts")]);
+      expect(result.created).not.toContain(join(root, ".dek", "slide.d.ts"));
       expect(formatNew(result)).toStartWith(
-        `created deck second\n  ${join(root, ".dekc", "slide.d.ts")} (updated)\n`,
+        `created deck second\n  ${join(root, ".dek", "slide.d.ts")} (updated)\n`,
       );
     });
   });
 
-  test("names only the deck when dekc's own files were already current", async () => {
+  test("names only the deck when dek's own files were already current", async () => {
     await withTempProject({ theme: defaultTheme() }, async (root) => {
       newCommand({ cwd: root, name: "first" });
       const result = newCommand({ cwd: root, name: "second" });
@@ -164,12 +164,12 @@ describe("newCommand", () => {
 
   test("fails outside a project and points to dekc init", async () => {
     await withTempDir(async (dir) => {
-      expect(() => newCommand({ cwd: dir, name: "demo" })).toThrow(DekcError);
+      expect(() => newCommand({ cwd: dir, name: "demo" })).toThrow(DekError);
       try {
         newCommand({ cwd: dir, name: "demo" });
       } catch (error) {
-        expect(error).toBeInstanceOf(DekcError);
-        expect(`${(error as DekcError).message} ${(error as DekcError).hint ?? ""}`).toContain(
+        expect(error).toBeInstanceOf(DekError);
+        expect(`${(error as DekError).message} ${(error as DekError).hint ?? ""}`).toContain(
           "dekc init",
         );
       }

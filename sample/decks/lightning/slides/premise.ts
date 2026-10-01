@@ -21,4 +21,4 @@ export default {
     const strike = slide.querySelector<HTMLElement>("[data-strike]");
     if (strike) strike.style.transform = `scaleX(${ease((t - STRIKE_AT) / STRIKE_MS)})`;
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

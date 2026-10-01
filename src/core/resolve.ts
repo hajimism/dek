@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
-import { DekcError } from "./error.ts";
+import { DekError } from "./error.ts";
 import { walkUp } from "./optional.ts";
 import { parseScript } from "./parse.ts";
 import { deckProjectRoot } from "./path.ts";
@@ -20,7 +20,7 @@ export type Project = {
   root: string;
   configPath: string;
   decks: ProjectDeck[];
-  failed: Array<{ name: string; dir: string; scriptPath: string; error: DekcError }>;
+  failed: Array<{ name: string; dir: string; scriptPath: string; error: DekError }>;
 };
 
 export type ResolvedDeck = {
@@ -59,7 +59,7 @@ export function resolveDeck(dir: string): ResolvedDeck {
   const { root, configPath } = findRoot(resolve(dir));
   const located = locateDeck(root, dir);
   if (!located) {
-    throw new DekcError("not a deck directory", {
+    throw new DekError("not a deck directory", {
       path: dir,
       hint: "pass a deck name or run from a deck directory",
     });
@@ -85,7 +85,7 @@ export function requireSection(deck: ProjectDeck, slug: string): Section {
       slug,
       deck.deck.sections.map((entry) => entry.slug),
     );
-    throw new DekcError(`section "${slug}" not found`, {
+    throw new DekError(`section "${slug}" not found`, {
       path: deck.scriptPath,
       hint: guess ? `did you mean \`${guess}\`? run \`dekc ls\` for every slide` : "run `dekc ls`",
     });
@@ -128,13 +128,13 @@ export function listSlideFiles(
 
 function findRoot(startDir: string): { root: string; configPath: string } {
   const hit = walkUp(startDir, (dir) => {
-    const configPath = join(dir, "dekc.toml");
+    const configPath = join(dir, "dek.toml");
     if (existsSync(configPath) && statSync(configPath).isFile()) {
       return { root: dir, configPath };
     }
   });
   if (!hit) {
-    throw new DekcError("not a dekc project", {
+    throw new DekError("not a dek project", {
       path: startDir,
       hint: "run `dekc init` to create one here, or cd into a project",
     });
@@ -151,7 +151,7 @@ function loadDecks(root: string): {
     return { decks: [], failed: [] };
   }
   if (!statSync(decksDir).isDirectory()) {
-    throw new DekcError("decks is not a directory", { path: decksDir });
+    throw new DekError("decks is not a directory", { path: decksDir });
   }
 
   const decks: ProjectDeck[] = [];
@@ -190,7 +190,7 @@ function readDeck(
   try {
     source = readDeckFile(dir, scriptPath);
   } catch (error) {
-    return { ok: false, error: { name, dir, scriptPath, error: error as DekcError } };
+    return { ok: false, error: { name, dir, scriptPath, error: error as DekError } };
   }
   if (source === undefined) {
     return {
@@ -199,7 +199,7 @@ function readDeck(
         name,
         dir,
         scriptPath,
-        error: new DekcError(`deck "${name}" has no script.md`, { path: scriptPath }),
+        error: new DekError(`deck "${name}" has no script.md`, { path: scriptPath }),
       },
     };
   }
@@ -221,7 +221,7 @@ function readDeck(
         dir,
         scriptPath,
         error:
-          error instanceof DekcError ? error : new DekcError(String(error), { path: scriptPath }),
+          error instanceof DekError ? error : new DekError(String(error), { path: scriptPath }),
       },
     };
   }

@@ -1,4 +1,4 @@
-import { DekcError } from "../error.ts";
+import { DekError } from "../error.ts";
 import { type PlaywrightRunner, requirePlaywright } from "../playwright.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection } from "../resolve.ts";
 import { morphEntry } from "../shot-cache.ts";
@@ -28,7 +28,7 @@ export function parseMorphAt(value: string | undefined): number {
 
 function requireMorphAt(at: number, written: string = String(at)): number {
   if (!Number.isFinite(at) || at < 0 || at > 1) {
-    throw new DekcError(`invalid --at "${written}"`, {
+    throw new DekError(`invalid --at "${written}"`, {
       hint: "use a number between 0 and 1, e.g. --at 0.5",
     });
   }

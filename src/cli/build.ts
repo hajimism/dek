@@ -1,6 +1,6 @@
 import { buildDeck } from "../core/build.ts";
 import type { Diagnostic } from "../core/diagnostic.ts";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { lintDeck, lintProject } from "../core/lint.ts";
 import { parsePublicUrl } from "../core/ogp.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "../core/playwright.ts";
@@ -10,7 +10,7 @@ import type { DecksTarget } from "./scope.ts";
 
 /**
  * A build never fails on lint: at the venue, a deck that shows is better than
- * none. What dekc's own rules say comes back with it, so nobody ships it unaware;
+ * none. What dek's own rules say comes back with it, so nobody ships it unaware;
  * rumdl's Markdown style is `dekc lint`'s alone, since it never stops a deck showing.
  */
 export type BuildCliResult = {
@@ -27,7 +27,7 @@ const PREVIEW_SKIPPED = {
   "no-url": {
     check: "preview",
     reason: "url is not set",
-    hint: "set url in dekc.toml, or pass --url, to the URL dist/ is served from",
+    hint: "set url in dek.toml, or pass --url, to the URL dist/ is served from",
   },
   "no-playwright": {
     check: "preview",
@@ -42,7 +42,7 @@ export async function buildCommand(
 ): Promise<BuildCliResult> {
   const url = options.url === undefined ? undefined : parsePublicUrl(options.url);
   if (options.url !== undefined && url === undefined) {
-    throw new DekcError(`invalid --url "${options.url}"`, {
+    throw new DekError(`invalid --url "${options.url}"`, {
       hint: "pass the absolute http(s) URL dist/ is served from, like --url https://example.com/talks/",
     });
   }

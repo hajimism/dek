@@ -1,13 +1,13 @@
-import { DekcError } from "./error.ts";
+import { DekError } from "./error.ts";
 
 /**
  * A ref is someone else's deck, kept as a read-only snapshot to read as a
- * model. dekc.toml `[refs]` pins each one to a commit; the snapshot under
+ * model. dek.toml `[refs]` pins each one to a commit; the snapshot under
  * `refs/owner/repo/deck` is only a copy of that commit and can be fetched again.
  * This module only names refs; `ref.ts` fetches and stores them.
  */
 export type RefSource = {
-  /** `owner/repo/deck`, the key in dekc.toml `[refs]`. */
+  /** `owner/repo/deck`, the key in dek.toml `[refs]`. */
   name: string;
   owner: string;
   repo: string;
@@ -24,7 +24,7 @@ const DECK_RE = /^[^/\\\s@]+$/;
 const SHA_RE = /^[0-9a-f]{40}$/;
 
 const REF_HINT =
-  "name a ref as owner/repo/deck, e.g. hajimism/dekc/why-dekc or hajimism/dekc/why-dekc@v1";
+  "name a ref as owner/repo/deck, e.g. hajimism/dek/why-dek or hajimism/dek/why-dek@v1";
 
 /** True for `owner/repo/deck[@rev]` or a GitHub link, which a deck name never is. */
 export function isRefName(arg: string): boolean {
@@ -37,7 +37,7 @@ export function isRefName(arg: string): boolean {
   return arg.split("@")[0]?.split("/").length === 3;
 }
 
-/** A valid `owner/repo/deck` with no rev: the form dekc.toml `[refs]` keys take. */
+/** A valid `owner/repo/deck` with no rev: the form dek.toml `[refs]` keys take. */
 export function isPlainRefName(name: string): boolean {
   try {
     const source = parseRefSource(name);
@@ -74,7 +74,7 @@ export function parseRefSource(input: string): RefSource {
     deck !== ".." &&
     (rev === undefined || /^[^\s@]+$/.test(rev));
   if (!valid) {
-    throw new DekcError(`"${input}" is not a ref name`, { hint: REF_HINT });
+    throw new DekError(`"${input}" is not a ref name`, { hint: REF_HINT });
   }
   return {
     name: `${owner}/${repo}/${deck}`,
@@ -101,8 +101,8 @@ function parseGithubUrl(input: string): RefSource {
     !rev ||
     deck === undefined
   ) {
-    throw new DekcError(`"${input}" is not a link to a deck on GitHub`, {
-      hint: "link to the deck's folder, e.g. https://github.com/hajimism/dekc/tree/main/sample/decks/why-dekc, or name it as owner/repo/deck",
+    throw new DekError(`"${input}" is not a link to a deck on GitHub`, {
+      hint: "link to the deck's folder, e.g. https://github.com/hajimism/dek/tree/main/sample/decks/why-dek, or name it as owner/repo/deck",
     });
   }
   const source = parseRefSource(`${owner}/${repo.replace(/\.git$/, "")}/${deck}@${rev}`);

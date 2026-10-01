@@ -1,5 +1,5 @@
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner, playwrightReady } from "../core/playwright.ts";
 import { addressHint, deckAround, type HintDeck } from "./address.ts";
 import { type CliResult, outputOf } from "./commands.ts";
@@ -110,9 +110,9 @@ export function writeSuccess(original: CliResult, options: WriteSuccessOptions):
 }
 
 /**
- * Paths into the source tree (diagnostics, files dekc created) relative to
+ * Paths into the source tree (diagnostics, files dek created) relative to
  * `cwd`, so an agent reads `slides/intro.html` instead of the same long
- * absolute prefix on every line. Artifacts dekc writes, such as `shot` or a
+ * absolute prefix on every line. Artifacts dek writes, such as `shot` or a
  * build, stay absolute: they are meant to be opened as-is.
  */
 export function displayPaths(result: CliResult, cwd: string): CliResult {
@@ -144,15 +144,15 @@ export function writeFailure(error: unknown, options: { json: boolean; cwd: stri
   process.exitCode = 1;
 }
 
-/** A DekcError whose hint runs as written from `cwd`, about the deck its path is in. */
+/** A DekError whose hint runs as written from `cwd`, about the deck its path is in. */
 function addressError(error: unknown, cwd: string): unknown {
-  if (!(error instanceof DekcError) || error.path === undefined || error.hint === undefined) {
+  if (!(error instanceof DekError) || error.path === undefined || error.hint === undefined) {
     return error;
   }
   const hint = addressHint(error.hint, deckAround(error.path), cwd);
   return hint === error.hint
     ? error
-    : new DekcError(error.message, {
+    : new DekError(error.message, {
         path: error.path,
         hint,
         ...(error.line !== undefined ? { line: error.line } : {}),

@@ -1,4 +1,4 @@
-import { DekcError } from "../error.ts";
+import { DekError } from "../error.ts";
 import {
   askPlaywright,
   type PagesRequest,
@@ -199,7 +199,7 @@ function shotOf(still: Still): ShotFile {
 export function resolveBeat(section: Section, step?: string): { index: number; label: string } {
   const index = step === undefined ? lastStop(section.beats) : resolveStop(section.beats, step);
   if (index === undefined) {
-    throw new DekcError(`step "${step}" not found in "${section.slug}"`, {
+    throw new DekError(`step "${step}" not found in "${section.slug}"`, {
       hint: stepNotFoundHint(section),
     });
   }

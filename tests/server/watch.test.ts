@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import type { LiveEvent } from "../../src/core/live-protocol.ts";
 import { syncDeck } from "../../src/core/sync.ts";
 import { createEventHub, type EventHub } from "../../src/server/hub.ts";
@@ -125,7 +125,7 @@ describe("watchDeck", () => {
           hub,
           (event) =>
             event.type === "diagnostics" &&
-            event.diagnostics.some((diagnostic) => diagnostic.id === "DEKC016"),
+            event.diagnostics.some((diagnostic) => diagnostic.id === "DEK016"),
         );
         const watcher = watchDeck(deckDir(root), emitTo(hub), { pollIntervalMs: 20 });
         // A synchronous evaluation holds the loop for the sandbox's whole 1s timeout, so a
@@ -160,7 +160,7 @@ describe("watchDeck", () => {
   });
 
   test("creates skeletons for a script written before the watcher started", async () => {
-    // A titled heading, so the skeleton has a title and lint has nothing to say (DEKC024).
+    // A titled heading, so the skeleton has a title and lint has nothing to say (DEK024).
     const script = "---\ntitle: Demo\n---\n\n## intro\n\n## Two {#two}\n\nhello\n";
     await withTempProject(
       { decks: [{ name: "demo", script, slides: { intro: introHtml } }] },
@@ -189,7 +189,7 @@ describe("watchDeck", () => {
   });
 
   test("removes an orphan skeleton on sync and names its slug", async () => {
-    // A skeleton dekc wrote for a section the script has since dropped.
+    // A skeleton dek wrote for a section the script has since dropped.
     const before = "---\ntitle: Demo\n---\n\n## intro\n\n## Old {#old}\n";
     const script = "---\ntitle: Demo\n---\n\n## intro\n\n## Two {#two}\n\nhello\n";
     await withTempProject(
@@ -505,7 +505,7 @@ describe("voiceFailureLine", () => {
   test("says what failed and what to do in one line, with no stack", () => {
     expect(
       voiceFailureLine(
-        new DekcError("voicevox is not running at http://127.0.0.1:50021", {
+        new DekError("voicevox is not running at http://127.0.0.1:50021", {
           hint: "start it with docker",
         }),
       ),
@@ -527,8 +527,8 @@ describe("watchDeck on a script that does not read", () => {
           throw new Error("expected diagnostics");
         }
         expect(event.diagnostics.map((d) => [d.id, d.line])).toEqual([
-          ["DEKC027", 5],
-          ["DEKC027", 7],
+          ["DEK027", 5],
+          ["DEK027", 7],
         ]);
       } finally {
         watcher.close();
@@ -539,10 +539,10 @@ describe("watchDeck on a script that does not read", () => {
 });
 
 describe("watchErrorDiagnostic", () => {
-  test("keeps a DekcError's location and its hint, the next step the author sees", () => {
+  test("keeps a DekError's location and its hint, the next step the author sees", () => {
     expect(
       watchErrorDiagnostic(
-        new DekcError("bad frontmatter", { path: "decks/demo/script.md", line: 2, hint: "fix it" }),
+        new DekError("bad frontmatter", { path: "decks/demo/script.md", line: 2, hint: "fix it" }),
       ),
     ).toEqual({
       id: "parse",

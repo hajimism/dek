@@ -1,12 +1,12 @@
 # 設定
 
-設定する場所は 3 つです。プロジェクトの `dekc.toml`、各デッキの `script.md` の frontmatter、そしてデッキ内の任意の `voice/` ファイル群。
+設定する場所は 3 つです。プロジェクトの `dek.toml`、各デッキの `script.md` の frontmatter、そしてデッキ内の任意の `voice/` ファイル群。
 
 ## ディレクトリ構成
 
 ```
 my-talks/
-├── dekc.toml
+├── dek.toml
 ├── .gitignore
 ├── .rumdl.toml
 ├── theme.css
@@ -37,7 +37,7 @@ my-talks/
 │           ├── voice/
 │           ├── video/
 │           └── shots/
-└── .dekc/
+└── .dek/
     ├── schema.json
     ├── slide.d.ts
     └── server.json                # 開発サーバの起動中だけ
@@ -45,10 +45,10 @@ my-talks/
 
 プロジェクトとデッキの境界は[プロジェクトとデッキ](/ja/guide/structure)で説明しています。
 
-## `dekc.toml`
+## `dek.toml`
 
 ```toml
-# dekc project
+# dek project
 url = "https://example.com/talks/"
 max_classes = 40
 cjk_per_minute = 300
@@ -60,13 +60,13 @@ speaker = "ずんだもん/ノーマル"
 speed = 1.0
 
 [refs]
-"hajimism/dekc/why-dekc" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
+"hajimism/dek/why-dek" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
 ```
 
 | キー | 既定 | 役割 |
 | --- | --- | --- |
 | `url` | なし | `dist/` を公開する http(s) の絶対 URL。あれば `dekc build` が `og:url` と 1 枚目のスライドの `og:image` を書く。`--url` が優先される。[Web で公開する](/ja/guide/present#web-で公開する)を参照 |
-| `max_classes` | `40` | `DEKC013` の上限 |
+| `max_classes` | `40` | `DEK013` の上限 |
 | `cjk_per_minute` | `300` | CJK テキストの話速（字/分） |
 | `latin_per_minute` | `130` | それ以外のテキストの話速（語/分） |
 | `voice.engine` | `"voicevox"` | エンジン名（`voicevox`、`aivis`、`coeiroink`、`sharevox`）、エンジン名とローカルのポート（`voicevox:50021`）、またはベース URL |
@@ -74,15 +74,15 @@ speed = 1.0
 | `voice.speed` | `1.0` | 話速 |
 | `refs` | なし | ref（`owner/repo/deck`）ごとに、固定したコミットの40桁の sha。`dekc ref` が書く。[ref](/ja/reference/cli#ref) を参照 |
 
-dekc は知らないキーを無視し、lint がそれぞれを `DEKC008` として、おそらく意図したキーと一緒に示します。`[voice]` があるとき、`dekc new` はそれを新しいデッキへ `voice/voice.toml` としてコピーします。
+dek は知らないキーを無視し、lint がそれぞれを `DEK008` として、おそらく意図したキーと一緒に示します。`[voice]` があるとき、`dekc new` はそれを新しいデッキへ `voice/voice.toml` としてコピーします。
 
 ## frontmatter
 
-スキーマは Zod で定義され、sync のたびに `.dekc/schema.json` に書き出されます。1 行目の `$schema` コメントで yaml-language-server が入力中に検証してくれます。
+スキーマは Zod で定義され、sync のたびに `.dek/schema.json` に書き出されます。1 行目の `$schema` コメントで yaml-language-server が入力中に検証してくれます。
 
 ```yaml
 ---
-# yaml-language-server: $schema=../../.dekc/schema.json
+# yaml-language-server: $schema=../../.dek/schema.json
 title: HTML スライドツールを作った話
 description: 発表のためのビルドシステムとは何か、なぜ台本から始めるのか。
 event: Tokyo Frontend Meetup #42
@@ -103,7 +103,7 @@ lang: ja
 | `ratio` | いいえ | `16:9`（既定、1280 × 720）または `4:3`（1024 × 768） |
 | `lang` | いいえ | BCP 47 タグ。プレイヤー、スクリーンショット、PDF の `<html lang>` になる。省くと台本から決める。かながあれば `ja`、次にハングルなら `ko`、漢字なら `zh`、それ以外は `en` |
 
-これ以外のキーは無視され、lint が `DEKC008` として示します。
+これ以外のキーは無視され、lint が `DEK008` として示します。
 
 セクションとビートの id は `[a-z0-9-]+` にマッチし、英字を 1 文字以上含みます。数字だけの id は数値の `data-step` と衝突します。
 
@@ -118,7 +118,7 @@ pause   = { sentence = 350, beat = 700 }
 
 | キー | 役割 |
 | --- | --- |
-| `engine` | エンジン名かベース URL。既定 `voicevox`。`DEKC_VOICE_URL` が優先する |
+| `engine` | エンジン名かベース URL。既定 `voicevox`。`DEK_VOICE_URL` が優先する |
 | `speaker` | `名前/スタイル`。`dekc voice speakers` でエンジンの話者を一覧できる |
 | `speed` | 話速。既定 1 |
 | `pause.sentence` | 文と文の間の無音（ミリ秒）。既定 350 |
@@ -132,14 +132,14 @@ pause   = { sentence = 350, beat = 700 }
 エンジンが読み間違える単語の読みです。キーは ASCII の単語全体に、長いものから順にマッチします。
 
 ```toml
-[dekc]
+[dek]
 kana = "デック"
 
 ["script.md"]
 kana = "スクリプトエムディー"
 ```
 
-`dekc voice dict add <word> <kana>` でエントリを追加できます。辞書にない単語は `DEKC040` です。
+`dekc voice dict add <word> <kana>` でエントリを追加できます。辞書にない単語は `DEK040` です。
 
 ## テーマのトークン
 

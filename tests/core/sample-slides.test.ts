@@ -9,7 +9,7 @@ async function mount(id: string, deck = "with-agents") {
   const window = new Window();
   window.document.body.innerHTML = await Bun.file(join(slides, `${id}.html`)).text();
   const slide = window.document.querySelector(".slide") as unknown as HTMLElement;
-  const script = (await import(join(slides, `${id}.ts`))).default as Required<DekcSlide>;
+  const script = (await import(join(slides, `${id}.ts`))).default as Required<DekSlide>;
   return { slide, script };
 }
 

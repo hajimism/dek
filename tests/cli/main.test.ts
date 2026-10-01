@@ -39,7 +39,7 @@ describe("main", () => {
   );
 
   test.serial(
-    "serve is no command word: dekc serve says the dev server is the bare dekc",
+    "serve is no command word: dekc serve says the dev server is the bare dek",
     async () => {
       await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
         const error = await failure(["serve", "--port", "3"], root);
@@ -49,7 +49,7 @@ describe("main", () => {
     },
   );
 
-  test.serial("prints a result as text, its paths relative to where dekc runs", async () => {
+  test.serial("prints a result as text, its paths relative to where dek runs", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const result = await run(["sync", "demo"], root);
       expect(result.stdout).toStartWith("synced ");
@@ -65,7 +65,7 @@ describe("main", () => {
         expect(result.stdout).toStartWith("wrote ");
         expect(result.stdout).not.toContain("preview");
         expect(result.stderr).toContain("preview: skipped (url is not set)");
-        expect(result.stderr).toContain("help: set url in dekc.toml");
+        expect(result.stderr).toContain("help: set url in dek.toml");
       });
     },
   );
@@ -119,14 +119,14 @@ describe("main", () => {
           diagnostics: Array<{ id: string; line?: number; hint?: string }>;
         };
         expect(json.ok).toBe(false);
-        expect(json.diagnostics.filter((d) => d.id === "DEKC027").map((d) => d.line)).toEqual([
+        expect(json.diagnostics.filter((d) => d.id === "DEK027").map((d) => d.line)).toEqual([
           5, 7,
         ]);
       }
       const sarif = JSON.parse((await run(["lint", "--format", "sarif"], deck)).stdout) as {
         runs: Array<{ results: Array<{ ruleId: string }> }>;
       };
-      expect(sarif.runs[0]?.results.map((r) => r.ruleId)).toEqual(["DEKC027", "DEKC027"]);
+      expect(sarif.runs[0]?.results.map((r) => r.ruleId)).toEqual(["DEK027", "DEK027"]);
     });
   });
 
@@ -201,7 +201,7 @@ describe("subcommands", () => {
       const say = await failure(["voice", "say"], join(root, "decks", "demo"));
       expect(say.message).toBe("missing <text> for dekc voice say");
       expect(say.hint).toBe("usage: dekc voice [deck] say <text>; run `dekc help voice`");
-      const dict = await failure(["voice", "dict", "add", "dekc"], join(root, "decks", "demo"));
+      const dict = await failure(["voice", "dict", "add", "dek"], join(root, "decks", "demo"));
       expect(dict.message).toBe("missing <kana> for dekc voice dict add");
       const pin = await failure(["voice", "pin", "now"], join(root, "decks", "demo"));
       expect(pin.message).toBe('unexpected argument "now" for dekc voice pin');

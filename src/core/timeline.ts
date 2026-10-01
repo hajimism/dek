@@ -1,5 +1,5 @@
 import { type Cue, splitSentences } from "./cue.ts";
-import { DekcError } from "./error.ts";
+import { DekError } from "./error.ts";
 import type { Position } from "./step.ts";
 
 export type PauseConfig = {
@@ -72,7 +72,7 @@ export function scheduleVoice(
   const take = (text: string): Utterance => {
     const utterance = queue[next];
     if (!utterance || utterance.text !== text) {
-      throw new DekcError(`missing utterance for ${JSON.stringify(text)}`, {
+      throw new DekError(`missing utterance for ${JSON.stringify(text)}`, {
         hint: "run `dekc voice`",
       });
     }
@@ -192,7 +192,7 @@ export function slideVideoSeconds(timeline: Timeline, slideIndex: number): numbe
 export function sliceTimeline(timeline: Timeline, slideIndex: number): Timeline {
   const range = slideTimeRange(timeline, slideIndex);
   if (!range) {
-    throw new DekcError(`no timeline beats for slide ${slideIndex}`, {
+    throw new DekError(`no timeline beats for slide ${slideIndex}`, {
       hint: "run `dekc voice`",
     });
   }

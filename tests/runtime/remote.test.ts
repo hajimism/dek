@@ -47,7 +47,7 @@ class FakeWebSocket {
 let root = "";
 
 beforeAll(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), "dekc-")));
+  root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
   await writeProject(root, {
     decks: [
       {

@@ -153,7 +153,7 @@ describe("stampSlide", () => {
       slug: "b",
       place: { number: 2, count: 3 },
     });
-    expect(html).toContain('style="--dekc-slide-number: 2; --dekc-slide-count: 3"');
+    expect(html).toContain('style="--dek-slide-number: 2; --dek-slide-count: 3"');
   });
 
   test("keeps the author's inline style after the place, so it can override it", () => {
@@ -161,7 +161,7 @@ describe("stampSlide", () => {
       slug: "b",
       place: { number: 2, count: 3 },
     });
-    expect(html).toContain('style="--dekc-slide-number: 2; --dekc-slide-count: 3; color: red"');
+    expect(html).toContain('style="--dek-slide-number: 2; --dek-slide-count: 3; color: red"');
   });
 
   test("stamps the place on the slide alone, not on a section inside it", () => {
@@ -169,7 +169,7 @@ describe("stampSlide", () => {
       `<section class="slide"><section class="slide-part">a</section></section>`,
       { slug: "a", place: { number: 1, count: 1 } },
     );
-    expect(html.match(/--dekc-slide-number/g)).toHaveLength(1);
+    expect(html.match(/--dek-slide-number/g)).toHaveLength(1);
   });
 });
 
@@ -179,7 +179,7 @@ describe("renderRailHtml", () => {
       { slug: "intro", title: "intro" },
       { slug: "architecture", title: "architecture" },
     ]);
-    expect(html).toContain('id="dekc-rail"');
+    expect(html).toContain('id="dek-rail"');
     expect(html).toContain('href="#intro"');
     expect(html).toContain('href="#architecture"');
     expect(html).toContain('data-slide-index="0"');
@@ -294,12 +294,12 @@ body
       },
       async (root) => {
         const html = await renderPage(join(root, "decks", "demo"));
-        expect(html).toContain('id="dekc-rail"');
-        expect(html).toContain('id="dekc-rail-resize"');
+        expect(html).toContain('id="dek-rail"');
+        expect(html).toContain('id="dek-rail-resize"');
         expect(html).toContain('href="#intro"');
         expect(html).toContain('href="#architecture"');
         expect(html).not.toContain('class="is-presenter"');
-        expect(html).toContain("body.is-presenter #dekc-rail");
+        expect(html).toContain("body.is-presenter #dek-rail");
       },
     );
   });
@@ -334,18 +334,18 @@ body
           mode: "presenter",
         });
         expect(html).toContain('class="is-presenter"');
-        expect(html).toContain('id="dekc-shell"');
-        expect(html).toContain('id="dekc-current-stage"');
-        expect(html).toContain('id="dekc-next-stage"');
-        expect(html).toContain('id="dekc-progress"');
-        expect(html).toContain('id="dekc-page"');
-        expect(html).toContain('id="dekc-next"');
-        expect(html).toMatch(/id="dekc-next"[^>]*>[\s\S]*architecture/);
+        expect(html).toContain('id="dek-shell"');
+        expect(html).toContain('id="dek-current-stage"');
+        expect(html).toContain('id="dek-next-stage"');
+        expect(html).toContain('id="dek-progress"');
+        expect(html).toContain('id="dek-page"');
+        expect(html).toContain('id="dek-next"');
+        expect(html).toMatch(/id="dek-next"[^>]*>[\s\S]*architecture/);
         expect(html).toContain('data-beat-index="1"');
-        expect(html).not.toMatch(/id="dekc-presenter" hidden/);
-        expect(html).toContain('id="dekc-rail"');
+        expect(html).not.toMatch(/id="dek-presenter" hidden/);
+        expect(html).toContain('id="dek-rail"');
         expect(html).toContain('href="#intro"');
-        expect(html).toContain("body.is-presenter #dekc-rail");
+        expect(html).toContain("body.is-presenter #dek-rail");
       },
     );
   });
@@ -374,9 +374,9 @@ hello
           kind: "dev",
           mode: "presenter",
         });
-        expect(html).toContain('id="dekc-elapsed"');
-        expect(html).toMatch(/id="dekc-budget"[^>]*>20:00/);
-        const data = JSON.parse(html.match(/id="dekc-data">([^<]+)/)?.[1] ?? "[]") as Array<{
+        expect(html).toContain('id="dek-elapsed"');
+        expect(html).toMatch(/id="dek-budget"[^>]*>20:00/);
+        const data = JSON.parse(html.match(/id="dek-data">([^<]+)/)?.[1] ?? "[]") as Array<{
           slug: string;
           budgetSeconds?: number;
         }>;
@@ -395,8 +395,8 @@ hello
           kind: "dev",
           mode: "presenter",
         });
-        expect(html).toMatch(/id="dekc-budget"><\/p>/);
-        const data = JSON.parse(html.match(/id="dekc-data">([^<]+)/)?.[1] ?? "[]") as Array<{
+        expect(html).toMatch(/id="dek-budget"><\/p>/);
+        const data = JSON.parse(html.match(/id="dek-data">([^<]+)/)?.[1] ?? "[]") as Array<{
           slug: string;
           budgetSeconds?: number;
         }>;
@@ -415,9 +415,9 @@ hello
         const html = await renderPage(join(root, "decks", "demo"), { kind: "video" });
         expect(html).toContain('data-mode="video"');
         expect(html).toContain('data-deck="demo"');
-        expect(html).not.toContain('id="dekc-presenter"');
-        expect(html).not.toContain('id="dekc-rail"');
-        expect(html).not.toContain('id="dekc-rail-resize"');
+        expect(html).not.toContain('id="dek-presenter"');
+        expect(html).not.toContain('id="dek-rail"');
+        expect(html).not.toContain('id="dek-rail-resize"');
       },
     );
   });
@@ -447,7 +447,7 @@ hello
       },
       async (root) => {
         const html = await renderPage(join(root, "decks", "demo"));
-        expect(html).toContain('id="dekc-hint"');
+        expect(html).toContain('id="dek-hint"');
         expect(html).toContain("<kbd>s</kbd>スライド一覧");
         expect(html).toContain("<kbd>p</kbd>発表者ビュー");
       },
@@ -473,7 +473,7 @@ hello
           { kind: "dev" as const, mode: "presenter" as const },
           { kind: "video" as const },
         ]) {
-          expect(await renderPage(dir, options)).not.toContain('id="dekc-hint"');
+          expect(await renderPage(dir, options)).not.toContain('id="dek-hint"');
         }
       },
     );
@@ -506,7 +506,7 @@ describe("renderSlideHtml", () => {
       async (root) => {
         const { deck } = resolveDeck(join(root, "decks", "demo"));
         const html = renderSlideHtml(loadSlideSources(deck), "architecture", 0);
-        const own = html.match(/<style id="dekc-slide-css">([\s\S]*?)<\/style>/)?.[1] ?? "";
+        const own = html.match(/<style id="dek-slide-css">([\s\S]*?)<\/style>/)?.[1] ?? "";
         expect(own).toContain('.slide:where([data-slug="architecture"]) .arch-mark');
         expect(own).not.toContain("navy");
         expect(html).toContain("navy");
@@ -519,7 +519,7 @@ describe("renderSlideHtml", () => {
     await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
       const { deck } = resolveDeck(join(root, "decks", "demo"));
       const html = renderSlideHtml(loadSlideSources(deck), "architecture", 0);
-      expect(html).not.toContain("dekc-slide-css");
+      expect(html).not.toContain("dek-slide-css");
     });
   });
 
@@ -753,14 +753,14 @@ more
       },
       async (root) => {
         const html = await renderPage(join(root, "decks", "demo"), { kind: "dev" });
-        expect(html).not.toContain('class="dekc-diagnostics"');
+        expect(html).not.toContain('class="dek-diagnostics"');
         expect(html).toContain('data-slug="intro"');
         expect(html).toContain('data-slug="extra"');
         expect(html).not.toContain("data-missing");
         expect(html).toMatch(
           /data-slug="extra"[^>]*data-layout="title"|data-layout="title"[^>]*data-slug="extra"/,
         );
-        const data = JSON.parse(html.match(/id="dekc-data">([^<]+)/)?.[1] ?? "[]") as Array<{
+        const data = JSON.parse(html.match(/id="dek-data">([^<]+)/)?.[1] ?? "[]") as Array<{
           slug: string;
         }>;
         expect(data.map((slide) => slide.slug)).toEqual(["intro", "extra"]);

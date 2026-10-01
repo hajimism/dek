@@ -178,7 +178,7 @@ export function clearance(
 export function pairingResponse(url: URL, redeemed: boolean, session: PresenterSession): Response {
   if (!redeemed) {
     return new Response(
-      "This QR code was used already or has expired; press Enter in the terminal where dekc runs for a new one.\n",
+      "This QR code was used already or has expired; press Enter in the terminal where dek runs for a new one.\n",
       { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } },
     );
   }
@@ -198,7 +198,7 @@ export function pairingResponse(url: URL, redeemed: boolean, session: PresenterS
 export function unauthorized(): Response {
   return new Response("Unauthorized\n", {
     status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="dekc presenter"' },
+    headers: { "WWW-Authenticate": 'Basic realm="dek presenter"' },
   });
 }
 

@@ -38,14 +38,14 @@ async function lintStyles(
     },
     async (root) => {
       const resolved = resolveDeck(join(root, "decks", "demo"));
-      return lintDeck(resolved, options).filter((d) => d.id === "DEKC026");
+      return lintDeck(resolved, options).filter((d) => d.id === "DEK026");
     },
   );
 }
 
 const DARK_CARD = ".card {\n  --muted: var(--bg);\n}\n";
 
-describe("DEKC026 repeated slide styles", () => {
+describe("DEK026 repeated slide styles", () => {
   test("flags a declaration three slides repeat, on each of them", async () => {
     const found = await lintStyles({ a: DARK_CARD, b: DARK_CARD, c: DARK_CARD });
     expect(found.map((d) => d.slug)).toEqual(["a", "b", "c"]);
@@ -65,7 +65,7 @@ describe("DEKC026 repeated slide styles", () => {
   });
 
   // A hint that moves the rule into theme.css as the slide wrote it, `.card { … }`, would trade
-  // DEKC026 for DEKC012: the theme scopes every selector under .slide itself.
+  // DEK026 for DEK012: the theme scopes every selector under .slide itself.
   test("names the rule as theme.css must write it, under .slide", async () => {
     const child = ".slide > .card { --muted: var(--bg); }";
     const found = await lintStyles({ a: child, b: child, c: child, d: child });

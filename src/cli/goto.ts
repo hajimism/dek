@@ -1,4 +1,4 @@
-import { DekcError } from "../core/error.ts";
+import { DekError } from "../core/error.ts";
 import { deckRoutePath } from "../runtime/routes.ts";
 import { isPidAlive, readDevServerLock } from "../server/lock.ts";
 import { type DeckTarget, requireSection } from "./scope.ts";
@@ -31,7 +31,7 @@ async function requestDevServer(
   const deckName = deck.name;
   const lock = readDevServerLock(project.root);
   if (!lock || !isPidAlive(lock.pid)) {
-    throw new DekcError("dev server is not running", { hint: "run `dekc`" });
+    throw new DekError("dev server is not running", { hint: "run `dekc`" });
   }
 
   // Under /decks/<name> whether or not the server is scoped to this deck; a scoped one takes both.
@@ -61,7 +61,7 @@ async function requestDevServer(
     error?: { message?: string };
   };
   if (!response.ok || json.ok === false || json.slug === undefined) {
-    throw new DekcError(json.error?.message ?? `dev server ${request.path} failed`, {
+    throw new DekError(json.error?.message ?? `dev server ${request.path} failed`, {
       hint: "run `dekc`",
     });
   }
@@ -79,21 +79,18 @@ function refusal(
   lock: { url: string; deck?: string },
   deckName: string,
   path: string,
-): DekcError {
+): DekError {
   if (status === 404 && lock.deck !== undefined && lock.deck !== deckName) {
-    return new DekcError(`the running dev server serves deck "${lock.deck}", not "${deckName}"`, {
+    return new DekError(`the running dev server serves deck "${lock.deck}", not "${deckName}"`, {
       hint: `pass --deck ${lock.deck}, or stop the server at ${lock.url} and run \`dekc ${deckName}\``,
     });
   }
   if (status === 401) {
-    return new DekcError(
-      `the dev server at ${lock.url} refused the password in .dekc/server.json`,
-      {
-        hint: "restart it: stop `dekc` and run it again",
-      },
-    );
+    return new DekError(`the dev server at ${lock.url} refused the password in .dek/server.json`, {
+      hint: "restart it: stop `dekc` and run it again",
+    });
   }
-  return new DekcError(`dev server ${path} failed with HTTP ${status}`, {
-    hint: `restart the server at ${lock.url}: stop \`dekc\` and run it again`,
+  return new DekError(`dev server ${path} failed with HTTP ${status}`, {
+    hint: `restart the server at ${lock.url}: stop \`dek\` and run it again`,
   });
 }

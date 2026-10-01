@@ -26,4 +26,4 @@ export default {
     const count = slide.querySelector<HTMLElement>("[data-count]");
     if (count) count.textContent = clock(now);
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

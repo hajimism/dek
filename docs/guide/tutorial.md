@@ -2,20 +2,20 @@
 
 In this tutorial you build a short talk from scratch: a ten-minute lightning talk about a bug that turned out to be a design flaw. By the end you will have a script with beats, a hand-written slide that reveals itself in step with your speaking, a figure that carries over between two slides, a theme change that stays inside the rules, and a single HTML file you could present from a USB stick.
 
-Every step ends in a state you could stop at and still give the talk. That is deliberate. dekc is designed so that the script alone is enough, and everything after it is optional polish.
+Every step ends in a state you could stop at and still give the talk. That is deliberate. dek is designed so that the script alone is enough, and everything after it is optional polish.
 
 You need [Bun](https://bun.sh) 1.4 or later. Voice, video, and Playwright are not used here.
 
 ## 1. Create the project
 
 ```bash
-bunx @hajimism/dekc init lightning --deck postmortem
+bunx @hajimism/dek init lightning --deck postmortem
 cd lightning
-bun add -d @hajimism/dekc
+bun add -d @hajimism/dek
 cd decks/postmortem
 ```
 
-These are the steps `init` prints when it finishes. From here on, `dekc` means `bunx dekc`, which runs the dekc installed in the project.
+These are the steps `init` prints when it finishes. From here on, `dekc` means `bunx dekc`, which runs the dek installed in the project.
 
 ## 2. Write the script
 
@@ -23,7 +23,7 @@ Replace the contents of `script.md` with the talk. Write it the way you would sa
 
 ```markdown
 ---
-# yaml-language-server: $schema=../../.dekc/schema.json
+# yaml-language-server: $schema=../../.dek/schema.json
 title: The Bug That Was a Design
 event: Lightning Talks
 date: 2026-05-14
@@ -118,7 +118,7 @@ In a second terminal, from the deck directory:
 dekc ls
 ```
 
-You see the budget from `duration`, an estimate from the word count, and the per-section split. dekc estimates Latin text at 130 words per minute and CJK text at 300 characters per minute. Blockquotes are not counted. The script in this tutorial reads in about a minute, so `dekc ls` ends with `1 diagnostic`, and `dekc lint` and the dev server show what it is: a DEKC041 warning that the script is short of its ten-minute budget. That warning is the point: it is your cue to write more script, not more slides. It is a warning, not an error, so lint still passes. Anything you plan to say out loud belongs in the file, because only then does it count.
+You see the budget from `duration`, an estimate from the word count, and the per-section split. dek estimates Latin text at 130 words per minute and CJK text at 300 characters per minute. Blockquotes are not counted. The script in this tutorial reads in about a minute, so `dekc ls` ends with `1 diagnostic`, and `dekc lint` and the dev server show what it is: a DEK041 warning that the script is short of its ten-minute budget. That warning is the point: it is your cue to write more script, not more slides. It is a warning, not an error, so lint still passes. Anything you plan to say out loud belongs in the file, because only then does it count.
 
 ## 5. Write one slide by hand
 
@@ -139,7 +139,7 @@ The `cause` slide carries the point of the talk. Give it a real layout. Open `sl
 </section>
 ```
 
-Save it. The browser updates only that slide. Every class you used is defined in the bundled theme: `slide-title`, `col`, `node`, `node-parent`. Try adding a class the theme does not know, such as `class="node highlight"`, and save. The terminal and the browser overlay both report `DEKC010`: the class is not in `theme.css`. Remove it and the diagnostic disappears.
+Save it. The browser updates only that slide. Every class you used is defined in the bundled theme: `slide-title`, `col`, `node`, `node-parent`. Try adding a class the theme does not know, such as `class="node highlight"`, and save. The terminal and the browser overlay both report `DEK010`: the class is not in `theme.css`. Remove it and the diagnostic disappears.
 
 That is the loop. Write, save, read the diagnostic, fix. The dev server lints on every save, and "no diagnostics" means nothing measurable is left to fix.
 
@@ -237,7 +237,7 @@ Now try to cheat. Add a raw color to a rule:
 }
 ```
 
-Save, and lint reports `DEKC014`: a raw value outside a token assignment. Raw colors, font families, and absolute units may only appear when assigning a `--*` custom property. Everything else goes through `var()`. Change it back to `var(--accent)` and the deck is clean again.
+Save, and lint reports `DEK014`: a raw value outside a token assignment. Raw colors, font families, and absolute units may only appear when assigning a `--*` custom property. Everything else goes through `var()`. Change it back to `var(--accent)` and the deck is clean again.
 
 This deck's theme is its own copy. The `theme.css` at the project root is untouched, and so is every other deck. When you like the result, promote it:
 
@@ -259,7 +259,7 @@ Copy that one file to a USB stick. That is the talk.
 
 ## Where to go next
 
-You have used the whole core of dekc: a script that owns order and timing, one HTML file per slide, beats bound by id, a morph between slides, a token-only theme, lint for everything a rule can measure, and a single-file build.
+You have used the whole core of dek: a script that owns order and timing, one HTML file per slide, beats bound by id, a morph between slides, a token-only theme, lint for everything a rule can measure, and a single-file build.
 
 - The detailed rules for each piece: [The Script](./script), [Slides](./slides), [Beats](./steps), [Themes](./theme), [Lint](./lint)
 - Presenter view, remote control, and PDF: [Presenting](./present)

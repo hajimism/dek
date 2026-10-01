@@ -9,7 +9,7 @@ import {
 import { formatInit, formatReport } from "../../src/cli/text.ts";
 import { agentHelpText, helpText } from "../../src/cli/usage.ts";
 import type { Diagnostic } from "../../src/core/diagnostic.ts";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 
 describe("helpText", () => {
   test("lists core commands and --json", () => {
@@ -25,7 +25,7 @@ describe("helpText", () => {
     expect(text).toContain("dekc help --agent");
     expect(text).toContain("--root-dist");
     expect(text).toContain(
-      "Commands that print a result accept --json. dekc and dekc rehearse stay running.",
+      "Commands that print a result accept --json. dek and dekc rehearse stay running.",
     );
     expect(text).not.toContain("All commands accept --json");
   });
@@ -83,7 +83,7 @@ describe("agentHelpText", () => {
 
   test("names where each command's --json shape is published", () => {
     expect(agentHelpText()).toContain(
-      "Each command's --json shape: https://hajimism.github.io/dekc/cli.schema.json",
+      "Each command's --json shape: https://hajimism.github.io/dek/cli.schema.json",
     );
   });
 });
@@ -93,21 +93,21 @@ describe("formatDiagnostics", () => {
     expect(
       formatDiagnostics([
         {
-          id: "DEKC001",
+          id: "DEK001",
           severity: "error",
           message: 'missing slide HTML for "intro"',
           path: "script.md",
           line: 3,
         },
       ]),
-    ).toBe('script.md:3: DEKC001 missing slide HTML for "intro"');
+    ).toBe('script.md:3: DEK001 missing slide HTML for "intro"');
   });
 
   test("adds the column after the line, the way editors jump to it", () => {
     expect(
       formatDiagnostics([
         {
-          id: "DEKC011",
+          id: "DEK011",
           severity: "error",
           message: "slide contains a style attribute",
           path: "slides/intro.html",
@@ -115,42 +115,42 @@ describe("formatDiagnostics", () => {
           column: 27,
         },
       ]),
-    ).toBe("slides/intro.html:3:27: DEKC011 slide contains a style attribute");
+    ).toBe("slides/intro.html:3:27: DEK011 slide contains a style attribute");
   });
 
   test("formats path without a line", () => {
     expect(
       formatDiagnostics([
         {
-          id: "DEKC002",
+          id: "DEK002",
           severity: "error",
           message: 'slide HTML has no section "orphan"',
           path: "slides/orphan.html",
         },
       ]),
-    ).toBe('slides/orphan.html: DEKC002 slide HTML has no section "orphan"');
+    ).toBe('slides/orphan.html: DEK002 slide HTML has no section "orphan"');
   });
 
   test("formats a line without a path", () => {
     expect(
-      formatDiagnostics([{ id: "DEKC004", severity: "error", message: "duplicate id", line: 4 }]),
-    ).toBe("4: DEKC004 duplicate id");
+      formatDiagnostics([{ id: "DEK004", severity: "error", message: "duplicate id", line: 4 }]),
+    ).toBe("4: DEK004 duplicate id");
   });
 
   test("prints a diagnostic hint under its line", () => {
     expect(
       formatDiagnostics([
         {
-          id: "DEKC003",
+          id: "DEK003",
           severity: "error",
           message: 'data-step "3"',
           path: "slides/intro.html",
           hint: "use hook",
         },
-        { id: "DEKC011", severity: "error", message: "style attribute", path: "slides/intro.html" },
+        { id: "DEK011", severity: "error", message: "style attribute", path: "slides/intro.html" },
       ]),
     ).toBe(
-      'slides/intro.html: DEKC003 data-step "3"\n  help: use hook\nslides/intro.html: DEKC011 style attribute',
+      'slides/intro.html: DEK003 data-step "3"\n  help: use hook\nslides/intro.html: DEK011 style attribute',
     );
   });
 
@@ -158,14 +158,14 @@ describe("formatDiagnostics", () => {
     expect(
       formatDiagnostics([
         {
-          id: "DEKC040",
+          id: "DEK040",
           severity: "warning",
           message: "dictionary is missing English word: AI",
           path: "script.md",
           line: 9,
         },
       ]),
-    ).toBe("script.md:9: DEKC040 warning: dictionary is missing English word: AI");
+    ).toBe("script.md:9: DEK040 warning: dictionary is missing English word: AI");
   });
 
   test("returns no diagnostics for an empty list", () => {
@@ -176,21 +176,21 @@ describe("formatDiagnostics", () => {
     expect(
       formatDiagnostics([
         {
-          id: "DEKC001",
+          id: "DEK001",
           severity: "error",
           message: 'missing slide HTML for "intro"',
           path: "script.md",
           line: 5,
         },
         {
-          id: "DEKC002",
+          id: "DEK002",
           severity: "error",
           message: 'slide HTML has no section "orphan"',
           path: "slides/orphan.html",
         },
       ]),
-    ).toBe(`script.md:5: DEKC001 missing slide HTML for "intro"
-slides/orphan.html: DEKC002 slide HTML has no section "orphan"`);
+    ).toBe(`script.md:5: DEK001 missing slide HTML for "intro"
+slides/orphan.html: DEK002 slide HTML has no section "orphan"`);
   });
 });
 
@@ -204,23 +204,23 @@ describe("formatReport", () => {
 
   test("ends the list with how many errors and warnings, and of which rules, most first", () => {
     const report = formatReport([
-      found("DEKC014"),
-      found("DEKC033"),
-      found("DEKC029", "warning"),
-      found("DEKC033"),
+      found("DEK014"),
+      found("DEK033"),
+      found("DEK029", "warning"),
+      found("DEK033"),
     ]);
     expect(report.split("\n").at(-1)).toBe(
-      "3 errors and 1 warning: DEKC033 ×2, DEKC014 ×1, DEKC029 ×1",
+      "3 errors and 1 warning: DEK033 ×2, DEK014 ×1, DEK029 ×1",
     );
     expect(report.split("\n")).toHaveLength(5);
   });
 
   test("counts one in the singular, and names no errors when there are none", () => {
     expect(
-      formatReport([found("DEKC040", "warning")])
+      formatReport([found("DEK040", "warning")])
         .split("\n")
         .at(-1),
-    ).toBe("1 warning: DEKC040 ×1");
+    ).toBe("1 warning: DEK040 ×1");
   });
 
   test("says no diagnostics when there are none", () => {
@@ -230,12 +230,12 @@ describe("formatReport", () => {
 
 describe("formatError", () => {
   test("includes path, line, and hint", () => {
-    const error = new DekcError("not a dekc project", {
+    const error = new DekError("not a dek project", {
       path: "/tmp/talks",
       hint: "run `dekc init` first",
     });
     expect(formatError(error)).toEqual({
-      message: "not a dekc project",
+      message: "not a dek project",
       path: "/tmp/talks",
       hint: "run `dekc init` first",
     });
@@ -244,21 +244,21 @@ describe("formatError", () => {
 
 describe("formatErrorText", () => {
   test("uses rustc-lite error, location, and help lines", () => {
-    const error = new DekcError("not a dekc project", {
+    const error = new DekError("not a dek project", {
       path: "/tmp/talks",
       hint: "run `dekc init` first",
     });
-    expect(formatErrorText(error)).toBe(`error: not a dekc project
+    expect(formatErrorText(error)).toBe(`error: not a dek project
  --> /tmp/talks
   help: run \`dekc init\` first`);
   });
 
   test("colors the error label when color is true", () => {
-    const error = new DekcError("not a dekc project");
+    const error = new DekError("not a dek project");
     const text = formatErrorText(error, { color: true });
     expect(text).toContain("\x1b[31m");
     expect(text).toContain("error:");
-    expect(text).toContain("not a dekc project");
+    expect(text).toContain("not a dek project");
   });
 });
 
@@ -300,7 +300,7 @@ describe("formatDevEvent", () => {
   test("formats diagnostics the same way as formatDiagnostics", () => {
     const diagnostics: Diagnostic[] = [
       {
-        id: "DEKC001",
+        id: "DEK001",
         severity: "error",
         message: 'missing slide HTML for "architecture"',
         path: "slides/architecture.html",
@@ -320,11 +320,11 @@ describe("formatDevEvent", () => {
       formatDevEvent({ type: "sync", created: ["a.html"], removed: ["b"] }, { deck: "talk" }),
     ).toBe("[talk] synced 2 files\n  a.html\n  b (removed)");
     const diagnostics: Diagnostic[] = [
-      { id: "DEKC001", severity: "error", message: "one", hint: "fix one" },
-      { id: "DEKC002", severity: "error", message: "two" },
+      { id: "DEK001", severity: "error", message: "one", hint: "fix one" },
+      { id: "DEK002", severity: "error", message: "two" },
     ];
     expect(formatDevEvent({ type: "diagnostics", diagnostics }, { deck: "talk" })).toBe(
-      "[talk] DEKC001 one\n  help: fix one\n[talk] DEKC002 two",
+      "[talk] DEK001 one\n  help: fix one\n[talk] DEK002 two",
     );
   });
 });
@@ -343,7 +343,7 @@ describe("writeDevEvent", () => {
         type: "diagnostics",
         diagnostics: [
           {
-            id: "DEKC010",
+            id: "DEK010",
             severity: "error",
             message: 'class "x"',
             path: "/p/decks/demo/slides/a.html",
@@ -353,7 +353,7 @@ describe("writeDevEvent", () => {
       { write: (s) => chunks.push(s) },
       { cwd: "/p/decks/demo" },
     );
-    expect(chunks).toEqual(['slides/a.html: DEKC010 class "x"\n']);
+    expect(chunks).toEqual(['slides/a.html: DEK010 class "x"\n']);
   });
 
   test("writes nothing for a clean diagnostics event", () => {
@@ -365,7 +365,7 @@ describe("writeDevEvent", () => {
 
 describe("formatError paths", () => {
   test("prints the error path relative to cwd when one is given", () => {
-    const error = new DekcError("section not found", { path: "/p/decks/demo/script.md" });
+    const error = new DekError("section not found", { path: "/p/decks/demo/script.md" });
     expect(formatError(error, { cwd: "/p/decks/demo" }).path).toBe("script.md");
     expect(formatError(error).path).toBe("/p/decks/demo/script.md");
   });
@@ -376,12 +376,12 @@ describe("formatInit", () => {
     expect(
       formatInit({
         root: "/tmp/talks",
-        created: ["dekc.toml"],
+        created: ["dek.toml"],
         updated: [],
         kept: ["AGENTS.md"],
         next: [],
       }),
-    ).toBe("created project at /tmp/talks\n  dekc.toml\n  AGENTS.md (kept)");
+    ).toBe("created project at /tmp/talks\n  dek.toml\n  AGENTS.md (kept)");
   });
 
   test("says so when every file was already there", () => {

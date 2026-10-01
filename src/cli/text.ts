@@ -34,7 +34,7 @@ export function countSummary(diagnostics: Diagnostic[]): string {
 
 /**
  * The diagnostics, then how many there are and of which rules, most first: "2 errors and 1
- * warning: DEKC033 ×2, DEKC014 ×1". An agent reads a command's last lines, so the verdict ends the
+ * warning: DEK033 ×2, DEK014 ×1". An agent reads a command's last lines, so the verdict ends the
  * report, whatever was cut above it.
  */
 export function formatReport(diagnostics: Diagnostic[], opts?: { color?: boolean }): string {
@@ -79,7 +79,7 @@ export function formatKept(kept: string[], color = false): string {
 
 /**
  * A theme.css init kept that is no dekc theme, for stderr: every deck copies it, so each would fail
- * lint on its first run with a DEKC015 per token.
+ * lint on its first run with a DEK015 per token.
  */
 export function formatKeptTheme(data: InitResult, color = false): string {
   const missing = data.missingTokens ?? [];
@@ -91,11 +91,11 @@ export function formatKeptTheme(data: InitResult, color = false): string {
   const named = missing.length > 3 ? [...missing.slice(0, 3), "…"] : missing;
   return [
     `${theme} was kept and lacks ${missing.length} ${missing.length === 1 ? "token" : "tokens"} every deck needs (${named.join(", ")})`,
-    `  ${c.yellow("help:")} add them to its .slide rule, or move it aside and run \`dekc init\` again for dekc's own theme`,
+    `  ${c.yellow("help:")} add them to its .slide rule, or move it aside and run \`dekc init\` again for dek's own theme`,
   ].join("\n");
 }
 
-// Lint alone weighs the sections a kept slide could be renamed to (DEKC002), so sync defers to it
+// Lint alone weighs the sections a kept slide could be renamed to (DEK002), so sync defers to it
 // rather than suggest the section or the deletion a rename would make wrong.
 const ORPHAN_HINT =
   "run `dekc lint`, which names the `dekc mv` if its section was renamed, or what else to do with it";
@@ -126,7 +126,7 @@ export function formatInit(data: InitResult): string {
     : done;
 }
 
-/** The deck, and any of dekc's own files it brought up to date: the rest is the deck's, and new. */
+/** The deck, and any of dek's own files it brought up to date: the rest is the deck's, and new. */
 export function formatNew(data: NewResult): string {
   const updated = data.updated.map((path) => `  ${path} (updated)`);
   return withNext([`created deck ${data.name}`, ...updated].join("\n"), data.next);
@@ -277,19 +277,19 @@ function diagnosticCount(count: number): string {
 }
 
 /**
- * "lint: 1 error from dekc's rules; run `dekc lint` to see it", or nothing when clean. A build
- * runs dekc's rules only; `dekc lint` adds rumdl, so the count names what it covers.
+ * "lint: 1 error from dek's rules; run `dekc lint` to see it", or nothing when clean. A build
+ * runs dek's rules only; `dekc lint` adds rumdl, so the count names what it covers.
  */
 function lintSummary(diagnostics: Diagnostic[]): string | undefined {
   if (diagnostics.length === 0) {
     return undefined;
   }
   const them = diagnostics.length === 1 ? "it" : "them";
-  return `lint: ${countSummary(diagnostics)} ${DEKC_RULES}; run \`dekc lint\` to see ${them}`;
+  return `lint: ${countSummary(diagnostics)} ${DEK_RULES}; run \`dekc lint\` to see ${them}`;
 }
 
-/** What build and ls count: dekc's own rules, without the rumdl pass `dekc lint` adds. */
-const DEKC_RULES = "from dekc's rules";
+/** What build and ls count: dek's own rules, without the rumdl pass `dekc lint` adds. */
+const DEK_RULES = "from dek's rules";
 
 export function formatTheme(data: ThemeResult): string {
   if (data.layout) {

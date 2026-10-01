@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { lstatSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DekcError } from "../../src/core/error.ts";
+import { DekError } from "../../src/core/error.ts";
 import {
   followInside,
   outputPath,
@@ -26,7 +26,7 @@ async function withProject(fn: (root: string, outside: string) => Promise<void>)
 describe("followInside", () => {
   test("takes a path with no link in it as written, hidden folders included", async () => {
     await withProject(async (root) => {
-      const path = join(root, ".dekc", "schema.json");
+      const path = join(root, ".dek", "schema.json");
       expect(followInside(path, root)).toBe(path);
     });
   });
@@ -99,13 +99,13 @@ describe("readSourceIfExists", () => {
     await withProject(async (root, outside) => {
       const link = join(root, "decks", "talk", "theme.css");
       await symlink(outside, link);
-      expect(() => readSourceIfExists(link, root)).toThrow(DekcError);
+      expect(() => readSourceIfExists(link, root)).toThrow(DekError);
       try {
         readSourceIfExists(link, root);
       } catch (error) {
-        expect((error as DekcError).path).toBe(link);
-        expect((error as DekcError).message).toContain("leads outside");
-        expect((error as DekcError).hint).toContain("copy");
+        expect((error as DekError).path).toBe(link);
+        expect((error as DekError).message).toContain("leads outside");
+        expect((error as DekError).hint).toContain("copy");
       }
     });
   });
@@ -114,7 +114,7 @@ describe("readSourceIfExists", () => {
 describe("writeInside", () => {
   test("creates the folders and the file", async () => {
     await withProject(async (root) => {
-      const path = join(root, ".dekc", "server.json");
+      const path = join(root, ".dek", "server.json");
       writeInside(path, "{}", root, { mode: 0o600 });
       expect(await readFile(path, "utf8")).toBe("{}");
       expect(statSync(path).mode & 0o777).toBe(0o600);
@@ -123,10 +123,10 @@ describe("writeInside", () => {
 
   test("refuses to write through a link out of the project, leaving its target alone", async () => {
     await withProject(async (root, outside) => {
-      await mkdir(join(root, ".dekc"));
-      const link = join(root, ".dekc", "schema.css");
+      await mkdir(join(root, ".dek"));
+      const link = join(root, ".dek", "schema.css");
       await symlink(outside, link);
-      expect(() => writeInside(link, "{}", root)).toThrow(DekcError);
+      expect(() => writeInside(link, "{}", root)).toThrow(DekError);
       expect(readFileSync(outside, "utf8")).toBe("SECRET");
     });
   });
@@ -178,7 +178,7 @@ describe("removeInside", () => {
   test("never reaches through a linked folder to delete outside the project", async () => {
     await withProject(async (root, outside) => {
       await symlink(join(outside, ".."), join(root, "refs"));
-      expect(() => removeInside(join(root, "refs", "secret.css"), root)).toThrow(DekcError);
+      expect(() => removeInside(join(root, "refs", "secret.css"), root)).toThrow(DekError);
       expect(readFileSync(outside, "utf8")).toBe("SECRET");
     });
   });

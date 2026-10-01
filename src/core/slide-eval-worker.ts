@@ -1,5 +1,5 @@
 /**
- * Evaluates compiled slide scripts for lint, away from the dekc process.
+ * Evaluates compiled slide scripts for lint, away from the dek process.
  * Reads a JSON array of classic scripts on stdin and writes one JSON line per
  * script as it finishes. Each script runs in a fresh context with no host
  * objects, so it cannot reach Bun, process, or the file system, and a loop
@@ -11,9 +11,9 @@ import vm from "node:vm";
 
 const SLIDE_EVAL_TIMEOUT_MS = 1000;
 
-/** Runs inside the context, so reading the module's fields cannot run code in dekc. */
+/** Runs inside the context, so reading the module's fields cannot run code in dek. */
 const SUMMARY = `(function () {
-  var module = globalThis.__dekcSlides && globalThis.__dekcSlides.slide;
+  var module = globalThis.__dekSlides && globalThis.__dekSlides.slide;
   if (module === null || typeof module !== "object") return JSON.stringify({ object: false });
   var motion = module.motion;
   return JSON.stringify({

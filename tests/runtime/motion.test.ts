@@ -195,7 +195,7 @@ describe("drawAtEnd", () => {
 describe("stillDrawScript", () => {
   test("is self-contained and draws each marked slide with drawAtEnd", () => {
     const frames: unknown[] = [];
-    const attrs = { "data-slug": "chart", "data-dekc-beat": "1", "data-dekc-step": "growth" };
+    const attrs = { "data-slug": "chart", "data-dek-beat": "1", "data-dek-step": "growth" };
     const chart = {
       getAttribute: (name: string) => attrs[name as keyof typeof attrs] ?? null,
       outerHTML: "<section></section>",
@@ -203,7 +203,7 @@ describe("stillDrawScript", () => {
     };
     const unmarked = { getAttribute: (name: string) => (name === "data-slug" ? "chart" : null) };
     const window = {
-      __dekcSlides: {
+      __dekSlides: {
         chart: { motion: { growth: 900 }, draw: (el: unknown, f: unknown) => frames.push([el, f]) },
       },
       MutationObserver: class {

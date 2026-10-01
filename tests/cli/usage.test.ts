@@ -11,9 +11,9 @@ import {
 } from "../../src/cli/commands.ts";
 import { FLAGS, parseCommandLine } from "../../src/cli/flags.ts";
 import { commandHelp, helpRequest, unknownCommandError, versionText } from "../../src/cli/usage.ts";
-import type { DekcError } from "../../src/core/error.ts";
+import type { DekError } from "../../src/core/error.ts";
 import { suggest } from "../../src/core/suggest.ts";
-import { runDekc } from "../helpers/cli.ts";
+import { runDek } from "../helpers/cli.ts";
 
 describe("command help", () => {
   test("documents every flag each command takes", () => {
@@ -75,12 +75,12 @@ also becomes dist/<deck>.png, the picture a shared link shows.
 flags
   --deck NAME   target a deck by name from the project root
   --root-dist   write to <root>/dist/ instead of the deck's dist/
-  --url <url>   the URL dist/ is served from, over url in dekc.toml
+  --url <url>   the URL dist/ is served from, over url in dek.toml
   --public      a page for anyone with the link, without the script's stage directions and comments
   --json        print the result, or the error, as JSON
   --help, -h    show help; dekc help <command> for one command
 
-https://hajimism.github.io/dekc/reference/cli.html`);
+https://hajimism.github.io/dek/reference/cli.html`);
   });
 });
 
@@ -105,7 +105,7 @@ describe("helpRequest", () => {
     try {
       request(["help", "biuld"]);
     } catch (error) {
-      expect((error as DekcError).hint).toBe("did you mean `dekc build`?");
+      expect((error as DekError).hint).toBe("did you mean `dekc build`?");
     }
   });
 
@@ -149,7 +149,7 @@ describe("unknownCommandError", () => {
 
 describe("dekc help <unknown>", () => {
   test("fails like dekc <unknown> instead of printing the overview", async () => {
-    const result = await runDekc(["help", "bogus"]);
+    const result = await runDek(["help", "bogus"]);
     expect(result).toMatchObject({ exitCode: 1 });
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("unknown command: bogus");

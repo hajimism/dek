@@ -111,10 +111,10 @@ describe("a symlink in the deck", () => {
     });
   });
 
-  test("that leads outside the deck is DEKC022 in lint", async () => {
+  test("that leads outside the deck is DEK022 in lint", async () => {
     await withEscapingLink(async ({ deckDir }) => {
       const diagnostics = lintDeck(deckDir);
-      expect(diagnostics.filter((d) => d.id === "DEKC022")).toMatchObject([
+      expect(diagnostics.filter((d) => d.id === "DEK022")).toMatchObject([
         { message: 'path "assets/p.png" is outside the deck directory' },
       ]);
     });

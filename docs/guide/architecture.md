@@ -27,13 +27,13 @@ script.md → Deck → Cue → Synth → Timeline → schedule
                                       └→ VideoDriver    → player.go() + frames → mux
 ```
 
-Video capture does not replay the talk at wall-clock speed. The worker starts each `go`, pauses the Web Animations, and screenshots at `currentTime` stops from `frameStops`. One hold frame covers the rest of the beat, so rendering time follows the amount of motion rather than the length of the talk. Slide scripts share that clock: in video mode the player holds each script at `t = 0`, and the worker seeks it at the same stops through `window.dekcMotion`.
+Video capture does not replay the talk at wall-clock speed. The worker starts each `go`, pauses the Web Animations, and screenshots at `currentTime` stops from `frameStops`. One hold frame covers the rest of the beat, so rendering time follows the amount of motion rather than the length of the talk. Slide scripts share that clock: in video mode the player holds each script at `t = 0`, and the worker seeks it at the same stops through `window.dekMotion`.
 
 ## Optional dependencies
 
 Playwright, ffmpeg, and the speech engine are optional. When one is missing, only the command that needs it fails, and its hint says what to install. The CLI itself always starts.
 
-Playwright runs in a separate worker process, resolved from `node_modules` at run time, because Bun's Node compatibility is partial. `DEKC_PLAYWRIGHT` can point at an alternative worker, which is also how the tests run without a browser. rumdl is found on `PATH`, in the `node_modules/.bin` beside dekc's install, or at `DEKC_RUMDL`. Neither is looked up from the current directory, which a cloned repository controls.
+Playwright runs in a separate worker process, resolved from `node_modules` at run time, because Bun's Node compatibility is partial. `DEK_PLAYWRIGHT` can point at an alternative worker, which is also how the tests run without a browser. rumdl is found on `PATH`, in the `node_modules/.bin` beside dek's install, or at `DEK_RUMDL`. Neither is looked up from the current directory, which a cloned repository controls.
 
 ## Where agents plug in
 

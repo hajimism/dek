@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { withEnv } from "./env.ts";
 
-const KEY = "DEKC_TEST_WITH_ENV";
+const KEY = "DEK_TEST_WITH_ENV";
 
 describe("withEnv", () => {
   test("overlapping calls each see their own value and leave the original behind", async () => {

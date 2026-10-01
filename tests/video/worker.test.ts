@@ -11,7 +11,7 @@ import { withTempProject } from "../helpers/project.ts";
 
 const defaultTheme = await Bun.file(new URL("../../src/theme/default.css", import.meta.url)).text();
 
-const skipCapture = resolvePlaywrightModule() === undefined || Boolean(process.env.DEKC_VIDEO);
+const skipCapture = resolvePlaywrightModule() === undefined || Boolean(process.env.DEK_VIDEO);
 
 describe("video worker", () => {
   test.serial.skipIf(skipCapture)(

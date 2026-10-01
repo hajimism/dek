@@ -23,7 +23,7 @@ import { createPositionSocket, type PositionSocket } from "./socket.ts";
 /**
  * Where a move came from. Local moves, and the rehearsal clock's, are published to peers; remote
  * ones arrived from one; a hash move came from the URL, which already holds its history entry.
- * Capture (the video recorder and morph shots, through `window.dekcGo`) drives this page alone.
+ * Capture (the video recorder and morph shots, through `window.dekGo`) drives this page alone.
  */
 export type GoOrigin = "local" | "rehearse" | "remote" | "hash" | "capture";
 

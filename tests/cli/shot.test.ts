@@ -3,8 +3,8 @@ import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { parseShotMode, shotCommand } from "../../src/cli/shot.ts";
-import { DekcError } from "../../src/core/error.ts";
-import { jsonStdout, runDekc } from "../helpers/cli.ts";
+import { DekError } from "../../src/core/error.ts";
+import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -26,9 +26,9 @@ describe("dekc shot", () => {
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await chmod(fakePlaywright, 0o755);
-        const result = await runDekc(["shot", "intro", "--json"], {
+        const result = await runDek(["shot", "intro", "--json"], {
           cwd: join(root, "decks", "demo"),
-          env: { DEKC_PLAYWRIGHT: fakePlaywright },
+          env: { DEK_PLAYWRIGHT: fakePlaywright },
         });
         expect(result).toMatchObject({ exitCode: 0 });
         const json = jsonStdout<ShotOk>(result);
@@ -51,7 +51,7 @@ describe("shotCommand", () => {
         await expect(
           shotCommand(resolveTarget(cwd, "deck", { refs: true }), { to: "intro" }),
         ).rejects.toMatchObject({
-          name: "DekcError",
+          name: "DekError",
           hint: expect.stringContaining("dekc shot [deck] <a> --to <b>"),
         });
         await expect(
@@ -61,7 +61,7 @@ describe("shotCommand", () => {
             step: "1",
           }),
         ).rejects.toMatchObject({
-          name: "DekcError",
+          name: "DekError",
           hint: expect.stringContaining("--step"),
         });
         await expect(
@@ -71,13 +71,13 @@ describe("shotCommand", () => {
             at: "2",
           }),
         ).rejects.toMatchObject({
-          name: "DekcError",
+          name: "DekError",
           hint: expect.stringContaining("0 and 1"),
         });
         await expect(
           shotCommand(resolveTarget(cwd, "deck", { refs: true }), { slug: "intro", at: "0.3" }),
         ).rejects.toMatchObject({
-          name: "DekcError",
+          name: "DekError",
           hint: expect.stringContaining("--to"),
         });
       },
@@ -92,7 +92,7 @@ describe("shotCommand", () => {
         const target = resolveTarget(cwd, "deck");
         const refused = (options: Parameters<typeof shotCommand>[1], hint: string) =>
           expect(shotCommand(target, options)).rejects.toMatchObject({
-            name: "DekcError",
+            name: "DekError",
             hint: expect.stringContaining(hint),
           });
         await refused({ slug: "intro", sheet: true }, "dekc shot intro --motion");
@@ -112,7 +112,7 @@ describe("shotCommand", () => {
       async (root) => {
         await chmod(fakePlaywright, 0o755);
         const target = resolveTarget(join(root, "decks", "demo"), "deck", { refs: true });
-        await withEnv({ DEKC_PLAYWRIGHT: fakePlaywright }, async () => {
+        await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
           const sheet = await shotCommand(target, { sheet: true });
           expect(sheet.shots.map((shot) => shot.slug)).toEqual(["intro"]);
           expect(sheet.sheets).toHaveLength(1);
@@ -130,7 +130,7 @@ describe("shotCommand", () => {
           `const request = JSON.parse(await new Response(Bun.stdin).text());
 process.stdout.write(JSON.stringify({ sheets: [], motion: request.motion.beats.map(({ label }) => ({ label, frames: [] })) }) + "\\n");\n`,
         );
-        await withEnv({ DEKC_PLAYWRIGHT: motionWorker }, async () => {
+        await withEnv({ DEK_PLAYWRIGHT: motionWorker }, async () => {
           const motion = await shotCommand(target, { slug: "intro", motion: true });
           expect(motion).toEqual({ shots: [], sheets: [], motion: [{ step: "0", frames: [] }] });
         });
@@ -142,15 +142,15 @@ process.stdout.write(JSON.stringify({ sheets: [], motion: request.motion.beats.m
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        await withEnv({ DEKC_PLAYWRIGHT: "/no/such/playwright" }, async () => {
+        await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
           try {
             await shotCommand(resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }), {
               slug: "intro",
             });
-            throw new Error("expected DekcError");
+            throw new Error("expected DekError");
           } catch (error) {
-            expect(error).toBeInstanceOf(DekcError);
-            expect((error as DekcError).hint).toContain("playwright install");
+            expect(error).toBeInstanceOf(DekError);
+            expect((error as DekError).hint).toContain("playwright install");
           }
         });
       },

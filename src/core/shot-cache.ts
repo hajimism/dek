@@ -8,7 +8,7 @@ import type { Section } from "./schema.ts";
 import { lastStop, stepKey } from "./step.ts";
 
 /**
- * Every capture dekc caches lives under `.cache/shots`, named by what it is and a hash of what it
+ * Every capture dek caches lives under `.cache/shots`, named by what it is and a hash of what it
  * shows. The parts of a name are joined with "~", which no slug, beat id or number can contain,
  * so no two captures share a name, and pruning one never reaches another.
  */

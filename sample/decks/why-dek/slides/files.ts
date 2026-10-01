@@ -11,4 +11,4 @@ export default {
       bar.style.width = `${Math.min(1, n / SCALE_LINES) * 100 * p}%`;
     }
   },
-} satisfies DekcSlide;
+} satisfies DekSlide;

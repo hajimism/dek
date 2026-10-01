@@ -198,11 +198,11 @@ function visualPages(
   deck: ResolvedDeck["deck"],
   options: VisualDeckOptions,
 ): { pages: VisualPage[]; stills: Still[]; scripted: boolean } {
-  // A broken slide script is DEKC016's to report; keep checking the slide without it.
+  // A broken slide script is DEK016's to report; keep checking the slide without it.
   const sources = loadSlideSources(deck, { strict: false });
   const pages: VisualPage[] = [];
   const stills: Still[] = [];
-  // A missing file or section is lint's to report (DEKC001, DEKC007); there is nothing to render.
+  // A missing file or section is lint's to report (DEK001, DEK007); there is nothing to render.
   const sections = deck.deck.sections.filter(
     (section) =>
       (!options.slug || section.slug === options.slug) && sources.slides.has(section.slug),
@@ -368,7 +368,7 @@ function collisionDiagnostic(
 ): Diagnostic {
   const css = `slides/${first.slug}.css`;
   const drawn = [first.box, first.other].some((box) => box.includes("::"));
-  return diag("DEKC033", {
+  return diag("DEK033", {
     message: `${describeTarget(first.box, first.text)}and ${describeTarget(first.other, first.otherText)}are drawn over each other ${atSteps(steps)}`,
     path: paths.slide(first.slug, ".html"),
     slug: first.slug,
@@ -416,7 +416,7 @@ function drawErrorDiagnostic(
       hint: `draw from t alone in ${script}: work every value out from t and set everything you touch on every call, with nothing kept between calls`,
     },
   }[first.kind ?? "throw"];
-  return diag("DEKC032", {
+  return diag("DEK032", {
     message,
     path: deckPaths(deckDir).slide(first.slug, ".ts"),
     slug: first.slug,
@@ -514,7 +514,7 @@ function overflowDiagnostic(
       : `is cut off by ${first.clip} ${Object.entries(amounts)
           .map(([edge, px]) => `past its ${edge} edge by ${px}px`)
           .join(" and ")}`;
-  return diag("DEKC030", {
+  return diag("DEK030", {
     message: `${target}${where} ${atSteps(steps)}`,
     path: overflowPath(first, paths),
     slug: first.slug,
@@ -540,7 +540,7 @@ function contrastDiagnostic(
   const fg = toHex(first.fg);
   const bg = toHex(first.bg);
   const colors = fg && bg ? ` (${fg} on ${bg})` : "";
-  return diag("DEKC031", {
+  return diag("DEK031", {
     message: `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`,
     path: contrastPath(first.origin, first.slug, paths),
     slug: first.slug,

@@ -22,7 +22,7 @@ export type BuildResult = { outPath: string } & (
 
 export type BuildOptions = DistOptions & {
   playerScript: string;
-  /** Where dist/ is served from, ending in a slash; overrides `url` in dekc.toml. */
+  /** Where dist/ is served from, ending in a slash; overrides `url` in dek.toml. */
   url?: string;
   /** For anyone with the link: the presenter view carries only what is said aloud. */
   public?: boolean;

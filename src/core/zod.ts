@@ -1,9 +1,9 @@
 import type { z } from "zod";
-import { DekcError } from "./error.ts";
+import { DekError } from "./error.ts";
 
-const REFERENCE = "https://hajimism.github.io/dekc/reference/config.html";
+const REFERENCE = "https://hajimism.github.io/dek/reference/config.html";
 
-type ConfigAnchor = "dekc-toml" | "frontmatter" | "voice-voice-toml" | "voice-dict-toml";
+type ConfigAnchor = "dek-toml" | "frontmatter" | "voice-voice-toml" | "voice-dict-toml";
 
 /** Where the keys of a config file are documented, as a hint. */
 export function configHint(anchor: ConfigAnchor): string {
@@ -49,7 +49,7 @@ export function parseTomlWith<S extends z.ZodType>(
   try {
     parsed = Bun.TOML.parse(source);
   } catch (error) {
-    throw new DekcError(`invalid ${where.label}: ${parseFailure(error)}`, {
+    throw new DekError(`invalid ${where.label}: ${parseFailure(error)}`, {
       path: where.path,
       cause: error,
       hint,
@@ -57,7 +57,7 @@ export function parseTomlWith<S extends z.ZodType>(
   }
   const result = schema.safeParse(parsed ?? {});
   if (!result.success) {
-    throw new DekcError(formatZodIssues(result.error), { path: where.path, hint });
+    throw new DekError(formatZodIssues(result.error), { path: where.path, hint });
   }
   return result.data;
 }

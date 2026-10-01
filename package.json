@@ -1,5 +1,5 @@
 {
-  "name": "@hajimism/dekc",
+  "name": "@hajimism/dek",
   "version": "0.1.0",
   "description": "A build system for talks.",
   "license": "MIT",
@@ -15,12 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hajimism/dekc.git"
+    "url": "git+https://github.com/hajimism/dek.git"
   },
   "bugs": {
-    "url": "https://github.com/hajimism/dekc/issues"
+    "url": "https://github.com/hajimism/dek/issues"
   },
-  "homepage": "https://hajimism.github.io/dekc/",
+  "homepage": "https://hajimism.github.io/dek/",
   "publishConfig": {
     "access": "public"
   },

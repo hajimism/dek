@@ -1,6 +1,6 @@
 import { readTheme } from "./assets.ts";
 import { playerChromeCss } from "./chrome.ts";
-import { type DekcConfig, loadConfig } from "./config.ts";
+import { type DekConfig, loadConfig } from "./config.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { collectSlidesHtml, htmlShell } from "./html.ts";
 import { type OgpImage, ogpHead } from "./ogp.ts";
@@ -56,7 +56,7 @@ export function renderDeckHtml(
 
 export function renderDeckDocument(
   deck: ProjectDeck,
-  options: { config: DekcConfig; playerScript: string; target: PageTarget },
+  options: { config: DekConfig; playerScript: string; target: PageTarget },
 ): string {
   const { target } = options;
   const mode: PageMode =
@@ -82,13 +82,13 @@ export function renderDeckDocument(
   const hidden = presenterOpen ? "" : " hidden";
   const nextTitle = state ? nextPresenterTitle(state) : "";
   const atEnd = Boolean(state) && nextTitle === "" && !state?.next;
-  const page = data.length > 0 ? `1 <span class="dekc-page-total">/ ${data.length}</span>` : "";
+  const page = data.length > 0 ? `1 <span class="dek-page-total">/ ${data.length}</span>` : "";
   const progress = includeNotes ? `<div id="${PAGE_ID.progress}"${hidden}></div>` : "";
   const presenter = includeNotes
     ? `<aside id="${PAGE_ID.presenter}"${hidden}>
     <section id="${PAGE_ID.nextPanel}">
-      <div class="dekc-panel-label">Next</div>
-      <div class="dekc-next-body">
+      <div class="dek-panel-label">Next</div>
+      <div class="dek-next-body">
         <div id="${PAGE_ID.nextStage}"></div>
         <p id="${PAGE_ID.nextEnd}"${atEnd ? "" : " hidden"}>End</p>
       </div>
@@ -111,7 +111,7 @@ export function renderDeckDocument(
     </footer>
   </aside>`
     : "";
-  const currentLabel = includeNotes ? `<div class="dekc-panel-label">Current</div>` : "";
+  const currentLabel = includeNotes ? `<div class="dek-panel-label">Current</div>` : "";
   const rail = target.kind === "video" ? "" : renderRailHtml(data);
   const hint = target.kind === "build" ? renderKeyHintHtml(deck.deck.lang) : "";
   const railResize = rail
@@ -137,7 +137,7 @@ export function renderDeckDocument(
     lang: deck.deck.lang,
     title: deck.deck.title,
     head: `${ogp}<style>${playerChromeCss({ presenter: includeNotes, ...size })}</style>
-  <style data-dekc-theme>${themeCss}</style>`,
+  <style data-dek-theme>${themeCss}</style>`,
     bodyAttrs: `${presenterOpen ? ' class="is-presenter"' : ""}${pageConfigAttrs({
       mode,
       deck: deck.name,
@@ -177,7 +177,7 @@ export function renderRailHtml(slides: Array<{ slug: string; title: string }>): 
     .map((slide, index) => {
       const n = index + 1;
       const label = `${n}. ${slide.title}`;
-      return `<a class="dekc-thumb" href="#${escapeAttr(slide.slug)}" data-slide-index="${index}" aria-label="${escapeAttr(label)}"><span class="dekc-thumb-num">${n}</span><span class="dekc-thumb-frame"></span></a>`;
+      return `<a class="dek-thumb" href="#${escapeAttr(slide.slug)}" data-slide-index="${index}" aria-label="${escapeAttr(label)}"><span class="dek-thumb-num">${n}</span><span class="dek-thumb-frame"></span></a>`;
     })
     .join("");
   return `<nav id="${PAGE_ID.rail}" aria-label="Slides">${items}</nav>`;

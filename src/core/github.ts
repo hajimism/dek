@@ -1,8 +1,8 @@
-import { DekcError } from "./error.ts";
+import { DekError } from "./error.ts";
 
 /**
  * The two GitHub calls dekc ref needs: pin a rev to a commit, and download
- * that commit. DEKC_GITHUB_API points them elsewhere, the way DEKC_VOICE_URL
+ * that commit. DEK_GITHUB_API points them elsewhere, the way DEK_VOICE_URL
  * does for the voice engine.
  */
 const DEFAULT_API = "https://api.github.com";
@@ -29,7 +29,7 @@ export type TarballOptions = GithubOptions & {
 };
 
 function apiBase(): string {
-  return (process.env.DEKC_GITHUB_API ?? DEFAULT_API).replace(/\/+$/, "");
+  return (process.env.DEK_GITHUB_API ?? DEFAULT_API).replace(/\/+$/, "");
 }
 
 /** GITHUB_TOKEN, else what `gh auth token` prints, else nothing: public repositories need no token. */
@@ -39,7 +39,7 @@ function token(): string | undefined {
     return fromEnv;
   }
   try {
-    const result = Bun.spawnSync([process.env.DEKC_GH ?? "gh", "auth", "token"], {
+    const result = Bun.spawnSync([process.env.DEK_GH ?? "gh", "auth", "token"], {
       stdout: "pipe",
       stderr: "ignore",
     });
@@ -59,7 +59,7 @@ type Deadline = {
   signal: AbortSignal;
   timeout: AbortSignal;
   abort: () => void;
-  expired: () => DekcError;
+  expired: () => DekError;
 };
 
 function deadline(what: string, timeoutMs: number): Deadline {
@@ -70,7 +70,7 @@ function deadline(what: string, timeoutMs: number): Deadline {
     timeout,
     abort: () => controller.abort(),
     expired: () =>
-      new DekcError(`GitHub timed out after ${timeoutMs / 1000}s while fetching ${what}`, {
+      new DekError(`GitHub timed out after ${timeoutMs / 1000}s while fetching ${what}`, {
         hint: "check the network and run the command again; GitHub may also be slow, see https://www.githubstatus.com",
       }),
   };
@@ -93,7 +93,7 @@ async function request(
     response = await fetch(`${apiBase()}${path}`, {
       headers: {
         accept,
-        "user-agent": "dekc",
+        "user-agent": "dek",
         ...(auth ? { authorization: `Bearer ${auth}` } : {}),
       },
       redirect: "follow",
@@ -103,7 +103,7 @@ async function request(
     if (timeout.aborted) {
       throw expired();
     }
-    throw new DekcError(`could not reach GitHub for ${what}`, {
+    throw new DekError(`could not reach GitHub for ${what}`, {
       cause: error,
       hint: "check the network; an agent sandbox may block it, so run the command yourself",
     });
@@ -112,23 +112,23 @@ async function request(
     return response;
   }
   if (response.status === 404) {
-    throw new DekcError(`${what} not found on GitHub`, { hint: SIGN_IN_HINT });
+    throw new DekError(`${what} not found on GitHub`, { hint: SIGN_IN_HINT });
   }
   const retryAfter = response.headers.get("retry-after");
   if (
     (response.status === 403 || response.status === 429) &&
     (retryAfter !== null || response.headers.get("x-ratelimit-remaining") === "0")
   ) {
-    throw new DekcError(`GitHub rate limit reached while fetching ${what}`, {
+    throw new DekError(`GitHub rate limit reached while fetching ${what}`, {
       hint: rateLimitHint(retryAfter),
     });
   }
   if (response.status === 401 || response.status === 403) {
-    throw new DekcError(`GitHub refused access to ${what} (${response.status})`, {
+    throw new DekError(`GitHub refused access to ${what} (${response.status})`, {
       hint: SIGN_IN_HINT,
     });
   }
-  throw new DekcError(`GitHub answered ${response.status} for ${what}`, {
+  throw new DekError(`GitHub answered ${response.status} for ${what}`, {
     hint: "run the command again; if it keeps failing, check https://www.githubstatus.com",
   });
 }
@@ -149,7 +149,7 @@ export async function resolveRev(
   );
   const sha = (await response.text()).trim();
   if (!/^[0-9a-f]{40}$/.test(sha)) {
-    throw new DekcError(`GitHub did not return a commit for ${what}`, {
+    throw new DekError(`GitHub did not return a commit for ${what}`, {
       hint: "run the command again",
     });
   }
@@ -167,7 +167,7 @@ export async function downloadTarball(
   const maxBytes = options.maxBytes ?? MAX_TARBALL_BYTES;
   const limit = deadline(what, options.timeoutMs ?? TARBALL_TIMEOUT_MS);
   const response = await request(`/repos/${owner}/${repo}/tarball/${sha}`, what, "*/*", limit);
-  const tooLarge = new DekcError(`${what} is larger than ${maxBytes / 1024 / 1024} MB`, {
+  const tooLarge = new DekError(`${what} is larger than ${maxBytes / 1024 / 1024} MB`, {
     hint: "dekc ref downloads the whole repository; keep decks in a smaller repository",
   });
   if (Number(response.headers.get("content-length") ?? 0) > maxBytes) {
@@ -185,7 +185,7 @@ export async function downloadTarball(
 async function readBody(
   response: Response,
   maxBytes: number,
-  tooLarge: DekcError,
+  tooLarge: DekError,
   { timeout, abort, expired }: Deadline,
 ): Promise<Uint8Array> {
   if (!response.body) {

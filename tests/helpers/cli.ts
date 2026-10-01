@@ -11,7 +11,7 @@ export type RunResult = {
   stderr: string;
 };
 
-export async function runDekc(
+export async function runDek(
   args: string[],
   options?: { cwd?: string; env?: Record<string, string> },
 ): Promise<RunResult> {
@@ -36,7 +36,7 @@ export async function runDekc(
 }
 
 /**
- * Every `--json` line a test makes dekc print is held to the contract, so the suite as a whole
+ * Every `--json` line a test makes dek print is held to the contract, so the suite as a whole
  * checks it: a field the contract does not name, or one it needs that is missing, fails the test
  * that printed it.
  */
@@ -69,7 +69,7 @@ const STOP_GRACE_MS = 3_000;
  */
 const SERVER_READY_MS = 15_000;
 
-export async function spawnDekcServer(
+export async function spawnDekServer(
   cwd: string,
   options: { args?: string[]; timeoutMs?: number; ready?: (buf: string) => boolean } = {},
 ): Promise<{ url: string; stdout: string; stop: () => Promise<void> }> {
@@ -101,7 +101,7 @@ export async function spawnDekcServer(
 
   try {
     if (!proc.stdout || typeof proc.stdout === "number") {
-      throw new Error("dekc stdout is not a stream");
+      throw new Error("dek stdout is not a stream");
     }
     const stdout = await readUntilReady(
       proc.stdout,

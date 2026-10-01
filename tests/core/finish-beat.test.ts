@@ -53,7 +53,7 @@ describe("finishBeat", () => {
   test("draws the slide script at the end of its beat", () => {
     (document as { getAnimations: () => unknown[] }).getAnimations = () => [];
     const seeks: number[] = [];
-    window.dekcMotion = { duration: () => 1400, seek: (t) => seeks.push(t) };
+    window.dekMotion = { duration: () => 1400, seek: (t) => seeks.push(t) };
 
     finishBeat();
 

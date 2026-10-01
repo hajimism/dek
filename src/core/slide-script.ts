@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { DekcError } from "./error.ts";
+import { DekError } from "./error.ts";
 import { escapeRegExp } from "./escape.ts";
 import { listSlideFiles } from "./resolve.ts";
 import { stillDrawScript } from "./slide-draw.ts";
@@ -52,7 +52,7 @@ export function staticProblems(code: string): SlideScriptProblem[] {
       withLine(
         {
           message: IMPORTS_MESSAGE,
-          hint: "remove the import and write what it gave in this file; DekcSlide is global, from .dekc/slide.d.ts",
+          hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
         },
         lineMatching(code, /^\s*import\b/),
       ),
@@ -75,7 +75,7 @@ export function staticProblems(code: string): SlideScriptProblem[] {
   if (!scan.exports.includes("default") || !DEFAULT_EXPORT_RE.test(code)) {
     problems.push({
       message: "missing export default",
-      hint: "end the script with export default { draw(slide, { t }) {} } satisfies DekcSlide",
+      hint: "end the script with export default { draw(slide, { t }) {} } satisfies DekSlide",
     });
   }
   return problems;
@@ -104,7 +104,7 @@ function syntaxProblem(error: unknown): SlideScriptProblem {
 
 /**
  * Turns the module into a classic script that registers its default export
- * as `window.__dekcSlides[slug]`, each slide in its own function scope. Of the
+ * as `window.__dekSlides[slug]`, each slide in its own function scope. Of the
  * lines that start with `export default`, the real one is the only one whose
  * rewrite parses; a template literal can hold look-alikes, a comment cannot.
  */
@@ -154,17 +154,17 @@ function rewriteDefaultExport(js: string, index: number): string {
   const declaration = DECLARATION_RE.exec(rest);
   if (declaration) {
     const kept = rest.slice("export default ".length);
-    return `${js.slice(0, index)}${kept}\n__dekcDefault = ${declaration[2]};`;
+    return `${js.slice(0, index)}${kept}\n__dekDefault = ${declaration[2]};`;
   }
-  return `${js.slice(0, index)}__dekcDefault =${rest.slice("export default".length)}`;
+  return `${js.slice(0, index)}__dekDefault =${rest.slice("export default".length)}`;
 }
 
 function wrap(body: string, slug: string, async: boolean): string {
-  return `(window.__dekcSlides ||= {})[${JSON.stringify(slug)}] = (${async ? "async " : ""}function () {
+  return `(window.__dekSlides ||= {})[${JSON.stringify(slug)}] = (${async ? "async " : ""}function () {
 "use strict";
-var __dekcDefault;
+var __dekDefault;
 ${body}
-return __dekcDefault;
+return __dekDefault;
 })();
 `;
 }
@@ -205,7 +205,7 @@ export function loadSlideScripts(deckDir: string, only?: string): SlideScriptEnt
 }
 
 /**
- * The scripts that can run. A broken one is skipped and left to lint (DEKC016),
+ * The scripts that can run. A broken one is skipped and left to lint (DEK016),
  * unless `strict`, where the render refuses to build without it.
  */
 export function usableSlideScripts(entries: SlideScriptEntry[], strict: boolean): SlideScript[] {
@@ -214,7 +214,7 @@ export function usableSlideScripts(entries: SlideScriptEntry[], strict: boolean)
       return [entry];
     }
     if (strict) {
-      throw new DekcError(`invalid slide script "${entry.slug}": ${entry.problem.message}`, {
+      throw new DekError(`invalid slide script "${entry.slug}": ${entry.problem.message}`, {
         path: entry.path,
         hint: "run `dekc lint`",
       });
@@ -225,7 +225,7 @@ export function usableSlideScripts(entries: SlideScriptEntry[], strict: boolean)
 
 /**
  * The deck's slide scripts, compiled. The dev server skips a broken one and
- * lets lint report it (DEKC016); `strict` renders refuse to build without it.
+ * lets lint report it (DEK016); `strict` renders refuse to build without it.
  * `only` limits the read to one slide, for pages that show one slide.
  */
 export function readSlideScripts(
@@ -238,7 +238,7 @@ export function readSlideScripts(
 /** One tag per slide, so a script that throws while loading cannot stop the others. */
 export function slideScriptTags(scripts: SlideScript[]): string {
   return scripts
-    .map((script) => `<script data-dekc-slides="${script.slug}">${script.code}</script>`)
+    .map((script) => `<script data-dek-slides="${script.slug}">${script.code}</script>`)
     .join("");
 }
 

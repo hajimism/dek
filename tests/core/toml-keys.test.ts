@@ -5,8 +5,8 @@ const SHA = "a".repeat(40);
 
 describe("setTableKey", () => {
   test("adds a table at the end when there is none, keeping the rest byte for byte", () => {
-    expect(setTableKey("# dekc project\nmax_classes = 40\n", "refs", "o/r/d", SHA)).toBe(
-      `# dekc project\nmax_classes = 40\n\n[refs]\n"o/r/d" = "${SHA}"\n`,
+    expect(setTableKey("# dek project\nmax_classes = 40\n", "refs", "o/r/d", SHA)).toBe(
+      `# dek project\nmax_classes = 40\n\n[refs]\n"o/r/d" = "${SHA}"\n`,
     );
     expect(setTableKey("", "refs", "o/r/d", SHA)).toBe(`[refs]\n"o/r/d" = "${SHA}"\n`);
     expect(setTableKey("max_classes = 40", "refs", "o/r/d", SHA)).toBe(

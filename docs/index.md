@@ -1,22 +1,22 @@
 ---
 layout: home
 hero:
-  name: dekc
+  name: dek
   text: A build system for talks
-  tagline: Write what you will say; dekc builds, measures, and ships the rest.
+  tagline: Write what you will say; dek builds, measures, and ships the rest.
   actions:
     - theme: brand
       text: Get Started
       link: /guide/getting-started
     - theme: alt
-      text: Why dekc
+      text: Why dek
       link: /guide/why
     - theme: alt
       text: Samples
       link: /samples
     - theme: alt
       text: GitHub
-      link: https://github.com/hajimism/dekc
+      link: https://github.com/hajimism/dek
 features:
   - title: The script is the parent
     details: Order, timing, and every spoken word live in one Markdown file. Slides hang off its headings. Put the boxes first and you get a polished deck you cannot deliver.
@@ -29,14 +29,14 @@ features:
 ---
 
 ```bash
-bunx @hajimism/dekc init my-talks --deck 2026-04-vite
-cd my-talks && bun add -d @hajimism/dekc
+bunx @hajimism/dek init my-talks --deck 2026-04-vite
+cd my-talks && bun add -d @hajimism/dek
 cd decks/2026-04-vite
 $EDITOR script.md   # write what you will say
 bunx dekc           # dev server: skeleton slides, live reload, lint on save
 bunx dekc build     # dist/2026-04-vite.html — the whole talk in one file
 ```
 
-Type `dekc`, not `dek`: the `dek` package on npm is unrelated.
+The command is `dekc`, not `dek`: the `dek` package on npm is unrelated. Run `bunx dekc` inside the project.
 
 You have not written a line of HTML yet, and you can already give the talk. Start with the [Getting Started](/guide/getting-started) guide, or read the [Tutorial](/guide/tutorial) to build a real deck from script to single-file build.

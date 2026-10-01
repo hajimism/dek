@@ -13,27 +13,27 @@ const rumdl: SarifLog = {
 };
 
 describe("mergeSarif", () => {
-  test("concatenates dekc and rumdl runs", () => {
+  test("concatenates dek and rumdl runs", () => {
     const merged = mergeSarif(
-      toSarif([{ id: "DEKC001", severity: "error", message: 'missing slide HTML for "intro"' }]),
+      toSarif([{ id: "DEK001", severity: "error", message: 'missing slide HTML for "intro"' }]),
       rumdl,
     );
     expect(merged.version).toBe("2.1.0");
-    expect(merged.runs.map((run) => run.tool.driver.name)).toEqual(["dekc", "rumdl"]);
-    expect(merged.runs[0]?.results[0]?.ruleId).toBe("DEKC001");
+    expect(merged.runs.map((run) => run.tool.driver.name)).toEqual(["dek", "rumdl"]);
+    expect(merged.runs[0]?.results[0]?.ruleId).toBe("DEK001");
     expect(merged.runs[1]?.results[0]?.ruleId).toBe("MD013");
   });
 
-  test("keeps the dekc run when rumdl is missing", () => {
-    const dekc = toSarif([]);
-    expect(mergeSarif(dekc).runs).toHaveLength(1);
-    expect(mergeSarif(dekc).runs[0]?.tool.driver.name).toBe("dekc");
+  test("keeps the dek run when rumdl is missing", () => {
+    const dek = toSarif([]);
+    expect(mergeSarif(dek).runs).toHaveLength(1);
+    expect(mergeSarif(dek).runs[0]?.tool.driver.name).toBe("dek");
   });
 });
 
 describe("toSarif", () => {
   const diagnostic = {
-    id: "DEKC011",
+    id: "DEK011",
     severity: "error",
     message: "slide contains a style attribute",
     path: "/tmp/talks/decks/demo/slides/intro.html",
@@ -47,7 +47,7 @@ describe("toSarif", () => {
   test("keeps the message as written and the hint, slug, and data as properties", () => {
     const [result] = toSarif([diagnostic]).runs[0]?.results ?? [];
     expect(result).toEqual({
-      ruleId: "DEKC011",
+      ruleId: "DEK011",
       level: "error",
       message: { text: "slide contains a style attribute" },
       locations: [
@@ -76,18 +76,18 @@ describe("toSarif", () => {
 
   test("sets the SARIF level from the severity", () => {
     const sarif = toSarif([
-      { id: "DEKC010", severity: "error", message: "class" },
-      { id: "DEKC040", severity: "warning", message: "word" },
+      { id: "DEK010", severity: "error", message: "class" },
+      { id: "DEK040", severity: "warning", message: "word" },
     ]);
     expect(sarif.runs[0]?.results.map((r) => r.level)).toEqual(["error", "warning"]);
   });
 
   test("describes every rule with its default level and where it is documented", () => {
     const rules = toSarif([]).runs[0]?.tool.driver.rules ?? [];
-    expect(rules.find((rule) => rule.id === "DEKC024")).toEqual({
-      id: "DEKC024",
+    expect(rules.find((rule) => rule.id === "DEK024")).toEqual({
+      id: "DEK024",
       defaultConfiguration: { level: "warning" },
-      helpUri: "https://hajimism.github.io/dekc/reference/lint.html",
+      helpUri: "https://hajimism.github.io/dek/reference/lint.html",
     });
   });
 
@@ -111,7 +111,7 @@ describe("toSarif", () => {
   });
 
   test("is a structurally valid SARIF 2.1.0 log", () => {
-    const sarif = toSarif([diagnostic, { id: "DEKC018", severity: "error", message: "no theme" }], {
+    const sarif = toSarif([diagnostic, { id: "DEK018", severity: "error", message: "no theme" }], {
       skipped: [{ check: "visual", reason: "Playwright is not installed" }],
     });
     expect(sarif.version).toBe("2.1.0");

@@ -26,10 +26,10 @@ if (request.pdfPath) {
 }
 
 const overflows = (
-  process.env.DEKC_PLAYWRIGHT_OVERFLOWS ? JSON.parse(process.env.DEKC_PLAYWRIGHT_OVERFLOWS) : []
+  process.env.DEK_PLAYWRIGHT_OVERFLOWS ? JSON.parse(process.env.DEK_PLAYWRIGHT_OVERFLOWS) : []
 ).map((overflow: object) => ({ by: {}, ...overflow }));
-const contrasts = process.env.DEKC_PLAYWRIGHT_CONTRASTS
-  ? JSON.parse(process.env.DEKC_PLAYWRIGHT_CONTRASTS)
+const contrasts = process.env.DEK_PLAYWRIGHT_CONTRASTS
+  ? JSON.parse(process.env.DEK_PLAYWRIGHT_CONTRASTS)
   : [];
 
 process.stdout.write(

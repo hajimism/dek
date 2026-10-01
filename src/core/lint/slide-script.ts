@@ -25,7 +25,7 @@ export function lintedSlideScripts(files: DeckFiles): LintedScript[] {
   });
 }
 
-/** DEKC016 from what evaluating each script found, and DEKC017 from its source, by slug. */
+/** DEK016 from what evaluating each script found, and DEK017 from its source, by slug. */
 export function slideScriptDiagnostics(
   scripted: LintedScript[],
   problems: SlideScriptProblem[][],
@@ -35,7 +35,7 @@ export function slideScriptDiagnostics(
       section.slug,
       [
         ...(problems[index] ?? []).map(({ message, line, hint }) =>
-          diag("DEKC016", {
+          diag("DEK016", {
             message,
             path,
             ...(line !== undefined ? { line } : {}),
@@ -45,17 +45,17 @@ export function slideScriptDiagnostics(
           }),
         ),
         ...seekProblems(input.code).map((problem) =>
-          diag("DEKC017", { path, slug: section.slug, ...problem }),
+          diag("DEK017", { path, slug: section.slug, ...problem }),
         ),
       ],
     ]),
   );
 }
 
-/** DEKC016 for a slides/<slug>.js, which dekc does not load: motion is written in TypeScript. */
+/** DEK016 for a slides/<slug>.js, which dek does not load: motion is written in TypeScript. */
 export function javascriptDiagnostics(ctx: LintContext): Diagnostic[] {
   return listSlideFiles(ctx.deck.dir, ".js").map((file) =>
-    diag("DEKC016", {
+    diag("DEK016", {
       message: `slide scripts are TypeScript; rename ${file.slug}.js to ${file.slug}.ts`,
       path: file.path,
       slug: file.slug,
@@ -119,7 +119,7 @@ const SEEK_PATTERNS: Array<{ re: RegExp; find: (match: RegExpMatchArray) => Seek
 ];
 
 /**
- * DEKC017: what makes a slide script draw something other than a function of
+ * DEK017: what makes a slide script draw something other than a function of
  * `t`, so a seek to the same `t` in video, screenshots, or the PDF would not
  * give the same frame. Also classes used to find elements, which a theme may
  * rename. Comments are ignored; lines are 1-based.

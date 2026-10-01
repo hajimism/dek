@@ -11,7 +11,7 @@ const engine = (
 ).engines.bun;
 const floor = engine.replace(/^>=\s*/, "");
 
-describe("the Bun dekc runs on", () => {
+describe("the Bun dek runs on", () => {
   test("is one package.json allows", () => {
     expect({ bun: Bun.version, satisfies: Bun.semver.satisfies(Bun.version, engine) }).toEqual({
       bun: Bun.version,

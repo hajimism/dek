@@ -15,7 +15,7 @@ export type DeckSnapshot = {
   slides: Mtimes;
   styles: Mtimes;
   scripts: Mtimes;
-  /** `.js` scripts, which dekc does not load but lint names so the author can rename them. */
+  /** `.js` scripts, which dek does not load but lint names so the author can rename them. */
   javascript: Mtimes;
   /** `voice/voice.toml`, `voice/dict.toml`, and `voice/pin/*`. */
   voice: Mtimes;
