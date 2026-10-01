@@ -23,16 +23,16 @@ dekc は、ビルドシステムがコードを扱うように発表を扱う CL
 [Bun](https://bun.sh) 1.4 以上。
 
 ```bash
-bunx dekc init my-talks --deck 2026-04-vite
+bunx @hajimism/dekc init my-talks --deck 2026-04-vite
 cd my-talks
-bun add -d dekc
+bun add -d @hajimism/dekc
 cd decks/2026-04-vite
 ```
 
 `init` は終わりに同じ手順を表示します。プロジェクトを作るのは最初の一度だけです。dekc をプロジェクトの開発依存に入れたあとは `bunx dekc` で動きます。残るのは 3 手で、ライブ発表ならこれがすべてです。
 
 > [!WARNING]
-> 打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。
+> 打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。プロジェクトの外では `bunx dekc` は何も見つけられないので、`bunx @hajimism/dekc` を使ってください。
 
 ```bash
 $EDITOR script.md   # 1. 喋ることを書く。時間をかけるのはここ

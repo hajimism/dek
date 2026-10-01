@@ -17,7 +17,7 @@ HTML は書きません。声も動画も触りません。ゴールは、同梱
 dekc のリポジトリの外に、トーク用のプロジェクトを作ります。
 
 ```bash
-bunx dekc init my-talks --deck 2026-04-vite
+bunx @hajimism/dekc init my-talks --deck 2026-04-vite
 ```
 
 `init` は書いたファイルを並べ、最後に次に打つコマンドを表示します。
@@ -25,7 +25,7 @@ bunx dekc init my-talks --deck 2026-04-vite
 ```
 next:
   cd my-talks
-  bun add -d dekc
+  bun add -d @hajimism/dekc
   cd decks/2026-04-vite
   $EDITOR script.md
   bunx dekc
@@ -34,7 +34,7 @@ next:
 上から順に実行します。`bun add -d` で dekc をプロジェクトに入れ、以降の `bunx dekc` はその dekc を動かします。固定されるのは CLI のバージョンだけで、デッキの HTML が `node_modules` を見ることはありません。
 
 ::: warning 打つのは `dek` ではなく `dekc`
-打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。
+打つのは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。プロジェクトの外では `bunx dekc` は何も見つけられないので、`bunx @hajimism/dekc` を使ってください。
 :::
 
 プロジェクトを作るのは最初の一度だけです。最初のデッキも一緒にでき、以降は `dekc new <name>` で足します。`init` をもう一度実行しても安全です。足りないものだけを書き、あるファイルはすべて残し、`init` の内容と違うものには `(kept)` と表示します。プロジェクトの中では 2 つ目のプロジェクトを作らず、`dekc new` を案内します。

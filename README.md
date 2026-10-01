@@ -23,16 +23,16 @@ The three principles and the comparison with Slidev are in [Why dekc](https://ha
 [Bun](https://bun.sh) 1.4 or later.
 
 ```bash
-bunx dekc init my-talks --deck 2026-04-vite
+bunx @hajimism/dekc init my-talks --deck 2026-04-vite
 cd my-talks
-bun add -d dekc
+bun add -d @hajimism/dekc
 cd decks/2026-04-vite
 ```
 
 `init` prints these same steps as it finishes. You create the project once. Once dekc is a dev dependency of the project, `bunx dekc` runs it. Three commands remain, and for a live talk that is all there is.
 
 > [!WARNING]
-> Type `dekc`, not `dek`: `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it.
+> Type `dekc`, not `dek`: `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Outside a project, `bunx dekc` finds nothing to run; use `bunx @hajimism/dekc`.
 
 ```bash
 $EDITOR script.md   # 1. write what you will say — spend your time here

@@ -64,8 +64,8 @@ disable = ["MD041"]
 `;
 }
 
-/** How to install dekc into a project. */
-const INSTALL_DEKC = "bun add -d dekc";
+/** How to install dekc into a project: the package is scoped, the bin is not. */
+const INSTALL_DEKC = "bun add -d @hajimism/dekc";
 
 /**
  * The starter script: short, but a real talk, so the first `dekc ls` already

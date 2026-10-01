@@ -28,7 +28,7 @@ describe("dekc new", () => {
       async (root) => {
         const result = newCommand({ cwd: root, name: "talk" });
         expect(result.next).toEqual([
-          "bun add -d dekc",
+          "bun add -d @hajimism/dekc",
           "cd decks/talk",
           "$EDITOR script.md",
           "bunx dekc",
@@ -124,7 +124,7 @@ describe("newCommand", () => {
       const inDeck = join(root, "decks", "demo");
       expect(newCommand({ cwd: inDeck, name: "My Talk" }).next).toEqual([
         "cd ../..",
-        "bun add -d dekc",
+        "bun add -d @hajimism/dekc",
         "cd 'decks/My Talk'",
         "$EDITOR script.md",
         "bunx dekc",

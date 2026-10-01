@@ -9,9 +9,9 @@
 ## 1. プロジェクトを作る
 
 ```bash
-bunx dekc init lightning --deck postmortem
+bunx @hajimism/dekc init lightning --deck postmortem
 cd lightning
-bun add -d dekc
+bun add -d @hajimism/dekc
 cd decks/postmortem
 ```
 

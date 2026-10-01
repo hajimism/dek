@@ -29,8 +29,8 @@ features:
 ---
 
 ```bash
-bunx dekc init my-talks --deck 2026-04-vite
-cd my-talks && bun add -d dekc
+bunx @hajimism/dekc init my-talks --deck 2026-04-vite
+cd my-talks && bun add -d @hajimism/dekc
 cd decks/2026-04-vite
 $EDITOR script.md   # write what you will say
 bunx dekc           # dev server: skeleton slides, live reload, lint on save

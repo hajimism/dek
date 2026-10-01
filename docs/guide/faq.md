@@ -2,11 +2,11 @@
 
 ## How do I install it?
 
-Create a project with `bunx dekc init`, then install dekc inside it with `bun add -d dekc` and use `bunx dekc` from there. See [Getting Started](./getting-started).
+Create a project with `bunx @hajimism/dekc init`, then install dekc inside it with `bun add -d @hajimism/dekc` and use `bunx dekc` from there. See [Getting Started](./getting-started).
 
 ## Why does `bunx dek` run something else?
 
-The command is `dekc`, not `dek`. `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it.
+The command is `dekc`, not `dek`. `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Outside a project, `bunx dekc` finds nothing to run; use `bunx @hajimism/dekc`.
 
 ## When should I use Slidev instead?
 

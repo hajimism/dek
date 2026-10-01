@@ -17,7 +17,7 @@ You will not write HTML, and you will not touch voice or video. The goal is a pr
 Create the project somewhere outside the dekc repository.
 
 ```bash
-bunx dekc init my-talks --deck 2026-04-vite
+bunx @hajimism/dekc init my-talks --deck 2026-04-vite
 ```
 
 `init` lists the files it wrote and ends with the commands to run next:
@@ -25,7 +25,7 @@ bunx dekc init my-talks --deck 2026-04-vite
 ```
 next:
   cd my-talks
-  bun add -d dekc
+  bun add -d @hajimism/dekc
   cd decks/2026-04-vite
   $EDITOR script.md
   bunx dekc
@@ -34,7 +34,7 @@ next:
 Run them in order. `bun add -d` installs dekc into the project, and from then on `bunx dekc` runs that copy. It only fixes the CLI version; deck HTML never looks inside `node_modules`.
 
 ::: warning Type `dekc`, not `dek`
-Type `dekc`, not `dek`: `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it.
+Type `dekc`, not `dek`: `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Outside a project, `bunx dekc` finds nothing to run; use `bunx @hajimism/dekc`.
 :::
 
 You create a project once. The first deck comes with it; add more with `dekc new <name>`. Running `init` again is safe: it writes only what is missing and keeps every file that is there, marking the ones that differ from its own as `(kept)`. Inside a project it refuses to make a second one and points at `dekc new` instead.

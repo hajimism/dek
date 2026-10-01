@@ -5,7 +5,7 @@
     "": {
       "name": "dekc-sample",
       "devDependencies": {
-        "dekc": "file:..",
+        "@hajimism/dekc": "file:..",
         "playwright": "^1.63.0",
         "rumdl": "^0.2.73",
       },
@@ -131,6 +131,8 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.21.5", "", { "os": "win32", "cpu": "ia32" }, "sha512-SWXFF1CL2RVNMaVs+BBClwtfZSvDgtL//G/smwAc5oVK/UPu2Gu9tIaRgFmYFFKrmg3SyAjSrElf0TiJ1v8fYA=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.21.5", "", { "os": "win32", "cpu": "x64" }, "sha512-tQd/1efJuzPC6rCFwEvLtci/xNFcTZknmXs98FYDfGE4wP9ClFV98nyKrzJKVPMhdDnjzLhdUyMX4PsQAPjwIw=="],
+
+    "@hajimism/dekc": ["@hajimism/dekc@file:..", { "dependencies": { "zod": "^4.6.5" }, "devDependencies": { "@biomejs/biome": "2.5.14", "@happy-dom/global-registrator": "20.14.5", "@types/bun": "^1.4.2", "happy-dom": "20.14.5", "knip": "6.38.0", "playwright": "^1.63.0", "typescript": "^7.0.2", "vitepress": "^1.6.4" }, "bin": { "dekc": "src/cli.ts" } }],
 
     "@happy-dom/global-registrator": ["@happy-dom/global-registrator@20.14.5", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^20.14.5" } }, "sha512-B05ID9DhSwLs6mlm1fzlkAtTIvB3duCvjJjfr19LBrlTK7VZtRjDqoTRIVv13GuYuNdhByu8LSZgThwV3Rkj7g=="],
 
@@ -423,8 +425,6 @@
     "copy-anything": ["copy-anything@4.1.0", "", {}, "sha512-ufbM3smX/Jbnpk5wcQjzd1MgBpzmqfNETUAyZNrGwU9foRlyHoGzMMBBCRzEhQLBjZfFDE1W2ufPXX2vdWkV8Q=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
-
-    "dekc": ["dekc@file:..", { "dependencies": { "zod": "^4.6.5" }, "devDependencies": { "@biomejs/biome": "2.5.14", "@happy-dom/global-registrator": "20.14.5", "@types/bun": "^1.4.2", "happy-dom": "20.14.5", "knip": "6.38.0", "playwright": "^1.63.0", "typescript": "^7.0.2", "vitepress": "^1.6.4" }, "bin": { "dekc": "src/cli.ts" } }],
 
     "dequal": ["dequal@2.0.3", "", {}, "sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA=="],
 

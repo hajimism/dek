@@ -16,7 +16,7 @@
     "video": "dekc video"
   },
   "devDependencies": {
-    "dekc": "file:..",
+    "@hajimism/dekc": "file:..",
     "playwright": "^1.63.0",
     "rumdl": "^0.2.73"
   }
