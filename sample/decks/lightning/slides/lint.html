@@ -5,8 +5,8 @@
     <div class="screen">
       <div data-scene="lint-fail">
         <span class="line"><span class="prompt">~/my-talks</span><span data-type>bunx dek lint lightning --visual</span><span class="cursor" data-caret></span></span>
-        <span class="line err" data-out="900">decks/lightning/slides/premise.html: <strong>DEK030</strong> h2.slide-title "最初に書くのは、スライドではない" overflows the top edge by <strong>132px</strong> and the bottom edge by <strong>108px</strong> at step 1</span>
-        <span class="line dim" data-out>  help: cut it, split it across beats or slides, or give it a smaller size in slides/premise.css</span>
+        <span class="line err" data-out="900">decks/lightning/slides/premise.css: <strong>DEK030</strong> h2.slide-title "最初に書くのは、スライドではない" overflows the top edge by <strong>132px</strong> and the bottom edge by <strong>108px</strong> at step 0</span>
+        <span class="line dim" data-out>  help: slides/premise.css puts it past the edge, which the theme alone does not: fix its position or size in slides/premise.css</span>
       </div>
       <div data-scene="lint-pass" data-step="lint-pass">
         <span class="line"> </span>

@@ -6,14 +6,14 @@
 
 .slide .screen {
   font-size: var(--size-small);
-  line-height: 1.36;
+  line-height: 1.28;
 }
 
 .slide .line,
 .slide .row {
   position: relative;
   isolation: isolate;
-  min-height: 1.36em;
+  min-height: 1.28em;
 }
 
 .slide .table {
