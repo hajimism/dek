@@ -26,7 +26,7 @@ lint がワークフローにどう組み込まれるかは [Lint](/ja/guide/lin
 | `DEK008` | `project`, `deck` | `dek.toml`（`voice = { … }` のようなインラインテーブルも含む）や frontmatter にある、dek が読まないキー。hint がおそらく意図したキーを示す。警告 | — |
 | `DEK009` | `slide` | `slides/` の 1 ファイルに `<section class="slide">` が 2 つ以上ある。表示されるのは最初の 1 つだけ | — |
 | `DEK010` | `slide` | テーマにも、その枚のスタイルシートにも定義のないクラス | — |
-| `DEK011` | `slide` | スライド内の `<style>`、`style=`、`<script>`、スライドの中の `<link>`（完全な文書の head にあるものは head ごと捨てられる）、イベントハンドラ属性（`onclick=` など）、`javascript:` URL | — |
+| `DEK011` | `slide` | スライド内の `<style>`、`style=`、`<script>`、スライドの中の `<link>`（完全な文書の head にあるものは head ごと捨てられる）、イベントハンドラ属性（`onclick=` など）、スクリプトが動く URL（`javascript:`、`vbscript:`、HTML を入れた `data:`、`<iframe>` や `<object>` に入れた SVG） | — |
 | `DEK012` | `deck`, `slide` | テーマに `.slide` の下にないセレクタ（トップレベルでも、`@media` などのアットルールの中でも。`.slide` のルールに入れ子にしたルールはその下にある）、またはスライドのスタイルシートにスライドの外まで届くルール（`::view-transition-*`、`:root`、`html`、`body`、`.slide` から `~` や `+` で兄弟へ進むもの、ページ全体に何かを登録するアットルール `@font-face`・`@import`・`@property`・`@counter-style`・`@page`・`@font-palette-values`・`@font-feature-values`）。どの指摘も行番号と、そのルールを置くべき場所を示す | — |
 | `DEK013` | `deck` | テーマのクラス数が `max_classes`（既定 40）を超過 | — |
 | `DEK014` | `deck`, `slide` | トークンの外に書いた生のデザインの値。色（16 進、関数、色名、システムカラー）、フォントファミリー（`font-family` でも `font` ショートハンドでも）、絶対・ビューポート・コンテナ・ルート基準の単位の長さ、時間、書き下したイージング。テーマでもスライドのスタイルシートでも、入れ子のルールも含む。カスタムプロパティがトークンになるのは、トークンを置く場所、つまり `.slide` かビュー遷移の上だけ。`content: "#fff"` のような文字列はテキストで、値ではない。スライドの表示属性（`fill`、`stroke`、`color`、`stop-color`、`font-family`、`<font face>`、`bgcolor`）に書いた生の色やファミリーも対象。属性は `var()` を取れないので、hint は `slides/<id>.css` へ移すよう案内する。`fill="none"` と `currentColor` は通る | — |

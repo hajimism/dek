@@ -272,7 +272,7 @@ function morphDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
 /**
  * DEK011: style or script inside the markup, which belongs in the slide's own .css or .ts. Every
  * occurrence is its own finding: a `<style>` or `<script>` element, a `style` attribute, an event
- * handler attribute, and a `javascript:` URL.
+ * handler attribute, and a URL that runs script.
  */
 function inlineCodeDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
   return scan.elements
@@ -346,8 +346,11 @@ function inlineAttribute(
       hint: `remove it; a slide takes no input, and motion goes in slides/${slug}.ts as a draw(t) function`,
     };
   }
-  if (isUrlAttribute(tag, attribute.name) && isJavascriptUrl(attribute.value)) {
-    return { message: "slide contains a javascript: URL", hint: motionHint(slug) };
+  const scheme = isUrlAttribute(tag, attribute.name)
+    ? scriptUrlScheme(tag, attribute.value)
+    : undefined;
+  if (scheme) {
+    return { message: `slide contains a ${scheme} URL`, hint: motionHint(slug) };
   }
   return undefined;
 }
@@ -358,13 +361,34 @@ function motionHint(slug: string): string {
 
 /** `onclick`, `onload`, and every other attribute the browser runs as script. */
 const EVENT_HANDLER_RE = /^on[a-z]+$/;
-/** Read the way the URL parser reads it: tabs and newlines dropped, leading space trimmed, any case. */
-function isJavascriptUrl(value: string): boolean {
-  return value
+/** Tags that load a URL as a document of its own, so an SVG there runs its scripts. */
+const DOCUMENT_TAGS = new Set(["iframe", "frame", "object", "embed"]);
+
+/**
+ * The scheme of a URL that runs script, or undefined: `javascript:` and `vbscript:` always, and a
+ * `data:` URL holding HTML, or SVG where a tag loads it as a document. An image's `data:` stays.
+ * Read the way the URL parser reads it: tabs and newlines dropped, leading space trimmed, any case.
+ */
+function scriptUrlScheme(tag: string, value: string): string | undefined {
+  const url = value
     .replace(/[\t\n\r]/g, "")
     .trimStart()
-    .toLowerCase()
-    .startsWith("javascript:");
+    .toLowerCase();
+  if (url.startsWith("javascript:")) {
+    return "javascript:";
+  }
+  if (url.startsWith("vbscript:")) {
+    return "vbscript:";
+  }
+  if (url.startsWith("data:")) {
+    const type = url.slice("data:".length).split(/[;,]/, 1)[0]?.trim();
+    const runs =
+      type === "text/html" ||
+      type === "application/xhtml+xml" ||
+      (type === "image/svg+xml" && DOCUMENT_TAGS.has(tag));
+    return runs ? "data:" : undefined;
+  }
+  return undefined;
 }
 
 /**

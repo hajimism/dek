@@ -2278,6 +2278,25 @@ describe("markup rules report every occurrence where it is written", () => {
     );
   });
 
+  test("DEK011: a vbscript: URL, and a data: URL that runs script but not an image's", async () => {
+    const diagnostics = await lintMarkup(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <a href=" VBScript:msgbox(1)">a</a>
+  <iframe src="data:text/html,<p>b</p>"></iframe>
+  <object data="data:image/svg+xml;base64,PHN2Zy8+"></object>
+  <img src="data:image/svg+xml;base64,PHN2Zy8+" alt="">
+  <img src="data:image/png;base64,iVBORw0KGgo=" alt="">
+</section>
+`);
+    expect(
+      diagnostics.filter((d) => d.id === "DEK011").map(({ line, message }) => ({ line, message })),
+    ).toEqual([
+      { line: 3, message: "slide contains a vbscript: URL" },
+      { line: 4, message: "slide contains a data: URL" },
+      { line: 5, message: "slide contains a data: URL" },
+    ]);
+  });
+
   test("DEK020: a remote URL in srcset, poster, or a media source", async () => {
     const diagnostics = await lintMarkup(
       `<section class="slide" data-layout="title">
