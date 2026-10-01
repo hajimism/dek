@@ -2,7 +2,7 @@
   <div class="col">
     <p class="kicker"><span class="badge"></span>Promise 3 · lint = stop</p>
     <h2 class="slide-title">止めどきは、<span class="hl">lint</span> が決める</h2>
-    <p class="lede">dek の規約は、すべて lint のルール。エラーがなければ、測れる問題は残っていない。残る判断は人に渡す。</p>
+    <p class="lede">dek の規約は、すべて lint のルール。エラーがなければ、全体を一枚に並べて釣り合いを見て、止める。判断できなかったことは人に渡す。</p>
     <ul class="rules">
       <li class="rule">
         <span class="what">使ってよいクラス</span>
@@ -24,7 +24,9 @@
   <figure class="window verdict">
     <div class="window-bar"><p class="window-title">terminal</p><span class="pill pill-ok">exit 0</span></div>
     <pre class="code"><span class="tok-c">$ dek lint with-agents --visual</span>
-<span class="tok-s">no diagnostics</span></pre>
+<span class="tok-s">no diagnostics</span>
+<span class="tok-c">$ dek shot with-agents --sheet</span>
+<span class="tok-p">…/.cache/shots/sheets/…/sheet-1.png</span></pre>
     <div class="done">
       <p class="check" aria-hidden="true"></p>
       <p class="done-title">止める</p>
