@@ -1,4 +1,4 @@
-/* Thirty-eight rules in five layers: structure takes two columns, assets and rendering share one. Warnings are outlined, errors are solid. */
+/* Thirty-nine rules in five layers: structure takes two columns, assets and rendering share one. Warnings are outlined, errors are solid. */
 .slide {
   --rid-w: 58px;
 }
