@@ -1,8 +1,9 @@
 version: 2
 updates:
-  # One weekly PR per ecosystem, so updates arrive as a batch CI checks together.
+  # One weekly PR per ecosystem, so updates arrive as a batch CI checks together. Not /sample:
+  # it installs this repository through `file:..`, and Dependabot hangs copying it.
   - package-ecosystem: bun
-    directories: ["/", "/sample"]
+    directory: /
     schedule:
       interval: weekly
     groups:
