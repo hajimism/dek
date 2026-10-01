@@ -8,6 +8,7 @@ import {
   findCollisions,
   findOverflows,
   type OverflowOrigin,
+  samePlace,
 } from "./overflow.ts";
 import { visitInPages } from "./page-pool.ts";
 import type {
@@ -187,9 +188,11 @@ async function pageTexts(page: Page, measured: SlideMeasure): Promise<PageText[]
 
 /**
  * The texts drawn over each other. Each text in a pair the boxes suggest is looked at again as it
- * shows, drawn alone: one none of whose glyphs shows, under a box drawn above it, collides with
- * nothing, and a pseudo-element's, whose box can be far wider than its words as a full-width
- * running head's is, is looked at with the box its glyphs cover.
+ * shows, drawn alone. A pseudo-element's, whose box can be far wider than its words as a
+ * full-width running head's is, is looked at with the box its glyphs cover. One none of whose
+ * glyphs shows was replaced when the text it crosses takes its place, as a count-up's next number
+ * does, and collides with nothing; under anything else, such as a callout laid over a label, the
+ * audience loses it, and it collides where it is laid out.
  */
 async function textCollisions(page: Page, texts: PageText[]): Promise<Array<[PageText, PageText]>> {
   const candidates = findCollisions(texts);
@@ -203,17 +206,16 @@ async function textCollisions(page: Page, texts: PageText[]): Promise<Array<[Pag
       pseudo ? { ...pseudo, rects } : { element: Number(key), rects },
     ),
   );
-  // Each text in a candidate pair as it shows, and back to itself once the pairs are found.
-  const drawn = new Map<PageText, PageText>();
-  for (const [at, text] of paired.entries()) {
-    const glyph = glyphs[at];
-    const rects = !glyph ? [] : text.pseudo ? [glyph] : text.rects;
-    drawn.set({ ...text, rects }, text);
-  }
-  const pairs = findCollisions([...drawn.keys()]).map(
-    ([a, b]) => [drawn.get(a) ?? a, drawn.get(b) ?? b] as [PageText, PageText],
+  const glyphOf = new Map(paired.map((text, at) => [text, glyphs[at]]));
+  const drawn = (text: PageText): PageText => {
+    const glyph = glyphOf.get(text);
+    return glyph && text.pseudo ? { ...text, rects: [glyph] } : text;
+  };
+  return candidates.filter(([a, b]) =>
+    !glyphOf.get(a) || !glyphOf.get(b)
+      ? !samePlace(a, b)
+      : findCollisions([drawn(a), drawn(b)]).length > 0,
   );
-  return pairs.filter(([a, b]) => candidates.some(([x, y]) => x === a && y === b));
 }
 
 /** How each text measures against what it is drawn on, in the order of `texts`. */

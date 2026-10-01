@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { findCollisions, findOverflows } from "../../src/core/overflow.ts";
+import { findCollisions, findOverflows, samePlace } from "../../src/core/overflow.ts";
 
 describe("findOverflows", () => {
   const slideBox = { left: 0, top: 0, right: 1280, bottom: 720 };
@@ -79,5 +79,31 @@ describe("findCollisions", () => {
         { ...line("p.hidden", 100, 100), opacity: 0 },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe("samePlace", () => {
+  const line = (left: number, top: number, width: number, height = 30) => ({
+    rects: [{ left, top, right: left + width, bottom: top + height }],
+  });
+
+  // A count-up stacks each beat's number in one cell, a narrower one as well.
+  test("holds for numbers stacked in one cell", () => {
+    expect(samePlace(line(100, 100, 120), line(100, 100, 120))).toBe(true);
+    expect(samePlace(line(100, 100, 120), line(100, 100, 90))).toBe(true);
+  });
+
+  // A callout laid over a row of labels covers a label, and is far larger than it.
+  test("fails for a callout over a label", () => {
+    expect(
+      samePlace(
+        { rects: [...line(900, 600, 280).rects, ...line(900, 630, 280).rects] },
+        line(940, 610, 48),
+      ),
+    ).toBe(false);
+  });
+
+  test("fails for lines that only cross", () => {
+    expect(samePlace(line(100, 100, 200), line(250, 110, 200))).toBe(false);
   });
 });

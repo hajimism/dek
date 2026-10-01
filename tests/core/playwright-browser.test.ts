@@ -351,6 +351,20 @@ p { margin: 0 }
     expect(pairs(await stacked(""))).toEqual(["1.00 + 0.80", "1.00 + 0.48", "0.80 + 0.48"]);
   });
 
+  // A callout laid over a row of labels, as a journey map's can be: the labels no longer show, and
+  // what covers them is no number taking their place, so the audience loses them.
+  browserTest("reports text a box hides whole, when it takes no place of its own", async () => {
+    const response = await measure(
+      `<p class="drink" style="position:absolute; left: 900px; top: 600px">drink</p>
+<p class="leave" style="position:absolute; left: 1000px; top: 600px">leave</p>
+<p class="callout" style="position:absolute; left: 880px; top: 590px; width: 300px; background: #fff">fix this first: no seat to be found, and the guest wanders</p>`,
+    );
+    expect(pairs(response)).toEqual([
+      "drink + fix this first: no seat to be found, and the guest wanders",
+      "leave + fix this first: no seat to be found, and the guest wanders",
+    ]);
+  });
+
   browserTest("still reports text a box covers only in part, which shows cut off", async () => {
     const response = await measure(
       `<p class="a" style="position:absolute; left: 100px; top: 100px">first words</p>

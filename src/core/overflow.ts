@@ -192,5 +192,29 @@ export function findCollisions<T extends TextBox>(texts: T[]): Array<[T, T]> {
   return found;
 }
 
+/**
+ * Whether two texts take one place, as the numbers a count-up stacks in one cell do: the box their
+ * lines span shares at least half of each. A callout laid over a label is far larger than the
+ * label, and takes no place of the label's.
+ */
+export function samePlace(a: Pick<TextBox, "rects">, b: Pick<TextBox, "rects">): boolean {
+  const span = ({ rects }: Pick<TextBox, "rects">): Box => ({
+    left: Math.min(...rects.map((rect) => rect.left)),
+    top: Math.min(...rects.map((rect) => rect.top)),
+    right: Math.max(...rects.map((rect) => rect.right)),
+    bottom: Math.max(...rects.map((rect) => rect.bottom)),
+  });
+  const area = (box: Box): number =>
+    Math.max(0, box.right - box.left) * Math.max(0, box.bottom - box.top);
+  const [one, other] = [span(a), span(b)];
+  const shared = area({
+    left: Math.max(one.left, other.left),
+    top: Math.max(one.top, other.top),
+    right: Math.min(one.right, other.right),
+    bottom: Math.min(one.bottom, other.bottom),
+  });
+  return shared >= 0.5 * Math.max(area(one), area(other));
+}
+
 /** Two texts drawn over each other: the one first in the page, and the one it collides with. */
 export type Collision = { box: string; text?: string; other: string; otherText?: string };
