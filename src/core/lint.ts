@@ -19,6 +19,7 @@ import { voiceDiagnostics } from "./lint/voice.ts";
 import { asResolvedDeck, type Project, type ProjectDeck } from "./resolve.ts";
 import type { Section } from "./schema.ts";
 import { evaluateSlideScripts, slideScriptsProblems } from "./slide-script-eval.ts";
+import { RUNTIME_CLASSES } from "./theme-facts.ts";
 
 export { unreadableScriptDiagnostics } from "./lint/script.ts";
 export { silentCueDiagnostics } from "./lint/voice.ts";
@@ -122,7 +123,13 @@ function slideDiagnostics(ctx: LintContext, section: Section): Diagnostic[] {
       deckDir: ctx.deck.dir,
       skeleton: source.skeleton,
       hasScript: script !== undefined,
-      classes: ctx.theme && new Set([...ctx.theme.classes, ...(sheet ? cssClassNames(sheet) : [])]),
+      classes:
+        ctx.theme &&
+        new Set(
+          [...ctx.theme.classes, ...(sheet ? cssClassNames(sheet) : [])].filter(
+            (name) => !RUNTIME_CLASSES.has(name),
+          ),
+        ),
       // A theme with no layouts at all has nothing to check a data-layout against.
       ...(ctx.theme && ctx.theme.layouts.length > 0
         ? {

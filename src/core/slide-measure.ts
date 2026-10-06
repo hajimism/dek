@@ -90,6 +90,7 @@ export function measureSlideInPage(): SlideMeasure {
   if (!slide) {
     return { slideBox: undefined, elements: [], pseudoTexts: [] };
   }
+  // RUNTIME_CLASSES from theme-facts.ts, written out: this function cannot import.
   const runtimeClasses = new Set(["is-current", "is-shown"]);
   const pictures = new Set(["img", "svg", "video", "canvas", "iframe", "object", "embed"]);
   // Computed colors come back as rgba() or, from a newer syntax, with a "/ alpha" at the end.

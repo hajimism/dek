@@ -343,6 +343,13 @@ export function formatTheme(data: ThemeResult): string {
     "CLASSES",
     `  ${data.classes.join(" ")}`,
     "",
+    ...(data.stateClasses.length > 0
+      ? [
+          "STATE CLASSES (the player sets these; select them in CSS, never write them in markup)",
+          `  ${data.stateClasses.join(" ")}`,
+          "",
+        ]
+      : []),
     "TOKENS",
     ...data.tokens.map((token) => `  ${token.name.padEnd(width)}  ${token.value}`),
     "",

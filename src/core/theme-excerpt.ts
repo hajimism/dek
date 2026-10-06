@@ -7,9 +7,7 @@ import {
   splitSelectorList,
 } from "./css.ts";
 import { escapeRegExp } from "./escape.ts";
-
-/** Classes the player adds at runtime, so a slide's markup never names them. */
-const RUNTIME_CLASSES = ["is-current", "is-shown"];
+import { RUNTIME_CLASSES } from "./theme-facts.ts";
 
 export type SlideUsage = {
   /** Classes the slide's markup uses. */

@@ -9,7 +9,10 @@ import type { ReadableDeck, RefInfo } from "./scope.ts";
 export type ThemeResult = {
   /** The deck's theme.css: the one lint and the slides use. */
   path: string;
+  /** The classes slide markup may use; what `max_classes` counts. */
   classes: string[];
+  /** The state classes the theme selects that the player sets at runtime; never in markup. */
+  stateClasses: string[];
   /** The tokens every slide can `var()`. */
   tokens: CssToken[];
   layouts: ThemeLayout[];
@@ -28,10 +31,13 @@ export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeR
       hint: "copy the project theme.css into the deck, or run `dekc new <name>` for a fresh deck",
     });
   }
-  const { classes, layouts, tokens } = themeFacts(parseCss(readDeckFile(deck.dir, path) ?? ""));
+  const { classes, stateClasses, layouts, tokens } = themeFacts(
+    parseCss(readDeckFile(deck.dir, path) ?? ""),
+  );
   const result: ThemeResult = {
     path,
     classes: [...classes].sort(),
+    stateClasses: [...stateClasses].sort(),
     tokens,
     layouts,
     ...(ref ? { ref } : {}),

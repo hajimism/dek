@@ -647,6 +647,57 @@ ${body}
     );
   });
 
+  test("DEK010: a runtime state class written in markup", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: `${vocabTheme}.slide.is-current [data-step].is-shown { opacity: 1; }\n`,
+            slides: {
+              intro: slideDocument(`<section class="slide is-current" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+</section>`),
+            },
+            styles: { intro: ".slide.is-current .slide-title { color: var(--fg); }" },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK010");
+        expect(found).toHaveLength(1);
+        expect(found[0]).toMatchObject({
+          message:
+            'class "is-current" is a state the player sets at runtime, not a class for markup',
+          data: { class: "is-current", state: true },
+        });
+        expect(found[0]?.hint).toStartWith('remove "is-current" from the class attribute');
+      },
+    );
+  });
+
+  test("DEK010: the hint offers no runtime state class", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: `${vocabTheme}.slide.is-current [data-step].is-shown { opacity: 1; }\n`,
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title mystery">intro</h2>
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const [found] = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK010");
+        expect(found?.hint).toBe("define it in slides/intro.css, or use one of: node, slide-title");
+      },
+    );
+  });
+
   test("DEK011: inline style element in a slide", async () => {
     await withTempProject(
       {
@@ -925,6 +976,27 @@ ${body}
       async (root) => {
         const diagnostics = lintDeck(join(root, "decks", "demo"));
         expect(diagnostics.some((d) => d.id === "DEK013")).toBe(true);
+      },
+    );
+  });
+
+  // The player's state classes are no vocabulary: DEK013 counts what `dekc theme` lists as classes.
+  test("DEK013: the runtime state classes do not count", async () => {
+    // .slide plus c0..c38 is 40; is-current and is-shown would make it 42.
+    const classes = Array.from({ length: 39 }, (_, i) => `.slide .c${i} {}`).join("\n");
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: `.slide {}\n${classes}\n.slide.is-current [data-step].is-shown {}\n`,
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const diagnostics = lintDeck(join(root, "decks", "demo"));
+        expect(diagnostics.some((d) => d.id === "DEK013")).toBe(false);
       },
     );
   });

@@ -195,7 +195,14 @@ export const RESULT_FIELDS = {
   }),
   theme: z.strictObject({
     path: z.string(),
-    classes: z.array(z.string()),
+    classes: z
+      .array(z.string())
+      .describe("The classes slide markup may use; what max_classes counts."),
+    stateClasses: z
+      .array(z.string())
+      .describe(
+        "State classes the theme selects that the player sets at runtime (is-current, is-shown); never written in markup.",
+      ),
     tokens: z.array(z.strictObject({ name: z.string(), value: z.string() })),
     layouts: z.array(z.strictObject({ name: z.string(), example: z.string().optional() })),
     layout: z.strictObject({ name: z.string(), example: z.string() }).optional(),

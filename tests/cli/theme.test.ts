@@ -73,6 +73,26 @@ describe("themeCommand", () => {
     );
   });
 
+  // The player sets is-current and is-shown; listed among the classes, they read as words an
+  // agent may write in markup, and they would count against max_classes as vocabulary.
+  test("lists the runtime state classes apart from the classes markup may use", async () => {
+    const stateTheme = `${theme}.slide.is-current [data-step] { opacity: 0; }
+.slide.is-current [data-step].is-shown { opacity: 1; }
+`;
+    await withTempProject({ decks: [{ name: "demo", theme: stateTheme }] }, async (root) => {
+      const result = themeCommand(
+        resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+      );
+      expect(result.classes).toEqual(["node", "slide"]);
+      expect(result.stateClasses).toEqual(["is-current", "is-shown"]);
+      const text = formatText({ command: "theme", data: result });
+      expect(text).toContain("CLASSES\n  node slide\n");
+      expect(text).toContain(
+        "STATE CLASSES (the player sets these; select them in CSS, never write them in markup)\n  is-current is-shown\n",
+      );
+    });
+  });
+
   test("prints one layout's example markup, ready to paste", async () => {
     await withTempProject({ decks: [{ name: "demo", theme }] }, async (root) => {
       const result = themeCommand(

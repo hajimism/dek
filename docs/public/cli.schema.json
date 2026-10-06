@@ -606,7 +606,15 @@
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "The classes slide markup may use; what max_classes counts."
+            },
+            "stateClasses": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "State classes the theme selects that the player sets at runtime (is-current, is-shown); never written in markup."
             },
             "tokens": {
               "type": "array",
@@ -672,6 +680,7 @@
           "required": [
             "path",
             "classes",
+            "stateClasses",
             "tokens",
             "layouts",
             "ok"

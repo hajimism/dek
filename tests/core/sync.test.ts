@@ -617,6 +617,15 @@ c
     });
   });
 
+  // The player sets is-current and is-shown; AGENTS.md says not to write them, and DEK010 checks it.
+  test("AGENTS.md says the state classes are the player's, not markup's", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      syncDeck(join(root, "decks", "demo"));
+      const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      expect(agents).toContain("never write them in markup (`DEK010`)");
+    });
+  });
+
   // Each deck owns its theme.css, so a list read from the project theme is wrong for any deck
   // whose copy has grown. AGENTS.md names none of it and sends the agent to the deck's own theme.
   test("AGENTS.md lists nothing a deck's theme decides, and points to dekc theme", async () => {

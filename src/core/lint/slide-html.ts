@@ -3,6 +3,7 @@ import type { HtmlAttribute, HtmlScan, Picture, SourceSpot } from "../html-scan.
 import type { Section } from "../schema.ts";
 import { beatAt, formatStepChoices, resolveStep, stepChoices } from "../step.ts";
 import { suggest } from "../suggest.ts";
+import { RUNTIME_CLASSES } from "../theme-facts.ts";
 import { isUrlAttribute } from "../url-attributes.ts";
 import { assetRefDiagnostics } from "./asset-refs.ts";
 import { RESERVED_MORPHS } from "./morph.ts";
@@ -517,7 +518,11 @@ function unnamedPicture({
   };
 }
 
-/** DEK010: a class neither theme.css nor the slide's own stylesheet defines. */
+/**
+ * DEK010: a class neither theme.css nor the slide's own stylesheet defines, or a state class the
+ * player sets, which markup that writes it would claim before the player does. `classes` holds
+ * neither.
+ */
 function unknownClassDiagnostics(
   { section, path, scan }: SlideHtml,
   classes: Set<string>,
@@ -543,6 +548,16 @@ function unknownClassDiagnostics(
     }
   }
   return [...unknown].map(([name, attribute]) => {
+    if (RUNTIME_CLASSES.has(name)) {
+      return diag("DEK010", {
+        message: `class "${name}" is a state the player sets at runtime, not a class for markup`,
+        path,
+        ...spotOf(attribute),
+        slug: section.slug,
+        hint: `remove "${name}" from the class attribute: the player puts is-current on the slide on screen and is-shown on each data-step element once its beat plays. To style that state, select it in theme.css or slides/${section.slug}.css, as .slide.is-current [data-step].is-shown`,
+        data: { class: name, state: true },
+      });
+    }
     const suggestion = suggest(name, known);
     return diag("DEK010", {
       message: `class "${name}" is not defined in theme.css`,

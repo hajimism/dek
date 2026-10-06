@@ -8,7 +8,7 @@ A beat is a `###` heading in the script. On screen, a beat is the moment an elem
 
 ## `data-step`
 
-`data-step` names the beat an element belongs to. Its value is a beat id, or a positive integer meaning "the k-th beat of this slide". The runtime does one thing: when you reach a beat, it adds `is-shown` to every element bound to that beat or an earlier one. A slide arrives before its first beat, so nothing bound to a beat is shown until the first press on it; every beat, the first included, brings its elements in the same way. The theme decides what shown and hidden look like.
+`data-step` names the beat an element belongs to. Its value is a beat id, or a positive integer meaning "the k-th beat of this slide". The runtime does one thing: when you reach a beat, it adds `is-shown` to every element bound to that beat or an earlier one. A slide arrives before its first beat, so nothing bound to a beat is shown until the first press on it; every beat, the first included, brings its elements in the same way. The theme decides what shown and hidden look like. `is-shown`, like `is-current` on the slide on screen, is the player's to set: select it in CSS, never write it in markup (`DEK010`).
 
 ```html
 <div class="col" data-step="slides-hang">…</div>

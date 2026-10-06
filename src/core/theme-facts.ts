@@ -9,12 +9,20 @@ import {
 export type ThemeLayout = { name: string; example?: string };
 
 /**
+ * The state classes the player sets at runtime: `is-current` on the slide on screen, `is-shown`
+ * on each beat element that has appeared. A theme selects them; a slide's markup never writes them.
+ */
+export const RUNTIME_CLASSES: ReadonlySet<string> = new Set(["is-current", "is-shown"]);
+
+/**
  * What a theme offers a slide, read once: AGENTS.md, `dekc theme`, and lint all say the same
  * thing about it because they all read it here.
  */
 export type ThemeFacts = {
-  /** Every class the theme's selectors name. */
+  /** Every class the theme's selectors name for markup to use: its vocabulary. */
   classes: Set<string>;
+  /** The runtime state classes its selectors name, which the player sets and markup never does. */
+  stateClasses: Set<string>;
   /** The layouts it styles, by name, each with its example markup when it has one. */
   layouts: ThemeLayout[];
   /** The tokens every slide can `var()`, with their values, in source order. */
@@ -22,8 +30,10 @@ export type ThemeFacts = {
 };
 
 export function themeFacts(sheet: Stylesheet): ThemeFacts {
+  const named = [...cssClassNames(sheet)];
   return {
-    classes: cssClassNames(sheet),
+    classes: new Set(named.filter((name) => !RUNTIME_CLASSES.has(name))),
+    stateClasses: new Set(named.filter((name) => RUNTIME_CLASSES.has(name))),
     layouts: themeLayouts(sheet),
     tokens: publishedTokens(sheet),
   };
