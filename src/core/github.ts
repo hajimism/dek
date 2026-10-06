@@ -3,7 +3,7 @@ import { DekError } from "./error.ts";
 /**
  * The two GitHub calls dekc ref needs: pin a rev to a commit, and download
  * that commit. DEK_GITHUB_API points them elsewhere, the way DEK_VOICE_URL
- * does for the voice engine.
+ * does for the voice engine, but a token only ever goes here.
  */
 const DEFAULT_API = "https://api.github.com";
 
@@ -15,9 +15,6 @@ const COMMIT_TIMEOUT_MS = 30 * 1000;
 
 /** A tarball near the size cap on a slow line still fits well inside this. */
 const TARBALL_TIMEOUT_MS = 10 * 60 * 1000;
-
-const SIGN_IN_HINT =
-  "if the repository is private, set GITHUB_TOKEN or run `gh auth login`, then run the command again";
 
 export type GithubOptions = {
   /** Covers the whole call, from connecting to the last byte of the body. */
@@ -32,22 +29,27 @@ function apiBase(): string {
   return (process.env.DEK_GITHUB_API ?? DEFAULT_API).replace(/\/+$/, "");
 }
 
-/** GITHUB_TOKEN, else what `gh auth token` prints, else nothing: public repositories need no token. */
-function token(): string | undefined {
-  const fromEnv = process.env.GITHUB_TOKEN?.trim();
-  if (fromEnv) {
-    return fromEnv;
-  }
-  try {
-    const result = Bun.spawnSync([process.env.DEK_GH ?? "gh", "auth", "token"], {
-      stdout: "pipe",
-      stderr: "ignore",
-    });
-    const printed = result.exitCode === 0 ? result.stdout.toString().trim() : "";
-    return printed || undefined;
-  } catch {
+/**
+ * The Authorization header for a call to `base`: the token the user set in GITHUB_TOKEN, else
+ * GH_TOKEN, and only for api.github.com. Public repositories need none. dek never asks `gh` for
+ * one: that token can write to every repository its owner can, and a tool that takes it unasked
+ * reads as credential theft to the machine's security software.
+ */
+export function authorization(
+  base: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  if (base !== DEFAULT_API) {
     return undefined;
   }
+  const token = env.GITHUB_TOKEN?.trim() || env.GH_TOKEN?.trim();
+  return token ? `Bearer ${token}` : undefined;
+}
+
+function signInHint(base: string): string {
+  return base === DEFAULT_API
+    ? "if the repository is private, set GITHUB_TOKEN to a token that can read it (`gh auth token` prints yours), then run the command again"
+    : "DEK_GITHUB_API points dek away from api.github.com, and a token goes only there; unset it to read a private repository";
 }
 
 /**
@@ -78,7 +80,7 @@ function deadline(what: string, timeoutMs: number): Deadline {
 
 function rateLimitHint(retryAfter: string | null): string {
   const wait = retryAfter ? `wait ${retryAfter}s, and ` : "";
-  return `${wait}set GITHUB_TOKEN or run \`gh auth login\` to raise the limit, then run the command again`;
+  return `${wait}set GITHUB_TOKEN to raise the limit, then run the command again`;
 }
 
 async function request(
@@ -87,14 +89,15 @@ async function request(
   accept: string,
   { signal, timeout, expired }: Deadline,
 ): Promise<Response> {
-  const auth = token();
+  const base = apiBase();
+  const auth = authorization(base);
   let response: Response;
   try {
-    response = await fetch(`${apiBase()}${path}`, {
+    response = await fetch(`${base}${path}`, {
       headers: {
         accept,
         "user-agent": "dek",
-        ...(auth ? { authorization: `Bearer ${auth}` } : {}),
+        ...(auth ? { authorization: auth } : {}),
       },
       redirect: "follow",
       signal,
@@ -112,7 +115,7 @@ async function request(
     return response;
   }
   if (response.status === 404) {
-    throw new DekError(`${what} not found on GitHub`, { hint: SIGN_IN_HINT });
+    throw new DekError(`${what} not found on GitHub`, { hint: signInHint(base) });
   }
   const retryAfter = response.headers.get("retry-after");
   if (
@@ -125,7 +128,7 @@ async function request(
   }
   if (response.status === 401 || response.status === 403) {
     throw new DekError(`GitHub refused access to ${what} (${response.status})`, {
-      hint: SIGN_IN_HINT,
+      hint: signInHint(base),
     });
   }
   throw new DekError(`GitHub answered ${response.status} for ${what}`, {

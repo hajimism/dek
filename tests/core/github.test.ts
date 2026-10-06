@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { downloadTarball, resolveRev } from "../../src/core/github.ts";
+import { authorization, downloadTarball, resolveRev } from "../../src/core/github.ts";
 import { withEnv } from "../helpers/env.ts";
 import { deckRepoFiles, SHA_A, SHA_B, withFakeGithub } from "../helpers/fake-github.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -23,11 +23,11 @@ describe("resolveRev", () => {
     });
   });
 
-  test.serial("a missing repo or rev says it may be private and how to sign in", async () => {
+  test.serial("a missing repo or rev says a token goes only to api.github.com", async () => {
     await withFakeGithub(repos, async () => {
       await expect(resolveRev("someone", "nope")).rejects.toMatchObject({
         message: "someone/nope not found on GitHub",
-        hint: expect.stringMatching(/GITHUB_TOKEN.*gh auth login/),
+        hint: expect.stringMatching(/DEK_GITHUB_API.*api\.github\.com/),
       });
       await expect(resolveRev("someone", "talks", "v9")).rejects.toMatchObject({
         message: "someone/talks@v9 not found on GitHub",
@@ -81,34 +81,53 @@ describe("resolveRev", () => {
 });
 
 describe("authentication", () => {
-  test.serial("sends GITHUB_TOKEN as a bearer token", async () => {
+  test("sends GITHUB_TOKEN, else GH_TOKEN, as a bearer token to api.github.com", () => {
+    const api = "https://api.github.com";
+    expect(authorization(api, { GITHUB_TOKEN: "from-github", GH_TOKEN: "from-gh" })).toBe(
+      "Bearer from-github",
+    );
+    expect(authorization(api, { GH_TOKEN: " from-gh \n" })).toBe("Bearer from-gh");
+    expect(authorization(api, { GITHUB_TOKEN: "", GH_TOKEN: "" })).toBeUndefined();
+    expect(authorization(api, {})).toBeUndefined();
+  });
+
+  test("sends no token to any other API", () => {
+    for (const base of [
+      "http://127.0.0.1:8080",
+      "https://api.github.com.example",
+      "https://github.com",
+    ]) {
+      expect(authorization(base, { GITHUB_TOKEN: "secret", GH_TOKEN: "secret" })).toBeUndefined();
+    }
+  });
+
+  test.serial("a token set for GitHub never reaches DEK_GITHUB_API", async () => {
     await withFakeGithub(
       repos,
       async (fake) => {
         await resolveRev("someone", "talks");
-        expect(fake.requests[0]?.authorization).toBe("Bearer from-env");
+        await downloadTarball("someone", "talks", SHA_A);
+        expect(fake.requests.map((request) => request.authorization)).toEqual([null, null, null]);
       },
-      { GITHUB_TOKEN: "from-env" },
+      { GITHUB_TOKEN: "secret", GH_TOKEN: "secret" },
     );
   });
 
-  test.serial("falls back to gh auth token, then to no token at all", async () => {
+  test.serial("never asks gh for a token", async () => {
     await withTempDir(async (dir) => {
+      const asked = join(dir, "asked");
       const gh = join(dir, "gh");
-      await writeFile(gh, '#!/bin/sh\n[ "$1 $2" = "auth token" ] && echo from-gh\n');
+      await writeFile(gh, `#!/bin/sh\ntouch '${asked}'\necho from-gh\n`);
       await chmod(gh, 0o755);
       await withFakeGithub(
         repos,
         async (fake) => {
           await resolveRev("someone", "talks");
-          expect(fake.requests[0]?.authorization).toBe("Bearer from-gh");
+          expect(fake.requests[0]?.authorization).toBeNull();
         },
-        { DEK_GH: gh },
+        { PATH: `${dir}:${process.env.PATH ?? ""}`, DEK_GH: gh },
       );
-    });
-    await withFakeGithub(repos, async (fake) => {
-      await resolveRev("someone", "talks");
-      expect(fake.requests[0]?.authorization).toBeNull();
+      expect(await Bun.file(asked).exists()).toBe(false);
     });
   });
 });

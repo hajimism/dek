@@ -42,7 +42,7 @@ Create a project with `bunx @hajimism/dek init`, then install dek into it with `
 
 ## Refs
 
-A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. Its snapshot under `refs/` is gitignored; whenever it is missing or at another commit, the next read fetches the pinned commit again. Public repositories need no token; for a private one, set `GITHUB_TOKEN` or sign in with `gh auth login`.
+A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. Its snapshot under `refs/` is gitignored; whenever it is missing or at another commit, the next read fetches the pinned commit again. Public repositories need no token. For a private one, set `GITHUB_TOKEN` (or `GH_TOKEN`) to a token that can read it, such as `GITHUB_TOKEN=$(gh auth token) dekc ref …`. dek sends it only to `api.github.com`, and never asks `gh` for one itself.
 
 | Command | Purpose |
 | --- | --- |
@@ -101,10 +101,10 @@ A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. 
 | Variable | Purpose |
 | --- | --- |
 | `DEK_FFMPEG` | Path to the ffmpeg binary that `dekc video` muxes with, instead of `ffmpeg` on `PATH`. |
-| `DEK_GH` | Path to the `gh` CLI that `dekc ref` asks for a token when `GITHUB_TOKEN` is unset. |
-| `DEK_GITHUB_API` | Base URL of the GitHub API that `dekc ref` fetches from. |
+| `DEK_GITHUB_API` | Base URL of the GitHub API that `dekc ref` fetches from. No token is sent to it. |
 | `DEK_PLAYWRIGHT` | Path to an alternative Playwright worker script. |
-| `GITHUB_TOKEN` | Token `dekc ref` sends to GitHub, for private repositories and a higher rate limit. |
+| `GITHUB_TOKEN` | Token `dekc ref` sends to `api.github.com`, for private repositories and a higher rate limit. |
+| `GH_TOKEN` | Read as `GITHUB_TOKEN` when that is unset. |
 | `DEK_RUMDL` | Path to the rumdl binary, ahead of `PATH` and the `node_modules/.bin` beside dek's own install. |
 | `DEK_VIDEO` | Path to an alternative video capture worker, used instead of the Playwright worker. |
 | `DEK_VOICE_PLAY` | Set to `0` to keep `dekc voice say` from playing the audio it synthesized. |

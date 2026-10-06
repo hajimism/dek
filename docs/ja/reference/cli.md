@@ -42,7 +42,7 @@ description: 'コマンド、フラグ、環境変数。'
 
 ## ref
 
-ref は、見本として読むために `dek.toml` の `[refs]` に固定した、他人のデッキです。`refs/` にある実体は gitignore されます。実体が無いときや別のコミットにあるときは、次に読むときに固定したコミットを取り直します。公開リポジトリならトークンは要りません。非公開なら `GITHUB_TOKEN` を設定するか、`gh auth login` でサインインしてください。
+ref は、見本として読むために `dek.toml` の `[refs]` に固定した、他人のデッキです。`refs/` にある実体は gitignore されます。実体が無いときや別のコミットにあるときは、次に読むときに固定したコミットを取り直します。公開リポジトリならトークンは要りません。非公開なら、読めるトークンを `GITHUB_TOKEN`（または `GH_TOKEN`）に設定してください。たとえば `GITHUB_TOKEN=$(gh auth token) dekc ref …` です。dek はトークンを `api.github.com` にだけ送り、`gh` に自分からトークンを尋ねることはしません。
 
 | コマンド | 役割 |
 | --- | --- |
@@ -101,10 +101,10 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | 変数 | 役割 |
 | --- | --- |
 | `DEK_FFMPEG` | `dekc video` が mux に使う ffmpeg バイナリのパス。`PATH` の `ffmpeg` より優先 |
-| `DEK_GH` | `GITHUB_TOKEN` が無いときに `dekc ref` がトークンを尋ねる `gh` CLI のパス |
-| `DEK_GITHUB_API` | `dekc ref` が取得に使う GitHub API のベース URL |
+| `DEK_GITHUB_API` | `dekc ref` が取得に使う GitHub API のベース URL。ここにはトークンを送らない |
 | `DEK_PLAYWRIGHT` | 代わりの Playwright ワーカースクリプトのパス |
-| `GITHUB_TOKEN` | `dekc ref` が GitHub に送るトークン。非公開リポジトリと、rate limit の引き上げに使う |
+| `GITHUB_TOKEN` | `dekc ref` が `api.github.com` に送るトークン。非公開リポジトリと、rate limit の引き上げに使う |
+| `GH_TOKEN` | `GITHUB_TOKEN` が無いときに、その代わりに読む |
 | `DEK_RUMDL` | rumdl バイナリのパス。`PATH` と、dek 本体のインストール先の `node_modules/.bin` より優先 |
 | `DEK_VIDEO` | 代わりの動画キャプチャワーカーのパス。Playwright ワーカーの代わりに使う |
 | `DEK_VOICE_PLAY` | `0` にすると `dekc voice say` が合成した音声を再生しない |

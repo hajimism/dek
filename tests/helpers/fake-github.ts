@@ -27,7 +27,7 @@ export type FakeGithub = {
 
 /**
  * Serves the two GitHub endpoints dekc ref uses, and points dek at it through
- * DEK_GITHUB_API. `gh` and GITHUB_TOKEN are cleared so a test never reaches
+ * DEK_GITHUB_API. GITHUB_TOKEN and GH_TOKEN are cleared so a test never reaches
  * the real GitHub or the developer's credentials.
  */
 export async function withFakeGithub<T>(
@@ -94,9 +94,12 @@ export async function withFakeGithub<T>(
     },
   });
   fake.url = `http://127.0.0.1:${server.port}`;
-  fake.env = { DEK_GITHUB_API: fake.url, DEK_GH: "/nonexistent/gh", GITHUB_TOKEN: "" };
+  fake.env = { DEK_GITHUB_API: fake.url, GITHUB_TOKEN: "", GH_TOKEN: "" };
   try {
-    return await withEnv({ ...fake.env, GITHUB_TOKEN: undefined, ...env }, () => fn(fake));
+    return await withEnv(
+      { ...fake.env, GITHUB_TOKEN: undefined, GH_TOKEN: undefined, ...env },
+      () => fn(fake),
+    );
   } finally {
     server.stop(true);
   }
