@@ -569,6 +569,17 @@ c
     });
   });
 
+  test("AGENTS.md says how to read the human's annotations and who clears them", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      syncDeck(join(root, "decks", "demo"));
+      const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      expect(agents).toContain("## When the human points at an element");
+      expect(agents).toContain("`dekc annotations` lists the notes");
+      expect(agents).toContain("`edited` does not mean a note is dealt with");
+      expect(agents).toContain("Leave `dekc annotations clear` to the human");
+    });
+  });
+
   test("AGENTS.md says how a picture tells a screen reader what it shows, as DEK034 checks", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       syncDeck(join(root, "decks", "demo"));

@@ -18,10 +18,10 @@ export function defaultToml(): string {
 }
 
 /**
- * What dek keeps for itself under .dek/ while it runs: the dev server's lock, and the marks left
- * while rehearsing. Neither belongs in the repository.
+ * What dek keeps for itself under .dek/ while it runs: the dev server's lock, the marks left
+ * while rehearsing, and the notes written in annotate mode. None belongs in the repository.
  */
-const LOCAL_STATE = [".dek/server.json", ".dek/marks.json"];
+const LOCAL_STATE = [".dek/server.json", ".dek/marks.json", ".dek/annotations.json"];
 
 export function defaultGitignore(): string {
   return `# dek

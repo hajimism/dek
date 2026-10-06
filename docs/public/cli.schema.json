@@ -1453,6 +1453,228 @@
         }
       ]
     },
+    "annotations": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "list"
+            },
+            "annotations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "As the dev page's markers and Copy number it."
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "step": {
+                    "type": "string",
+                    "description": "The stop as `dekc shot --step` takes it; 0 as the slide arrives."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "edited",
+                      "gone"
+                    ],
+                    "description": "edited once the slide's own html, css, or ts changed since the note; gone once none of its elements is on the slide."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "What the human wrote."
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "line": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Where the start tag is now; where it was last found when not found."
+                        },
+                        "column": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "1-based, in UTF-16 units as editors count."
+                        },
+                        "found": {
+                          "type": "boolean"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The tag and its classes as written where it was last found, as div.chevron."
+                        },
+                        "was": {
+                          "type": "string",
+                          "description": "Its text as written when the note was written, cut short."
+                        },
+                        "text": {
+                          "description": "Its text as written now; null when not found.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "box": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "width": {
+                              "type": "number"
+                            },
+                            "height": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "width",
+                            "height"
+                          ],
+                          "additionalProperties": false,
+                          "description": "On the slide in logical pixels, when the note was written."
+                        },
+                        "point": {
+                          "description": "Where the slide itself was clicked.",
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "line",
+                        "column",
+                        "found",
+                        "name",
+                        "was",
+                        "text",
+                        "box"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "changed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The slide's own files that changed since the note."
+                  },
+                  "shot": {
+                    "type": "string",
+                    "description": "The command that shows the slide at the note's beat."
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "number",
+                  "id",
+                  "slug",
+                  "step",
+                  "status",
+                  "text",
+                  "targets",
+                  "changed",
+                  "shot",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "annotations",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "clear"
+            },
+            "cleared": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "cleared",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "sync": {
       "anyOf": [
         {

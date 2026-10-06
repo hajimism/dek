@@ -2,6 +2,7 @@
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
 import { formatClock } from "../core/timing.ts";
+import type { AnnotationsCliResult } from "./annotations.ts";
 import type { BuildCliResult } from "./build.ts";
 import type { CheckCliResult } from "./check.ts";
 import type { CuesResult } from "./cues.ts";
@@ -167,6 +168,41 @@ export function formatMarks(data: MarksCliResult): string {
       const status = mark.status === "open" ? "" : ` (${mark.status})`;
       const words = (mark.text ?? mark.was).split("\n").find((line) => line.trim() !== "");
       return [`${where}  ${beat}${status}`, ...(words ? [`  ${words.trim()}`] : [])];
+    })
+    .join("\n");
+}
+
+/**
+ * Each note by its number, as the page's markers show it, with its slide and beat, each element
+ * at its line the way an editor jumps to it, the human's words, and the shot that shows it.
+ */
+export function formatAnnotations(data: AnnotationsCliResult): string {
+  if (data.action === "clear") {
+    return data.cleared === 1 ? "cleared 1 annotation" : `cleared ${data.cleared} annotations`;
+  }
+  if (data.annotations.length === 0) {
+    return "no annotations: press a on the dev server's page to point at an element and write a note";
+  }
+  return data.annotations
+    .flatMap((row) => {
+      const beat = row.step === "0" ? row.slug : `${row.slug} › ${row.step}`;
+      const status = row.status === "open" ? "" : ` (${row.status})`;
+      const targets = row.targets.map((target) => {
+        const where = `${target.path}:${target.line}:${target.column}`;
+        if (!target.found) {
+          return `   ${where}  ${target.name} (not found)`;
+        }
+        const text =
+          target.text === "" || target.text === null ? "" : ` ${JSON.stringify(target.text)}`;
+        const was = target.text !== target.was ? ` (was ${JSON.stringify(target.was)})` : "";
+        return `   ${where}  ${target.name}${text}${was}`;
+      });
+      const words = row.text
+        .trim()
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== "")
+        .map((line) => `   > ${line}`);
+      return [`${row.number}  ${beat}${status}`, ...targets, ...words, `   ${row.shot}`];
     })
     .join("\n");
 }

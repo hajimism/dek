@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import type { AnnotationRow } from "../core/annotation-rows.ts";
+import { AnnotationOp, applyAnnotationOp, listAnnotations } from "../core/annotations.ts";
 import { fileInside, readTheme } from "../core/assets.ts";
 import { DekError, errorFields } from "../core/error.ts";
 import { escapeAttr, escapeHtml } from "../core/escape.ts";
@@ -116,6 +118,16 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
         respond: () =>
           deck ? marksResponse(req, ctx.project().root, deck) : jsonNotFound(deckName),
       };
+    case "annotations":
+      return {
+        route: "annotations",
+        respond: () =>
+          deck
+            ? annotationsResponse(req, ctx.project().root, deck, () =>
+                ctx.hub.emit({ type: "annotations", deck: deckName }),
+              )
+            : jsonNotFound(deckName),
+      };
     case "asset": {
       const asset = dir && safeDeckAsset(dir, route.path);
       return asset
@@ -214,6 +226,61 @@ async function marksResponse(req: Request, root: string, deck: ProjectDeck): Pro
       throw error;
     }
     return jsonResponse({ ok: false, error: errorFields(error) }, 404);
+  }
+}
+
+/**
+ * The deck's annotations: GET lists them as the files have them now, and a POST of an operation
+ * adds, edits, removes, clears, or puts back. Every change is told to the deck's other pages,
+ * so tabs and devices annotating one deck show the same notes. One that names nothing on the
+ * slide as it is now, sent from a page an edit left behind, is refused.
+ */
+async function annotationsResponse(
+  req: Request,
+  root: string,
+  deck: ProjectDeck,
+  changed: () => void,
+): Promise<Response> {
+  const rows = (annotations: AnnotationRow[]) =>
+    annotations.map((row) => ({
+      ...row,
+      targets: row.targets.map((target) => ({ ...target, path: relative(root, target.path) })),
+      changed: row.changed.map((path) => relative(root, path)),
+    }));
+  try {
+    if (req.method === "GET") {
+      return jsonResponse({ ok: true, annotations: rows(listAnnotations(root, deck)) });
+    }
+    if (req.method !== "POST") {
+      return new Response("Method not allowed", { status: 405 });
+    }
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      body = undefined;
+    }
+    const op = AnnotationOp.safeParse(body);
+    if (!op.success) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: {
+            message:
+              'the request names no operation: send {"op": "add" | "edit" | "remove" | "clear" | "restore", …}',
+          },
+        },
+        400,
+      );
+    }
+    const done = applyAnnotationOp(root, deck, op.data);
+    changed();
+    return jsonResponse({ ok: true, ...done, annotations: rows(done.annotations) });
+  } catch (error) {
+    if (!(error instanceof DekError)) {
+      throw error;
+    }
+    return jsonResponse({ ok: false, error: errorFields(error) }, 409);
   }
 }
 

@@ -5,3 +5,4 @@ dist/
 .dek/marks.json
 node_modules/
 refs/
+.dek/annotations.json

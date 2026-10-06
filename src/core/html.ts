@@ -1,3 +1,4 @@
+import { cutText } from "./annotation-rows.ts";
 import { assetInliner } from "./assets.ts";
 import { deckPaths } from "./deck-paths.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
@@ -233,8 +234,11 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
   });
 }
 
-/** Where a start tag is written, and its classes as written; none when it has no `class`. */
-type TagSpot = LineColumn & { classes?: string };
+/**
+ * Where a start tag is written, its tag, its classes as written (none when it has no `class`),
+ * and the text inside it as written, whitespace collapsed.
+ */
+type TagSpot = LineColumn & { tag: string; classes?: string; text: string };
 
 /**
  * Where each start tag of `html` is written in the file it was taken from, in document order,
@@ -243,12 +247,30 @@ type TagSpot = LineColumn & { classes?: string };
  */
 function startTagSpots(html: string, source: SlideSource): TagSpot[] {
   const mark = uniqueMark(html);
-  const classes: Array<string | null> = [];
+  const tags: Array<{ tag: string; classes: string | null; text: string }> = [];
+  const open: number[] = [];
   const marked = rewriteHtml(html, (rewriter) => {
     rewriter.on("*", {
       element(el) {
         el.before(mark, { html: true });
-        classes.push(el.getAttribute("class"));
+        const index = tags.length;
+        tags.push({ tag: el.tagName.toLowerCase(), classes: el.getAttribute("class"), text: "" });
+        if (el.canHaveContent) {
+          open.push(index);
+          el.onEndTag(() => {
+            open.splice(open.lastIndexOf(index), 1);
+          });
+        }
+      },
+    });
+    rewriter.onDocument({
+      text(chunk) {
+        for (const index of open) {
+          const tag = tags[index];
+          if (tag) {
+            tag.text += chunk.text;
+          }
+        }
       },
     });
   });
@@ -259,11 +281,34 @@ function startTagSpots(html: string, source: SlideSource): TagSpot[] {
     .slice(0, -1)
     .map((before, index) => {
       offset += before.length;
-      const written = classes[index];
-      return written === null || written === undefined
-        ? spot(offset)
-        : { ...spot(offset), classes: written.split(/\s+/).filter(Boolean).join(" ") };
+      const { tag = "", classes = null, text = "" } = tags[index] ?? {};
+      const found = { ...spot(offset), tag, text: text.replace(/\s+/g, " ").trim() };
+      return classes === null
+        ? found
+        : { ...found, classes: classes.split(/\s+/).filter(Boolean).join(" ") };
     });
+}
+
+/**
+ * An element of a written slide as annotate mode names it, whatever a script adds to it: where
+ * its start tag is written, `<line>:<column>`, its tag and classes as written, as `div.chevron`,
+ * and its text as written, cut short. The slide itself has no text: all of the slide names
+ * nothing.
+ */
+export type WrittenElement = { source: string; name: string; text: string };
+
+/** Every element of the slide `slides/<slug>.html` writes, in document order; none for a skeleton. */
+export function writtenElements(slides: DeckSlides, slug: string): WrittenElement[] | undefined {
+  const html = slides.written(slug);
+  const source = slides.source(slug);
+  if (html === undefined || source === undefined) {
+    return undefined;
+  }
+  return startTagSpots(html, source).map((spot, index) => ({
+    source: `${spot.line}:${spot.column}`,
+    name: [spot.tag, ...(spot.classes ?? "").split(" ").filter(Boolean)].join("."),
+    text: index === 0 ? "" : cutText(spot.text),
+  }));
 }
 
 /**

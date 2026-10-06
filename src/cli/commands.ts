@@ -9,6 +9,7 @@ import type { DeckScope, DecksTarget, ReadableDeck } from "./scope.ts";
 import {
   countSummary,
   displayDiagnostics,
+  formatAnnotations,
   formatBuild,
   formatCheck,
   formatCues,
@@ -537,6 +538,51 @@ export const COMMANDS = {
       paths: (data, display) =>
         data.action === "list"
           ? { ...data, marks: data.marks.map((mark) => ({ ...mark, path: display(mark.path) })) }
+          : data,
+    },
+  }),
+  annotations: result({
+    scope: "deck",
+    args: [],
+    flags: [],
+    usage: ["dekc annotations [deck]"],
+    summary:
+      "List the notes written on elements of the slides in annotate mode, by pressing a on the\ndev server's page: each element where the file has it now, and whether the slide changed since.",
+    group: "Slide",
+    overview: [
+      ["dekc annotations", "list the notes written on slide elements in annotate mode (a)"],
+      ["dekc annotations clear", "drop the deck's annotations"],
+    ],
+    agent: [
+      "dekc annotations [clear]   notes a human wrote on slide elements (a): path:line:column, text, shot, status open|edited|gone",
+    ],
+    run: async ({ target }) => {
+      const { annotationsCommand } = await import("./annotations.ts");
+      return annotationsCommand(target);
+    },
+    subcommands: {
+      clear: {
+        args: [],
+        flags: [],
+        usage: ["dekc annotations [deck] clear"],
+        run: async ({ target }) => {
+          const { clearAnnotationsCommand } = await import("./annotations.ts");
+          return clearAnnotationsCommand(target);
+        },
+      },
+    },
+    output: {
+      text: formatAnnotations,
+      paths: (data, display) =>
+        data.action === "list"
+          ? {
+              ...data,
+              annotations: data.annotations.map((row) => ({
+                ...row,
+                targets: row.targets.map((target) => ({ ...target, path: display(target.path) })),
+                changed: row.changed.map(display),
+              })),
+            }
           : data,
     },
   }),

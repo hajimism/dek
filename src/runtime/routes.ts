@@ -20,6 +20,8 @@ export type DeckRoute =
   | { kind: "goto" }
   /** The beats the presenter marked to rewrite: listed, and one marked or unmarked. */
   | { kind: "marks" }
+  /** The notes annotate mode keeps on elements of the slides: listed, and one added or changed. */
+  | { kind: "annotations" }
   /** A file under the deck's `assets/`, decoded. */
   | { kind: "asset"; path: string };
 
@@ -34,6 +36,7 @@ const FIXED: Record<Fixed, string> = {
   current: "/current",
   goto: "/goto",
   marks: "/marks",
+  annotations: "/annotations",
 };
 
 /** The path of `route` below its deck's prefix. */

@@ -3,18 +3,15 @@
 // each is called, and where it is on the slide. Only elements the dev server stamped with where
 // they are written count, so every one can be named by its file and line.
 
+import { type Box, cutText } from "../core/annotation-rows.ts";
 import { deckStops, positionFromHash } from "../core/position.ts";
 import { type BeatRef, stepKey } from "../core/step.ts";
-import type { Box } from "./annotate-notes.ts";
 
 /** The attribute the dev server writes on each start tag of a slide: `<line>:<column>`. */
 export const SOURCE_ATTR = "data-dek-source";
 
 /** The classes the dev server saw written on each stamped tag, before any script added more. */
 const CLASS_ATTR = "data-dek-class";
-
-/** How long a text may be before it is cut short. */
-const TEXT_MAX = 40;
 
 type Point = { x: number; y: number };
 
@@ -92,11 +89,10 @@ export function describeElement(
   slide: Element,
 ): { source: string; name: string; text: string } {
   const classes = (el.getAttribute(CLASS_ATTR) ?? "").split(" ").filter(Boolean);
-  const text = el === slide ? "" : (el.textContent ?? "").replace(/\s+/g, " ").trim();
   return {
     source: el.getAttribute(SOURCE_ATTR) ?? "",
     name: [el.tagName.toLowerCase(), ...classes].join("."),
-    text: text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX)}…` : text,
+    text: el === slide ? "" : cutText(el.textContent ?? ""),
   };
 }
 

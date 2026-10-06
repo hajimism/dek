@@ -4,7 +4,9 @@ Date: 2026-10-06
 
 ## Status
 
-Accepted
+Superseded
+
+Superseded by [7. Keep annotations in .dek/ and let agents list them with dekc annotations](0007-keep-annotations-in-dek-and-let-agents-list-them-with-dekc-annotations.md)
 
 ## Context
 

@@ -62,6 +62,7 @@ export function applyLiveEvent(event: HydratedLiveEvent, host: LiveHost): { relo
       host.setDiagnostics(formatLiveDiagnostics(event.diagnostics));
       return { reload: false };
     case "timeline":
+    case "annotations":
       return { reload: false };
   }
 }
