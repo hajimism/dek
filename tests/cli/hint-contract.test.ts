@@ -103,7 +103,7 @@ function runsHere(argv: string[]): boolean {
   const [command] = argv;
   return (
     command !== undefined &&
-    !["shot", "pdf", "video", "serve", "rehearse"].includes(command) &&
+    !["shot", "pdf", "pptx", "video", "serve", "rehearse"].includes(command) &&
     !argv.includes("--visual")
   );
 }

@@ -76,7 +76,7 @@ dek は Vue も UnoCSS も Monaco も Mermaid も依存に含めません。そ�
 - ライブコーディングや埋め込みエディタ
 - npm で配布されるテーマのギャラリー
 - CSS とシーク可能な `draw(t)` の外に出るアニメーション DSL
-- PPTX / Keynote への書き出し、WYSIWYG 編集
+- PowerPoint で編集できる図形、Keynote 形式への書き出し、WYSIWYG 編集。`dekc pptx` は文字を編集できる形で、台本をノートに入れて渡せますが、各スライドの図形は画像です
 
 dek は、ひとりで保守できる大きさを守り、喋りが主役のトークに集中します。細かい境界は [FAQ](./faq) にあります。
 

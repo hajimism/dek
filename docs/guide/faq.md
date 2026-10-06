@@ -32,6 +32,10 @@ Never once you have edited it. It creates skeletons for missing slides, rewrites
 
 The same CLI as a human: `dekc help --agent`, `dekc check <slug> --shot`, `dekc lint --format sarif`. There is no MCP server. See [Working with AI Agents](./ai).
 
+## Can I hand a talk to someone who uses PowerPoint?
+
+Yes. `dekc pptx` writes `dist/<deck>.pptx`: one slide per `##`, at its last beat, as the PDF prints it. Each slide is a picture of what the browser drew, with its text laid back over it in text boxes, line by line, so the recipient can fix a word, a date, or a name where it stands; the script goes in the notes. Shapes, SVG diagrams, and decoration stay in the picture, so they cannot be moved or recolored. Add `--public` to leave the stage directions out of the notes. Keynote opens the same file. See [Presenting](./present#pptx).
+
 ## Can I present without the dev server?
 
 Yes. `dekc build` produces one HTML file. Put it on a USB stick. Press `p` or open it with `?presenter`, and a second window follows the first through `BroadcastChannel`. Use `dekc --remote` only when another device needs to drive the deck.

@@ -164,7 +164,7 @@ Two texts whose lines cross by a few pixels each way, and share a fifth of the s
 
 ### DEK034
 
-A picture is either content, which needs words a screen reader can say, or decoration, which says so. Lint cannot tell which, and does not judge whether the words are good; it asks that every picture be one or the other. The built HTML file passes the words on to the audience's screen readers as they are.
+A picture is either content, which needs words a screen reader can say, or decoration, which says so. Lint cannot tell which, and does not judge whether the words are good; it asks that every picture be one or the other. The built HTML file passes the words on to the audience's screen readers as they are, and `dekc pptx` makes them the alternative text of each slide's picture.
 
 - An `<img>` takes `alt`. `alt=""` is decoration, as the theme's `full-bleed` layout writes it; any other `alt` is what the picture shows. `aria-label`, `aria-labelledby`, and `title` name it as well.
 - An `<svg>` that holds text, such as a diagram's `<text>` labels or a `<title>`, is read as it is, and passes. One with nothing to read takes `role="img"` and an `aria-label`, or `aria-hidden="true"` when it is decoration. The hint offers `aria-hidden` only for an SVG with no text, so following it never makes a `DEK029`.

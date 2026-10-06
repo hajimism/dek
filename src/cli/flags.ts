@@ -89,7 +89,7 @@ export const FLAGS = {
   },
   public: {
     type: "boolean",
-    text: "a page for anyone with the link, without the script's stage directions and comments",
+    text: "for anyone the file reaches: the script without its stage directions and comments",
   },
 } as const satisfies Record<string, FlagSpec>;
 

@@ -76,7 +76,7 @@ Use Slidev if you need any of the following.
 - Live coding or an embedded editor
 - A gallery of npm themes
 - An animation DSL beyond CSS and a seekable `draw(t)`
-- PPTX or Keynote export, or a WYSIWYG editor
+- Shapes you can edit in PowerPoint, Keynote export, or a WYSIWYG editor. `dekc pptx` hands a talk over with its text editable and its script in the notes, but each slide's shapes are a picture
 
 dek stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
 

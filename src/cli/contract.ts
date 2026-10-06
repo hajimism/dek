@@ -397,6 +397,7 @@ export const RESULT_FIELDS = {
     credits: z.string().optional(),
   }),
   pdf: z.strictObject({ outs: paths }),
+  pptx: z.strictObject({ outs: paths }),
 } satisfies Record<ResultCommand, FieldsSchema>;
 
 type FieldsSchema = z.ZodObject | z.ZodUnion<readonly z.ZodObject[]>;
