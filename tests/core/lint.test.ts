@@ -2463,6 +2463,138 @@ describe("DEK029: text hidden from lint by aria-hidden", () => {
   });
 });
 
+describe("DEK034: a picture with nothing for a screen reader to say", () => {
+  const script = "---\ntitle: Demo\n---\n\n## intro\n\nhello\n";
+
+  async function pictures(markup: string) {
+    const intro = `<section class="slide">
+  <h2 class="slide-title">intro</h2>
+${markup}
+</section>
+`;
+    const diagnostics = await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro }, assets: { "a.png": "png" } }] },
+      async (root) => lintDeck(join(root, "decks", "demo")),
+    );
+    return diagnostics.filter((d) => d.id === "DEK034");
+  }
+
+  test("an image without alt is an error at its tag, with the two ways out", async () => {
+    expect(await pictures(`  <img src="assets/a.png">`)).toEqual([
+      {
+        id: "DEK034",
+        severity: "error",
+        message: '<img src="assets/a.png"> has no alt, so a screen reader cannot say what it shows',
+        path: expect.stringContaining("slides/intro.html"),
+        line: 3,
+        column: 3,
+        slug: "intro",
+        hint: 'add alt="…" saying what the picture shows, or alt="" if it is decoration',
+        data: { tag: "img", src: "assets/a.png" },
+      },
+    ]);
+  });
+
+  test('alt="" declares decoration, as the theme\'s full-bleed layout writes it', async () => {
+    expect(await pictures(`  <img src="assets/a.png" alt="">`)).toEqual([]);
+    expect(await pictures(`  <img src="assets/a.png" alt="a chart">`)).toEqual([]);
+  });
+
+  test("an image named another way, or hidden as decoration, passes", async () => {
+    for (const markup of [
+      `<img src="assets/a.png" aria-label="a chart">`,
+      `<img src="assets/a.png" aria-labelledby="cap"><p id="cap">a chart</p>`,
+      `<img src="assets/a.png" title="a chart">`,
+      `<img src="assets/a.png" role="presentation">`,
+      `<img src="assets/a.png" role="none">`,
+      `<img src="assets/a.png" aria-hidden="true">`,
+      `<div aria-hidden="true"><img src="assets/a.png"></div>`,
+    ]) {
+      expect({ markup, found: await pictures(markup) }).toEqual({ markup, found: [] });
+    }
+  });
+
+  test("an empty aria-label names nothing", async () => {
+    expect((await pictures(`<img src="assets/a.png" aria-label=" ">`)).map((d) => d.data)).toEqual([
+      { tag: "img", src: "assets/a.png" },
+    ]);
+  });
+
+  test("an SVG with nothing to read and no name is an error, and the hint offers both ways", async () => {
+    expect(await pictures(`  <svg viewBox="0 0 10 10"><path d="M0 0 L10 10" /></svg>`)).toEqual([
+      {
+        id: "DEK034",
+        severity: "error",
+        message: "<svg> has nothing to read and no name, so a screen reader skips what it shows",
+        path: expect.stringContaining("slides/intro.html"),
+        line: 3,
+        column: 3,
+        slug: "intro",
+        hint: 'give it role="img" and aria-label="…" saying what it shows, or aria-hidden="true" if it is decoration',
+        data: { tag: "svg" },
+      },
+    ]);
+  });
+
+  test("an SVG with text of its own is read as it is and passes, so no hint leads to DEK029", async () => {
+    expect(
+      await pictures(
+        `<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" /><text x="1" y="5">読む</text></svg>`,
+      ),
+    ).toEqual([]);
+  });
+
+  test("an SVG named by aria-label, a title, or hidden as decoration passes", async () => {
+    for (const markup of [
+      `<svg role="img" aria-label="a loop"><path d="M0 0" /></svg>`,
+      `<svg aria-labelledby="cap"><path d="M0 0" /></svg><p id="cap">a loop</p>`,
+      `<svg><title>a loop</title><path d="M0 0" /></svg>`,
+      `<svg aria-hidden="true"><path d="M0 0" /></svg>`,
+      `<svg role="presentation"><path d="M0 0" /></svg>`,
+      `<div aria-hidden="true"><svg><path d="M0 0" /></svg></div>`,
+    ]) {
+      expect({ markup, found: await pictures(markup) }).toEqual({ markup, found: [] });
+    }
+  });
+
+  test("an SVG inside another is part of the outer picture", async () => {
+    const found = await pictures(`<svg><svg><path d="M0 0" /></svg></svg>`);
+    expect(found.map((d) => d.column)).toEqual([1]);
+  });
+
+  test('role="img" hides an element\'s own text, so it needs a name, and the hint never says aria-hidden', async () => {
+    const found = await pictures(
+      `<svg role="img" viewBox="0 0 10 10"><text x="1" y="5">読む</text></svg>`,
+    );
+    expect(found).toEqual([
+      expect.objectContaining({
+        message:
+          '<svg role="img"> has no name, and role="img" keeps a screen reader from reading its text',
+        hint: 'give it aria-label="…" saying what it shows, or remove role="img" so its text is read',
+        data: { tag: "svg", role: "img" },
+      }),
+    ]);
+  });
+
+  test('a div with role="img" and nothing to read is offered aria-hidden for decoration', async () => {
+    const found = await pictures(`<div role="img" class="slide-title"></div>`);
+    expect(found).toEqual([
+      expect.objectContaining({
+        message: '<div role="img"> has no name, so a screen reader cannot say what it shows',
+        hint: 'give it aria-label="…" saying what it shows, or replace role="img" with aria-hidden="true" if it is decoration',
+        data: { tag: "div", role: "img" },
+      }),
+    ]);
+  });
+
+  test("every picture is its own finding, reported in one run", async () => {
+    const found = await pictures(`  <img src="assets/a.png">
+  <img src="assets/a.png">
+  <svg><path d="M0 0" /></svg>`);
+    expect(found.map((d) => d.line)).toEqual([3, 4, 5]);
+  });
+});
+
 describe("DEK024: a heading with nothing to read", () => {
   const script = `---
 title: Demo

@@ -1,5 +1,5 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
-import type { HtmlAttribute, HtmlScan, SourceSpot } from "../html-scan.ts";
+import type { HtmlAttribute, HtmlScan, Picture, SourceSpot } from "../html-scan.ts";
 import type { Section } from "../schema.ts";
 import { beatAt, formatStepChoices, resolveStep, stepChoices } from "../step.ts";
 import { suggest } from "../suggest.ts";
@@ -52,6 +52,7 @@ export function lintSlideHtml(
     ...presentationDiagnostics(slide),
     ...emptyHeadingDiagnostics(slide),
     ...hiddenTextDiagnostics(slide),
+    ...pictureDiagnostics(slide),
     ...(options.classes
       ? unknownClassDiagnostics(slide, options.classes, options.hasScript === true)
       : []),
@@ -440,6 +441,80 @@ function hiddenTextDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[]
       data: { tag: element.tag, text },
     });
   });
+}
+
+/**
+ * DEK034: a picture with nothing for a screen reader to say: an `<img>` without `alt`, an `<svg>`
+ * with no text and no name, or an element whose `role="img"` has no name. Each is either content,
+ * which wants words, or decoration, which says so: `alt=""` or `aria-hidden="true"`. An SVG with
+ * text of its own is read as it is, so the hint never sends a labeled figure to `aria-hidden`,
+ * where DEK029 would warn of it.
+ */
+function pictureDiagnostics({ section, path, scan }: SlideHtml): Diagnostic[] {
+  return scan.pictures.flatMap((picture) => {
+    const found = unnamedPicture(picture);
+    return found
+      ? [
+          diag("DEK034", {
+            message: found.message,
+            path,
+            ...spotOf(picture.element),
+            slug: section.slug,
+            hint: found.hint,
+            data: found.data,
+          }),
+        ]
+      : [];
+  });
+}
+
+function unnamedPicture({
+  element,
+  text,
+  titled,
+}: Picture): { message: string; hint: string; data: Record<string, string> } | undefined {
+  const value = (name: string): string | undefined =>
+    element.attributes.find((attribute) => attribute.name === name)?.value;
+  const named = [value("aria-label"), value("aria-labelledby"), value("title")].some(
+    (name) => name !== undefined && name.trim() !== "",
+  );
+  const { tag } = element;
+  if (named || (tag === "img" && value("alt") !== undefined)) {
+    return undefined;
+  }
+  if ((value("role") ?? "").trim().toLowerCase().split(/\s+/)[0] === "img") {
+    if (titled) {
+      return undefined;
+    }
+    const data = { tag, role: "img" };
+    return text
+      ? {
+          message: `<${tag} role="img"> has no name, and role="img" keeps a screen reader from reading its text`,
+          hint: 'give it aria-label="…" saying what it shows, or remove role="img" so its text is read',
+          data,
+        }
+      : {
+          message: `<${tag} role="img"> has no name, so a screen reader cannot say what it shows`,
+          hint: 'give it aria-label="…" saying what it shows, or replace role="img" with aria-hidden="true" if it is decoration',
+          data,
+        };
+  }
+  if (tag === "img") {
+    const src = value("src");
+    return {
+      message: `<img${src === undefined ? "" : ` src="${src}"`}> has no alt, so a screen reader cannot say what it shows`,
+      hint: 'add alt="…" saying what the picture shows, or alt="" if it is decoration',
+      data: src === undefined ? { tag } : { tag, src },
+    };
+  }
+  if (text) {
+    return undefined;
+  }
+  return {
+    message: `<${tag}> has nothing to read and no name, so a screen reader skips what it shows`,
+    hint: 'give it role="img" and aria-label="…" saying what it shows, or aria-hidden="true" if it is decoration',
+    data: { tag },
+  };
 }
 
 /** DEK010: a class neither theme.css nor the slide's own stylesheet defines. */

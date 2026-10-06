@@ -39,7 +39,16 @@ export type HtmlScan = {
    * collapsed. An SVG's `<title>` and `<desc>` describe it and are never drawn, so they hold none.
    */
   hiddenTexts: Array<{ element: HtmlElement; text: string }>;
+  /**
+   * Each outermost picture a screen reader is not told to skip: an `<img>`, an `<svg>`, or an
+   * element with `role="img"`, none of them under `aria-hidden="true"`. `text` says whether it
+   * holds any text to read, and `titled` whether a `<title>` inside it names it.
+   */
+  pictures: Picture[];
 };
+
+/** A picture in the markup, with what it holds that a screen reader could say. */
+export type Picture = { element: HtmlElement; text: boolean; titled: boolean };
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 /** Elements that give a heading something to show without any text. */
@@ -62,6 +71,10 @@ export function scanSlideHtml(html: string): HtmlScan {
   // The outermost aria-hidden element still open, and how many undrawn elements are open in it.
   let hiding: { index: number; text: string } | undefined;
   let undrawn = 0;
+  // The outermost picture still open, and whether a <title> inside it is open.
+  const pictures: Array<{ index: number; text: boolean; titled: boolean }> = [];
+  let picture: { index: number; text: boolean; titled: boolean } | undefined;
+  let titles = 0;
 
   const transformed = new HTMLRewriter()
     .on("*", {
@@ -94,6 +107,27 @@ export function scanSlideHtml(html: string): HtmlScan {
             hiding = undefined;
           });
         }
+        if (picture) {
+          if (tag === "title" && el.canHaveContent) {
+            titles++;
+            el.onEndTag(() => {
+              titles--;
+            });
+          }
+        } else if (
+          !hiding &&
+          el.getAttribute("aria-hidden")?.trim() !== "true" &&
+          isPicture(tag, el.getAttribute("role"))
+        ) {
+          const entry = { index: parsed.length, text: false, titled: false };
+          pictures.push(entry);
+          if (el.canHaveContent) {
+            picture = entry;
+            el.onEndTag(() => {
+              picture = undefined;
+            });
+          }
+        }
         if (HEADING_TAGS.has(tag) && el.canHaveContent) {
           const heading = {
             index: parsed.length,
@@ -118,6 +152,10 @@ export function scanSlideHtml(html: string): HtmlScan {
       text(chunk) {
         if (hiding && undrawn === 0) {
           hiding.text += chunk.text;
+        }
+        if (picture && !hiding && chunk.text.trim() !== "") {
+          picture.text = true;
+          picture.titled ||= titles > 0;
         }
         if (open.length > 0 && chunk.text.trim() !== "") {
           for (const heading of open) {
@@ -187,7 +225,23 @@ export function scanSlideHtml(html: string): HtmlScan {
       const squashed = text.replace(/\s+/g, " ").trim();
       return element && squashed !== "" ? [{ element, text: squashed }] : [];
     }),
+    pictures: pictures.flatMap(({ index, text, titled }) => {
+      const element = elements[index];
+      return element ? [{ element, text, titled }] : [];
+    }),
   };
+}
+
+/**
+ * Whether an element draws a picture a screen reader must be told about. `role="presentation"`
+ * or `"none"` says it is decoration, as `aria-hidden` does.
+ */
+function isPicture(tag: string, role: string | null): boolean {
+  const roles = (role ?? "").trim().toLowerCase().split(/\s+/);
+  if (roles[0] === "presentation" || roles[0] === "none") {
+    return false;
+  }
+  return tag === "img" || tag === "svg" || roles[0] === "img";
 }
 
 /** The value of `name` on `element`, as the parser read it. */
