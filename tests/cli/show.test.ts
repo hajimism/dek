@@ -198,6 +198,68 @@ describe("show as a reading entry point", () => {
     });
   });
 
+  // The default theme styles lists and beats under .slide; a title slide with neither uses none
+  // of it, and an excerpt that printed those rules would say it does.
+  test("leaves out the element and attribute rules the slide's markup has no use for", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const result = showCommand(
+          resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+          "intro",
+        );
+        expect(result.theme).toContain('.slide[data-layout="title"] {');
+        expect(result.theme).toContain(".slide .slide-title {");
+        expect(result.theme).not.toContain(".slide ul");
+        expect(result.theme).not.toContain("[data-step]");
+        expect(result.theme).not.toContain("@keyframes fade-in");
+      },
+    );
+  });
+
+  test("keeps the rules for the elements and beats the slide has", async () => {
+    const html = slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <ul><li data-step="1">one</li></ul>
+</section>`);
+    const script = "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n### one\n\nmore\n";
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: html } }] },
+      async (root) => {
+        const result = showCommand(
+          resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+          "intro",
+        );
+        expect(result.theme).toContain(".slide ul {");
+        expect(result.theme).toContain(".slide.is-current [data-step] {");
+      },
+    );
+  });
+
+  // draw() may add elements and attributes the markup does not have yet, so with a slide script
+  // the excerpt keeps every rule under .slide that could reach them.
+  test("keeps element and attribute rules when a slide script may add them", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: { intro: introHtml },
+            scripts: { intro: "export default { draw() {} } satisfies DekSlide;\n" },
+          },
+        ],
+      },
+      async (root) => {
+        const result = showCommand(
+          resolveTarget(join(root, "decks", "demo"), "deck", { refs: true }),
+          "intro",
+        );
+        expect(result.theme).toContain(".slide ul {");
+        expect(result.theme).toContain("[data-step]");
+      },
+    );
+  });
+
   test("returns null for the files a slide does not have", async () => {
     await withTempProject({ decks: [{ name: "demo", theme: null }] }, async (root) => {
       const result = showCommand(

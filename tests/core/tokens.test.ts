@@ -25,6 +25,29 @@ describe("isRawThemeValue", () => {
   });
 });
 
+// AGENTS.md says which values DEK014 wants from a token and which pass; this is that sentence.
+describe("what AGENTS.md says DEK014 checks", () => {
+  test("colors, font families, easings, and lengths and times in a raw unit are raw", () => {
+    expect(isRawThemeValue("color", "#fff")).toBe(true);
+    expect(isRawThemeValue("font-family", "serif")).toBe(true);
+    expect(isRawThemeValue("transition-timing-function", "cubic-bezier(0, 0, 1, 1)")).toBe(true);
+    for (const value of ["2px", "1rem", "10vw", "5cqi", "200ms", "1s"]) {
+      expect({ value, raw: isRawThemeValue("margin", value) }).toEqual({ value, raw: true });
+    }
+  });
+
+  test("keywords, unitless numbers, %, and the element's own font units pass", () => {
+    expect(isRawThemeValue("letter-spacing", "0.1em")).toBe(false);
+    expect(isRawThemeValue("font-weight", "bold")).toBe(false);
+    expect(isRawThemeValue("border", "thin solid")).toBe(false);
+    expect(isRawThemeValue("grid-template-columns", "5.5em 1fr")).toBe(false);
+    expect(isRawThemeValue("line-height", "1.4")).toBe(false);
+    expect(isRawThemeValue("width", "50%")).toBe(false);
+    expect(isRawThemeValue("max-width", "40ch")).toBe(false);
+    expect(isRawThemeValue("margin-block", "1lh")).toBe(false);
+  });
+});
+
 describe("isRawThemeValue reads a value as CSS tokens", () => {
   test("a negative length is as raw as a positive one", () => {
     expect(isRawThemeValue("margin-top", "-12px")).toBe(true);

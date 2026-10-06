@@ -408,6 +408,29 @@ describe("themeExcerpt", () => {
     expect(excerpt).not.toContain("view-transition");
   });
 
+  test("with the slide's markup, keeps only the element and attribute rules it can match", () => {
+    const sheet = parseCss(`.slide { color: var(--fg); }
+.slide h2 { margin: 0; }
+.slide ul > li:first-child { margin: 0; }
+.slide.is-current [data-step] { opacity: 0; }
+.slide [aria-hidden="true"] { opacity: 0.5; }
+.slide p:not(:empty, blockquote) { margin: 0; }
+.slide :is(ol, table) { margin: 0; }
+.slide[data-slug] { outline: 0; }
+`);
+    const excerpt = themeExcerpt(sheet, {
+      classes: ["slide"],
+      markup: { tags: ["section", "H2", "p"], attributes: ["class", "data-layout"] },
+    });
+    expect(excerpt).toContain(".slide h2 {");
+    expect(excerpt).toContain(".slide p:not(:empty, blockquote) {");
+    expect(excerpt).toContain(".slide :is(ol, table) {");
+    expect(excerpt).toContain(".slide[data-slug] {");
+    expect(excerpt).not.toContain("ul");
+    expect(excerpt).not.toContain("[data-step]");
+    expect(excerpt).not.toContain("aria-hidden");
+  });
+
   test("follows tokens and keyframes the slide's own stylesheet uses", () => {
     const own = themeExcerpt(parseCss(theme), {
       classes: ["slide"],

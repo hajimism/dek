@@ -189,7 +189,12 @@ export const RESULT_FIELDS = {
     html: z.string().nullable(),
     css: z.string().nullable(),
     ts: z.string().nullable(),
-    theme: z.string().nullable().describe("The rules of the deck's theme.css this slide uses."),
+    theme: z
+      .string()
+      .nullable()
+      .describe(
+        "The rules of the deck's theme.css this slide uses: those its classes, layout, elements, and attributes match; with a slide script, every element and attribute rule under .slide.",
+      ),
     assets: paths,
     ref: RefInfo.optional(),
   }),
@@ -256,7 +261,9 @@ export const RESULT_FIELDS = {
       .optional(),
   }),
   shot: z.strictObject({
-    shots: z.array(shotFile),
+    shots: z
+      .array(shotFile)
+      .describe("Each still or morph frame; with --motion, empty: the frames are in motion."),
     sheets: paths.optional().describe("Contact sheets, from --sheet or --motion."),
     motion: z
       .array(
@@ -267,7 +274,8 @@ export const RESULT_FIELDS = {
           ),
         }),
       )
-      .optional(),
+      .optional()
+      .describe("With --motion, each beat in order with its frames, the settled end last."),
   }),
   mv: z.strictObject({
     from: z.string(),

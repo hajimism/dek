@@ -6,6 +6,7 @@ import {
   selectorLayouts,
   splitSelectorList,
 } from "./css.ts";
+import { blankStringsAndComments } from "./css-scan.ts";
 import { escapeRegExp } from "./escape.ts";
 import { RUNTIME_CLASSES } from "./theme-facts.ts";
 
@@ -16,7 +17,16 @@ export type SlideUsage = {
   layout?: string;
   /** The slide's own stylesheet, whose `var()` and animations reach into the theme too. */
   css?: Stylesheet;
+  /**
+   * The element tags and attribute names the slide's markup has. Given, a rule that needs an
+   * element or an attribute the slide lacks, as `.slide ul` or `[data-step]`, is left out; left
+   * out, every element and attribute rule under `.slide` is kept.
+   */
+  markup?: { tags: Iterable<string>; attributes: Iterable<string> };
 };
+
+/** The markup as a selector meets it: lowercased, with what the build stamps on every slide. */
+type Markup = { tags: Set<string>; attributes: Set<string> };
 
 type ExcerptEntry = {
   atPath: string[];
@@ -27,9 +37,9 @@ type ExcerptEntry = {
 
 /**
  * The part of a theme one slide depends on, as CSS that reads on its own: the
- * rules its classes and layout select, element and state rules under `.slide`,
- * the keyframes those rules animate with, and only the tokens they reach
- * through `var()`. It errs toward keeping a rule, since a rule left out misleads
+ * rules its classes and layout select, element and state rules under `.slide`
+ * for the elements and attributes it has, the keyframes those rules animate
+ * with, and only the tokens they reach through `var()`. It errs toward keeping a rule, since a rule left out misleads
  * a reader silently while an extra one only costs a line.
  */
 export function themeExcerpt(sheet: Stylesheet, usage: SlideUsage): string {
@@ -64,6 +74,10 @@ export function themeExcerpt(sheet: Stylesheet, usage: SlideUsage): string {
  */
 function excerptEntries(sheet: Stylesheet, usage: SlideUsage): ExcerptEntry[] {
   const used = new Set([...usage.classes, "slide", ...RUNTIME_CLASSES]);
+  const markup = usage.markup && {
+    tags: new Set([...usage.markup.tags].map((tag) => tag.toLowerCase())),
+    attributes: new Set([...usage.markup.attributes].map((name) => name.toLowerCase())),
+  };
   const entries: ExcerptEntry[] = [];
   for (const rule of sheet.rules) {
     // An at-rule's block reads here only where it styles its parent's elements.
@@ -80,7 +94,7 @@ function excerptEntries(sheet: Stylesheet, usage: SlideUsage): ExcerptEntry[] {
     }
     const parts = splitSelectorList(selector)
       .map((part) => part.trim())
-      .filter((part) => part && selectorPartApplies(part, used, usage.layout));
+      .filter((part) => part && selectorPartApplies(part, used, usage.layout, markup));
     if (parts.length > 0) {
       entries.push({ atPath, selector: parts.join(", "), decls: rule.decls });
     }
@@ -102,13 +116,53 @@ function animatedKeyframes(styled: CssDeclaration[], entries: ExcerptEntry[]): S
   );
 }
 
-function selectorPartApplies(part: string, used: Set<string>, layout?: string): boolean {
+function selectorPartApplies(
+  part: string,
+  used: Set<string>,
+  layout: string | undefined,
+  markup: Markup | undefined,
+): boolean {
   if (part.startsWith("::view-transition")) {
     return false;
   }
   return (
     selectorClasses(part).every((name) => used.has(name)) &&
-    selectorLayouts(part).every((name) => name === layout)
+    selectorLayouts(part).every((name) => name === layout) &&
+    (markup === undefined || selectorFitsMarkup(part, markup))
+  );
+}
+
+/** Attributes the build sets on every slide, or that the layout check already decides. */
+const STAMPED_ATTRIBUTES = new Set(["data-layout", "data-slug", "style"]);
+
+/**
+ * Whether the markup has every element and attribute a selector needs. Only what the selector
+ * requires outright counts: a name inside `:not()`, `:is()`, `:has()`, or any other parenthesis
+ * may be absent, so it keeps the rule.
+ */
+function selectorFitsMarkup(part: string, markup: Markup): boolean {
+  let outside = "";
+  let depth = 0;
+  for (const ch of blankStringsAndComments(part)) {
+    if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+    } else if (depth === 0) {
+      outside += ch;
+    }
+  }
+  const attributes = [...outside.matchAll(/\[\s*([-\w]+)/g)].map((m) => (m[1] ?? "").toLowerCase());
+  const bare = outside.replace(/\[[^\]]*\]/g, "").replace(/::?[-\w]+/g, "");
+  const tags = [...bare.matchAll(/(?:^|[\s>+~])([A-Za-z][-\w]*)/g)].map((m) =>
+    (m[1] ?? "").toLowerCase(),
+  );
+  return (
+    tags.every((tag) => markup.tags.has(tag)) &&
+    attributes.every(
+      (name) =>
+        markup.attributes.has(name) || STAMPED_ATTRIBUTES.has(name) || name.startsWith("data-dek-"),
+    )
   );
 }
 

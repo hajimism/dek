@@ -564,7 +564,7 @@ c
       expect(agents).toContain("dekc shot <a> --to <b> --at 0.5");
       expect(agents).toContain("`--dek-slide-number` and `--dek-slide-count`");
       expect(agents).toContain("never by hand");
-      expect(agents).toContain("When a hint sends a fix to `theme.css`, make it there");
+      expect(agents).toContain("When a hint sends a fix to the deck's `theme.css`, make it there");
       expect(agents).toContain("`DEK029` warns of text under it");
     });
   });
@@ -617,12 +617,18 @@ c
     });
   });
 
-  // The player sets is-current and is-shown; AGENTS.md says not to write them, and DEK010 checks it.
-  test("AGENTS.md says the state classes are the player's, not markup's", async () => {
+  // An agent reads AGENTS.md before anything else, so what it says about the theme has to match
+  // what lint checks and which file the commands read.
+  test("AGENTS.md names the deck's theme.css, the state classes, and what DEK014 checks", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       syncDeck(join(root, "decks", "demo"));
       const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      expect(agents).not.toContain("use token `var()` only");
+      expect(agents).toContain("(`DEK014`). Keywords such as `bold` or `thin`");
+      expect(agents).toContain("The `theme.css` at the project root is only the template");
+      expect(agents).toContain("Shared look lives in the deck's `theme.css`");
       expect(agents).toContain("never write them in markup (`DEK010`)");
+      expect(agents).toContain("`shots` is empty");
     });
   });
 

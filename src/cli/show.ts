@@ -1,7 +1,7 @@
 import { classifyAssetRef } from "../core/assets.ts";
 import { cssUrls, parseCss } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
-import { scanSlideHtml } from "../core/html-scan.ts";
+import { type HtmlScan, scanSlideHtml } from "../core/html-scan.ts";
 import { sectionChunks, splitLines } from "../core/lines.ts";
 import { readDeckFile } from "../core/resolve.ts";
 import type { Section } from "../core/schema.ts";
@@ -24,7 +24,11 @@ export type ShowResult = {
   css: string | null;
   /** `slides/<slug>.ts`. */
   ts: string | null;
-  /** The rules of the deck's theme.css this slide uses; null when the deck has no theme.css. */
+  /**
+   * The rules of the deck's theme.css this slide uses, for the classes, layout, elements, and
+   * attributes its markup has; with a slide script, every element and attribute rule under
+   * `.slide`. Null when the deck has no theme.css.
+   */
   theme: string | null;
   /** Deck-relative paths of the files the slide references that exist. */
   assets: string[];
@@ -52,6 +56,8 @@ export function showCommand({ deck, ref }: ReadableDeck, slug: string): ShowResu
           classes: scan?.classes ?? [],
           ...(scan?.layout !== undefined ? { layout: scan.layout } : {}),
           ...(sheet ? { css: sheet } : {}),
+          // A slide script may add elements and attributes the markup lacks: keep their rules.
+          ...(scan && ts === null ? { markup: slideMarkup(scan) } : {}),
         });
 
   const refs = [
@@ -70,6 +76,15 @@ export function showCommand({ deck, ref }: ReadableDeck, slug: string): ShowResu
     theme,
     assets: existingRefs(refs, paths.slides, deck.dir),
     ...(ref ? { ref } : {}),
+  };
+}
+
+/** The tags and attribute names of the slide and the elements inside it. */
+function slideMarkup(scan: HtmlScan): { tags: string[]; attributes: string[] } {
+  const elements = scan.elements.filter((element) => element.inSlide);
+  return {
+    tags: elements.map((element) => element.tag),
+    attributes: elements.flatMap((element) => element.attributes.map((attr) => attr.name)),
   };
 }
 

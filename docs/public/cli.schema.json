@@ -541,7 +541,7 @@
               ]
             },
             "theme": {
-              "description": "The rules of the deck's theme.css this slide uses.",
+              "description": "The rules of the deck's theme.css this slide uses: those its classes, layout, elements, and attributes match; with a slide script, every element and attribute rule under .slide.",
               "type": [
                 "string",
                 "null"
@@ -1077,7 +1077,8 @@
                   "path"
                 ],
                 "additionalProperties": false
-              }
+              },
+              "description": "Each still or morph frame; with --motion, empty: the frames are in motion."
             },
             "sheets": {
               "description": "Contact sheets, from --sheet or --motion.",
@@ -1087,6 +1088,7 @@
               }
             },
             "motion": {
+              "description": "With --motion, each beat in order with its frames, the settled end last.",
               "type": "array",
               "items": {
                 "type": "object",
