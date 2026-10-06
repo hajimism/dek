@@ -1,3 +1,7 @@
+---
+description: '`##` is a slide, `###` is a beat, only paragraphs are spoken. Ids, renaming, timing.'
+---
+
 # The Script
 
 `script.md` holds three things and nothing else: the order of the talk, the words you will say, and how long you have. Layout and decoration belong to the slide HTML. Voice belongs to `voice/`. The script knows about neither.

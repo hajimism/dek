@@ -1,3 +1,7 @@
+---
+description: 'Boxes first means a deck you cannot deliver. The script is the parent. Three principles, a comparison, and what dek is not for.'
+---
+
 # Why dek
 
 Slides exist so that you can talk. Every mainstream tool forgets this. PowerPoint, Keynote, Google Slides, Marp, Slidev: all of them start with an empty box and ask you to fill it. You add a heading, then a diagram, then an animation. The deck grows more polished, and the talk grows harder to deliver. On the day, you watch the clock, skip three slides, and leave out the one thing you came to say.

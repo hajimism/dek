@@ -1,3 +1,7 @@
+---
+description: 'ディレクトリ構成、`dek.toml`、frontmatter、`voice.toml`、トークン、レイアウト。'
+---
+
 # 設定
 
 設定する場所は 3 つです。プロジェクトの `dek.toml`、各デッキの `script.md` の frontmatter、そしてデッキ内の任意の `voice/` ファイル群。

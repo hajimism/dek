@@ -44,6 +44,8 @@ bunx dekc build     # 3. dist/2026-04-vite.html — the whole talk in one file
 
 Write the script, run `dekc`, and you can present with the bundled theme without writing a line of HTML.
 
+Working with an agent? Install the official skill with `npx skills add hajimism/dek`, or in Claude Code with `/plugin marketplace add hajimism/dek` and `/plugin install dek@dek`; an agent outside any project can start from [llms.txt](https://hajimism.github.io/dek/llms.txt). See [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html).
+
 Continue with [Getting Started](https://hajimism.github.io/dek/guide/getting-started.html), or build a real deck end to end in the [Tutorial](https://hajimism.github.io/dek/guide/tutorial.html). Every command is listed in the [CLI reference](https://hajimism.github.io/dek/reference/cli.html).
 
 ## Sample

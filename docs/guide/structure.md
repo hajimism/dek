@@ -1,3 +1,7 @@
+---
+description: 'One project, many decks. Themes are copied. Other people''s decks are read-only refs. The working directory sets the scope.'
+---
+
 # Projects and Decks
 
 A **project** holds many **decks**. This page explains the boundary between the two, why the theme is copied rather than shared, and how dek decides which deck a command applies to.

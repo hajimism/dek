@@ -6,13 +6,21 @@ Site: https://hajimism.github.io/dek/
 Japanese: https://hajimism.github.io/dek/ja/
 Repo: https://github.com/hajimism/dek
 
-Install dek into the project with `bun add -d @hajimism/dek` and run it as `bunx dekc` from inside it, or `bunx @hajimism/dek` outside one; the command is `dekc`, not `dek`: `dek` on npm is an unrelated package, which `bunx dek` downloads and runs.
+dek runs on Bun. Install dek into the project with `bun add -d @hajimism/dek` and run it as `bunx dekc` from inside it, or `bunx @hajimism/dek` outside one; the command is `dekc`, not `dek`: `dek` on npm is an unrelated package, which `bunx dek` downloads and runs. Use `bunx`, not `npx`.
 
-Agents use the same CLI as humans. Run `dekc help --agent`, or `dekc help <command>` for one command's flags. Result commands accept `--json`: branch on `ok`; every `"ok": false` carries `error` (`message`, `hint`, optional `path`/`line`), and lint, check, build, ls, and cues always carry `diagnostics` (with `line`/`column` and `data`). A check that did not run is in `skipped` with its `reason` and `hint`. 0.x: the JSON shape and DEK ids may change; DEK ids are never reused. Diagnostics: `dekc lint --format sarif`. Do not parse human-oriented text output.
+Agents use the same CLI as humans. Run `dekc help --agent`, or `dekc help <command>` for one command's flags; they describe the dek installed in the project, which wins over anything written here. Result commands accept `--json`: branch on `ok`; every `"ok": false` carries `error` (`message`, `hint`, optional `path`/`line`), and lint, check, build, ls, and cues always carry `diagnostics` (with `line`/`column` and `data`). A check that did not run is in `skipped` with its `reason` and `hint`. 0.x: the JSON shape and DEK ids may change; DEK ids are never reused. Diagnostics: `dekc lint --format sarif`. Do not parse human-oriented text output.
+
+## Skill
+
+The official skill teaches an agent the loop: script first, then one slide at a time with `show`, an edit, `check --shot`, and `lint`, and when to stop. It names few commands and defers to `dekc help --agent` for the rest, so it never runs ahead of the dek a project has.
+
+- The skills CLI: `npx skills add hajimism/dek`
+- Claude Code: `/plugin marketplace add hajimism/dek`, then `/plugin install dek@dek`
+- In a project: `node_modules/@hajimism/dek/skills/dek/SKILL.md`, the copy for the dek installed there
 
 ## Guide
 
-- [Why dek](https://hajimism.github.io/dek/guide/why.html): Boxes first means a deck you cannot deliver. The script is the parent. Three principles and a comparison.
+- [Why dek](https://hajimism.github.io/dek/guide/why.html): Boxes first means a deck you cannot deliver. The script is the parent. Three principles, a comparison, and what dek is not for.
 - [Getting Started](https://hajimism.github.io/dek/guide/getting-started.html): Install to a presentable skeleton deck without writing HTML.
 - [Tutorial](https://hajimism.github.io/dek/guide/tutorial.html): Build a ten-minute talk end to end: script, beats, a hand-written slide, a morph, a theme change, a single-file build.
 - [Projects and Decks](https://hajimism.github.io/dek/guide/structure.html): One project, many decks. Themes are copied. Other people's decks are read-only refs. The working directory sets the scope.
@@ -21,15 +29,59 @@ Agents use the same CLI as humans. Run `dekc help --agent`, or `dekc help <comma
 - [Beats](https://hajimism.github.io/dek/guide/steps.html): `data-step` and `data-morph`. Order from the script, appearance from CSS.
 - [Themes](https://hajimism.github.io/dek/guide/theme.html): Thirteen tokens on `.slide`. Growing the vocabulary is a design decision.
 - [Lint](https://hajimism.github.io/dek/guide/lint.html): Lint decides what a rule can measure; `--visual` measures geometry. The rest is the author's call.
-- [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys and touch, one file on a USB stick, print, remote, PDF.
+- [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys and touch, marks and annotations, one file on a USB stick, print, remote, PDF, and PPTX with editable text.
 - [Voice and Video](https://hajimism.github.io/dek/guide/voice.html): Opt-in. Cue, Timeline, rehearse, video.
-- [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): CLI plus `AGENTS.md`. `check --shot --voice`. `show` a slide, or a ref's, to use it as a model. No MCP.
-- [FAQ](https://hajimism.github.io/dek/guide/faq.html): When to use Slidev, whether voice is required, and more.
+- [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): The CLI, `AGENTS.md`, and the official skill. `check --shot`, `show` a slide or a ref's as a model, and `dekc annotations` for what the human pointed at. No MCP.
+- [FAQ](https://hajimism.github.io/dek/guide/faq.html): When to use Slidev, handing a talk to PowerPoint users, whether voice is required, and more.
 - [Architecture](https://hajimism.github.io/dek/guide/architecture.html): Core shared by the CLI and the dev server. Optional dependencies.
 - [Agent Usability Criteria](https://hajimism.github.io/dek/guide/agent-criteria.html): The yardstick for agent-facing changes: accurate guidance, conventions that lint checks, verifiable output, actionable diagnostics, a clear stopping point.
 
 ## Reference
 
 - [CLI](https://hajimism.github.io/dek/reference/cli.html): Commands, flags, environment variables.
-- [Lint Rules](https://hajimism.github.io/dek/reference/lint.html): DEK001 to DEK044.
+- [Lint Rules](https://hajimism.github.io/dek/reference/lint.html): Every rule's id, scope, and condition, and which rules are warnings. DEK001 to DEK045, 40 rules.
 - [Configuration](https://hajimism.github.io/dek/reference/config.html): Directory layout, `dek.toml`, frontmatter, `voice.toml`, tokens, layouts.
+
+## Commands
+
+As `dekc help --agent` prints them for the dek this file was written with:
+
+```text
+dek — agent interface
+Result commands accept --json. dekc / rehearse do not (long-running). Diagnostics: dekc lint --format sarif.
+Each command's --json shape: https://hajimism.github.io/dek/cli.schema.json
+Each diagnostic has severity (error | warning) and data; only errors exit 1.
+Scope: project root = all decks; deck dir = that deck; NAME or --deck NAME.
+
+dekc [deck] [--visual] [--port N]
+dekc --remote
+dekc rehearse [slug] [--remote]
+dekc init [dir] [--deck NAME]
+dekc new <name> [--theme-from DECK]
+dekc ls [deck]
+dekc ref [owner/repo/deck[@rev] | github-link]   pin + fetch; no args lists; dekc ref rm <ref>
+Refs are read-only decks to learn from: ls, show, theme, shot take owner/repo/deck as the deck.
+dekc show <slug>     script with its beat ids, HTML, CSS, TS, the theme rules it uses, assets
+dekc theme [layout]  deck theme: layouts, classes, tokens; with a layout, its example markup
+dekc check <slug> [--shot] [--voice]   fill: share of the frame it fills, by tenths
+dekc shot [slug] [--step <id|n>]
+dekc shot --sheet    every slide at its last beat on contact sheets sized for one look
+dekc shot <slug> --motion [--step <id|n>]   a row per beat: 0/25/50/75% of all it moves, then its end
+dekc shot <a> --to <b> [--at 0..1]   frame of the a→b view transition, default 0.5
+dekc mv <old> <new> | dekc mv <slug> --before|--after <slug>
+dekc goto <slug>     requires running dek
+dekc current         requires running dek
+dekc marks [clear]   beats the speaker marked (m) to rewrite: line, was, text, status open|edited|gone
+dekc annotations [clear]   notes a human wrote on slide elements (a): path:line:column, text, shot, status open|edited|gone
+dekc sync            create missing skeletons; refresh or drop untouched ones; never edits your slides
+dekc lint [--fix] [--visual] [--format sarif]
+dekc cues
+dekc voice [speakers | say <text> | dict add <word> <kana> [--accent N] | pin]
+dekc build [--root-dist] [--url <url>] [--public]
+dekc video [slug] [--fps N] [--root-dist]
+dekc pdf [--root-dist]
+dekc pptx [--root-dist] [--public]   text editable over a picture of each slide; script in notes
+dekc help [command] | dekc <command> --help | dekc --version
+
+Errors include hint with the next command to run.
+```

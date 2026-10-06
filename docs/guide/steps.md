@@ -1,3 +1,7 @@
+---
+description: '`data-step` and `data-morph`. Order from the script, appearance from CSS.'
+---
+
 # Beats
 
 A beat is a `###` heading in the script. On screen, a beat is the moment an element appears. This page covers the HTML side of that link, the transition between slides, and how to carry an element from one slide to the next. The order always comes from the script; the appearance always comes from CSS.

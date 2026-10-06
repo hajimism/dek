@@ -1,3 +1,7 @@
+---
+description: 'コマンド、フラグ、環境変数。'
+---
+
 # CLI
 
 `bunx @hajimism/dek init` でプロジェクトを作り、その中で `bun add -d @hajimism/dek` と dek を入れます。[はじめる](/ja/guide/getting-started)を参照してください。以下の例では `dekc` と書きますが、実体はそのプロジェクトの中での `bunx dekc`、プロジェクトの外なら `bunx @hajimism/dek` です。`dek` と打たないでください。`bunx dek` は npm の無関係な `dek` を動かします。

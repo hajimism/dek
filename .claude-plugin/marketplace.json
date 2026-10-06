@@ -1,0 +1,12 @@
+{
+  "name": "dek",
+  "owner": { "name": "Hajime Nakagawa", "url": "https://github.com/hajimism" },
+  "description": "The official dek skill.",
+  "plugins": [
+    {
+      "name": "dek",
+      "source": "./",
+      "description": "Write and fix talks with dek, a build system for talks run as dekc on Bun."
+    }
+  ]
+}

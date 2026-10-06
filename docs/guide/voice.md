@@ -1,3 +1,7 @@
+---
+description: 'Opt-in. Cue, Timeline, rehearse, video.'
+---
+
 # Voice and Video
 
 Voice is opt-in. A deck with a `voice/` directory can synthesize its script with a local text-to-speech engine, rehearse to that audio, and bake an MP4. A deck without `voice/` is unaffected, and what fails its lint does not change.

@@ -1,3 +1,7 @@
+---
+description: '1 ファイルに `<section class="slide">` を 1 つ。使えるのはテーマのクラスだけ。HTML に `<script>` は書かず、動きは `slides/<id>.ts` に。骨格は手を入れるまで更新される。'
+---
+
 # スライド
 
 スライドは `slides/` の中の 1 ファイルです。名前はセクションの id、ルート要素は `<section class="slide">` ひとつ。スタイルはテーマが定義するクラスだけで付けます。

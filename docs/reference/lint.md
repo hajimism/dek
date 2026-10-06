@@ -1,3 +1,7 @@
+---
+description: 'Every rule''s id, scope, and condition, and which rules are warnings.'
+---
+
 # Lint Rules
 
 How lint fits the workflow is in [Lint](/guide/lint). This page is the table of ids, scopes, and conditions.

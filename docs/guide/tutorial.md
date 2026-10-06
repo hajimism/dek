@@ -1,3 +1,7 @@
+---
+description: 'Build a ten-minute talk end to end: script, beats, a hand-written slide, a morph, a theme change, a single-file build.'
+---
+
 # Tutorial
 
 In this tutorial you build a short talk from scratch: a ten-minute lightning talk about a bug that turned out to be a design flaw. By the end you will have a script with beats, a hand-written slide that reveals itself in step with your speaking, a figure that carries over between two slides, a theme change that stays inside the rules, and a single HTML file you could present from a USB stick.

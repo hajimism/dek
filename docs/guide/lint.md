@@ -1,3 +1,7 @@
+---
+description: 'Lint decides what a rule can measure; `--visual` measures geometry. The rest is the author''s call.'
+---
+
 # Lint
 
 Lint decides everything a rule can decide. A deck is not done while `dekc lint --visual` fails; passing it means nothing measurable is wrong, not that the deck is good. The balance of the slides, the argument, and the timing are judged by reading the sheet and the script, and finally by the author. The dev server lints on every save, so a deck you are working on is always passing or telling you why not. You rarely run `dekc lint` by hand; it exists for CI and for checking one slide.

@@ -1,3 +1,7 @@
+---
+description: 'One `<section class="slide">` per file. Theme classes only. No `<script>` in the HTML; motion lives in `slides/<id>.ts`. Skeletons, refreshed until you edit them.'
+---
+
 # Slides
 
 A slide is one file in `slides/`, named after its section id, with a single root element: `<section class="slide">`. You style it with the classes your theme defines and nothing else.

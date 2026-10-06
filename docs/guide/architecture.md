@@ -1,3 +1,7 @@
+---
+description: 'Core shared by the CLI and the dev server. Optional dependencies.'
+---
+
 # Architecture
 
 The design decision that matters most is that **core** is a standalone module. The CLI and the dev server share one parser, one rule set, and one project resolver. Two parsers would drift.

@@ -1,3 +1,7 @@
+---
+description: 'CLI と `AGENTS.md` と公式スキル。`check --shot`、お手本にするスライドや ref の `show`、人が指した要素を読む `dekc annotations`。MCP はない。'
+---
+
 # AI エージェントと作る
 
 エージェントは、あなたと同じ CLI を使います。MCP サーバも、インストールするツール定義もありません。コーディングエージェントはすでにシェルとファイルエディタを持っていて、スライドは 40 行の HTML ファイルです。エージェント自身のエディタで直接書くのが、いちばん正確で、いちばん安い。dek が足すのは、エージェントが単独ではうまくできないことだけです。描画結果を見ること、読み上げを聞くこと、そして改名と並べ替えという、間違いが起きやすい操作。
@@ -13,6 +17,19 @@ dekc help --agent
 ```
 
 これだけで、Claude Code でも Codex でも OpenCode でも、追加設定なしに dek のプロジェクトで作業できます。
+
+## プロジェクトの前に：llms.txt とスキル
+
+dek をまだ知らないエージェントや、プロジェクトの外で作業するエージェントには、入口が 2 つあります。
+
+- [`llms.txt`](https://hajimism.github.io/dek/llms.txt) は、dek の入れ方と呼び方、このドキュメントの各ページが扱うこと、lint のルールの数、`dekc help --agent` が出すとおりの全コマンドを示します。`bun run llms` がドキュメント・ルール表・コマンドから作り、公開している版が古くなるとテストが失敗します。
+- 公式スキルは、作業のループを教えます。台本から始め、1 枚ずつ `dekc show`、編集、`dekc check --shot`、`dekc lint --visual` と進め、どこで止めるか。罠も扱います。コマンドは `dek` ではなく `dekc` で、dek は Bun で動くので `npx` ではなく `bunx` です。0.2 以降のどの dek にもあるコマンドだけを名指しし、それ以外は `dekc help --agent` と `AGENTS.md` に任せるので、プロジェクトに古い dek が入っていても、ないコマンドを教えることはありません。
+
+```bash
+npx skills add hajimism/dek
+```
+
+skills CLI が、対応するエージェントにスキルを入れます。Claude Code では、`/plugin marketplace add hajimism/dek` のあと `/plugin install dek@dek` でプラグインとして入ります。npm パッケージにも同じファイルが入っているので、プロジェクトには必ず、その dek に合った版が `node_modules/@hajimism/dek/skills/dek/SKILL.md` にあります。MCP サーバはなく、スキルは CLI の使い方を教えるものです。どちらも `AGENTS.md` と同じく英語です。エージェントは、あなたが話しかけた言語で答えます。
 
 ## CLI が約束すること
 
