@@ -4,8 +4,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Browser } from "playwright";
+import {
+  AnnotationOp,
+  applyAnnotationOp,
+  clearAnnotations,
+  listAnnotations,
+} from "../../src/core/annotations.ts";
 import { renderDeckHtml } from "../../src/core/document.ts";
 import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
+import { resolveDeck } from "../../src/core/resolve.ts";
 import { annotateScript, playerScript } from "../../src/runtime/player.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
@@ -36,7 +43,10 @@ type Page = {
   on(event: "pageerror", listener: (error: Error) => void): void;
   close(): Promise<void>;
 };
-type Route = { fulfill(response: { contentType: string; body: string }): Promise<void> };
+type Route = {
+  request(): { postData(): string | null };
+  fulfill(response: { status?: number; contentType: string; body: string }): Promise<void>;
+};
 
 const script = `---
 title: Plan
@@ -111,6 +121,20 @@ async function openDevPage(): Promise<{ page: Page; errors: Error[] }> {
   await page.route("http://deck.test/", (route) =>
     route.fulfill({ contentType: "text/html", body: html }),
   );
+  // The dev server's notes, answered from the project's file as its route answers them.
+  const deck = resolveDeck(join(root, "decks", "plan")).deck;
+  clearAnnotations(root, deck);
+  await page.route("http://deck.test/annotations", (route) => {
+    const sent = route.request().postData();
+    const op = sent ? AnnotationOp.parse(JSON.parse(sent)) : undefined;
+    const done = op
+      ? applyAnnotationOp(root, deck, op)
+      : { annotations: listAnnotations(root, deck) };
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, ...done }),
+    });
+  });
   await page.routeWebSocket(/.*/, () => undefined);
   await page.goto("http://deck.test/#plan");
   await page.keyboard.press("a");
@@ -274,6 +298,14 @@ describe("annotate mode in a browser", () => {
       expect((await choices(page)).all).toEqual(["section.slide :8"]);
       await page.keyboard.type("ここに矢印");
       await page.keyboard.press("Enter");
+      await page.waitForFunction(
+        () =>
+          document
+            .getElementById("dek-annotate")
+            ?.shadowRoot?.querySelector("[data-part=marker]") !== null,
+        undefined,
+        { timeout: 5_000 },
+      );
       // Its pin's tip is on the place clicked, not on a corner of the slide.
       const at = await onScreen(page, 1100, 600);
       const tip = await page.evaluate(() => {

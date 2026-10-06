@@ -12,7 +12,9 @@ export type LiveEvent =
   | { type: "reload-theme" }
   | { type: "reload-script"; slugs: string[] }
   | { type: "diagnostics"; diagnostics: Diagnostic[] }
-  | { type: "timeline" };
+  | { type: "timeline" }
+  /** The deck's annotations changed; a page that shows them asks for them again. */
+  | { type: "annotations" };
 
 export type LiveEventType = LiveEvent["type"];
 
@@ -32,6 +34,7 @@ const FIELDS_OK: Record<LiveEventType, (event: Record<string, unknown>) => boole
   "reload-script": (event) => isStrings(event.slugs),
   diagnostics: (event) => Array.isArray(event.diagnostics),
   timeline: () => true,
+  annotations: () => true,
 };
 
 /** Whether a message read off the stream is one this build of the page understands. */

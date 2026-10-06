@@ -1,9 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { realpathSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readNotes } from "../../src/runtime/annotate-notes.ts";
+import { AnnotationOp, applyAnnotationOp, listAnnotations } from "../../src/core/annotations.ts";
+import { DekError } from "../../src/core/error.ts";
+import { deckSlides, slidePlace, stampSlide } from "../../src/core/html.ts";
+import { ANNOTATIONS_CHANGED } from "../../src/core/page.ts";
+import { resolveDeck } from "../../src/core/resolve.ts";
 import {
   currentSlug,
   dekLive,
@@ -40,24 +44,67 @@ const planHtml = slideDocument(`<section class="slide">
   </div>
 </section>`);
 
-/** The plan slide as the dev server sends it after an edit put a line above it. */
-const movedDown = `<section class="slide" data-slug="plan" data-dek-source="9:3" data-dek-class="slide">
-  <div class="lane" data-dek-source="10:3" data-dek-class="lane">
-    <div class="chevron" data-dek-source="11:5" data-dek-class="chevron">画面 <b data-dek-source="11:29">設計</b></div>
-    <div class="arrow" style="pointer-events: none" data-dek-source="12:5" data-dek-class="arrow"></div>
-  </div>
-</section>`;
+/** The plan slide after an edit put a line above it. */
+const movedDown = planHtml.replace("<body>\n", "<body>\n  <p>new</p>\n");
 
-/** The plan slide after an edit took the arrow away. */
-const arrowGone = `<section class="slide" data-slug="plan" data-dek-source="9:3" data-dek-class="slide">
-  <div class="lane" data-dek-source="10:3" data-dek-class="lane">
-    <div class="chevron" data-dek-source="11:5" data-dek-class="chevron">画面 <b data-dek-source="11:29">設計</b></div>
-  </div>
-</section>`;
+/** The plan slide after an edit took the arrow away as well. */
+const arrowGone = movedDown.replace(
+  '    <div class="arrow" style="pointer-events: none"></div>\n',
+  "",
+);
 
 let root = "";
-let liveSlide = movedDown;
+let liveSlide = "";
 const copied: string[] = [];
+
+const deckDir = (): string => join(root, "decks", "plan");
+const deck = () => resolveDeck(deckDir()).deck;
+
+/** The plan slide as the dev server sends it on a live update: stamped from the file. */
+function stamped(): string {
+  const slides = deckSlides(deck());
+  const source = slides.source("plan");
+  return stampSlide(slides.written("plan") ?? "", {
+    slug: "plan",
+    place: slidePlace(deck().deck.sections, 1),
+    ...(source ? { source } : {}),
+  });
+}
+
+/** Save the plan slide, and tell the page as the dev server would. */
+async function edit(html: string): Promise<void> {
+  await writeFile(join(deckDir(), "slides", "plan.html"), html);
+  liveSlide = stamped();
+  await dekLive({ type: "reload-slide", slug: "plan" });
+  await settle();
+}
+
+/** The dev server's annotations, answered from the file as the route answers them. */
+function annotationsAnswer(init?: RequestInit): Response {
+  try {
+    const op =
+      init?.body === undefined ? undefined : AnnotationOp.parse(JSON.parse(String(init.body)));
+    const done = op
+      ? applyAnnotationOp(root, deck(), op)
+      : { annotations: listAnnotations(root, deck()) };
+    return Response.json({ ok: true, ...done });
+  } catch (error) {
+    if (!(error instanceof DekError)) {
+      throw error;
+    }
+    return Response.json({ ok: false, error: { message: error.message } }, { status: 409 });
+  }
+}
+
+const kept = (): number => listAnnotations(root, deck()).length;
+
+/** Copy until what is copied says `done`: the page asks the server again after a live update. */
+async function copyUntil(done: (text: string) => boolean): Promise<void> {
+  await waitFor(() => {
+    part<HTMLButtonElement>("[data-part=copy]").click();
+    return done(copied.at(-1) ?? "");
+  });
+}
 
 beforeAll(async () => {
   root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
@@ -86,10 +133,16 @@ async function mount(beforeStart?: () => void): Promise<void> {
     live: true,
     url: "http://localhost:3000/#plan",
     beforeStart: () => {
-      globalThis.fetch = (async (input: RequestInfo | URL) =>
-        String(input).includes("/slide/plan")
-          ? new Response(liveSlide)
-          : Response.json({ ok: true, positions: [] })) as typeof fetch;
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/slide/plan")) {
+          return new Response(liveSlide);
+        }
+        if (url.includes("/annotations")) {
+          return annotationsAnswer(init);
+        }
+        return Response.json({ ok: true, positions: [] });
+      }) as typeof fetch;
       (globalThis as { WebSocket: unknown }).WebSocket = class {
         readyState = 0;
         addEventListener(): void {}
@@ -202,7 +255,7 @@ describe("annotate mode", () => {
     expect(document.body.classList.contains("is-presenter")).toBe(false);
   });
 
-  test.serial("takes another element on the path, and Enter adds the note", () => {
+  test.serial("takes another element on the path, and Enter adds the note", async () => {
     const chevron = ui().querySelector<HTMLButtonElement>(
       '[data-part=path] button[title^="div.chevron"]',
     );
@@ -213,11 +266,11 @@ describe("annotate mode", () => {
     field.value = "右に寄せて";
     pressKey("Enter", { composed: true }, field);
     expect(shown("[data-part=popup]")).toBe(false);
-    expect(part("[data-part=count]").textContent).toBe("1 note");
+    await waitFor(() => part("[data-part=count]").textContent === "1 note");
     expect(texts("[data-part=marker]")).toEqual(["1"]);
   });
 
-  test.serial("adds elements to one note with Cmd or Ctrl", () => {
+  test.serial("adds elements to one note with Cmd or Ctrl", async () => {
     under(on(".arrow"), on(".lane"), slide());
     pointAt("click");
     under(on(".chevron"), on(".lane"), slide());
@@ -228,7 +281,7 @@ describe("annotate mode", () => {
       'div.chevron "画面 設計" :10',
     ]);
     part<HTMLButtonElement>("[data-part=add]").click();
-    expect(part("[data-part=count]").textContent).toBe("2 notes");
+    await waitFor(() => part("[data-part=count]").textContent === "2 notes");
   });
 
   test.serial("lists what is only near the click apart from its path", () => {
@@ -255,26 +308,24 @@ describe("annotate mode", () => {
     await waitFor(() => part("[data-part=status]").textContent === "Copied 2 notes");
   });
 
-  test.serial("keeps the notes for the tab", () => {
-    expect(readNotes(sessionStorage.getItem("dek-annotate:plan"))).toHaveLength(2);
+  test.serial("keeps the notes in .dek/annotations.json, for `dekc annotations` to read", () => {
+    expect(kept()).toBe(2);
+    expect(listAnnotations(root, deck()).map((row) => row.targets.map((t) => t.name))).toEqual([
+      ["div.chevron"],
+      ["div.arrow", "div.chevron"],
+    ]);
   });
 
   test.serial("follows an element when an edit moves it down the file", async () => {
-    liveSlide = movedDown;
-    await dekLive({ type: "reload-slide", slug: "plan" });
-    await settle();
-    part<HTMLButtonElement>("[data-part=copy]").click();
-    await waitFor(() => copied.at(-1)?.includes("plan.html:11:5") === true);
+    await edit(movedDown);
+    await copyUntil((text) => text.includes("plan.html:11:5"));
     expect(copied.at(-1)).toContain("   - div.arrow at decks/plan/slides/plan.html:12:5");
     expect(copied.at(-1)).not.toContain("before an edit");
   });
 
   test.serial("keeps a note whose element an edit took away, as written before it", async () => {
-    liveSlide = arrowGone;
-    await dekLive({ type: "reload-slide", slug: "plan" });
-    await settle();
-    part<HTMLButtonElement>("[data-part=copy]").click();
-    await waitFor(() => copied.at(-1)?.includes("before an edit") === true);
+    await edit(arrowGone);
+    await copyUntil((text) => text.includes("before an edit"));
     expect(copied.at(-1)).toContain(
       "   - div.arrow at decks/plan/slides/plan.html:12:5 (box 0,0 0×0), as written before an edit",
     );
@@ -295,13 +346,44 @@ describe("annotate mode", () => {
     }
   });
 
-  test.serial("opens a note from its marker, to change or delete it", () => {
+  test.serial("opens a note from its marker, to change or delete it", async () => {
     part<HTMLButtonElement>("[data-part=marker]").click();
     expect(part<HTMLTextAreaElement>("textarea").value).toBe("右に寄せて");
     expect(shown("[data-part=delete]")).toBe(true);
     expect(shown("[data-part=hint]")).toBe(false);
     part<HTMLButtonElement>("[data-part=delete]").click();
-    expect(part("[data-part=count]").textContent).toBe("1 note");
+    await waitFor(() => part("[data-part=count]").textContent === "1 note");
+    expect(kept()).toBe(1);
+  });
+
+  test.serial("shows a note another tab wrote, once the dev server says so", async () => {
+    applyAnnotationOp(root, deck(), {
+      op: "add",
+      slug: "plan",
+      step: "0",
+      text: "from the phone",
+      targets: [{ source: "10:3", box: { x: 0, y: 0, width: 0, height: 0 } }],
+    });
+    document.dispatchEvent(new Event(ANNOTATIONS_CHANGED));
+    await waitFor(() => part("[data-part=count]").textContent === "2 notes");
+    const [, phone] = listAnnotations(root, deck());
+    applyAnnotationOp(root, deck(), { op: "remove", id: phone?.id ?? "" });
+    await dekLive({ type: "annotations" });
+    await waitFor(() => part("[data-part=count]").textContent === "1 note");
+  });
+
+  test.serial("says why a note was not kept when the slide changed under it", async () => {
+    under(on(".lane"), slide());
+    pointAt("click");
+    // Saved, but the live update has not reached the page yet.
+    await writeFile(
+      join(deckDir(), "slides", "plan.html"),
+      arrowGone.replace('  <div class="lane">', '    <div class="lane">'),
+    );
+    part<HTMLButtonElement>("[data-part=add]").click();
+    await waitFor(() => (part("[data-part=status]").textContent ?? "").startsWith("Not saved:"));
+    expect(kept()).toBe(1);
+    await edit(arrowGone);
   });
 
   test.serial("puts the note away when Cmd or Ctrl takes its only element out", () => {
@@ -364,29 +446,30 @@ describe("annotate mode", () => {
     expect(order).toEqual(["copy", "count", "clear", "divider", "close"]);
   });
 
-  test.serial("Clear takes every note away, and Undo brings them back", () => {
-    const kept = (): number => readNotes(sessionStorage.getItem("dek-annotate:plan")).length;
+  test.serial("Clear takes every note away, and Undo brings them back", async () => {
     part<HTMLButtonElement>("[data-part=clear]").click();
+    await waitFor(() => part("[data-part=status]").textContent === "Cleared 1 note");
     expect(part("[data-part=count]").textContent).toBe("0 notes");
     expect(kept()).toBe(0);
-    expect(part("[data-part=status]").textContent).toBe("Cleared 1 note");
     expect(shown("[data-part=undo]")).toBe(true);
 
     part<HTMLButtonElement>("[data-part=undo]").click();
-    expect(part("[data-part=count]").textContent).toBe("1 note");
+    await waitFor(() => part("[data-part=count]").textContent === "1 note");
     expect(kept()).toBe(1);
     expect(shown("[data-part=tray]")).toBe(false);
   });
 
-  test.serial("lets Undo go once a note is written after Clear, or the mode is left", () => {
+  test.serial("lets Undo go once a note is written after Clear, or the mode is left", async () => {
     part<HTMLButtonElement>("[data-part=clear]").click();
+    await waitFor(() => shown("[data-part=undo]"));
     under(on(".lane"), slide());
     pointAt("click");
     part<HTMLButtonElement>("[data-part=add]").click();
-    expect(part("[data-part=count]").textContent).toBe("1 note");
+    await waitFor(() => part("[data-part=count]").textContent === "1 note");
     expect(shown("[data-part=undo]")).toBe(false);
 
     part<HTMLButtonElement>("[data-part=clear]").click();
+    await waitFor(() => shown("[data-part=undo]"));
     pressKey("a");
     pressKey("a");
     expect(shown("[data-part=undo]")).toBe(false);
@@ -394,33 +477,18 @@ describe("annotate mode", () => {
     pressKey("a");
   });
 
-  test.serial("brings back the tab's notes when the page loads again", async () => {
-    await unmountPlayer();
-    await mount(() => {
-      sessionStorage.setItem(
-        "dek-annotate:plan",
-        JSON.stringify({
-          version: 1,
-          notes: [
-            {
-              slug: "plan",
-              step: "0",
-              targets: [
-                {
-                  source: "10:5",
-                  name: "div.chevron",
-                  text: "画面 設計",
-                  box: { x: 0, y: 0, width: 0, height: 0 },
-                },
-              ],
-              text: "kept",
-            },
-          ],
-        }),
-      );
+  test.serial("shows the notes the dev server keeps when the page loads again", async () => {
+    applyAnnotationOp(root, deck(), {
+      op: "add",
+      slug: "plan",
+      step: "0",
+      text: "kept",
+      targets: [{ source: "11:5", box: { x: 0, y: 0, width: 0, height: 0 } }],
     });
+    await unmountPlayer();
+    await mount();
     pressKey("a");
-    expect(part("[data-part=count]").textContent).toBe("1 note");
+    await waitFor(() => part("[data-part=count]").textContent === "1 note");
     expect(texts("[data-part=marker]")).toEqual(["1"]);
   });
 });

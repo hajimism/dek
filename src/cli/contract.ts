@@ -294,6 +294,61 @@ export const RESULT_FIELDS = {
     }),
     z.strictObject({ action: z.literal("clear"), cleared: z.number().int() }),
   ]),
+  annotations: z.union([
+    z.strictObject({
+      action: z.literal("list"),
+      annotations: z.array(
+        z.strictObject({
+          number: z.number().int().describe("As the dev page's markers and Copy number it."),
+          id: z.string(),
+          slug: z.string(),
+          step: z
+            .string()
+            .describe("The stop as `dekc shot --step` takes it; 0 as the slide arrives."),
+          status: z
+            .enum(["open", "edited", "gone"])
+            .describe(
+              "edited once the slide's own html, css, or ts changed since the note; gone once none of its elements is on the slide.",
+            ),
+          text: z.string().describe("What the human wrote."),
+          targets: z.array(
+            z.strictObject({
+              path: z.string(),
+              line: z
+                .number()
+                .int()
+                .describe("Where the start tag is now; where it was last found when not found."),
+              column: z.number().int().describe("1-based, in UTF-16 units as editors count."),
+              found: z.boolean(),
+              name: z
+                .string()
+                .describe(
+                  "The tag and its classes as written where it was last found, as div.chevron.",
+                ),
+              was: z.string().describe("Its text as written when the note was written, cut short."),
+              text: z.string().nullable().describe("Its text as written now; null when not found."),
+              box: z
+                .strictObject({
+                  x: z.number(),
+                  y: z.number(),
+                  width: z.number(),
+                  height: z.number(),
+                })
+                .describe("On the slide in logical pixels, when the note was written."),
+              point: z
+                .strictObject({ x: z.number(), y: z.number() })
+                .optional()
+                .describe("Where the slide itself was clicked."),
+            }),
+          ),
+          changed: paths.describe("The slide's own files that changed since the note."),
+          shot: z.string().describe("The command that shows the slide at the note's beat."),
+          createdAt: z.string(),
+        }),
+      ),
+    }),
+    z.strictObject({ action: z.literal("clear"), cleared: z.number().int() }),
+  ]),
   sync: z.strictObject({ created: paths, updated: paths, removed: paths, kept: paths }),
   lint: z.strictObject({ diagnostics, skipped }),
   cues: z.strictObject({

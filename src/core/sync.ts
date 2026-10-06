@@ -276,6 +276,11 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - \`dekc marks\` lists the beats the speaker marked while rehearsing aloud (\`m\` in the presenter view): the words they stumbled over are \`was\`, at \`line\` in \`script.md\`. Rewrite those beats to be easier to say, and keep each beat's heading so its mark follows it; \`status\` turns \`edited\` once the words changed.
 - Leave \`dekc marks clear\` to the speaker: only saying the new words aloud tells whether they work.
 
+## When the human points at an element
+
+- \`dekc annotations\` lists the notes the human wrote on elements of the slides (\`a\` on the dev server's page): each element at \`path\`, \`line\`, and \`column\` in the file as it is now, with its \`name\`, the note's \`text\`, and the \`shot\` that shows the slide at the beat the human saw. Read them yourself when the human says to deal with their notes. Fix each, then list them again: \`status\` turns \`edited\` once the slide's own files changed and \`gone\` once none of the note's elements is left. \`edited\` does not mean a note is dealt with: compare the \`shot\` with the note.
+- Leave \`dekc annotations clear\` to the human: they wrote the notes and judge the result.
+
 ## Before you report a deck as done
 
 - \`dekc lint --visual\` passes.

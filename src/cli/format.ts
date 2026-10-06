@@ -141,6 +141,9 @@ function formatLiveEvent(event: LiveEvent, cwd: string | undefined): string | nu
       return event.diagnostics.length === 0 ? null : formatDiagnostics(event.diagnostics, { cwd });
     case "timeline":
       return "timeline";
+    // The page that changed them already shows it; the terminal has nothing to add.
+    case "annotations":
+      return null;
   }
 }
 

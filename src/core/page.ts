@@ -33,6 +33,12 @@ export const PAGE_ID = {
   announce: "dek-announce",
 } as const;
 
+/**
+ * The event the player fires on `document` when the dev server says the deck's annotations
+ * changed, for annotate mode, which is compiled apart from the player, to ask for them again.
+ */
+export const ANNOTATIONS_CHANGED = "dek-annotations";
+
 export type PageMode = "player" | "presenter" | "video";
 
 /** The page's settings, written on <body> as `data-*` and read back once by the runtime. */

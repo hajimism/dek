@@ -169,7 +169,7 @@ describe("syncCommand and .gitignore", () => {
       const first = syncCommand(resolveDecks(root));
       expect(first.updated).toContain(path);
       expect(await readFile(path, "utf8")).toBe(
-        "# mine\ndist/\n.dek/server.json\n.dek/marks.json\n",
+        "# mine\ndist/\n.dek/server.json\n.dek/marks.json\n.dek/annotations.json\n",
       );
       const second = syncCommand(resolveDecks(root));
       expect(second.updated).not.toContain(path);

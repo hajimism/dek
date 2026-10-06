@@ -1532,6 +1532,89 @@ body
     );
   });
 
+  test("keeps annotations in .dek/, answers with where each element is, and tells the other tabs", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
+          const url = new URL("/annotations", server.url);
+          const post = (body: unknown) =>
+            fetch(url, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(body),
+            });
+          const events = await fetch(new URL("/events", server.url));
+          const told = waitForSseEvent(events, (buf) => buf.includes('"annotations"'));
+          // slideDocument puts the section on line 8 and its heading on 9.
+          const added = await post({
+            op: "add",
+            slug: "intro",
+            step: "0",
+            text: "bigger",
+            targets: [{ source: "9:3", box: { x: 1, y: 2, width: 3, height: 4 } }],
+          });
+          expect(added.status).toBe(200);
+          const body = await added.json();
+          expect(body).toEqual({
+            ok: true,
+            annotations: [
+              expect.objectContaining({
+                number: 1,
+                status: "open",
+                text: "bigger",
+                targets: [
+                  expect.objectContaining({
+                    path: "decks/demo/slides/intro.html",
+                    line: 9,
+                    column: 3,
+                    name: "h2.slide-title",
+                    was: "intro",
+                  }),
+                ],
+              }),
+            ],
+          });
+          await told;
+          expect(existsSync(join(root, ".dek", "annotations.json"))).toBe(true);
+          expect(await (await fetch(url)).json()).toEqual(body);
+
+          const stale = await post({
+            op: "add",
+            slug: "intro",
+            step: "0",
+            text: "",
+            targets: [{ source: "99:1", box: { x: 0, y: 0, width: 0, height: 0 } }],
+          });
+          expect(stale.status).toBe(409);
+          expect(await stale.json()).toMatchObject({
+            ok: false,
+            error: { hint: expect.any(String) },
+          });
+          expect((await post({ op: "nope" })).status).toBe(400);
+          expect((await fetch(url, { method: "PUT" })).status).toBe(405);
+        });
+      },
+    );
+  });
+
+  test("keeps annotations for the presenter behind --remote", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer(
+          { cwd: join(root, "decks", "demo"), remote: true, password: "secret" },
+          async (server) => {
+            const url = new URL("/annotations", server.url);
+            expect((await fetch(url)).status).toBe(401);
+            const allowed = await fetch(url, { headers: { authorization: basicAuth("secret") } });
+            expect(await allowed.json()).toEqual({ ok: true, annotations: [] });
+          },
+        );
+      },
+    );
+  });
+
   test("keeps marking for the presenter behind --remote", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

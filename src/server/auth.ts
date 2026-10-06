@@ -86,7 +86,7 @@ export type Exposure = "audience" | "presenter";
 
 /**
  * What each dev server route reveals. The script, its notes, the voice read from it, moving the
- * deck, and the marks left on its beats belong to the presenter. The server routes only by these names, so a new route does
+ * deck, the marks left on its beats, and the annotations on its slides belong to the presenter. The server routes only by these names, so a new route does
  * not compile until it is placed here.
  */
 export const ROUTE_EXPOSURE = {
@@ -101,6 +101,7 @@ export const ROUTE_EXPOSURE = {
   voice: "presenter",
   control: "presenter",
   marks: "presenter",
+  annotations: "presenter",
   missing: "audience",
 } as const satisfies Record<string, Exposure>;
 
@@ -117,6 +118,7 @@ export const EVENT_EXPOSURE: Record<LiveEventType, Exposure> = {
   "reload-script": "audience",
   diagnostics: "presenter",
   timeline: "presenter",
+  annotations: "presenter",
 };
 
 /** True when a request cleared for `seen` may read what `exposure` names. */

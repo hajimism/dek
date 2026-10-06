@@ -87,7 +87,15 @@ dekc current
 
 After editing a slide, the agent can jump the human's browser to it. When the human says "make the figure on this slide smaller", the agent runs `dekc current`, learns the slug, and fixes it without asking which slide.
 
-A slug names the slide but not the shape, such as one arrow among eight on a roadmap. For that, the human points at it: `a` on the dev server, a click on the shape, a note, and **Copy** ([how](./present#keys)). What they paste names each element by the file and line it is written at:
+A slug names the slide but not the shape, such as one arrow among eight on a roadmap. For that, the human points at it: `a` on the dev server, a click on the shape, and a note ([how](./present#keys)). Then they can say "deal with my notes", and the agent reads them itself:
+
+```bash
+dekc annotations --json
+```
+
+Each note comes with its number, as the page's markers show it, the human's `text`, each element's `path`, `line`, and `column` in the file as it is now, its `name` and its text `was` and is now, its `box`, and the `shot` that shows the slide at the beat the human saw. Fix the slide, then list them again: `status` turns `edited` once the slide's own HTML, CSS, or script changed since the note (`changed` names which), and `gone` once none of its elements is left. `edited` means the slide changed, not that the note is dealt with; check the `shot` against the note. Leave `dekc annotations clear` to the human, who wrote the notes and judges the result.
+
+An agent with no access to the project, such as one in a chat on another machine, gets the same notes from **Copy**. What the human pastes names each element by the file and line it is written at:
 
 ```md
 ## Notes on decks/plan
@@ -107,7 +115,7 @@ Boxes and points are in the slide's own pixels, from its top left.
 To see it: `dekc shot plan roadmap --step milestones`
 ```
 
-Every value is read from the source or measured on the page. The name is the tag and its classes as the file writes them, without any a script adds as the deck plays. The box is in the slide's own pixels, and the last line shows the slide at the beat the human saw. A place on the slide rather than an element is the slide itself at a `point`. A note written before an edit it could not follow says so, and keeps the line it had.
+Every value is read from the source or measured on the page. The name is the tag and its classes as the file writes them, without any a script adds as the deck plays. The box is in the slide's own pixels, and the last line shows the slide at the beat the human saw. A place on the slide rather than an element is the slide itself at a `point`. An element an edit took where it could not be followed says so, and keeps the line it had.
 
 ## After a rehearsal
 

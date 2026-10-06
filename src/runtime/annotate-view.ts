@@ -1,15 +1,7 @@
 /// <reference lib="dom" />
-import { PAGE_ID } from "../core/page.ts";
+import { type AnnotationRow, type Box, formatNotes, type Point } from "../core/annotation-rows.ts";
+import { ANNOTATIONS_CHANGED, PAGE_ID } from "../core/page.ts";
 import type { PresenterSlide } from "../core/presenter-state.ts";
-import {
-  formatNotes,
-  type Note,
-  type NoteTarget,
-  readNotes,
-  reanchor,
-  sortNotes,
-  writeNotes,
-} from "./annotate-notes.ts";
 import {
   candidatesAt,
   currentStop,
@@ -22,8 +14,6 @@ import {
 import { placePopup } from "./annotate-place.ts";
 import { slideSelector } from "./live.ts";
 import { isLetterKey, isTextEntry } from "./step.ts";
-
-type Point = { x: number; y: number };
 
 /** One element picked for the note being written, and where the click that picked it was. */
 type Pick = { el: Element; at: Point };
@@ -45,6 +35,7 @@ const LABELS = {
   notes: (n: number) => `${n} ${n === 1 ? "note" : "notes"}`,
   copied: (n: number) => `Copied ${n} ${n === 1 ? "note" : "notes"}`,
   manual: "Press ⌘C or Ctrl+C to copy",
+  failed: (why: string) => `Not saved: ${why}`,
 };
 
 /** Line icons, drawn in the text's color. */
@@ -111,20 +102,43 @@ textarea::placeholder { color: var(--faint); }
 [data-part=undo] { margin-left: auto; padding: 3px 10px; color: var(--ink); background: var(--raised); }
 `;
 
+/** A note as the page sends it: the elements by where each start tag is written. */
+type NewTarget = { source: string; box: Box; point?: Point };
+
+/**
+ * What the page asks of the dev server's notes; each answer is the deck's notes as they stand,
+ * and a clear also hands back what it took, to put back.
+ */
+type Ask = (
+  op?:
+    | { op: "add"; slug: string; step: string; text: string; targets: NewTarget[] }
+    | { op: "edit"; id: string; text: string }
+    | { op: "remove"; id: string }
+    | { op: "clear" }
+    | { op: "restore"; annotations: unknown[] },
+) => Promise<{ annotations: AnnotationRow[]; removed?: unknown[] }>;
+
 /**
  * Annotate mode: point at elements of the slide on screen, write what should change, and copy
  * the notes as one block for an agent, each element named by the file and line it is written
  * at. It runs only on the dev server's pages for the speaker, beside the player, and shows
  * nothing until `a` or the presenter bar's button turns it on: the page may be on the projector.
+ * The notes are the dev server's, kept in `.dek/annotations.json` for `dekc annotations` to
+ * read; every tab of the deck shows the same ones, and asks again whenever they or a slide change.
  */
-export function createAnnotateView(options: { deck: string; slides: PresenterSlide[] }): void {
+export function createAnnotateView(options: {
+  deck: string;
+  slides: PresenterSlide[];
+  /** The dev server's annotations endpoint for this deck, with the presenter's token. */
+  url: string;
+  fetch: (url: string, init?: RequestInit) => Promise<Response>;
+}): void {
   const { deck, slides } = options;
   const deckEl = document.getElementById(PAGE_ID.deck);
   const stageEl = document.getElementById(PAGE_ID.currentStage);
   if (!deckEl || !stageEl) {
     return;
   }
-  const storageKey = `dek-annotate:${deck}`;
   const toggleEl = document.getElementById(PAGE_ID.annotateToggle);
 
   const host = document.createElement("div");
@@ -182,7 +196,7 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
    * and with Undo after Clear. Clear is undone rather than confirmed, and only until something
    * else is said here, a note is written, or the mode is left.
    */
-  function report(text: string, extra: { byHand?: string; undo?: Note[] } = {}): void {
+  function report(text: string, extra: { byHand?: string; undo?: unknown[] } = {}): void {
     status.textContent = text;
     manual.hidden = extra.byHand === undefined;
     manual.value = extra.byHand ?? "";
@@ -196,31 +210,58 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
   hitStyle.textContent = `#${PAGE_ID.deck} [${SOURCE_ATTR}] { pointer-events: auto !important; }`;
 
   let on = false;
-  let notes = load();
+  let notes: AnnotationRow[] = [];
   /** What the last Clear took away, while Undo can still bring it back. */
-  let cleared: Note[] | undefined;
+  let cleared: unknown[] | undefined;
   let picks: Pick[] = [];
   let choiceButtons = new Map<Element, HTMLButtonElement>();
-  let editing: Note | undefined;
+  let editing: AnnotationRow | undefined;
   let hovered: Element | undefined;
   let frame: number | undefined;
   // Hit testing tries dozens of points; the pointer is followed at most once a frame.
   let hoverTested = false;
   let hoverPending: Point | undefined;
 
-  function load(): Note[] {
-    try {
-      return readNotes(sessionStorage.getItem(storageKey));
-    } catch {
-      return [];
+  const ask: Ask = async (op) => {
+    const response = await options.fetch(
+      options.url,
+      op === undefined
+        ? undefined
+        : {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(op),
+          },
+    );
+    const body = (await response.json()) as {
+      ok?: boolean;
+      annotations?: AnnotationRow[];
+      removed?: unknown[];
+      error?: { message?: string };
+    };
+    if (!response.ok || body.ok !== true || !body.annotations) {
+      throw new Error(body.error?.message ?? `the dev server answered ${response.status}`);
     }
-  }
+    return { annotations: body.annotations, ...(body.removed ? { removed: body.removed } : {}) };
+  };
 
-  function save(): void {
+  /**
+   * Send `op`, or ask for the notes when there is none, and show what the server says they are
+   * now. A refusal is said above the bar, and the notes are asked for again, since a refused
+   * note names a slide the page no longer shows as it is.
+   */
+  async function sync(op?: Parameters<Ask>[0]): Promise<{ removed?: unknown[] } | undefined> {
     try {
-      sessionStorage.setItem(storageKey, writeNotes(notes));
-    } catch {
-      // Storage blocked: the notes last as long as the page.
+      const answer = await ask(op);
+      notes = answer.annotations;
+      rebuild();
+      return answer;
+    } catch (error) {
+      report(LABELS.failed(error instanceof Error ? error.message : String(error)));
+      if (op !== undefined) {
+        await sync();
+      }
+      return undefined;
     }
   }
 
@@ -324,7 +365,7 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
       }
     });
     for (const marker of part("markers").querySelectorAll<HTMLElement>("[data-part=marker]")) {
-      const tip = pinAt(notes[Number(marker.dataset.note)]);
+      const tip = pinAt(notes.find((note) => note.id === marker.dataset.note));
       marker.hidden = !tip;
       if (tip) {
         marker.style.left = `${tip.x}px`;
@@ -337,7 +378,7 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
    * Where a note's pin points: the top right corner of its first element, or the place clicked
    * when the note is about a place on the slide rather than an element.
    */
-  function pinAt(note: Note | undefined): Point | undefined {
+  function pinAt(note: AnnotationRow | undefined): Point | undefined {
     const anchor = anchorOf(note);
     const point = note?.targets[0]?.point;
     if (!anchor) {
@@ -350,16 +391,20 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
     return { x: rect.right, y: rect.top };
   }
 
-  /** The element a note's marker sits on: its first element, on the slide on screen. */
-  function anchorOf(note: Note | undefined): Element | null {
+  /**
+   * The element a note's marker sits on: its first element, on the slide on screen, where the
+   * server found it as the file is now.
+   */
+  function anchorOf(note: AnnotationRow | undefined): Element | null {
     const { slug, slide } = onScreen();
     const first = note?.targets[0];
-    if (!note || note.stale || note.slug !== slug || !first || !slide) {
+    if (!note || note.slug !== slug || !first?.found || !slide) {
       return null;
     }
-    return slide.getAttribute(SOURCE_ATTR) === first.source
+    const source = `${first.line}:${first.column}`;
+    return slide.getAttribute(SOURCE_ATTR) === source
       ? slide
-      : slide.querySelector(`[${SOURCE_ATTR}="${first.source}"]`);
+      : slide.querySelector(`[${SOURCE_ATTR}="${source}"]`);
   }
 
   /** Redraw what the state is made of: the count, the picks, the choices, and the markers. */
@@ -378,7 +423,13 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
     for (const [el, button] of choiceButtons) {
       button.setAttribute("aria-pressed", String(el === last));
     }
-    const picked = editing ? editing.targets : picks.map((pick) => describe(pick.el));
+    const picked = editing
+      ? editing.targets.map((target) => ({
+          name: target.name,
+          text: target.text ?? target.was,
+          source: `${target.line}:${target.column}`,
+        }))
+      : picks.map((pick) => describe(pick.el));
     part("picked").replaceChildren(
       ...picked.map((target) => {
         const item = document.createElement("li");
@@ -388,15 +439,15 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
     );
     // Numbered as Copy numbers them, so a marker and its note in the chat say the same number.
     const markers = on
-      ? sortNotes(slides, notes).flatMap((note, index) => {
+      ? notes.flatMap((note) => {
           if (!anchorOf(note)) {
             return [];
           }
           const marker = document.createElement("button");
           marker.type = "button";
           marker.dataset.part = "marker";
-          marker.dataset.note = String(notes.indexOf(note));
-          marker.textContent = String(index + 1);
+          marker.dataset.note = note.id;
+          marker.textContent = String(note.number);
           marker.addEventListener("click", () => edit(note));
           return [marker];
         })
@@ -528,16 +579,17 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
     openPopup();
   }
 
-  function edit(note: Note): void {
+  function edit(note: AnnotationRow): void {
     closePopup();
     editing = note;
     field.value = note.text;
     openPopup();
   }
 
-  function snapshot(pick: Pick, slide: Element): NoteTarget {
+  /** A picked element as the page sends it; the server reads its name and text from the file. */
+  function snapshot(pick: Pick, slide: Element): NewTarget {
     const box = slideBox(pick.el, deckEl as HTMLElement);
-    const target: NoteTarget = { ...describeElement(pick.el, slide), box };
+    const target: NewTarget = { source: describeElement(pick.el, slide).source, box };
     return pick.el === slide
       ? { ...target, point: slidePoint(pick.at, deckEl as HTMLElement) }
       : target;
@@ -546,26 +598,25 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
   function submit(): void {
     const text = field.value;
     if (editing) {
-      const target = editing;
-      notes = notes.map((note) => (note === target ? { ...note, text } : note));
+      void sync({ op: "edit", id: editing.id, text });
     } else {
       const { slug, step, slide } = onScreen();
       if (!slide || picks.length === 0) {
         return;
       }
-      notes = [...notes, { slug, step, targets: picks.map((pick) => snapshot(pick, slide)), text }];
+      const targets = picks.map((pick) => snapshot(pick, slide));
+      void sync({ op: "add", slug, step, text, targets });
     }
     if (cleared) {
       report("");
     }
-    save();
     closePopup();
   }
 
   function remove(): void {
-    const target = editing;
-    notes = notes.filter((note) => note !== target);
-    save();
+    if (editing) {
+      void sync({ op: "remove", id: editing.id });
+    }
     closePopup();
   }
 
@@ -583,36 +634,6 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
       manual.focus();
       manual.select();
     }
-  }
-
-  /**
-   * Match the notes on a slide an edit replaced to its elements as they are now; a note that
-   * cannot be matched keeps what it said, marked as written before the edit.
-   */
-  function follow(slug: string): void {
-    const slide = document.querySelector(slideSelector(slug));
-    if (!slide) {
-      return;
-    }
-    const present = [slide, ...slide.querySelectorAll(`[${SOURCE_ATTR}]`)].map((el) =>
-      describeElement(el, slide),
-    );
-    notes = notes.map((note) => {
-      if (note.slug !== slug) {
-        return note;
-      }
-      const found = note.targets.map((target) => reanchor(target, present));
-      if (found.some((el) => el === undefined)) {
-        return { ...note, stale: true };
-      }
-      const { stale: _, ...rest } = note;
-      return {
-        ...rest,
-        targets: note.targets.map((target, index) => ({ ...target, ...found[index] })),
-      };
-    });
-    save();
-    rebuild();
   }
 
   // Holding Cmd or Ctrl to add an element lets clicks through the popup, which may lie over it.
@@ -692,17 +713,15 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
   act("delete", remove);
   act("copy", () => void copy());
   act("clear", () => {
-    const gone = notes;
-    notes = [];
-    save();
-    rebuild();
-    report(LABELS.cleared(gone.length), { undo: gone });
+    void sync({ op: "clear" }).then((answer) => {
+      const gone = answer?.removed ?? [];
+      report(LABELS.cleared(gone.length), { undo: gone });
+    });
   });
   act("undo", () => {
-    notes = cleared ?? notes;
-    save();
-    rebuild();
+    const back = cleared ?? [];
     report("");
+    void sync({ op: "restore", annotations: back });
   });
   act("close", () => setOn(false));
   toggleEl?.addEventListener("click", () => setOn(!on));
@@ -712,27 +731,22 @@ export function createAnnotateView(options: { deck: string; slides: PresenterSli
     }
     rebuild();
   });
-  // A live update replaces a slide's section whole; its notes are matched to the new one.
+  // A live update replaces a slide's section whole; the server matches its notes to the file
+  // as it is now, so the page asks for them again.
   new MutationObserver((records) => {
-    const slugs = new Set(
-      records.flatMap((record) =>
-        [...record.addedNodes].flatMap((node) =>
-          node instanceof Element && node.matches(".slide")
-            ? [node.getAttribute("data-slug") ?? ""]
-            : [],
-        ),
-      ),
+    const replaced = records.some((record) =>
+      [...record.addedNodes].some((node) => node instanceof Element && node.matches(".slide")),
     );
     // What was picked for the note being written went with the old section.
     if (picks.some((pick) => !pick.el.isConnected)) {
       closePopup();
     }
-    for (const slug of slugs) {
-      follow(slug);
+    if (replaced) {
+      void sync();
     }
   }).observe(deckEl, { childList: true });
-  for (const slug of new Set(notes.map((note) => note.slug))) {
-    follow(slug);
-  }
+  // Another tab, or another device, changed the notes.
+  document.addEventListener(ANNOTATIONS_CHANGED, () => void sync());
   rebuild();
+  void sync();
 }

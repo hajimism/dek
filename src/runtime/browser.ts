@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { isLiveEvent } from "../core/live-protocol.ts";
-import { PAGE_ID, readPageConfig } from "../core/page.ts";
+import { ANNOTATIONS_CHANGED, PAGE_ID, readPageConfig } from "../core/page.ts";
 import { deckStops, moveTarget, positionsEqual } from "../core/position.ts";
 import type { PresenterSlide } from "../core/presenter-state.ts";
 import type { Position } from "../core/step.ts";
@@ -183,6 +183,10 @@ if (dataEl?.textContent) {
       if (rehearseMode) {
         await rehearse.load();
       }
+      return;
+    }
+    if (raw.type === "annotations") {
+      document.dispatchEvent(new Event(ANNOTATIONS_CHANGED));
       return;
     }
     const event = await hydrateLiveEvent(raw, location.pathname);

@@ -33,6 +33,8 @@ describe("exposure", () => {
     expect(ROUTE_EXPOSURE.voice).toBe("presenter");
     expect(ROUTE_EXPOSURE.control).toBe("presenter");
     expect(ROUTE_EXPOSURE.marks).toBe("presenter");
+    expect(ROUTE_EXPOSURE.annotations).toBe("presenter");
+    expect(EVENT_EXPOSURE.annotations).toBe("presenter");
     expect(ROUTE_EXPOSURE.player).toBe("audience");
     expect(EVENT_EXPOSURE.diagnostics).toBe("presenter");
     expect(EVENT_EXPOSURE["reload-slide"]).toBe("audience");
