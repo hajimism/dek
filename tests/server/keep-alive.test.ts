@@ -73,43 +73,49 @@ describe("stopOnce", () => {
 });
 
 describe("dek dev server lifetime", () => {
-  test("exits when the process that started it dies without cleaning up", async () => {
-    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      // A parent that starts `dekc`, names its pid, and is then SIGKILLed like a timed-out test run.
-      const parent = Bun.spawn(
-        [
-          "bun",
-          "-e",
-          `const child = Bun.spawn(["bun", ${JSON.stringify(cliPath)}], { cwd: ${JSON.stringify(
-            join(root, "decks", "demo"),
-          )}, stdout: "inherit", stderr: "ignore" });
+  // The preload's default timeout reaches only the first test file, so this one names its own,
+  // above the wait for the server and the wait for its exit together.
+  test(
+    "exits when the process that started it dies without cleaning up",
+    async () => {
+      await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+        // A parent that starts `dekc`, names its pid, and is then SIGKILLed like a timed-out test run.
+        const parent = Bun.spawn(
+          [
+            "bun",
+            "-e",
+            `const child = Bun.spawn(["bun", ${JSON.stringify(cliPath)}], { cwd: ${JSON.stringify(
+              join(root, "decks", "demo"),
+            )}, stdout: "inherit", stderr: "ignore" });
 console.log("child " + child.pid);
 await child.exited;`,
-        ],
-        { stdout: "pipe", stderr: "ignore" },
-      );
-      let child = 0;
-      try {
-        const reader = parent.stdout.getReader();
-        const decoder = new TextDecoder();
-        let out = "";
-        const ready = until(() => /child \d+/.test(out) && /https?:\/\//.test(out), WAIT_MS);
-        void (async () => {
-          for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
-            out += decoder.decode(chunk.value, { stream: true });
+          ],
+          { stdout: "pipe", stderr: "ignore" },
+        );
+        let child = 0;
+        try {
+          const reader = parent.stdout.getReader();
+          const decoder = new TextDecoder();
+          let out = "";
+          const ready = until(() => /child \d+/.test(out) && /https?:\/\//.test(out), WAIT_MS);
+          void (async () => {
+            for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+              out += decoder.decode(chunk.value, { stream: true });
+            }
+          })();
+          expect(await ready).toBe(true);
+          child = Number(out.match(/child (\d+)/)?.[1]);
+          parent.kill("SIGKILL");
+          await parent.exited;
+          expect(await until(() => !isAlive(child), 5000)).toBe(true);
+        } finally {
+          parent.kill("SIGKILL");
+          if (child && isAlive(child)) {
+            process.kill(child, "SIGKILL");
           }
-        })();
-        expect(await ready).toBe(true);
-        child = Number(out.match(/child (\d+)/)?.[1]);
-        parent.kill("SIGKILL");
-        await parent.exited;
-        expect(await until(() => !isAlive(child), 5000)).toBe(true);
-      } finally {
-        parent.kill("SIGKILL");
-        if (child && isAlive(child)) {
-          process.kill(child, "SIGKILL");
         }
-      }
-    });
-  });
+      });
+    },
+    WAIT_MS * 2,
+  );
 });
