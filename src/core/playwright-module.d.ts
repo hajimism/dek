@@ -34,7 +34,10 @@ declare module "playwright" {
   };
   export type Browser = {
     newPage(options?: { viewport?: Viewport }): Promise<Page>;
-    newContext(options?: { viewport?: Viewport }): Promise<BrowserContext>;
+    newContext(options?: {
+      viewport?: Viewport;
+      deviceScaleFactor?: number;
+    }): Promise<BrowserContext>;
     close(): Promise<void>;
   };
   export const chromium: {

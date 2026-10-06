@@ -6,7 +6,7 @@
 
 [Documentation](https://hajimism.github.io/dek/) · [日本語 README](./README.ja.md)
 
-dek treats a talk the way a build system treats code. The source is your talk script, in Markdown; every `##` heading becomes one HTML slide, and from the same source dek estimates the timing, lints and measures every slide, and builds a single HTML file, a PDF, and a narrated video. A project holds many decks, so the theme and conventions carry forward from one talk to the next. It is designed from the start to be worked on together with AI agents.
+dek treats a talk the way a build system treats code. The source is your talk script, in Markdown; every `##` heading becomes one HTML slide, and from the same source dek estimates the timing, lints and measures every slide, and builds a single HTML file, a PDF, a PowerPoint file with its text editable, and a narrated video. A project holds many decks, so the theme and conventions carry forward from one talk to the next. It is designed from the start to be worked on together with AI agents.
 
 ## Why
 

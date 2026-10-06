@@ -1,6 +1,6 @@
 # Presenting
 
-While you work, the dev server keeps the browser in step with your files. At the venue, one HTML file is all you need. This page covers both, plus the presenter view, remote control from another device, and PDF export.
+While you work, the dev server keeps the browser in step with your files. At the venue, one HTML file is all you need. This page covers both, plus the presenter view, remote control from another device, and PDF and PPTX export.
 
 ## The dev server
 
@@ -126,6 +126,22 @@ dekc pdf
 ```
 
 Renders every slide at its last beat into `dist/<deck>.pdf`. Requires Playwright.
+
+## PPTX
+
+```bash
+dekc pptx
+dekc pptx --public
+```
+
+Writes `dist/<deck>.pptx` for someone who works in PowerPoint or Keynote: an organizer collecting slides, a co-presenter, a company template. Each `##` is one slide, at its last beat, as the PDF prints it, and its script is in the notes; `--public` leaves out the stage directions and comments, as `dekc build --public` does. Requires Playwright.
+
+The browser draws each slide, as for the PDF, and the file keeps that drawing in two layers:
+
+- **The text is editable.** Every line of text in the slide's HTML is a text box where the browser set it, in its size, weight, color, and font, broken where the browser broke it. A recipient fixes a word, a date, or a name in place.
+- **Everything else is a picture**, at twice the slide's size: backgrounds, cards, rules, images, SVG diagrams with their labels, decoration under `aria-hidden`, a folio or running head a pseudo-element draws, text a transform rotates, and every text's shadow. Those cannot be moved or recolored.
+
+Each text box names the font Chromium drew it with; the file embeds none. A recipient without that font sees PowerPoint's substitute in the same place; since a box never wraps, a wider font runs a line a little longer rather than reflowing the slide. The same holds for OpenType features PowerPoint does not apply, such as the proportional Japanese punctuation `font-feature-settings: "palt"` sets: the line comes out a little wider, and can run under a chip that follows it on the same line. Text meant to be edited belongs in HTML, not in an SVG. The picture's alternative text is the slide's own: each image's `alt` and each named picture's `aria-label`, which `DEK034` asks for.
 
 ## Next
 

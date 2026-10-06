@@ -2228,6 +2228,47 @@
         }
       ]
     },
+    "pptx": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "outs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "outs",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "help": {
       "anyOf": [
         {

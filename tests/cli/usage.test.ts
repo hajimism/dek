@@ -76,7 +76,7 @@ flags
   --deck NAME   target a deck by name from the project root
   --root-dist   write to <root>/dist/ instead of the deck's dist/
   --url <url>   the URL dist/ is served from, over url in dek.toml
-  --public      a page for anyone with the link, without the script's stage directions and comments
+  --public      for anyone the file reaches: the script without its stage directions and comments
   --json        print the result, or the error, as JSON
   --help, -h    show help; dekc help <command> for one command
 

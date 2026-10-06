@@ -784,6 +784,26 @@ export const COMMANDS = {
     },
     output: { text: formatPdf },
   }),
+  pptx: result({
+    scope: "decks",
+    args: [],
+    flags: ["root-dist", "public"],
+    usage: ["dekc pptx [deck] [--root-dist] [--public]"],
+    summary:
+      "Write dist/<deck>.pptx, one slide per slide at its last beat: a picture of it with its text\nin text boxes to edit, and its script in the notes. Needs Playwright.",
+    group: "Output",
+    overview: [
+      ["dekc pptx [--root-dist] [--public]", "write a PowerPoint file with editable text"],
+    ],
+    agent: [
+      "dekc pptx [--root-dist] [--public]   text editable over a picture of each slide; script in notes",
+    ],
+    run: async ({ target, flags }) => {
+      const { pptxCommand } = await import("./pptx.ts");
+      return pptxCommand(target, { rootDist: flags["root-dist"], public: flags.public });
+    },
+    output: { text: formatPdf },
+  }),
   help: {
     kind: "help",
     args: ["command?"],

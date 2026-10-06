@@ -3,7 +3,7 @@
 const stdin = await new Response(Bun.stdin).text();
 let request: {
   kind?: string;
-  pages?: Array<{ screenshotPath?: string }>;
+  pages?: Array<{ screenshotPath?: string; slug?: string }>;
   screenshotPath?: string;
   pdfPath?: string;
 } = {};
@@ -32,6 +32,15 @@ const contrasts = process.env.DEK_PLAYWRIGHT_CONTRASTS
   ? JSON.parse(process.env.DEK_PLAYWRIGHT_CONTRASTS)
   : [];
 
+// A PPTX's pages come back with no text, each slide only its picture.
+const pptx = {
+  slides: (request.pages ?? []).map((page) => ({
+    slug: page.slug ?? "",
+    description: "",
+    boxes: [],
+  })),
+};
+
 process.stdout.write(
-  `${JSON.stringify(request.kind === "pages" ? { overflows, contrasts } : {})}\n`,
+  `${JSON.stringify(request.kind === "pages" ? { overflows, contrasts } : request.kind === "pptx" ? pptx : {})}\n`,
 );

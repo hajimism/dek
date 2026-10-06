@@ -83,6 +83,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 | `dekc voice [deck] pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
 | `dekc build [deck] [--root-dist] [--url <url>] [--public]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dekc lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。`--public` はリンクを知る誰もが開くページを作り、発表者ビューから台本のト書きと HTML コメントを外す。付けなければ、URL の有無にかかわらず発表者ビューに台本がすべて入る。 |
 | `dekc video [deck] [slug] [--fps N] [--root-dist]` | `dekc voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` も書く。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
+| `dekc pptx [deck] [--root-dist] [--public]` | `dist/<deck>.pptx` を書く。`##` 1 つが最終ビートの 1 枚で、2 倍の大きさで描いた画像の上に、文字を 1 行ずつ編集できるテキストボックスとして置き、台本をノートに入れる。`--public` は `build --public` と同じく、ノートからト書きとコメントを除く。各ボックスには Chromium が描いたフォントの名前を入れ、フォントは埋め込まない。SVG、`aria-hidden` の飾り、疑似要素の文字、回した文字、影は画像に残る。動かないスライドスクリプトがあると `dekc pdf` と同じく止まる。`--json` は `outs` を返す。Playwright が必要 |
 | `dekc pdf [deck] [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く。動かないスライドスクリプトがあると `dekc video` と同じく止まる。どちらも診断を返す場所がなく、スクリプトが走らなかったかのような枚を出してしまうから |
 
 ## ヘルプ

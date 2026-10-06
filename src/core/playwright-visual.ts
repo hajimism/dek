@@ -21,12 +21,15 @@ import type {
   PagesRequest,
   PagesResponse,
   PdfRequest,
+  PptxRequest,
+  PptxResponse,
   ResponseTo,
   VisualPage,
   VisualRequest,
 } from "./playwright.ts";
 import { captureMotion } from "./playwright-motion.ts";
 import { renderSheets } from "./playwright-sheet.ts";
+import { measurePptxTextsInPage, PPTX_OWNER_ATTR } from "./pptx-text.ts";
 import { pseudoTextBoxes } from "./pseudo-text.ts";
 import { motionSheets } from "./sheet.ts";
 import {
@@ -47,7 +50,11 @@ export async function runVisualRequest<R extends VisualRequest>(
   browser: Browser,
   request: R,
 ): Promise<ResponseTo<R>> {
-  const context = await browser.newContext({ viewport: request.viewport });
+  // A PPTX's pictures are shown full screen, so they are drawn at twice the slide's size.
+  const context = await browser.newContext({
+    viewport: request.viewport,
+    ...(request.kind === "pptx" ? { deviceScaleFactor: 2 } : {}),
+  });
   try {
     return (await answer(context, request)) as ResponseTo<R>;
   } finally {
@@ -65,6 +72,8 @@ function answer(context: BrowserContext, request: VisualRequest) {
       return shootMorph(context, request);
     case "motion":
       return shootMotion(context, request);
+    case "pptx":
+      return shootPptx(context, request);
     default: {
       const unknown: never = request;
       throw new Error(`unknown visual request ${JSON.stringify(unknown)}`);
@@ -84,6 +93,70 @@ async function printPdf(context: BrowserContext, request: PdfRequest): Promise<D
     margin: { top: "0", right: "0", bottom: "0", left: "0" },
   });
   return {};
+}
+
+/** Each slide's text measured and taken out, and the slide shot without it, page by page. */
+async function shootPptx(context: BrowserContext, request: PptxRequest): Promise<PptxResponse> {
+  const slides = await visitInPages(
+    request.pages,
+    () => context.newPage(),
+    async (page, pageReq) => {
+      await page.setContent(pageReq.html, { waitUntil: "load" });
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      const measured = await page.evaluate(measurePptxTextsInPage);
+      const fonts = await platformFonts(page);
+      await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
+      return {
+        slug: pageReq.slug,
+        description: measured.description,
+        boxes: measured.boxes.map((box) => ({
+          ...box,
+          runs: box.runs.map(({ owner, ...run }) => {
+            const font = fonts.get(owner);
+            return font === undefined ? run : { ...run, font };
+          }),
+        })),
+      };
+    },
+  );
+  return { slides };
+}
+
+/**
+ * The font Chromium drew each marked element's text with, by the element's number: the one that
+ * drew most of its glyphs, as the DevTools protocol reports it. A theme names a stack, or only
+ * `sans-serif`; this is the face that was found.
+ */
+async function platformFonts(page: Page): Promise<Map<number, string>> {
+  const fonts = new Map<number, string>();
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
+    const { root } = (await cdp.send("DOM.getDocument", { depth: -1 })) as {
+      root: { nodeId: number };
+    };
+    const { nodeIds } = (await cdp.send("DOM.querySelectorAll", {
+      nodeId: root.nodeId,
+      selector: `[${PPTX_OWNER_ATTR}]`,
+    })) as { nodeIds: number[] };
+    for (const nodeId of nodeIds) {
+      const { attributes } = (await cdp.send("DOM.getAttributes", { nodeId })) as {
+        attributes: string[];
+      };
+      const owner = Number(attributes[attributes.indexOf(PPTX_OWNER_ATTR) + 1]);
+      const { fonts: used } = (await cdp.send("CSS.getPlatformFontsForNode", { nodeId })) as {
+        fonts: Array<{ familyName: string; glyphCount: number }>;
+      };
+      const main = [...used].sort((a, b) => b.glyphCount - a.glyphCount)[0];
+      if (main && Number.isInteger(owner)) {
+        fonts.set(owner, main.familyName);
+      }
+    }
+  } finally {
+    await cdp.detach();
+  }
+  return fonts;
 }
 
 /** The move between two slides, frozen at a moment and shot. */
