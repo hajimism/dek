@@ -98,6 +98,8 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 
 ## 環境変数
 
+dek は `DEK_` で始まる変数を、起動したときの環境からだけ読みます。プロジェクトのファイルからは読みません。`dekc` は Bun を `--no-env-file` で動かします。`bun ./node_modules/.bin/dekc` のように Bun がそれでも `.env` を読み込んだときは、`.env`・`.env.local`・`.env.development`・`.env.production`・`.env.test` に出てくる `DEK_` の変数をすべて無視し、警告を出します。
+
 | 変数 | 役割 |
 | --- | --- |
 | `DEK_FFMPEG` | `dekc video` が mux に使う ffmpeg バイナリのパス。`PATH` の `ffmpeg` より優先 |

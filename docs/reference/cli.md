@@ -98,6 +98,8 @@ A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. 
 
 ## Environment variables
 
+dek reads its `DEK_` variables only from the environment it starts in, never from a project's files. `dekc` runs Bun with `--no-env-file`, and when Bun loads a `.env` file anyway, as `bun ./node_modules/.bin/dekc` does, dek ignores every `DEK_` variable that `.env`, `.env.local`, `.env.development`, `.env.production`, or `.env.test` names, and says so.
+
 | Variable | Purpose |
 | --- | --- |
 | `DEK_FFMPEG` | Path to the ffmpeg binary that `dekc video` muxes with, instead of `ffmpeg` on `PATH`. |
