@@ -28,6 +28,7 @@ export const PAGE_ID = {
   laser: "dek-laser",
   laserToggle: "dek-laser-toggle",
   markToggle: "dek-mark-toggle",
+  annotateToggle: "dek-annotate-toggle",
   hint: "dek-hint",
   announce: "dek-announce",
 } as const;

@@ -60,10 +60,12 @@ ${indent(printPageCss({ width, height }))}
 @media print { #dek-presenter, #dek-progress { display: none !important; } }
 body[data-mode="video"] #dek-presenter, body[data-mode="video"] #dek-progress { display: none !important; }
 #dek-presenter[hidden], #dek-progress[hidden], #dek-next-end[hidden] { display: none; }
-#dek-mark-toggle { flex: none; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; background: transparent; color: rgba(255,255,255,0.45); cursor: pointer; font: 600 1rem/1 system-ui, sans-serif; }
+#dek-mark-toggle, #dek-annotate-toggle { flex: none; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; background: transparent; color: rgba(255,255,255,0.45); cursor: pointer; font: 600 1rem/1 system-ui, sans-serif; }
 #dek-mark-toggle::before { content: "✎"; }
 #dek-mark-toggle[aria-pressed="true"] { border-color: #eab308; color: #eab308; }
 #dek-mark-toggle[data-error] { border-color: #ef4444; }
+#dek-annotate-toggle::before { content: "⌖"; }
+#dek-annotate-toggle[aria-pressed="true"] { border-color: #3b82f6; color: #3b82f6; }
 #dek-beats li.is-marked::after { content: " ✎"; color: #eab308; }
 #dek-laser-toggle { flex: none; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; background: transparent; cursor: pointer; }
 #dek-laser-toggle::before { content: ""; display: block; width: 10px; height: 10px; margin: auto; border-radius: 50%; background: rgba(255,255,255,0.45); }

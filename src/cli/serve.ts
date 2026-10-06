@@ -121,5 +121,5 @@ export function devBanner(
   remoteUrls: string[],
   options: Parameters<typeof remoteBanner>[2],
 ): string {
-  return `${remoteBanner(url, remoteUrls, options)}\n\np presenter view · s slide rail · Ctrl-C stops the server`;
+  return `${remoteBanner(url, remoteUrls, options)}\n\np presenter view · s slide rail · a annotate · Ctrl-C stops the server`;
 }

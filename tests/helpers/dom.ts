@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { renderDeckHtml } from "../../src/core/document.ts";
-import { playerScript } from "../../src/runtime/player.ts";
+import { annotateScript, playerScript } from "../../src/runtime/player.ts";
 import { deckChannelName } from "../../src/runtime/routes.ts";
 
 /** The channel the mounted player posts on, so a test can play another window of the deck. */
@@ -31,7 +31,13 @@ export async function mountPlayer(
   const html = renderDeckHtml(deckDir, {
     playerScript: "",
     target: options.live
-      ? { kind: "dev", mode: "player", includeNotes: true, liveReloadScript: "" }
+      ? {
+          kind: "dev",
+          mode: "player",
+          includeNotes: true,
+          liveReloadScript: "",
+          annotateScript: "",
+        }
       : { kind: options.mode === "video" ? "video" : "build" },
   });
   GlobalRegistrator.register({ url: options.url ?? "file:///deck.html", width: 1280, height: 720 });
@@ -57,6 +63,12 @@ export async function mountPlayer(
     // biome-ignore lint/security/noGlobalEval: compiled IIFE must see happy-dom globals
     // biome-ignore lint/complexity/noCommaOperator: indirect eval
     (0, eval)(await playerScript());
+    // The dev server's page for the speaker runs annotate mode after the player, as served.
+    if (options.live) {
+      // biome-ignore lint/security/noGlobalEval: compiled IIFE must see happy-dom globals
+      // biome-ignore lint/complexity/noCommaOperator: indirect eval
+      (0, eval)(await annotateScript());
+    }
   } finally {
     globalThis.BroadcastChannel = Channel;
   }

@@ -1,6 +1,7 @@
 import { assetInliner } from "./assets.ts";
 import { deckPaths } from "./deck-paths.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
+import { type LineColumn, lineLocator } from "./lines.ts";
 import { isInside } from "./path.ts";
 import { type ProjectDeck, readDeckFile } from "./resolve.ts";
 import { FALLBACK_LANG, type Section } from "./schema.ts";
@@ -41,6 +42,11 @@ export function hasSlideClass(className: string | null | undefined): boolean {
  * written. A slide that never closes runs to `</body>`, or to the end.
  */
 export function extractSlideSection(html: string): string | undefined {
+  return locateSlideSection(html)?.section;
+}
+
+/** The first slide section, as `extractSlideSection` reads it, and the offset it starts at. */
+function locateSlideSection(html: string): { section: string; start: number } | undefined {
   const mark = uniqueMark(html);
   let found = false;
   let closed = false;
@@ -68,10 +74,13 @@ export function extractSlideSection(html: string): string | undefined {
     : undefined;
   // The parser closes an unclosed slide at the end of its parent, past `</body>`.
   if (slide !== undefined && /<\/section\s*>$/i.test(slide)) {
-    return slide;
+    return { section: slide, start };
   }
   const bodyClose = html.slice(start).search(/<\/body>/i);
-  return bodyClose >= 0 ? html.slice(start, start + bodyClose) : html.slice(start);
+  return {
+    section: bodyClose >= 0 ? html.slice(start, start + bodyClose) : html.slice(start),
+    start,
+  };
 }
 
 /** A deck's slide markup, each file read at most once. */
@@ -86,32 +95,43 @@ export type DeckSlides = {
    * stops on them, because at the venue a deck that shows beats one that does not.
    */
   section(slug: string): string;
+  /** Where the written section is in `slides/<slug>.html`; none for a skeleton. */
+  source(slug: string): SlideSource | undefined;
 };
+
+/** A slide file and the offset its section starts at: the section is `file` from `start`. */
+type SlideSource = { file: string; start: number };
 
 export function deckSlides(deck: ProjectDeck): DeckSlides {
   const paths = deckPaths(deck.dir);
-  const read = new Map<string, string | undefined>();
+  const read = new Map<string, (SlideSource & { section: string }) | undefined>();
   let layouts: SkeletonLayouts | undefined;
   const skeleton = (slug: string): string | undefined => {
     layouts ??= deckLayouts(deck.dir);
     return skeletonHtml(deck.deck, slug, layouts);
   };
-  const written = (slug: string): string | undefined => {
+  const located = (slug: string): (SlideSource & { section: string }) | undefined => {
     if (!read.has(slug)) {
       const path = paths.slide(slug, ".html");
       // A slug from a URL may try to climb out of slides/.
-      const source =
+      const file =
         isSafeSlideSlug(slug) && isInside(path, paths.slides)
           ? readDeckFile(deck.dir, path)
           : undefined;
-      read.set(slug, source === undefined ? undefined : extractSlideSection(source));
+      const found = file === undefined ? undefined : locateSlideSection(file);
+      read.set(slug, file !== undefined && found ? { file, ...found } : undefined);
     }
     return read.get(slug);
   };
+  const written = (slug: string): string | undefined => located(slug)?.section;
   return {
     has: (slug) => written(slug) !== undefined,
     written,
     section: (slug) => written(slug) ?? extractSlideSection(skeleton(slug) ?? "") ?? "",
+    source(slug) {
+      const found = located(slug);
+      return found && { file: found.file, start: found.start };
+    },
   };
 }
 
@@ -140,15 +160,24 @@ export type SlideStamp = {
   beat?: { index: number; step: string };
   /** Inline the deck's files as data: URIs, for a page that stands alone. */
   inline?: { deckDir: string };
+  /**
+   * Where the section is written, for the dev server's pages: every start tag then says where
+   * in the file it is, as `data-dek-source="<line>:<column>"`, and the classes it is written
+   * with, as `data-dek-class`, so annotate mode can name it as the file does whatever a script
+   * adds to it.
+   */
+  source?: SlideSource;
 };
 
 /**
  * One slide section with what the page needs on it, in one parser pass: its `data-slug` unless
- * it names its own, its place as `--dek-slide-number` and `--dek-slide-count`, and for a still
- * page the classes and beat the player would have set.
+ * it names its own, its place as `--dek-slide-number` and `--dek-slide-count`, for a still page
+ * the classes and beat the player would have set, and for the dev server where each tag is
+ * written.
  */
 export function stampSlide(html: string, stamp: SlideStamp): string {
   let done = false;
+  const spots = stamp.source && startTagSpots(html, stamp.source);
   return rewriteHtml(html, (rewriter) => {
     rewriter.on("section", {
       element(el) {
@@ -186,21 +215,77 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
     if (stamp.inline) {
       rewriter.on("*", assetInliner(stamp.inline.deckDir));
     }
+    if (spots) {
+      // The same parser over the same markup meets the start tags in the same order.
+      let index = 0;
+      rewriter.on("*", {
+        element(el) {
+          const spot = spots[index++];
+          if (spot) {
+            el.setAttribute("data-dek-source", `${spot.line}:${spot.column}`);
+            if (spot.classes !== undefined) {
+              el.setAttribute("data-dek-class", spot.classes);
+            }
+          }
+        },
+      });
+    }
   });
 }
 
-/** Every slide of the deck in script order, as the player pages hold them. */
-export function collectSlidesHtml(deck: ProjectDeck, options: { inline: boolean }): string {
+/** Where a start tag is written, and its classes as written; none when it has no `class`. */
+type TagSpot = LineColumn & { classes?: string };
+
+/**
+ * Where each start tag of `html` is written in the file it was taken from, in document order,
+ * read before anything else touches the markup. A marker goes in front of each tag; where the
+ * markers land, less their own length, is where the tags were.
+ */
+function startTagSpots(html: string, source: SlideSource): TagSpot[] {
+  const mark = uniqueMark(html);
+  const classes: Array<string | null> = [];
+  const marked = rewriteHtml(html, (rewriter) => {
+    rewriter.on("*", {
+      element(el) {
+        el.before(mark, { html: true });
+        classes.push(el.getAttribute("class"));
+      },
+    });
+  });
+  const spot = lineLocator(source.file);
+  let offset = source.start;
+  return marked
+    .split(mark)
+    .slice(0, -1)
+    .map((before, index) => {
+      offset += before.length;
+      const written = classes[index];
+      return written === null || written === undefined
+        ? spot(offset)
+        : { ...spot(offset), classes: written.split(/\s+/).filter(Boolean).join(" ") };
+    });
+}
+
+/**
+ * Every slide of the deck in script order, as the player pages hold them. `sources` says where
+ * each tag is written, for the dev server's pages.
+ */
+export function collectSlidesHtml(
+  deck: ProjectDeck,
+  options: { inline: boolean; sources?: boolean },
+): string {
   const slides = deckSlides(deck);
   const { sections } = deck.deck;
   return sections
-    .map((section, index) =>
-      stampSlide(slides.section(section.slug), {
+    .map((section, index) => {
+      const source = options.sources ? slides.source(section.slug) : undefined;
+      return stampSlide(slides.section(section.slug), {
         slug: section.slug,
         place: slidePlace(sections, index),
         ...(options.inline ? { inline: { deckDir: deck.dir } } : {}),
-      }),
-    )
+        ...(source ? { source } : {}),
+      });
+    })
     .join("");
 }
 

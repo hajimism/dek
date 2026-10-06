@@ -13,7 +13,7 @@ export type DevPages = {
 
 /** The pages a dev server renders, each kept until `clear`. */
 export function createDevPages(options: {
-  embed: { playerScript: string; liveReloadScript: string };
+  embed: { playerScript: string; liveReloadScript: string; annotateScript: string };
   remote: boolean;
   /** Embedded on the presenter page, so its stream and moves are let through. */
   password: string | undefined;
@@ -44,6 +44,7 @@ export function createDevPages(options: {
                 mode,
                 includeNotes: mode === "presenter" || !remote,
                 liveReloadScript: embed.liveReloadScript,
+                annotateScript: embed.annotateScript,
                 ...(mode === "presenter" && password ? { liveToken: password } : {}),
               },
             }),

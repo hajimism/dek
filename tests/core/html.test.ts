@@ -43,7 +43,9 @@ body
 /** The page for a build, for video, or the dev server's player or presenter page. */
 async function renderPage(
   dir: string,
-  target: { kind?: "build" | "video" } | { kind: "dev"; mode?: "player" | "presenter" } = {},
+  target:
+    | { kind?: "build" | "video" }
+    | { kind: "dev"; mode?: "player" | "presenter"; includeNotes?: boolean } = {},
 ) {
   const embed = await playerEmbed();
   return renderDeckHtml(dir, {
@@ -53,8 +55,9 @@ async function renderPage(
         ? {
             kind: "dev",
             mode: target.mode ?? "player",
-            includeNotes: true,
+            includeNotes: target.includeNotes ?? true,
             liveReloadScript: embed.liveReloadScript,
+            annotateScript: embed.annotateScript,
           }
         : { kind: target.kind ?? "build" },
   });
@@ -169,6 +172,99 @@ describe("stampSlide", () => {
       { slug: "a", place: { number: 1, count: 1 } },
     );
     expect(html.match(/--dek-slide-number/g)).toHaveLength(1);
+  });
+});
+
+describe("stampSlide with the slide's source", () => {
+  const place = { number: 1, count: 1 };
+
+  /** Each start tag's name and the place it was stamped with, in document order. */
+  function stamped(html: string): Array<[string, string]> {
+    return [...html.matchAll(/<([a-z][\w-]*)\b[^>]*?\sdata-dek-source="([^"]*)"/gi)].map(
+      ([, tag, at]) => [tag ?? "", at ?? ""],
+    );
+  }
+
+  function stampFile(file: string): string {
+    const section = extractSlideSection(file) ?? "";
+    return stampSlide(section, {
+      slug: "s",
+      place,
+      source: { file, start: file.indexOf(section) },
+    });
+  }
+
+  test("says where each start tag is written in the file, as diagnostics count", () => {
+    const file = `<!DOCTYPE html>
+<html lang="ja">
+<body>
+  <section class="slide">
+    <h2 class="title">plan</h2>
+    <div class="lane"><div class="chevron">設計</div><img src="a.png" alt=""></div>
+  </section>
+</body>
+</html>
+`;
+    expect(stamped(stampFile(file))).toEqual([
+      ["section", "4:3"],
+      ["h2", "5:5"],
+      ["div", "6:5"],
+      ["div", "6:23"],
+      ["img", "6:52"],
+    ]);
+  });
+
+  test("keeps each tag's classes as written, whatever a script adds to them later", () => {
+    const file = `<section class="slide plan">
+  <div class=" chevron  lane-item ">a</div><p class="">b</p><svg class="ring"><line/></svg><i>c</i>
+</section>`;
+    const html = stampFile(file);
+    const classes = [...html.matchAll(/<([a-z]+)\b([^>]*)>/g)].map(([, tag, attrs]) => [
+      tag,
+      attrs?.match(/data-dek-class="([^"]*)"/)?.[1] ?? null,
+    ]);
+    expect(classes).toEqual([
+      ["section", "slide plan"],
+      ["div", "chevron lane-item"],
+      ["p", ""],
+      ["svg", "ring"],
+      ["line", null],
+      ["i", null],
+    ]);
+  });
+
+  test("reaches into SVG, whose shapes are what an arrow is drawn with", () => {
+    const file = `<section class="slide">
+  <svg viewBox="0 0 10 10"><path d="M0 0L10 10"/><line x1="0" y1="5" x2="10" y2="5"/></svg>
+</section>`;
+    expect(stamped(stampFile(file))).toEqual([
+      ["section", "1:1"],
+      ["svg", "2:3"],
+      ["path", "2:28"],
+      ["line", "2:50"],
+    ]);
+  });
+
+  test("counts lines the same in a file saved with CRLF", () => {
+    const file = '<body>\r\n<section class="slide">\r\n  <p>a</p>\r\n</section>\r\n</body>\r\n';
+    expect(stamped(stampFile(file))).toEqual([
+      ["section", "2:1"],
+      ["p", "3:3"],
+    ]);
+  });
+
+  test("counts columns in UTF-16 units, as editors do", () => {
+    const file = `<section class="slide"><p>𝑥</p><p>y</p></section>`;
+    expect(stamped(stampFile(file))).toEqual([
+      ["section", "1:1"],
+      ["p", "1:24"],
+      ["p", "1:33"],
+    ]);
+  });
+
+  test("stamps nothing without the source", () => {
+    const html = stampSlide(`<section class="slide"><p>a</p></section>`, { slug: "s", place });
+    expect(html).not.toContain("data-dek-source");
   });
 });
 
@@ -762,6 +858,103 @@ more
         expect(data.map((slide) => slide.slug)).toEqual(["intro", "extra"]);
       },
     );
+  });
+});
+
+describe("data-dek-source", () => {
+  const deck = {
+    name: "demo",
+    script: `---
+title: Demo
+---
+
+## intro
+
+hello
+
+## extra
+
+more
+`,
+    slides: { intro: introHtml },
+  };
+
+  test("is on every tag of a written slide on the dev server's page", async () => {
+    await withTempProject({ decks: [deck] }, async (root) => {
+      for (const mode of ["player", "presenter"] as const) {
+        const html = await renderPage(join(root, "decks", "demo"), { kind: "dev", mode });
+        // slideDocument puts the section on line 8 and its heading on line 9.
+        expect(html).toMatch(/<section [^>]*data-dek-source="8:3"[^>]*>/);
+        expect(html).toMatch(
+          /<h2 class="slide-title" data-dek-source="9:3" data-dek-class="slide-title">intro<\/h2>/,
+        );
+      }
+    });
+  });
+
+  test("is not on a slide drawn from the skeleton, which has no file", async () => {
+    await withTempProject({ decks: [deck] }, async (root) => {
+      const html = await renderPage(join(root, "decks", "demo"), { kind: "dev" });
+      const extra = html.slice(html.indexOf('data-slug="extra"'));
+      expect(extra.slice(0, extra.indexOf("</section>"))).not.toContain("data-dek-source");
+    });
+  });
+
+  test("is on no page but the dev server's", async () => {
+    await withTempProject({ decks: [deck] }, async (root) => {
+      const dir = join(root, "decks", "demo");
+      for (const kind of ["build", "video"] as const) {
+        expect(await renderPage(dir, { kind })).not.toContain("data-dek-source");
+      }
+      const { deck: loaded } = resolveDeck(dir);
+      expect(renderSlideHtml(loadSlideSources(loaded), "intro", 0)).not.toContain(
+        "data-dek-source",
+      );
+    });
+  });
+});
+
+describe("annotate mode", () => {
+  const deck = { name: "demo", slides: { intro: introHtml } };
+
+  test("runs on the speaker's dev pages, after the player", async () => {
+    const embed = await playerEmbed();
+    await withTempProject({ decks: [deck] }, async (root) => {
+      for (const mode of ["player", "presenter"] as const) {
+        const html = await renderPage(join(root, "decks", "demo"), { kind: "dev", mode });
+        const annotate = html.indexOf(`<script>${embed.annotateScript}</script>`);
+        expect(annotate).toBeGreaterThan(html.indexOf(`<script>${embed.playerScript}</script>`));
+        expect(html).toContain('id="dek-annotate-toggle"');
+      }
+    });
+  });
+
+  test("is on no audience page on the LAN, no build, and no video", async () => {
+    const embed = await playerEmbed();
+    await withTempProject({ decks: [deck] }, async (root) => {
+      const dir = join(root, "decks", "demo");
+      const pages = [
+        await renderPage(dir, { kind: "dev", includeNotes: false }),
+        await renderPage(dir, { kind: "build" }),
+        await renderPage(dir, { kind: "video" }),
+      ];
+      for (const html of pages) {
+        expect(html).not.toContain(embed.annotateScript);
+        expect(html).not.toContain('id="dek-annotate-toggle"');
+      }
+    });
+  });
+
+  test("names its key on the button, in the deck's language", async () => {
+    await withTempProject({ decks: [deck] }, async (root) => {
+      const html = await renderPage(join(root, "decks", "demo"), {
+        kind: "dev",
+        mode: "presenter",
+      });
+      expect(html).toMatch(
+        /id="dek-annotate-toggle"[^>]*aria-label="Annotate slide elements \(a\)"/,
+      );
+    });
   });
 });
 

@@ -24,6 +24,8 @@ export type PageTarget =
       mode: "player" | "presenter";
       includeNotes: boolean;
       liveReloadScript: string;
+      /** Annotate mode, run after the player on a page that is the speaker's: one with the notes. */
+      annotateScript: string;
       /**
        * What a presenter page sends as `?token=` on its live channels at `/decks/<name>/events`
        * and `/decks/<name>/ws`: neither an EventSource nor a WebSocket can set a header of its
@@ -70,7 +72,7 @@ export function renderDeckDocument(
   const data = presenterSlides(deck, scriptReader(target)).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
-  const slidesHtml = collectSlidesHtml(deck, { inline: standalone });
+  const slidesHtml = collectSlidesHtml(deck, { inline: standalone, sources: live });
   const themeCss = readTheme(deck.dir, standalone);
   const slideScripts = readSlideScripts(deck.dir, { strict: strictScripts });
   const state = data[0] ? presenterState(data, { slideIndex: 0, beatIndex: 0 }) : undefined;
@@ -105,6 +107,7 @@ export function renderDeckDocument(
       <p id="${PAGE_ID.elapsed}">0:00</p>
       <p id="${PAGE_ID.budget}">${budget}</p>
       ${target.kind === "dev" ? markButton(deck.deck.lang) : ""}
+      ${target.kind === "dev" ? annotateButton(deck.deck.lang) : ""}
       <button id="${PAGE_ID.laserToggle}" type="button" aria-pressed="false" aria-label="${escapeAttr(laserLabel(deck.deck.lang))}" title="${escapeAttr(laserLabel(deck.deck.lang))}"></button>
     </footer>
   </aside>`
@@ -157,7 +160,8 @@ export function renderDeckDocument(
   <script type="application/json" id="${PAGE_ID.data}">${jsonForScript(data)}</script>
   ${slideScriptTags(slideScripts)}
   <script>${options.playerScript}</script>
-  ${target.kind === "dev" ? `<script>${target.liveReloadScript}</script>` : ""}`,
+  ${target.kind === "dev" ? `<script>${target.liveReloadScript}</script>` : ""}
+  ${target.kind === "dev" && includeNotes ? `<script>${target.annotateScript}</script>` : ""}`,
   });
 }
 
@@ -195,6 +199,17 @@ function markButton(lang: string): string {
     ? "このビートに直す印を付ける (m)"
     : "Mark this beat to rewrite (m)";
   return `<button id="${PAGE_ID.markToggle}" type="button" aria-pressed="false" aria-label="${escapeAttr(label)}" title="${escapeAttr(label)}"></button>`;
+}
+
+/**
+ * The button that turns annotate mode on and off. Only the dev server's page has it: the notes
+ * name files and lines of a project on this machine, and a built file is someone else's to read.
+ */
+function annotateButton(lang: string): string {
+  const label = lang.toLowerCase().startsWith("ja")
+    ? "スライドの要素に注釈を付ける (a)"
+    : "Annotate slide elements (a)";
+  return `<button id="${PAGE_ID.annotateToggle}" type="button" aria-pressed="false" aria-label="${escapeAttr(label)}" title="${escapeAttr(label)}"></button>`;
 }
 
 /** The laser button's name, with the key that does the same. */

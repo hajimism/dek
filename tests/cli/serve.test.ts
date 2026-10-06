@@ -6,7 +6,7 @@ import { devBanner, devSessionView, offerPairing, pairingBlock } from "../../src
 describe("devBanner", () => {
   test("names the keys a viewer cannot discover and how to stop", () => {
     expect(devBanner("http://127.0.0.1:5173/", [], {})).toBe(
-      "http://127.0.0.1:5173/\n\np presenter view · s slide rail · Ctrl-C stops the server",
+      "http://127.0.0.1:5173/\n\np presenter view · s slide rail · a annotate · Ctrl-C stops the server",
     );
   });
 });

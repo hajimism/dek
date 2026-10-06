@@ -7,8 +7,9 @@ const script = await playerScript();
 describe("playerScript", () => {
   test("compiles lazily and caches the result", async () => {
     const source = await Bun.file(new URL("../../src/runtime/player.ts", import.meta.url)).text();
-    expect(source).toContain("compiled ??=");
-    expect(source).not.toMatch(/const compiledPlayer = await compilePlayer/);
+    expect(source).toContain("player ??=");
+    expect(source).toContain("annotate ??=");
+    expect(source).not.toMatch(/= await compile\(/);
     expect(await playerScript()).toBe(script);
   });
 });

@@ -87,6 +87,28 @@ dekc current
 
 スライドを編集した直後に、エージェントは人間のブラウザをその枚へ飛ばせます。人間が「この枚の図を小さくして」と言えば、エージェントは `dekc current` で slug を知り、どの枚かを聞き返さずに直せます。
 
+slug でわかるのはどの枚かまでで、どの図形かまではわかりません。たとえば工程表に並ぶ 8 本の矢印のうちの 1 本です。そういうときは人間がその図形を指します。開発サーバで `a` を押し、図形をクリックし、注釈を書いて **Copy** を押します（[やり方](./present#キー操作)）。貼り付けるテキストは、各要素をそれが書かれたファイルと行で示します。
+
+```md
+## Notes on decks/plan
+
+Boxes and points are in the slide's own pixels, from its top left.
+
+### Slide 4 of 12, roadmap ("次の四半期のロードマップ"), at beat `milestones`
+
+1. div.arrow.arrow-up at decks/plan/slides/roadmap.html:58:7 (box 1188,286 24×290)
+   > 矢じりを大きく
+
+2. 2 elements:
+   - div.chevron "画面デザイン" at decks/plan/slides/roadmap.html:30:7 (box 150,380 220×24)
+   - div.chevron "デザインレビュー" at decks/plan/slides/roadmap.html:31:7 (box 150,410 220×24)
+   > 右端を揃えて
+
+To see it: `dekc shot plan roadmap --step milestones`
+```
+
+値はどれもソースから読んだものか、ページ上で測ったものです。名前はタグと、ファイルに書かれたとおりのクラスです（再生中にスクリプトが足すクラスは含みません）。box はスライド自身のピクセル単位で、最後の行は人間が見ていたビートでそのスライドを表示します。要素ではなくスライド上の位置を指したときは、スライドそのものに `point` が付きます。追いかけられない編集より前に書いた注釈は、そう明記したうえで、当時の行のまま残ります。
+
 ## リハーサルのあとで
 
 ```bash

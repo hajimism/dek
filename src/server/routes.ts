@@ -75,10 +75,16 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
           // A slide the script does not list has no place in the deck, so no page shows it.
           const sections = deck?.deck.sections ?? [];
           const index = sections.findIndex((section) => section.slug === route.slug);
-          const html = deck && index >= 0 && deckSlides(deck).written(route.slug);
-          return html
+          const slides = deck && index >= 0 ? deckSlides(deck) : undefined;
+          const html = slides?.written(route.slug);
+          const source = slides?.source(route.slug);
+          return html && source
             ? htmlResponse(
-                stampSlide(html, { slug: route.slug, place: slidePlace(sections, index) }),
+                stampSlide(html, {
+                  slug: route.slug,
+                  place: slidePlace(sections, index),
+                  source,
+                }),
               )
             : notFound();
         },

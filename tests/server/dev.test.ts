@@ -569,6 +569,31 @@ more
     );
   });
 
+  test("a live slide says where each tag is written, as the page did, from the file as it is now", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await withDevServer({ cwd: deckDir }, async (server) => {
+          const page = await (await fetch(new URL("/", server.url))).text();
+          const before = await (await fetch(new URL("/slide/intro", server.url))).text();
+          expect(page).toContain(before);
+          expect(before).toContain('data-dek-source="8:3"');
+
+          const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
+          await writeFile(
+            join(deckDir, "slides", "intro.html"),
+            introHtml.replace("<body>", "<body>\n<!-- moved down a line -->"),
+          );
+          await pending;
+          const after = await (await fetch(new URL("/slide/intro", server.url))).text();
+          expect(after).toContain('data-dek-source="9:3"');
+          expect(after).not.toContain('data-dek-source="8:3"');
+        });
+      },
+    );
+  });
+
   test("serves no fragment for a slide file the script does not list", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml, leftover: leftoverHtml } }] },

@@ -87,6 +87,28 @@ dekc current
 
 After editing a slide, the agent can jump the human's browser to it. When the human says "make the figure on this slide smaller", the agent runs `dekc current`, learns the slug, and fixes it without asking which slide.
 
+A slug names the slide but not the shape, such as one arrow among eight on a roadmap. For that, the human points at it: `a` on the dev server, a click on the shape, a note, and **Copy** ([how](./present#keys)). What they paste names each element by the file and line it is written at:
+
+```md
+## Notes on decks/plan
+
+Boxes and points are in the slide's own pixels, from its top left.
+
+### Slide 4 of 12, roadmap ("Next quarter's roadmap"), at beat `milestones`
+
+1. div.arrow.arrow-up at decks/plan/slides/roadmap.html:58:7 (box 1188,286 24×290)
+   > Make the arrowhead larger
+
+2. 2 elements:
+   - div.chevron "UI design" at decks/plan/slides/roadmap.html:30:7 (box 150,380 220×24)
+   - div.chevron "Design review" at decks/plan/slides/roadmap.html:31:7 (box 150,410 220×24)
+   > Line up their right edges
+
+To see it: `dekc shot plan roadmap --step milestones`
+```
+
+Every value is read from the source or measured on the page. The name is the tag and its classes as the file writes them, without any a script adds as the deck plays. The box is in the slide's own pixels, and the last line shows the slide at the beat the human saw. A place on the slide rather than an element is the slide itself at a `point`. A note written before an edit it could not follow says so, and keeps the line it had.
+
 ## After a rehearsal
 
 ```bash

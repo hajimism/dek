@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { locateDeck, type Project, resolveProject } from "../core/resolve.ts";
-import { liveReloadScript, playerScript } from "../runtime/player.ts";
+import { annotateScript, liveReloadScript, playerScript } from "../runtime/player.ts";
 import {
   clearance,
   mayRead,
@@ -71,6 +71,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const embed = {
     playerScript: await playerScript(),
     liveReloadScript: liveReloadScript(),
+    annotateScript: await annotateScript(),
   };
 
   const pages = createDevPages({
