@@ -1,3 +1,7 @@
+---
+description: 'Commands, flags, environment variables.'
+---
+
 # CLI
 
 Create a project with `bunx @hajimism/dek init`, then install dek into it with `bun add -d @hajimism/dek`; see [Getting Started](/guide/getting-started). The examples below write `dekc` for what is really `bunx dekc` inside that project, or `bunx @hajimism/dek` outside one. Type `dekc`, not `dek`: `bunx dek` runs `dek` from npm, an unrelated package.

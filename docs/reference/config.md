@@ -1,3 +1,7 @@
+---
+description: 'Directory layout, `dek.toml`, frontmatter, `voice.toml`, tokens, layouts.'
+---
+
 # Configuration
 
 There are three places to configure dek: the project's `dek.toml`, the frontmatter of each deck's `script.md`, and the optional `voice/` files inside a deck.

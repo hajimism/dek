@@ -44,6 +44,8 @@ bunx dekc build     # 3. dist/2026-04-vite.html — トーク全体がこの 1 �
 
 台本を書いて `dekc` を叩けば、HTML を一行も書かずに同梱テーマで発表できます。
 
+エージェントと作るなら、公式スキルを `npx skills add hajimism/dek` で、Claude Code なら `/plugin marketplace add hajimism/dek` と `/plugin install dek@dek` で入れてください。プロジェクトの外にいるエージェントは [llms.txt](https://hajimism.github.io/dek/llms.txt) から始められます。[AI エージェントと作る](https://hajimism.github.io/dek/ja/guide/ai.html)を参照してください。
+
 続きは [はじめる](https://hajimism.github.io/dek/ja/guide/getting-started.html)へ。通しで 1 本作るなら [チュートリアル](https://hajimism.github.io/dek/ja/guide/tutorial.html)。コマンドの一覧は [CLI リファレンス](https://hajimism.github.io/dek/ja/reference/cli.html)にあります。
 
 ## サンプル

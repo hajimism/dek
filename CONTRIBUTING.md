@@ -32,6 +32,7 @@ bash scripts/check-package.sh   # the tarball npm would ship, installed and run
 - **Docs come in two languages.** A change to `docs/` or a README lands in both English and Japanese.
 - **The command is `dekc`.** Write the product, the package, and its files as dek; write anything you type to run it as `dekc`.
 - If you change the shape of a command's `--json`, run `bun run schema` and commit the result.
+- If you add or change a command, a lint rule, or a docs page's `description`, run `bun run llms` and commit `docs/public/llms.txt`.
 
 ## Commits and releases
 

@@ -1,3 +1,7 @@
+---
+description: 'The yardstick for agent-facing changes: accurate guidance, conventions that lint checks, verifiable output, actionable diagnostics, a clear stopping point.'
+---
+
 # Agent Usability Criteria
 
 dek is built to be used by coding agents. This page is the yardstick for that: what a change must not break, and what an improvement should move. Use it when you design a command, a diagnostic, or a convention, and when you review one.

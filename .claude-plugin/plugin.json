@@ -1,0 +1,9 @@
+{
+  "name": "dek",
+  "description": "Write and fix talks with dek, a build system for talks run as dekc on Bun.",
+  "author": { "name": "Hajime Nakagawa", "url": "https://github.com/hajimism" },
+  "homepage": "https://hajimism.github.io/dek/",
+  "repository": "https://github.com/hajimism/dek",
+  "license": "MIT",
+  "keywords": ["slides", "presentation", "talk", "dek", "dekc"]
+}

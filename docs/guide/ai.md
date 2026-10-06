@@ -1,3 +1,7 @@
+---
+description: 'The CLI, `AGENTS.md`, and the official skill. `check --shot`, `show` a slide or a ref''s as a model, and `dekc annotations` for what the human pointed at. No MCP.'
+---
+
 # Working with AI Agents
 
 Agents use the same CLI you do. There is no MCP server and no tool schema to install. A coding agent already has a shell and a file editor; a slide is a forty-line HTML file, so the agent's own editor is the most precise and cheapest way to change it. dek adds only what an agent cannot do well on its own: seeing how the slide renders, hearing how it reads, and the fragile operations of renaming and reordering.
@@ -13,6 +17,19 @@ dekc help --agent
 ```
 
 That is enough for Claude Code, Codex, OpenCode, or any other agent to work in a dek project with no extra configuration.
+
+## Before the project: llms.txt and the skill
+
+An agent that does not know dek yet, or works outside any project, has two ways in.
+
+- [`llms.txt`](https://hajimism.github.io/dek/llms.txt) says how to install and run dek, what every page of these docs covers, how many lint rules there are, and every command as `dekc help --agent` prints it. It is built from the docs, the rule table, and the commands with `bun run llms`, and a test fails while the published copy is out of date.
+- The official skill teaches the loop: script first, then one slide at a time with `dekc show`, an edit, `dekc check --shot`, and `dekc lint --visual`, and when to stop. It also covers the traps: the command is `dekc`, not `dek`, and dek runs on Bun, with `bunx`, not `npx`. It names only commands every dek since 0.2 has, and sends the agent to `dekc help --agent` and `AGENTS.md` for the rest, so an older dek in a project is never told to run what it lacks.
+
+```bash
+npx skills add hajimism/dek
+```
+
+The skills CLI installs it for the agents it supports. In Claude Code, `/plugin marketplace add hajimism/dek` and then `/plugin install dek@dek` install it as a plugin. The npm package ships the same file, so a project always has the copy for its own dek at `node_modules/@hajimism/dek/skills/dek/SKILL.md`. There is no MCP server; the skill teaches the CLI. Both are in English, like `AGENTS.md`; an agent answers in whatever language you write to it.
 
 ## What the CLI promises
 

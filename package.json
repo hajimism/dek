@@ -10,6 +10,7 @@
   },
   "files": [
     "src",
+    "skills",
     "LICENSE",
     "README.md",
     "README.ja.md",
@@ -46,6 +47,7 @@
     "typecheck": "tsc --noEmit",
     "knip": "knip",
     "schema": "bun scripts/cli-schema.ts",
+    "llms": "bun scripts/llms.ts",
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check": "biome check --write .",

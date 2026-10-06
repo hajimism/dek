@@ -1,3 +1,7 @@
+---
+description: 'Slidev を使うべきとき、PowerPoint を使う人への渡し方、声は必須か、など。'
+---
+
 # FAQ
 
 ## どうやって入れますか

@@ -1,3 +1,7 @@
+---
+description: 'Thirteen tokens on `.slide`. Growing the vocabulary is a design decision.'
+---
+
 # Themes
 
 `theme.css` decides how a deck looks. Slides supply structure and class names; the theme supplies the shared look, and a slide's own `slides/<id>.css` adds decoration that only that slide uses. This page covers the token contract, how to grow a theme's vocabulary, and why each deck owns a copy.

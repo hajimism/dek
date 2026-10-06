@@ -1,3 +1,7 @@
+---
+description: 'When to use Slidev, handing a talk to PowerPoint users, whether voice is required, and more.'
+---
+
 # FAQ
 
 ## How do I install it?

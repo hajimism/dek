@@ -1,3 +1,7 @@
+---
+description: 'Dev server, presenter view, keys and touch, marks and annotations, one file on a USB stick, print, remote, PDF, and PPTX with editable text.'
+---
+
 # Presenting
 
 While you work, the dev server keeps the browser in step with your files. At the venue, one HTML file is all you need. This page covers both, plus the presenter view, remote control from another device, and PDF and PPTX export.

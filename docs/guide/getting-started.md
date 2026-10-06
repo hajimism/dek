@@ -1,3 +1,7 @@
+---
+description: 'Install to a presentable skeleton deck without writing HTML.'
+---
+
 # Getting Started
 
 This page takes you from nothing to a deck you can present. You will:
