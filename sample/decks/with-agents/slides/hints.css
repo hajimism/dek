@@ -4,10 +4,7 @@
 }
 
 .side {
-  display: flex;
-  flex-direction: column;
   gap: calc(var(--gap) * 0.6);
-  min-width: 0;
 }
 
 .side-head {
@@ -27,5 +24,4 @@
   padding-top: calc(var(--gap) * 0.6);
   padding-bottom: calc(var(--gap) * 0.6);
   font-size: var(--size-small);
-  line-height: 1.6;
 }

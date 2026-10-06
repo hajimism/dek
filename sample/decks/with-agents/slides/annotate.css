@@ -1,0 +1,178 @@
+/*
+ * The presenter's schedule slide in miniature, with annotate mode over it: the two chevrons
+ * picked for a note, the pins of the notes written, and the note being written. On the right,
+ * the notes as the agent receives them. The plan's boxes sit where the real slide has them,
+ * as shares of its 1136 × 470 plan.
+ */
+.slide {
+  --arrow: #ec9cc0;
+  --lane-fill: #2f7a5c;
+  --size-mini: calc(var(--size-caption) * 0.85);
+  --size-code-annotate: 0.75rem;
+}
+
+.grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+/* Room under the plan for the popup, so it covers none of the plan's words. */
+.screen {
+  padding: calc(var(--gap) * 0.7) calc(var(--gap) * 1.2) calc(var(--gap) * 5.2) calc(var(--gap) * 0.7);
+  background: var(--surface-2);
+}
+
+.plan {
+  position: relative;
+  aspect-ratio: 1136 / 470;
+  font-size: var(--size-mini);
+}
+
+.plan p {
+  position: absolute;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.month {
+  top: 0;
+  height: 6%;
+  justify-content: center;
+  background: var(--accent-ink);
+  color: var(--on-accent);
+}
+
+.m10 { left: 15.85%; width: 22%; }
+.m11 { left: 38.73%; width: 22%; }
+.m12 { left: 61.62%; width: 22%; }
+.m1 { left: 84.51%; width: 15.49%; }
+
+.lane {
+  left: 0;
+  width: 14.79%;
+  height: 25.53%;
+  justify-content: center;
+  background: var(--lane-fill);
+  color: var(--on-accent);
+}
+
+.l1 { top: 9.36%; }
+.l2 { top: 39.15%; }
+.l3 { top: 68.94%; }
+
+.chev {
+  height: 11.06%;
+  padding-left: 1.2%;
+  background: var(--surface);
+  color: var(--fg);
+  clip-path: polygon(0 0, 94% 0, 100% 50%, 94% 100%, 0 100%);
+  filter: drop-shadow(0 0 var(--hairline) var(--line-strong));
+}
+
+.c1 { left: 15.85%; top: 11.91%; width: 52.82%; }
+.c2 { left: 49.3%; top: 23.83%; width: 50.7%; }
+.c3 { left: 15.85%; top: 41.7%; width: 22.01%; }
+.c4 { left: 38.73%; top: 41.7%; width: 22.01%; }
+.c5 { left: 61.62%; top: 41.7%; width: 38.38%; }
+.c6 { left: 15.85%; top: 74.89%; width: 28.17%; }
+.c7 { left: 44.89%; top: 74.89%; width: 55.11%; }
+
+/* Pink arrows between lanes, a shaft and a head in one clip-path; the last points up. */
+.arrow {
+  position: absolute;
+  width: 0.9%;
+  background: var(--arrow);
+  clip-path: polygon(20% 0, 80% 0, 80% 80%, 100% 80%, 50% 100%, 0 80%, 20% 80%);
+}
+
+.a1 { left: 54.58%; top: 35.32%; height: 6.38%; }
+.a2 { left: 79.23%; top: 53.62%; height: 21.28%; }
+.a3 { left: 49.3%; top: 53.62%; height: 21.28%; }
+.a4 { left: 95.07%; top: 35.32%; height: 39.57%; transform: scaleY(-1); }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.pick {
+  position: absolute;
+  height: 11.06%;
+  outline: calc(var(--hairline) * 1.5) solid var(--accent);
+  outline-offset: var(--hairline);
+}
+
+/* Teardrop pins, their tips on the top right corner of what each note is about. */
+.pin {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: calc(var(--gap) * 0.85);
+  height: calc(var(--gap) * 0.85);
+  transform: translate(calc(var(--hairline) * -2), -100%);
+  border: calc(var(--hairline) * 2) solid var(--surface);
+  border-radius: var(--radius-pill) var(--radius-pill) var(--radius-pill) calc(var(--radius-sm) * 0.25);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--size-mini);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.pin-1 { left: 80.11%; top: 53.62%; }
+.pin-2 { left: 100%; top: 23.83%; }
+
+.popup {
+  position: absolute;
+  left: 30%;
+  top: calc(100% + var(--gap) * 0.5);
+  width: 70%;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.25);
+  padding: calc(var(--gap) * 0.35);
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+  box-shadow: var(--shadow-lg);
+}
+
+.plan .popup p {
+  position: static;
+}
+
+.path span {
+  margin: 0 0.4em;
+  color: var(--code-dim);
+}
+
+.path b {
+  margin-left: 0.2em;
+  padding: 0.1em 0.4em;
+  border-radius: calc(var(--radius-sm) * 0.5);
+  outline: var(--hairline) solid var(--code-key);
+  font-weight: 600;
+}
+
+.plan .picked {
+  display: block;
+  color: var(--code-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.field {
+  padding: 0.4em 0.6em;
+  border: var(--hairline) solid var(--code-key);
+  border-radius: calc(var(--radius-sm) * 0.6);
+  font-family: var(--font-body);
+}
+
+.side .code {
+  font-size: var(--size-code-annotate);
+}

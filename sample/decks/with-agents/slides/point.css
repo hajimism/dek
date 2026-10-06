@@ -10,13 +10,6 @@
   align-items: center;
 }
 
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--gap) * 0.5);
-  min-width: 0;
-}
-
 .screen {
   position: relative;
   display: flex;
@@ -129,5 +122,4 @@
 
 .side .code {
   font-size: var(--size-code-point);
-  line-height: 1.6;
 }

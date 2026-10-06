@@ -212,6 +212,18 @@
   align-items: start;
 }
 
+/* One side of a two-sided stage, you and the agent: who it is, their window, what they say. */
+.slide .side {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 0.5);
+  min-width: 0;
+}
+
+.slide .side .code {
+  line-height: 1.6;
+}
+
 .slide .cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -1,0 +1,52 @@
+<section class="slide" data-layout="default">
+  <p class="kicker"><span class="badge"></span>Annotate</p>
+  <h2 class="slide-title">矢印一本まで、<span class="hl">指して頼む</span></h2>
+  <div class="stage grid">
+    <div class="side">
+      <p class="who">you · 開発サーバで <span class="cmd">a</span></p>
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">127.0.0.1:4790 · plan</p><span class="pill">1 / 1</span></div>
+        <div class="screen">
+          <div class="plan">
+            <p class="month m10">10</p><p class="month m11">11</p><p class="month m12">12</p><p class="month m1">1</p>
+            <p class="lane l1">デザイン</p><p class="lane l2">開発</p><p class="lane l3">リリース</p>
+            <p class="chev c1">画面デザイン</p>
+            <p class="chev c2">デザインレビュー</p>
+            <p class="chev c3">要件整理</p><p class="chev c4">試作</p><p class="chev c5">本実装</p>
+            <p class="chev c6">リリース準備</p><p class="chev c7">段階リリース</p>
+            <span class="arrow a1" aria-hidden="true"></span><span class="arrow a2" aria-hidden="true"></span>
+            <span class="arrow a3" aria-hidden="true"></span><span class="arrow a4" aria-hidden="true"></span>
+            <div class="overlay" data-step="annotate-pick">
+              <span class="pick c1" aria-hidden="true"></span><span class="pick c2" aria-hidden="true"></span>
+              <span class="pin pin-1">1</span><span class="pin pin-2">2</span>
+              <div class="popup">
+                <p class="path">section.slide <span>›</span> div.plan <span>›</span> <b>p.chevron.c2</b></p>
+                <p class="picked">p.chevron.c2 "デザインレビュー" :12<br>p.chevron.c1 "画面デザイン" :11</p>
+                <p class="field">右端を揃えて</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+    <div class="side" data-step="annotate-paste">
+      <p class="who">agent · 貼られた注釈を読む</p>
+      <figure class="window">
+        <div class="window-bar"><p class="window-title">agent session</p><span class="pill pill-ok">2 notes</span></div>
+<pre class="code"><span class="tok-k">## Notes on decks/plan</span>
+<span class="tok-p">…</span>
+1. span.arrow.a2 at <span class="tok-s">…/schedule.html:19:5</span> (box <span class="tok-n">980,412 10×100</span>)
+   <span class="tok-c">&gt; 矢じりをもう少し大きく</span>
+
+2. 2 elements:
+   - p.chevron.c2 "デザインレビュー" at <span class="tok-s">…/schedule.html:12:5</span> <span class="tok-p">…</span>
+   - p.chevron.c1 "画面デザイン" at <span class="tok-s">…/schedule.html:11:5</span> <span class="tok-p">…</span>
+   <span class="tok-c">&gt; 右端を揃えて</span>
+
+To see it: <span class="tok-hot">`dekc shot plan schedule --step 0`</span></pre>
+      </figure>
+      <p class="bubble bubble-agent">19 行目の矢印と、11・12 行目の矢羽を直して、shot で確かめます。</p>
+    </div>
+  </div>
+  <p class="meta"><span>スライドを、エージェントに任せる</span></p>
+</section>
