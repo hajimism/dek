@@ -24,6 +24,7 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 | Theme contract | Unknown classes, inline styles, tokens, scoping, slide stylesheets |
 | Slide scripts | `slides/<id>.ts` evaluated apart from Node and Bun |
 | Self-containment | Remote URLs, missing files, paths outside the deck |
+| Accessibility | Pictures with nothing for a screen reader to say; contrast is under Rendering |
 | Rendering | Overflow and contrast, measured in a browser |
 | Narration | Only for decks with `voice/` |
 | Length | Only for decks with a `duration` |

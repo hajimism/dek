@@ -569,6 +569,16 @@ c
     });
   });
 
+  test("AGENTS.md says how a picture tells a screen reader what it shows, as DEK034 checks", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      syncDeck(join(root, "decks", "demo"));
+      const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      expect(agents).toContain('`alt=""` for decoration');
+      expect(agents).toContain('`role="img"` and an `aria-label`');
+      expect(agents).toContain("(`DEK034`)");
+    });
+  });
+
   // What an agent otherwise reads the guides for, or finds out by a failed open.
   test("AGENTS.md states the class budget, how slide CSS weighs, and that shots move", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {

@@ -49,6 +49,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK031` | `slide` | Contrast below 4.5:1, or below 3:1 for WCAG large text (24px+, or 18.66px+ bold) | — |
 | `DEK033` | `slide` | Two texts are drawn over each other, a folio or a running head a pseudo-element draws included | — |
 | `DEK032` | `slide` | A slide script's `draw` misbehaves while drawing the end of a beat: it throws, changes the page outside its slide, or draws the end differently after drawing the beat's start | — |
+| `DEK034` | `slide` | A picture with nothing for a screen reader to say: an `<img>` without `alt`, an `<svg>` with no text and no name, or an element with `role="img"` and no name. `alt=""`, `aria-hidden="true"`, and `role="presentation"` or `role="none"` say a picture is decoration and pass | — |
 | `DEK040` | `slide` | An ASCII word missing from the pronunciation dictionary. Warning | — |
 | `DEK041` | `deck` | The talk's length far from the `duration` budget: narrated length with a Timeline, the reading-time estimate without. Warning | — |
 | `DEK042` | `slide` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
@@ -160,6 +161,17 @@ The presenter keeps going whatever a slide does; the fix is in `slides/<id>.ts`.
 ### DEK033
 
 Two texts whose lines cross by a few pixels each way, and share a fifth of the smaller one, are drawn over each other: neither reads. Lines that only touch, as the words of one sentence set in two elements do, pass. A folio or a running head a `::before` or `::after` draws is one of the texts, judged by the box its glyphs cover rather than the box it is laid out in, which for a full-width running head is the whole line. Each text in a pair the boxes suggest is drawn alone to see where its glyphs show. One none of whose glyphs shows was replaced when the text it crosses takes its place, its lines spanning much the same box: numbers stacked in one cell to count up, each beat's painting its box over the one before, show only the last, and collide with nothing. Under anything else, such as a callout laid over a row of labels, the audience loses it, and it collides. One a box covers only in part collides too, since the audience sees it cut off. The hint says whether to move the content or make room for it. `data` carries `box`, `other`, their texts, and `steps`.
+
+### DEK034
+
+A picture is either content, which needs words a screen reader can say, or decoration, which says so. Lint cannot tell which, and does not judge whether the words are good; it asks that every picture be one or the other. The built HTML file passes the words on to the audience's screen readers as they are.
+
+- An `<img>` takes `alt`. `alt=""` is decoration, as the theme's `full-bleed` layout writes it; any other `alt` is what the picture shows. `aria-label`, `aria-labelledby`, and `title` name it as well.
+- An `<svg>` that holds text, such as a diagram's `<text>` labels or a `<title>`, is read as it is, and passes. One with nothing to read takes `role="img"` and an `aria-label`, or `aria-hidden="true"` when it is decoration. The hint offers `aria-hidden` only for an SVG with no text, so following it never makes a `DEK029`.
+- An element with `role="img"`, an SVG included, is one picture whose own text a screen reader no longer reads, so it needs a name: `aria-label`, `aria-labelledby`, or, on an SVG, a `<title>`. With text inside, the hint offers to remove the role instead, so the text is read.
+- Anything under `aria-hidden="true"`, and an element with `role="presentation"` or `role="none"`, is decoration and passes. An SVG inside another SVG is part of the outer picture.
+
+Each picture is its own finding, at its tag. `data` carries `tag`, the `src` of an `<img>`, and `role` when the finding is about `role="img"`. `<video>`, `<iframe>`, and `<object>` are not checked: a video's alternative is captions, which no attribute says are right, and a frame or object in a self-contained deck is rare enough that a rule would mostly be in the way.
 
 ### DEK042
 

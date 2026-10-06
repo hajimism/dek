@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseCss, publishedTokens } from "../../src/core/css.ts";
+import { scanSlideHtml } from "../../src/core/html-scan.ts";
+import { lintSlideHtml } from "../../src/core/lint/slide-html.ts";
 import { REQUIRED_TOKENS } from "../../src/core/lint/tokens.ts";
 import { lintDeck } from "../../src/core/lint.ts";
+import type { Section } from "../../src/core/schema.ts";
 import { contrastRatio, type Rgb } from "../../src/core/text-contrast.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -140,6 +143,25 @@ describe("default theme", () => {
         expect(diagnostics.filter((d) => d.id === "DEK014" || d.id === "DEK015")).toEqual([]);
       },
     );
+  });
+});
+
+describe("default theme layout examples", () => {
+  const examples = [
+    ...readFileSync(themePath, "utf8").matchAll(/\/\*\s*@layout\s+(\S+)\s*\n([\s\S]*?)\*\//g),
+  ].map(([, name, body]) => [name, body ?? ""] as const);
+
+  test("there are examples to check", () => {
+    expect(examples.map(([name]) => name)).toContain("full-bleed");
+  });
+
+  // `dekc theme <layout>` hands these to agents to paste, so each must pass as pasted.
+  test.each(examples)("%s says what its pictures show, or that they are decoration", (_, body) => {
+    const section: Section = { slug: "intro", title: "intro", line: 1, body: "", beats: [] };
+    const found = lintSlideHtml(section, "slides/intro.html", scanSlideHtml(body), {
+      deckDir: "/deck",
+    });
+    expect(found.filter((d) => d.id === "DEK034")).toEqual([]);
   });
 });
 
