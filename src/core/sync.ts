@@ -293,6 +293,25 @@ For commands, run \`dekc help --agent\`.
 `;
 }
 
+/** The longest ref title AGENTS.md shows: a title names a deck, it does not describe one. */
+const REF_TITLE_MAX = 80;
+
+/**
+ * A ref's title as it goes into AGENTS.md. Someone else wrote it, and agents read dek's block as
+ * dek's own guidance, so a title must not start a line of its own there, such as a heading or an
+ * instruction: line breaks and control characters become one space, and it is cut to
+ * REF_TITLE_MAX characters.
+ */
+function refTitleLine(title: string | undefined): string | undefined {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+  const line = title?.replace(/[\s\x00-\x1f\x7f-\x9f]+/gu, " ").trim();
+  if (!line) {
+    return undefined;
+  }
+  const chars = [...line];
+  return chars.length > REF_TITLE_MAX ? `${chars.slice(0, REF_TITLE_MAX - 1).join("")}…` : line;
+}
+
 /**
  * The refs dek.toml pins, one line each, so an agent knows which decks it may
  * read as models. Empty when there are none, leaving AGENTS.md as before. A
@@ -311,7 +330,7 @@ function referencesSection(root: string): string {
     return "";
   }
   const lines = refs.map((name) => {
-    const title = refTitle(refDir(root, name), parseRefSource(name).deck)?.title;
+    const title = refTitleLine(refTitle(refDir(root, name), parseRefSource(name).deck)?.title);
     return title ? `- \`${name}\`: ${title}` : `- \`${name}\``;
   });
   return `
