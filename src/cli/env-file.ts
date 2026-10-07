@@ -4,20 +4,33 @@ import { ansi, shouldColor, terminalSafe } from "./tty.ts";
 
 /**
  * The files Bun may read into process.env from the working directory before dek starts: `.env`,
- * `.env.local`, and the one for NODE_ENV. All of them are read whatever NODE_ENV is, so a change
- * in which one Bun picks cannot let a variable through.
+ * `.env.local`, and the two for NODE_ENV, plain and `.local`. All of them are read whatever
+ * NODE_ENV is, so a change in which ones Bun picks cannot let a variable through.
  */
-const ENV_FILES = [".env", ".env.local", ".env.development", ".env.production", ".env.test"];
-
-/** Every DEK_ name a file holds, however the line around it is written: `K=v`, `export K=v`, `K: v`. */
-const DEK_NAME_RE = /DEK_[A-Z0-9_]*/gi;
+const ENV_FILES = [
+  ".env",
+  ".env.local",
+  ...["development", "production", "test"].flatMap((mode) => [
+    `.env.${mode}`,
+    `.env.${mode}.local`,
+  ]),
+];
 
 /**
- * Takes out of `env` every DEK_ variable a `.env` file in `cwd` may have set, and returns their
- * names. Bun loads those files before dek runs, so a repository someone else wrote could otherwise
- * choose the programs dek runs and the host `dekc ref` calls. DEK_ variables come only from the
- * environment dek was started in. Under `--no-env-file`, which the dekc bin passes, Bun loaded
- * nothing, so every DEK_ variable there is the user's own.
+ * Every name dek takes only from the environment that a file holds, however the line around it is
+ * written: `K=v`, `export K=v`, `K: v`. Besides DEK_ variables, NODE_TLS_REJECT_UNAUTHORIZED: Bun
+ * reads it on each request, and with it a proxy that a `.env` named could read the token `dekc ref`
+ * sends. Other variables Bun acts on, such as HTTPS_PROXY, take effect before dek starts, and
+ * deleting them changes nothing.
+ */
+const NAME_RE = /DEK_[A-Z0-9_]*|NODE_TLS_REJECT_UNAUTHORIZED/gi;
+
+/**
+ * Takes out of `env` every variable in NAME_RE that a `.env` file in `cwd` may have set, and
+ * returns their names. Bun loads those files before dek runs, so a repository someone else wrote
+ * could otherwise choose the programs dek runs and the host `dekc ref` calls. These variables come
+ * only from the environment dek was started in. Under `--no-env-file`, which the dekc bin passes,
+ * Bun loaded nothing, so every one there is the user's own.
  */
 export function dropEnvFileVariables(
   cwd: string,
@@ -35,7 +48,7 @@ export function dropEnvFileVariables(
     } catch {
       continue;
     }
-    for (const [name] of text.matchAll(DEK_NAME_RE)) {
+    for (const [name] of text.matchAll(NAME_RE)) {
       names.add(name.toUpperCase());
     }
   }
@@ -51,7 +64,7 @@ export function envFileWarning(names: readonly string[], color = false): string 
   const c = ansi(color);
   const list = names.join(", ");
   return [
-    `${c.yellow("warning:")} ignored ${list}: a .env file in this directory sets it, and dek reads DEK_ variables only from the environment`,
+    `${c.yellow("warning:")} ignored ${list}: a .env file in this directory sets it, and dek takes it only from the environment`,
     `  ${c.yellow("help:")} set it in the shell that runs dekc instead`,
   ].join("\n");
 }

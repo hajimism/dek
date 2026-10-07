@@ -7,7 +7,7 @@ import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 describe("dropEnvFileVariables", () => {
-  test("takes out each DEK_ variable a .env file names, however the line is written", async () => {
+  test("takes out each DEK_ variable and NODE_TLS_REJECT_UNAUTHORIZED a .env file names, however the line is written", async () => {
     await withTempDir(async (dir) => {
       await writeFile(
         join(dir, ".env"),
@@ -15,11 +15,17 @@ describe("dropEnvFileVariables", () => {
       );
       await writeFile(join(dir, ".env.local"), "DEK_GITHUB_API: http://127.0.0.1:1\n");
       await writeFile(join(dir, ".env.production"), "  dek_ffmpeg = ./ffmpeg\n");
+      await writeFile(
+        join(dir, ".env.test.local"),
+        "DEK_VIDEO=./v.ts\nNODE_TLS_REJECT_UNAUTHORIZED=0\n",
+      );
       const env: NodeJS.ProcessEnv = {
         DEK_RUMDL: "./payload.sh",
         DEK_PLAYWRIGHT: "./w.ts",
         DEK_GITHUB_API: "http://127.0.0.1:1",
         DEK_FFMPEG: "./ffmpeg",
+        DEK_VIDEO: "./v.ts",
+        NODE_TLS_REJECT_UNAUTHORIZED: "0",
         DEK_VOICE_PLAY: "0",
         OTHER: "1",
       };
@@ -28,6 +34,8 @@ describe("dropEnvFileVariables", () => {
         "DEK_GITHUB_API",
         "DEK_PLAYWRIGHT",
         "DEK_RUMDL",
+        "DEK_VIDEO",
+        "NODE_TLS_REJECT_UNAUTHORIZED",
       ]);
       expect(env).toEqual({ DEK_VOICE_PLAY: "0", OTHER: "1" });
     });
