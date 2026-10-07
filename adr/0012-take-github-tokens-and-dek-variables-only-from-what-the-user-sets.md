@@ -1,4 +1,4 @@
-# 5. Take GitHub tokens and DEK_ variables only from what the user sets
+# 12. Take GitHub tokens and DEK_ variables only from what the user sets
 
 Date: 2026-10-06
 
