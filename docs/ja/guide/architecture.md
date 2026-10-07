@@ -41,7 +41,7 @@ Bun の Node 互換は部分的なので、Playwright は実行時に `node_modu
 
 ## 自分が書いていないプロジェクト
 
-dek はプロジェクトをビルドしますが、dek を動かす Bun の設定はプロジェクトには決めさせません。`dekc` の bin は Bun を `--no-env-file --config=/dev/null` で動かし、dek が起動する bun にも同じフラグを付けます。そのため、カレントディレクトリの `.env` や `bunfig.toml` で変数を設定したり、コードを preload したりはできません。パッケージには dek 自身の `tsconfig.json` が入っているので、プロジェクトの `paths` で dek の import を差し替えることもできません。`dekc ref` がトークンを送るのは `api.github.com` だけで、送るのは `GITHUB_TOKEN` か `GH_TOKEN` に設定されたものだけです。dek が `gh` にトークンを尋ねることはありません。
+dek はプロジェクトをビルドしますが、dek を動かす Bun の設定はプロジェクトには決めさせません。`dekc` の bin は Bun を `--no-env-file --config=/dev/null` で動かし、dek が起動する bun にも同じフラグを付けます。そのため、カレントディレクトリの `.env` や `bunfig.toml` で変数を設定したり、コードを preload したりはできません。パッケージには dek 自身の `tsconfig.json` が入っているので、プロジェクトの `paths` で dek の import を差し替えることもできません。`dekc ref` がトークンを送るのは `api.github.com` だけで、送るのは `GITHUB_TOKEN` か `GH_TOKEN` に設定されたものだけです。dek が `gh` にトークンを尋ねることはありません。ref のタイトルは 80 文字までの 1 行として `AGENTS.md` に入るので、そこに見出しや指示を足すことはできません。ref の slide script は `dekc shot` で撮るときに動きますが、Chromium の sandbox を（起動できる環境では）有効にし、ネットワークを切った状態で動かします。
 
 dek をどう起動するかは、dek には確かめられません。`bun ./node_modules/.bin/dekc` は bin のフラグを飛ばすので、dek が動く前に Bun がプロジェクトの `bunfig.toml` を読みます（`.env` が設定した `DEK_` の変数は、この場合も dek が無視します）。プロジェクトの `package.json` の scripts や、`node_modules` の下にコミットされたものは、そのプロジェクト自身のコードです。自分が書いていないプロジェクトで dekc を実行する前に、実行する `dekc` が自分でインストールしたものか確かめてください。どの報告が対象になるかは [SECURITY.md](https://github.com/hajimism/dek/blob/main/SECURITY.md) にあります。
 

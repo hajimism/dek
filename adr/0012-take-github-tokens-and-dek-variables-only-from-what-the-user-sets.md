@@ -19,11 +19,18 @@ Checking the fix turned up three more ways a project's files configured the Bun 
 - For dek installed in a project's `node_modules`, the `tsconfig.json` nearest dek's files was the project's, since the package shipped none. Its `paths` could map `zod` to a file the project committed, and `dekc --version` ran it.
 - Bun also loads `.env.development.local`, `.env.production.local`, and `.env.test.local`. Besides DEK_ variables, a `.env` reaches Bun's own: `HTTPS_PROXY` takes effect before dek starts and cannot be undone from inside it, and `NODE_TLS_REJECT_UNAUTHORIZED=0` turns off certificate checks, so together they could read a token. Bun reads `NODE_TLS_REJECT_UNAUTHORIZED` on each request, so deleting it restores the checks; `NODE_EXTRA_CA_CERTS` from a `.env` has no effect.
 
+The reporter also pointed at two ways a ref, someone else's deck pinned in `dek.toml`, reached further than reading:
+
+- `dekc ref` wrote the ref's title into the References list of dek's block in `AGENTS.md` as it was. YAML lets a title hold line breaks, so a title could add a heading and instructions to the block agents read as dek's own guidance.
+- `dekc shot <ref>` runs the ref's slide scripts in Chromium, and Playwright leaves Chromium's sandbox off by default. Nothing kept those scripts off the network.
+
 ## Decision
 
 - The `dekc` bin runs Bun with `--no-env-file --config=/dev/null` (`#!/usr/bin/env -S bun --no-env-file --config=/dev/null`), and every bun dek starts gets `--no-install --no-env-file --config=/dev/null` (`BUN_FLAGS` in `src/core/spawn.ts`).
 - The package ships its `tsconfig.json`, so it is the one nearest dek's files wherever dek is installed. `scripts/check-package.sh` tries a project's `paths` against the packed tarball.
 - When Bun loaded `.env` files anyway, as `bun ./node_modules/.bin/dekc` does, dek removes from `process.env` every `DEK_` variable, and `NODE_TLS_REJECT_UNAUTHORIZED`, that `.env`, `.env.local`, or a `.env.<mode>` or `.env.<mode>.local` file for `development`, `production`, or `test` names, before it reads any, and warns. `DEK_` variables come only from the environment dek starts in.
+- A ref's title goes into `AGENTS.md` as one line: line breaks and control characters become one space, and it is cut to 80 characters.
+- The Playwright worker launches Chromium with `chromiumSandbox: true`, and without it only when that launch fails, as in a container running as root. Every page it draws, and the video worker's, runs with `offline: true`; a deck is self-contained (`DEK020`), so a slide needs no network.
 - dek does not warn about a `bunfig.toml` on that launch: its preload has already run by then and could silence the warning. SECURITY.md puts such a launch out of scope instead.
 - dek never asks `gh` for a token. `dekc ref` sends the token the user set in `GITHUB_TOKEN`, else `GH_TOKEN`, and none for public repositories when neither is set. `DEK_GH` is gone.
 - A token is sent only to `https://api.github.com`. `DEK_GITHUB_API` still points the calls elsewhere, without a token.
@@ -38,6 +45,7 @@ This is a breaking change:
 - A `DEK_` variable kept in a project's `.env`, such as `DEK_VOICE_URL`, stops applying; set it in the shell, or use `engine` in `voice.toml`.
 - `DEK_GITHUB_API` cannot read a private repository, since no token goes to it.
 - A project's `bunfig.toml` no longer applies to `dekc`.
+- A slide that loads something remote, which `DEK020` already reports, draws without it in `shot`, `lint --visual`, `pdf`, `pptx`, and `video`.
 
 What stays open, and is written down as out of scope in SECURITY.md and the architecture guide:
 
