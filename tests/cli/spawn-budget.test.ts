@@ -12,7 +12,8 @@ describe("cli test spawn budget", () => {
     for (const name of readdirSync(dir)) {
       if (!name.endsWith(".test.ts") || name === "spawn-budget.test.ts") continue;
       const source = readFileSync(join(dir, name), "utf8");
-      const n = (source.match(/\b(runDek|spawnDekServer)\(|\bBun\.spawn\(\[cliPath\b/g) ?? []).length;
+      const n = (source.match(/\b(runDek|spawnDekServer)\(|\bBun\.spawn\(\[cliPath\b/g) ?? [])
+        .length;
       perFile[name] = n;
       count += n;
     }
