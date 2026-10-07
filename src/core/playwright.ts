@@ -260,7 +260,7 @@ export async function runPlaywrightWorker<Request, Response>(
   }
   const request = await readWorkerRequest<Request>();
   try {
-    const browser = await playwright.chromium.launch({ headless: true });
+    const browser = await launchChromium(playwright.chromium);
     try {
       const response = await handle(browser, request);
       process.stdout.write(`${JSON.stringify(response)}\n`);
@@ -269,6 +269,19 @@ export async function runPlaywrightWorker<Request, Response>(
     }
   } catch (error) {
     exitWorker(error);
+  }
+}
+
+/**
+ * Headless Chromium with its sandbox, which Playwright leaves off by default: slide scripts run in
+ * it, a ref's included. Where the sandbox cannot start, as in a container running as root, it
+ * runs without one rather than not at all.
+ */
+async function launchChromium(chromium: typeof import("playwright").chromium): Promise<Browser> {
+  try {
+    return await chromium.launch({ headless: true, chromiumSandbox: true });
+  } catch {
+    return await chromium.launch({ headless: true });
   }
 }
 

@@ -552,6 +552,26 @@ describe("playwright worker slide scripts", () => {
       { slug: "intro", step: "turn", t: 400, kind: "throw", message: "TypeError: no bar at 400" },
     ]);
   });
+
+  // A ref's scripts run here too, and a deck is self-contained (DEK020): the page has no network.
+  browserTest("draws with the network off", async () => {
+    const { stillPageScript } = await import("../../src/core/slide-script.ts");
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["contrast"],
+      pages: [
+        {
+          html: `<html><body style="margin:0"><section class="slide" data-slug="intro" data-dek-step="0" data-dek-beat="0">
+  <p>hello</p>
+</section><script>(window.__dekSlides ||= {}).intro = { draw() { if (navigator.onLine) throw new Error("online"); } };</script>${stillPageScript([])}</body></html>`,
+          slug: "intro",
+          step: "0",
+        },
+      ],
+    });
+    expect(response?.drawErrors).toEqual([]);
+  });
 });
 
 // A draw must be a function of t that touches only its own slide: video and shots seek it, and the

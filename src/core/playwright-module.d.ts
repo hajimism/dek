@@ -33,14 +33,15 @@ declare module "playwright" {
     close(): Promise<void>;
   };
   export type Browser = {
-    newPage(options?: { viewport?: Viewport }): Promise<Page>;
+    newPage(options?: { viewport?: Viewport; offline?: boolean }): Promise<Page>;
     newContext(options?: {
       viewport?: Viewport;
       deviceScaleFactor?: number;
+      offline?: boolean;
     }): Promise<BrowserContext>;
     close(): Promise<void>;
   };
   export const chromium: {
-    launch(options?: { headless?: boolean }): Promise<Browser>;
+    launch(options?: { headless?: boolean; chromiumSandbox?: boolean }): Promise<Browser>;
   };
 }

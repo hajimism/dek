@@ -21,8 +21,10 @@ async function capture(
   request: VideoCaptureRequest,
 ): Promise<VideoCaptureResponse> {
   mkdirSync(request.outDir, { recursive: true });
+  // A deck is self-contained (DEK020), so the page needs no network.
   const page = await browser.newPage({
     viewport: { width: request.viewport.width, height: request.viewport.height },
+    offline: true,
   });
   await loadVideoDoc(page, request.html);
 

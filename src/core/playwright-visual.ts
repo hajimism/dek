@@ -50,9 +50,11 @@ export async function runVisualRequest<R extends VisualRequest>(
   browser: Browser,
   request: R,
 ): Promise<ResponseTo<R>> {
-  // A PPTX's pictures are shown full screen, so they are drawn at twice the slide's size.
+  // A PPTX's pictures are shown full screen, so they are drawn at twice the slide's size. A deck is
+  // self-contained (DEK020), so the page needs no network, and a ref's slide scripts get none.
   const context = await browser.newContext({
     viewport: request.viewport,
+    offline: true,
     ...(request.kind === "pptx" ? { deviceScaleFactor: 2 } : {}),
   });
   try {
