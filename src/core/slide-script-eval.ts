@@ -7,6 +7,7 @@ import {
   type SlideScriptProblem,
   staticProblems,
 } from "./slide-script.ts";
+import { BUN_FLAGS } from "./spawn.ts";
 import { suggest } from "./suggest.ts";
 
 /** One slide script as lint checks it: its source, and the slide's step keys to check `motion` by. */
@@ -149,7 +150,7 @@ const EVALUATOR_OPTIONS = { stdout: "pipe", stderr: "ignore", env: {} } as const
 
 function evaluatorCommand(): string[] {
   const worker = moduleFilePath(new URL("./slide-eval-worker.ts", import.meta.url));
-  return [process.execPath, "--no-install", worker];
+  return [process.execPath, ...BUN_FLAGS, worker];
 }
 
 /** A worker that was killed still wrote a line for every script it finished. */

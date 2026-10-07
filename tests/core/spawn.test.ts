@@ -15,7 +15,13 @@ const options = { label: "Playwright worker failed", hint: "install it" };
 
 describe("workerCommand", () => {
   test("runs a .ts worker with bun and anything else as is", () => {
-    expect(workerCommand("/x/worker.ts")).toEqual(["bun", "--no-install", "/x/worker.ts"]);
+    expect(workerCommand("/x/worker.ts")).toEqual([
+      "bun",
+      "--no-install",
+      "--no-env-file",
+      "--config=/dev/null",
+      "/x/worker.ts",
+    ]);
     expect(workerCommand("/x/worker")).toEqual(["/x/worker"]);
   });
 });

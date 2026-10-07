@@ -13,9 +13,16 @@ export async function awaitPiped(proc: {
   return { stdout, stderr, exitCode };
 }
 
+/**
+ * How dek runs bun: with no auto install, and without the working directory's `.env` or
+ * `bunfig.toml`, which a repository someone else wrote can commit to set variables or preload code.
+ * The dekc bin's shebang passes the last two to dek itself; a child does not inherit them.
+ */
+export const BUN_FLAGS = ["--no-install", "--no-env-file", "--config=/dev/null"];
+
 /** `bin` as a command line: a .ts worker runs under bun, anything else as is. */
 export function workerCommand(bin: string, args: string[] = []): string[] {
-  return bin.endsWith(".ts") ? ["bun", "--no-install", bin, ...args] : [bin, ...args];
+  return bin.endsWith(".ts") ? ["bun", ...BUN_FLAGS, bin, ...args] : [bin, ...args];
 }
 
 /** A browser that hangs must not hang dek; a whole visual run or capture fits well inside this. */

@@ -51,9 +51,9 @@ describe("dropEnvFileVariables", () => {
 });
 
 describe("dekc where a .env sets DEK_ variables", () => {
-  test("the bin asks Bun not to load .env at all", async () => {
+  test("the bin asks Bun not to load .env or bunfig.toml at all", async () => {
     const [shebang] = (await Bun.file(cliPath).text()).split("\n");
-    expect(shebang).toBe("#!/usr/bin/env -S bun --no-env-file");
+    expect(shebang).toBe("#!/usr/bin/env -S bun --no-env-file --config=/dev/null");
   });
 
   test.serial("run through bun, which loads .env, it runs no program the .env names", async () => {
@@ -68,5 +68,36 @@ describe("dekc where a .env sets DEK_ variables", () => {
       expect(result.stderr).toContain("warning: ignored DEK_RUMDL");
       expect(await Bun.file(ran).exists()).toBe(false);
     });
+  });
+});
+
+describe("dekc where a bunfig.toml preloads code", () => {
+  test.serial("run as its bin, neither dekc nor a bun it starts runs the preload", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: '<section class="slide" data-slug="intro"><h2>Intro</h2></section>\n',
+            },
+            scripts: { intro: "export default { draw() {} } satisfies DekSlide;\n" },
+          },
+        ],
+      },
+      async (root) => {
+        const ran = join(root, "ran");
+        await writeFile(
+          join(root, "preload.ts"),
+          `require("node:fs").appendFileSync(${JSON.stringify(ran)}, process.argv.join(" ") + "\\n");\n`,
+        );
+        await writeFile(join(root, "bunfig.toml"), 'preload = ["./preload.ts"]\n');
+
+        // The bin itself, so the shebang runs: runDek starts `bun src/cli.ts`, which skips it.
+        const proc = Bun.spawn([cliPath, "lint"], { cwd: root, stdout: "pipe", stderr: "pipe" });
+        await proc.exited;
+        expect(await Bun.file(ran).exists()).toBe(false);
+      },
+    );
   });
 });
