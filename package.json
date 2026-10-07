@@ -11,6 +11,7 @@
   "files": [
     "src",
     "skills",
+    "tsconfig.json",
     "LICENSE",
     "README.md",
     "README.ja.md",

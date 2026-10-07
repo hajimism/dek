@@ -17,6 +17,14 @@ mkdir "$work/boot"
 cd "$work/boot"
 echo '{}' > package.json
 bun add -d "$tarball" > /dev/null
+# A project's tsconfig.json `paths` must not reach dek's own imports: the package's tsconfig.json
+# is nearer to them.
+mkdir hijack
+echo 'require("node:fs").writeFileSync("hijacked", ""); export * from "zod/v4";' > hijack/zod.ts
+echo '{ "compilerOptions": { "paths": { "zod": ["./hijack/zod.ts"] } } }' > tsconfig.json
+bunx dekc --version > /dev/null
+test ! -e hijacked
+rm -r hijack tsconfig.json
 bunx dekc init talks --deck demo > /dev/null
 cd talks
 bun add -d "$tarball" > /dev/null
