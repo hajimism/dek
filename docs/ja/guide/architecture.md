@@ -39,6 +39,12 @@ Playwright、ffmpeg、音声エンジンは任意です。欠けているとき�
 
 Bun の Node 互換は部分的なので、Playwright は実行時に `node_modules` から解決し、別のワーカープロセスで動かします。`DEK_PLAYWRIGHT` で代わりのワーカーを指定でき、テストはこれでブラウザなしに動いています。rumdl は `DEK_RUMDL`、`PATH`、dek 本体のインストール先の `node_modules/.bin` の順に探します。どちらもカレントディレクトリからは探しません。clone したリポジトリが中身を決められるからです。
 
+## 自分が書いていないプロジェクト
+
+dek はプロジェクトをビルドしますが、dek を動かす Bun の設定はプロジェクトには決めさせません。`dekc` の bin は Bun を `--no-env-file --config=/dev/null` で動かし、dek が起動する bun にも同じフラグを付けます。そのため、カレントディレクトリの `.env` や `bunfig.toml` で変数を設定したり、コードを preload したりはできません。パッケージには dek 自身の `tsconfig.json` が入っているので、プロジェクトの `paths` で dek の import を差し替えることもできません。`dekc ref` がトークンを送るのは `api.github.com` だけで、送るのは `GITHUB_TOKEN` か `GH_TOKEN` に設定されたものだけです。dek が `gh` にトークンを尋ねることはありません。
+
+dek をどう起動するかは、dek には確かめられません。`bun ./node_modules/.bin/dekc` は bin のフラグを飛ばすので、dek が動く前に Bun がプロジェクトの `bunfig.toml` を読みます（`.env` が設定した `DEK_` の変数は、この場合も dek が無視します）。プロジェクトの `package.json` の scripts や、`node_modules` の下にコミットされたものは、そのプロジェクト自身のコードです。自分が書いていないプロジェクトで dekc を実行する前に、実行する `dekc` が自分でインストールしたものか確かめてください。どの報告が対象になるかは [SECURITY.md](https://github.com/hajimism/dek/blob/main/SECURITY.md) にあります。
+
 ## エージェントの接点
 
 エージェントとの接点は CLI です。結果を返すコマンドはすべて `--json` を受け、診断は SARIF、`dekc help --agent` が圧縮リファレンスです。[AI エージェントと作る](./ai)と [CLI リファレンス](/ja/reference/cli)を参照してください。

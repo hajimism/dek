@@ -39,6 +39,12 @@ Playwright, ffmpeg, and the speech engine are optional. When one is missing, onl
 
 Playwright runs in a separate worker process, resolved from `node_modules` at run time, because Bun's Node compatibility is partial. `DEK_PLAYWRIGHT` can point at an alternative worker, which is also how the tests run without a browser. rumdl is found on `PATH`, in the `node_modules/.bin` beside dek's install, or at `DEK_RUMDL`. Neither is looked up from the current directory, which a cloned repository controls.
 
+## A project you did not write
+
+dek builds a project, but the project does not configure the Bun that runs dek. The `dekc` bin runs Bun with `--no-env-file --config=/dev/null`, and every bun dek starts gets the same flags, so a `.env` or a `bunfig.toml` in the working directory sets no variable and preloads no code. The package ships its own `tsconfig.json`, so a project's `paths` cannot redirect dek's imports. `dekc ref` sends a token only to `api.github.com`, and only one set in `GITHUB_TOKEN` or `GH_TOKEN`; dek never asks `gh` for one.
+
+How dek is started is outside what it can check. `bun ./node_modules/.bin/dekc` skips the bin's flags, so Bun reads the project's `bunfig.toml` before dek starts; dek still ignores the `DEK_` variables a `.env` sets. A project's `package.json` scripts and anything it commits under `node_modules` are the project's own code. Before running dekc in a project you did not write, check that the `dekc` you run is one you installed. [SECURITY.md](https://github.com/hajimism/dek/blob/main/SECURITY.md) says which reports are in scope.
+
 ## Where agents plug in
 
 At the CLI. Every result command takes `--json`, diagnostics are SARIF, and `dekc help --agent` is the compact reference. See [Working with AI Agents](./ai) and the [CLI reference](/reference/cli).

@@ -98,7 +98,7 @@ ref は、見本として読むために `dek.toml` の `[refs]` に固定した
 
 ## 環境変数
 
-dek は `DEK_` で始まる変数を、起動したときの環境からだけ読みます。プロジェクトのファイルからは読みません。`dekc` は Bun を `--no-env-file` で動かします。`bun ./node_modules/.bin/dekc` のように Bun がそれでも `.env` を読み込んだときは、`.env`・`.env.local`・`.env.development`・`.env.production`・`.env.test` に出てくる `DEK_` の変数をすべて無視し、警告を出します。
+dek は `DEK_` で始まる変数を、起動したときの環境からだけ読みます。プロジェクトのファイルからは読みません。`dekc` は Bun を `--no-env-file --config=/dev/null` で動かし、dek が起動する bun もすべて同じフラグで動かします。そのため、カレントディレクトリの `.env` も `bunfig.toml` も効きません。`bun ./node_modules/.bin/dekc` のように Bun がそれでも `.env` を読み込んだときは、`.env`・`.env.local`と、`development`・`production`・`test` それぞれの `.env.<mode>`・`.env.<mode>.local` に出てくる `DEK_` の変数と `NODE_TLS_REJECT_UNAUTHORIZED` をすべて無視し、警告を出します。この起動方法では `bunfig.toml` は読まれたままです。[自分が書いていないプロジェクト](/ja/guide/architecture#自分が書いていないプロジェクト)を見てください。
 
 | 変数 | 役割 |
 | --- | --- |
