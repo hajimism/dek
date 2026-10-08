@@ -1,14 +1,23 @@
-import { annotateScript, liveReloadScript, playerScript } from "../../src/runtime/player.ts";
+import {
+  annotateScript,
+  livePlayerScript,
+  liveReloadScript,
+  playerScript,
+} from "../../src/runtime/player.ts";
 
-let cached: { playerScript: string; liveReloadScript: string; annotateScript: string } | undefined;
-
-export async function playerEmbed(): Promise<{
+type Embed = {
   playerScript: string;
+  livePlayerScript: string;
   liveReloadScript: string;
   annotateScript: string;
-}> {
+};
+
+let cached: Embed | undefined;
+
+export async function playerEmbed(): Promise<Embed> {
   cached ??= {
     playerScript: await playerScript(),
+    livePlayerScript: await livePlayerScript(),
     liveReloadScript: liveReloadScript(),
     annotateScript: await annotateScript(),
   };

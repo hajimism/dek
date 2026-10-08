@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { renderDeckHtml } from "../../src/core/document.ts";
-import { annotateScript, playerScript } from "../../src/runtime/player.ts";
+import { annotateScript, livePlayerScript, playerScript } from "../../src/runtime/player.ts";
 import { deckChannelName } from "../../src/runtime/routes.ts";
 
 /** The channel the mounted player posts on, so a test can play another window of the deck. */
@@ -62,7 +62,7 @@ export async function mountPlayer(
   try {
     // biome-ignore lint/security/noGlobalEval: compiled IIFE must see happy-dom globals
     // biome-ignore lint/complexity/noCommaOperator: indirect eval
-    (0, eval)(await playerScript());
+    (0, eval)(await (options.live ? livePlayerScript() : playerScript()));
     // The dev server's page for the speaker runs annotate mode after the player, as served.
     if (options.live) {
       // biome-ignore lint/security/noGlobalEval: compiled IIFE must see happy-dom globals
@@ -74,9 +74,16 @@ export async function mountPlayer(
   }
 }
 
+/** What the player sets on `window`, which happy-dom makes the test process's globalThis. */
+const PLAYER_HOOKS = ["dekGo", "dekMotion", "dekLive"] as const;
+
 export async function unmountPlayer(): Promise<void> {
   for (const channel of openChannels.splice(0)) {
     channel.close();
+  }
+  // unregister leaves what the page added, so a dev page's dekLive would reach the next mount.
+  for (const hook of PLAYER_HOOKS) {
+    delete window[hook];
   }
   await GlobalRegistrator.unregister();
 }

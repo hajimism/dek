@@ -4,7 +4,7 @@ import { playerChannelName, settle } from "../helpers/dom.ts";
 
 // Bun shares BroadcastChannel across the whole test process, so a player left
 // listening would touch `document` after happy-dom is gone.
-test("an unmounted player no longer hears the dek channel", async () => {
+test.serial("an unmounted player no longer hears the dek channel", async () => {
   await mountChartDeck("player");
   const name = playerChannelName();
   await unmountChartDeck();
@@ -23,4 +23,15 @@ test("an unmounted player no longer hears the dek channel", async () => {
     process.off("uncaughtException", onError);
   }
   expect(errors).toEqual([]);
+});
+
+// happy-dom's window is the test process's globalThis, so what the player sets on it outlives
+// the page: a dev page's dekLive would show up on the built file a later test mounts.
+test.serial("an unmounted player leaves none of its hooks on window", async () => {
+  await mountChartDeck("player");
+  (window as { dekLive?: unknown }).dekLive = async () => undefined;
+  await unmountChartDeck();
+  for (const hook of ["dekGo", "dekMotion", "dekLive"]) {
+    expect(globalThis).not.toHaveProperty(hook);
+  }
 });

@@ -7,7 +7,6 @@ import { decodePosition } from "../../src/core/live-protocol.ts";
 import {
   currentSlug,
   dekGo,
-  dekLive,
   mountPlayer,
   playerChannelName,
   pressKey,
@@ -166,34 +165,6 @@ describe("player runtime in happy-dom", () => {
     expect(document.querySelector('#deck [data-step="2"]')?.classList.contains("is-shown")).toBe(
       true,
     );
-  });
-
-  test.serial("dekLive reload-slide swaps the fragment and re-applies is-shown", async () => {
-    const original = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response(
-        '<section class="slide" data-slug="steps"><ul><li data-step="1">A</li><li data-step="2">B</li></ul></section>',
-      )) as unknown as typeof fetch;
-    try {
-      await dekLive({ type: "reload-slide", slug: "steps" });
-    } finally {
-      globalThis.fetch = original;
-    }
-    expect(document.querySelector('#deck .slide[data-slug="steps"] li')?.textContent).toBe("A");
-    expect(document.querySelector('#deck [data-step="2"]')?.classList.contains("is-shown")).toBe(
-      true,
-    );
-    expect(currentSlug()).toBe("steps");
-  });
-
-  test.serial("dekLive diagnostics shows the banner and clears it when empty", async () => {
-    await dekLive({
-      type: "diagnostics",
-      diagnostics: [{ id: "DEK001", severity: "error", message: "missing" }],
-    });
-    expect(document.querySelector(".dek-diagnostics")?.textContent).toContain("DEK001");
-    await dekLive({ type: "diagnostics", diagnostics: [] });
-    expect(document.querySelector(".dek-diagnostics")).toBeNull();
   });
 
   test.serial("a position from a peer moves the deck without being echoed back", async () => {

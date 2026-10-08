@@ -90,10 +90,19 @@ class FakeAudio {
   }
 }
 
+/** A position socket to a server that never answers, so the peers here are the windows. */
+class SilentSocket {
+  readyState = 0;
+  addEventListener(): void {}
+  send(): void {}
+  close(): void {}
+}
+
 let root = "";
 let fetches: string[] = [];
 const realFetch = globalThis.fetch;
 const realAudio = globalThis.Audio;
+const realWebSocket = globalThis.WebSocket;
 
 beforeAll(async () => {
   root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
@@ -122,6 +131,7 @@ afterEach(async () => {
   await unmountPlayer();
   globalThis.fetch = realFetch;
   globalThis.Audio = realAudio;
+  globalThis.WebSocket = realWebSocket;
 });
 
 type Peer = { heard: Position[]; post: (position: Position) => void; close: () => void };
@@ -138,11 +148,18 @@ async function mount(
   fetches = [];
   FakeAudio.made = [];
   const served = options.served ?? timeline(EVERY_STOP);
+  // Only the dev server has a rehearsal to serve.
   await mountPlayer(join(root, "decks", "demo"), {
-    url: `file:///deck.html?rehearse${hash}`,
+    live: true,
+    url: `http://localhost:3000/?rehearse${hash}`,
     beforeStart: () => {
+      (globalThis as { WebSocket: unknown }).WebSocket = SilentSocket;
       globalThis.fetch = (async (input: string | URL | Request) => {
         const url = String(input);
+        // The speaker's page also asks for its marks and annotations: none.
+        if (!url.includes("/voice/")) {
+          return Response.json({ ok: true, positions: [], annotations: [] });
+        }
         fetches.push(url);
         if (url.endsWith("timeline.json")) {
           return new Response(JSON.stringify(served), { status: 200 });

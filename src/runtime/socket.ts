@@ -46,6 +46,13 @@ export type PositionSocket = {
   close(): void;
 };
 
+/** Where what a peer sends over the line goes. */
+export type PositionHandlers = {
+  onPosition: (position: Position) => void;
+  /** Where a presenter's laser points, or null once it went away. */
+  onPointer?: (pointer: Pointer | null) => void;
+};
+
 /**
  * The deck's line to the server, which relays positions between the presenter, the audience,
  * and a phone remote, and where the presenter's laser points. Like an EventSource, it reconnects by itself after a drop (a restarted
@@ -55,15 +62,14 @@ export type PositionSocket = {
  * missed whatever moved meanwhile. A move this deck made while away is sent instead, and that
  * greeting, if it is still where the deck was when the line dropped, is stale and passed over.
  */
-export function createPositionSocket(options: {
-  connect: () => SocketLike;
-  onPosition: (position: Position) => void;
-  /** Where a presenter's laser points, or null once it went away. */
-  onPointer?: (pointer: Pointer | null) => void;
-  setTimer: (fn: () => void, ms: number) => number;
-  clearTimer: (id: number) => void;
-  random?: () => number;
-}): PositionSocket {
+export function createPositionSocket(
+  options: PositionHandlers & {
+    connect: () => SocketLike;
+    setTimer: (fn: () => void, ms: number) => number;
+    clearTimer: (id: number) => void;
+    random?: () => number;
+  },
+): PositionSocket {
   let socket: SocketLike | undefined;
   let timer: number | undefined;
   let attempt = 0;

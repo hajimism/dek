@@ -142,7 +142,6 @@ export function renderDeckDocument(
     bodyAttrs: `${presenterOpen ? ' class="is-presenter"' : ""}${pageConfigAttrs({
       mode,
       deck: deck.name,
-      live,
       ...(liveToken ? { liveToken } : {}),
     })}`,
     body: `${progress}
