@@ -74,9 +74,16 @@ export async function mountPlayer(
   }
 }
 
+/** What the player sets on `window`, which happy-dom makes the test process's globalThis. */
+const PLAYER_HOOKS = ["dekGo", "dekMotion", "dekLive"] as const;
+
 export async function unmountPlayer(): Promise<void> {
   for (const channel of openChannels.splice(0)) {
     channel.close();
+  }
+  // unregister leaves what the page added, so a dev page's dekLive would reach the next mount.
+  for (const hook of PLAYER_HOOKS) {
+    delete window[hook];
   }
   await GlobalRegistrator.unregister();
 }
