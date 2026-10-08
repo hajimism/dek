@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
+import { livePlayerScript } from "../../src/runtime/player.ts";
 import { startDevServer } from "../../src/server/dev.ts";
 import { POLL_INTERVAL_MS } from "../../src/server/watch.ts";
 import { spawnDekServer } from "../helpers/cli.ts";
@@ -144,10 +145,14 @@ describe("startDevServer", () => {
           const playerHtml = await player.text();
           expect(playerHtml).toContain("intro");
           expect(playerHtml).toContain("EventSource");
+          const live = `<script>${await livePlayerScript()}</script>`;
+          expect(playerHtml).toContain(live);
 
           const presenter = await fetch(new URL("/presenter", server.url));
           expect(presenter.ok).toBe(true);
-          expect(await presenter.text()).toContain("hello");
+          const presenterHtml = await presenter.text();
+          expect(presenterHtml).toContain("hello");
+          expect(presenterHtml).toContain(live);
         });
       },
     );

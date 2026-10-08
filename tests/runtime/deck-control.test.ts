@@ -48,6 +48,18 @@ describe("createDeckControl", () => {
     expect(went).toEqual([]);
   });
 
+  test("a page with no rehearsal to load moves the deck and leaves the play key alone", () => {
+    const went: Array<[Position, GoOrigin]> = [];
+    const control = createDeckControl({
+      go: async (position, origin) => {
+        went.push([position, origin]);
+      },
+    });
+    control.request(at(1), "local");
+    expect(went).toEqual([[at(1), "local"]]);
+    expect(control.togglePlay()).toBe(false);
+  });
+
   test("play and pause belong to a loaded rehearsal only", () => {
     const off = setup(false);
     expect(off.control.togglePlay()).toBe(false);

@@ -18,7 +18,7 @@ import {
 } from "../core/position.ts";
 import type { Position } from "../core/step.ts";
 import { applyIncomingPosition, createGuardedGo } from "./go.ts";
-import { createPositionSocket, type PositionSocket } from "./socket.ts";
+import type { PositionHandlers, PositionSocket } from "./socket.ts";
 
 /**
  * Where a move came from. Local moves, and the rehearsal clock's, are published to peers; remote
@@ -52,8 +52,8 @@ type GoRequest = { position: Position; origin: GoOrigin };
 export function createNavigator(options: {
   deck: DeckStops;
   channelName: string;
-  /** The dev server's position socket; a built file on a static host has none. */
-  socketUrl?: string;
+  /** Open the dev server's position socket; a file that stands alone has none to open. */
+  connect?: (handlers: PositionHandlers) => PositionSocket;
   /**
    * Draw the move from `from` to `to`. `apply` puts it on screen, perhaps inside a transition;
    * the promise settles once the move has played.
@@ -156,14 +156,10 @@ export function createNavigator(options: {
       receive(next);
     }
   });
-  if (options.socketUrl) {
-    const url = options.socketUrl;
-    remote = createPositionSocket({
-      connect: () => new WebSocket(url),
+  if (options.connect) {
+    remote = options.connect({
       onPosition: receive,
       ...(options.onPointer ? { onPointer: options.onPointer } : {}),
-      setTimer: (fn, ms) => window.setTimeout(fn, ms),
-      clearTimer: (id) => window.clearTimeout(id),
     });
     // A page that is really going away must not dial back in; one kept for Back reconnects.
     window.addEventListener("pagehide", (event) => {

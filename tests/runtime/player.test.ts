@@ -1,16 +1,30 @@
 import { describe, expect, test } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
-import { liveReloadScript, playerScript } from "../../src/runtime/player.ts";
+import { livePlayerScript, liveReloadScript, playerScript } from "../../src/runtime/player.ts";
 
 const script = await playerScript();
+const live = await livePlayerScript();
+
+/** What only a page served by the dev server reaches for: its socket, routes, and live hook. */
+const DEV_SERVER_ONLY = ["WebSocket", '"/ws"', '"/marks"', "/voice/", "dekLive"];
 
 describe("playerScript", () => {
   test("compiles lazily and caches the result", async () => {
     const source = await Bun.file(new URL("../../src/runtime/player.ts", import.meta.url)).text();
     expect(source).toContain("player ??=");
+    expect(source).toContain("livePlayer ??=");
     expect(source).toContain("annotate ??=");
     expect(source).not.toMatch(/= await compile\(/);
     expect(await playerScript()).toBe(script);
+    expect(await livePlayerScript()).toBe(live);
+  });
+
+  test.each(DEV_SERVER_ONLY)("leaves %s out of a file that stands alone", (needle) => {
+    expect(script).not.toContain(needle);
+  });
+
+  test.each(DEV_SERVER_ONLY)("keeps %s on the dev server's pages", (needle) => {
+    expect(live).toContain(needle);
   });
 });
 

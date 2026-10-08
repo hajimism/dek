@@ -45,8 +45,6 @@ export type PageMode = "player" | "presenter" | "video";
 export type PageConfig = {
   mode: PageMode;
   deck: string;
-  /** The dev server's page: it follows the server's socket and events. */
-  live: boolean;
   /** What a presenter page sends as `?token=` on its live channels. */
   liveToken?: string;
 };
@@ -56,18 +54,16 @@ export function pageConfigAttrs(config: PageConfig): string {
   return [
     ` data-mode="${config.mode}"`,
     ` data-deck="${escapeAttr(config.deck)}"`,
-    config.live ? ` data-live="true"` : "",
     config.liveToken ? ` data-live-token="${escapeAttr(config.liveToken)}"` : "",
   ].join("");
 }
 
 /** The settings `pageConfigAttrs` wrote on `body`. */
 export function readPageConfig(body: HTMLElement): PageConfig {
-  const { mode, deck, live, liveToken } = body.dataset;
+  const { mode, deck, liveToken } = body.dataset;
   return {
     mode: mode === "presenter" || mode === "video" ? mode : "player",
     deck: deck ?? "",
-    live: live === "true",
     ...(liveToken ? { liveToken } : {}),
   };
 }

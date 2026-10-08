@@ -21,6 +21,8 @@ The design decision that matters most is that **core** is a standalone module. T
 
 The CLI works on files directly. Only the two commands that need to know or change what a browser is showing, `goto` and `current`, talk to a running dev server over HTTP, and they fail with a hint when none is running. The only command that reaches the network is `dekc ref`, which fetches a pinned commit from GitHub; `ls`, `show`, `theme`, and `shot` fetch it again when a ref's snapshot is missing. Lint, build, and sync never do.
 
+A built file never reaches for a server either. The player is compiled twice: the one a build, a video, or a shot embeds has no position socket, no live updates, no marks, and no rehearsal, which only the dev server's pages carry, as they alone carry annotate mode.
+
 ## Voice and video
 
 Voice and video sit on the same core as separate drivers. Core knows about Cues, Timelines, and schedules; the speech engine, ffmpeg, and the browser are adapters.

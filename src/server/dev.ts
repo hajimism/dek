@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { locateDeck, type Project, resolveProject } from "../core/resolve.ts";
-import { annotateScript, liveReloadScript, playerScript } from "../runtime/player.ts";
+import { annotateScript, livePlayerScript, liveReloadScript } from "../runtime/player.ts";
 import {
   clearance,
   mayRead,
@@ -69,7 +69,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const { scopedDeckName, deckDir } = serverScope(project, options);
   const access = accessFor(options);
   const embed = {
-    playerScript: await playerScript(),
+    playerScript: await livePlayerScript(),
     liveReloadScript: liveReloadScript(),
     annotateScript: await annotateScript(),
   };

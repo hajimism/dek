@@ -49,7 +49,7 @@ async function renderPage(
 ) {
   const embed = await playerEmbed();
   return renderDeckHtml(dir, {
-    playerScript: embed.playerScript,
+    playerScript: target.kind === "dev" ? embed.livePlayerScript : embed.playerScript,
     target:
       target.kind === "dev"
         ? {
@@ -923,7 +923,9 @@ describe("annotate mode", () => {
       for (const mode of ["player", "presenter"] as const) {
         const html = await renderPage(join(root, "decks", "demo"), { kind: "dev", mode });
         const annotate = html.indexOf(`<script>${embed.annotateScript}</script>`);
-        expect(annotate).toBeGreaterThan(html.indexOf(`<script>${embed.playerScript}</script>`));
+        expect(annotate).toBeGreaterThan(
+          html.indexOf(`<script>${embed.livePlayerScript}</script>`),
+        );
         expect(html).toContain('id="dek-annotate-toggle"');
       }
     });

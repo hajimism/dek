@@ -45,6 +45,7 @@ class FakeWebSocket {
 }
 
 let root = "";
+const realFetch = globalThis.fetch;
 
 beforeAll(async () => {
   root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
@@ -63,17 +64,20 @@ beforeAll(async () => {
     ],
   });
   await mountPlayer(join(root, "decks", "demo"), {
+    live: true,
     url: "http://localhost:3000/demo/#intro",
     beforeStart: () => {
       (globalThis as { WebSocket: unknown }).WebSocket = FakeWebSocket;
+      // The marks and the annotations the speaker's page asks for: none yet.
+      globalThis.fetch = (async () => Response.json({ positions: [] })) as unknown as typeof fetch;
       // What the dev server writes on a presenter page behind `--remote`.
-      document.body.dataset.live = "true";
       document.body.dataset.liveToken = "a b";
     },
   });
 });
 
 afterAll(async () => {
+  globalThis.fetch = realFetch;
   await unmountPlayer();
   await rm(root, { recursive: true, force: true });
 });

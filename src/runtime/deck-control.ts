@@ -18,7 +18,8 @@ export type DeckControl = {
  */
 export function createDeckControl(options: {
   go: (next: Position, origin: RequestOrigin) => Promise<void>;
-  rehearse: Pick<RehearseController, "ready" | "move" | "toggle">;
+  /** The rehearsal the dev server can load; a file that stands alone has none. */
+  rehearse?: Pick<RehearseController, "ready" | "move" | "toggle">;
 }): DeckControl {
   const { go, rehearse } = options;
   return {
@@ -26,14 +27,14 @@ export function createDeckControl(options: {
       if (!next) {
         return;
       }
-      if (rehearse.ready()) {
+      if (rehearse?.ready()) {
         rehearse.move(next, origin);
       } else {
         void go(next, origin);
       }
     },
     togglePlay() {
-      if (!rehearse.ready()) {
+      if (!rehearse?.ready()) {
         return false;
       }
       rehearse.toggle();
