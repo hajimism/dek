@@ -61,11 +61,11 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.5.15",
     "@happy-dom/global-registrator": "20.14.5",
     "@types/bun": "^1.4.2",
     "happy-dom": "20.14.5",
-    "knip": "6.38.0",
+    "knip": "6.39.0",
     "playwright": "^1.63.0",
     "typescript": "^7.0.2",
     "vitepress": "^1.6.4"
