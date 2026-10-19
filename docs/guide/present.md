@@ -105,7 +105,7 @@ When the URL is only known after the upload, there is no absolute address to put
 
 A build is the file you present from, so its presenter view carries the whole script, a URL or not. A page for anyone who has the link is `dekc build --public`: its presenter view carries only what you say aloud, with the stage directions (blockquotes) and HTML comments in `script.md` left out, and code blocks kept as written. Build it `--public` before you put it on the web, and present from a build without it, or from the dev server.
 
-To print, use the browser's own Print: every slide gets a page of its own at the deck's size and in its own layout, with every beat shown, each slide script drawn at its last beat, and no rail or hint. `dekc pdf` writes the same pages without a dialog.
+To print, use the browser's own Print: every slide gets a page of its own at the deck's size and in its own layout, with every beat shown, each slide script drawn at its last beat, and no rail or hint. `dekc pdf` writes the same pages without a dialog, drawn so that they look the same in every PDF viewer (see [PDF](#pdf)).
 
 ## Another device
 
@@ -130,6 +130,10 @@ dekc pdf
 ```
 
 Renders every slide at its last beat into `dist/<deck>.pdf`. Requires Playwright.
+
+Each page is a picture of the slide as the browser drew it, at twice the slide's size, with the slide's text laid over it, unseen: a reader selects, searches, and copies the text where they see it, and links still work. A PDF printed as vectors can look different in another viewer: Chromium writes a blurred `box-shadow` and a gradient clipped with `background-clip: text` in a way that Preview, Quick Look, Safari, and iPhone and iPad draw as flat boxes. A picture looks the same everywhere. In exchange, the type softens when zoomed in far, and the file is larger, about a PNG per slide.
+
+The browser's own Print still prints vectors, so a PDF saved from its dialog can show those boxes in Apple's viewers. Hand over the one `dekc pdf` writes.
 
 ## PPTX
 
