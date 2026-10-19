@@ -11,6 +11,13 @@ import {
   samePlace,
 } from "./overflow.ts";
 import { visitInPages } from "./page-pool.ts";
+import {
+  keepOnlyTextInPage,
+  PDF_SLIDES,
+  PDF_TEXT_CSS,
+  setSlidePictureInPage,
+  slideBoxesInPage,
+} from "./pdf-text.ts";
 import type {
   ContrastFinding,
   ContrastOrigin,
@@ -50,12 +57,13 @@ export async function runVisualRequest<R extends VisualRequest>(
   browser: Browser,
   request: R,
 ): Promise<ResponseTo<R>> {
-  // A PPTX's pictures are shown full screen, so they are drawn at twice the slide's size. A deck is
-  // self-contained (DEK020), so the page needs no network, and a ref's slide scripts get none.
+  // A PPTX's and a PDF's pictures are shown full screen, so they are drawn at twice the slide's
+  // size. A deck is self-contained (DEK020), so the page needs no network, and a ref's slide
+  // scripts get none.
   const context = await browser.newContext({
     viewport: request.viewport,
     offline: true,
-    ...(request.kind === "pptx" ? { deviceScaleFactor: 2 } : {}),
+    ...(request.kind === "pptx" || request.kind === "pdf" ? { deviceScaleFactor: 2 } : {}),
   });
   try {
     return (await answer(context, request)) as ResponseTo<R>;
@@ -83,10 +91,27 @@ function answer(context: BrowserContext, request: VisualRequest) {
   }
 }
 
-/** The whole print document as one PDF, a page per slide. */
+/**
+ * The whole print document as one PDF, a page per slide: each slide shot as print draws it, then
+ * printed as that picture with its text laid over it, unseen.
+ */
 async function printPdf(context: BrowserContext, request: PdfRequest): Promise<DoneResponse> {
   const page = await context.newPage();
   await page.setContent(request.html, { waitUntil: "load" });
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.emulateMedia({ media: "print" });
+  const pictures: Buffer[] = [];
+  for (const clip of await page.evaluate(slideBoxesInPage, PDF_SLIDES)) {
+    pictures.push(await page.screenshot({ clip, fullPage: true }));
+  }
+  await page.evaluate(keepOnlyTextInPage, { selector: PDF_SLIDES, css: PDF_TEXT_CSS });
+  for (const [index, picture] of pictures.entries()) {
+    await page.evaluate(setSlidePictureInPage, {
+      selector: PDF_SLIDES,
+      index,
+      picture: picture.toString("base64"),
+    });
+  }
   await page.pdf({
     path: request.pdfPath,
     width: `${request.viewport.width}px`,

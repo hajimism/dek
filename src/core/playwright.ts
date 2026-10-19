@@ -55,7 +55,10 @@ export type PagesRequest = {
   sheets?: SheetSpec[];
 };
 
-/** One page printed to `pdfPath`, a PDF page per slide. */
+/**
+ * One page printed to `pdfPath`, a PDF page per slide: each slide a picture at twice its size,
+ * with its text laid over it, unseen, to select and search.
+ */
 export type PdfRequest = {
   kind: "pdf";
   viewport: Viewport;

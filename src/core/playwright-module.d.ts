@@ -3,12 +3,16 @@ declare module "playwright" {
   export type Page = {
     goto(url: string): Promise<unknown>;
     setContent(html: string, options?: { waitUntil?: string }): Promise<void>;
-    emulateMedia(options: { reducedMotion?: "reduce" | "no-preference" }): Promise<void>;
+    emulateMedia(options: {
+      media?: "screen" | "print";
+      reducedMotion?: "reduce" | "no-preference";
+    }): Promise<void>;
     setViewportSize(size: Viewport): Promise<void>;
     evaluate<T, A = unknown>(fn: (arg: A) => T | Promise<T>, arg?: A): Promise<T>;
     screenshot(options: {
       path?: string;
       fullPage?: boolean;
+      clip?: { x: number; y: number; width: number; height: number };
       type?: "png" | "jpeg";
     }): Promise<Buffer>;
     addScriptTag(options: { content: string }): Promise<unknown>;

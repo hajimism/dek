@@ -774,7 +774,8 @@ export const COMMANDS = {
     args: [],
     flags: ["root-dist"],
     usage: ["dekc pdf [deck] [--root-dist]"],
-    summary: "Write dist/<deck>.pdf, one page per slide at its last beat. Needs Playwright.",
+    summary:
+      "Write dist/<deck>.pdf, one page per slide at its last beat: a picture of it with its text\nlaid over it, unseen, to select and search. Needs Playwright.",
     group: "Output",
     overview: [["dekc pdf [--root-dist]", "write a PDF"]],
     agent: ["dekc pdf [--root-dist]"],
