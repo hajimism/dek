@@ -131,7 +131,7 @@ dekc pdf
 
 Renders every slide at its last beat into `dist/<deck>.pdf`. Requires Playwright.
 
-Each page is a picture of the slide as the browser drew it, at twice the slide's size, with the slide's text laid over it, unseen: a reader selects, searches, and copies the text where they see it, and links still work. A PDF printed as vectors can look different in another viewer: Chromium writes a blurred `box-shadow` and a gradient clipped with `background-clip: text` in a way that Preview, Quick Look, Safari, and iPhone and iPad draw as flat boxes. A picture looks the same everywhere. In exchange, the type softens when zoomed in far, and the file is larger, about a PNG per slide.
+Each page is a picture of the slide as the browser drew it, at twice the slide's size, with the slide's text laid over it, unseen: a reader selects, searches, and copies the text where they see it, and links still work. A PDF printed as vectors can look different in another viewer: Chromium writes a blurred `box-shadow` and a gradient clipped with `background-clip: text` in a way that Preview, Quick Look, Safari, and iPhone and iPad draw as flat boxes. A picture looks the same everywhere. A slide is kept as a PNG, so type and shapes keep their edges; one that shows photographs, a tenth of its area or more, is kept as a JPEG at quality 90 when that is smaller. In exchange, the type softens when zoomed in far, and the file is larger than a vector one, about a picture per slide.
 
 The browser's own Print still prints vectors, so a PDF saved from its dialog can show those boxes in Apple's viewers. Hand over the one `dekc pdf` writes.
 
