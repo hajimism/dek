@@ -13,8 +13,11 @@ import {
 import { visitInPages } from "./page-pool.ts";
 import {
   keepOnlyTextInPage,
+  PDF_JPEG_QUALITY,
   PDF_SLIDES,
   PDF_TEXT_CSS,
+  pdfPictureType,
+  photoSharesInPage,
   setSlidePictureInPage,
   slideBoxesInPage,
 } from "./pdf-text.ts";
@@ -100,17 +103,25 @@ async function printPdf(context: BrowserContext, request: PdfRequest): Promise<D
   await page.setContent(request.html, { waitUntil: "load" });
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.emulateMedia({ media: "print" });
-  const pictures: Buffer[] = [];
-  for (const clip of await page.evaluate(slideBoxesInPage, PDF_SLIDES)) {
-    pictures.push(await page.screenshot({ clip, fullPage: true }));
+  // A slide that shows photographs is shot as a JPEG too, and kept as one where it is smaller.
+  const shares = await page.evaluate(photoSharesInPage, PDF_SLIDES);
+  const pictures: string[] = [];
+  for (const [index, clip] of (await page.evaluate(slideBoxesInPage, PDF_SLIDES)).entries()) {
+    const share = shares[index] ?? 0;
+    const png = await page.screenshot({ clip, fullPage: true });
+    const jpeg =
+      pdfPictureType({ png: png.length, jpeg: 0 }, share) === "jpeg"
+        ? await page.screenshot({ clip, fullPage: true, type: "jpeg", quality: PDF_JPEG_QUALITY })
+        : undefined;
+    const kept =
+      jpeg && pdfPictureType({ png: png.length, jpeg: jpeg.length }, share) === "jpeg"
+        ? { type: "jpeg", data: jpeg }
+        : { type: "png", data: png };
+    pictures.push(`data:image/${kept.type};base64,${kept.data.toString("base64")}`);
   }
   await page.evaluate(keepOnlyTextInPage, { selector: PDF_SLIDES, css: PDF_TEXT_CSS });
   for (const [index, picture] of pictures.entries()) {
-    await page.evaluate(setSlidePictureInPage, {
-      selector: PDF_SLIDES,
-      index,
-      picture: picture.toString("base64"),
-    });
+    await page.evaluate(setSlidePictureInPage, { selector: PDF_SLIDES, index, picture });
   }
   await page.pdf({
     path: request.pdfPath,

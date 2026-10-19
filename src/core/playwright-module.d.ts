@@ -14,6 +14,7 @@ declare module "playwright" {
       fullPage?: boolean;
       clip?: { x: number; y: number; width: number; height: number };
       type?: "png" | "jpeg";
+      quality?: number;
     }): Promise<Buffer>;
     addScriptTag(options: { content: string }): Promise<unknown>;
     pdf(options: {

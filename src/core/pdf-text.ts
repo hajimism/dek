@@ -111,8 +111,62 @@ export function keepOnlyTextInPage({ selector, css }: { selector: string; css: s
   document.head.append(sheet);
 }
 
+/** How good a JPEG a photograph's slide is kept as: near the PNG to the eye, at under half its size. */
+export const PDF_JPEG_QUALITY = 90;
+
+/** How much of a slide its photographs must cover for the slide to be kept as a JPEG. */
+const PHOTO_SHARE = 0.1;
+
 /**
- * Sets a slide's picture, a PNG in base64, under its text: the `index`th of the page's slides.
+ * Which of a slide's two pictures the PDF keeps: the JPEG for a slide that shows photographs,
+ * where it is smaller, and the PNG for the rest. Type and flat shapes keep their edges in a PNG;
+ * a JPEG blurs them, so a slide of them is never kept as one, however much smaller it would be.
+ */
+export function pdfPictureType(
+  sizes: { png: number; jpeg: number },
+  photoShare: number,
+): "png" | "jpeg" {
+  return photoShare >= PHOTO_SHARE && sizes.jpeg < sizes.png ? "jpeg" : "png";
+}
+
+/**
+ * How much of each slide raster pictures cover, 0 to 1: images, video, and canvases, and
+ * backgrounds drawn from a picture's URL. SVG is shapes, not a photograph, and does not count.
+ *
+ * Runs in the page, shipped by `page.evaluate`, so it references nothing outside itself.
+ */
+export function photoSharesInPage(selector: string): number[] {
+  const vector = (url: string) => /^data:image\/svg|\.svg(?:[?#]|$)/i.test(url);
+  return [...document.querySelectorAll(selector)].map((slide) => {
+    const frame = slide.getBoundingClientRect();
+    let covered = 0;
+    for (const el of [slide, ...slide.querySelectorAll("*")]) {
+      const style = getComputedStyle(el);
+      if (style.visibility !== "visible" || style.display === "none") {
+        continue;
+      }
+      const raster =
+        el instanceof HTMLImageElement
+          ? !vector(el.currentSrc || el.src)
+          : el instanceof HTMLVideoElement ||
+            el instanceof HTMLCanvasElement ||
+            [...style.backgroundImage.matchAll(/url\("?([^")]*)"?\)/g)].some(
+              ([, url]) => url !== undefined && !vector(url),
+            );
+      if (!raster) {
+        continue;
+      }
+      const box = el.getBoundingClientRect();
+      const width = Math.min(box.right, frame.right) - Math.max(box.left, frame.left);
+      const height = Math.min(box.bottom, frame.bottom) - Math.max(box.top, frame.top);
+      covered += Math.max(0, width) * Math.max(0, height);
+    }
+    return Math.min(1, covered / (frame.width * frame.height));
+  });
+}
+
+/**
+ * Sets a slide's picture, a `data:` URL, under its text: the `index`th of the page's slides.
  * One slide a call, so no message to the page carries more than one picture.
  *
  * Runs in the page, shipped by `page.evaluate`, so it references nothing outside itself.
@@ -130,7 +184,7 @@ export function setSlidePictureInPage({
   if (slide instanceof HTMLElement) {
     slide.style.setProperty(
       "background",
-      `url("data:image/png;base64,${picture}") 0 0 / 100% 100% no-repeat border-box`,
+      `url("${picture}") 0 0 / 100% 100% no-repeat border-box`,
       "important",
     );
   }

@@ -9,6 +9,7 @@ import {
   keepOnlyTextInPage,
   PDF_SLIDES,
   PDF_TEXT_CSS,
+  pdfPictureType,
   setSlidePictureInPage,
 } from "../../src/core/pdf-text.ts";
 import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
@@ -30,6 +31,11 @@ afterAll(async () => {
   await browser?.close();
 });
 
+/** A photograph, which the PDF keeps as a JPEG, unlike type and flat shapes. */
+const photo = readFileSync(
+  join(import.meta.dir, "..", "..", "sample", "decks", "why-dek", "assets", "finished-later.jpg"),
+).toString("base64");
+
 /** What Apple's viewers draw as flat boxes when Chromium prints it: a blur and a clip to text. */
 const slides = `<div id="deck">
   <section class="slide" style="background:#fff">
@@ -38,6 +44,7 @@ const slides = `<div id="deck">
     <p style="filter:drop-shadow(0 4px 8px #000)">Filtered</p>
   </section>
   <section class="slide" style="background:#fff"><p>Second</p></section>
+  <section class="slide" style="background:url(data:image/jpeg;base64,${photo}) 0 0 / cover"><p>Photo</p></section>
 </div>`;
 
 /** Every stream of a PDF, inflated where Chromium compressed it. */
@@ -53,6 +60,15 @@ function pdfStreams(bytes: Buffer): { dict: string; data: Buffer }[] {
   }
   return streams;
 }
+
+describe("pdfPictureType", () => {
+  test("keeps a JPEG only for a slide of photographs, where it is smaller", () => {
+    expect(pdfPictureType({ png: 1000, jpeg: 400 }, 0.5)).toBe("jpeg");
+    expect(pdfPictureType({ png: 1000, jpeg: 1200 }, 0.5)).toBe("png");
+    // Type over a gradient makes a small JPEG too, and keeps its edges only as a PNG.
+    expect(pdfPictureType({ png: 1000, jpeg: 400 }, 0)).toBe("png");
+  });
+});
 
 describe("dekc pdf in Chromium", () => {
   browserTest("prints each slide as one picture, with its text and no soft mask", async () => {
@@ -73,9 +89,16 @@ describe("dekc pdf in Chromium", () => {
       const text = bytes.toString("latin1");
       expect(text.startsWith("%PDF-")).toBe(true);
 
-      // One picture a page, drawn at twice the slide's size, and nothing else rasterized.
-      const images = [...text.matchAll(/\/Subtype \/Image[\s\S]*?\/Width (\d+)\s*\/Height (\d+)/g)];
-      expect(images.map((image) => `${image[1]}x${image[2]}`)).toEqual(["2560x1440", "2560x1440"]);
+      // One picture a page, drawn at twice the slide's size, and nothing else rasterized: a JPEG
+      // where the slide is a photograph, a PNG where it is type.
+      const images = pdfStreams(bytes)
+        .filter(({ dict }) => dict.includes("/Subtype /Image"))
+        .map(({ dict }) => {
+          const width = dict.match(/\/Width (\d+)/)?.[1];
+          const height = dict.match(/\/Height (\d+)/)?.[1];
+          return `${width}x${height} ${dict.includes("/DCTDecode") ? "jpeg" : "png"}`;
+        });
+      expect(images).toEqual(["2560x1440 png", "2560x1440 png", "2560x1440 jpeg"]);
       // The blur and the clip to text are in the pictures, not soft masks a viewer may draw wrong.
       expect(text).not.toMatch(/\/S \/(Luminosity|Alpha)/);
       // The text is still text: drawn, and drawn unseen.
@@ -123,7 +146,7 @@ describe("dekc pdf in Chromium", () => {
       await page.evaluate(setSlidePictureInPage, {
         selector: PDF_SLIDES,
         index: 0,
-        picture: "iVBORw0KGgo=",
+        picture: "data:image/png;base64,iVBORw0KGgo=",
       });
       // The backdrop filter that made its box the pinned text's containing block is gone, not the box.
       expect(await style('[data-k="pinned"]')).toMatchObject({
