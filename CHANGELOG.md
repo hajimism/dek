@@ -2,6 +2,25 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.3.2](https://github.com/hajimism/dek/compare/v0.3.1...v0.3.2) (2026-10-20)
+
+
+### Bug Fixes
+
+* **pdf:** print each slide as a picture with its text laid over it ([02f49a8](https://github.com/hajimism/dek/commit/02f49a855209e1c4430613fd9358699305bcbb9b))
+* **pdf:** print each slide as a picture with its text laid over it ([b88259d](https://github.com/hajimism/dek/commit/b88259dbcc80ed0a1450cc6bf6422c71120c5802))
+
+
+### Performance
+
+* **pdf:** keep a slide of photographs as a JPEG ([19a9092](https://github.com/hajimism/dek/commit/19a909214b256c8bbcf66a443f00c54c2b43766e))
+
+
+### Documentation
+
+* record the PDF as pictures in ADR 14 and the presenting guide ([c889781](https://github.com/hajimism/dek/commit/c88978175a9b3812f611d8af4de94b2de57556c1))
+* say which slides the PDF keeps as JPEGs, in ADR 14 and the guide ([de733fb](https://github.com/hajimism/dek/commit/de733fb4589d5f6f45f6f9a83b60673d2feab706))
+
 ## [0.3.1](https://github.com/hajimism/dek/compare/v0.3.0...v0.3.1) (2026-10-08)
 
 
