@@ -11,6 +11,16 @@ import {
   samePlace,
 } from "./overflow.ts";
 import { visitInPages } from "./page-pool.ts";
+import {
+  keepOnlyTextInPage,
+  PDF_JPEG_QUALITY,
+  PDF_SLIDES,
+  PDF_TEXT_CSS,
+  pdfPictureType,
+  photoSharesInPage,
+  setSlidePictureInPage,
+  slideBoxesInPage,
+} from "./pdf-text.ts";
 import type {
   ContrastFinding,
   ContrastOrigin,
@@ -50,12 +60,13 @@ export async function runVisualRequest<R extends VisualRequest>(
   browser: Browser,
   request: R,
 ): Promise<ResponseTo<R>> {
-  // A PPTX's pictures are shown full screen, so they are drawn at twice the slide's size. A deck is
-  // self-contained (DEK020), so the page needs no network, and a ref's slide scripts get none.
+  // A PPTX's and a PDF's pictures are shown full screen, so they are drawn at twice the slide's
+  // size. A deck is self-contained (DEK020), so the page needs no network, and a ref's slide
+  // scripts get none.
   const context = await browser.newContext({
     viewport: request.viewport,
     offline: true,
-    ...(request.kind === "pptx" ? { deviceScaleFactor: 2 } : {}),
+    ...(request.kind === "pptx" || request.kind === "pdf" ? { deviceScaleFactor: 2 } : {}),
   });
   try {
     return (await answer(context, request)) as ResponseTo<R>;
@@ -83,10 +94,35 @@ function answer(context: BrowserContext, request: VisualRequest) {
   }
 }
 
-/** The whole print document as one PDF, a page per slide. */
+/**
+ * The whole print document as one PDF, a page per slide: each slide shot as print draws it, then
+ * printed as that picture with its text laid over it, unseen.
+ */
 async function printPdf(context: BrowserContext, request: PdfRequest): Promise<DoneResponse> {
   const page = await context.newPage();
   await page.setContent(request.html, { waitUntil: "load" });
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.emulateMedia({ media: "print" });
+  // A slide that shows photographs is shot as a JPEG too, and kept as one where it is smaller.
+  const shares = await page.evaluate(photoSharesInPage, PDF_SLIDES);
+  const pictures: string[] = [];
+  for (const [index, clip] of (await page.evaluate(slideBoxesInPage, PDF_SLIDES)).entries()) {
+    const share = shares[index] ?? 0;
+    const png = await page.screenshot({ clip, fullPage: true });
+    const jpeg =
+      pdfPictureType({ png: png.length, jpeg: 0 }, share) === "jpeg"
+        ? await page.screenshot({ clip, fullPage: true, type: "jpeg", quality: PDF_JPEG_QUALITY })
+        : undefined;
+    const kept =
+      jpeg && pdfPictureType({ png: png.length, jpeg: jpeg.length }, share) === "jpeg"
+        ? { type: "jpeg", data: jpeg }
+        : { type: "png", data: png };
+    pictures.push(`data:image/${kept.type};base64,${kept.data.toString("base64")}`);
+  }
+  await page.evaluate(keepOnlyTextInPage, { selector: PDF_SLIDES, css: PDF_TEXT_CSS });
+  for (const [index, picture] of pictures.entries()) {
+    await page.evaluate(setSlidePictureInPage, { selector: PDF_SLIDES, index, picture });
+  }
   await page.pdf({
     path: request.pdfPath,
     width: `${request.viewport.width}px`,
