@@ -4,12 +4,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { newCommand } from "../../src/cli/new.ts";
+import { resolveScope, resolveTarget } from "../../src/cli/scope.ts";
 import { formatNew } from "../../src/cli/text.ts";
+import { themeCommand } from "../../src/cli/theme.ts";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDek, runMain } from "../helpers/cli.ts";
+import { deckRepoFiles, SHA_A, withFakeGithub } from "../helpers/fake-github.ts";
 import { withTempDir } from "../helpers/fs.ts";
-import { withTempProject } from "../helpers/project.ts";
+import { REF_SHA, type RefSpec, withTempProject } from "../helpers/project.ts";
 
 type NewOk = {
   ok: true;
@@ -195,6 +198,84 @@ describe("newCommand", () => {
           "dekc init",
         );
       }
+    });
+  });
+});
+
+describe("dekc new --theme-from <ref>", () => {
+  const REF = "someone/talks/style";
+  const theme = ".slide { --fg: #111; color: var(--fg); }\n.slide .card { padding: 0; }\n";
+  const ref: RefSpec = { name: REF, license: "MIT", deck: { theme } };
+
+  test("starts the deck on a copy of the ref's theme, saying where it came from", async () => {
+    await withTempProject({ decks: [{ name: "mine" }], refs: [ref] }, async (root) => {
+      const result = newCommand({ cwd: root, name: "talk", themeFrom: REF });
+      expect(result.warnings).toEqual([]);
+      expect(await readFile(join(root, "decks", "talk", "theme.css"), "utf8")).toBe(
+        `/* Theme from the ref ${REF} at ${REF_SHA.slice(0, 7)}. */\n${theme}`,
+      );
+      expect(existsSync(join(root, "decks", "talk", "slides", "intro.html"))).toBe(true);
+      const read = themeCommand(resolveTarget(root, "deck", { deck: "talk" }));
+      expect(read.classes).toContain("card");
+    });
+  });
+
+  test("warns when the ref has no license, and says so in the text", async () => {
+    await withTempProject(
+      { decks: [{ name: "mine" }], refs: [{ ...ref, license: undefined }] },
+      async (root) => {
+        const result = newCommand({ cwd: root, name: "talk", themeFrom: REF });
+        expect(result.warnings).toEqual([expect.stringContaining(`${REF} has no license`)]);
+        expect(formatNew(result)).toContain("warning: ");
+      },
+    );
+  });
+
+  test("a ref that is not pinned, or whose deck has no theme, says what to run", async () => {
+    await withTempProject({ refs: [{ ...ref, declared: false }] }, async (root) => {
+      expect(() => newCommand({ cwd: root, name: "talk", themeFrom: REF })).toThrow(
+        `ref "${REF}" is not added`,
+      );
+    });
+    await withTempProject({ refs: [{ ...ref, deck: { theme: null } }] }, async (root) => {
+      expect(() => newCommand({ cwd: root, name: "talk", themeFrom: REF })).toThrow(
+        expect.objectContaining({ hint: expect.stringContaining("dekc ref") }),
+      );
+    });
+  });
+
+  test.serial("fetches a pinned ref whose snapshot is gone before copying its theme", async () => {
+    const repos = {
+      "someone/talks": {
+        head: SHA_A,
+        commits: { [SHA_A]: { ...deckRepoFiles("style"), LICENSE: "MIT" } },
+      },
+    };
+    await withFakeGithub(repos, async () => {
+      await withTempProject({ refs: [{ ...ref, rev: SHA_A, fetched: false }] }, async (root) => {
+        const result = await runMain(["new", "talk", "--theme-from", REF, "--json"], root);
+        expect(result).toMatchObject({ exitCode: 0 });
+        expect(jsonStdout<{ warnings: string[] }>(result).warnings).toEqual([]);
+        expect(await readFile(join(root, "decks", "talk", "theme.css"), "utf8")).toStartWith(
+          `/* Theme from the ref ${REF} at aaaaaaa. */\n.slide { --fg: #111;`,
+        );
+      });
+    });
+  });
+
+  test("the guidance and the read-only error both name it", async () => {
+    await withTempProject({ decks: [{ name: "mine" }], refs: [ref] }, async (root) => {
+      newCommand({ cwd: root, name: "talk", themeFrom: REF });
+      const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      const build = agents.indexOf("dekc new <name> --theme-from <ref>");
+      const read = agents.indexOf("dekc show <ref> <slug>");
+      expect(build).toBeGreaterThan(-1);
+      expect(read).toBeGreaterThan(build);
+      expect(() => resolveScope(root, { deck: REF })).toThrow(
+        expect.objectContaining({
+          hint: expect.stringMatching(new RegExp(`--theme-from ${REF}.*dekc show ${REF} <slug>`)),
+        }),
+      );
     });
   });
 });

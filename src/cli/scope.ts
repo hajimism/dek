@@ -140,7 +140,7 @@ export function resolveScope(cwd: string, options: { deck?: string } = {}): Scop
   }
   if (isRefName(name)) {
     throw new DekError(`"${name}" is a ref; refs are read-only`, {
-      hint: `read it with \`dekc show ${name} <slug>\`, then copy what you need into your own deck and rewrite it in your theme`,
+      hint: `start a deck on its theme with \`dekc new <name> --theme-from ${name}\`, or read it with \`dekc show ${name} <slug>\` and write what you need in your own deck's theme`,
     });
   }
   const deck = project.decks.find((entry) => entry.name === name);

@@ -112,6 +112,13 @@
                 "type": "string"
               }
             },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Set when the theme came from a ref with no license."
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -123,6 +130,7 @@
             "created",
             "updated",
             "next",
+            "warnings",
             "ok"
           ],
           "additionalProperties": false

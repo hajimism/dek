@@ -4,9 +4,10 @@ import { loadConfig } from "../core/config.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
+import { isRefName } from "../core/ref-name.ts";
 import { syncDeck } from "../core/sync.ts";
 import { applyPlan, deckPlan, nextSteps } from "./files.ts";
-import { requireDeckFromCwd, requireProject } from "./scope.ts";
+import { type RefInfo, requireDeckFromCwd, requireProject, resolveTarget } from "./scope.ts";
 
 export type NewResult = {
   name: string;
@@ -16,6 +17,8 @@ export type NewResult = {
   updated: string[];
   /** The commands to run next, from the directory new ran in. */
   next: string[];
+  /** Set when the theme came from a ref with no license. */
+  warnings: string[];
 };
 
 export function newCommand(options: { cwd: string; name: string; themeFrom?: string }): NewResult {
@@ -35,19 +38,29 @@ export function newCommand(options: { cwd: string; name: string; themeFrom?: str
     });
   }
 
-  const themeSource = options.themeFrom
-    ? deckPaths(requireDeckFromCwd(options.cwd, options.themeFrom).deck.dir).theme
-    : join(project.root, "theme.css");
+  // A ref is read where it is, never written: only the copy below is the new deck's.
+  const fromRef =
+    options.themeFrom !== undefined && isRefName(options.themeFrom)
+      ? resolveTarget(options.cwd, "deck", { refs: true, deck: options.themeFrom })
+      : undefined;
+  const ref = fromRef?.ref;
+  const themeSource = fromRef
+    ? deckPaths(fromRef.deck.dir).theme
+    : options.themeFrom
+      ? deckPaths(requireDeckFromCwd(options.cwd, options.themeFrom).deck.dir).theme
+      : join(project.root, "theme.css");
   if (!existsSync(themeSource)) {
     throw new DekError("theme.css not found", {
       path: themeSource,
-      hint: options.themeFrom
-        ? "run `dekc ls` and pick a deck that has theme.css"
-        : "add theme.css at the project root",
+      hint: ref
+        ? "run `dekc ref` to list the refs, and pick one whose deck has theme.css"
+        : options.themeFrom
+          ? "run `dekc ls` and pick a deck that has theme.css"
+          : "add theme.css at the project root",
     });
   }
 
-  const theme = readFileSync(themeSource, "utf8");
+  const theme = `${ref ? provenance(ref) : ""}${readFileSync(themeSource, "utf8")}`;
   const { created } = applyPlan(
     deckPlan(project.root, name, theme, loadConfig(project.configPath)),
   );
@@ -61,5 +74,16 @@ export function newCommand(options: { cwd: string; name: string; themeFrom?: str
     created,
     updated: synced.dekFiles.updated,
     next: nextSteps(options.cwd, project.root, dir),
+    warnings:
+      ref && ref.license === null
+        ? [
+            `${ref.name} has no license; ask its author before you present or share a deck built on its theme`,
+          ]
+        : [],
   };
+}
+
+/** The first line of a theme copied from a ref: where it came from, for its reader and its credit. */
+function provenance(ref: RefInfo): string {
+  return `/* Theme from the ref ${ref.name} at ${ref.rev.slice(0, 7)}. */\n`;
 }
