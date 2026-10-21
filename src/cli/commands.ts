@@ -1,4 +1,5 @@
 import { hasErrors } from "../core/diagnostic.ts";
+import { isRefName } from "../core/ref-name.ts";
 import { mergeSarif, toSarif } from "../core/sarif.ts";
 import type { CheckCliResult } from "./check.ts";
 import type { ResultFields } from "./contract.ts";
@@ -267,14 +268,22 @@ export const COMMANDS = {
   new: result({
     args: ["name"],
     flags: ["theme-from"],
-    usage: ["dekc new <name> [--theme-from DECK]"],
-    summary: "Add a deck with the project's theme, or another deck's, and its skeleton slides.",
+    usage: ["dekc new <name> [--theme-from DECK|REF]"],
+    summary:
+      "Add a deck with the project's theme, another deck's, or a ref's, and its skeleton slides.",
     group: "Project",
-    overview: [["dekc new <name> [--theme-from DECK]", "add a deck"]],
-    agent: ["dekc new <name> [--theme-from DECK]"],
+    overview: [["dekc new <name> [--theme-from DECK|REF]", "add a deck"]],
+    agent: [
+      "dekc new <name> [--theme-from DECK|REF]   a ref's theme to build on its layouts; copied, never linked",
+    ],
     run: async ({ cwd, args, flags }) => {
+      const themeFrom = flags["theme-from"];
       const { newCommand } = await import("./new.ts");
-      return newCommand({ cwd, name: args.name, themeFrom: flags["theme-from"] });
+      if (themeFrom !== undefined && isRefName(themeFrom)) {
+        const { restoreRef } = await import("./ref.ts");
+        await restoreRef(cwd, themeFrom);
+      }
+      return newCommand({ cwd, name: args.name, themeFrom });
     },
     output: {
       text: formatNew,

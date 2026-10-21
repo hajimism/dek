@@ -336,7 +336,7 @@ function referencesSection(root: string): string {
   return `
 ## References
 
-Other people's decks, pinned in \`dek.toml\` \`[refs]\`, to read as models. They are read-only: read a slide with \`dekc show <ref> <slug>\`, then write your own in this deck's theme.
+Other people's decks, pinned in \`dek.toml\` \`[refs]\`, to read as models. They are read-only. To build a deck on a ref's layouts, start it with \`dekc new <name> --theme-from <ref>\`, which copies the ref's theme into it. Otherwise read a slide with \`dekc show <ref> <slug>\`, then write your own in this deck's theme.
 
 ${lines.join("\n")}
 `;

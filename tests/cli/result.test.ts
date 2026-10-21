@@ -36,7 +36,14 @@ describe("formatText", () => {
     expect(
       formatText({
         command: "new",
-        data: { name: "demo", dir: "/tmp/demo", created: [], updated: [], next: ["cd decks/demo"] },
+        data: {
+          name: "demo",
+          dir: "/tmp/demo",
+          created: [],
+          updated: [],
+          next: ["cd decks/demo"],
+          warnings: [],
+        },
       }),
     ).toBe("created deck demo\n\nnext:\n  cd decks/demo");
   });
@@ -412,6 +419,7 @@ describe("displayPaths created files", () => {
           created: ["/p/decks/next/script.md"],
           updated: [],
           next: [],
+          warnings: [],
         },
       },
       "/p",

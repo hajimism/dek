@@ -111,6 +111,7 @@ export const RESULT_FIELDS = {
     created: paths,
     updated: paths,
     next: z.array(z.string()),
+    warnings: z.array(z.string()).describe("Set when the theme came from a ref with no license."),
   }),
   ls: z.union([
     z.strictObject({

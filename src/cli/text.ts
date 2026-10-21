@@ -132,7 +132,8 @@ export function formatInit(data: InitResult): string {
 /** The deck, and any of dek's own files it brought up to date: the rest is the deck's, and new. */
 export function formatNew(data: NewResult): string {
   const updated = data.updated.map((path) => `  ${path} (updated)`);
-  return withNext([`created deck ${data.name}`, ...updated].join("\n"), data.next);
+  const warnings = data.warnings.map((warning) => `warning: ${warning}`);
+  return withNext([`created deck ${data.name}`, ...updated, ...warnings].join("\n"), data.next);
 }
 
 export function formatMv(data: MvResult): string {

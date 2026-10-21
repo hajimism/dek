@@ -19,7 +19,7 @@ description: 'コマンド、フラグ、環境変数。'
 - **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dek が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
 - **実行しなかったチェックは `"skipped"` に並びます。** 各要素は `check`、`reason`、実行する方法があれば `hint` を持ちます。Playwright がない `dekc check` は `visual` を、`voice/` のないデッキでの `dekc check --voice` は `voice` を、rumdl がない `dekc lint` は `rumdl` を、URL か Playwright がない `dekc build` は `preview`（リンクプレビュー画像）を、ref に対する `dekc ls` は `lint` を飛ばします。テキストでは `<check>: skipped (<reason>)` と出て、hint が `help:` 行に続きます。`lint`、`check`、`build` はこれを標準エラーに出すので、標準出力には結果だけが残ります。すべて実行できたときはこのフィールド自体がありません。
 - **デッキごとにファイルを書くコマンドはリストを返す。** `build` と `pdf` は、1 デッキでも対象のデッキごとのパスを `outs` で返します。
-- **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`、pack なら `file/<deck>`）を受け取ります。それ以外のコマンドは ref を受け取りません。[ref](#ref) を参照してください。
+- **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`、pack なら `file/<deck>`）を受け取ります。`dekc new --theme-from` は ref のテーマを新しいデッキにコピーします。それ以外のコマンドは ref を受け取りません。[ref](#ref) を参照してください。
 - **ヘルプはコマンドごとに出る。** `dekc help <command>`、`dekc <command> --help`、`-h` で、そのコマンドの使い方、やること、受け付けるフラグをすべて表示します。`dekc --version`（`-v`）はバージョンを表示します。コマンド名やデッキ名を打ち間違えると `did you mean …?` で候補を示します。
 - **フラグはコマンドごとに確かめる。** `--json`、`--help`、`--version` はどこでも使えます。それ以外のフラグは受け付けるコマンドでだけ使え、`--deck` は `new`・`ref`・`help` 以外のすべてで使えます。綴りを間違えたフラグや別のコマンドのフラグは知らないうちに無視されることはなく、エラーになります。hint にはそのコマンドが受け付けるフラグと `dekc help <command>` が並びます。値も何かを実行する前に確かめます。`--port` は 1 から 65535 の整数、`--fps` は 0 より大きい数、`--accent` は 0 以上の整数、`--format` は `sarif` だけを受け付け、それ以外は空の値も含めて `invalid --<flag> "<value>"` になり、hint にそのフラグが受け付ける値が出ます。
 - **引数もコマンドごとに確かめる。** 足りない引数は `missing <slug> for dekc show`、コマンドが受け付ける数を超えた引数は `unexpected argument "extra" for dekc ls` になり、どちらも hint にそのコマンドの使い方と `dekc help <command>` が出ます。サブコマンドを打ち間違えると `did you mean …?` で候補を示します。`dekc voice speakr` なら `dekc voice speakers` です。
@@ -37,7 +37,7 @@ description: 'コマンド、フラグ、環境変数。'
 | コマンド | 役割 |
 | --- | --- |
 | `dekc init [dir] [--deck NAME]` | `dir`（既定はカレント）にプロジェクトを作る。最初のデッキも作れる。`dek.toml`（`[pack] license = "CC0-1.0"` 入り。[設定](/ja/reference/config#dek-toml)を参照）、`theme.css`、`.gitignore`、`.rumdl.toml`、`tsconfig.json`、`assets/`、`decks/`、`AGENTS.md`、`.dek/schema.json`、`.dek/slide.d.ts` を書く。最初のデッキは短いお手本の台本と骨格スライド付きで作るので、そのまま lint を通る。台本を自分のものに書き換えれば、手付かずのお手本の骨格は `dekc sync` が消す。既にあるものは上書きしない。あるファイルは残し、内容が違えば残したと表示する（`--json` では `created` と `kept`）。ただし dek 自身のファイルは最新にし、更新したと表示する（`updated`）。既にある `AGENTS.md` は、書いた内容を残したまま、sync と同じく dek のブロックを足す。既にある `theme.css` も残し、どのデッキもそれをコピーする。そこにどのデッキにも要るトークンが欠けていれば、init は最初の lint がそれを `DEK015` として報告する前に、標準エラーに挙げる（`--json` では `missingTokens`）。`DEK015` の hint は dek 自身のテーマが使う値を示す。入力はすべて書き込む前に確かめる。別のプロジェクトの中では実行を断るので、そこでは `dekc new` でデッキを足す。次に打つコマンドも表示し（`--json` では `next`）、プロジェクトに dek が入るまでは `bun add -d @hajimism/dek` も含める |
-| `dekc new <name> [--theme-from DECK]` | デッキを追加。プロジェクトの `theme.css`、または指定デッキのものをコピーし、骨格スライドを作る。そのまま lint を通る。sync と同じく dek 自身のファイルを更新し、更新したものを一覧する（`--json` では `updated`）。次に打つコマンドも表示する（`--json` では `next`） |
+| `dekc new <name> [--theme-from DECK\|REF]` | デッキを追加。プロジェクトの `theme.css`、または指定したデッキか ref のものをコピーし、骨格スライドを作る。そのまま lint を通る。ref のテーマには、ref の名前と固定先を書いたコメントが先頭に付く。ref に LICENSE が無ければ警告する（`--json` では `warnings`）。sync と同じく dek 自身のファイルを更新し、更新したものを一覧する（`--json` では `updated`）。次に打つコマンドも表示する（`--json` では `next`） |
 | `dekc ls [deck]` | デッキ一覧、または 1 つの概要。セクション数、枚数、診断、予算、見積もり、Timeline があれば実尺。診断は rumdl を除いた dek 自身のルールの結果。一覧では各デッキの指摘をその行に、プロジェクトの指摘（`dek.toml`）を `project` 行と `--json` の最上位の `diagnostics` に 1 回だけ数える |
 
 ## ref
@@ -53,6 +53,7 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 | `dekc pack [deck] [--root-dist]` | `dist/<deck>.tgz` を書く。そのデッキだけを持つプロジェクトを、デッキ名のフォルダの下にまとめた gzip の tar。`script.md`・`theme.css`・`slides/`・`assets/` を入れ、`dist/`・`.cache/`・`voice/` と名前がドットで始まるファイルは入れない。`LICENSE` と、空の `dek.toml` を入れるので、プロジェクトの設定は外に出ない。`LICENSE` は `dek.toml` の `[pack] license` が指すライセンスの本文で、無ければプロジェクトの LICENSE ファイル。どちらも無ければ何も入れず、足し方を警告する（`--json` では `warnings`）。名前に空白か `@` を含むデッキ、50 MB を超えるデッキ、プロジェクトの外や存在しない先を指すシンボリックリンク、ref は受け付けない。`--json` は `outs` と `warnings` を返す |
 | `dekc ref` | 固定した ref の一覧。rev、タイトル、枚数、取得していないもの |
 | `dekc ref rm <ref>` | 固定と実体を消す。pack なら `packs/` のコピーも消す |
+| `dekc new <name> --theme-from <ref>` | ref の `theme.css` のコピーで新しいデッキを始める。ref のレイアウトの上に組み立てるため。`dekc theme <ref> <layout>` が出すマークアップが、そのデッキでは lint を通る。実体が無い ref は先に取得するか、pack から展開する。コピーは新しいデッキのもので、ref はそのまま |
 | `dekc ls <ref>` | ref の概要。尺は ref 自身の話速で計算する。`skipped` に `lint` を入れる（ref は直す対象ではないため） |
 | `dekc show <ref> <slug>` | 自分のスライドと同じ内容に加えて、`ref`（名前、rev、実体のディレクトリ、LICENSE ファイル）を返す |
 | `dekc theme <ref>`、`dekc shot <ref> <slug>` | ref のテーマと、1枚のスクリーンショット |

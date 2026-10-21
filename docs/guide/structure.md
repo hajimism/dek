@@ -66,7 +66,13 @@ dekc ref hajimism/dek/why-dek
 dekc show hajimism/dek/why-dek timing
 ```
 
-A ref is read-only. `ls`, `show`, `theme`, and `shot` read it; nothing writes it. To use a slide, copy what you need into your own deck and rewrite it in your theme. Your deck never refers to a ref, so it stays self-contained.
+A ref is read-only. `ls`, `show`, `theme`, and `shot` read it; nothing writes it. To use a slide, copy what you need into your own deck and rewrite it in your theme. To build a whole deck on a ref's layouts, such as a style guide made to be built on, start it on the ref's theme:
+
+```bash
+dekc new 2026-11-steerco --theme-from hajimism/dek/why-dek
+```
+
+The new deck gets a copy of the ref's `theme.css`, its first line naming the ref and the commit it came from, and nothing else of it. Your deck never refers to a ref, so it stays self-contained.
 
 The pin in `dek.toml` is the ref; the snapshot is only a copy of that commit. `refs/` is gitignored, and deleting it, or cloning the project somewhere new, loses nothing: the next read fetches the pinned commit again. `dek` never looks in `refs/` when it lints or builds your decks.
 

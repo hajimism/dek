@@ -57,7 +57,7 @@ dekc [deck] [--visual] [--port N]
 dekc --remote
 dekc rehearse [slug] [--remote]
 dekc init [dir] [--deck NAME]
-dekc new <name> [--theme-from DECK]
+dekc new <name> [--theme-from DECK|REF]   a ref's theme to build on its layouts; copied, never linked
 dekc ls [deck]
 dekc ref [owner/repo/deck[@rev] | github-link]   pin + fetch; no args lists; dekc ref rm <ref>
 dekc ref <file>.tgz  pin a pack as file/<deck>; commit packs/<deck>.tgz, which a clone unpacks
