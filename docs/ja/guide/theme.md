@@ -76,8 +76,11 @@ CSS カウンターに渡せば、どのカウンタースタイルでも刷れ�
 ```bash
 dekc new 2026-09-dek
 dekc new 2026-09-dek --theme-from 2026-04-vite
+dekc new 2026-09-dek --theme-from hajimism/dek/why-dek
 cp decks/2026-09-dek/theme.css theme.css
 ```
+
+`--theme-from` には ref も渡せます。別のプロジェクトのテーマでデッキを始め、そのレイアウトの上に組み立てるときに使います。[プロジェクトとデッキ](./structure)を参照してください。
 
 理由は[プロジェクトとデッキ](./structure#テーマは共有せず、コピーする)にあります。
 

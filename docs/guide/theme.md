@@ -76,8 +76,11 @@ The project's `theme.css` is the starting point for new decks. Edits flow in one
 ```bash
 dekc new 2026-09-dek
 dekc new 2026-09-dek --theme-from 2026-04-vite
+dekc new 2026-09-dek --theme-from hajimism/dek/why-dek
 cp decks/2026-09-dek/theme.css theme.css
 ```
+
+`--theme-from` takes a ref too, to start a deck on another project's theme and build on its layouts; see [Projects and Decks](./structure#other-people-s-decks-are-read-not-borrowed).
 
 The reasoning is in [Projects and Decks](./structure#themes-are-copied-not-shared).
 
