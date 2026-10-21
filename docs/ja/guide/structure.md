@@ -18,6 +18,7 @@ my-talks/                       # プロジェクト（dekc init）
 ├── tsconfig.json               # スライドのスクリプト用のエディタ設定（dekc init が書く）
 ├── assets/                     # 素材置き場。デッキは使うものをコピーする
 ├── refs/                       # 見本として読む他人のデッキ。dek.toml の [refs] から取得する
+├── packs/                      # ファイルで受け取ったデッキ。コミットする。refs/ はここから展開する
 ├── decks/
 │   └── 2026-04-vite/           # デッキ（dekc new）
 │       ├── script.md           # 唯一の真実
@@ -68,6 +69,16 @@ dekc show hajimism/dek/why-dek timing
 ref は読み取り専用です。`ls`・`show`・`theme`・`shot` で読めますが、書き換えるコマンドはありません。スライドを使いたいときは、必要な部分を自分のデッキにコピーして、自分のテーマで書き直します。自分のデッキが ref を参照することはないので、デッキは自己完結したままです。
 
 ref の本体は `dek.toml` の固定で、実体はそのコミットのコピーにすぎません。`refs/` は gitignore されます。消しても、別の場所に clone しても、何も失いません。次に読むときに、固定したコミットを取り直します。自分のデッキを lint やビルドするとき、`dek` が `refs/` を見ることはありません。
+
+別の組織の非公開リポジトリにあるデッキや、どのリポジトリにもないデッキのように、GitHub で届かないデッキは pack として受け取ります。作者が `dekc pack` でファイルを書き出して送り、受け取った側がそれを固定して、`file/<deck>` として読みます。
+
+```bash
+dekc pack 2026-10-talk                 # 作者: decks/2026-10-talk/dist/2026-10-talk.tgz を書く
+dekc ref ~/Downloads/2026-10-talk.tgz  # 自分: file/2026-10-talk を固定し、packs/2026-10-talk.tgz を置く
+dekc show file/2026-10-talk intro
+```
+
+pack には取り直せるコミットがないので、`dekc ref` は pack を `packs/<deck>.tgz` に置き、中のファイルのダイジェストに固定します。`packs/` は `dek.toml` と一緒にコミットしてください。clone した先では、そこから ref を展開します。そのぶん自分のリポジトリに他人のデッキが入るので、作者の了解なしに公開の場所へは置かないでください。
 
 ## 実行場所がスコープを決める
 
