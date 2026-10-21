@@ -227,6 +227,13 @@ describe("DEK008 in dek.toml", () => {
     ]);
   });
 
+  test("catches a misspelled key under [pack]", async () => {
+    const found = await lintWith({ toml: '# project\n\n[pack]\nlicence = "CC0-1.0"\n' });
+    expect(found.filter((d) => d.id === "DEK008")).toMatchObject([
+      { line: 4, data: { key: "pack.licence", suggestion: "pack.license" } },
+    ]);
+  });
+
   test("takes any key under [refs]", async () => {
     const found = await lintWith({ toml: `[refs]\n"o/r/d" = "${"a".repeat(40)}"\n` });
     expect(ids(found)).not.toContain("DEK008");

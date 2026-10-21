@@ -22,6 +22,7 @@ import {
   formatMv,
   formatNav,
   formatNew,
+  formatPack,
   formatPdf,
   formatRef,
   formatReport,
@@ -378,7 +379,7 @@ export const COMMANDS = {
       const { packCommand } = await import("./pack.ts");
       return packCommand(target, { rootDist: flags["root-dist"] });
     },
-    output: { text: formatPdf },
+    output: { text: formatPack },
   }),
   show: result({
     scope: "deck",

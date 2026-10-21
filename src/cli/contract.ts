@@ -418,7 +418,10 @@ export const RESULT_FIELDS = {
   }),
   pdf: z.strictObject({ outs: paths }),
   pptx: z.strictObject({ outs: paths }),
-  pack: z.strictObject({ outs: paths }),
+  pack: z.strictObject({
+    outs: paths,
+    warnings: z.array(z.string()).describe("Once per project: the packs carry no license."),
+  }),
 } satisfies Record<ResultCommand, FieldsSchema>;
 
 type FieldsSchema = z.ZodObject | z.ZodUnion<readonly z.ZodObject[]>;

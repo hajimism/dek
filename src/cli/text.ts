@@ -14,6 +14,7 @@ import type { LsDeckResult, LsListResult } from "./ls.ts";
 import type { MarksCliResult } from "./marks.ts";
 import type { MvResult } from "./mv.ts";
 import type { NewResult } from "./new.ts";
+import type { PackCliResult } from "./pack.ts";
 import type { PdfCliResult } from "./pdf.ts";
 import type { RefCliResult } from "./ref.ts";
 import type { ShotCliResult } from "./shot.ts";
@@ -227,6 +228,10 @@ export function formatVideo(data: VideoCliResult): string {
 
 export function formatPdf(data: PdfCliResult): string {
   return data.outs.map((path) => `wrote ${path}`).join("\n");
+}
+
+export function formatPack(data: PackCliResult): string {
+  return [formatPdf(data), ...data.warnings.map((warning) => `warning: ${warning}`)].join("\n");
 }
 
 export function formatLs(data: LsListResult | LsDeckResult): string {

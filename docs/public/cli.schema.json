@@ -2303,6 +2303,13 @@
                 "type": "string"
               }
             },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Once per project: the packs carry no license."
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2310,6 +2317,7 @@
           },
           "required": [
             "outs",
+            "warnings",
             "ok"
           ],
           "additionalProperties": false

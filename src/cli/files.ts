@@ -14,7 +14,14 @@ export function defaultTheme(): string {
 }
 
 export function defaultToml(): string {
-  return "# dek project\n";
+  return `# dek project
+
+[pack]
+# The license \`dekc pack\` hands a deck over under. CC0-1.0 lets the reader reuse it
+# freely, with no credit owed, as a template is meant to be used; CC-BY-4.0 asks for
+# credit. Delete the line to hand decks over with no license.
+license = "CC0-1.0"
+`;
 }
 
 /**
