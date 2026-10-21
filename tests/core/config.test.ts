@@ -66,6 +66,20 @@ describe("[refs]", () => {
   });
 });
 
+describe("[pack]", () => {
+  test("reads the license a pack is handed over under", () => {
+    expect(parseDekToml('[pack]\nlicense = "CC0-1.0"\n').pack).toEqual({ license: "CC0-1.0" });
+    expect(parseDekToml('[pack]\nlicense = "CC-BY-4.0"\n').pack).toEqual({ license: "CC-BY-4.0" });
+    expect(parseDekToml("# no pack\n").pack).toBeUndefined();
+  });
+
+  test("refuses a license dek has no text for, and names the ones it has", () => {
+    expect(() => parseDekToml('[pack]\nlicense = "MIT"\n')).toThrow(
+      /CC0-1\.0.*CC-BY-4\.0.*LICENSE/,
+    );
+  });
+});
+
 describe("url", () => {
   test("reads the URL dist/ is served from, ending it with a slash", () => {
     expect(parseDekToml('url = "https://example.com/talks"\n').url).toBe(

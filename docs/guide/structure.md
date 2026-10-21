@@ -80,6 +80,8 @@ dekc show file/2026-10-talk intro
 
 A pack has no commit to fetch again, so `dekc ref` keeps it as `packs/<deck>.tgz` and pins it to a digest of its files. Commit `packs/` with `dek.toml`: it is where a clone unpacks the ref from. It also means your repository now holds someone else's deck, so keep it out of anywhere public unless its author agrees.
 
+What the reader may do with it is the pack's `LICENSE`. A project `dekc init` creates hands its decks over under CC0 1.0, written in `dek.toml` as `[pack] license = "CC0-1.0"`: a deck you pack is meant to be built on, so the reader may reuse it freely, with no credit owed in the decks they make from it. Change it to `"CC-BY-4.0"` to ask for credit, or delete it to hand decks over with no license.
+
 ## Where you run a command decides its scope
 
 dek finds the project root by walking up from the current directory until it finds `dek.toml`, the same way Cargo finds a workspace.

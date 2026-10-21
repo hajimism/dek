@@ -1,4 +1,4 @@
-import { DekToml, Voice } from "./config.ts";
+import { DekToml, Pack, Voice } from "./config.ts";
 import { splitLines } from "./lines.ts";
 import { readFrontmatterYaml } from "./parse.ts";
 import { Frontmatter } from "./schema.ts";
@@ -10,12 +10,16 @@ import { unrecognizedKeys } from "./zod.ts";
 export type UnknownKey = { key: string; line: number; suggestion?: string };
 
 /** dek.toml's schema, but a key it does not read is an issue; `refs` still takes any key. */
-const StrictDekToml = DekToml.extend({ voice: Voice.strict().optional() }).strict();
+const StrictDekToml = DekToml.extend({
+  voice: Voice.strict().optional(),
+  pack: Pack.strict().optional(),
+}).strict();
 
 /** Every key dek.toml may hold, as dotted paths. */
 const DEK_TOML_KEYS: readonly string[] = [
   ...Object.keys(DekToml.shape),
   ...Object.keys(Voice.shape).map((key) => `voice.${key}`),
+  ...Object.keys(Pack.shape).map((key) => `pack.${key}`),
 ];
 
 export const FRONTMATTER_KEYS: readonly string[] = Object.keys(Frontmatter.shape);
