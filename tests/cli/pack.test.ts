@@ -58,6 +58,24 @@ describe("dekc pack", () => {
     });
   });
 
+  test.serial(
+    "warns the sender, who can fix it, when the pack would carry no license",
+    async () => {
+      await withTempProject(sender, async (root) => {
+        const bare = await run(["pack", "talk", "--json"], root);
+        expect(jsonStdout<{ warnings: string[] }>(bare).warnings).toEqual([
+          expect.stringContaining('[pack] license = "CC0-1.0"'),
+        ]);
+        expect((await run(["pack", "talk"], root)).stdout).toContain("warning: ");
+      });
+      await withTempProject({ ...sender, toml: '[pack]\nlicense = "CC0-1.0"\n' }, async (root) => {
+        expect(
+          jsonStdout<{ warnings: string[] }>(await run(["pack", "talk", "--json"], root)).warnings,
+        ).toEqual([]);
+      });
+    },
+  );
+
   test.serial("refuses a ref, which is not the reader's to hand on", async () => {
     await withTempDir(async (inbox) => {
       const pack = await packOf(inbox, talk);
@@ -100,6 +118,20 @@ describe("dekc ref <file>.tgz", () => {
       });
     },
   );
+
+  test.serial("adds [refs] after the [pack] table a new project has", async () => {
+    await withTempDir(async (inbox) => {
+      const pack = await packOf(inbox, talk);
+      const toml = '# dek project\n\n[pack]\nlicense = "CC0-1.0"\n';
+      await withTempProject({ ...receiver, toml }, async (root) => {
+        const { rev } = await addRef(root, pack);
+        expect(loadConfig(join(root, "dek.toml"))).toMatchObject({
+          pack: { license: "CC0-1.0" },
+          refs: { [REF]: rev },
+        });
+      });
+    });
+  });
 
   test.serial("dekc show reads it as a ref, with the digest it is pinned to", async () => {
     await withTempDir(async (inbox) => {
