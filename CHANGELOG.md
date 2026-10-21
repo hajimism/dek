@@ -2,6 +2,33 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.3.3](https://github.com/hajimism/dek/compare/v0.3.2...v0.3.3) (2026-10-21)
+
+
+### Features
+
+* **new:** start a deck on a ref's theme with `--theme-from <ref>` ([6d0ffc9](https://github.com/hajimism/dek/commit/6d0ffc9c45a54092375ca73e305294e71e005655))
+* **new:** start a deck on a ref's theme with `--theme-from <ref>` ([54be6db](https://github.com/hajimism/dek/commit/54be6db71b2521fda1bec3ddb967a4a7545bc36c))
+* **pack:** hand a deck over under CC0 1.0 unless dek.toml says otherwise ([b7e2565](https://github.com/hajimism/dek/commit/b7e2565fd83a8d82c8d8416f6ae3551ba5040427))
+* **pack:** hand a deck over under CC0 1.0 unless dek.toml says otherwise ([46cd7b9](https://github.com/hajimism/dek/commit/46cd7b9424d9e76570c2e017f2345b41f85506b3))
+* **ref:** hand a deck over with `dekc pack` and read it with `dekc ref <file>.tgz` ([9e77bbc](https://github.com/hajimism/dek/commit/9e77bbc7bdf9f2e232c115903c73bf8fa8f078fe))
+* **ref:** hand a deck over with `dekc pack` and read it with `dekc ref <file>.tgz` ([a0c67bc](https://github.com/hajimism/dek/commit/a0c67bc8258a2132dd77eadb2b87c838e6e9f866))
+
+
+### Bug Fixes
+
+* **dev:** leave the Enter and Escape that end a conversion to the input method ([f148c54](https://github.com/hajimism/dek/commit/f148c54377460b4df11e8fedd059554f00c06889))
+* **dev:** leave the Enter and Escape that end a conversion to the input method ([e2b3940](https://github.com/hajimism/dek/commit/e2b3940cf48168b5a7c2b95250df982566222b60))
+
+
+### Documentation
+
+* **adr:** hand a deck over as a pack and read it as a ref ([4b3ffc6](https://github.com/hajimism/dek/commit/4b3ffc6e653757f3976a581acff1a2bf76862748))
+* **adr:** start a deck from a ref's theme ([f836941](https://github.com/hajimism/dek/commit/f836941cb2faf9b33faaab63abd16f66878e4767))
+* describe packs in the structure guide, the reference, and ADR 15 ([020d4a0](https://github.com/hajimism/dek/commit/020d4a0254138c55e0a78c41e2e28f8a839bf8d1))
+* record the pack's license in ADR 16, the guide, and the reference ([a0b4ea7](https://github.com/hajimism/dek/commit/a0b4ea74b6d896d102c1c0e2c06a040b75905962))
+* say a deck can start on a ref's theme, in the guides and the reference ([49791ff](https://github.com/hajimism/dek/commit/49791ff46f77e5fd37e9d21f4061669de31af1f9))
+
 ## [0.3.2](https://github.com/hajimism/dek/compare/v0.3.1...v0.3.2) (2026-10-20)
 
 
