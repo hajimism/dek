@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
+import { isPackLicense, PACK_LICENSES, type PackLicense } from "./licenses.ts";
 import { parsePublicUrl } from "./ogp.ts";
 import { isPinFor, isPlainRefName, packFile, parseRefSource } from "./ref-name.ts";
 import { DeckSettings } from "./schema.ts";
@@ -9,6 +10,15 @@ export const Voice = z.object({
   engine: z.string().optional(),
   speaker: z.string(),
   speed: z.number().optional(),
+});
+
+export const Pack = z.object({
+  license: z
+    .string()
+    .refine(isPackLicense, {
+      message: `write ${PACK_LICENSES.join(" or ")}, or delete the line and put a LICENSE at the project root`,
+    })
+    .optional(),
 });
 
 export const DekToml = z.object({
@@ -21,6 +31,7 @@ export const DekToml = z.object({
     .optional(),
   ...DeckSettings.partial().shape,
   voice: Voice.optional(),
+  pack: Pack.optional(),
   refs: z
     .record(z.string(), z.string())
     .superRefine((refs, ctx) => {
@@ -65,6 +76,8 @@ export type DekConfig = {
    */
   seed?: Partial<DeckSettings>;
   voice?: VoiceDefaults;
+  /** `[pack]`: what `dekc pack` hands a deck over with, the license it carries. */
+  pack?: { license?: PackLicense };
   /** `[refs]`: each ref name and what it is pinned to: a commit, or a pack's digest. */
   refs?: Record<string, string>;
 };
@@ -88,6 +101,9 @@ export function parseDekToml(source: string, path?: string): DekConfig {
     ...(url ? { url } : {}),
     ...(Object.keys(seed).length > 0 ? { seed } : {}),
     ...(voice ? { voice } : {}),
+    ...(data.pack
+      ? { pack: data.pack.license ? { license: data.pack.license as PackLicense } : {} }
+      : {}),
     ...(data.refs && Object.keys(data.refs).length > 0 ? { refs: data.refs } : {}),
   };
 }

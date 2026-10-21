@@ -7,6 +7,7 @@ import { initCommand } from "../../src/cli/init.ts";
 import { type LsDeckResult, lsCommand } from "../../src/cli/ls.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { formatInit } from "../../src/cli/text.ts";
+import { loadConfig } from "../../src/core/config.ts";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { PLAYWRIGHT_INSTALL } from "../../src/core/playwright.ts";
@@ -31,6 +32,17 @@ describe("dekc init", () => {
       expect(json.root).toBe(target);
       expect(json.created).toContain("my-talks/dek.toml");
       expect(json.kept).toEqual([]);
+    });
+  });
+});
+
+describe("dekc init's dek.toml", () => {
+  test("hands decks over under CC0-1.0 until the author says otherwise", async () => {
+    await withTempDir(async (dir) => {
+      initCommand({ cwd: dir, dir: "my-talks" });
+      const toml = await readFile(join(dir, "my-talks", "dek.toml"), "utf8");
+      expect(loadConfig(join(dir, "my-talks", "dek.toml")).pack).toEqual({ license: "CC0-1.0" });
+      expect(toml).toContain("CC-BY-4.0");
     });
   });
 });

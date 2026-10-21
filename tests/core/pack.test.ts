@@ -49,6 +49,29 @@ describe("packDeck", () => {
     });
   });
 
+  test("carries the license [pack] names, before the project's own LICENSE", async () => {
+    const cc0 = '[pack]\nlicense = "CC0-1.0"\n';
+    await withTempProject({ toml: cc0, decks: [talk] }, async (root) => {
+      await writeFile(join(root, "LICENSE"), "MIT");
+      const files = await readPack(await packDeck({ root }, deck(root)));
+      expect(await files.get("LICENSE")?.text()).toStartWith(
+        "Creative Commons Legal Code\n\nCC0 1.0 Universal",
+      );
+    });
+    const by = '[pack]\nlicense = "CC-BY-4.0"\n';
+    await withTempProject({ toml: by, decks: [talk] }, async (root) => {
+      const files = await readPack(await packDeck({ root }, deck(root)));
+      expect(await files.get("LICENSE")?.text()).toStartWith("Attribution 4.0 International");
+    });
+  });
+
+  test("with no [pack] license and no LICENSE, carries none", async () => {
+    await withTempProject({ decks: [talk] }, async (root) => {
+      const files = await readPack(await packDeck({ root }, deck(root)));
+      expect([...files.keys()].filter((path) => !path.includes("/"))).toEqual(["dek.toml"]);
+    });
+  });
+
   test("a deck packed twice, or by hand with the same files, pins the same digest", async () => {
     await withTempProject({ decks: [talk] }, async (root) => {
       const packed = await readPack(await packDeck({ root }, deck(root)));
