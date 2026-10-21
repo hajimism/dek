@@ -53,6 +53,17 @@ describe("[refs]", () => {
   test("rejects a value that is not a full sha", () => {
     expect(() => parseDekToml(`[refs]\n"hajimism/dek/why-dek" = "main"\n`)).toThrow("40-character");
   });
+
+  test("pins a pack's ref to a 64-character sha256, and refuses each pin where the other belongs", () => {
+    const digest = "ab".repeat(32);
+    expect(parseDekToml(`[refs]\n"file/talk" = "${digest}"\n`).refs).toEqual({
+      "file/talk": digest,
+    });
+    expect(() => parseDekToml(`[refs]\n"file/talk" = "${sha}"\n`)).toThrow("64-character");
+    expect(() => parseDekToml(`[refs]\n"hajimism/dek/why-dek" = "${digest}"\n`)).toThrow(
+      "40-character",
+    );
+  });
 });
 
 describe("url", () => {

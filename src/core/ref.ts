@@ -11,6 +11,7 @@ import { outputDir } from "./safe-fs.ts";
 export {
   isPinnedRev,
   isRefName,
+  packFile,
   parseRefSource,
   type RefSource,
 } from "./ref-name.ts";
@@ -35,8 +36,10 @@ export const RefMeta = z.object({
 export type RefMeta = z.infer<typeof RefMeta>;
 
 export function refDir(root: string, name: string): string {
-  const { owner, repo, deck } = parseRefSource(name);
-  return join(root, "refs", owner, repo, deck);
+  const source = parseRefSource(name);
+  return source.kind === "file"
+    ? join(root, "refs", "file", source.deck)
+    : join(root, "refs", source.owner, source.repo, source.deck);
 }
 
 /** The marker of a snapshot, or nothing when it is missing or not one dek wrote. */
@@ -53,7 +56,7 @@ export function readRefMeta(dir: string): RefMeta | undefined {
   }
 }
 
-const LICENSE_NAMES = ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"];
+export const LICENSE_NAMES = ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"];
 
 /** The snapshot's license file, relative to the snapshot, when the source had one. */
 export function refLicense(dir: string): string | null {
@@ -86,7 +89,12 @@ export function refState(project: { root: string; configPath: string }, name: st
 export type RepoFiles = Map<string, Blob>;
 
 /** Beyond this, a snapshot is refused: a deck to read is a few hundred kilobytes. */
-const MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
+export const MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
+
+/** A pack's tar, unzipped, may hold its files and their headers, not much more. */
+const MAX_PACK_TAR_BYTES = 2 * MAX_SNAPSHOT_BYTES;
+
+const PACK_HINT = "ask for a pack its author made with `dekc pack <deck>`";
 
 /**
  * Reads a GitHub tarball. Bun leaves out links; a path that is absolute, has
@@ -108,6 +116,64 @@ export async function readTarball(bytes: Uint8Array): Promise<RepoFiles> {
   return files;
 }
 
+/**
+ * Reads a pack from someone else. It is gunzipped through a count that stops at `maxTarBytes`
+ * before Bun takes any of it apart, so a small file that inflates without end is refused rather
+ * than held in memory; the tar is then read as a GitHub tarball is.
+ */
+export async function readPack(
+  bytes: Uint8Array,
+  limits: { maxBytes?: number; maxTarBytes?: number } = {},
+): Promise<RepoFiles> {
+  const maxBytes = limits.maxBytes ?? MAX_SNAPSHOT_BYTES;
+  const maxTarBytes = limits.maxTarBytes ?? MAX_PACK_TAR_BYTES;
+  if (bytes.byteLength > maxBytes) {
+    throw new DekError(`the pack is larger than ${formatMb(maxBytes)}`, { hint: PACK_HINT });
+  }
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    const reader = new Blob([new Uint8Array(bytes)])
+      .stream()
+      .pipeThrough(new DecompressionStream("gzip"))
+      .getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      size += value.byteLength;
+      if (size > maxTarBytes) {
+        await reader.cancel();
+        throw new DekError(`the pack unpacks to more than ${formatMb(maxTarBytes)}`, {
+          hint: PACK_HINT,
+        });
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof DekError) {
+      throw error;
+    }
+    throw new DekError("the file is not a pack: a pack is a gzipped tar", { hint: PACK_HINT });
+  }
+  const tar = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    tar.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return await readTarball(tar);
+  } catch {
+    throw new DekError("the file is not a pack: a pack is a gzipped tar", { hint: PACK_HINT });
+  }
+}
+
+function formatMb(bytes: number): string {
+  return bytes >= 1024 * 1024 ? `${bytes / 1024 / 1024} MB` : `${bytes} bytes`;
+}
+
 const DECK_SCRIPT_RE = /^(?:(.*)\/)?decks\/([^/]+)\/script\.md$/;
 
 /** The decks in a repository: each `decks/<name>/script.md` beside its project's dek.toml. */
@@ -119,14 +185,32 @@ function repoDecks(files: RepoFiles): Array<{ name: string; prefix: string }> {
   });
 }
 
+/** The name of the one deck a pack holds; a pack of none, or of more, is refused. */
+export function deckOfPack(files: RepoFiles): string {
+  const names = [...new Set(repoDecks(files).map((deck) => deck.name))].sort();
+  const [name, ...others] = names;
+  if (name === undefined) {
+    throw new DekError("the pack holds no deck", {
+      hint: `a pack is one deck beside a dek.toml; ${PACK_HINT}`,
+    });
+  }
+  if (others.length > 0) {
+    throw new DekError(`the pack holds more than one deck: ${names.join(", ")}`, {
+      hint: `a pack is one deck; ${PACK_HINT}`,
+    });
+  }
+  return name;
+}
+
 /** The directory of the project that holds the deck, as a prefix: "" or "sample/". */
 export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
-  const repo = `${source.owner}/${source.repo}`;
+  const repo = source.kind === "file" ? "the pack" : `${source.owner}/${source.repo}`;
+  const path = source.kind === "github" ? source.path : undefined;
   const decks = repoDecks(files);
   const matches = decks.filter(
     (deck) =>
       deck.name === source.deck &&
-      (source.path === undefined || `${deck.prefix}decks/${deck.name}` === source.path),
+      (path === undefined || `${deck.prefix}decks/${deck.name}` === path),
   );
   const [match, ...others] = matches;
   if (!match) {
@@ -148,7 +232,7 @@ export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
 }
 
 /** Inside the deck, only what reading it needs: not dist/, .cache/, or voice/. */
-function keepsInDeck(path: string): boolean {
+export function keepsInDeck(path: string): boolean {
   return (
     path === "script.md" ||
     path === "theme.css" ||
@@ -157,17 +241,19 @@ function keepsInDeck(path: string): boolean {
   );
 }
 
+/** The files a snapshot keeps, by their paths in it, and where the deck was in its source. */
+export type Snapshot = {
+  files: Map<string, Blob>;
+  license: string | undefined;
+  /** The deck's directory in the source repository or pack. */
+  path: string;
+};
+
 /**
- * Writes the snapshot of one deck at one commit under refs/, laid out as the
- * project it came from so it resolves like any dek project. It is written
- * beside the old one and swapped in, so a failure leaves the old one whole.
+ * What a snapshot keeps of a repository or a pack: its project's dek.toml, the deck's files that
+ * reading needs, and its license, laid out as the project it came from.
  */
-export async function installSnapshot(
-  root: string,
-  source: RefSource,
-  sha: string,
-  files: RepoFiles,
-): Promise<{ dir: string; license: string | null; path: string }> {
+export function pickSnapshot(files: RepoFiles, source: RefSource): Snapshot {
   const prefix = findDeckInRepo(files, source);
   const deckPrefix = `${prefix}decks/${source.deck}/`;
   const license =
@@ -190,10 +276,52 @@ export async function installSnapshot(
       hint: "a deck to read as a model should be far smaller; check its assets",
     });
   }
+  return { files: picked, license, path: `${prefix}decks/${source.deck}` };
+}
 
+/**
+ * What a pack's ref is pinned to: the sha256 of every file the snapshot keeps, in byte order of
+ * their paths, each as its path, a NUL, its size in decimal digits, a NUL, and its bytes. It
+ * follows the files, not the tarball, whose headers carry the time it was made.
+ */
+export async function snapshotDigest(snapshot: Snapshot): Promise<string> {
+  const hasher = new Bun.CryptoHasher("sha256");
+  const encoder = new TextEncoder();
+  const paths = [...snapshot.files.keys()].sort((a, b) =>
+    Buffer.compare(encoder.encode(a), encoder.encode(b)),
+  );
+  for (const path of paths) {
+    const blob = snapshot.files.get(path) ?? new Blob([]);
+    hasher.update(`${path}\0${blob.size}\0`);
+    hasher.update(new Uint8Array(await blob.arrayBuffer()));
+  }
+  return hasher.digest("hex");
+}
+
+/** Writes the snapshot of one deck at one commit under refs/; see writeSnapshot. */
+export async function installSnapshot(
+  root: string,
+  source: RefSource,
+  sha: string,
+  files: RepoFiles,
+): Promise<{ dir: string; license: string | null; path: string }> {
+  return writeSnapshot(root, source.name, sha, pickSnapshot(files, source));
+}
+
+/**
+ * Writes a snapshot under refs/, laid out as the project it came from so it resolves like any
+ * dek project, and marks it with what it is pinned to. It is written beside the old one and
+ * swapped in, so a failure leaves the old one whole.
+ */
+export async function writeSnapshot(
+  root: string,
+  name: string,
+  pin: string,
+  snapshot: Snapshot,
+): Promise<{ dir: string; license: string | null; path: string }> {
   // refs/ is dek's; a link on the way would aim the swap below, and its delete, elsewhere.
   const refsDir = join(root, "refs");
-  const dir = refDir(root, source.name);
+  const dir = refDir(root, name);
   outputDir(dirname(dir), root);
   if (isLink(dir)) {
     await rm(dir);
@@ -201,9 +329,9 @@ export async function installSnapshot(
   const suffix = `${process.pid}-${Date.now().toString(36)}`;
   const temp = join(refsDir, `.tmp-${suffix}`);
   const old = join(refsDir, `.old-${suffix}`);
-  const meta: RefMeta = { name: source.name, rev: sha, path: `${prefix}decks/${source.deck}` };
+  const meta: RefMeta = { name, rev: pin, path: snapshot.path };
   try {
-    for (const [path, blob] of picked) {
+    for (const [path, blob] of snapshot.files) {
       await mkdir(dirname(join(temp, path)), { recursive: true });
       await writeFile(join(temp, path), new Uint8Array(await blob.arrayBuffer()));
     }
@@ -224,7 +352,7 @@ export async function installSnapshot(
       await rm(old, { recursive: true, force: true });
     }
   }
-  return { dir, license: license ?? null, path: meta.path };
+  return { dir, license: snapshot.license ?? null, path: meta.path };
 }
 
 /** The snapshot deck's title and slide count, or nothing when it does not parse. */

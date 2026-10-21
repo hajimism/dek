@@ -3,20 +3,33 @@ import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
+  deckOfPack,
   findDeckInRepo,
   installSnapshot,
   isRefName,
   parseRefSource,
+  pickSnapshot,
   REF_MARKER,
+  readPack,
   readRefMeta,
   readTarball,
   refDir,
   refState,
+  snapshotDigest,
 } from "../../src/core/ref.ts";
+import type { GithubRefSource } from "../../src/core/ref-name.ts";
 import { resolveProject } from "../../src/core/resolve.ts";
 import { deckRepoFiles, SHA_A, SHA_B } from "../helpers/fake-github.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { REF_SHA, withTempProject } from "../helpers/project.ts";
+
+function githubSource(input: string): GithubRefSource {
+  const source = parseRefSource(input);
+  if (source.kind !== "github") {
+    throw new Error(`expected ${input} to name a ref on GitHub`);
+  }
+  return source;
+}
 
 function refError(input: string): DekError {
   try {
@@ -33,6 +46,7 @@ function refError(input: string): DekError {
 describe("parseRefSource", () => {
   test("splits owner, repo, and deck", () => {
     expect(parseRefSource("hajimism/dek/why-dek")).toEqual({
+      kind: "github",
       name: "hajimism/dek/why-dek",
       owner: "hajimism",
       repo: "dek",
@@ -64,9 +78,37 @@ describe("parseRefSource", () => {
   });
 });
 
+describe("parseRefSource with a pack's name", () => {
+  test("file/<deck> names the deck of a pack", () => {
+    expect(parseRefSource("file/2026-10-talk")).toEqual({
+      kind: "file",
+      name: "file/2026-10-talk",
+      deck: "2026-10-talk",
+    });
+  });
+
+  test("a pack's name takes no rev and no more segments", () => {
+    for (const input of ["file/talk@v1", "file/", "file/..", "file/a b"]) {
+      expect(refError(input).message).toContain(input);
+    }
+  });
+
+  test("file is no GitHub owner, in any case", () => {
+    for (const input of ["file/talks/why-dek", "File/talks/why-dek@v1"]) {
+      const error = refError(input);
+      expect(error.message).toContain(input);
+      expect(error.hint).toContain("file/<deck>");
+    }
+    expect(() => parseRefSource("https://github.com/file/talks/tree/main/decks/why-dek")).toThrow(
+      expect.objectContaining({ hint: expect.stringContaining("file/<deck>") }),
+    );
+  });
+});
+
 describe("parseRefSource with a GitHub link", () => {
   test("reads owner, repo, rev, and the deck's path from a folder or file link", () => {
     const expected = {
+      kind: "github" as const,
       name: "hajimism/dek/why-dek",
       owner: "hajimism",
       repo: "dek",
@@ -107,6 +149,8 @@ describe("isRefName", () => {
     expect(isRefName("./a/b")).toBe(false);
     expect(isRefName("/a/b/c")).toBe(false);
     expect(isRefName("a/b")).toBe(false);
+    expect(isRefName("file/why-dek")).toBe(true);
+    expect(isRefName("files/why-dek")).toBe(false);
     expect(isRefName("https://github.com/hajimism/dek/tree/main/sample/decks/why-dek")).toBe(true);
   });
 });
@@ -116,6 +160,12 @@ describe("refDir", () => {
     expect(refDir("/p", "hajimism/dek/why-dek")).toBe(
       join("/p", "refs", "hajimism", "dek", "why-dek"),
     );
+  });
+});
+
+describe("refDir for a pack", () => {
+  test("places a pack's ref under refs/file/<deck>", () => {
+    expect(refDir("/p", "file/why-dek")).toBe(join("/p", "refs", "file", "why-dek"));
   });
 });
 
@@ -187,6 +237,81 @@ describe("readTarball", () => {
   });
 });
 
+describe("readPack", () => {
+  test("refuses a pack that inflates past the limit, before taking it apart", async () => {
+    const bomb = Bun.gzipSync(new Uint8Array(1024 * 1024));
+    await expect(readPack(bomb, { maxTarBytes: 64 * 1024 })).rejects.toMatchObject({
+      message: expect.stringContaining("more than"),
+      hint: expect.stringContaining("dekc pack"),
+    });
+  });
+
+  test("refuses a file larger than a pack may be, and one that is not a gzipped tar", async () => {
+    const bytes = await new Bun.Archive({ "t/dek.toml": "" }, { compress: "gzip" }).bytes();
+    await expect(readPack(bytes, { maxBytes: 8 })).rejects.toMatchObject({
+      message: expect.stringContaining("larger than"),
+    });
+    await expect(readPack(new TextEncoder().encode("PK\u0003\u0004 a zip"))).rejects.toMatchObject({
+      message: expect.stringContaining("not a pack"),
+      hint: expect.stringContaining("dekc pack"),
+    });
+  });
+
+  test("drops the top folder and any path that could escape, as a tarball's", async () => {
+    const bytes = await new Bun.Archive(
+      { "t/decks/d/script.md": "s", "t/../evil": "x" },
+      { compress: "gzip" },
+    ).bytes();
+    expect([...(await readPack(bytes)).keys()]).toEqual(["decks/d/script.md"]);
+  });
+});
+
+describe("deckOfPack", () => {
+  test("is the one deck the pack holds", () => {
+    expect(deckOfPack(repoFiles(deckRepoFiles("talk")))).toBe("talk");
+  });
+
+  test("a pack of no deck, or of more than one, asks for a pack of one", () => {
+    expect(() => deckOfPack(repoFiles({ "README.md": "" }))).toThrow(
+      expect.objectContaining({
+        message: "the pack holds no deck",
+        hint: expect.stringContaining("dekc pack <deck>"),
+      }),
+    );
+    expect(() => deckOfPack(repoFiles({ ...deckRepoFiles("a"), ...deckRepoFiles("b") }))).toThrow(
+      expect.objectContaining({
+        message: "the pack holds more than one deck: a, b",
+        hint: expect.stringContaining("dekc pack <deck>"),
+      }),
+    );
+  });
+});
+
+describe("snapshotDigest", () => {
+  test("is the sha256 of each kept file's path, size, and bytes, in order of their paths", async () => {
+    const files = repoFiles({
+      "decks/d/script.md": "s",
+      "dek.toml": "",
+      "decks/d/dist/d.html": "built",
+    });
+    const snapshot = pickSnapshot(files, parseRefSource("file/d"));
+    const expected = new Bun.CryptoHasher("sha256")
+      .update("decks/d/script.md\u00001\u0000s")
+      .update("dek.toml\u00000\u0000")
+      .digest("hex");
+    expect(await snapshotDigest(snapshot)).toBe(expected);
+  });
+
+  test("changes with any kept byte, and not with what the snapshot leaves out", async () => {
+    const base = deckRepoFiles("d");
+    const digest = async (entries: Record<string, string>) =>
+      snapshotDigest(pickSnapshot(repoFiles(entries), parseRefSource("file/d")));
+    const before = await digest(base);
+    expect(await digest({ ...base, "decks/d/dist/d.html": "rebuilt" })).toBe(before);
+    expect(await digest({ ...base, "decks/d/theme.css": ".slide {}" })).not.toBe(before);
+  });
+});
+
 describe("findDeckInRepo", () => {
   test("finds a deck at the repository root or in a project in a subdirectory", () => {
     expect(findDeckInRepo(repoFiles(deckRepoFiles("why-dek")), parseRefSource("o/r/why-dek"))).toBe(
@@ -221,7 +346,7 @@ describe("findDeckInRepo", () => {
     expect(() => findDeckInRepo(files, parseRefSource("o/r/d"))).toThrow(
       expect.objectContaining({ hint: expect.stringContaining("decks/d, x/decks/d") }),
     );
-    expect(findDeckInRepo(files, { ...parseRefSource("o/r/d"), path: "x/decks/d" })).toBe("x/");
+    expect(findDeckInRepo(files, { ...githubSource("o/r/d"), path: "x/decks/d" })).toBe("x/");
   });
 });
 

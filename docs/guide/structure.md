@@ -18,6 +18,7 @@ my-talks/                       # project (dekc init)
 ├── tsconfig.json               # editor types for slide scripts (written by dekc init)
 ├── assets/                     # shared source material; decks copy what they use
 ├── refs/                       # other people's decks to read, fetched from dek.toml [refs]
+├── packs/                      # decks handed over as files, committed; refs/ unpacks them
 ├── decks/
 │   └── 2026-04-vite/           # deck (dekc new)
 │       ├── script.md           # the single source of truth
@@ -68,6 +69,16 @@ dekc show hajimism/dek/why-dek timing
 A ref is read-only. `ls`, `show`, `theme`, and `shot` read it; nothing writes it. To use a slide, copy what you need into your own deck and rewrite it in your theme. Your deck never refers to a ref, so it stays self-contained.
 
 The pin in `dek.toml` is the ref; the snapshot is only a copy of that commit. `refs/` is gitignored, and deleting it, or cloning the project somewhere new, loses nothing: the next read fetches the pinned commit again. `dek` never looks in `refs/` when it lints or builds your decks.
+
+A deck you cannot reach on GitHub, in another organization's private repository or in no repository at all, comes over as a pack. Its author runs `dekc pack` and sends the file; you pin it, and read it as `file/<deck>`:
+
+```bash
+dekc pack 2026-10-talk                 # the author: writes decks/2026-10-talk/dist/2026-10-talk.tgz
+dekc ref ~/Downloads/2026-10-talk.tgz  # you: pins file/2026-10-talk, keeps packs/2026-10-talk.tgz
+dekc show file/2026-10-talk intro
+```
+
+A pack has no commit to fetch again, so `dekc ref` keeps it as `packs/<deck>.tgz` and pins it to a digest of its files. Commit `packs/` with `dek.toml`: it is where a clone unpacks the ref from. It also means your repository now holds someone else's deck, so keep it out of anywhere public unless its author agrees.
 
 ## Where you run a command decides its scope
 

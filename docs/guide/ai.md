@@ -151,7 +151,7 @@ dekc show why-dek timing
 
 `show` returns everything one slide is made of in one call, each part labeled with its file: the section's script, the slide's HTML, CSS, and TS, the rules of `theme.css` the slide actually uses with only the tokens and keyframes they reach, and the assets it references. An agent learns how the slide is built without reading the whole theme, then writes its own slide in its own deck's theme. Lint catches any class or token it carried over by mistake.
 
-The model can be someone else's deck. `dekc ref owner/repo/deck` pins it, and `ls`, `show`, `theme`, and `shot` then take `owner/repo/deck` as the deck. AGENTS.md lists the pinned refs, so the agent knows which decks it may learn from. A ref is read-only; the agent copies what it needs into its own deck.
+The model can be someone else's deck. `dekc ref owner/repo/deck` pins it, and `ls`, `show`, `theme`, and `shot` then take `owner/repo/deck` as the deck. A deck its author sent as a file from `dekc pack` is pinned with `dekc ref <file>.tgz` and read as `file/<deck>`. AGENTS.md lists the pinned refs, so the agent knows which decks it may learn from. A ref is read-only; the agent copies what it needs into its own deck.
 
 ## Prompts that work
 

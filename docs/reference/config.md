@@ -18,7 +18,9 @@ my-talks/
 ├── AGENTS.md
 ├── assets/
 ├── refs/                          # gitignored; fetched again from [refs]
-│   └── owner/repo/deck/
+│   ├── owner/repo/deck/
+│   └── file/deck/                 # a pack's, unpacked again from packs/
+├── packs/                         # committed: the packs dekc ref pinned
 ├── decks/
 │   └── 2026-04-vite/
 │       ├── script.md
@@ -76,7 +78,7 @@ speed = 1.0
 | `voice.engine` | `"voicevox"` | Engine name (`voicevox`, `aivis`, `coeiroink`, `sharevox`), a name and a local port (`voicevox:50021`), or a base URL |
 | `voice.speaker` | required when `[voice]` is present | Speaker, as `name/style` |
 | `voice.speed` | `1.0` | Speaking speed |
-| `refs` | none | Each ref (`owner/repo/deck`) and the 40-character commit it is pinned to. `dekc ref` writes it; see [Refs](/reference/cli#refs) |
+| `refs` | none | Each ref and what it is pinned to: `owner/repo/deck` to a 40-character commit sha, a pack's `file/<deck>` to the 64-character sha256 of its files. `dekc ref` writes it; see [Refs](/reference/cli#refs) |
 
 dek ignores keys it does not know, and lint names each one as `DEK008`, with the key it most likely meant.
 

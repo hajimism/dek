@@ -18,7 +18,9 @@ my-talks/
 ├── AGENTS.md
 ├── assets/
 ├── refs/                          # gitignore される。[refs] から取り直せる
-│   └── owner/repo/deck/
+│   ├── owner/repo/deck/
+│   └── file/deck/                 # pack の実体。packs/ から展開し直す
+├── packs/                         # コミットする。dekc ref が固定した pack
 ├── decks/
 │   └── 2026-04-vite/
 │       ├── script.md
@@ -76,7 +78,7 @@ speed = 1.0
 | `voice.engine` | `"voicevox"` | エンジン名（`voicevox`、`aivis`、`coeiroink`、`sharevox`）、エンジン名とローカルのポート（`voicevox:50021`）、またはベース URL |
 | `voice.speaker` | `[voice]` があるとき必須 | 話者。`名前/スタイル` の形 |
 | `voice.speed` | `1.0` | 話速 |
-| `refs` | なし | ref（`owner/repo/deck`）ごとに、固定したコミットの40桁の sha。`dekc ref` が書く。[ref](/ja/reference/cli#ref) を参照 |
+| `refs` | なし | ref ごとに、固定した先。`owner/repo/deck` はコミットの40桁の sha、pack の `file/<deck>` は中のファイルの64桁の sha256。`dekc ref` が書く。[ref](/ja/reference/cli#ref) を参照 |
 
 dek は知らないキーを無視し、lint がそれぞれを `DEK008` として、おそらく意図したキーと一緒に示します。
 

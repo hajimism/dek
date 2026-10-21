@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { parsePublicUrl } from "./ogp.ts";
-import { isPinnedRev, isPlainRefName } from "./ref-name.ts";
+import { isPinFor, isPlainRefName, packFile, parseRefSource } from "./ref-name.ts";
 import { DeckSettings } from "./schema.ts";
 import { parseTomlWith } from "./zod.ts";
 
@@ -26,14 +26,25 @@ export const DekToml = z.object({
     .superRefine((refs, ctx) => {
       for (const [name, rev] of Object.entries(refs)) {
         if (!isPlainRefName(name)) {
-          ctx.addIssue({ code: "custom", path: [name], message: "a ref is named owner/repo/deck" });
-        } else if (!isPinnedRev(rev)) {
           ctx.addIssue({
             code: "custom",
             path: [name],
-            message: `pin a ref to a 40-character commit sha; run \`dekc ref ${name}\` to pin one`,
+            message: "a ref is named owner/repo/deck, or file/<deck> for a pack",
           });
+          continue;
         }
+        const source = parseRefSource(name);
+        if (isPinFor(source, rev)) {
+          continue;
+        }
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message:
+            source.kind === "file"
+              ? `pin a pack's ref to the 64-character sha256 of its files; run \`dekc ref ${packFile(source.deck)}\` to pin one`
+              : `pin a ref to a 40-character commit sha; run \`dekc ref ${name}\` to pin one`,
+        });
       }
     })
     .optional(),
@@ -54,7 +65,7 @@ export type DekConfig = {
    */
   seed?: Partial<DeckSettings>;
   voice?: VoiceDefaults;
-  /** `[refs]`: each ref name and the commit it is pinned to. */
+  /** `[refs]`: each ref name and what it is pinned to: a commit, or a pack's digest. */
   refs?: Record<string, string>;
 };
 
