@@ -65,6 +65,9 @@ engine = "voicevox"
 speaker = "ずんだもん/ノーマル"
 speed = 1.0
 
+[pack]
+license = "CC0-1.0"
+
 [refs]
 "hajimism/dek/why-dek" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
 ```
@@ -78,6 +81,7 @@ speed = 1.0
 | `voice.engine` | `"voicevox"` | Engine name (`voicevox`, `aivis`, `coeiroink`, `sharevox`), a name and a local port (`voicevox:50021`), or a base URL |
 | `voice.speaker` | required when `[voice]` is present | Speaker, as `name/style` |
 | `voice.speed` | `1.0` | Speaking speed |
+| `pack.license` | none; `dekc init` writes `"CC0-1.0"` | The license `dekc pack` hands a deck over under: `"CC0-1.0"`, which lets the reader reuse the deck freely, with no credit owed, as a template is meant to be used, or `"CC-BY-4.0"`, which asks for credit. The pack carries its legal code as `LICENSE`, in place of the project's own LICENSE file. Without it, the pack carries the project's LICENSE file, or none, and `dekc pack` warns. Nothing else reads it: a ref on GitHub reads the repository's LICENSE file |
 | `refs` | none | Each ref and what it is pinned to: `owner/repo/deck` to a 40-character commit sha, a pack's `file/<deck>` to the 64-character sha256 of its files. `dekc ref` writes it; see [Refs](/reference/cli#refs) |
 
 dek ignores keys it does not know, and lint names each one as `DEK008`, with the key it most likely meant.
