@@ -27,7 +27,7 @@ Three facts bound the format:
 ```text
 <deck>/
 ├── dek.toml            # empty: the sender's [refs] and [voice] stay home
-├── LICENSE             # the project's, when it has one at its root
+├── LICENSE             # what [pack] license names, else the project's own
 └── decks/<deck>/
     ├── script.md
     ├── theme.css
@@ -38,6 +38,18 @@ Three facts bound the format:
 The deck keeps what reading it needs, the same files `dekc ref` keeps from a repository: not `dist/`, `.cache/`, or `voice/`. A file or folder whose name starts with a dot stays behind. `--json` returns `outs`.
 
 Pack refuses, before it writes anything, what the reader could not take: a deck whose name holds a space or `@`, since a ref name cannot carry it; a deck whose files come to more than 50 MB, the most `dekc ref` keeps of any ref; a symlink dek does not follow anywhere else, one that leads out of the project, into a hidden folder, or to a file of another kind. A deck need not pass lint to be packed: the reader reads it, they do not build it. A ref cannot be packed; it is not the reader's to hand on.
+
+**A pack says what its reader may do with it, and a new project hands its decks over under CC0 1.0.** A deck handed over to be read as a ref is used as a template: the reader takes its layouts, its theme, and its way of writing into decks of their own, which they then present to other people. The license that suits that is the one that carries nothing into those decks. CC BY 4.0 would have every deck built on the template credit it; MIT would have its notice travel with every copy of `theme.css`; CC0 1.0 asks for neither. So `dek.toml` takes `[pack] license`, `"CC0-1.0"` or `"CC-BY-4.0"`, for an author who wants credit, and `dekc init` writes `"CC0-1.0"` into every new project, under a comment that says what it grants and that deleting the line hands decks over with no license:
+
+```toml
+[pack]
+# The license `dekc pack` hands a deck over under. CC0-1.0 lets the reader reuse it
+# freely, with no credit owed, as a template is meant to be used; CC-BY-4.0 asks for
+# credit. Delete the line to hand decks over with no license.
+license = "CC0-1.0"
+```
+
+The pack carries the license's legal code as `LICENSE`, as Creative Commons publishes it; dek ships the two texts in `src/core/licenses/`, which Creative Commons dedicates to the public domain under CC0. `[pack] license` comes before the project's own LICENSE file, since it is the license for this act of handing over; without it, the pack carries that file, and with neither it carries none. Then `dekc pack` warns the sender, who can fix it, rather than leaving the warning to the reader, who cannot: `warnings` in `--json`. Any other value is refused when `dek.toml` is read, with the two ids and the LICENSE file as the hint. Nothing but `dekc pack` reads the key: a ref on GitHub reads the repository's LICENSE file, so a default written by `init` never speaks for a repository pushed in public.
 
 **`dekc ref <file>.tgz` pins the pack as `file/<deck>`.** An argument that ends in `.tgz` or `.tar.gz` is a path, read from the working directory; anything else is a ref name or a GitHub link as before. The pack must hold exactly one deck beside a `dek.toml`, as `dekc pack` writes it; a tarball of a whole project with more than one deck is refused, with `dekc pack <deck>` as the hint. Its deck name is the ref's: `file/2026-10-talk`.
 
@@ -66,13 +78,17 @@ Running `dekc ref` on a newer pack of the same deck moves the pin, and `from` an
 - **A sha256 of the pack file.** The same deck packs to different bytes, so the pin would move on every pack. A tar writer of dek's own that leaves the time out would also have to split long paths for ustar.
 - **A table in `[refs]`** holding the pack's path and digest. The path follows from the name.
 - **The snapshot committed under `refs/`.** `refs/` is ignored whole and is a copy by definition; a committed pack keeps both true.
+- **A top-level `license` in `dek.toml`.** It reads as the repository's license, which GitHub refs never consult, so a default `init` wrote would look like a grant made in public. `[pack]` names the one thing it does.
+- **CC BY 4.0 or MIT as the default.** Each puts a condition into every deck built on the template: credit on its slides, or a notice beside its theme. CC BY 4.0 stays one line away for an author who wants credit.
 - **A name from the file, or a prefix like `local/`.** A file's name changes in transit; a prefix GitHub could hand to a user would put its refs in the same folders.
 
 ## Consequences
 
 Anyone who can send a file can hand over a deck to learn from, and the reader's agent reads it as it reads a deck on GitHub: read-only, out of their lint and build, listed in AGENTS.md as a model.
 
-The reader's repository holds a copy of someone else's deck. Who may read it is now whoever may read that repository, which is what the people handing it over asked for, and what the reader has to keep in mind before pushing it anywhere public. A pack carries a license only when the sender's project has one at its root; otherwise the reader is warned to ask before reusing its text or assets.
+The reader's repository holds a copy of someone else's deck. Who may read it is now whoever may read that repository, which is what the people handing it over asked for, and what the reader has to keep in mind before pushing it anywhere public.
+
+A deck packed in a project `dekc init` made goes out under CC0 1.0, so its author gives up every right in it, credit included, toward anyone who receives the pack; the comment in `dek.toml` is what tells them so, and they may change it before they pack. Projects made before this, and `sample/`, have no `[pack]` and pack with their own LICENSE file or none, with the warning. A pack with no license is read with the warning a repository with none gets.
 
 Two senders whose decks share a name share a ref: the second pack replaces the first, and `from` says that the pin moved. Telling them apart, with a name the reader chooses, is left until it is needed.
 

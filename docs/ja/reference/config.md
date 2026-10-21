@@ -65,6 +65,9 @@ engine = "voicevox"
 speaker = "ずんだもん/ノーマル"
 speed = 1.0
 
+[pack]
+license = "CC0-1.0"
+
 [refs]
 "hajimism/dek/why-dek" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
 ```
@@ -78,6 +81,7 @@ speed = 1.0
 | `voice.engine` | `"voicevox"` | エンジン名（`voicevox`、`aivis`、`coeiroink`、`sharevox`）、エンジン名とローカルのポート（`voicevox:50021`）、またはベース URL |
 | `voice.speaker` | `[voice]` があるとき必須 | 話者。`名前/スタイル` の形 |
 | `voice.speed` | `1.0` | 話速 |
+| `pack.license` | なし。`dekc init` は `"CC0-1.0"` を書く | `dekc pack` でデッキを渡すときのライセンス。`"CC0-1.0"` は、テンプレートとして使われるとおり、受け手が出典表示なしに自由に再利用できる。`"CC-BY-4.0"` は出典表示を求める。pack にはその本文を `LICENSE` として、プロジェクトの LICENSE ファイルの代わりに入れる。無ければ、プロジェクトの LICENSE ファイルを入れるか何も入れず、`dekc pack` が警告する。ほかに読むものはない。GitHub の ref はリポジトリの LICENSE ファイルを読む |
 | `refs` | なし | ref ごとに、固定した先。`owner/repo/deck` はコミットの40桁の sha、pack の `file/<deck>` は中のファイルの64桁の sha256。`dekc ref` が書く。[ref](/ja/reference/cli#ref) を参照 |
 
 dek は知らないキーを無視し、lint がそれぞれを `DEK008` として、おそらく意図したキーと一緒に示します。
