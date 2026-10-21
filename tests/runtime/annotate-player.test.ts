@@ -255,6 +255,18 @@ describe("annotate mode", () => {
     expect(document.body.classList.contains("is-presenter")).toBe(false);
   });
 
+  test.serial("leaves the Enter and Escape that end a conversion to the input method", () => {
+    const field = part<HTMLTextAreaElement>("textarea");
+    field.value = "右に";
+    // Safari sends the key that commits or cancels a conversion after compositionend, so
+    // isComposing is false by then; keyCode 229 is what still marks it as the input method's.
+    expect(pressKey("Enter", { composed: true, keyCode: 229 }, field)).toBe(false);
+    expect(pressKey("Escape", { composed: true, keyCode: 229 }, field)).toBe(false);
+    expect(pressKey("Enter", { composed: true, isComposing: true }, field)).toBe(false);
+    expect(shown("[data-part=popup]")).toBe(true);
+    expect(part("[data-part=count]").textContent).not.toBe("1 note");
+  });
+
   test.serial("takes another element on the path, and Enter adds the note", async () => {
     const chevron = ui().querySelector<HTMLButtonElement>(
       '[data-part=path] button[title^="div.chevron"]',

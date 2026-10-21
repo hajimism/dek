@@ -671,10 +671,12 @@ export function createAnnotateView(options: {
       return;
     }
     event.stopPropagation();
-    if (event.target !== field) {
+    // Safari sends the key that commits or cancels a conversion after compositionend, with
+    // isComposing false; keyCode 229 still marks it as the input method's.
+    if (event.target !== field || event.isComposing || event.keyCode === 229) {
       return;
     }
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       submit();
     } else if (event.key === "Escape") {
