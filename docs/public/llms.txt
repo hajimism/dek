@@ -60,7 +60,9 @@ dekc init [dir] [--deck NAME]
 dekc new <name> [--theme-from DECK]
 dekc ls [deck]
 dekc ref [owner/repo/deck[@rev] | github-link]   pin + fetch; no args lists; dekc ref rm <ref>
+dekc ref <file>.tgz  pin a pack as file/<deck>; commit packs/<deck>.tgz, which a clone unpacks
 Refs are read-only decks to learn from: ls, show, theme, shot take owner/repo/deck as the deck.
+dekc pack [--root-dist]   dist/<deck>.tgz, for another project's `dekc ref <file>.tgz`
 dekc show <slug>     script with its beat ids, HTML, CSS, TS, the theme rules it uses, assets
 dekc theme [layout]  deck theme: layouts, classes, tokens; with a layout, its example markup
 dekc check <slug> [--shot] [--voice]   fill: share of the frame it fills, by tenths

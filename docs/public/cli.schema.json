@@ -368,6 +368,10 @@
                 "null"
               ]
             },
+            "pack": {
+              "description": "A pack's ref: the copy in packs/ to commit, which a clone unpacks it from.",
+              "type": "string"
+            },
             "warnings": {
               "type": "array",
               "items": {
@@ -2240,6 +2244,47 @@
       ]
     },
     "pptx": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "outs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "outs",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "pack": {
       "anyOf": [
         {
           "type": "object",

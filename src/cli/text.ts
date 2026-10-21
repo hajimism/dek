@@ -1,6 +1,7 @@
 // How each command's result reads as text; commands.ts says which command prints which.
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
+import { packFile, parseRefSource } from "../core/ref-name.ts";
 import { formatClock } from "../core/timing.ts";
 import type { AnnotationsCliResult } from "./annotations.ts";
 import type { BuildCliResult } from "./build.ts";
@@ -409,6 +410,14 @@ export function formatShow(data: ShowResult): string {
     .join("\n\n");
 }
 
+/** What a read does for a ref whose snapshot is not there: fetch it, or unpack its pack. */
+function notFetched(name: string): string {
+  const source = parseRefSource(name);
+  return source.kind === "file"
+    ? `(not unpacked; a read unpacks ${packFile(source.deck)})`
+    : "(not fetched; a read fetches it)";
+}
+
 export function formatRef(data: RefCliResult): string {
   const short = (rev: string) => rev.slice(0, 7);
   switch (data.action) {
@@ -421,6 +430,7 @@ export function formatRef(data: RefCliResult): string {
       return [
         head,
         ...data.warnings.map((warning) => `warning: ${warning}`),
+        ...(data.pack ? [`commit ${data.pack}: a clone unpacks the ref from it`] : []),
         `read it with \`dekc ls ${data.name}\` and \`dekc show ${data.name} <slug>\``,
       ].join("\n");
     }
@@ -433,7 +443,7 @@ export function formatRef(data: RefCliResult): string {
         data.refs.map((ref) => [
           ref.name,
           short(ref.rev),
-          ref.fetched ? (ref.title ?? "") : "(not fetched; a read fetches it)",
+          ref.fetched ? (ref.title ?? "") : notFetched(ref.name),
           ref.slides === undefined ? "" : String(ref.slides),
         ]),
         ["left", "left", "left", "right"],

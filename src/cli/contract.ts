@@ -159,6 +159,10 @@ export const RESULT_FIELDS = {
       changed: z.boolean(),
       dir: z.string(),
       license: z.string().nullable(),
+      pack: z
+        .string()
+        .optional()
+        .describe("A pack's ref: the copy in packs/ to commit, which a clone unpacks it from."),
       warnings: z.array(z.string()),
     }),
     z.strictObject({
@@ -413,6 +417,7 @@ export const RESULT_FIELDS = {
   }),
   pdf: z.strictObject({ outs: paths }),
   pptx: z.strictObject({ outs: paths }),
+  pack: z.strictObject({ outs: paths }),
 } satisfies Record<ResultCommand, FieldsSchema>;
 
 type FieldsSchema = z.ZodObject | z.ZodUnion<readonly z.ZodObject[]>;

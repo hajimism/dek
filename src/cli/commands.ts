@@ -313,7 +313,7 @@ export const COMMANDS = {
   ref: result({
     args: ["source?"],
     flags: [],
-    usage: ["dekc ref <owner/repo/deck>[@rev]", "dekc ref"],
+    usage: ["dekc ref <owner/repo/deck>[@rev]", "dekc ref <file>.tgz", "dekc ref"],
     summary:
       "Pin another project's deck to read as a model, list the pins, or drop one.\nls, show, theme, and shot read a ref as they read a deck.",
     group: "Refs",
@@ -322,11 +322,13 @@ export const COMMANDS = {
         "dekc ref owner/repo/deck[@rev]",
         "pin and fetch one (a GitHub link works too); again moves the pin",
       ],
+      ["dekc ref <file>.tgz", "pin a pack someone sent as file/<deck>; commit packs/"],
       ["dekc ref", "list pinned refs"],
       ["dekc ref rm <ref>", "drop one"],
     ],
     agent: [
       "dekc ref [owner/repo/deck[@rev] | github-link]   pin + fetch; no args lists; dekc ref rm <ref>",
+      "dekc ref <file>.tgz  pin a pack as file/<deck>; commit packs/<deck>.tgz, which a clone unpacks",
     ],
     run: async ({ cwd, args }) => {
       const { addRef, listRefs } = await import("./ref.ts");
@@ -343,7 +345,31 @@ export const COMMANDS = {
         },
       },
     },
-    output: { text: formatRef },
+    output: {
+      text: formatRef,
+      paths: (data, display) =>
+        data.action === "add" && data.pack !== undefined
+          ? { ...data, pack: display(data.pack) }
+          : data,
+    },
+  }),
+  pack: result({
+    scope: "decks",
+    args: [],
+    flags: ["root-dist"],
+    usage: ["dekc pack [deck] [--root-dist]"],
+    summary:
+      "Write dist/<deck>.tgz: the deck as a file to hand to someone who reads it as a ref with\n`dekc ref <file>.tgz`, without access to where it lives.",
+    group: "Refs",
+    overview: [["dekc pack [--root-dist]", "write the deck as a file for `dekc ref` elsewhere"]],
+    agent: [
+      "dekc pack [--root-dist]   dist/<deck>.tgz, for another project's `dekc ref <file>.tgz`",
+    ],
+    run: async ({ target, flags }) => {
+      const { packCommand } = await import("./pack.ts");
+      return packCommand(target, { rootDist: flags["root-dist"] });
+    },
+    output: { text: formatPdf },
   }),
   show: result({
     scope: "deck",

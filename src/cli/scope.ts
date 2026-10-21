@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import {
   isRefName,
+  packFile,
   parseRefSource,
   REF_MARKER,
   readRefMeta,
@@ -273,10 +274,18 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
   if (pinned === undefined) {
     throw new DekError(`ref "${source.name}" is not added`, {
       path: project.configPath,
-      hint: `run \`dekc ref ${arg}\``,
+      hint:
+        source.kind === "file"
+          ? "add it from the pack you were sent: `dekc ref <file>.tgz`"
+          : `run \`dekc ref ${arg}\``,
     });
   }
-  if (source.rev !== undefined && source.rev !== pinned) {
+  // What adds the ref again: a pack's ref from its file, any other from its name.
+  const again =
+    source.kind === "file"
+      ? `dekc ref ${packFile(source.deck)}`
+      : `dekc ref ${source.name}@${pinned}`;
+  if (source.kind === "github" && source.rev !== undefined && source.rev !== pinned) {
     throw new DekError(`"${arg}" is not the pinned version, ${pinned.slice(0, 7)}`, {
       path: project.configPath,
       hint: `run \`dekc ref ${arg}\` to pin that version, or drop @${source.rev}`,
@@ -285,7 +294,7 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
   if (!fetched) {
     throw new DekError(`ref "${source.name}" is not fetched`, {
       path: dir,
-      hint: `run \`dekc ref ${source.name}@${pinned}\``,
+      hint: `run \`${again}\``,
     });
   }
   const snapshot = resolveProject(dir);
@@ -297,7 +306,7 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
     }
     throw new DekError(`ref "${source.name}" has no deck "${source.deck}"`, {
       path: dir,
-      hint: `run \`dekc ref ${source.name}@${pinned}\` to fetch it again`,
+      hint: `run \`${again}\` to fetch it again`,
     });
   }
   return {
