@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import pkg from "../../package.json";
 import { LLMS_PATH, llmsText } from "../../scripts/llms-text.ts";
@@ -10,11 +10,10 @@ import { repoRoot } from "../helpers/paths.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 // Every place an agent is told how to use dek: what dekc sync writes into AGENTS.md, what
-// llms.txt says to an agent outside any project, and the official skill. Each must name only
-// what exists, and the two written by hand must not drift from what the code says.
+// llms.txt says to an agent outside any project, and the skills. Each must name only what
+// exists, and what is written by hand must not drift from what the code says.
 
 const read = (path: string): string => readFileSync(join(repoRoot, path), "utf8");
-const skill = read("skills/dek/SKILL.md");
 const commands = new Set(allSpecs().map(([name]) => name));
 
 /** Each command a text names as `dekc <word>`, and the DEK ids it names. */
@@ -26,9 +25,10 @@ function named(text: string): { commands: string[]; rules: string[] } {
 }
 
 /**
- * The commands of the oldest dek the skill still teaches, 0.2.0. The skill is installed apart
- * from dek, so it must not tell a project on that version to run a command it does not have;
- * name a newer command, and this list, with the skill's "First" section, must move up with it.
+ * The commands of the oldest dek the skills still teach, 0.2.2. A skill is installed apart from
+ * dek, so it must not tell a project on that version to run a command it does not have; name a
+ * newer command, and this list, with the version the official skill's "First" section names,
+ * must move up with it.
  */
 const SKILL_FLOOR = new Set([
   "init",
@@ -43,6 +43,7 @@ const SKILL_FLOOR = new Set([
   "goto",
   "current",
   "marks",
+  "annotations",
   "sync",
   "lint",
   "cues",
@@ -52,6 +53,11 @@ const SKILL_FLOOR = new Set([
   "pdf",
   "help",
 ]);
+
+/** Each skill in skills/: the official one, then the optional ones, as the marketplace lists them. */
+const SKILLS = ["dek", "dek-design"] as const;
+const skillText = (name: string): string => read(`skills/${name}/SKILL.md`);
+const skill = skillText("dek");
 
 describe("agent guidance", () => {
   test("llms.txt is what the docs, the rule table, and the commands say now", () => {
@@ -71,7 +77,7 @@ describe("agent guidance", () => {
     for (const [where, text] of [
       ["AGENTS.md", agents],
       ["llms.txt", llmsText()],
-      ["SKILL.md", skill],
+      ...SKILLS.map((name) => [`skills/${name}`, skillText(name)] as const),
     ] as const) {
       const found = named(text);
       expect({
@@ -85,8 +91,16 @@ describe("agent guidance", () => {
     }
   });
 
-  test("the skill teaches no command the oldest dek it covers lacks", () => {
-    expect(named(skill).commands.filter((name) => !SKILL_FLOOR.has(name))).toEqual([]);
+  test("each skill teaches no command the oldest dek it covers lacks", () => {
+    expect(readdirSync(join(repoRoot, "skills")).sort()).toEqual([...SKILLS].sort());
+    for (const name of SKILLS) {
+      expect(skillText(name)).toMatch(new RegExp(`^---\nname: ${name}\ndescription: .+\n---\n`));
+      expect({
+        name,
+        newer: named(skillText(name)).commands.filter((command) => !SKILL_FLOOR.has(command)),
+      }).toEqual({ name, newer: [] });
+    }
+    expect(skill).toContain("dek 0.2.2 or newer");
   });
 
   test("the skill runs dek the one way that works", () => {
@@ -98,17 +112,27 @@ describe("agent guidance", () => {
     expect(skill).not.toMatch(/npx (dekc|@hajimism)/);
   });
 
-  test("the skill ships in the package and installs as a Claude Code plugin", () => {
+  test("each skill ships in the package and installs as its own Claude Code plugin", () => {
     expect(pkg.files).toContain("skills");
     const plugin = JSON.parse(read(".claude-plugin/plugin.json")) as { name: string };
     const marketplace = JSON.parse(read(".claude-plugin/marketplace.json")) as {
       name: string;
       owner: { name: string };
-      plugins: Array<{ name: string; source: string }>;
+      plugins: Array<{ name: string; source: string; skills?: string[] }>;
     };
     expect(plugin.name).toBe("dek");
     expect(marketplace.owner.name).not.toBe("");
-    expect(marketplace.plugins).toEqual([expect.objectContaining({ name: "dek", source: "./" })]);
+    // The official plugin sits at the root, beside plugin.json; listing its skill keeps the
+    // optional ones out of it. Each optional skill is a plugin of its own folder.
+    expect(marketplace.plugins).toEqual(
+      SKILLS.map((name) =>
+        expect.objectContaining(
+          name === "dek"
+            ? { name, source: "./", skills: ["./skills/dek/"] }
+            : { name, source: `./skills/${name}/` },
+        ),
+      ),
+    );
     expect(llmsText()).toContain(`/plugin install ${plugin.name}@${marketplace.name}`);
   });
 });

@@ -12,11 +12,13 @@ Agents use the same CLI as humans. Run `dekc help --agent`, or `dekc help <comma
 
 ## Skill
 
-The official skill teaches an agent the loop: script first, then one slide at a time with `show`, an edit, `check --shot`, and `lint`, and when to stop. It names few commands and defers to `dekc help --agent` for the rest, so it never runs ahead of the dek a project has.
+The official skill teaches an agent the loop: script first, then one slide at a time with `show`, an edit, `check --shot`, and `lint`, how to let the human review it in the browser, and when to stop. It names few commands and defers to `dekc help --agent` for the rest, so it never runs ahead of the dek a project has.
 
-- The skills CLI: `npx skills add hajimism/dek`
+- The skills CLI: `npx skills add hajimism/dek --skill dek`
 - Claude Code: `/plugin marketplace add hajimism/dek`, then `/plugin install dek@dek`
 - In a project: `node_modules/@hajimism/dek/skills/dek/SKILL.md`, the copy for the dek installed there
+
+An optional skill, `dek-design`, is for slides that read at a glance; it installs the same way under its own name.
 
 ## Guide
 
@@ -31,7 +33,7 @@ The official skill teaches an agent the loop: script first, then one slide at a 
 - [Lint](https://hajimism.github.io/dek/guide/lint.html): Lint decides what a rule can measure; `--visual` measures geometry. The rest is the author's call.
 - [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys and touch, marks and annotations, one file on a USB stick, print, remote, PDF, and PPTX with editable text.
 - [Voice and Video](https://hajimism.github.io/dek/guide/voice.html): Opt-in. Cue, Timeline, rehearse, video.
-- [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): The CLI, `AGENTS.md`, and the official skill. `check --shot`, `show` a slide or a ref's as a model, and `dekc annotations` for what the human pointed at. No MCP.
+- [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): The CLI, `AGENTS.md`, the official skill, and an optional design skill. `check --shot`, `show` a slide or a ref's as a model, and `dekc annotations` for what the human pointed at. No MCP.
 - [FAQ](https://hajimism.github.io/dek/guide/faq.html): When to use Slidev, handing a talk to PowerPoint users, whether voice is required, and more.
 - [Architecture](https://hajimism.github.io/dek/guide/architecture.html): Core shared by the CLI and the dev server. Optional dependencies.
 - [Agent Usability Criteria](https://hajimism.github.io/dek/guide/agent-criteria.html): The yardstick for agent-facing changes: accurate guidance, conventions that lint checks, verifiable output, actionable diagnostics, a clear stopping point.
