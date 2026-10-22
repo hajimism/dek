@@ -16,7 +16,7 @@ dek builds a talk from its script. `script.md` holds what will be said, in order
 
 ## First, ask the dek you have
 
-1. `bunx dekc --version` and `bunx dekc help --agent`: every command and flag of the dek installed in this project. This file names few on purpose; use only what that list shows.
+1. `bunx dekc --version` and `bunx dekc help --agent`: every command and flag of the dek installed in this project. This file names few on purpose; use only what that list shows. It is written for dek 0.2.2 or newer; with an older one, follow only that list and `AGENTS.md`.
 2. Read dek's block in `AGENTS.md`. dek rewrites it for the installed version: the conventions lint checks, how to check a slide, and what to do before reporting a deck as done. Follow it as written.
 3. In the deck, `bunx dekc theme`: the classes, tokens, and layouts this deck's theme defines, and `bunx dekc theme <layout>` for a layout's markup. Use nothing else.
 
@@ -39,6 +39,13 @@ A hint that sends a fix to `theme.css` means every slide of the deck shares the 
 - You have looked at `bunx dekc shot --sheet` and judged the deck's balance.
 - Say what you could not judge, such as the argument and how the timing feels when spoken, and hand it back to the author. Passing lint means nothing measurable is wrong, not that the talk is good.
 
-## When the human points at something
+## When the human reviews the deck
 
-If the human marked beats while rehearsing or pointed at elements of a slide, `bunx dekc help --agent` lists the commands that read those notes, and `AGENTS.md` says how to use them. Leave clearing them to the human.
+The human sees what lint cannot. Let them point at it:
+
+1. Start the dev server in the background, since it keeps running: `bunx dekc <deck> --port <free port>`, or your harness's preview tool if it has one.
+2. Give them the URL and ask them to press `a`, click what they want changed, write a note, and tell you when they are done. They may not know dek: name the keys, not the commands.
+3. `bunx dekc annotations <deck> --json`, and fix every note. Shoot the slide again with `bunx dekc shot <slug>` and compare it with the note's `shot`. Tell them in short what you changed.
+4. Ask them to look again, until they say the deck is done. Stop the dev server you started.
+
+Leave `dekc annotations clear` to the human. If they marked beats while rehearsing, `AGENTS.md` says how to read those too.

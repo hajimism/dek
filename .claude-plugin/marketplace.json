@@ -1,12 +1,23 @@
 {
   "name": "dek",
-  "owner": { "name": "Hajime Nakagawa", "url": "https://github.com/hajimism" },
-  "description": "The official dek skill.",
+  "owner": {
+    "name": "Hajime Nakagawa",
+    "url": "https://github.com/hajimism"
+  },
+  "description": "The official dek skill, and an optional design skill.",
   "plugins": [
     {
       "name": "dek",
       "source": "./",
+      "skills": [
+        "./skills/dek/"
+      ],
       "description": "Write and fix talks with dek, a build system for talks run as dekc on Bun."
+    },
+    {
+      "name": "dek-design",
+      "source": "./skills/dek-design/",
+      "description": "Make dek slides that read at a glance: a claim for a heading, one focal point, no difference without a meaning."
     }
   ]
 }

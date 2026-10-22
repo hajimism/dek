@@ -69,11 +69,13 @@ Agents use the same CLI as humans. Run \`${command} help --agent\`, or \`${comma
 
 ## Skill
 
-The official skill teaches an agent the loop: script first, then one slide at a time with \`show\`, an edit, \`check --shot\`, and \`lint\`, and when to stop. It names few commands and defers to \`${command} help --agent\` for the rest, so it never runs ahead of the dek a project has.
+The official skill teaches an agent the loop: script first, then one slide at a time with \`show\`, an edit, \`check --shot\`, and \`lint\`, how to let the human review it in the browser, and when to stop. It names few commands and defers to \`${command} help --agent\` for the rest, so it never runs ahead of the dek a project has.
 
-- The skills CLI: \`npx skills add hajimism/dek\`
+- The skills CLI: \`npx skills add hajimism/dek --skill dek\`
 - Claude Code: \`/plugin marketplace add hajimism/dek\`, then \`/plugin install dek@dek\`
 - In a project: \`node_modules/${pkg.name}/skills/dek/SKILL.md\`, the copy for the dek installed there
+
+An optional skill, \`dek-design\`, is for slides that read at a glance; it installs the same way under its own name.
 
 ## Guide
 

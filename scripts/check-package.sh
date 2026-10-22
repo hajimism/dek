@@ -30,7 +30,7 @@ cd talks
 bun add -d "$tarball" > /dev/null
 # The skill ships with the version it describes, wherever the install put the package.
 installed="$(bun -e 'console.log(require.resolve("@hajimism/dek/package.json"))')"
-test -f "$(dirname "$installed")/skills/dek/SKILL.md"
+for skill in dek dek-design; do test -f "$(dirname "$installed")/skills/$skill/SKILL.md"; done
 cd decks/demo
 bunx dekc --version
 bunx dekc ls > /dev/null 2>&1
