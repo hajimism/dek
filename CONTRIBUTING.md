@@ -13,6 +13,8 @@ bun install
 bunx playwright install chromium   # the visual checks, shots, and video tests
 ```
 
+`bunfig.toml` keeps `bun install` and `bun add` from taking a version published in the last seven days, and Dependabot waits as long, so a hijacked release has time to be found first. To take a fix sooner, name it in `minimumReleaseAgeExcludes` for that one change.
+
 From the repository, run the CLI as `bun src/cli.ts`, or work in `sample/`, which installs this checkout: `cd sample && bunx dekc`.
 
 ## Before you open a pull request
