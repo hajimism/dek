@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -16,12 +14,17 @@ concurrency:
 
 jobs:
   build:
+    # configure-pages reads the site's settings; nothing here can write to it.
+    permissions:
+      contents: read
+      pages: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.0
@@ -38,7 +41,12 @@ jobs:
         with:
           path: docs/.vitepress/dist
 
+  # Only this job can write to Pages; the build, which installs and runs the dependencies,
+  # cannot.
   deploy:
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

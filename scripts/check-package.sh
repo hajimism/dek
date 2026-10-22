@@ -2,15 +2,22 @@
 # Checks the package as npm would ship it: packs the tarball, lints its manifest with publint,
 # installs it into a fresh project the way the docs say to, and runs `dekc` from there. A file
 # missing from `files`, or a `bin` that points nowhere, fails here instead of after publishing.
+# Given a directory, it leaves the tarball it checked there, for the release to publish as is.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+out=""
+if [ -n "${1:-}" ]; then
+  mkdir -p "$1"
+  out="$(cd "$1" && pwd)"
+fi
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 cd "$root"
 tarball="$work/$(npm pack --silent --pack-destination "$work")"
-bunx publint@0.3 run "$tarball" --strict
+# The publint the lockfile pins, from node_modules: never a version fetched at release time.
+bun run --bun publint run "$tarball" --strict
 
 # `bunx @hajimism/dek init`, then `bun add -d @hajimism/dek`, with the tarball standing in for npm.
 mkdir "$work/boot"
@@ -37,4 +44,7 @@ bunx dekc ls > /dev/null 2>&1
 bunx dekc lint > /dev/null 2>&1
 bunx dekc build > /dev/null 2>&1
 test -f dist/demo.html
+if [ -n "$out" ]; then
+  cp "$tarball" "$out/"
+fi
 echo "package ok: $(basename "$tarball")"
