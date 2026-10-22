@@ -1,3 +1,8 @@
+[install]
+# A version published in the last seven days is not installed: a hijacked package is usually
+# found and pulled within that time. Dependabot waits as long (.github/dependabot.yml).
+minimumReleaseAge = 604800
+
 [test]
 root = "./tests"
 # Async tests in a file overlap while awaiting I/O. Sync tests and test.serial stay sequential.

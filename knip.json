@@ -9,5 +9,6 @@
     "tests/helpers/fake-*.ts",
     "scripts/*.ts"
   ],
-  "project": ["src/**/*.ts", "tests/**/*.ts"]
+  "project": ["src/**/*.ts", "tests/**/*.ts"],
+  "ignoreDependencies": ["publint"]
 }

@@ -6,6 +6,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A version is offered a week after its release, as bunfig.toml installs it. Security
+    # updates do not wait.
+    cooldown:
+      default-days: 7
     groups:
       dependencies:
         patterns: ["*"]
@@ -14,6 +18,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A version is offered a week after its release, as bunfig.toml installs it. Security
+    # updates do not wait.
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]

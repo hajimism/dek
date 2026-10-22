@@ -67,6 +67,7 @@
     "happy-dom": "21.0.1",
     "knip": "6.41.0",
     "playwright": "^1.63.0",
+    "publint": "0.3.25",
     "typescript": "^7.0.2",
     "vitepress": "^1.6.4"
   },

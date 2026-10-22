@@ -6,6 +6,8 @@ Date: 2026-10-01
 
 Accepted
 
+Amended by [19. Keep dependency code away from the tokens that publish](0019-keep-dependency-code-away-from-the-tokens-that-publish.md)
+
 ## Context
 
 dek is published to npm. A release needs a version, a changelog, a tag, and a publish, and a token kept in the repository for publishing is a secret that can leak. `bun publish` cannot authenticate over OIDC.
