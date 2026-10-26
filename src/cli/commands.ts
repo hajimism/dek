@@ -24,6 +24,7 @@ import {
   formatNew,
   formatPack,
   formatPdf,
+  formatPptx,
   formatRef,
   formatReport,
   formatShot,
@@ -827,19 +828,22 @@ export const COMMANDS = {
     flags: ["root-dist", "public"],
     usage: ["dekc pptx [deck] [--root-dist] [--public]"],
     summary:
-      "Write dist/<deck>.pptx, one slide per slide at its last beat: a picture of it with its text\nin text boxes to edit, and its script in the notes. Needs Playwright.",
+      "Write dist/<deck>.pptx, one slide per slide at its last beat: its plain boxes, pictures, and\ntext as PowerPoint's own over a picture of the rest, in the deck's theme, and its script in\nthe notes. Needs Playwright.",
     group: "Output",
     overview: [
-      ["dekc pptx [--root-dist] [--public]", "write a PowerPoint file with editable text"],
+      [
+        "dekc pptx [--root-dist] [--public]",
+        "write a PowerPoint file with editable shapes and text",
+      ],
     ],
     agent: [
-      "dekc pptx [--root-dist] [--public]   text editable over a picture of each slide; script in notes",
+      "dekc pptx [--root-dist] [--public]   boxes, pictures, and text editable over a picture of the rest; script in notes",
     ],
     run: async ({ target, flags }) => {
       const { pptxCommand } = await import("./pptx.ts");
       return pptxCommand(target, { rootDist: flags["root-dist"], public: flags.public });
     },
-    output: { text: formatPdf },
+    output: { text: formatPptx, json: ({ outs }) => ({ outs }) },
   }),
   help: {
     kind: "help",
