@@ -2,8 +2,8 @@ import { zipStored } from "./zip.ts";
 
 // A PowerPoint file as dek writes it: the fewest OOXML parts PowerPoint opens without a repair,
 // as strings. Each slide is a picture of what the browser drew, with what is laid over it taken
-// out of it: the text, in text boxes line by line where the browser set it, and with `--shapes`
-// the boxes, pictures, and the text in them, as PowerPoint's own shapes.
+// out of it: boxes, pictures, and the text in them as PowerPoint's own shapes, other text in text
+// boxes line by line where the browser set it, in the deck's theme.
 
 /** One run of text on one line, as the browser drew it. Sizes are in the slide's own pixels. */
 export type PptxRun = {
@@ -160,7 +160,7 @@ export type PptxDeck = {
   /** The slide's logical size in pixels; one pixel is 1/96 inch, as CSS has it. */
   size: { width: number; height: number };
   slides: PptxSlide[];
-  /** With `--shapes`, the deck's theme as PowerPoint's; PowerPoint's own without it. */
+  /** The deck's theme as PowerPoint's; PowerPoint's own without it. */
   theme?: PptxTheme;
 };
 

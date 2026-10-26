@@ -16,10 +16,11 @@ import type { PptxPageTexts } from "./pptx-text.ts";
 import { slideBackground } from "./pptx-theme.ts";
 import type { Box } from "./slide-measure.ts";
 
-// What a PPTX lays over a slide's picture, decided from what the page measured: with `--shapes`,
-// which boxes and pictures become PowerPoint's own, what they are grouped with, and which text
-// becomes a shape's paragraphs; without it, the text alone, line by line. Nothing here touches a
-// page, so every rule ADR 20 writes down is checked without a browser.
+// What a PPTX lays over a slide's picture, decided from what the page measured: which boxes and
+// pictures become PowerPoint's own, what they are grouped with, which text becomes a shape's
+// paragraphs and which stays line by line, and whether the slide's background is PowerPoint's.
+// Nothing here touches a page, so every rule ADRs 20 and 21 write down is checked without a
+// browser.
 
 /**
  * A place in the order the browser paints: a `[layer, index]` pair for each element from the
@@ -207,14 +208,7 @@ function textKey(key: PaintKey): PaintKey {
 /** How far apart, in pixels, two edges may be and still be one. */
 const NEAR = 1;
 
-export function planPptxLayers(page: PptxPageFacts, options: { shapes: boolean }): PptxPlan {
-  if (!options.shapes) {
-    return {
-      layers: page.boxes.map(textLayer),
-      lifted: { shapes: [], pictures: [], markers: [] },
-      description: page.described.map((said) => said.text).join(" / "),
-    };
-  }
+export function planPptxLayers(page: PptxPageFacts): PptxPlan {
   const tree = new Tree(page.nodes);
   const blocks = new Map(page.blocks.map((block) => [block.node, block]));
   const candidates = page.nodes.flatMap((node, id) =>

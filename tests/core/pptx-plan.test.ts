@@ -104,17 +104,8 @@ const shapes = (layers: PptxLayer<{ node: number }>[]) =>
   layers.filter((layer): layer is PptxShape<{ node: number }> => layer.kind === "shape");
 
 describe("planPptxLayers", () => {
-  test("lays only the text over the picture without --shapes, line by line, in order", () => {
-    const page = plainCard();
-    const plan = planPptxLayers(page, { shapes: false });
-    expect(plan.layers.map((layer) => layer.kind)).toEqual(["text", "text", "text"]);
-    expect(plan.lifted).toEqual({ shapes: [], pictures: [], markers: [] });
-    const [first] = plan.layers;
-    expect(first?.kind === "text" && first.runs[0]?.text).toBe("見出し");
-  });
-
   test("makes a plain card a shape, its text the shape's in paragraphs set where they were", () => {
-    const plan = planPptxLayers(plainCard(), { shapes: true });
+    const plan = planPptxLayers(plainCard());
     expect(plan.lifted.shapes).toEqual([0]);
     const [shape] = shapes(plan.layers);
     expect(plan.layers).toHaveLength(1);
@@ -147,7 +138,7 @@ describe("planPptxLayers", () => {
       rect: rect(120, 173, 200, 199),
       paint: { kind: "drawn", extent: rect(120, 173, 200, 199) },
     });
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     expect(plan.lifted.shapes).toEqual([]);
     expect(plan.layers.map((layer) => layer.kind)).toEqual(["text", "text", "text"]);
   });
@@ -156,16 +147,16 @@ describe("planPptxLayers", () => {
     const over = plainCard();
     // A pseudo-element of the slide, positioned, which paints after the cards in the flow.
     over.drawn.push({ within: -1, key: [1, 99], extent: rect(450, 350, 600, 450) });
-    expect(planPptxLayers(over, { shapes: true }).lifted.shapes).toEqual([]);
+    expect(planPptxLayers(over).lifted.shapes).toEqual([]);
 
     const under = plainCard();
     // One at z-index -1, beneath everything.
     under.drawn.push({ within: -1, key: [-1, 99], extent: rect(450, 350, 600, 450) });
-    expect(planPptxLayers(under, { shapes: true }).lifted.shapes).toEqual([0]);
+    expect(planPptxLayers(under).lifted.shapes).toEqual([0]);
 
     const apart = plainCard();
     apart.drawn.push({ within: -1, key: [1, 99], extent: rect(600, 350, 700, 450) });
-    expect(planPptxLayers(apart, { shapes: true }).lifted.shapes).toEqual([0]);
+    expect(planPptxLayers(apart).lifted.shapes).toEqual([0]);
   });
 
   test("keeps what holds a picture something drawn covers, and the picture, until nothing changes", () => {
@@ -178,7 +169,7 @@ describe("planPptxLayers", () => {
     });
     // Text left in the picture, a rotated label, over the icon: the icon stays, so the card does.
     page.drawn.push({ within: 0, key: [0, 0, 0, 4], extent: rect(420, 130, 470, 150) });
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     expect(plan.lifted).toEqual({ shapes: [], pictures: [], markers: [] });
   });
 
@@ -200,7 +191,7 @@ describe("planPptxLayers", () => {
     );
     page.boxes.push(line(3, 3, "タグ", 316, 307, 48));
     page.blocks.push(block(3, "タグ", rect(312, 300, 368, 340)));
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     const [shape] = shapes(plan.layers);
     expect(shape?.layers.map((layer) => layer.kind)).toEqual(["picture", "shape"]);
     expect(shape?.layers[0]).toMatchObject({ kind: "picture", node: 4, description: "an icon" });
@@ -219,7 +210,7 @@ describe("planPptxLayers", () => {
     // The second line holds two pieces set apart, as a chip's padding sets them.
     page.boxes.push(line(2, 2, "離れた字", 380, 205, 60));
     page.blocks[1] = block(2, "本文の一行目と二行目離れた字", rect(120, 170, 480, 234));
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     const [shape] = shapes(plan.layers);
     expect(shape?.text).toBeUndefined();
     expect(shape?.layers.map((layer) => layer.kind)).toEqual(["text", "text", "text", "text"]);
@@ -228,7 +219,7 @@ describe("planPptxLayers", () => {
   test("leaves a shape's text in lines when the page's runs say other than its lines", () => {
     const page = plainCard();
     page.blocks[1] = block(2, "違う字", rect(120, 170, 480, 234));
-    const [shape] = shapes(planPptxLayers(page, { shapes: true }).layers);
+    const [shape] = shapes(planPptxLayers(page).layers);
     expect(shape?.text).toBeUndefined();
   });
 
@@ -241,7 +232,7 @@ describe("planPptxLayers", () => {
     // The text, from 120 to 234, set at the foot of a content box from 0: it starts 140 down.
     atFoot.paint.content = rect(120, 0, 480, 234);
     atFoot.rect = rect(100, -20, 500, 254);
-    const [foot] = shapes(planPptxLayers(page, { shapes: true }).layers);
+    const [foot] = shapes(planPptxLayers(page).layers);
     expect(foot?.text?.inset).toEqual({ left: 20, top: 140, right: 20, bottom: 20 });
   });
 
@@ -252,9 +243,9 @@ describe("planPptxLayers", () => {
     page.boxes[0] = { ...line(1, 1, "見出し", 258, 121, 84), height: 34, lineHeight: 34 };
     page.boxes[1] = line(2, 2, "本文の一行目と", 280, 173);
     page.boxes[2] = line(2, 2, "二行目", 380, 205, 100);
-    const paragraphs = shapes(planPptxLayers(page, { shapes: true }).layers)[0]?.text?.paragraphs;
+    const paragraphs = shapes(planPptxLayers(page).layers)[0]?.text?.paragraphs;
     expect(paragraphs?.map((p) => p.align)).toEqual(["center", "right"]);
-    expect(planPptxLayers(plainCard(), { shapes: true }).layers[0]).toMatchObject({
+    expect(planPptxLayers(plainCard()).layers[0]).toMatchObject({
       text: { paragraphs: [{ align: "left" }, { align: "left" }] },
     });
   });
@@ -271,7 +262,7 @@ describe("planPptxLayers", () => {
       extent: rect(126, 173, 138, 199),
       bullet: { char: "•" },
     });
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     expect(plan.lifted.markers).toEqual([2]);
     const paragraph = shapes(plan.layers)[0]?.text?.paragraphs[1];
     expect(paragraph).toMatchObject({ marginLeft: 24, indent: -18, bullet: { char: "•" } });
@@ -293,7 +284,7 @@ describe("planPptxLayers", () => {
         bullet: { ordinal: 4 },
       },
     );
-    const paragraphs = shapes(planPptxLayers(page, { shapes: true }).layers)[0]?.text?.paragraphs;
+    const paragraphs = shapes(planPptxLayers(page).layers)[0]?.text?.paragraphs;
     expect(paragraphs?.map((p) => p.bullet)).toEqual([{ startAt: 3 }, { startAt: 3 }]);
   });
 
@@ -308,7 +299,7 @@ describe("planPptxLayers", () => {
       extent: rect(104, 173, 116, 199),
       bullet: { char: "•" },
     });
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     expect(plan.lifted).toEqual({ shapes: [], pictures: [], markers: [] });
   });
 
@@ -341,7 +332,7 @@ describe("planPptxLayers", () => {
         },
       ],
     });
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     expect(plan.layers.map((layer) => layer.kind)).toEqual(["rule", "shape"]);
     expect(plan.layers[0]).toEqual({
       kind: "rule",
@@ -368,8 +359,7 @@ describe("planPptxLayers", () => {
       paint: { kind: "picture", description: "an icon" },
     });
     page.described.push({ node: 3, text: "an icon" }, { node: -1, text: "the venue" });
-    expect(planPptxLayers(page, { shapes: true }).description).toBe("the venue");
-    expect(planPptxLayers(page, { shapes: false }).description).toBe("an icon / the venue");
+    expect(planPptxLayers(page).description).toBe("the venue");
   });
 
   test("lays text out of any shape over the shapes it was painted after", () => {
@@ -377,7 +367,7 @@ describe("planPptxLayers", () => {
     page.nodes.push({ parent: -1, key: [1, 9], rect: rect(150, 380, 300, 420) });
     page.boxes.push(line(3, 3, "上の字", 150, 385));
     page.blocks.push(block(3, "上の字", rect(150, 380, 300, 420)));
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     expect(plan.layers.map((layer) => layer.kind)).toEqual(["shape", "text"]);
   });
 
@@ -394,7 +384,7 @@ describe("planPptxLayers", () => {
       ...line(2, 2, "", 120, 173),
       runs: [run("本文の", 2), run("一行目", 3), run("と", 2)],
     };
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     const inner = shapes(plan.layers)[0]?.layers ?? [];
     const highlight = inner.findIndex((layer) => layer.kind === "shape");
     const words = inner.findIndex(
@@ -412,7 +402,7 @@ describe("planPptxLayers", () => {
       rect: rect(600, 100, 700, 200),
       paint: { kind: "shape", content: rect(600, 100, 700, 200), fill: BLACK, radius: 0 },
     });
-    expect(planPptxLayers(apart, { shapes: true }).lifted.shapes).toEqual([0]);
+    expect(planPptxLayers(apart).lifted.shapes).toEqual([0]);
 
     const inside = plainCard();
     inside.nodes.push({
@@ -421,7 +411,7 @@ describe("planPptxLayers", () => {
       rect: rect(300, 300, 400, 380),
       paint: { kind: "shape", content: rect(300, 300, 400, 380), fill: BLACK, radius: 0 },
     });
-    expect(planPptxLayers(inside, { shapes: true }).lifted.shapes).toEqual([]);
+    expect(planPptxLayers(inside).lifted.shapes).toEqual([]);
   });
 
   test("keeps the later of two shapes laid over in an order the browser may not paint them in", () => {
@@ -439,7 +429,7 @@ describe("planPptxLayers", () => {
         { parent: -1, key: [0, 2], rect: rect(300, 100, 500, 300), paint: box(300, 500) },
       ],
     });
-    expect(planPptxLayers(page, { shapes: true }).lifted.shapes).toEqual([0, 1]);
+    expect(planPptxLayers(page).lifted.shapes).toEqual([0, 1]);
   });
 
   test("paints a block's text after the backgrounds of the blocks around it, as CSS does", () => {
@@ -457,13 +447,13 @@ describe("planPptxLayers", () => {
       blocks: [block(0, "はみ出す字", rect(100, 100, 300, 130))],
     });
     // Text that runs into the next block is painted over its background, so it is laid over it.
-    const plan = planPptxLayers(page, { shapes: true });
+    const plan = planPptxLayers(page);
     expect(plan.lifted.shapes).toEqual([1]);
     expect(plan.layers.map((layer) => layer.kind)).toEqual(["shape", "text"]);
 
     // The same text with a shadow stays drawn, over the block: the block stays too.
     page.drawn.push({ within: 0, key: [0, 0, 0, 0.5], extent: rect(100, 108, 300, 142) });
-    expect(planPptxLayers(page, { shapes: true }).lifted.shapes).toEqual([]);
+    expect(planPptxLayers(page).lifted.shapes).toEqual([]);
   });
 
   test("paints a picture after the backgrounds of the blocks around it, block-level or not", () => {
@@ -484,10 +474,7 @@ describe("planPptxLayers", () => {
         },
       ],
     });
-    expect(planPptxLayers(page, { shapes: true }).layers.map((layer) => layer.kind)).toEqual([
-      "shape",
-      "picture",
-    ]);
+    expect(planPptxLayers(page).layers.map((layer) => layer.kind)).toEqual(["shape", "picture"]);
   });
 
   test("keeps the box of two lists numbered apart, which PowerPoint would number as one", () => {
@@ -506,7 +493,7 @@ describe("planPptxLayers", () => {
         bullet: { ordinal: 1 },
       },
     );
-    expect(planPptxLayers(page, { shapes: true }).lifted).toEqual({
+    expect(planPptxLayers(page).lifted).toEqual({
       shapes: [],
       pictures: [],
       markers: [],
@@ -517,7 +504,7 @@ describe("planPptxLayers", () => {
     const page = plainCard();
     // The paragraph a pixel's noise out of the card's content box, on both sides.
     page.blocks[1] = block(2, "本文の一行目と二行目", rect(119.1, 170, 480.9, 234));
-    const text = shapes(planPptxLayers(page, { shapes: true }).layers)[0]?.text;
+    const text = shapes(planPptxLayers(page).layers)[0]?.text;
     expect(text?.paragraphs.map((p) => [p.marginLeft, p.marginRight])).toEqual([
       [expect.closeTo(0.9, 5), 0],
       [0, 0],
@@ -528,7 +515,7 @@ describe("planPptxLayers", () => {
   test("leaves a block's text in lines when its lines are set farther apart than its pitch", () => {
     const page = plainCard();
     page.boxes[2] = line(2, 2, "二行目", 120, 215);
-    expect(shapes(planPptxLayers(page, { shapes: true }).layers)[0]?.text).toBeUndefined();
+    expect(shapes(planPptxLayers(page).layers)[0]?.text).toBeUndefined();
   });
 
   test("takes a pseudo-element Chromium does not place to draw anywhere in its element", () => {
@@ -543,13 +530,13 @@ describe("planPptxLayers", () => {
       { boxes: page.boxes, blocks: page.blocks, drawn: [] },
       new Map(),
     );
-    expect(planPptxLayers(facts, { shapes: true }).lifted.shapes).toEqual([]);
+    expect(planPptxLayers(facts).lifted.shapes).toEqual([]);
   });
 
   test("keeps a box a hairline left in the picture crosses", () => {
     const page = plainCard();
     page.drawn.push({ within: -1, key: [1, 99], extent: rect(300, 250, 300.4, 450) });
-    expect(planPptxLayers(page, { shapes: true }).lifted.shapes).toEqual([]);
+    expect(planPptxLayers(page).lifted.shapes).toEqual([]);
   });
 
   test("lays a picture over as far as its outline reaches, and keeps it for what that covers", () => {
@@ -560,28 +547,27 @@ describe("planPptxLayers", () => {
       paint: { kind: "picture", description: "an icon", extent },
     });
     const framed = facts({ nodes: [icon(rect(96, 96, 144, 144))] });
-    expect(planPptxLayers(framed, { shapes: true }).layers).toEqual([
+    expect(planPptxLayers(framed).layers).toEqual([
       { kind: "picture", x: 96, y: 96, width: 48, height: 48, description: "an icon", node: 0 },
     ]);
     framed.drawn.push({ within: -1, key: [1, 9], extent: rect(141, 100, 160, 120) });
-    expect(planPptxLayers(framed, { shapes: true }).lifted.pictures).toEqual([]);
+    expect(planPptxLayers(framed).lifted.pictures).toEqual([]);
   });
 
   test("takes the slide's background out of its picture, unless something is laid out under it", () => {
     const fill = { kind: "solid" as const, paint: BLACK };
     const plain = plainCard();
     plain.slide = { background: fill, stacking: false };
-    expect(planPptxLayers(plain, { shapes: true }).background).toEqual(fill);
-    expect(planPptxLayers(plain, { shapes: false }).background).toBeUndefined();
+    expect(planPptxLayers(plain).background).toEqual(fill);
 
     // Something a negative z-index puts beneath the slide's own paint, which hides it.
     const under = plainCard();
     under.slide = { background: fill, stacking: false };
     under.drawn.push({ within: -1, key: [-1, 9], extent: rect(0, 0, 50, 50) });
-    expect(planPptxLayers(under, { shapes: true }).background).toBeUndefined();
+    expect(planPptxLayers(under).background).toBeUndefined();
     // In a slide that is a stacking context of its own, it paints over the background.
     under.slide.stacking = true;
-    expect(planPptxLayers(under, { shapes: true }).background).toEqual(fill);
+    expect(planPptxLayers(under).background).toEqual(fill);
   });
 
   test("reads the slide's background from what the page computed, when the slide is plain", () => {

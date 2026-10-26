@@ -84,7 +84,7 @@ dekc voice [speakers | say <text> | dict add <word> <kana> [--accent N] | pin]
 dekc build [--root-dist] [--url <url>] [--public]
 dekc video [slug] [--fps N] [--root-dist]
 dekc pdf [--root-dist]
-dekc pptx [--root-dist] [--public] [--shapes]   text editable over a picture of each slide; --shapes: boxes and pictures too
+dekc pptx [--root-dist] [--public]   boxes, pictures, and text editable over a picture of the rest; script in notes
 dekc help [command] | dekc <command> --help | dekc --version
 
 Errors include hint with the next command to run.

@@ -15,10 +15,10 @@ import { loadSlideSources, renderSlideHtml } from "./still-page.ts";
 export type PptxResult = {
   outPath: string;
   /**
-   * With `shapes`, what was laid over the pictures: how many shapes, lines included, and
-   * pictures, and the slugs of the slides that kept everything in their picture.
+   * What was laid over the pictures: how many shapes, lines included, and pictures, and the
+   * slugs of the slides that kept everything in their picture.
    */
-  lifted?: PptxLifted;
+  lifted: PptxLifted;
 };
 
 export type PptxLifted = { shapes: number; pictures: number; untouched: string[] };
@@ -26,16 +26,14 @@ export type PptxLifted = { shapes: number; pictures: number; untouched: string[]
 export type PptxOptions = DistOptions & {
   /** For anyone who has the file: the notes leave out the stage directions and comments. */
   public?: boolean;
-  /** Lay boxes, pictures, and the text in them over the picture as PowerPoint's own (ADR 20). */
-  shapes?: boolean;
   runner?: PlaywrightRunner;
 };
 
 /**
- * The deck as a PowerPoint file: each slide at its last beat, as the PDF prints it, drawn as a
- * picture with its text laid over it in text boxes a recipient can edit, and with `shapes` its
- * boxes and pictures as shapes and pictures of their own; its script in the notes. A slide
- * script that cannot run stops it, as it stops the PDF.
+ * The deck as a PowerPoint file: each slide at its last beat, as the PDF prints it, its plain
+ * boxes, pictures, and text as PowerPoint's own over a picture of the rest, in the deck's theme
+ * (ADRs 20 to 22), and its script in the notes. A slide script that cannot run stops it, as it
+ * stops the PDF.
  */
 export async function pptxDeck(dir: string, options?: PptxOptions): Promise<PptxResult>;
 export async function pptxDeck(source: ResolvedDeck, options?: PptxOptions): Promise<PptxResult>;
@@ -60,7 +58,6 @@ export async function pptxDeck(
       {
         kind: "pptx",
         viewport: size,
-        shapes: options.shapes ?? false,
         pages: pages.map(({ html, slug, index }) => ({
           html,
           slug,
@@ -70,15 +67,13 @@ export async function pptxDeck(
       options.runner,
     );
     const scripts = presenterSlides(deck, options.public ? "audience" : "speaker");
-    // With --shapes, the deck's tokens are PowerPoint's theme, as most slides have them.
-    const theme = options.shapes
-      ? deckTheme(answer.slides.flatMap((slide) => (slide.theme ? [slide.theme] : [])))
-      : undefined;
+    // The deck's tokens are PowerPoint's theme, as most slides have them.
+    const theme = deckTheme(answer.slides.flatMap((slide) => (slide.theme ? [slide.theme] : [])));
     const bytes = pptxPackage({
       title: deck.deck.title,
       lang: deck.deck.lang,
       size,
-      ...(theme ? { theme } : {}),
+      theme,
       slides: answer.slides.map((slide, index) => ({
         ...(slide.picture === false
           ? {}
@@ -94,9 +89,6 @@ export async function pptxDeck(
       })),
     });
     writeInside(outPath, bytes, project.root);
-    if (!options.shapes) {
-      return { outPath };
-    }
     const lifted: PptxLifted = { shapes: 0, pictures: 0, untouched: [] };
     for (const slide of answer.slides) {
       const counts = countLifted(slide.layers);

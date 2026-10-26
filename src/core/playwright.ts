@@ -85,14 +85,13 @@ export type MotionRequest = {
 };
 
 /**
- * Each slide's still page drawn for a PPTX, at twice its size: its text measured line by line,
- * and with `shapes` its boxes and pictures, each picture drawn alone beside `screenshotPath`,
- * then the page shot without what is laid over it, to `screenshotPath`.
+ * Each slide's still page drawn for a PPTX, at twice its size: its text, boxes, and pictures
+ * measured, each picture drawn alone beside `screenshotPath`, then the page shot without what
+ * is laid over it, to `screenshotPath`.
  */
 export type PptxRequest = {
   kind: "pptx";
   viewport: Viewport;
-  shapes: boolean;
   pages: Array<{ html: string; slug: string; screenshotPath: string }>;
 };
 
@@ -105,11 +104,11 @@ export type PptxResponse = {
     slug: string;
     description: string;
     layers: PptxLayer<PptxPictureFile>[];
-    /** With `shapes`: whether anything is left in the slide's picture, false for nothing. */
+    /** Whether anything is left in the slide's picture; false for nothing. */
     picture?: boolean;
-    /** With `shapes`, the slide's background, when PowerPoint paints it. */
+    /** The slide's background, when PowerPoint paints it. */
     background?: PptxFill;
-    /** With `shapes`, what the slide says of the deck's theme. */
+    /** What the slide says of the deck's theme. */
     theme?: PptxPageTheme;
   }>;
 };

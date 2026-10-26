@@ -27,7 +27,7 @@ describe("pptxCommand", () => {
         await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => {
           const result = await pptxCommand(resolveDecks(join(root, "decks", "demo")));
           const out = join(root, "decks", "demo", "dist", "demo.pptx");
-          expect(result).toEqual({ outs: [out] });
+          expect(result.outs).toEqual([out]);
           const files = readZip(new Uint8Array(await readFile(out)));
           expect(new TextDecoder().decode(files.get("ppt/notesSlides/notesSlide1.xml"))).toContain(
             "hello",
@@ -39,13 +39,11 @@ describe("pptxCommand", () => {
     );
   });
 
-  test.serial("asks the worker for shapes only with --shapes", async () => {
+  test.serial("says which slides kept everything in their picture", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const asked: unknown[] = [];
         const runner: PlaywrightRunner = async (request) => {
-          asked.push(request.kind === "pptx" ? request.shapes : undefined);
           const pages = request.kind === "pptx" ? request.pages : [];
           for (const page of pages) {
             await writeFile(page.screenshotPath, "png");
@@ -59,19 +57,17 @@ describe("pptxCommand", () => {
           } as never;
         };
         const dir = join(root, "decks", "demo");
-        expect(await pptxDeck(dir, { runner })).not.toHaveProperty("lifted");
         // Nothing came out of the picture: the slide is named, to rewrite toward shapes.
-        expect((await pptxDeck(dir, { runner, shapes: true })).lifted).toEqual({
+        expect((await pptxDeck(dir, { runner })).lifted).toEqual({
           shapes: 0,
           pictures: 0,
           untouched: ["intro"],
         });
-        expect(asked).toEqual([false, true]);
       },
     );
   });
 
-  test("says what --shapes laid over each file's pictures, and where it laid nothing", () => {
+  test("says what it laid over each file's pictures, and where it laid nothing", () => {
     expect(formatPptx({ outs: ["a.pptx"] })).toBe("wrote a.pptx");
     expect(
       formatPptx({
@@ -84,9 +80,9 @@ describe("pptxCommand", () => {
     ).toBe(
       [
         "wrote a.pptx",
-        "  --shapes laid 3 shapes and 1 picture over the picture",
+        "  laid 3 shapes and 1 picture over the picture",
         "wrote b.pptx",
-        "  --shapes laid 0 shapes and 0 pictures over the picture; nothing on cover, close",
+        "  laid 0 shapes and 0 pictures over the picture; nothing on cover, close",
       ].join("\n"),
     );
   });

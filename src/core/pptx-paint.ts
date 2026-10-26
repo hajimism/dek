@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-// What a PPTX with `--shapes` reads of a slide's paint: each element, where the browser paints
+// What a PPTX reads of a slide's paint: each element, where the browser paints
 // it and what it draws of its own, what its pseudo-elements and list marker draw, and each
 // picture as itself; then, once the plan is made, each picture drawn alone and the lifted paint
 // taken out of the slide's picture. Each function here runs in the page, shipped by

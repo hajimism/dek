@@ -232,8 +232,8 @@ export function formatPdf(data: PdfCliResult): string {
 }
 
 /**
- * Each file written, and with `--shapes` what it laid over its pictures, naming the slides that
- * kept everything in the picture, which are the ones to rewrite toward shapes.
+ * Each file written, and what it laid over its pictures, naming the slides that kept everything
+ * in the picture, which are the ones to rewrite toward shapes.
  */
 export function formatPptx(data: PptxCliResult): string {
   return data.outs
@@ -246,7 +246,7 @@ export function formatPptx(data: PptxCliResult): string {
       const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
       return [
         `wrote ${path}`,
-        `  --shapes laid ${count(lifted.shapes, "shape")} and ${count(lifted.pictures, "picture")} over the picture${none}`,
+        `  laid ${count(lifted.shapes, "shape")} and ${count(lifted.pictures, "picture")} over the picture${none}`,
       ];
     })
     .join("\n");

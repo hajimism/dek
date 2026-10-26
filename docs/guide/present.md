@@ -140,43 +140,30 @@ The browser's own Print still prints vectors, so a PDF saved from its dialog can
 ```bash
 dekc pptx
 dekc pptx --public
-dekc pptx --shapes
 ```
 
-Writes `dist/<deck>.pptx` for someone who works in PowerPoint or Keynote: an organizer collecting slides, a co-presenter, a company template. Each `##` is one slide, at its last beat, as the PDF prints it, and its script is in the notes; `--public` leaves out the stage directions and comments, as `dekc build --public` does. Requires Playwright.
+Writes `dist/<deck>.pptx` for someone who works in PowerPoint or Keynote: an organizer collecting slides, a co-presenter, a company template, a recipient who has to keep editing the deck. Each `##` is one slide, at its last beat, as the PDF prints it, and its script is in the notes; `--public` leaves out the stage directions and comments, as `dekc build --public` does. Requires Playwright.
 
-The browser draws each slide, as for the PDF, and the file keeps that drawing in two layers:
-
-- **The text is editable.** Every line of text in the slide's HTML is a text box where the browser set it, in its size, weight, color, and font, broken where the browser broke it. A recipient fixes a word, a date, or a name in place.
-- **Everything else is a picture**, at twice the slide's size: backgrounds, cards, rules, images, SVG diagrams with their labels, decoration under `aria-hidden`, a folio or running head a pseudo-element draws, text a transform rotates, and every text's shadow. Those cannot be moved or recolored, unless `--shapes` makes them PowerPoint's own, as below.
-
-Each text box names the font Chromium drew it with; the file embeds none. A recipient without that font sees PowerPoint's substitute in the same place; since a box never wraps, a wider font runs a line a little longer rather than reflowing the slide. The same holds for OpenType features PowerPoint does not apply, such as the proportional Japanese punctuation `font-feature-settings: "palt"` sets: the line comes out a little wider, and can run under a chip that follows it on the same line. Text meant to be edited belongs in HTML, not in an SVG. The picture's alternative text is the slide's own: each image's `alt` and each named picture's `aria-label`, which `DEK034` asks for.
-
-### Boxes and pictures as PowerPoint's own
-
-```bash
-dekc pptx --shapes
-```
-
-For a recipient who has to keep editing the deck: move a card, recolor a cell, add a bullet, swap an icon. With `--shapes`, what PowerPoint can draw exactly comes out of the picture as PowerPoint's own:
+The browser draws each slide, as for the PDF, and what PowerPoint can draw exactly comes out of that drawing as PowerPoint's own:
 
 - **A box with no more than a color, a solid border, and round corners is a shape.** A card, a chip, a cell of a table drawn as a grid of boxes. A border that differs per side, such as a row's rule, is a line per side.
 - **Each `<img>`, `<canvas>`, and outermost `<svg>` is a picture of its own** when it is upright and nothing cuts it off, drawn alone on a transparent ground with its shadow and outline. An inline SVG comes as itself too, its theme colors written in, so PowerPoint can turn it into shapes; one the file would draw otherwise comes as its picture alone: an SVG with padding or a border, under a filter or a clip, or styled by CSS its attributes cannot say.
 - **What a shape holds is grouped with it**, so a card moves with its icon and its words.
 - **Text in a shape is the shape's**, in paragraphs that wrap at the shape's width, when its blocks stand one under another. A list's disc, circle, square, or decimal marker is the paragraph's bullet. The text is set from the top, where the browser set it; text a flexbox or a grid centers is centered.
+- **Any other text is a text box a line**, where the browser set it, in its size, weight, color, and font, broken where the browser broke it.
 - **The theme's tokens are PowerPoint's theme.** `--fg`, `--bg`, `--muted`, and `--accent` fill the color scheme's Dark 1, Light 1, Dark 2, and Accent 1; `--font-title` and `--font-body` are its heading and body fonts. A shape, line, or run in a token's color, and text in a font token, refers to the theme, so a new color or font scheme in the Design tab restyles them.
-- **The slide's background is PowerPoint's** when it is one color, or a linear gradient running straight across or down, in sRGB colors: the master's when it is `--bg`, the slide's own otherwise. What is left in the picture is drawn on nothing, and a slide with nothing left has no picture at all. An image, a texture, a radial or diagonal gradient, or a second layer stays in the picture.
+- **The slide's background is PowerPoint's** when it is one color, or a linear gradient running straight across or down, in sRGB colors: the master's when it is `--bg`, the slide's own otherwise.
 
-A box or a picture stays in the picture whenever laying it over would cover something that stays drawn, or lay it over or under another in an order the browser may not have painted them in: a gradient, a shadow, a filter, a pseudo-element's drawing, a list marker PowerPoint has no bullet for, rotated text, a picture that stays, what a negative `z-index` puts beneath, a custom element. A card with a gradient highlight in it, or a bullet drawn with `::before`, stays a picture with its text over it, as without the flag. Write highlights as plain colors and bullets as list markers for such a card to become a shape.
+**Everything else is a picture** under them, at twice the slide's size, on nothing when the background is PowerPoint's; a slide with nothing left in it has no picture at all. That is what PowerPoint cannot draw as the browser did: a gradient, a shadow, a filter, a background image or texture, a pseudo-element's drawing such as a folio or a running head, a list marker PowerPoint has no bullet for, decoration under `aria-hidden` that is not a picture, text a transform rotates, every text's shadow, what a negative `z-index` puts beneath, a custom element. A box stays in the picture too whenever laying it over would cover something that stays drawn, or lay it over or under another in an order the browser may not have painted them in: a card with a gradient highlight in it, or a bullet drawn with `::before`, stays a picture with its text over it. Write highlights as plain colors and bullets as list markers for such a card to become a shape.
 
-The output says what each file got, and names each slide where nothing came out of the picture, the ones to rewrite toward plain boxes if they must be edited. `--json` still returns `outs` alone.
+The output says what each file got, and names each slide where nothing came out of the picture, the ones to rewrite toward plain boxes if they must be edited. `--json` returns `outs` alone.
 
 ```text
 wrote dist/talk.pptx
-  --shapes laid 19 shapes and 4 pictures over the picture; nothing on cover, close
+  laid 19 shapes and 4 pictures over the picture; nothing on cover, close
 ```
 
-Text in a shape is set by PowerPoint, so a substitute font, or `palt`, can wrap a line where the browser did not. Without `--shapes`, nothing changes.
+Each text names the font Chromium drew it with, or the theme's font for a font token; the file embeds none. A recipient without that font sees PowerPoint's substitute in the same place. A text box never wraps, so a wider font runs a line a little longer rather than reflowing the slide; text in a shape is set by PowerPoint, so a wider font can wrap a line where the browser did not. The same holds for OpenType features PowerPoint does not apply, such as the proportional Japanese punctuation `font-feature-settings: "palt"` sets. Text meant to be edited belongs in HTML, not in an SVG. The alternative text of each picture is its own `alt`, `aria-label`, or `<title>`, which `DEK034` asks for, and the slide's picture carries those of what stays in it.
 
 ## Next
 

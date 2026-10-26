@@ -825,27 +825,23 @@ export const COMMANDS = {
   pptx: result({
     scope: "decks",
     args: [],
-    flags: ["root-dist", "public", "shapes"],
-    usage: ["dekc pptx [deck] [--root-dist] [--public] [--shapes]"],
+    flags: ["root-dist", "public"],
+    usage: ["dekc pptx [deck] [--root-dist] [--public]"],
     summary:
-      "Write dist/<deck>.pptx, one slide per slide at its last beat: a picture of it with its text\nin text boxes to edit, and its script in the notes. With --shapes, plain boxes and pictures\nare PowerPoint's own too. Needs Playwright.",
+      "Write dist/<deck>.pptx, one slide per slide at its last beat: its plain boxes, pictures, and\ntext as PowerPoint's own over a picture of the rest, in the deck's theme, and its script in\nthe notes. Needs Playwright.",
     group: "Output",
     overview: [
       [
-        "dekc pptx [--root-dist] [--public] [--shapes]",
-        "write a PowerPoint file with editable text, and shapes with --shapes",
+        "dekc pptx [--root-dist] [--public]",
+        "write a PowerPoint file with editable shapes and text",
       ],
     ],
     agent: [
-      "dekc pptx [--root-dist] [--public] [--shapes]   text editable over a picture of each slide; --shapes: boxes and pictures too",
+      "dekc pptx [--root-dist] [--public]   boxes, pictures, and text editable over a picture of the rest; script in notes",
     ],
     run: async ({ target, flags }) => {
       const { pptxCommand } = await import("./pptx.ts");
-      return pptxCommand(target, {
-        rootDist: flags["root-dist"],
-        public: flags.public,
-        shapes: flags.shapes,
-      });
+      return pptxCommand(target, { rootDist: flags["root-dist"], public: flags.public });
     },
     output: { text: formatPptx, json: ({ outs }) => ({ outs }) },
   }),

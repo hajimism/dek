@@ -14,7 +14,11 @@ import {
 import { runVisualRequest } from "../../src/core/playwright-visual.ts";
 import { pptxDeck } from "../../src/core/pptx.ts";
 import type { PptxLayer, PptxTextBox } from "../../src/core/pptx-package.ts";
+import { measurePptxTextsInPage } from "../../src/core/pptx-text.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
+import { logicalSize } from "../../src/core/size.ts";
+import { lastStop } from "../../src/core/step.ts";
+import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { readZip } from "../helpers/zip.ts";
 
@@ -255,6 +259,28 @@ function allLayers(layers: PptxLayer<PptxPictureFile>[]): PptxLayer<PptxPictureF
   );
 }
 
+/**
+ * The characters a slide's page measures, line by line, as the text a file must carry: drawn
+ * on a page of its own, apart from what the file makes of it, sorted.
+ */
+async function measuredInk(html: string, size: { width: number; height: number }): Promise<string> {
+  if (!browser) {
+    throw new Error("no browser");
+  }
+  const page = await browser.newPage();
+  try {
+    await page.setViewportSize(size);
+    await page.setContent(html, { waitUntil: "load" });
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    const { boxes } = await page.evaluate(measurePptxTextsInPage);
+    return [...ink(boxes.flatMap((box) => box.runs.map((run) => run.text)).join(""))]
+      .sort()
+      .join("");
+  } finally {
+    await page.close();
+  }
+}
+
 /** Text without its white space. */
 function ink(text: string): string {
   return text.replace(/\s+/g, "");
@@ -320,7 +346,13 @@ describe("pptxDeck in a browser", () => {
             expect(box.x + box.width).toBeLessThanOrEqual(1280);
             expect(box.y + box.height).toBeLessThanOrEqual(720);
           }
-          expect(slide?.description).toBe("a sketch / a photo of the venue");
+          // The photo is a picture of its own, with its alternative text; the slide's says the rest.
+          expect(slide?.description).toBe("a sketch");
+          expect(
+            slide?.layers.find(
+              (layer) => layer.kind === "picture" && layer.description === "a photo of the venue",
+            ),
+          ).toBeDefined();
 
           const files = readZip(readFileSync(outPath));
           const png = files.get("ppt/media/image1.png") ?? new Uint8Array();
@@ -373,10 +405,7 @@ describe("pptxDeck in a browser", () => {
         },
         async (root) => {
           seen.length = 0;
-          const { outPath } = await pptxDeck(join(root, "decks", "shaped"), {
-            runner,
-            shapes: true,
-          });
+          const { outPath } = await pptxDeck(join(root, "decks", "shaped"), { runner });
           const [slide] = seen;
           const layers = slide?.layers ?? [];
           const shapes = layers.filter((layer) => layer.kind === "shape");
@@ -496,10 +525,7 @@ describe("pptxDeck in a browser", () => {
         },
         async (root) => {
           seen.length = 0;
-          const { outPath } = await pptxDeck(join(root, "decks", "edges"), {
-            runner,
-            shapes: true,
-          });
+          const { outPath } = await pptxDeck(join(root, "decks", "edges"), { runner });
           const [slide] = seen;
           const layers = allLayers(slide?.layers ?? []);
           const shapes = layers.filter((layer) => layer.kind === "shape");
@@ -581,10 +607,7 @@ describe("pptxDeck in a browser", () => {
         },
         async (root) => {
           seen.length = 0;
-          const { outPath } = await pptxDeck(join(root, "decks", "themed"), {
-            runner,
-            shapes: true,
-          });
+          const { outPath } = await pptxDeck(join(root, "decks", "themed"), { runner });
           const files = readZip(readFileSync(outPath));
           const parser = new new Window().DOMParser();
           const read = (name: string) =>
@@ -660,19 +683,21 @@ describe("pptxDeck in a browser", () => {
     },
   );
 
-  // What CI keeps checking without PowerPoint: on every sample slide, the boxes carry the
-  // slide's HTML text, each character once, and stay inside the frame.
+  // What CI keeps checking without PowerPoint: on every sample slide, the file carries the text
+  // the page measures, line by line, each character once, in shapes' paragraphs or in text boxes
+  // inside the frame.
   browserTest(
-    "carries every sample slide's text once, inside the frame",
+    "carries every sample slide's text once, its text boxes inside the frame",
     async () => {
       const samples = join(import.meta.dir, "..", "..", "sample", "decks");
       const parser = new new Window().DOMParser();
       for (const name of readdirSync(samples)) {
         seen.length = 0;
-        const { deck } = resolveDeck(join(samples, name));
+        const resolved = resolveDeck(join(samples, name));
         const { outPath } = await pptxDeck(join(samples, name), { runner });
         const files = readZip(readFileSync(outPath));
-        expect(seen).toHaveLength(deck.deck.sections.length);
+        const sources = loadSlideSources(resolved.deck, { strict: true });
+        expect(seen).toHaveLength(resolved.deck.deck.sections.length);
         for (const [index, slide] of seen.entries()) {
           for (const box of slide.boxes) {
             expect({
@@ -684,47 +709,22 @@ describe("pptxDeck in a browser", () => {
                 box.y + box.height <= 721,
             }).toEqual({ slide: slide.slug, inside: true });
           }
+          const section = resolved.deck.deck.sections[index];
+          const measured = await measuredInk(
+            renderSlideHtml(sources, slide.slug, lastStop(section?.beats ?? [])),
+            logicalSize(resolved.deck.deck.ratio),
+          );
           const xml = new TextDecoder().decode(files.get(`ppt/slides/slide${index + 1}.xml`));
           const doc = parser.parseFromString(xml, "application/xml");
           expect(doc.querySelector("parsererror")).toBeNull();
           const written = [...doc.getElementsByTagName("a:t")].map((t) => t.textContent).join("");
-          const measured = slide.boxes.flatMap((box) => box.runs.map((run) => run.text)).join("");
-          expect(written).toBe(measured);
+          expect({ slide: slide.slug, text: [...ink(written)].sort().join("") }).toEqual({
+            slide: slide.slug,
+            text: measured,
+          });
         }
       }
       // 42 slides drawn at twice their size; a CI runner is slower than a laptop.
-    },
-    120_000,
-  );
-
-  // With --shapes, the same text in other places: in shapes' paragraphs as well as in line boxes.
-  browserTest(
-    "carries every sample slide's text with --shapes as without it, each character once",
-    async () => {
-      const samples = join(import.meta.dir, "..", "..", "sample", "decks");
-      const parser = new new Window().DOMParser();
-      const characters = (outPath: string) => {
-        const files = readZip(readFileSync(outPath));
-        return [...files.keys()]
-          .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
-          .map((name) => {
-            const doc = parser.parseFromString(
-              new TextDecoder().decode(files.get(name)),
-              "application/xml",
-            );
-            expect(doc.querySelector("parsererror")).toBeNull();
-            const text = [...doc.getElementsByTagName("a:t")].map((t) => t.textContent).join("");
-            return { name, characters: [...ink(text)].sort().join("") };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
-      };
-      for (const name of readdirSync(samples)) {
-        const plain = characters((await pptxDeck(join(samples, name), { runner })).outPath);
-        const shaped = characters(
-          (await pptxDeck(join(samples, name), { runner, shapes: true })).outPath,
-        );
-        expect(shaped).toEqual(plain);
-      }
     },
     240_000,
   );

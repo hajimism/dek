@@ -151,8 +151,8 @@ async function printPdf(context: BrowserContext, request: PdfRequest): Promise<D
 }
 
 /**
- * Each slide's text measured, and with `shapes` its paint; what is laid over the picture planned,
- * each picture drawn alone, and the slide shot without what was laid over it, page by page.
+ * Each slide's text and paint measured; what is laid over the picture planned, each picture
+ * drawn alone, and the slide shot without what was laid over it, page by page.
  */
 async function shootPptx(context: BrowserContext, request: PptxRequest): Promise<PptxResponse> {
   const slides = await visitInPages(
@@ -161,19 +161,17 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
     async (page, pageReq) => {
       await page.setContent(pageReq.html, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
-      // Without --shapes the page is read as ADR 8 reads it: nothing is numbered or measured
-      // for shapes, so the file is what it was before them.
       const paint = {
-        ...(request.shapes
-          ? await page.evaluate(measurePptxPaintInPage)
-          : { origin: { left: 0, top: 0 }, nodes: [], pseudos: [] }),
+        ...(await page.evaluate(measurePptxPaintInPage)),
         described: await page.evaluate(describePptxPicturesInPage),
       };
-      const texts = await page.evaluate(measurePptxTextsInPage, { families: request.shapes });
+      const texts = await page.evaluate(measurePptxTextsInPage);
       const fonts = await platformFonts(page);
-      const placed = request.shapes
-        ? await pseudoElementBoxes(page, PPTX_PSEUDO_ATTR, "border", ["before", "after", "marker"])
-        : new Map();
+      const placed = await pseudoElementBoxes(page, PPTX_PSEUDO_ATTR, "border", [
+        "before",
+        "after",
+        "marker",
+      ]);
       for (const run of [
         ...texts.boxes.flatMap((box) => box.runs),
         ...texts.blocks.flatMap((block) => block.runs),
@@ -183,7 +181,7 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
           run.font = font;
         }
       }
-      const plan = planPptxLayers(pptxPageFacts(paint, texts, placed), { shapes: request.shapes });
+      const plan = planPptxLayers(pptxPageFacts(paint, texts, placed));
 
       const files = new Map<number, PptxPictureFile>();
       for (const [index, node] of plan.lifted.pictures.entries()) {
@@ -218,10 +216,6 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
         ...picture,
         ...(files.get(node) ?? { png: "" }),
       }));
-      if (!request.shapes) {
-        await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
-        return { slug: pageReq.slug, description: plan.description, layers };
-      }
       // With the background PowerPoint's, the slide is shot on nothing, and a picture with
       // nothing left in it is no picture.
       const { background } = plan;

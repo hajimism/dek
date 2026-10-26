@@ -80,7 +80,7 @@ Use Slidev if you need any of the following.
 - Live coding or an embedded editor
 - A gallery of npm themes
 - An animation DSL beyond CSS and a seekable `draw(t)`
-- All of CSS as shapes you can edit in PowerPoint, Keynote export, or a WYSIWYG editor. `dekc pptx` hands a talk over with its text editable and its script in the notes, and `--shapes` makes plain boxes, images, and SVGs PowerPoint's own, but a gradient, a shadow, or what a pseudo-element draws stays a picture
+- All of CSS as shapes you can edit in PowerPoint, Keynote export, or a WYSIWYG editor. `dekc pptx` hands a talk over with its plain boxes, images, SVGs, and text PowerPoint's own and its script in the notes, but a gradient, a shadow, or what a pseudo-element draws stays a picture
 
 dek stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
 
