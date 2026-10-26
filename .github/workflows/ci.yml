@@ -31,9 +31,18 @@ jobs:
         with:
           bun-version: ${{ matrix.bun }}
       - run: bun install --frozen-lockfile
-      # The visual checks, shots, and video capture are tested in a real Chromium.
+      # The visual checks, shots, and video capture are tested in a real Chromium. The runner
+      # already has the libraries it needs, so it skips --with-deps: that goes through apt, and
+      # an Ubuntu mirror slowing to a crawl has held this step up for over ten minutes.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(bun -p 'require("playwright/package.json").version')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install Chromium
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright install chromium
       - name: Install rumdl
         env:
           RUMDL_VERSION: 0.2.73
