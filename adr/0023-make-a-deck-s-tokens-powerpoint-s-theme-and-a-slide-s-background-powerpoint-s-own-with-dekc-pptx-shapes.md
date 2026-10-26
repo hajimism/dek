@@ -1,4 +1,4 @@
-# 21. Make a deck's tokens PowerPoint's theme and a slide's background PowerPoint's own with dekc pptx --shapes
+# 23. Make a deck's tokens PowerPoint's theme and a slide's background PowerPoint's own with dekc pptx --shapes
 
 Date: 2026-10-27
 
@@ -6,13 +6,13 @@ Date: 2026-10-27
 
 Accepted
 
-Amends [20. Lay boxes, pictures, and the text in them over a PPTX's picture as PowerPoint's own with dekc pptx --shapes](0020-lay-boxes-pictures-and-the-text-in-them-over-a-pptx-s-picture-as-powerpoint-s-own-with-dekc-pptx-shapes.md)
+Amends [22. Lay boxes, pictures, and the text in them over a PPTX's picture as PowerPoint's own with dekc pptx --shapes](0022-lay-boxes-pictures-and-the-text-in-them-over-a-pptx-s-picture-as-powerpoint-s-own-with-dekc-pptx-shapes.md)
 
-Amended by [22. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0022-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
+Amended by [24. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0024-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
 
 ## Context
 
-ADR 20 lays a slide's boxes, pictures, and text over its picture as PowerPoint's own. What it leaves is the picture under them, and the picture holds the slide's background, so a recipient who wants another background, or the deck in other colors, has a slide-sized image to replace, and every shape's color to change one by one. The file's theme is PowerPoint's default, which names Calibri and Office's blues, none of which the deck uses.
+ADR 22 lays a slide's boxes, pictures, and text over its picture as PowerPoint's own. What it leaves is the picture under them, and the picture holds the slide's background, so a recipient who wants another background, or the deck in other colors, has a slide-sized image to replace, and every shape's color to change one by one. The file's theme is PowerPoint's default, which names Calibri and Office's blues, none of which the deck uses.
 
 A dek theme is already a theme. Its colors and fonts are tokens on `.slide`: `--fg`, `--bg`, `--muted`, `--accent`, `--font-title`, `--font-body`. A slide's stylesheet may write a raw color only when it sets a token (`DEK014`), so every color a slide paints comes from a token. PowerPoint's theme has slots for the same things, a color scheme of twelve and a font scheme of two, and a shape or a run that refers to a slot changes with it.
 

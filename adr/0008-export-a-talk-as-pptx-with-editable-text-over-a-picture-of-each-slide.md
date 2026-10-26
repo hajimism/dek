@@ -6,9 +6,9 @@ Date: 2026-10-06
 
 Accepted
 
-Amended by [20. Lay boxes, pictures, and the text in them over a PPTX's picture as PowerPoint's own with dekc pptx --shapes](0020-lay-boxes-pictures-and-the-text-in-them-over-a-pptx-s-picture-as-powerpoint-s-own-with-dekc-pptx-shapes.md)
+Amended by [22. Lay boxes, pictures, and the text in them over a PPTX's picture as PowerPoint's own with dekc pptx --shapes](0022-lay-boxes-pictures-and-the-text-in-them-over-a-pptx-s-picture-as-powerpoint-s-own-with-dekc-pptx-shapes.md)
 
-Amended by [22. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0022-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
+Amended by [24. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0024-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
 
 ## Context
 
