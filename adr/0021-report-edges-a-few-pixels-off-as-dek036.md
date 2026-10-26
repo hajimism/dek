@@ -1,4 +1,4 @@
-# 22. Report edges a few pixels off as DEK036
+# 21. Report edges a few pixels off as DEK036
 
 Date: 2026-10-27
 

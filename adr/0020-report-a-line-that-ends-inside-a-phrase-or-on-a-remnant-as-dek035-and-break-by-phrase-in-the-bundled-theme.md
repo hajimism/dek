@@ -1,4 +1,4 @@
-# 21. Report a line that ends inside a phrase or on a remnant as DEK035, and break by phrase in the bundled theme
+# 20. Report a line that ends inside a phrase or on a remnant as DEK035, and break by phrase in the bundled theme
 
 Date: 2026-10-27
 
