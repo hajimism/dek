@@ -2,6 +2,7 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
 import { measureFill } from "./fill.ts";
 import { finishBeat } from "./finish-beat.ts";
+import { findLineBreaks, measureTextFlowsInPage } from "./line-break.ts";
 import {
   crossesEdge,
   findClippedText,
@@ -240,6 +241,7 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
     drawErrors: found.flatMap((page) => page.drawErrors ?? []),
     collisions: found.flatMap((page) => page.collisions ?? []),
     fills: found.flatMap((page) => page.fills ?? []),
+    lineBreaks: found.flatMap((page) => page.lineBreaks ?? []),
   };
 }
 
@@ -343,7 +345,13 @@ async function visitPage(
   pageReq: VisualPage,
   { actions, viewport }: Pick<PagesRequest, "actions" | "viewport">,
 ): Promise<PagesResponse> {
-  const response: PagesResponse = { overflows: [], contrasts: [], collisions: [], fills: [] };
+  const response: PagesResponse = {
+    overflows: [],
+    contrasts: [],
+    collisions: [],
+    fills: [],
+    lineBreaks: [],
+  };
   const failing: Failing[] = [];
   const crossing: Crossing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
@@ -361,6 +369,22 @@ async function visitPage(
     };
     if (actions.includes("fill") && frame) {
       response.fills?.push({ slug, step, ...measureFill(frame, measured.elements) });
+    }
+    if (actions.includes("breaks")) {
+      const { wordBreak, flows } = await page.evaluate(measureTextFlowsInPage);
+      const textWraps = new Map(flows.map((flow) => [flow.element, flow.textWrap]));
+      for (const { element, ...found } of findLineBreaks(flows)) {
+        const el = measured.elements[element];
+        response.lineBreaks?.push({
+          slug,
+          step,
+          box: el?.box ?? "",
+          ...(el?.text ? { text: el.text } : {}),
+          ...found,
+          wordBreak,
+          textWrap: textWraps.get(element) ?? "wrap",
+        });
+      }
     }
     if (actions.includes("overflow") && frame) {
       for (const { element, ...overflow } of [

@@ -23,6 +23,7 @@ const MEASURERS = [
   "slide-measure.ts",
   "text-contrast.ts",
   "fill.ts",
+  "line-break.ts",
   "overflow.ts",
   "pseudo-text.ts",
   "finish-beat.ts",

@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
 import { DekError } from "./error.ts";
 import type { Fill } from "./fill.ts";
+import type { LineBreakKind } from "./line-break.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
 import type { PptxTextBox } from "./pptx-package.ts";
@@ -41,7 +42,7 @@ export type MotionSpec = {
 };
 
 /** What to measure on each page; a screenshot is asked for by the page's `screenshotPath`. */
-export type PageAction = "overflow" | "contrast" | "fill";
+export type PageAction = "overflow" | "contrast" | "fill" | "breaks";
 
 type Viewport = { width: number; height: number };
 
@@ -144,6 +145,20 @@ type CollisionFinding = Collision & { slug: string; step: string };
 /** How much of the frame one page fills, and where. */
 export type FillFinding = Fill & { slug: string; step: string };
 
+/**
+ * A line break that reads wrong on one page, with what decides where the fix goes: the slide's own
+ * `word-break` and the text's `text-wrap`, as the page computes them.
+ */
+type LineBreakFinding = {
+  slug: string;
+  step: string;
+  box: string;
+  text?: string;
+  lines: string[];
+  wordBreak: string;
+  textWrap: string;
+} & LineBreakKind;
+
 export type PagesResponse = {
   overflows: OverflowFinding[];
   contrasts: ContrastFinding[];
@@ -153,6 +168,8 @@ export type PagesResponse = {
   collisions?: CollisionFinding[];
   /** One for each page, when `fill` was asked for; absent from a runner that has none. */
   fills?: FillFinding[];
+  /** Absent from a runner that has none to report. */
+  lineBreaks?: LineBreakFinding[];
 };
 
 export type MotionResponse = {
@@ -318,13 +335,21 @@ function spawnRunner(
 const RESPONSE_PARSERS: {
   [K in keyof VisualResponses]: (fields: Record<string, unknown>) => VisualResponses[K] | null;
 } = {
-  pages: ({ overflows, contrasts, drawErrors = [], collisions = [], fills = [] }) =>
+  pages: ({
+    overflows,
+    contrasts,
+    drawErrors = [],
+    collisions = [],
+    fills = [],
+    lineBreaks = [],
+  }) =>
     isArrayOf(overflows, isOverflowFinding) &&
     isArrayOf(contrasts, isContrastFinding) &&
     isArrayOf(drawErrors, isDrawErrorFinding) &&
     isArrayOf(collisions, isCollisionFinding) &&
-    isArrayOf(fills, isFillFinding)
-      ? { overflows, contrasts, drawErrors, collisions, fills }
+    isArrayOf(fills, isFillFinding) &&
+    isArrayOf(lineBreaks, isLineBreakFinding)
+      ? { overflows, contrasts, drawErrors, collisions, fills, lineBreaks }
       : null,
   pdf: () => ({}),
   morph: () => ({}),
@@ -398,6 +423,19 @@ function isFillFinding(value: unknown): value is FillFinding {
     (box === undefined || isBox(box)) &&
     isArrayOf(rows, isNumber) &&
     isArrayOf(columns, isNumber)
+  );
+}
+
+function isLineBreakFinding(value: unknown): value is LineBreakFinding {
+  if (!isFinding(value)) {
+    return false;
+  }
+  const { kind, lines, phrased, tail, wordBreak, textWrap } = value;
+  return (
+    isArrayOf(lines, isString) &&
+    isString(wordBreak) &&
+    isString(textWrap) &&
+    ((kind === "split" && isArrayOf(phrased, isString)) || (kind === "short" && isString(tail)))
   );
 }
 

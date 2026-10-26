@@ -53,6 +53,7 @@ describe("defaultPlaywrightRunner", () => {
         drawErrors: [],
         collisions: [],
         fills: [],
+        lineBreaks: [],
       });
     });
   });
@@ -175,6 +176,7 @@ describe("parseVisualResponse", () => {
       drawErrors: [],
       collisions: [],
       fills: [],
+      lineBreaks: [],
     });
     const thrown = {
       slug: "intro",
@@ -189,6 +191,7 @@ describe("parseVisualResponse", () => {
       drawErrors: [thrown],
       collisions: [],
       fills: [],
+      lineBreaks: [],
     });
     expect(parse({ motion, sheets: ["/s.png"] }, "motion")).toEqual({
       motion,
@@ -202,9 +205,39 @@ describe("parseVisualResponse", () => {
   test("keeps only what the kind it asked for answers with", () => {
     expect(
       parse({ overflows: [], contrasts: [], screenshotPath: "/a.png", sheets: [] }, "pages"),
-    ).toEqual({ overflows: [], contrasts: [], drawErrors: [], collisions: [], fills: [] });
+    ).toEqual({
+      overflows: [],
+      contrasts: [],
+      drawErrors: [],
+      collisions: [],
+      fills: [],
+      lineBreaks: [],
+    });
     expect(parse({ motion, sheets: [], overflows: [] }, "motion")).toEqual({ motion, sheets: [] });
     expect(parse({ pdfPath: "/a.pdf" }, "pdf")).toEqual({});
+  });
+
+  test("reads each line break with the fields its kind carries", () => {
+    const split = {
+      slug: "intro",
+      step: "1",
+      box: "h2.slide-title",
+      text: "AIはここが苦手です",
+      kind: "split",
+      lines: ["AIはここが苦", "手です"],
+      phrased: ["AIはここが", "苦手です"],
+      wordBreak: "normal",
+      textWrap: "wrap",
+    };
+    const { phrased: _phrased, ...short } = { ...split, kind: "short", tail: "す" };
+    const pages = (lineBreaks: object[]) =>
+      parse({ overflows: [], contrasts: [], lineBreaks }, "pages");
+    expect(pages([split, short])).toMatchObject({ lineBreaks: [split, short] });
+    expect(pages([{ ...split, phrased: undefined }])).toBeNull();
+    expect(pages([{ ...short, tail: 2 }])).toBeNull();
+    expect(pages([{ ...split, kind: "wrapped" }])).toBeNull();
+    expect(pages([{ ...split, lines: "AIはここが苦手です" }])).toBeNull();
+    expect(pages([{ ...split, textWrap: undefined }])).toBeNull();
   });
 
   test("answers null to anything short of what the kind promises", () => {

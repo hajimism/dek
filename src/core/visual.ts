@@ -83,7 +83,7 @@ async function visualDeck(
     return { diagnostics: [], fills: [] };
   }
 
-  const actions: PageAction[] = ["overflow", "contrast", "fill"];
+  const actions: PageAction[] = ["overflow", "contrast", "fill", "breaks"];
   const viewport = logicalSize(deck.deck.ratio);
   const cache = visualCache(deck.dir, { viewport, actions });
   const keyed = pages.map((page) => {
@@ -137,6 +137,7 @@ async function visualDeck(
         contrasts: all.flatMap((page) => page.contrasts),
         drawErrors: all.flatMap((page) => page.drawErrors),
         collisions: all.flatMap((page) => page.collisions ?? []),
+        lineBreaks: all.flatMap((page) => page.lineBreaks ?? []),
       },
       deck.dir,
     ),
@@ -147,13 +148,19 @@ async function visualDeck(
   };
 }
 
-const NOTHING_FOUND: PageFindings = {
-  overflows: [],
-  contrasts: [],
-  drawErrors: [],
-  collisions: [],
-  fills: [],
-};
+/** A page's findings before any is found, each list its own to push to. */
+function noFindings(): PageFindings {
+  return {
+    overflows: [],
+    contrasts: [],
+    drawErrors: [],
+    collisions: [],
+    fills: [],
+    lineBreaks: [],
+  };
+}
+
+const NOTHING_FOUND: PageFindings = noFindings();
 
 /** A page's findings name its slide and step, which no two pages of one run share. */
 function pageId(page: { slug: string; step: string }): string {
@@ -165,13 +172,7 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   const pages = new Map<string, PageFindings>();
   const of = (finding: { slug: string; step: string }): PageFindings => {
     const id = pageId(finding);
-    const found = pages.get(id) ?? {
-      overflows: [],
-      contrasts: [],
-      drawErrors: [],
-      collisions: [],
-      fills: [],
-    };
+    const found = pages.get(id) ?? noFindings();
     pages.set(id, found);
     return found;
   };
@@ -189,6 +190,9 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   }
   for (const finding of response.fills ?? []) {
     of(finding).fills.push(finding);
+  }
+  for (const finding of response.lineBreaks ?? []) {
+    of(finding).lineBreaks.push(finding);
   }
   return pages;
 }
@@ -352,7 +356,73 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
     ...groupBySteps(response.collisions ?? [], collisionKey).map((group) =>
       collisionDiagnostic(group, paths),
     ),
+    ...groupBySteps(response.lineBreaks ?? [], lineBreakKey).map((group) =>
+      lineBreakDiagnostic(group, paths),
+    ),
   ];
+}
+
+type LineBreakSample = NonNullable<PagesResponse["lineBreaks"]>[number];
+
+function lineBreakKey(b: LineBreakSample): string {
+  return [b.slug, b.box, b.text ?? "", b.kind, ...b.lines].join("\0");
+}
+
+/** Where a line ends: the end of one line and the start of the next, as far as either reads. */
+function breakAt(lines: string[], phrased: string[]): string {
+  const differs = lines.findIndex((line, at) => line !== phrased[at]);
+  const at = Math.max(0, Math.min(differs, lines.length - 2));
+  const end = [...(lines[at] ?? "")];
+  const start = [...(lines[at + 1] ?? "")];
+  const half = SNIPPET_CHARS / 2;
+  const before = end.length > half ? `…${end.slice(-half).join("")}` : end.join("");
+  const after = start.length > half ? `${start.slice(0, half).join("")}…` : start.join("");
+  return `${before} / ${after}`;
+}
+
+/**
+ * A line break the audience trips over. One inside a phrase is fixed where Japanese is told to
+ * break by phrase: on `.slide` in theme.css, for every slide, unless a rule takes it away from
+ * this text. A remnant on a last line is the text's own to fix, or the theme's text-wrap.
+ */
+function lineBreakDiagnostic(
+  { first, steps }: StepGroup<LineBreakSample>,
+  paths: DeckPaths,
+): Diagnostic {
+  const target = describeTarget(first.box, first.text);
+  const css = `slides/${first.slug}.css`;
+  const yourself = "break the line yourself with <br>";
+  const common = {
+    slug: first.slug,
+    data: {
+      kind: first.kind,
+      box: first.box,
+      ...(first.text ? { text: first.text } : {}),
+      lines: first.lines,
+      ...(first.kind === "split" ? { phrased: first.phrased } : { tail: first.tail }),
+      steps,
+    },
+  };
+  if (first.kind === "split") {
+    const theme = first.wordBreak !== "auto-phrase";
+    return diag("DEK035", {
+      message: `${target}breaks a line inside a phrase, at "${breakAt(first.lines, first.phrased)}", ${atSteps(steps)}`,
+      path: theme ? paths.theme : paths.slide(first.slug, ".html"),
+      hint: theme
+        ? `add word-break: auto-phrase to .slide in theme.css, so Japanese breaks between phrases on every slide; or ${yourself} where its sense breaks`
+        : `a rule gives it word-break: normal where .slide breaks by phrase: remove it from ${css} or theme.css, or ${yourself} where its sense breaks`,
+      ...common,
+    });
+  }
+  const evened = first.textWrap === "pretty" || first.textWrap === "balance";
+  return diag("DEK035", {
+    message: `${target}leaves "${first.tail}" alone on its last line ${atSteps(steps)}`,
+    path: paths.slide(first.slug, ".html"),
+    hint: evened
+      ? `reword it so its last line holds more, or ${yourself} earlier`
+      : `even out its lines with text-wrap: pretty, or balance for a heading, in ${css} or for every slide in theme.css; or reword it, or ${yourself}`,
+    ...common,
+  });
 }
 
 type CollisionSample = NonNullable<PagesResponse["collisions"]>[number];

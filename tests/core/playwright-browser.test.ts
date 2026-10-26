@@ -408,6 +408,7 @@ describe("playwright worker files", () => {
           drawErrors: [],
           collisions: [],
           fills: [],
+          lineBreaks: [],
         });
         expect((await pixelAt(screenshotPath, 10, 10)).slice(0, 5)).toEqual([320, 180, 255, 0, 0]);
       } finally {
@@ -1161,6 +1162,7 @@ describe("contact sheets in a real Chromium", () => {
         drawErrors: [],
         collisions: [],
         fills: [],
+        lineBreaks: [],
       });
       expect(await Bun.file(spec.path).exists()).toBe(true);
       const { size, boxes } = sheetLayout(spec);

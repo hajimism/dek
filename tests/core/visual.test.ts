@@ -219,6 +219,92 @@ describe("lintVisualDeck", () => {
     );
   });
 
+  test("emits DEK035 for a line broken inside a phrase, and a paragraph left with a remnant", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const split = {
+          slug: "intro",
+          box: "h2.slide-title",
+          text: "キャッシュが冷えるとビルドが落ちる",
+          kind: "split" as const,
+          lines: ["キャッシュが冷え", "るとビルドが落ちる"],
+          phrased: ["キャッシュが", "冷えると", "ビルドが落ちる"],
+          wordBreak: "normal",
+          textWrap: "balance",
+        };
+        const short = {
+          slug: "intro",
+          step: "1",
+          box: "p.note",
+          text: "説明はこれで終わります。",
+          kind: "short" as const,
+          lines: ["説明はこれで終わりま", "す。"],
+          tail: "す。",
+          wordBreak: "auto-phrase",
+        };
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [],
+            lineBreaks: [
+              { ...split, step: "1" },
+              { ...split, step: "2" },
+              { ...split, box: "p.lede", wordBreak: "auto-phrase", step: "1" },
+              { ...short, textWrap: "wrap" },
+              { ...short, box: "p.lede", textWrap: "pretty" },
+            ],
+          }),
+        });
+        const found = diagnostics?.filter((d) => d.id === "DEK035");
+        expect(found?.map(({ severity, path }) => [severity, path?.split("/demo/")[1]])).toEqual([
+          ["warning", "theme.css"],
+          ["warning", "slides/intro.html"],
+          ["warning", "slides/intro.html"],
+          ["warning", "slides/intro.html"],
+        ]);
+        expect(found?.map(({ message, hint }) => ({ message, hint }))).toEqual([
+          {
+            message:
+              'h2.slide-title "キャッシュが冷えるとビルドが落ちる" breaks a line inside a phrase, at "キャッシュが冷え / るとビルドが落ちる", at steps 1, 2',
+            hint: "add word-break: auto-phrase to .slide in theme.css, so Japanese breaks between phrases on every slide; or break the line yourself with <br> where its sense breaks",
+          },
+          {
+            message:
+              'p.lede "キャッシュが冷えるとビルドが落ちる" breaks a line inside a phrase, at "キャッシュが冷え / るとビルドが落ちる", at step 1',
+            hint: "a rule gives it word-break: normal where .slide breaks by phrase: remove it from slides/intro.css or theme.css, or break the line yourself with <br> where its sense breaks",
+          },
+          {
+            message:
+              'p.note "説明はこれで終わります。" leaves "す。" alone on its last line at step 1',
+            hint: "even out its lines with text-wrap: pretty, or balance for a heading, in slides/intro.css or for every slide in theme.css; or reword it, or break the line yourself with <br>",
+          },
+          {
+            message:
+              'p.lede "説明はこれで終わります。" leaves "す。" alone on its last line at step 1',
+            hint: "reword it so its last line holds more, or break the line yourself with <br> earlier",
+          },
+        ]);
+        expect(found?.[0]?.data).toEqual({
+          kind: "split",
+          box: "h2.slide-title",
+          text: "キャッシュが冷えるとビルドが落ちる",
+          lines: ["キャッシュが冷え", "るとビルドが落ちる"],
+          phrased: ["キャッシュが", "冷えると", "ビルドが落ちる"],
+          steps: ["1", "2"],
+        });
+        expect(found?.[2]?.data).toEqual({
+          kind: "short",
+          box: "p.note",
+          text: "説明はこれで終わります。",
+          lines: ["説明はこれで終わりま", "す。"],
+          tail: "す。",
+          steps: ["1"],
+        });
+      },
+    );
+  });
+
   test("emits DEK031 when the runner reports low contrast", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
