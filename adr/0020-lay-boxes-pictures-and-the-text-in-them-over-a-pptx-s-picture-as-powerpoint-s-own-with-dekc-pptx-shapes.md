@@ -8,6 +8,8 @@ Accepted
 
 Amends [8. Export a talk as PPTX with editable text over a picture of each slide](0008-export-a-talk-as-pptx-with-editable-text-over-a-picture-of-each-slide.md)
 
+Amended by [21. Make a deck's tokens PowerPoint's theme and a slide's background PowerPoint's own with dekc pptx --shapes](0021-make-a-deck-s-tokens-powerpoint-s-theme-and-a-slide-s-background-powerpoint-s-own-with-dekc-pptx-shapes.md)
+
 ## Context
 
 ADR 8 made a PPTX a picture of each slide with its text laid over it, line by line. A recipient fixes a word where it stands; nothing else moves.
