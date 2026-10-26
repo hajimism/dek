@@ -38,7 +38,7 @@ The same CLI as a human: `dekc help --agent`, `dekc check <slug> --shot`, `dekc 
 
 ## Can I hand a talk to someone who uses PowerPoint?
 
-Yes. `dekc pptx` writes `dist/<deck>.pptx`: one slide per `##`, at its last beat, as the PDF prints it. Each slide is a picture of what the browser drew, with its text laid back over it in text boxes, line by line, so the recipient can fix a word, a date, or a name where it stands; the script goes in the notes. Shapes, SVG diagrams, and decoration stay in the picture, so they cannot be moved or recolored. Add `--public` to leave the stage directions out of the notes. Keynote opens the same file. See [Presenting](./present#pptx).
+Yes. `dekc pptx` writes `dist/<deck>.pptx`: one slide per `##`, at its last beat, as the PDF prints it. Each slide is a picture of what the browser drew, with its text laid back over it in text boxes, line by line, so the recipient can fix a word, a date, or a name where it stands; the script goes in the notes. Shapes, SVG diagrams, and decoration stay in the picture, so they cannot be moved or recolored; add `--shapes` and plain boxes, images, and SVGs become PowerPoint's own shapes and pictures, grouped with their text. Add `--public` to leave the stage directions out of the notes. Keynote opens the same file. See [Presenting](./present#pptx).
 
 ## Can I present without the dev server?
 

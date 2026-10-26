@@ -1,8 +1,9 @@
 import { zipStored } from "./zip.ts";
 
 // A PowerPoint file as dek writes it: the fewest OOXML parts PowerPoint opens without a repair,
-// as strings. Each slide is a picture of what the browser drew, with the text taken out of it,
-// and that text laid back over it in text boxes, line by line, where the browser set it.
+// as strings. Each slide is a picture of what the browser drew, with what is laid over it taken
+// out of it: the text, in text boxes line by line where the browser set it, and with `--shapes`
+// the boxes, pictures, and the text in them, as PowerPoint's own shapes.
 
 /** One run of text on one line, as the browser drew it. Sizes are in the slide's own pixels. */
 export type PptxRun = {
@@ -31,12 +32,98 @@ export type PptxTextBox = {
   runs: PptxRun[];
 };
 
+/** A color and its alpha, 0..1, the opacity of everything it is in included. */
+export type PptxPaint = { color: [number, number, number]; alpha: number };
+
+/** A box on the slide in its own pixels. */
+type PptxRect = { x: number; y: number; width: number; height: number };
+
+export type PptxTextLayer = PptxTextBox & { kind: "text" };
+
+/** What a picture embeds: the PNG every renderer shows, and the SVG one that draws SVG prefers. */
+type PptxImage = { png: Uint8Array; svg?: string };
+
+/** A box the browser drew with no more than a color, a solid border, and round corners. */
+export type PptxShape<I = PptxImage> = PptxRect & {
+  kind: "shape";
+  fill?: PptxPaint;
+  /** A border the same on every side, inside the box as CSS draws it. */
+  outline?: { width: number; paint: PptxPaint };
+  /** The border box's corner radius; PowerPoint draws half the shorter side at most. */
+  radius: number;
+  text?: PptxShapeText;
+  /** What the shape holds, in the order the browser painted it, grouped with it. */
+  layers: PptxLayer<I>[];
+};
+
+/** One side of a border that differs per side: a straight line on the border's midline. */
+export type PptxRule = {
+  kind: "rule";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  paint: PptxPaint;
+};
+
+/**
+ * An image, a canvas, or an SVG, drawn alone. What it embeds is `I`: the files in a package,
+ * where to find them on the way there.
+ */
+export type PptxPicture<I = PptxImage> = PptxRect & { kind: "picture"; description: string } & I;
+
+export type PptxLayer<I = PptxImage> = PptxTextLayer | PptxShape<I> | PptxRule | PptxPicture<I>;
+
+/** The same layers with each picture's embedding replaced. */
+export function mapPictures<A, B>(
+  layers: PptxLayer<A>[],
+  replace: (picture: PptxPicture<A>) => PptxPicture<B>,
+): PptxLayer<B>[] {
+  return layers.map((layer): PptxLayer<B> => {
+    switch (layer.kind) {
+      case "picture":
+        return replace(layer);
+      case "shape":
+        return { ...layer, layers: mapPictures(layer.layers, replace) };
+      default:
+        return layer;
+    }
+  });
+}
+
+/** The text a shape holds, as paragraphs PowerPoint sets from the top of the shape's insets. */
+export type PptxShapeText = {
+  /** From the border box to where the text is set. */
+  inset: { left: number; top: number; right: number; bottom: number };
+  /** Whether PowerPoint wraps it: a text the browser set on one line is kept on one. */
+  wrap: boolean;
+  paragraphs: PptxParagraph[];
+};
+
+export type PptxParagraph = {
+  align: "left" | "center" | "right" | "justify";
+  /** The distance from one line to the next. */
+  lineHeight: number;
+  spaceBefore: number;
+  /** From the text's insets to where its lines start, and to where they end. */
+  marginLeft: number;
+  marginRight: number;
+  /** Where the first line, or the bullet, starts from the margin: negative hangs it. */
+  indent: number;
+  /** A bullet, or a number counted from `startAt` along the paragraphs that share it. */
+  bullet?: { char: string } | { startAt: number };
+  /** Its runs; a line break inside one, as `\n`, is PowerPoint's line break. */
+  runs: PptxRun[];
+};
+
 export type PptxSlide = {
-  /** The slide drawn without the text the boxes carry, as a PNG. */
+  /** The slide drawn without what is laid over it, as a PNG. */
   picture: Uint8Array;
   /** What the picture shows, for a screen reader: the slide's own alternative texts. */
   description: string;
-  texts: PptxTextBox[];
+  /** What is laid over the picture, in the order the browser painted it. */
+  layers: PptxLayer[];
   /** The script for this slide, a paragraph a line. */
   notes: string;
 };
@@ -73,7 +160,16 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
   const count = deck.slides.length;
   const numbers = deck.slides.map((_, index) => index + 1);
 
-  add("[Content_Types].xml", contentTypes(numbers));
+  // Each slide's own pictures are numbered after the slides' pictures, across the deck.
+  const media = { next: count + 1 };
+  const slides = deck.slides.map((slide) => slideParts(slide, deck, media));
+  add(
+    "[Content_Types].xml",
+    contentTypes(
+      numbers,
+      slides.some((slide) => slide.media.some((file) => file.path.endsWith(".svg"))),
+    ),
+  );
   add(
     "_rels/.rels",
     relationships([
@@ -128,16 +224,27 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
   );
   deck.slides.forEach((slide, index) => {
     const n = index + 1;
-    add(`ppt/slides/slide${n}.xml`, slideXml(slide, deck));
+    const written = slides[index];
+    if (!written) {
+      return;
+    }
+    add(`ppt/slides/slide${n}.xml`, written.xml);
     add(
       `ppt/slides/_rels/slide${n}.xml.rels`,
       relationships([
         [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout1.xml"],
         [`${NS.rel}/image`, `../media/image${n}.png`],
         [`${NS.rel}/notesSlide`, `../notesSlides/notesSlide${n}.xml`],
+        ...written.media.map((file): [string, string] => [
+          `${NS.rel}/image`,
+          `../media/${file.path}`,
+        ]),
       ]),
     );
     parts.push({ path: `ppt/media/image${n}.png`, data: slide.picture });
+    for (const file of written.media) {
+      parts.push({ path: `ppt/media/${file.path}`, data: file.data });
+    }
     add(`ppt/notesSlides/notesSlide${n}.xml`, notesSlide(slide.notes, deck.lang));
     add(
       `ppt/notesSlides/_rels/notesSlide${n}.xml.rels`,
@@ -150,10 +257,10 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
   return zipStored(parts);
 }
 
-function contentTypes(numbers: number[]): string {
+function contentTypes(numbers: number[], svg: boolean): string {
   const override = (part: string, type: string) =>
     `<Override PartName="/${part}" ContentType="${type}"/>`;
-  return `${DECL}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>${[
+  return `${DECL}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>${svg ? '<Default Extension="svg" ContentType="image/svg+xml"/>' : ""}${[
     override("ppt/presentation.xml", `${CT}.presentationml.presentation.main+xml`),
     override("ppt/presProps.xml", `${CT}.presentationml.presProps+xml`),
     override("ppt/viewProps.xml", `${CT}.presentationml.viewProps+xml`),
@@ -230,10 +337,211 @@ function notesSlide(notes: string, lang: string): string {
   return `${DECL}<p:notes ${PML}><p:cSld><p:spTree>${GROUP}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image"/><p:cNvSpPr><a:spLocks noGrp="1" noRot="1" noChangeAspect="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldImg"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/>${paragraphs || `<a:p><a:endParaRPr lang="${escapeXml(lang)}" dirty="0"/></a:p>`}</p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:notes>`;
 }
 
-function slideXml(slide: PptxSlide, deck: PptxDeck): string {
-  const picture = `<p:pic><p:nvPicPr><p:cNvPr id="2" name="Slide" descr="${escapeXml(slide.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emu(deck.size.width)}" cy="${emu(deck.size.height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
-  const boxes = slide.texts.map((box, index) => textBox(box, index + 3, deck.lang)).join("");
-  return `${DECL}<p:sld ${PML}><p:cSld><p:spTree>${GROUP}${picture}${boxes}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+/** The relationships a slide's XML holds before its pictures': layout, picture, and notes. */
+const SLIDE_RELS = 3;
+
+type MediaFile = { path: string; data: Uint8Array };
+
+/** What a slide writes: its XML, and the files its own pictures embed, in its relationships' order. */
+function slideParts(
+  slide: PptxSlide,
+  deck: PptxDeck,
+  media: { next: number },
+): { xml: string; media: MediaFile[] } {
+  const files: MediaFile[] = [];
+  const encoder = new TextEncoder();
+  let id = 2;
+  const writer: LayerWriter = {
+    lang: deck.lang,
+    id: () => ++id,
+    embed: (data, extension) => {
+      files.push({ path: `image${media.next++}.${extension}`, data });
+      return `rId${SLIDE_RELS + files.length}`;
+    },
+    encode: (text) => encoder.encode(text),
+  };
+  const picture = `<p:pic><p:nvPicPr><p:cNvPr id="2" name="Slide" descr="${escapeAttribute(slide.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform({ x: 0, y: 0, ...deck.size })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  const layers = slide.layers.map((layer) => layerXml(layer, writer)).join("");
+  return {
+    xml: `${DECL}<p:sld ${PML}><p:cSld><p:spTree>${GROUP}${picture}${layers}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`,
+    media: files,
+  };
+}
+
+type LayerWriter = {
+  lang: string;
+  /** The next shape id on the slide. */
+  id: () => number;
+  /** Adds a file the slide embeds, and answers its relationship's id. */
+  embed: (data: Uint8Array, extension: "png" | "svg") => string;
+  encode: (text: string) => Uint8Array;
+};
+
+function layerXml(layer: PptxLayer, writer: LayerWriter): string {
+  switch (layer.kind) {
+    case "text":
+      return textBox(layer, writer.id(), writer.lang);
+    case "shape":
+      return shapeXml(layer, writer);
+    case "rule":
+      return ruleXml(layer, writer.id());
+    case "picture":
+      return pictureXml(layer, writer);
+    default: {
+      const unknown: never = layer;
+      throw new Error(`unknown layer ${JSON.stringify(unknown)}`);
+    }
+  }
+}
+
+/** A shape alone, or, when it holds anything, a group of it and what it holds. */
+function shapeXml(shape: PptxShape, writer: LayerWriter): string {
+  if (shape.layers.length === 0) {
+    return shapeSp(shape, writer.id(), writer.lang);
+  }
+  const id = writer.id();
+  const own = shapeSp(shape, writer.id(), writer.lang);
+  const held = shape.layers.map((layer) => layerXml(layer, writer)).join("");
+  const bounds = frameOf(shape);
+  const at = `<a:off x="${emu(bounds.x)}" y="${emu(bounds.y)}"/><a:ext cx="${emu(bounds.width)}" cy="${emu(bounds.height)}"/>`;
+  const child = `<a:chOff x="${emu(bounds.x)}" y="${emu(bounds.y)}"/><a:chExt cx="${emu(bounds.width)}" cy="${emu(bounds.height)}"/>`;
+  return `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${id}" name="Group ${id - 2}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm>${at}${child}</a:xfrm></p:grpSpPr>${own}${held}</p:grpSp>`;
+}
+
+/**
+ * The shape itself. PowerPoint strokes the middle of a path and CSS draws a border inside the
+ * box, so the path runs half the border's width inside the border box, and so do its corners.
+ */
+function shapeSp(shape: PptxShape, id: number, lang: string): string {
+  const half = (shape.outline?.width ?? 0) / 2;
+  const path = pathOf(shape);
+  const radius = Math.max(0, shape.radius - half);
+  const shorter = Math.min(path.width, path.height);
+  const geometry =
+    radius > 0 && shorter > 0
+      ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.min(50000, Math.round((radius / shorter) * 100000))}"/></a:avLst></a:prstGeom>`
+      : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+  const fill = shape.fill ? solidFill(shape.fill) : "<a:noFill/>";
+  const line = shape.outline
+    ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint)}</a:ln>`
+    : "<a:ln><a:noFill/></a:ln>";
+  const text = shape.text ? shapeText(shape.text, half, lang) : "";
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path)}${geometry}${fill}${line}</p:spPr>${text}</p:sp>`;
+}
+
+const ALIGN = { left: "l", center: "ctr", right: "r", justify: "just" } as const;
+
+/** A shape's text, set inside its insets less what the path already took. */
+function shapeText(text: PptxShapeText, half: number, lang: string): string {
+  const inset = (px: number) => emu(Math.max(0, px - half));
+  const paragraphs = text.paragraphs.map((paragraph) => paragraphXml(paragraph, lang)).join("");
+  return `<p:txBody><a:bodyPr wrap="${text.wrap ? "square" : "none"}" lIns="${inset(text.inset.left)}" tIns="${inset(text.inset.top)}" rIns="${inset(text.inset.right)}" bIns="${inset(text.inset.bottom)}" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs || "<a:p/>"}</p:txBody>`;
+}
+
+function paragraphXml(paragraph: PptxParagraph, lang: string): string {
+  const { bullet } = paragraph;
+  const marker =
+    bullet === undefined
+      ? "<a:buNone/>"
+      : "char" in bullet
+        ? `<a:buChar char="${escapeXml(bullet.char)}"/>`
+        : `<a:buAutoNum type="arabicPeriod" startAt="${bullet.startAt}"/>`;
+  // A margin is never negative in DrawingML; the plan makes it at most a pixel's noise below 0.
+  const margin = (px: number) => Math.max(0, emu(px));
+  const properties = `<a:pPr marL="${margin(paragraph.marginLeft)}" marR="${margin(paragraph.marginRight)}" indent="${emu(paragraph.indent)}" algn="${ALIGN[paragraph.align]}"><a:lnSpc><a:spcPts val="${points(paragraph.lineHeight)}"/></a:lnSpc><a:spcBef><a:spcPts val="${Math.max(0, points(paragraph.spaceBefore))}"/></a:spcBef>${marker}</a:pPr>`;
+  // A break inside a run is PowerPoint's line break, set in the run's style.
+  const runs = paragraph.runs
+    .map((run) =>
+      run.text
+        .split("\n")
+        .map((piece) => (piece === "" ? "" : textRun({ ...run, text: piece }, lang)))
+        .join(`<a:br>${runProperties(run, lang)}</a:br>`),
+    )
+    .join("");
+  return `<a:p>${properties}${runs}</a:p>`;
+}
+
+/** A rule from one end to the other, a straight connector, flipped where it runs up or left. */
+function ruleXml(rule: PptxRule, id: number): string {
+  const frame = frameOf(rule);
+  const flips = `${rule.x2 < rule.x1 ? ' flipH="1"' : ""}${rule.y2 < rule.y1 ? ' flipV="1"' : ""}`;
+  return `<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="${id}" name="Line ${id - 2}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm${flips}><a:off x="${emu(frame.x)}" y="${emu(frame.y)}"/><a:ext cx="${emu(frame.width)}" cy="${emu(frame.height)}"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom><a:ln w="${emu(rule.width)}" cap="flat">${solidFill(rule.paint)}</a:ln></p:spPr></p:cxnSp>`;
+}
+
+/** The extension PowerPoint 2016 and later read an SVG from; the PNG is for any other. */
+const SVG_BLIP = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
+
+function pictureXml(picture: PptxPicture, writer: LayerWriter): string {
+  const id = writer.id();
+  const png = writer.embed(picture.png, "png");
+  const svg =
+    picture.svg === undefined
+      ? ""
+      : `<a:extLst><a:ext uri="${SVG_BLIP}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${writer.embed(writer.encode(picture.svg), "svg")}"/></a:ext></a:extLst>`;
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id - 2}" descr="${escapeAttribute(picture.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${png}">${svg}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform(picture)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+}
+
+/**
+ * The frame a layer is written with: what PowerPoint reads its place from, and a group's extent
+ * from, which it takes as the frames of what it holds put together. A group written any larger
+ * or smaller is scaled to fit by a renderer that works its extent out again.
+ */
+function frameOf(layer: PptxLayer): PptxRect {
+  switch (layer.kind) {
+    case "text":
+      return { x: layer.x, y: layer.y, width: layer.width + roomOf(layer), height: layer.height };
+    case "rule":
+      return {
+        x: Math.min(layer.x1, layer.x2),
+        y: Math.min(layer.y1, layer.y2),
+        width: Math.abs(layer.x2 - layer.x1),
+        height: Math.abs(layer.y2 - layer.y1),
+      };
+    case "picture":
+      return { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+    case "shape": {
+      const frames = [pathOf(layer), ...layer.layers.map(frameOf)];
+      const left = Math.min(...frames.map((frame) => frame.x));
+      const top = Math.min(...frames.map((frame) => frame.y));
+      const right = Math.max(...frames.map((frame) => frame.x + frame.width));
+      const bottom = Math.max(...frames.map((frame) => frame.y + frame.height));
+      return { x: left, y: top, width: right - left, height: bottom - top };
+    }
+    default: {
+      const unknown: never = layer;
+      throw new Error(`unknown layer ${JSON.stringify(unknown)}`);
+    }
+  }
+}
+
+/** A shape's path: half its outline's width inside its border box, where PowerPoint strokes it. */
+function pathOf(shape: PptxShape): PptxRect {
+  const half = (shape.outline?.width ?? 0) / 2;
+  return {
+    x: shape.x + half,
+    y: shape.y + half,
+    width: Math.max(0, shape.width - half * 2),
+    height: Math.max(0, shape.height - half * 2),
+  };
+}
+
+function transform(box: PptxRect): string {
+  return `<a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width)}" cy="${emu(box.height)}"/></a:xfrm>`;
+}
+
+function solidFill(paint: PptxPaint): string {
+  return `<a:solidFill>${srgb(paint.color, paint.alpha)}</a:solidFill>`;
+}
+
+function srgb(color: [number, number, number], alpha: number): string {
+  const hex = color.map((channel) => channel.toString(16).padStart(2, "0")).join("");
+  const opacity = alpha < 1 ? `<a:alpha val="${Math.round(alpha * 100000)}"/>` : "";
+  return `<a:srgbClr val="${hex.toUpperCase()}">${opacity}</a:srgbClr>`;
+}
+
+/** Hundredths of a point, as DrawingML sets sizes and spacing. */
+function points(px: number): number {
+  return Math.round(px * PT_PER_PX * 100);
 }
 
 /**
@@ -245,29 +553,34 @@ function slideXml(slide: PptxSlide, deck: PptxDeck): string {
 function textBox(box: PptxTextBox, id: number, lang: string): string {
   const runs = box.runs.map((run) => textRun(run, lang)).join("");
   const spacing = Math.max(1, Math.round(box.lineHeight * PT_PER_PX * 100));
-  const room = Math.max(box.width * 0.25, box.lineHeight * 2);
+  const room = roomOf(box);
   return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id - 2}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width + room)}" cy="${emu(box.height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr><a:lnSpc><a:spcPts val="${spacing}"/></a:lnSpc></a:pPr>${runs}</a:p></p:txBody></p:sp>`;
 }
 
+/** How far a text box runs on past its line's end. */
+function roomOf(box: PptxTextBox): number {
+  return Math.max(box.width * 0.25, box.lineHeight * 2);
+}
+
 function textRun(run: PptxRun, lang: string): string {
+  return `<a:r>${runProperties(run, lang)}<a:t>${escapeXml(run.text)}</a:t></a:r>`;
+}
+
+function runProperties(run: PptxRun, lang: string): string {
   const attributes = [
     `lang="${escapeXml(lang)}"`,
-    `sz="${Math.max(100, Math.round(run.size * PT_PER_PX * 100))}"`,
+    `sz="${Math.max(100, points(run.size))}"`,
     `b="${run.bold ? 1 : 0}"`,
     `i="${run.italic ? 1 : 0}"`,
     ...(run.underline ? ['u="sng"'] : []),
     ...(run.strike ? ['strike="sngStrike"'] : []),
-    ...(run.letterSpacing !== 0
-      ? [`spc="${Math.round(run.letterSpacing * PT_PER_PX * 100)}"`]
-      : []),
+    ...(run.letterSpacing !== 0 ? [`spc="${points(run.letterSpacing)}"`] : []),
     'dirty="0"',
   ].join(" ");
-  const alpha = run.alpha < 1 ? `<a:alpha val="${Math.round(run.alpha * 100000)}"/>` : "";
-  const color = run.color.map((channel) => channel.toString(16).padStart(2, "0")).join("");
   const font = run.font
     ? `<a:latin typeface="${escapeXml(run.font)}"/><a:ea typeface="${escapeXml(run.font)}"/><a:cs typeface="${escapeXml(run.font)}"/>`
     : "";
-  return `<a:r><a:rPr ${attributes}><a:solidFill><a:srgbClr val="${color.toUpperCase()}">${alpha}</a:srgbClr></a:solidFill>${font}</a:rPr><a:t>${escapeXml(run.text)}</a:t></a:r>`;
+  return `<a:rPr ${attributes}><a:solidFill>${srgb(run.color, run.alpha)}</a:solidFill>${font}</a:rPr>`;
 }
 
 function emu(px: number): number {
@@ -283,6 +596,11 @@ function escapeXml(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** An attribute's value: as text, with its line breaks and tabs kept, which XML would make spaces. */
+function escapeAttribute(text: string): string {
+  return escapeXml(text).replace(/\t/g, "&#9;").replace(/\n/g, "&#10;").replace(/\r/g, "&#13;");
 }
 
 /** Whether XML 1.0 holds the code point: tab, newline, return, and the rest of Unicode but surrogates. */

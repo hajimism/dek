@@ -31,6 +31,7 @@ import type {
   PagesRequest,
   PagesResponse,
   PdfRequest,
+  PptxPictureFile,
   PptxRequest,
   PptxResponse,
   ResponseTo,
@@ -39,8 +40,20 @@ import type {
 } from "./playwright.ts";
 import { captureMotion } from "./playwright-motion.ts";
 import { renderSheets } from "./playwright-sheet.ts";
+import { mapPictures } from "./pptx-package.ts";
+import {
+  describePptxPicturesInPage,
+  hidePptxLiftedInPage,
+  measurePptxPaintInPage,
+  PPTX_PSEUDO_ATTR,
+  pptxSvgInPage,
+  SVG_CHECKED,
+  SVG_PAINT,
+  showOnlyPptxNodeInPage,
+} from "./pptx-paint.ts";
+import { planPptxLayers, pptxPageFacts } from "./pptx-plan.ts";
 import { measurePptxTextsInPage, PPTX_OWNER_ATTR } from "./pptx-text.ts";
-import { pseudoTextBoxes } from "./pseudo-text.ts";
+import { pseudoElementBoxes, pseudoTextBoxes } from "./pseudo-text.ts";
 import { motionSheets } from "./sheet.ts";
 import {
   type Box,
@@ -133,7 +146,10 @@ async function printPdf(context: BrowserContext, request: PdfRequest): Promise<D
   return {};
 }
 
-/** Each slide's text measured and taken out, and the slide shot without it, page by page. */
+/**
+ * Each slide's text measured, and with `shapes` its paint; what is laid over the picture planned,
+ * each picture drawn alone, and the slide shot without what was laid over it, page by page.
+ */
 async function shootPptx(context: BrowserContext, request: PptxRequest): Promise<PptxResponse> {
   const slides = await visitInPages(
     request.pages,
@@ -141,18 +157,69 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
     async (page, pageReq) => {
       await page.setContent(pageReq.html, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
-      const measured = await page.evaluate(measurePptxTextsInPage);
+      // Without --shapes the page is read as ADR 8 reads it: nothing is numbered or measured
+      // for shapes, so the file is what it was before them.
+      const paint = {
+        ...(request.shapes
+          ? await page.evaluate(measurePptxPaintInPage)
+          : { origin: { left: 0, top: 0 }, nodes: [], pseudos: [] }),
+        described: await page.evaluate(describePptxPicturesInPage),
+      };
+      const texts = await page.evaluate(measurePptxTextsInPage);
       const fonts = await platformFonts(page);
+      const placed = request.shapes
+        ? await pseudoElementBoxes(page, PPTX_PSEUDO_ATTR, "border", ["before", "after", "marker"])
+        : new Map();
+      for (const run of [
+        ...texts.boxes.flatMap((box) => box.runs),
+        ...texts.blocks.flatMap((block) => block.runs),
+      ]) {
+        const font = fonts.get(run.owner);
+        if (font !== undefined) {
+          run.font = font;
+        }
+      }
+      const plan = planPptxLayers(pptxPageFacts(paint, texts, placed), { shapes: request.shapes });
+
+      const files = new Map<number, PptxPictureFile>();
+      for (const [index, node] of plan.lifted.pictures.entries()) {
+        const measured = paint.nodes[node];
+        const rect =
+          (measured?.paint?.kind === "picture" ? measured.paint.extent : undefined) ??
+          measured?.rect;
+        if (!rect) {
+          continue;
+        }
+        const svg = await page.evaluate(pptxSvgInPage, {
+          node,
+          paint: SVG_PAINT,
+          checked: SVG_CHECKED,
+        });
+        const png = pageReq.screenshotPath.replace(/\.png$/, `-${index + 1}.png`);
+        await page.evaluate(showOnlyPptxNodeInPage, node);
+        await page.screenshot({
+          path: png,
+          omitBackground: true,
+          clip: {
+            x: paint.origin.left + rect.left,
+            y: paint.origin.top + rect.top,
+            width: rect.right - rect.left,
+            height: rect.bottom - rect.top,
+          },
+        });
+        await page.evaluate(showOnlyPptxNodeInPage, null);
+        files.set(node, svg === undefined ? { png } : { png, svg });
+      }
+      if (request.shapes) {
+        await page.evaluate(hidePptxLiftedInPage, plan.lifted);
+      }
       await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
       return {
         slug: pageReq.slug,
-        description: measured.description,
-        boxes: measured.boxes.map((box) => ({
-          ...box,
-          runs: box.runs.map(({ owner, ...run }) => {
-            const font = fonts.get(owner);
-            return font === undefined ? run : { ...run, font };
-          }),
+        description: plan.description,
+        layers: mapPictures(plan.layers, ({ node, ...picture }) => ({
+          ...picture,
+          ...(files.get(node) ?? { png: "" }),
         })),
       };
     },

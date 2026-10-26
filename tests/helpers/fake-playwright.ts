@@ -32,12 +32,12 @@ const contrasts = process.env.DEK_PLAYWRIGHT_CONTRASTS
   ? JSON.parse(process.env.DEK_PLAYWRIGHT_CONTRASTS)
   : [];
 
-// A PPTX's pages come back with no text, each slide only its picture.
+// A PPTX's pages come back with nothing laid over them, each slide only its picture.
 const pptx = {
   slides: (request.pages ?? []).map((page) => ({
     slug: page.slug ?? "",
     description: "",
-    boxes: [],
+    layers: [],
   })),
 };
 

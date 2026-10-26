@@ -16,6 +16,7 @@ import type { MvResult } from "./mv.ts";
 import type { NewResult } from "./new.ts";
 import type { PackCliResult } from "./pack.ts";
 import type { PdfCliResult } from "./pdf.ts";
+import type { PptxCliResult } from "./pptx.ts";
 import type { RefCliResult } from "./ref.ts";
 import type { ShotCliResult } from "./shot.ts";
 import type { ShowResult } from "./show.ts";
@@ -228,6 +229,27 @@ export function formatVideo(data: VideoCliResult): string {
 
 export function formatPdf(data: PdfCliResult): string {
   return data.outs.map((path) => `wrote ${path}`).join("\n");
+}
+
+/**
+ * Each file written, and with `--shapes` what it laid over its pictures, naming the slides that
+ * kept everything in the picture, which are the ones to rewrite toward shapes.
+ */
+export function formatPptx(data: PptxCliResult): string {
+  return data.outs
+    .flatMap((path, index) => {
+      const lifted = data.lifted?.[index];
+      if (!lifted) {
+        return [`wrote ${path}`];
+      }
+      const none = lifted.untouched.length > 0 ? `; nothing on ${lifted.untouched.join(", ")}` : "";
+      const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+      return [
+        `wrote ${path}`,
+        `  --shapes laid ${count(lifted.shapes, "shape")} and ${count(lifted.pictures, "picture")} over the picture${none}`,
+      ];
+    })
+    .join("\n");
 }
 
 export function formatPack(data: PackCliResult): string {

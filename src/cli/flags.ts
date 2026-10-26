@@ -91,6 +91,10 @@ export const FLAGS = {
     type: "boolean",
     text: "for anyone the file reaches: the script without its stage directions and comments",
   },
+  shapes: {
+    type: "boolean",
+    text: "lift plain boxes, images, and SVGs out of the picture as PowerPoint shapes and pictures",
+  },
 } as const satisfies Record<string, FlagSpec>;
 
 export type FlagName = keyof typeof FLAGS;

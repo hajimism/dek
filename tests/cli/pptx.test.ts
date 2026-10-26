@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { chmod, readFile } from "node:fs/promises";
+import { chmod, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pptxCommand } from "../../src/cli/pptx.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
+import { formatPptx } from "../../src/cli/text.ts";
 import { DekError } from "../../src/core/error.ts";
+import type { PlaywrightRunner } from "../../src/core/playwright.ts";
+import { pptxDeck } from "../../src/core/pptx.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -33,6 +36,58 @@ describe("pptxCommand", () => {
           expect(rooted.outs).toEqual([join(root, "dist", "demo.pptx")]);
         });
       },
+    );
+  });
+
+  test.serial("asks the worker for shapes only with --shapes", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const asked: unknown[] = [];
+        const runner: PlaywrightRunner = async (request) => {
+          asked.push(request.kind === "pptx" ? request.shapes : undefined);
+          const pages = request.kind === "pptx" ? request.pages : [];
+          for (const page of pages) {
+            await writeFile(page.screenshotPath, "png");
+          }
+          return {
+            slides: pages.map((page) => ({
+              slug: page.slug,
+              description: "",
+              layers: [],
+            })),
+          } as never;
+        };
+        const dir = join(root, "decks", "demo");
+        expect(await pptxDeck(dir, { runner })).not.toHaveProperty("lifted");
+        // Nothing came out of the picture: the slide is named, to rewrite toward shapes.
+        expect((await pptxDeck(dir, { runner, shapes: true })).lifted).toEqual({
+          shapes: 0,
+          pictures: 0,
+          untouched: ["intro"],
+        });
+        expect(asked).toEqual([false, true]);
+      },
+    );
+  });
+
+  test("says what --shapes laid over each file's pictures, and where it laid nothing", () => {
+    expect(formatPptx({ outs: ["a.pptx"] })).toBe("wrote a.pptx");
+    expect(
+      formatPptx({
+        outs: ["a.pptx", "b.pptx"],
+        lifted: [
+          { shapes: 3, pictures: 1, untouched: [] },
+          { shapes: 0, pictures: 0, untouched: ["cover", "close"] },
+        ],
+      }),
+    ).toBe(
+      [
+        "wrote a.pptx",
+        "  --shapes laid 3 shapes and 1 picture over the picture",
+        "wrote b.pptx",
+        "  --shapes laid 0 shapes and 0 pictures over the picture; nothing on cover, close",
+      ].join("\n"),
     );
   });
 

@@ -6,7 +6,7 @@ import { DekError } from "./error.ts";
 import type { Fill } from "./fill.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
-import type { PptxTextBox } from "./pptx-package.ts";
+import type { PptxLayer, PptxTextBox } from "./pptx-package.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
 import { exitWorker, readWorkerRequest, runJsonWorker, workerCommand } from "./spawn.ts";
 import type { Position } from "./step.ts";
@@ -85,17 +85,22 @@ export type MotionRequest = {
 
 /**
  * Each slide's still page drawn for a PPTX, at twice its size: its text measured line by line,
- * then the page shot without it, to `screenshotPath`.
+ * and with `shapes` its boxes and pictures, each picture drawn alone beside `screenshotPath`,
+ * then the page shot without what is laid over it, to `screenshotPath`.
  */
 export type PptxRequest = {
   kind: "pptx";
   viewport: Viewport;
+  shapes: boolean;
   pages: Array<{ html: string; slug: string; screenshotPath: string }>;
 };
 
-/** Each page's text, in the order of the request's pages, with the font each run was drawn in. */
+/** A picture on its way to the package: the PNG the worker wrote, and the SVG it read. */
+export type PptxPictureFile = { png: string; svg?: string };
+
+/** Each page's layers, in the order of the request's pages, with the font each run was drawn in. */
 export type PptxResponse = {
-  slides: Array<{ slug: string; description: string; boxes: PptxTextBox[] }>;
+  slides: Array<{ slug: string; description: string; layers: PptxLayer<PptxPictureFile>[] }>;
 };
 
 /** What the Playwright worker is asked; the kind says which payload comes with it. */
@@ -453,8 +458,68 @@ function isPptxSlide(value: unknown): value is PptxResponse["slides"][number] {
   if (!value || typeof value !== "object") {
     return false;
   }
-  const { slug, description, boxes } = value as Record<string, unknown>;
-  return isString(slug) && isString(description) && isArrayOf(boxes, isPptxBox);
+  const { slug, description, layers } = value as Record<string, unknown>;
+  return isString(slug) && isString(description) && isArrayOf(layers, isPptxLayer);
+}
+
+function isPptxLayer(value: unknown): value is PptxLayer<PptxPictureFile> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const layer = value as Record<string, unknown>;
+  const at = ["x", "y", "width", "height"].every((key) => isNumber(layer[key]));
+  switch (layer.kind) {
+    case "text":
+      return isPptxBox(layer);
+    case "rule":
+      return (
+        ["x1", "y1", "x2", "y2", "width"].every((key) => isNumber(layer[key])) &&
+        isPaint(layer.paint)
+      );
+    case "picture":
+      return (
+        at &&
+        isString(layer.png) &&
+        isString(layer.description) &&
+        (layer.svg === undefined || isString(layer.svg))
+      );
+    case "shape":
+      return (
+        at &&
+        isNumber(layer.radius) &&
+        (layer.fill === undefined || isPaint(layer.fill)) &&
+        isArrayOf(layer.layers, isPptxLayer) &&
+        (layer.text === undefined || isShapeText(layer.text))
+      );
+    default:
+      return false;
+  }
+}
+
+function isPaint(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const { color, alpha } = value as Record<string, unknown>;
+  return isArrayOf(color, isNumber) && isNumber(alpha);
+}
+
+function isShapeText(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const { inset, paragraphs } = value as Record<string, unknown>;
+  return (
+    Boolean(inset) &&
+    typeof inset === "object" &&
+    isArrayOf(paragraphs, (paragraph: unknown): paragraph is object => {
+      if (!paragraph || typeof paragraph !== "object") {
+        return false;
+      }
+      const { runs, lineHeight } = paragraph as Record<string, unknown>;
+      return isNumber(lineHeight) && isArrayOf(runs, isPptxRun);
+    })
+  );
 }
 
 function isPptxBox(value: unknown): value is PptxTextBox {
@@ -464,20 +529,22 @@ function isPptxBox(value: unknown): value is PptxTextBox {
   const box = value as Record<string, unknown>;
   return (
     ["x", "y", "width", "height", "lineHeight"].every((key) => isNumber(box[key])) &&
-    isArrayOf(box.runs, (run: unknown): run is PptxTextBox["runs"][number] => {
-      if (!run || typeof run !== "object") {
-        return false;
-      }
-      const { text, size, alpha, letterSpacing, color, font } = run as Record<string, unknown>;
-      return (
-        isString(text) &&
-        isNumber(size) &&
-        isNumber(alpha) &&
-        isNumber(letterSpacing) &&
-        isArrayOf(color, isNumber) &&
-        (font === undefined || isString(font))
-      );
-    })
+    isArrayOf(box.runs, isPptxRun)
+  );
+}
+
+function isPptxRun(run: unknown): run is PptxTextBox["runs"][number] {
+  if (!run || typeof run !== "object") {
+    return false;
+  }
+  const { text, size, alpha, letterSpacing, color, font } = run as Record<string, unknown>;
+  return (
+    isString(text) &&
+    isNumber(size) &&
+    isNumber(alpha) &&
+    isNumber(letterSpacing) &&
+    isArrayOf(color, isNumber) &&
+    (font === undefined || isString(font))
   );
 }
 
