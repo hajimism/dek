@@ -41,7 +41,7 @@ export const FLAGS = {
   fix: { type: "boolean", text: "create missing skeleton slides before linting" },
   visual: {
     type: "boolean",
-    text: "add the rendered rules: overflow and contrast (needs Playwright)",
+    text: "add the rendered rules: overflow, contrast, line breaks, and alignment (needs Playwright)",
   },
   shot: { type: "boolean", text: "also write a screenshot and return its path" },
   voice: { type: "boolean", text: "also return each sentence's reading and duration" },

@@ -7,7 +7,7 @@ import { resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
 import { mergeSarif, type SarifLog } from "../core/sarif.ts";
 import { syncDeck } from "../core/sync.ts";
 import { lintVisualDeck } from "../core/visual.ts";
-import { type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
+import { RENDERED_RULES, type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
 import type { DecksTarget } from "./scope.ts";
 
 export type LintCliResult = {
@@ -60,7 +60,7 @@ export async function lintCommand(
         ? []
         : [
             visualSkipped("dekc lint --visual", {
-              reason: "overflow and contrast are measured only with --visual",
+              reason: `${RENDERED_RULES} are measured only with --visual`,
             }),
           ]),
     ]),

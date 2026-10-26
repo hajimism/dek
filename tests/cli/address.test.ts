@@ -97,7 +97,7 @@ describe("addressResult", () => {
         const layout = addressed.data.diagnostics.find((d) => d.id === "DEK019");
         expect(layout?.hint).toContain("`dekc theme demo`");
         expect(addressed.data.skipped?.find((s) => s.check === "visual")?.hint).toBe(
-          "run `dekc lint demo --visual` to measure overflow and contrast",
+          "run `dekc lint demo --visual` to measure overflow, contrast, line breaks, and alignment",
         );
       },
     );

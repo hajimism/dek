@@ -262,8 +262,9 @@ more
           const result = await lintCommand(resolveDecks(deckDir), { cwd: deckDir });
           expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
             check: "visual",
-            reason: "overflow and contrast are measured only with --visual",
-            hint: "run `dekc lint --visual` to measure overflow and contrast",
+            reason:
+              "overflow, contrast, line breaks, and alignment are measured only with --visual",
+            hint: "run `dekc lint --visual` to measure overflow, contrast, line breaks, and alignment",
           });
         });
         await withEnv({ DEK_PLAYWRIGHT: "/no/such/playwright" }, async () => {
@@ -271,7 +272,7 @@ more
           expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
             check: "visual",
             reason: "Playwright is not installed",
-            hint: "bun add -d playwright && bunx playwright install chromium, then run `dekc lint --visual` to measure overflow and contrast",
+            hint: "bun add -d playwright && bunx playwright install chromium, then run `dekc lint --visual` to measure overflow, contrast, line breaks, and alignment",
           });
         });
       },
