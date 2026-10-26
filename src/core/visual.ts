@@ -83,7 +83,7 @@ async function visualDeck(
     return { diagnostics: [], fills: [] };
   }
 
-  const actions: PageAction[] = ["overflow", "contrast", "fill", "breaks"];
+  const actions: PageAction[] = ["overflow", "contrast", "fill", "breaks", "alignment"];
   const viewport = logicalSize(deck.deck.ratio);
   const cache = visualCache(deck.dir, { viewport, actions });
   const keyed = pages.map((page) => {
@@ -138,6 +138,7 @@ async function visualDeck(
         drawErrors: all.flatMap((page) => page.drawErrors),
         collisions: all.flatMap((page) => page.collisions ?? []),
         lineBreaks: all.flatMap((page) => page.lineBreaks ?? []),
+        misalignments: all.flatMap((page) => page.misalignments ?? []),
       },
       deck.dir,
     ),
@@ -157,6 +158,7 @@ function noFindings(): PageFindings {
     collisions: [],
     fills: [],
     lineBreaks: [],
+    misalignments: [],
   };
 }
 
@@ -193,6 +195,9 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   }
   for (const finding of response.lineBreaks ?? []) {
     of(finding).lineBreaks.push(finding);
+  }
+  for (const finding of response.misalignments ?? []) {
+    of(finding).misalignments.push(finding);
   }
   return pages;
 }
@@ -359,7 +364,71 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
     ...groupBySteps(response.lineBreaks ?? [], lineBreakKey).map((group) =>
       lineBreakDiagnostic(group, paths),
     ),
+    ...groupBySteps(response.misalignments ?? [], misalignmentKey).map((group) =>
+      misalignmentDiagnostic(group, paths),
+    ),
   ];
+}
+
+type MisalignmentSample = NonNullable<PagesResponse["misalignments"]>[number];
+
+function misalignmentKey(m: MisalignmentSample): string {
+  return [m.slug, m.box, m.text ?? "", m.other, m.otherText ?? "", m.edge, m.of].join("\0");
+}
+
+/** How the message names an edge two items share. */
+const EDGE_NAMES: Record<MisalignmentSample["edge"], string> = {
+  top: "tops",
+  middle: "middles",
+  bottom: "bottoms",
+  left: "left edges",
+  center: "centers",
+  right: "right edges",
+};
+
+/**
+ * Two items that nearly line up and do not. The fix depends on the edge: a start lines up with
+ * the same space before it, an end with one size, a middle with one way of centering, and text in
+ * cards that line up with one padding.
+ */
+function misalignmentDiagnostic(
+  { first, items, steps }: StepGroup<MisalignmentSample>,
+  paths: DeckPaths,
+): Diagnostic {
+  // By the most they miss at any step, so the fix covers the worst beat.
+  const by = Math.max(...items.map((item) => item.by));
+  const pair = `${describeTarget(first.box, first.text)}and ${describeTarget(first.other, first.otherText).trimEnd()}`;
+  const where =
+    first.of === "text"
+      ? `almost start their text ${first.edge === "left" ? "at one left edge" : "on one line"}`
+      : `almost line up at their ${EDGE_NAMES[first.edge]}`;
+  const css = `slides/${first.slug}.css`;
+  const both = `${first.box} and ${first.other}`;
+  const why = "an edge a few pixels off reads as a mistake, not a choice";
+  const hint =
+    first.of === "text"
+      ? `give ${both} the same padding in ${css}, so their text starts on one line`
+      : first.edge === "top" || first.edge === "left"
+        ? `line ${first.box} up with ${first.other} in ${css}, with the same margin, padding, or alignment: ${why}`
+        : first.edge === "bottom" || first.edge === "right"
+          ? `give ${both} one ${first.edge === "bottom" ? "height" : "width"} in ${css}, with align-items: stretch or the same size: ${why}`
+          : `center ${both} on one line in ${css}, with align-items: center or the same margins: ${why}`;
+  return diag("DEK036", {
+    message: `${pair} ${where}, ${by}px apart, ${atSteps(steps)}`,
+    path: paths.slide(first.slug, ".html"),
+    slug: first.slug,
+    hint,
+    data: {
+      box: first.box,
+      ...(first.text ? { text: first.text } : {}),
+      other: first.other,
+      ...(first.otherText ? { otherText: first.otherText } : {}),
+      edge: first.edge,
+      of: first.of,
+      by,
+      steps,
+    },
+  });
 }
 
 type LineBreakSample = NonNullable<PagesResponse["lineBreaks"]>[number];

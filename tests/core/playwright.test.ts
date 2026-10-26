@@ -54,6 +54,7 @@ describe("defaultPlaywrightRunner", () => {
         collisions: [],
         fills: [],
         lineBreaks: [],
+        misalignments: [],
       });
     });
   });
@@ -177,6 +178,7 @@ describe("parseVisualResponse", () => {
       collisions: [],
       fills: [],
       lineBreaks: [],
+      misalignments: [],
     });
     const thrown = {
       slug: "intro",
@@ -192,6 +194,7 @@ describe("parseVisualResponse", () => {
       collisions: [],
       fills: [],
       lineBreaks: [],
+      misalignments: [],
     });
     expect(parse({ motion, sheets: ["/s.png"] }, "motion")).toEqual({
       motion,
@@ -212,6 +215,7 @@ describe("parseVisualResponse", () => {
       collisions: [],
       fills: [],
       lineBreaks: [],
+      misalignments: [],
     });
     expect(parse({ motion, sheets: [], overflows: [] }, "motion")).toEqual({ motion, sheets: [] });
     expect(parse({ pdfPath: "/a.pdf" }, "pdf")).toEqual({});
@@ -238,6 +242,29 @@ describe("parseVisualResponse", () => {
     expect(pages([{ ...split, kind: "wrapped" }])).toBeNull();
     expect(pages([{ ...split, lines: "AIはここが苦手です" }])).toBeNull();
     expect(pages([{ ...split, textWrap: undefined }])).toBeNull();
+  });
+
+  test("reads each misalignment with the edge and how far apart", () => {
+    const miss = {
+      slug: "intro",
+      step: "1",
+      box: "div.card",
+      text: "速い",
+      other: "div.card",
+      otherText: "安い",
+      edge: "top",
+      of: "box",
+      by: 3,
+    };
+    const pages = (misalignments: object[]) =>
+      parse({ overflows: [], contrasts: [], misalignments }, "pages");
+    expect(pages([miss, { ...miss, edge: "left", of: "text" }])).toMatchObject({
+      misalignments: [miss, { ...miss, edge: "left", of: "text" }],
+    });
+    expect(pages([{ ...miss, edge: "up" }])).toBeNull();
+    expect(pages([{ ...miss, of: "glyph" }])).toBeNull();
+    expect(pages([{ ...miss, by: "3" }])).toBeNull();
+    expect(pages([{ ...miss, other: undefined }])).toBeNull();
   });
 
   test("answers null to anything short of what the kind promises", () => {

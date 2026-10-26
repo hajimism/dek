@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
+import type { AlignedEdge, Misalignment } from "./alignment.ts";
 import { DekError } from "./error.ts";
 import type { Fill } from "./fill.ts";
 import type { LineBreakKind } from "./line-break.ts";
@@ -42,7 +43,7 @@ export type MotionSpec = {
 };
 
 /** What to measure on each page; a screenshot is asked for by the page's `screenshotPath`. */
-export type PageAction = "overflow" | "contrast" | "fill" | "breaks";
+export type PageAction = "overflow" | "contrast" | "fill" | "breaks" | "alignment";
 
 type Viewport = { width: number; height: number };
 
@@ -159,6 +160,16 @@ type LineBreakFinding = {
   textWrap: string;
 } & LineBreakKind;
 
+/** Two items on one page that nearly line up and do not, each named as the page shows it. */
+type MisalignmentFinding = Omit<Misalignment, "element" | "other"> & {
+  slug: string;
+  step: string;
+  box: string;
+  text?: string;
+  other: string;
+  otherText?: string;
+};
+
 export type PagesResponse = {
   overflows: OverflowFinding[];
   contrasts: ContrastFinding[];
@@ -170,6 +181,8 @@ export type PagesResponse = {
   fills?: FillFinding[];
   /** Absent from a runner that has none to report. */
   lineBreaks?: LineBreakFinding[];
+  /** Absent from a runner that has none to report. */
+  misalignments?: MisalignmentFinding[];
 };
 
 export type MotionResponse = {
@@ -342,14 +355,16 @@ const RESPONSE_PARSERS: {
     collisions = [],
     fills = [],
     lineBreaks = [],
+    misalignments = [],
   }) =>
     isArrayOf(overflows, isOverflowFinding) &&
     isArrayOf(contrasts, isContrastFinding) &&
     isArrayOf(drawErrors, isDrawErrorFinding) &&
     isArrayOf(collisions, isCollisionFinding) &&
     isArrayOf(fills, isFillFinding) &&
-    isArrayOf(lineBreaks, isLineBreakFinding)
-      ? { overflows, contrasts, drawErrors, collisions, fills, lineBreaks }
+    isArrayOf(lineBreaks, isLineBreakFinding) &&
+    isArrayOf(misalignments, isMisalignmentFinding)
+      ? { overflows, contrasts, drawErrors, collisions, fills, lineBreaks, misalignments }
       : null,
   pdf: () => ({}),
   morph: () => ({}),
@@ -437,6 +452,24 @@ function isLineBreakFinding(value: unknown): value is LineBreakFinding {
     isString(textWrap) &&
     ((kind === "split" && isArrayOf(phrased, isString)) || (kind === "short" && isString(tail)))
   );
+}
+
+const ALIGNED_EDGES: ReadonlySet<unknown> = new Set<AlignedEdge>([
+  "top",
+  "middle",
+  "bottom",
+  "left",
+  "center",
+  "right",
+]);
+
+function isMisalignmentFinding(value: unknown): value is MisalignmentFinding {
+  // Both name two elements by their boxes and their texts, as a collision does.
+  if (!isCollisionFinding(value)) {
+    return false;
+  }
+  const { edge, of, by } = value as Record<string, unknown>;
+  return ALIGNED_EDGES.has(edge) && (of === "box" || of === "text") && isNumber(by);
 }
 
 function isDrawErrorFinding(value: unknown): value is DrawErrorFinding {

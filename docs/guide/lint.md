@@ -29,7 +29,7 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 | Slide scripts | `slides/<id>.ts` evaluated apart from Node and Bun |
 | Self-containment | Remote URLs, missing files, paths outside the deck |
 | Accessibility | Pictures with nothing for a screen reader to say; contrast is under Rendering |
-| Rendering | Overflow, contrast, and line breaks, measured in a browser |
+| Rendering | Overflow, contrast, line breaks, and alignment, measured in a browser |
 | Narration | Only for decks with `voice/` |
 | Length | Only for decks with a `duration` |
 

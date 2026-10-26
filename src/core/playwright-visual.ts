@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Page } from "playwright";
+import { findMisalignments } from "./alignment.ts";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
 import { measureFill } from "./fill.ts";
 import { finishBeat } from "./finish-beat.ts";
@@ -242,6 +243,7 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
     collisions: found.flatMap((page) => page.collisions ?? []),
     fills: found.flatMap((page) => page.fills ?? []),
     lineBreaks: found.flatMap((page) => page.lineBreaks ?? []),
+    misalignments: found.flatMap((page) => page.misalignments ?? []),
   };
 }
 
@@ -351,6 +353,7 @@ async function visitPage(
     collisions: [],
     fills: [],
     lineBreaks: [],
+    misalignments: [],
   };
   const failing: Failing[] = [];
   const crossing: Crossing[] = [];
@@ -369,6 +372,20 @@ async function visitPage(
     };
     if (actions.includes("fill") && frame) {
       response.fills?.push({ slug, step, ...measureFill(frame, measured.elements) });
+    }
+    if (actions.includes("alignment")) {
+      for (const { element, other, ...miss } of findMisalignments(measured.elements)) {
+        const [one, two] = [measured.elements[element], measured.elements[other]];
+        response.misalignments?.push({
+          slug,
+          step,
+          box: one?.box ?? "",
+          ...(one?.text ? { text: one.text } : {}),
+          other: two?.box ?? "",
+          ...(two?.text ? { otherText: two.text } : {}),
+          ...miss,
+        });
+      }
     }
     if (actions.includes("breaks")) {
       const { wordBreak, flows } = await page.evaluate(measureTextFlowsInPage);

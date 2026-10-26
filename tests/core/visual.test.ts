@@ -305,6 +305,89 @@ describe("lintVisualDeck", () => {
     );
   });
 
+  test("emits DEK036 for items that nearly line up, each with the fix its edge takes", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const miss = {
+          slug: "intro",
+          box: "div.card",
+          text: "安い",
+          other: "div.card",
+          otherText: "速い",
+          of: "box" as const,
+        };
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [],
+            misalignments: [
+              { ...miss, step: "1", edge: "top", by: 3 },
+              { ...miss, step: "2", edge: "top", by: 5 },
+              { ...miss, step: "1", edge: "bottom", by: 4 },
+              { ...miss, step: "1", edge: "center", by: 2 },
+              { ...miss, step: "1", edge: "top", of: "text", by: 4 },
+              {
+                slug: "intro",
+                step: "1",
+                box: "ul",
+                other: "h2.slide-title",
+                otherText: "見出し",
+                edge: "left",
+                of: "box",
+                by: 6,
+              },
+            ],
+          }),
+        });
+        const found = diagnostics?.filter((d) => d.id === "DEK036");
+        expect(
+          found?.every(
+            ({ severity, path }) =>
+              severity === "warning" && path?.endsWith("demo/slides/intro.html"),
+          ),
+        ).toBe(true);
+        expect(found?.map(({ message, hint }) => ({ message, hint }))).toEqual([
+          {
+            message:
+              'div.card "安い" and div.card "速い" almost line up at their tops, 5px apart, at steps 1, 2',
+            hint: "line div.card up with div.card in slides/intro.css, with the same margin, padding, or alignment: an edge a few pixels off reads as a mistake, not a choice",
+          },
+          {
+            message:
+              'div.card "安い" and div.card "速い" almost line up at their bottoms, 4px apart, at step 1',
+            hint: "give div.card and div.card one height in slides/intro.css, with align-items: stretch or the same size: an edge a few pixels off reads as a mistake, not a choice",
+          },
+          {
+            message:
+              'div.card "安い" and div.card "速い" almost line up at their centers, 2px apart, at step 1',
+            hint: "center div.card and div.card on one line in slides/intro.css, with align-items: center or the same margins: an edge a few pixels off reads as a mistake, not a choice",
+          },
+          {
+            message:
+              'div.card "安い" and div.card "速い" almost start their text on one line, 4px apart, at step 1',
+            hint: "give div.card and div.card the same padding in slides/intro.css, so their text starts on one line",
+          },
+          {
+            message:
+              'ul and h2.slide-title "見出し" almost line up at their left edges, 6px apart, at step 1',
+            hint: "line ul up with h2.slide-title in slides/intro.css, with the same margin, padding, or alignment: an edge a few pixels off reads as a mistake, not a choice",
+          },
+        ]);
+        expect(found?.[0]?.data).toEqual({
+          box: "div.card",
+          text: "安い",
+          other: "div.card",
+          otherText: "速い",
+          edge: "top",
+          of: "box",
+          by: 5,
+          steps: ["1", "2"],
+        });
+      },
+    );
+  });
+
   test("emits DEK031 when the runner reports low contrast", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
