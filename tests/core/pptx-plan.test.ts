@@ -566,4 +566,37 @@ describe("planPptxLayers", () => {
     framed.drawn.push({ within: -1, key: [1, 9], extent: rect(141, 100, 160, 120) });
     expect(planPptxLayers(framed, { shapes: true }).lifted.pictures).toEqual([]);
   });
+
+  test("takes the slide's background out of its picture, unless something is laid out under it", () => {
+    const fill = { kind: "solid" as const, paint: BLACK };
+    const plain = plainCard();
+    plain.slide = { background: fill, stacking: false };
+    expect(planPptxLayers(plain, { shapes: true }).background).toEqual(fill);
+    expect(planPptxLayers(plain, { shapes: false }).background).toBeUndefined();
+
+    // Something a negative z-index puts beneath the slide's own paint, which hides it.
+    const under = plainCard();
+    under.slide = { background: fill, stacking: false };
+    under.drawn.push({ within: -1, key: [-1, 9], extent: rect(0, 0, 50, 50) });
+    expect(planPptxLayers(under, { shapes: true }).background).toBeUndefined();
+    // In a slide that is a stacking context of its own, it paints over the background.
+    under.slide.stacking = true;
+    expect(planPptxLayers(under, { shapes: true }).background).toEqual(fill);
+  });
+
+  test("reads the slide's background from what the page computed, when the slide is plain", () => {
+    const paint = (plain: boolean) => ({
+      origin: { left: 0, top: 0 },
+      nodes: [],
+      pseudos: [],
+      described: [],
+      slide: { paint: BLACK, image: "none", plain, stacking: true, width: 1280, height: 720 },
+    });
+    const texts = { boxes: [], blocks: [], drawn: [] };
+    expect(pptxPageFacts(paint(true), texts, new Map()).slide).toEqual({
+      background: { kind: "solid", paint: BLACK },
+      stacking: true,
+    });
+    expect(pptxPageFacts(paint(false), texts, new Map()).slide?.background).toBeUndefined();
+  });
 });

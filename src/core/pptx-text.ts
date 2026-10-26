@@ -24,11 +24,12 @@ export const PPTX_OWNER_ATTR = "data-dek-pptx-font";
  * is not measured stays drawn: SVG, decoration under `aria-hidden`, what a pseudo-element draws,
  * text a transform rotates or skews, text with no fill of its own, and every text's shadow; the
  * text and the shadows among these are reported as drawn. Each element is known by the number
- * `measurePptxPaintInPage` marked it with, which runs first.
+ * `measurePptxPaintInPage` marked it with, which runs first. With `families`, each run says the
+ * `font-family` it was set in, for the theme's fonts to be found.
  *
  * Runs in the page, shipped by `page.evaluate`, so it references nothing outside itself.
  */
-export function measurePptxTextsInPage(): PptxPageTexts {
+export function measurePptxTextsInPage(options?: { families: boolean }): PptxPageTexts {
   const slide = document.querySelector("#deck > .slide");
   if (!(slide instanceof HTMLElement)) {
     return { boxes: [], blocks: [], drawn: [] };
@@ -275,6 +276,7 @@ export function measurePptxTextsInPage(): PptxPageTexts {
       alpha: Math.round(fill.alpha * opacity * 1000) / 1000,
       letterSpacing: (Number.isFinite(letterSpacing) ? letterSpacing : 0) * scale,
       owner,
+      ...(options?.families ? { family: style.fontFamily } : {}),
     };
     const collapse = !/^(pre|pre-wrap|break-spaces)$/.test(style.whiteSpace);
     const lang = parent.closest("[lang]")?.getAttribute("lang") ?? "";

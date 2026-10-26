@@ -45,7 +45,10 @@ import {
   describePptxPicturesInPage,
   hidePptxLiftedInPage,
   measurePptxPaintInPage,
+  measurePptxThemeInPage,
   PPTX_PSEUDO_ATTR,
+  pptxFontProbesInPage,
+  pptxPictureEmptyInPage,
   pptxSvgInPage,
   SVG_CHECKED,
   SVG_PAINT,
@@ -53,6 +56,7 @@ import {
 } from "./pptx-paint.ts";
 import { planPptxLayers, pptxPageFacts } from "./pptx-plan.ts";
 import { measurePptxTextsInPage, PPTX_OWNER_ATTR } from "./pptx-text.ts";
+import type { PptxPageTheme } from "./pptx-theme.ts";
 import { pseudoElementBoxes, pseudoTextBoxes } from "./pseudo-text.ts";
 import { motionSheets } from "./sheet.ts";
 import {
@@ -165,7 +169,7 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
           : { origin: { left: 0, top: 0 }, nodes: [], pseudos: [] }),
         described: await page.evaluate(describePptxPicturesInPage),
       };
-      const texts = await page.evaluate(measurePptxTextsInPage);
+      const texts = await page.evaluate(measurePptxTextsInPage, { families: request.shapes });
       const fonts = await platformFonts(page);
       const placed = request.shapes
         ? await pseudoElementBoxes(page, PPTX_PSEUDO_ATTR, "border", ["before", "after", "marker"])
@@ -210,17 +214,39 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
         await page.evaluate(showOnlyPptxNodeInPage, null);
         files.set(node, svg === undefined ? { png } : { png, svg });
       }
-      if (request.shapes) {
-        await page.evaluate(hidePptxLiftedInPage, plan.lifted);
+      const layers = mapPictures(plan.layers, ({ node, ...picture }) => ({
+        ...picture,
+        ...(files.get(node) ?? { png: "" }),
+      }));
+      if (!request.shapes) {
+        await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
+        return { slug: pageReq.slug, description: plan.description, layers };
       }
-      await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
+      // With the background PowerPoint's, the slide is shot on nothing, and a picture with
+      // nothing left in it is no picture.
+      const { background } = plan;
+      await page.evaluate(hidePptxLiftedInPage, {
+        ...plan.lifted,
+        background: background !== undefined,
+      });
+      const shot = await page.screenshot({
+        path: pageReq.screenshotPath,
+        fullPage: false,
+        ...(background ? { omitBackground: true } : {}),
+      });
+      const empty =
+        background !== undefined &&
+        (await page.evaluate(
+          pptxPictureEmptyInPage,
+          `data:image/png;base64,${shot.toString("base64")}`,
+        ));
       return {
         slug: pageReq.slug,
         description: plan.description,
-        layers: mapPictures(plan.layers, ({ node, ...picture }) => ({
-          ...picture,
-          ...(files.get(node) ?? { png: "" }),
-        })),
+        layers,
+        picture: !empty,
+        ...(background ? { background } : {}),
+        theme: await pageTheme(page),
       };
     },
   );
@@ -228,12 +254,44 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
 }
 
 /**
- * The font Chromium drew each marked element's text with, by the element's number: the one that
- * drew most of its glyphs, as the DevTools protocol reports it. A theme names a stack, or only
- * `sans-serif`; this is the face that was found.
+ * What the slide says of the deck's theme: its color tokens, and each font token as the
+ * `font-family` it is and the faces Chromium drew Latin and East Asian text in with it. Measured
+ * after the slide's last shot, since it puts text in the page to measure.
  */
+async function pageTheme(page: Page): Promise<PptxPageTheme> {
+  const { colors, families } = await page.evaluate(measurePptxThemeInPage);
+  await page.evaluate(pptxFontProbesInPage, true);
+  const faces = await platformFaces(page, "data-dek-pptx-probe");
+  await page.evaluate(pptxFontProbesInPage, false);
+  const fonts: PptxPageTheme["fonts"] = {};
+  for (const token of ["title", "body"] as const) {
+    const family = families[token];
+    const latin = faces.get(`${token}-latin`);
+    if (family !== undefined && latin !== undefined) {
+      fonts[token] = { family, latin, ea: faces.get(`${token}-ea`) ?? latin };
+    }
+  }
+  return { colors, fonts };
+}
+
+/** The font Chromium drew each marked element's text with, by the element's number. */
 async function platformFonts(page: Page): Promise<Map<number, string>> {
   const fonts = new Map<number, string>();
+  for (const [owner, face] of await platformFaces(page, PPTX_OWNER_ATTR)) {
+    if (Number.isInteger(Number(owner))) {
+      fonts.set(Number(owner), face);
+    }
+  }
+  return fonts;
+}
+
+/**
+ * The font Chromium drew each element marked with `attr` in, by the attribute's value: the one
+ * that drew most of its glyphs, as the DevTools protocol reports it. A theme names a stack, or
+ * only `sans-serif`; this is the face that was found.
+ */
+async function platformFaces(page: Page, attr: string): Promise<Map<string, string>> {
+  const fonts = new Map<string, string>();
   const cdp = await page.context().newCDPSession(page);
   try {
     await cdp.send("DOM.enable");
@@ -243,19 +301,19 @@ async function platformFonts(page: Page): Promise<Map<number, string>> {
     };
     const { nodeIds } = (await cdp.send("DOM.querySelectorAll", {
       nodeId: root.nodeId,
-      selector: `[${PPTX_OWNER_ATTR}]`,
+      selector: `[${attr}]`,
     })) as { nodeIds: number[] };
     for (const nodeId of nodeIds) {
       const { attributes } = (await cdp.send("DOM.getAttributes", { nodeId })) as {
         attributes: string[];
       };
-      const owner = Number(attributes[attributes.indexOf(PPTX_OWNER_ATTR) + 1]);
+      const value = attributes[attributes.indexOf(attr) + 1];
       const { fonts: used } = (await cdp.send("CSS.getPlatformFontsForNode", { nodeId })) as {
         fonts: Array<{ familyName: string; glyphCount: number }>;
       };
       const main = [...used].sort((a, b) => b.glyphCount - a.glyphCount)[0];
-      if (main && Number.isInteger(owner)) {
-        fonts.set(owner, main.familyName);
+      if (main && value !== undefined) {
+        fonts.set(value, main.familyName);
       }
     }
   } finally {

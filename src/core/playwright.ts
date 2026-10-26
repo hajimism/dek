@@ -6,7 +6,8 @@ import { DekError } from "./error.ts";
 import type { Fill } from "./fill.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
-import type { PptxLayer, PptxTextBox } from "./pptx-package.ts";
+import type { PptxFill, PptxLayer, PptxTextBox } from "./pptx-package.ts";
+import type { PptxPageTheme } from "./pptx-theme.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
 import { exitWorker, readWorkerRequest, runJsonWorker, workerCommand } from "./spawn.ts";
 import type { Position } from "./step.ts";
@@ -100,7 +101,17 @@ export type PptxPictureFile = { png: string; svg?: string };
 
 /** Each page's layers, in the order of the request's pages, with the font each run was drawn in. */
 export type PptxResponse = {
-  slides: Array<{ slug: string; description: string; layers: PptxLayer<PptxPictureFile>[] }>;
+  slides: Array<{
+    slug: string;
+    description: string;
+    layers: PptxLayer<PptxPictureFile>[];
+    /** With `shapes`: whether anything is left in the slide's picture, false for nothing. */
+    picture?: boolean;
+    /** With `shapes`, the slide's background, when PowerPoint paints it. */
+    background?: PptxFill;
+    /** With `shapes`, what the slide says of the deck's theme. */
+    theme?: PptxPageTheme;
+  }>;
 };
 
 /** What the Playwright worker is asked; the kind says which payload comes with it. */
@@ -458,8 +469,37 @@ function isPptxSlide(value: unknown): value is PptxResponse["slides"][number] {
   if (!value || typeof value !== "object") {
     return false;
   }
-  const { slug, description, layers } = value as Record<string, unknown>;
-  return isString(slug) && isString(description) && isArrayOf(layers, isPptxLayer);
+  const { slug, description, layers, picture, background, theme } = value as Record<
+    string,
+    unknown
+  >;
+  return (
+    isString(slug) &&
+    isString(description) &&
+    isArrayOf(layers, isPptxLayer) &&
+    (picture === undefined || typeof picture === "boolean") &&
+    (background === undefined || isFill(background)) &&
+    (theme === undefined || (Boolean(theme) && typeof theme === "object"))
+  );
+}
+
+function isFill(value: unknown): value is PptxFill {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const fill = value as Record<string, unknown>;
+  return fill.kind === "solid"
+    ? isPaint(fill.paint)
+    : fill.kind === "linear" &&
+        isNumber(fill.angle) &&
+        isArrayOf(
+          fill.stops,
+          (stop: unknown): stop is object =>
+            Boolean(stop) &&
+            typeof stop === "object" &&
+            isNumber((stop as Record<string, unknown>).at) &&
+            isPaint((stop as Record<string, unknown>).paint),
+        );
 }
 
 function isPptxLayer(value: unknown): value is PptxLayer<PptxPictureFile> {

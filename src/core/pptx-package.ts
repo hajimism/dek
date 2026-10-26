@@ -19,6 +19,8 @@ export type PptxRun = {
   letterSpacing: number;
   /** The font the browser drew it with; PowerPoint's default when none is known. */
   font?: string;
+  /** The `font-family` it was set in, to find it in the theme's fonts. */
+  family?: string;
 };
 
 /** One line of text, or the part of one that sits together, at its box on the slide. */
@@ -32,8 +34,30 @@ export type PptxTextBox = {
   runs: PptxRun[];
 };
 
+type Rgb = [number, number, number];
+
 /** A color and its alpha, 0..1, the opacity of everything it is in included. */
-export type PptxPaint = { color: [number, number, number]; alpha: number };
+export type PptxPaint = { color: Rgb; alpha: number };
+
+/**
+ * A slide's background as PowerPoint's own: a color, or a linear gradient, its `angle` in
+ * degrees as DrawingML has it, 0 from left to right and clockwise, and each stop `at` 0..1.
+ */
+export type PptxFill =
+  | { kind: "solid"; paint: PptxPaint }
+  | { kind: "linear"; angle: number; stops: Array<{ at: number; paint: PptxPaint }> };
+
+/** A font of the deck's theme: the `font-family` it is, and the faces it was drawn in. */
+export type PptxThemeFont = { family: string; latin: string; ea: string };
+
+/**
+ * The deck's theme, from its tokens: the colors of `--fg`, `--bg`, `--muted`, and `--accent`,
+ * and the fonts of `--font-title` and `--font-body`. What a slide draws in them refers to them.
+ */
+export type PptxTheme = {
+  colors: Partial<Record<"fg" | "bg" | "muted" | "accent", Rgb>>;
+  fonts?: { title: PptxThemeFont; body: PptxThemeFont };
+};
 
 /** A box on the slide in its own pixels. */
 type PptxRect = { x: number; y: number; width: number; height: number };
@@ -118,8 +142,10 @@ export type PptxParagraph = {
 };
 
 export type PptxSlide = {
-  /** The slide drawn without what is laid over it, as a PNG. */
-  picture: Uint8Array;
+  /** The slide drawn without what is laid over it, as a PNG; none when nothing is left in it. */
+  picture?: Uint8Array;
+  /** The slide's background as PowerPoint's own, when it is not in the picture. */
+  background?: PptxFill;
   /** What the picture shows, for a screen reader: the slide's own alternative texts. */
   description: string;
   /** What is laid over the picture, in the order the browser painted it. */
@@ -134,6 +160,8 @@ export type PptxDeck = {
   /** The slide's logical size in pixels; one pixel is 1/96 inch, as CSS has it. */
   size: { width: number; height: number };
   slides: PptxSlide[];
+  /** With `--shapes`, the deck's theme as PowerPoint's; PowerPoint's own without it. */
+  theme?: PptxTheme;
 };
 
 /** English Metric Units in one CSS pixel: 914400 to the inch, 96 pixels to the inch. */
@@ -202,7 +230,7 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
     "ppt/tableStyles.xml",
     `${DECL}<a:tblStyleLst xmlns:a="${NS.a}" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`,
   );
-  add("ppt/theme/theme1.xml", theme("dek"));
+  add("ppt/theme/theme1.xml", theme("dek", deck.theme));
   add("ppt/theme/theme2.xml", theme("dek notes"));
   add("ppt/slideMasters/slideMaster1.xml", slideMaster());
   add(
@@ -233,7 +261,9 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
       `ppt/slides/_rels/slide${n}.xml.rels`,
       relationships([
         [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout1.xml"],
-        [`${NS.rel}/image`, `../media/image${n}.png`],
+        ...(slide.picture
+          ? [[`${NS.rel}/image`, `../media/image${n}.png`] as [string, string]]
+          : []),
         [`${NS.rel}/notesSlide`, `../notesSlides/notesSlide${n}.xml`],
         ...written.media.map((file): [string, string] => [
           `${NS.rel}/image`,
@@ -241,7 +271,9 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
         ]),
       ]),
     );
-    parts.push({ path: `ppt/media/image${n}.png`, data: slide.picture });
+    if (slide.picture) {
+      parts.push({ path: `ppt/media/image${n}.png`, data: slide.picture });
+    }
     for (const file of written.media) {
       parts.push({ path: `ppt/media/${file.path}`, data: file.data });
     }
@@ -337,9 +369,6 @@ function notesSlide(notes: string, lang: string): string {
   return `${DECL}<p:notes ${PML}><p:cSld><p:spTree>${GROUP}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image"/><p:cNvSpPr><a:spLocks noGrp="1" noRot="1" noChangeAspect="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldImg"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/>${paragraphs || `<a:p><a:endParaRPr lang="${escapeXml(lang)}" dirty="0"/></a:p>`}</p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:notes>`;
 }
 
-/** The relationships a slide's XML holds before its pictures': layout, picture, and notes. */
-const SLIDE_RELS = 3;
-
 type MediaFile = { path: string; data: Uint8Array };
 
 /** What a slide writes: its XML, and the files its own pictures embed, in its relationships' order. */
@@ -350,26 +379,58 @@ function slideParts(
 ): { xml: string; media: MediaFile[] } {
   const files: MediaFile[] = [];
   const encoder = new TextEncoder();
+  // The relationships before the slide's own pictures': its layout, its picture, its notes.
+  const before = slide.picture ? 3 : 2;
   let id = 2;
   const writer: LayerWriter = {
-    lang: deck.lang,
+    style: { lang: deck.lang, theme: deck.theme },
     id: () => ++id,
     embed: (data, extension) => {
       files.push({ path: `image${media.next++}.${extension}`, data });
-      return `rId${SLIDE_RELS + files.length}`;
+      return `rId${before + files.length}`;
     },
     encode: (text) => encoder.encode(text),
   };
-  const picture = `<p:pic><p:nvPicPr><p:cNvPr id="2" name="Slide" descr="${escapeAttribute(slide.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform({ x: 0, y: 0, ...deck.size })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  const picture = slide.picture
+    ? `<p:pic><p:nvPicPr><p:cNvPr id="2" name="Slide" descr="${escapeAttribute(slide.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform({ x: 0, y: 0, ...deck.size })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`
+    : "";
   const layers = slide.layers.map((layer) => layerXml(layer, writer)).join("");
   return {
-    xml: `${DECL}<p:sld ${PML}><p:cSld><p:spTree>${GROUP}${picture}${layers}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`,
+    xml: `${DECL}<p:sld ${PML}><p:cSld>${backgroundXml(slide.background, deck.theme)}<p:spTree>${GROUP}${picture}${layers}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`,
     media: files,
   };
 }
 
+/**
+ * A slide's own background: none when it has none of its own, or when it is the theme's
+ * background color, which the master paints on every slide.
+ */
+function backgroundXml(fill: PptxFill | undefined, theme: PptxTheme | undefined): string {
+  if (
+    !fill ||
+    (fill.kind === "solid" && fill.paint.alpha === 1 && same(fill.paint.color, theme?.colors.bg))
+  ) {
+    return "";
+  }
+  const painted =
+    fill.kind === "solid"
+      ? solidFill(fill.paint, theme)
+      : `<a:gradFill rotWithShape="1"><a:gsLst>${fill.stops
+          .map(
+            ({ at, paint }) =>
+              `<a:gs pos="${Math.round(at * 100000)}">${colorXml(paint, theme)}</a:gs>`,
+          )
+          .join(
+            "",
+          )}</a:gsLst><a:lin ang="${Math.round(fill.angle * 60000)}" scaled="0"/></a:gradFill>`;
+  return `<p:bg><p:bgPr>${painted}<a:effectLst/></p:bgPr></p:bg>`;
+}
+
+/** How the deck writes text and color: in its language, in its theme's colors and fonts. */
+type Style = { lang: string; theme?: PptxTheme };
+
 type LayerWriter = {
-  lang: string;
+  style: Style;
   /** The next shape id on the slide. */
   id: () => number;
   /** Adds a file the slide embeds, and answers its relationship's id. */
@@ -380,11 +441,11 @@ type LayerWriter = {
 function layerXml(layer: PptxLayer, writer: LayerWriter): string {
   switch (layer.kind) {
     case "text":
-      return textBox(layer, writer.id(), writer.lang);
+      return textBox(layer, writer.id(), writer.style);
     case "shape":
       return shapeXml(layer, writer);
     case "rule":
-      return ruleXml(layer, writer.id());
+      return ruleXml(layer, writer.id(), writer.style.theme);
     case "picture":
       return pictureXml(layer, writer);
     default: {
@@ -397,10 +458,10 @@ function layerXml(layer: PptxLayer, writer: LayerWriter): string {
 /** A shape alone, or, when it holds anything, a group of it and what it holds. */
 function shapeXml(shape: PptxShape, writer: LayerWriter): string {
   if (shape.layers.length === 0) {
-    return shapeSp(shape, writer.id(), writer.lang);
+    return shapeSp(shape, writer.id(), writer.style);
   }
   const id = writer.id();
-  const own = shapeSp(shape, writer.id(), writer.lang);
+  const own = shapeSp(shape, writer.id(), writer.style);
   const held = shape.layers.map((layer) => layerXml(layer, writer)).join("");
   const bounds = frameOf(shape);
   const at = `<a:off x="${emu(bounds.x)}" y="${emu(bounds.y)}"/><a:ext cx="${emu(bounds.width)}" cy="${emu(bounds.height)}"/>`;
@@ -412,7 +473,7 @@ function shapeXml(shape: PptxShape, writer: LayerWriter): string {
  * The shape itself. PowerPoint strokes the middle of a path and CSS draws a border inside the
  * box, so the path runs half the border's width inside the border box, and so do its corners.
  */
-function shapeSp(shape: PptxShape, id: number, lang: string): string {
+function shapeSp(shape: PptxShape, id: number, style: Style): string {
   const half = (shape.outline?.width ?? 0) / 2;
   const path = pathOf(shape);
   const radius = Math.max(0, shape.radius - half);
@@ -421,24 +482,24 @@ function shapeSp(shape: PptxShape, id: number, lang: string): string {
     radius > 0 && shorter > 0
       ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.min(50000, Math.round((radius / shorter) * 100000))}"/></a:avLst></a:prstGeom>`
       : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
-  const fill = shape.fill ? solidFill(shape.fill) : "<a:noFill/>";
+  const fill = shape.fill ? solidFill(shape.fill, style.theme) : "<a:noFill/>";
   const line = shape.outline
-    ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint)}</a:ln>`
+    ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint, style.theme)}</a:ln>`
     : "<a:ln><a:noFill/></a:ln>";
-  const text = shape.text ? shapeText(shape.text, half, lang) : "";
+  const text = shape.text ? shapeText(shape.text, half, style) : "";
   return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path)}${geometry}${fill}${line}</p:spPr>${text}</p:sp>`;
 }
 
 const ALIGN = { left: "l", center: "ctr", right: "r", justify: "just" } as const;
 
 /** A shape's text, set inside its insets less what the path already took. */
-function shapeText(text: PptxShapeText, half: number, lang: string): string {
+function shapeText(text: PptxShapeText, half: number, style: Style): string {
   const inset = (px: number) => emu(Math.max(0, px - half));
-  const paragraphs = text.paragraphs.map((paragraph) => paragraphXml(paragraph, lang)).join("");
+  const paragraphs = text.paragraphs.map((paragraph) => paragraphXml(paragraph, style)).join("");
   return `<p:txBody><a:bodyPr wrap="${text.wrap ? "square" : "none"}" lIns="${inset(text.inset.left)}" tIns="${inset(text.inset.top)}" rIns="${inset(text.inset.right)}" bIns="${inset(text.inset.bottom)}" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs || "<a:p/>"}</p:txBody>`;
 }
 
-function paragraphXml(paragraph: PptxParagraph, lang: string): string {
+function paragraphXml(paragraph: PptxParagraph, style: Style): string {
   const { bullet } = paragraph;
   const marker =
     bullet === undefined
@@ -454,18 +515,18 @@ function paragraphXml(paragraph: PptxParagraph, lang: string): string {
     .map((run) =>
       run.text
         .split("\n")
-        .map((piece) => (piece === "" ? "" : textRun({ ...run, text: piece }, lang)))
-        .join(`<a:br>${runProperties(run, lang)}</a:br>`),
+        .map((piece) => (piece === "" ? "" : textRun({ ...run, text: piece }, style)))
+        .join(`<a:br>${runProperties(run, style)}</a:br>`),
     )
     .join("");
   return `<a:p>${properties}${runs}</a:p>`;
 }
 
 /** A rule from one end to the other, a straight connector, flipped where it runs up or left. */
-function ruleXml(rule: PptxRule, id: number): string {
+function ruleXml(rule: PptxRule, id: number, theme: PptxTheme | undefined): string {
   const frame = frameOf(rule);
   const flips = `${rule.x2 < rule.x1 ? ' flipH="1"' : ""}${rule.y2 < rule.y1 ? ' flipV="1"' : ""}`;
-  return `<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="${id}" name="Line ${id - 2}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm${flips}><a:off x="${emu(frame.x)}" y="${emu(frame.y)}"/><a:ext cx="${emu(frame.width)}" cy="${emu(frame.height)}"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom><a:ln w="${emu(rule.width)}" cap="flat">${solidFill(rule.paint)}</a:ln></p:spPr></p:cxnSp>`;
+  return `<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="${id}" name="Line ${id - 2}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm${flips}><a:off x="${emu(frame.x)}" y="${emu(frame.y)}"/><a:ext cx="${emu(frame.width)}" cy="${emu(frame.height)}"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom><a:ln w="${emu(rule.width)}" cap="flat">${solidFill(rule.paint, theme)}</a:ln></p:spPr></p:cxnSp>`;
 }
 
 /** The extension PowerPoint 2016 and later read an SVG from; the PNG is for any other. */
@@ -529,14 +590,39 @@ function transform(box: PptxRect): string {
   return `<a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width)}" cy="${emu(box.height)}"/></a:xfrm>`;
 }
 
-function solidFill(paint: PptxPaint): string {
-  return `<a:solidFill>${srgb(paint.color, paint.alpha)}</a:solidFill>`;
+function solidFill(paint: PptxPaint, theme: PptxTheme | undefined): string {
+  return `<a:solidFill>${colorXml(paint, theme)}</a:solidFill>`;
 }
 
-function srgb(color: [number, number, number], alpha: number): string {
-  const hex = color.map((channel) => channel.toString(16).padStart(2, "0")).join("");
-  const opacity = alpha < 1 ? `<a:alpha val="${Math.round(alpha * 100000)}"/>` : "";
-  return `<a:srgbClr val="${hex.toUpperCase()}">${opacity}</a:srgbClr>`;
+/**
+ * The theme's colors as a slide refers to them, through the master's map, in the order a color
+ * two tokens share is taken: the text's, the background's, the accent, the muted.
+ */
+const SCHEME = [
+  ["fg", "tx1"],
+  ["bg", "bg1"],
+  ["accent", "accent1"],
+  ["muted", "tx2"],
+] as const;
+
+/** A color as the theme's when it is one of the theme's, so it follows the theme; else as itself. */
+function colorXml(paint: PptxPaint, theme: PptxTheme | undefined): string {
+  const opacity = paint.alpha < 1 ? `<a:alpha val="${Math.round(paint.alpha * 100000)}"/>` : "";
+  const scheme = SCHEME.find(([token]) => same(paint.color, theme?.colors[token]))?.[1];
+  return scheme
+    ? `<a:schemeClr val="${scheme}">${opacity}</a:schemeClr>`
+    : `<a:srgbClr val="${hex(paint.color)}">${opacity}</a:srgbClr>`;
+}
+
+function same(a: Rgb, b: Rgb | undefined): boolean {
+  return b !== undefined && a.every((channel, index) => channel === b[index]);
+}
+
+function hex(color: Rgb): string {
+  return color
+    .map((channel) => channel.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
 }
 
 /** Hundredths of a point, as DrawingML sets sizes and spacing. */
@@ -550,8 +636,8 @@ function points(px: number): number {
  * line's end, since a renderer that wraps anyway, or a substitute font a little wider, would
  * otherwise break the line again; the text is set from the left, so the room shows nowhere.
  */
-function textBox(box: PptxTextBox, id: number, lang: string): string {
-  const runs = box.runs.map((run) => textRun(run, lang)).join("");
+function textBox(box: PptxTextBox, id: number, style: Style): string {
+  const runs = box.runs.map((run) => textRun(run, style)).join("");
   const spacing = Math.max(1, Math.round(box.lineHeight * PT_PER_PX * 100));
   const room = roomOf(box);
   return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id - 2}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width + room)}" cy="${emu(box.height)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr><a:lnSpc><a:spcPts val="${spacing}"/></a:lnSpc></a:pPr>${runs}</a:p></p:txBody></p:sp>`;
@@ -562,13 +648,13 @@ function roomOf(box: PptxTextBox): number {
   return Math.max(box.width * 0.25, box.lineHeight * 2);
 }
 
-function textRun(run: PptxRun, lang: string): string {
-  return `<a:r>${runProperties(run, lang)}<a:t>${escapeXml(run.text)}</a:t></a:r>`;
+function textRun(run: PptxRun, style: Style): string {
+  return `<a:r>${runProperties(run, style)}<a:t>${escapeXml(run.text)}</a:t></a:r>`;
 }
 
-function runProperties(run: PptxRun, lang: string): string {
+function runProperties(run: PptxRun, style: Style): string {
   const attributes = [
-    `lang="${escapeXml(lang)}"`,
+    `lang="${escapeXml(style.lang)}"`,
     `sz="${Math.max(100, points(run.size))}"`,
     `b="${run.bold ? 1 : 0}"`,
     `i="${run.italic ? 1 : 0}"`,
@@ -577,10 +663,25 @@ function runProperties(run: PptxRun, lang: string): string {
     ...(run.letterSpacing !== 0 ? [`spc="${points(run.letterSpacing)}"`] : []),
     'dirty="0"',
   ].join(" ");
-  const font = run.font
-    ? `<a:latin typeface="${escapeXml(run.font)}"/><a:ea typeface="${escapeXml(run.font)}"/><a:cs typeface="${escapeXml(run.font)}"/>`
-    : "";
-  return `<a:rPr ${attributes}><a:solidFill>${srgb(run.color, run.alpha)}</a:solidFill>${font}</a:rPr>`;
+  // Text set in a font token is set in the theme's font, each script in its own face, as the
+  // browser set it; the body's wins when both tokens name one font.
+  const fonts = style.theme?.fonts;
+  const themed =
+    run.family === undefined
+      ? undefined
+      : run.family === fonts?.body.family
+        ? "mn"
+        : run.family === fonts?.title.family
+          ? "mj"
+          : undefined;
+  const faces = (face: (script: "lt" | "ea" | "cs") => string) =>
+    `<a:latin typeface="${face("lt")}"/><a:ea typeface="${face("ea")}"/><a:cs typeface="${face("cs")}"/>`;
+  const font = themed
+    ? faces((script) => `+${themed}-${script}`)
+    : run.font
+      ? faces(() => escapeXml(run.font ?? ""))
+      : "";
+  return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${font}</a:rPr>`;
 }
 
 function emu(px: number): number {
@@ -619,12 +720,21 @@ function xmlChar(code: number): boolean {
  * A complete theme: PowerPoint repairs a file whose theme leaves out the colors, the fonts, or
  * the three lists of fill, line, and effect styles. Nothing in a slide uses it but the notes.
  */
-function theme(name: string): string {
+function theme(name: string, deck?: PptxTheme): string {
   const solid = (value: string) => `<a:solidFill><a:schemeClr val="${value}"/></a:solidFill>`;
   const fills = `${solid("phClr")}${solid("phClr")}${solid("phClr")}`;
   const line = (width: number) =>
     `<a:ln w="${width}" cap="flat" cmpd="sng" algn="ctr">${solid("phClr")}<a:prstDash val="solid"/><a:miter lim="800000"/></a:ln>`;
   const effect = "<a:effectStyle><a:effectLst/></a:effectStyle>";
   const clr = (tag: string, value: string) => `<a:${tag}><a:srgbClr val="${value}"/></a:${tag}>`;
-  return `${DECL}<a:theme xmlns:a="${NS.a}" name="${escapeXml(name)}"><a:themeElements><a:clrScheme name="dek"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>${clr("dk2", "44546A")}${clr("lt2", "E7E6E6")}${clr("accent1", "4472C4")}${clr("accent2", "ED7D31")}${clr("accent3", "A5A5A5")}${clr("accent4", "FFC000")}${clr("accent5", "5B9BD5")}${clr("accent6", "70AD47")}${clr("hlink", "0563C1")}${clr("folHlink", "954F72")}</a:clrScheme><a:fontScheme name="dek"><a:majorFont><a:latin typeface="Calibri Light"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="dek"><a:fillStyleLst>${fills}</a:fillStyleLst><a:lnStyleLst>${line(6350)}${line(12700)}${line(19050)}</a:lnStyleLst><a:effectStyleLst>${effect}${effect}${effect}</a:effectStyleLst><a:bgFillStyleLst>${fills}</a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>`;
+  // The tokens fill the slots the master maps text, background, and accent to; the rest are
+  // PowerPoint's own, and so is every slot of a deck without a theme.
+  const token = (tag: string, color: Rgb | undefined, otherwise: string) =>
+    color ? clr(tag, hex(color)) : otherwise;
+  const colors = deck?.colors ?? {};
+  const face = (font: PptxThemeFont | undefined, latin: string) =>
+    font
+      ? `<a:latin typeface="${escapeXml(font.latin)}"/><a:ea typeface="${escapeXml(font.ea)}"/><a:cs typeface="${escapeXml(font.latin)}"/>`
+      : `<a:latin typeface="${latin}"/><a:ea typeface=""/><a:cs typeface=""/>`;
+  return `${DECL}<a:theme xmlns:a="${NS.a}" name="${escapeXml(name)}"><a:themeElements><a:clrScheme name="dek">${token("dk1", colors.fg, '<a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>')}${token("lt1", colors.bg, '<a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>')}${token("dk2", colors.muted, clr("dk2", "44546A"))}${clr("lt2", "E7E6E6")}${token("accent1", colors.accent, clr("accent1", "4472C4"))}${clr("accent2", "ED7D31")}${clr("accent3", "A5A5A5")}${clr("accent4", "FFC000")}${clr("accent5", "5B9BD5")}${clr("accent6", "70AD47")}${clr("hlink", "0563C1")}${clr("folHlink", "954F72")}</a:clrScheme><a:fontScheme name="dek"><a:majorFont>${face(deck?.fonts?.title, "Calibri Light")}</a:majorFont><a:minorFont>${face(deck?.fonts?.body, "Calibri")}</a:minorFont></a:fontScheme><a:fmtScheme name="dek"><a:fillStyleLst>${fills}</a:fillStyleLst><a:lnStyleLst>${line(6350)}${line(12700)}${line(19050)}</a:lnStyleLst><a:effectStyleLst>${effect}${effect}${effect}</a:effectStyleLst><a:bgFillStyleLst>${fills}</a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>`;
 }

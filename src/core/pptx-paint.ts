@@ -29,6 +29,19 @@ export type PptxPagePaint = {
   nodes: PptxPaintNode[];
   pseudos: PptxPseudoPaint[];
   described: Array<{ node: number; text: string }>;
+  /**
+   * The slide's own background as computed, and whether that is all the slide paints of its own
+   * box, over the whole viewport, as PowerPoint paints a slide's background; and whether it is a
+   * stacking context.
+   */
+  slide?: {
+    paint: { color: [number, number, number]; alpha: number };
+    image: string;
+    plain: boolean;
+    stacking: boolean;
+    width: number;
+    height: number;
+  };
 };
 
 /**
@@ -102,25 +115,36 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
   /** Whether one of the transform properties says anything; `transform` itself is read apart. */
   const set = (value: string): boolean => value !== "none" && value !== "";
 
-  const layerOf = (style: CSSStyleDeclaration, parent: Element | null): number => {
-    const positioned = style.position !== "static";
+  /** The element's `z-index`, when it is one that counts: positioned, or a flex or grid item. */
+  const zOf = (style: CSSStyleDeclaration, parent: Element | null): number | undefined => {
     const display = parent ? getComputedStyle(parent).display : "";
     const z = style.zIndex === "auto" ? undefined : Number(style.zIndex);
-    if (z !== undefined && Number.isFinite(z) && (positioned || /flex|grid/.test(display))) {
+    return z !== undefined &&
+      Number.isFinite(z) &&
+      (style.position !== "static" || /flex|grid/.test(display))
+      ? z
+      : undefined;
+  };
+
+  /** Whether the element is a stacking context of its own by what it paints, not by `z-index`. */
+  const isolates = (style: CSSStyleDeclaration): boolean =>
+    Number(style.opacity) < 1 ||
+    style.transform !== "none" ||
+    set(style.rotate) ||
+    set(style.scale) ||
+    set(style.translate) ||
+    style.filter !== "none" ||
+    style.isolation === "isolate" ||
+    style.mixBlendMode !== "normal" ||
+    style.clipPath !== "none" ||
+    (style.maskImage !== "none" && style.maskImage !== "");
+
+  const layerOf = (style: CSSStyleDeclaration, parent: Element | null): number => {
+    const z = zOf(style, parent);
+    if (z !== undefined) {
       return z < 0 ? z : z + 1;
     }
-    const stacking =
-      Number(style.opacity) < 1 ||
-      style.transform !== "none" ||
-      set(style.rotate) ||
-      set(style.scale) ||
-      set(style.translate) ||
-      style.filter !== "none" ||
-      style.isolation === "isolate" ||
-      style.mixBlendMode !== "normal" ||
-      style.clipPath !== "none" ||
-      (style.maskImage !== "none" && style.maskImage !== "");
-    return positioned || stacking ? 1 : 0;
+    return style.position !== "static" || isolates(style) ? 1 : 0;
   };
 
   /**
@@ -270,9 +294,14 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
       style.outlineStyle !== "none" && px(style.outlineWidth) > 0
         ? px(style.outlineWidth) + Math.max(0, px(style.outlineOffset))
         : 0;
+    // A border image paints instead of the borders, and a column rule between the columns.
+    const unmeasured =
+      style.borderImageSource !== "none" ||
+      (style.columnRuleStyle !== "none" && px(style.columnRuleWidth) > 0);
     const paints =
       background.alpha > 0 ||
       image ||
+      unmeasured ||
       sides.some((side) => side.drawn) ||
       shadow > 0 ||
       outline > 0;
@@ -295,6 +324,7 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
       getComputedStyle(el.closest("table") ?? el).borderCollapse === "collapse";
     if (
       image ||
+      unmeasured ||
       reach > 0 ||
       effect ||
       scale === undefined ||
@@ -582,7 +612,150 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
     }
   }
 
-  return { origin: { left: origin.left, top: origin.top }, nodes, pseudos };
+  // The slide's own box: painted only by its background, over the whole viewport, it is what
+  // PowerPoint paints as a slide's background.
+  const own = getComputedStyle(slide);
+  const plain =
+    SIDES.every((side) => px(own.getPropertyValue(`border-${side.toLowerCase()}-width`)) === 0) &&
+    [
+      own.borderTopLeftRadius,
+      own.borderTopRightRadius,
+      own.borderBottomRightRadius,
+      own.borderBottomLeftRadius,
+    ].every((radius) => px(radius) === 0) &&
+    reachOf(own.boxShadow) === 0 &&
+    (own.outlineStyle === "none" || px(own.outlineWidth) === 0) &&
+    !effects(own) &&
+    Number(own.opacity) === 1 &&
+    own.transform === "none" &&
+    !set(own.rotate) &&
+    !set(own.scale) &&
+    !set(own.translate) &&
+    own.visibility === "visible" &&
+    /^auto( auto)?$/.test(own.backgroundSize) &&
+    /^0% 0%$|^0px 0px$/.test(own.backgroundPosition) &&
+    own.backgroundBlendMode === "normal" &&
+    !offscreen(origin) &&
+    origin.left <= 0.5 &&
+    origin.top <= 0.5 &&
+    origin.right >= window.innerWidth - 0.5 &&
+    origin.bottom >= window.innerHeight - 0.5;
+  const stacking = zOf(own, slide.parentElement) !== undefined || isolates(own);
+  return {
+    origin: { left: origin.left, top: origin.top },
+    nodes,
+    pseudos,
+    slide: {
+      paint: rgba(own.backgroundColor),
+      image: own.backgroundImage,
+      plain,
+      stacking,
+      width: origin.width,
+      height: origin.height,
+    },
+  };
+}
+
+/**
+ * What the slide says of the deck's theme: the color each of its color tokens is, and the
+ * `font-family` each of its font tokens is, each as an element set in it computes it, so a token
+ * set from another reads as what it comes to. A token the slide does not set is not there.
+ */
+export function measurePptxThemeInPage(): {
+  colors: Partial<Record<"fg" | "bg" | "muted" | "accent", [number, number, number]>>;
+  families: Partial<Record<"title" | "body", string>>;
+} {
+  const slide = document.querySelector("#deck > .slide");
+  if (!(slide instanceof HTMLElement)) {
+    return { colors: {}, families: {} };
+  }
+  const tokens = getComputedStyle(slide);
+  const given = (token: string) => tokens.getPropertyValue(token).trim() !== "";
+  const probe = document.createElement("span");
+  probe.style.cssText = "position: absolute; visibility: hidden;";
+  slide.append(probe);
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const paint = canvas.getContext("2d", { willReadFrequently: true });
+  const colors: Partial<Record<"fg" | "bg" | "muted" | "accent", [number, number, number]>> = {};
+  for (const token of ["fg", "bg", "muted", "accent"] as const) {
+    if (!given(`--${token}`) || !paint) {
+      continue;
+    }
+    probe.style.color = `var(--${token})`;
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "rgba(0, 0, 0, 0)";
+    paint.fillStyle = getComputedStyle(probe).color;
+    paint.fillRect(0, 0, 1, 1);
+    const [r = 0, g = 0, b = 0, a = 0] = paint.getImageData(0, 0, 1, 1).data;
+    // A color the page shows through is no color a theme can name.
+    if (a === 255) {
+      colors[token] = [r, g, b];
+    }
+  }
+  const families: Partial<Record<"title" | "body", string>> = {};
+  for (const token of ["title", "body"] as const) {
+    if (given(`--font-${token}`)) {
+      probe.style.fontFamily = `var(--font-${token})`;
+      families[token] = getComputedStyle(probe).fontFamily;
+    }
+  }
+  probe.remove();
+  return { colors, families };
+}
+
+/**
+ * Puts, or takes away, a line of text in each font token, Latin and East Asian, marked
+ * `data-dek-pptx-probe="<token>-<script>"` for Chromium to say which face drew it. Puts them in
+ * only after the last shot of the slide.
+ */
+export async function pptxFontProbesInPage(put: boolean): Promise<void> {
+  for (const probe of document.querySelectorAll("[data-dek-pptx-probe]")) {
+    probe.remove();
+  }
+  const slide = document.querySelector("#deck > .slide");
+  if (!put || !(slide instanceof HTMLElement)) {
+    return;
+  }
+  for (const token of ["title", "body"] as const) {
+    for (const [script, text] of [
+      ["latin", "Aa"],
+      ["ea", "あ漢字"],
+    ] as const) {
+      const probe = document.createElement("span");
+      probe.setAttribute("data-dek-pptx-probe", `${token}-${script}`);
+      probe.style.cssText = `position: absolute; left: 0; top: 0; font-family: var(--font-${token});`;
+      probe.textContent = text;
+      slide.append(probe);
+    }
+  }
+  // Laid out and drawn once, so Chromium has shaped them with the faces it found.
+  await new Promise<void>((done) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => done())),
+  );
+}
+
+/** Whether a PNG, as a data URL, is transparent all over: nothing is left in the picture. */
+export async function pptxPictureEmptyInPage(src: string): Promise<boolean> {
+  const image = new Image();
+  image.src = src;
+  await image.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width;
+  canvas.height = image.height;
+  const paint = canvas.getContext("2d", { willReadFrequently: true });
+  if (!paint) {
+    return false;
+  }
+  paint.drawImage(image, 0, 0);
+  const { data } = paint.getImageData(0, 0, image.width, image.height);
+  for (let at = 3; at < data.length; at += 4) {
+    if (data[at] !== 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -955,12 +1128,15 @@ ${alone}${over} { visibility: visible !important; }`;
 
 /**
  * Takes what was laid over the picture out of it, with no change to the layout: a shape's
- * background and borders made transparent, a picture hidden, and a bullet's marker unpainted.
+ * background and borders made transparent, a picture hidden, a bullet's marker unpainted, and
+ * the slide's background, when PowerPoint paints it.
  */
 export function hidePptxLiftedInPage(lifted: {
   shapes: number[];
   pictures: number[];
   markers: number[];
+  /** Whether the slide's background is PowerPoint's: the slide is shot on nothing. */
+  background: boolean;
 }): void {
   const over = ":not(#dek-pptx-0):not(#dek-pptx-1):not(#dek-pptx-2)";
   const select = (ids: number[], suffix = "") =>
@@ -974,6 +1150,9 @@ export function hidePptxLiftedInPage(lifted: {
       : "",
     lifted.markers.length > 0
       ? `${select(lifted.markers, "::marker")} { color: transparent !important; }`
+      : "",
+    lifted.background
+      ? `html${over}, body${over}, #deck${over}, #deck > .slide${over} { background: transparent !important; }`
       : "",
   ].filter((rule) => rule !== "");
   if (rules.length === 0) {

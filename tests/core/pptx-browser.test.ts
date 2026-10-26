@@ -188,6 +188,40 @@ const edgeSlide = `<section class="slide">
 </section>
 `;
 
+const themedScript = `---
+title: Themed
+lang: ja
+---
+
+## cover
+
+表紙。
+
+## fade
+
+背景の移り変わり。
+`;
+
+const themedTheme = `.slide { --fg: rgb(20 20 20); --bg: rgb(250 248 240); --muted: rgb(225 225 215); --accent: rgb(200 60 0); --font-title: sans-serif; --font-body: serif; position: relative; width: 1280px; height: 720px; margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+.slide h2 { position: absolute; left: 80px; top: 60px; margin: 0; font-family: var(--font-title); font-size: 48px; line-height: 60px; }
+.slide .card { position: absolute; left: 80px; top: 200px; width: 400px; padding: 24px; background: var(--muted); border-radius: 12px; }
+.slide .card p { margin: 0; font-size: 24px; line-height: 36px; }
+.slide.fade { background: linear-gradient(to right, rgb(250 248 240), rgb(200 220 255)); }
+.slide .drawn { position: absolute; left: 600px; top: 200px; width: 200px; height: 100px; background: linear-gradient(rgb(255 0 0), rgb(0 0 255)); }
+`;
+
+const themedCover = `<section class="slide">
+  <h2>テーマの色</h2>
+  <div class="card"><p>カードの字。</p></div>
+</section>
+`;
+
+const themedFade = `<section class="slide fade">
+  <h2>移り変わる地</h2>
+  <div class="drawn"></div>
+</section>
+`;
+
 /** The color of a pixel of a PNG, as the browser decodes it. */
 async function pixel(png: Uint8Array, x: number, y: number): Promise<number[]> {
   if (!browser) {
@@ -474,11 +508,15 @@ describe("pptxDeck in a browser", () => {
             shapes.find((shape) => Math.abs(shape.x - x) < 1 && Math.abs(shape.y - y) < 1);
 
           // A box with a transition is a shape, and taken out of the picture at once, not
-          // halfway through fading.
+          // halfway through fading: with the slide's background PowerPoint's, nothing is there.
           expect(at(40, 40)).toMatchObject({ fill: { color: [255, 10, 10] } });
+          expect(slide?.background).toEqual({
+            kind: "solid",
+            paint: { color: [250, 250, 250], alpha: 1 },
+          });
           const files = readZip(readFileSync(outPath));
           const picture = files.get("ppt/media/image1.png") ?? new Uint8Array();
-          expect(await pixel(picture, 2 * 50, 2 * 50)).toEqual([250, 250, 250, 255]);
+          expect(await pixel(picture, 2 * 50, 2 * 50)).toEqual([0, 0, 0, 0]);
 
           // A picture the slide cuts stays drawn; one with an outline is a picture with it.
           const described = pictures.map((layer) => layer.kind === "picture" && layer.description);
@@ -522,6 +560,101 @@ describe("pptxDeck in a browser", () => {
           expect(svg("padded")).toBeUndefined();
           expect(svg("moved")).toBeUndefined();
           expect(svg("ground")).toContain('fill="rgb(255, 250, 200)"');
+        },
+      );
+    },
+  );
+
+  browserTest(
+    "makes the deck's tokens PowerPoint's theme, and its backgrounds PowerPoint's, with --shapes",
+    async () => {
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "themed",
+              script: themedScript,
+              theme: themedTheme,
+              slides: { cover: themedCover, fade: themedFade },
+            },
+          ],
+        },
+        async (root) => {
+          seen.length = 0;
+          const { outPath } = await pptxDeck(join(root, "decks", "themed"), {
+            runner,
+            shapes: true,
+          });
+          const files = readZip(readFileSync(outPath));
+          const parser = new new Window().DOMParser();
+          const read = (name: string) =>
+            parser.parseFromString(new TextDecoder().decode(files.get(name)), "application/xml");
+
+          // The theme's slots are the tokens; its fonts the faces the font tokens drew in.
+          const theme = read("ppt/theme/theme1.xml");
+          const slot = (name: string) =>
+            theme
+              .getElementsByTagName(name)[0]
+              ?.getElementsByTagName("a:srgbClr")[0]
+              ?.getAttribute("val");
+          expect(["a:dk1", "a:lt1", "a:dk2", "a:accent1"].map(slot)).toEqual([
+            "141414",
+            "FAF8F0",
+            "E1E1D7",
+            "C83C00",
+          ]);
+          for (const font of ["a:majorFont", "a:minorFont"]) {
+            const latin = theme.getElementsByTagName(font)[0]?.getElementsByTagName("a:latin")[0];
+            expect(latin?.getAttribute("typeface")).not.toBe("");
+          }
+
+          // The cover: everything is laid over, on the theme's background: no picture is left.
+          const cover = read("ppt/slides/slide1.xml");
+          expect(cover.getElementsByTagName("p:bg")).toHaveLength(0);
+          expect(
+            [...cover.getElementsByTagName("p:cNvPr")].map((el) => el.getAttribute("name")),
+          ).not.toContain("Slide");
+          expect(files.has("ppt/media/image1.png")).toBe(false);
+          const card = [...cover.getElementsByTagName("p:sp")].find(
+            (sp) => sp.getElementsByTagName("a:prstGeom")[0]?.getAttribute("prst") === "roundRect",
+          );
+          expect(
+            card
+              ?.getElementsByTagName("p:spPr")[0]
+              ?.getElementsByTagName("a:schemeClr")[0]
+              ?.getAttribute("val"),
+          ).toBe("tx2");
+          const faces = [...cover.getElementsByTagName("a:rPr")].map((rPr) =>
+            rPr.getElementsByTagName("a:latin")[0]?.getAttribute("typeface"),
+          );
+          expect(faces).toContain("+mj-lt");
+          expect(faces).toContain("+mn-lt");
+          expect(
+            cover
+              .getElementsByTagName("a:rPr")[0]
+              ?.getElementsByTagName("a:schemeClr")[0]
+              ?.getAttribute("val"),
+          ).toBe("tx1");
+
+          // The fade: its gradient is the slide's background; what stays drawn is in a picture
+          // on nothing.
+          const fade = read("ppt/slides/slide2.xml");
+          const gradient = fade
+            .getElementsByTagName("p:bg")[0]
+            ?.getElementsByTagName("a:gradFill")[0];
+          expect(gradient?.getElementsByTagName("a:lin")[0]?.getAttribute("ang")).toBe("0");
+          expect(
+            gradient
+              ?.getElementsByTagName("a:gs")[0]
+              ?.getElementsByTagName("a:schemeClr")[0]
+              ?.getAttribute("val"),
+          ).toBe("bg1");
+          const picture = files.get("ppt/media/image2.png") ?? new Uint8Array();
+          expect(picture[25]).toBe(6);
+          expect((await pixel(picture, 2 * 40, 2 * 400))[3]).toBe(0);
+          expect((await pixel(picture, 2 * 700, 2 * 250))[3]).toBe(255);
+          // The background's colors are PowerPoint's now, not the picture's.
+          expect(seen[1]?.background?.kind).toBe("linear");
         },
       );
     },

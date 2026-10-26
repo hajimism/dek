@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { type DistOptions, distFile } from "./path.ts";
 import { type PlaywrightRunner, requirePlaywright } from "./playwright.ts";
 import { mapPictures, type PptxLayer, pptxPackage } from "./pptx-package.ts";
+import { deckTheme } from "./pptx-theme.ts";
 import { presenterSlides } from "./presenter.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { writeInside } from "./safe-fs.ts";
@@ -69,12 +70,20 @@ export async function pptxDeck(
       options.runner,
     );
     const scripts = presenterSlides(deck, options.public ? "audience" : "speaker");
+    // With --shapes, the deck's tokens are PowerPoint's theme, as most slides have them.
+    const theme = options.shapes
+      ? deckTheme(answer.slides.flatMap((slide) => (slide.theme ? [slide.theme] : [])))
+      : undefined;
     const bytes = pptxPackage({
       title: deck.deck.title,
       lang: deck.deck.lang,
       size,
+      ...(theme ? { theme } : {}),
       slides: answer.slides.map((slide, index) => ({
-        picture: readFileSync(join(shots, `${index + 1}.png`)),
+        ...(slide.picture === false
+          ? {}
+          : { picture: readFileSync(join(shots, `${index + 1}.png`)) }),
+        ...(slide.background ? { background: slide.background } : {}),
         description: slide.description || (sections[index]?.title ?? slide.slug),
         layers: mapPictures(slide.layers, ({ png, svg, ...picture }) => ({
           ...picture,

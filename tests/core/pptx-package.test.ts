@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { posix } from "node:path";
 import { Window } from "happy-dom";
 import {
+  type PptxDeck,
   type PptxRun,
   type PptxShape,
   type PptxSlide,
+  type PptxTheme,
   pptxPackage,
 } from "../../src/core/pptx-package.ts";
 import { readZip } from "../helpers/zip.ts";
@@ -139,9 +141,15 @@ const card = (overrides: Partial<PptxShape> = {}): PptxShape => ({
   ...overrides,
 });
 
-function open(slides: PptxSlide[]) {
+function open(slides: PptxSlide[], deck: Partial<PptxDeck> = {}) {
   const files = readZip(
-    pptxPackage({ title: "Plan & more", lang: "ja", size: { width: 1280, height: 720 }, slides }),
+    pptxPackage({
+      title: "Plan & more",
+      lang: "ja",
+      size: { width: 1280, height: 720 },
+      slides,
+      ...deck,
+    }),
   );
   const decode = (name: string) => new TextDecoder().decode(files.get(name));
   const parser = new new Window().DOMParser();
@@ -507,5 +515,227 @@ describe("pptxPackage", () => {
     expect(xml("docProps/core.xml").getElementsByTagName("dc:title")[0]?.textContent).toBe(
       "Plan & more",
     );
+  });
+
+  describe("with the deck's theme", () => {
+    // A dark theme, as dek's own is: the background dark, the text light.
+    const THEME: PptxTheme = {
+      colors: {
+        fg: [245, 245, 245],
+        bg: [17, 17, 17],
+        accent: [255, 200, 0],
+        muted: [136, 136, 136],
+      },
+      fonts: {
+        title: { family: '"Futura", sans-serif', latin: "Futura", ea: "Hiragino Sans" },
+        body: { family: "sans-serif", latin: "Helvetica", ea: "Hiragino Sans" },
+      },
+    };
+    const MUTED = { color: [136, 136, 136] as [number, number, number], alpha: 0.5 };
+
+    test("names the theme's colors and fonts as PowerPoint's own, in the slots PowerPoint reads", () => {
+      const { xml } = open([slide()], { theme: THEME });
+      const theme = xml("ppt/theme/theme1.xml");
+      const scheme = theme.getElementsByTagName("a:clrScheme")[0];
+      expect([...(scheme?.children ?? [])].map((slot) => slot.tagName)).toEqual([
+        "a:dk1",
+        "a:lt1",
+        "a:dk2",
+        "a:lt2",
+        "a:accent1",
+        "a:accent2",
+        "a:accent3",
+        "a:accent4",
+        "a:accent5",
+        "a:accent6",
+        "a:hlink",
+        "a:folHlink",
+      ]);
+      const color = (slot: string) =>
+        theme
+          .getElementsByTagName(slot)[0]
+          ?.getElementsByTagName("a:srgbClr")[0]
+          ?.getAttribute("val");
+      expect(["a:dk1", "a:lt1", "a:dk2", "a:accent1"].map(color)).toEqual([
+        "F5F5F5",
+        "111111",
+        "888888",
+        "FFC800",
+      ]);
+      const face = (font: string, script: string) =>
+        theme
+          .getElementsByTagName(font)[0]
+          ?.getElementsByTagName(script)[0]
+          ?.getAttribute("typeface");
+      expect([face("a:majorFont", "a:latin"), face("a:majorFont", "a:ea")]).toEqual([
+        "Futura",
+        "Hiragino Sans",
+      ]);
+      expect([
+        face("a:minorFont", "a:latin"),
+        face("a:minorFont", "a:ea"),
+        face("a:minorFont", "a:cs"),
+      ]).toEqual(["Helvetica", "Hiragino Sans", "Helvetica"]);
+      // The notes keep PowerPoint's own.
+      expect(
+        xml("ppt/theme/theme2.xml")
+          .getElementsByTagName("a:dk1")[0]
+          ?.getElementsByTagName("a:sysClr"),
+      ).toHaveLength(1);
+    });
+
+    test("writes a color the theme has as the theme's, its alpha with it, and any other as itself", () => {
+      const { xml } = open(
+        [
+          slide({
+            layers: [
+              card({
+                fill: MUTED,
+                outline: { width: 2, paint: { color: [255, 200, 0], alpha: 1 } },
+                layers: [
+                  {
+                    kind: "rule",
+                    x1: 100,
+                    y1: 499,
+                    x2: 500,
+                    y2: 499,
+                    width: 2,
+                    paint: { color: [1, 2, 3], alpha: 1 },
+                  },
+                ],
+              }),
+            ],
+          }),
+        ],
+        { theme: THEME },
+      );
+      const doc = xml("ppt/slides/slide1.xml");
+      const shape = [...doc.getElementsByTagName("p:sp")].find(
+        (sp) =>
+          sp
+            .getElementsByTagName("p:txBody")[0]
+            ?.getElementsByTagName("a:bodyPr")[0]
+            ?.getAttribute("anchor") === "t" &&
+          sp.getElementsByTagName("a:prstGeom")[0]?.getAttribute("prst") === "roundRect",
+      );
+      const fill = shape?.getElementsByTagName("p:spPr")[0]?.getElementsByTagName("a:solidFill")[0];
+      expect(fill?.firstElementChild?.tagName).toBe("a:schemeClr");
+      expect(fill?.firstElementChild?.getAttribute("val")).toBe("tx2");
+      expect(fill?.getElementsByTagName("a:alpha")[0]?.getAttribute("val")).toBe("50000");
+      const line = shape?.getElementsByTagName("a:ln")[0]?.getElementsByTagName("a:schemeClr")[0];
+      expect(line?.getAttribute("val")).toBe("accent1");
+      const rule = doc.getElementsByTagName("p:cxnSp")[0];
+      expect(rule?.getElementsByTagName("a:srgbClr")[0]?.getAttribute("val")).toBe("010203");
+      // A run in the text's color.
+      const { xml: text } = open(
+        [
+          slide({
+            layers: [
+              {
+                kind: "text",
+                x: 0,
+                y: 0,
+                width: 10,
+                height: 10,
+                lineHeight: 10,
+                runs: [run("字", { color: [245, 245, 245] })],
+              },
+            ],
+          }),
+        ],
+        { theme: THEME },
+      );
+      const rPr = text("ppt/slides/slide1.xml").getElementsByTagName("a:rPr")[0];
+      expect(rPr?.getElementsByTagName("a:schemeClr")[0]?.getAttribute("val")).toBe("tx1");
+    });
+
+    test("sets text in the theme's fonts when it was set in the theme's font tokens", () => {
+      const runs = [
+        run("見出し", { family: '"Futura", sans-serif', font: "Futura" }),
+        run("本文", { family: "sans-serif", font: "Hiragino Sans" }),
+        run("別の字", { family: "serif", font: "Hiragino Mincho ProN" }),
+      ];
+      const layers = [
+        { kind: "text" as const, x: 0, y: 0, width: 10, height: 10, lineHeight: 10, runs },
+      ];
+      const faces = (deck: Partial<PptxDeck>) =>
+        [
+          ...open([slide({ layers })], deck)
+            .xml("ppt/slides/slide1.xml")
+            .getElementsByTagName("a:rPr"),
+        ].map((rPr) =>
+          ["a:latin", "a:ea", "a:cs"].map((script) =>
+            rPr.getElementsByTagName(script)[0]?.getAttribute("typeface"),
+          ),
+        );
+      expect(faces({ theme: THEME })).toEqual([
+        ["+mj-lt", "+mj-ea", "+mj-cs"],
+        ["+mn-lt", "+mn-ea", "+mn-cs"],
+        ["Hiragino Mincho ProN", "Hiragino Mincho ProN", "Hiragino Mincho ProN"],
+      ]);
+      // Without a theme, each run names the font it was drawn with, as ADR 8 has it.
+      expect(faces({})[0]).toEqual(["Futura", "Futura", "Futura"]);
+    });
+
+    test("leaves a background the theme's own to the master, and writes any other on its slide", () => {
+      const { xml } = open(
+        [
+          slide({ background: { kind: "solid", paint: { color: [17, 17, 17], alpha: 1 } } }),
+          slide({ background: { kind: "solid", paint: { color: [0, 51, 102], alpha: 1 } } }),
+          slide({
+            background: {
+              kind: "linear",
+              angle: 90,
+              stops: [
+                { at: 0, paint: { color: [17, 17, 17], alpha: 1 } },
+                { at: 0.4, paint: { color: [0, 51, 102], alpha: 1 } },
+              ],
+            },
+          }),
+        ],
+        { theme: THEME },
+      );
+      const master = xml("ppt/slideMasters/slideMaster1.xml").getElementsByTagName("p:bg")[0];
+      expect(master?.getElementsByTagName("a:schemeClr")[0]?.getAttribute("val")).toBe("bg1");
+      expect(xml("ppt/slides/slide1.xml").getElementsByTagName("p:bg")).toHaveLength(0);
+
+      const solid = xml("ppt/slides/slide2.xml");
+      const cSld = solid.getElementsByTagName("p:cSld")[0];
+      expect([...(cSld?.children ?? [])].map((el) => el.tagName)).toEqual(["p:bg", "p:spTree"]);
+      const bgPr = solid.getElementsByTagName("p:bgPr")[0];
+      expect([...(bgPr?.children ?? [])].map((el) => el.tagName)).toEqual([
+        "a:solidFill",
+        "a:effectLst",
+      ]);
+      expect(bgPr?.getElementsByTagName("a:srgbClr")[0]?.getAttribute("val")).toBe("003366");
+
+      const gradient = xml("ppt/slides/slide3.xml").getElementsByTagName("a:gradFill")[0];
+      const stops = [...(gradient?.getElementsByTagName("a:gs") ?? [])];
+      expect(stops.map((gs) => gs.getAttribute("pos"))).toEqual(["0", "40000"]);
+      expect(stops[0]?.getElementsByTagName("a:schemeClr")[0]?.getAttribute("val")).toBe("bg1");
+      expect(gradient?.getElementsByTagName("a:lin")[0]?.getAttribute("ang")).toBe("5400000");
+    });
+  });
+
+  test("writes a slide with nothing left in its picture without one, its relationships still whole", () => {
+    const { files, xml, decode } = open([slide({ picture: undefined, layers: [card()] }), slide()]);
+    const doc = xml("ppt/slides/slide1.xml");
+    expect(
+      [...doc.getElementsByTagName("p:cNvPr")].map((el) => el.getAttribute("name")),
+    ).not.toContain("Slide");
+    expect(files.has("ppt/media/image1.png")).toBe(false);
+    expect(files.has("ppt/media/image2.png")).toBe(true);
+    // The card's icon is embedded under the id the slide's relationships give it.
+    const rels = xml("ppt/slides/_rels/slide1.xml.rels");
+    const embed = doc.getElementsByTagName("a:blip")[0]?.getAttribute("r:embed");
+    const target = [...rels.getElementsByTagName("Relationship")]
+      .find((rel) => rel.getAttribute("Id") === embed)
+      ?.getAttribute("Target");
+    expect(decode(`ppt/media/${target?.split("/").pop()}`)).toBe(new TextDecoder().decode(PNG));
+    expect(
+      [...rels.getElementsByTagName("Relationship")].filter((rel) =>
+        (rel.getAttribute("Type") ?? "").endsWith("/notesSlide"),
+      ),
+    ).toHaveLength(1);
   });
 });

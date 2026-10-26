@@ -1,4 +1,5 @@
 import type {
+  PptxFill,
   PptxLayer,
   PptxPaint,
   PptxParagraph,
@@ -12,6 +13,7 @@ import type {
 } from "./pptx-package.ts";
 import type { PptxPagePaint } from "./pptx-paint.ts";
 import type { PptxPageTexts } from "./pptx-text.ts";
+import { slideBackground } from "./pptx-theme.ts";
 import type { Box } from "./slide-measure.ts";
 
 // What a PPTX lays over a slide's picture, decided from what the page measured: with `--shapes`,
@@ -110,6 +112,11 @@ export type PptxPageFacts = {
   blocks: PptxBlockText[];
   /** What the slide's pictures say they show, and the element that says it. */
   described: Array<{ node: number; text: string }>;
+  /**
+   * The slide's background, when PowerPoint can paint it as the browser did, and whether the
+   * slide is a stacking context, so nothing a negative `z-index` puts beneath it is hidden by it.
+   */
+  slide?: { background?: PptxFill; stacking: boolean };
 };
 
 /** A picture as the plan has it: the element to draw alone. */
@@ -121,6 +128,8 @@ export type PptxPlan = {
   lifted: { shapes: number[]; pictures: number[]; markers: number[] };
   /** What the slide's picture shows, without what was laid over it. */
   description: string;
+  /** The slide's background, taken out of its picture to be PowerPoint's. */
+  background?: PptxFill;
 };
 
 /**
@@ -168,6 +177,11 @@ export function pptxPageFacts(
       drawn.push({ within: pseudo.host, key: pseudo.key, extent });
     }
   }
+  const { slide } = paint;
+  const background =
+    slide?.plain === true
+      ? slideBackground(slide, { width: slide.width, height: slide.height })
+      : undefined;
   return {
     nodes: paint.nodes,
     drawn,
@@ -175,6 +189,9 @@ export function pptxPageFacts(
     boxes: texts.boxes,
     blocks: texts.blocks,
     described: paint.described,
+    ...(slide
+      ? { slide: { ...(background ? { background } : {}), stacking: slide.stacking } }
+      : {}),
   };
 }
 
@@ -246,7 +263,17 @@ export function planPptxLayers(page: PptxPageFacts, options: { shapes: boolean }
 
   const sorted = [...lifted].sort((a, b) => a - b);
   const pictures = sorted.filter((id) => page.nodes[id]?.paint?.kind === "picture");
+  // The slide's background paints first, unless the slide is no stacking context and something
+  // a negative z-index puts in it paints before that, under the background, out of sight.
+  const beneath = [
+    ...page.nodes.map((node) => node.key),
+    ...page.drawn.map((each) => each.key),
+    ...page.markers.map((marker) => marker.key),
+  ].some((key) => (key[0] ?? 0) < 0);
+  const background =
+    page.slide?.background && (page.slide.stacking || !beneath) ? page.slide.background : undefined;
   return {
+    ...(background ? { background } : {}),
     layers: assemble(page, tree, lifted, state).map(({ layer }) => layer),
     lifted: {
       shapes: sorted.filter((id) => page.nodes[id]?.paint?.kind === "shape"),
