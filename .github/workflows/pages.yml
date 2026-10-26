@@ -29,12 +29,32 @@ jobs:
         with:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
-      # `dekc build` shoots each sample's first slide for its link preview image.
+      # `dekc build` shoots each sample's first slide for its link preview image. As in CI, it
+      # skips --with-deps, whose apt can stall on a slow Ubuntu mirror, and caches the download.
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(bun -p 'require("playwright/package.json").version')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install Chromium
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright install chromium
       # The sample themes ask for Hiragino, which Linux lacks; Noto CJK is the closest fallback.
-      - name: Install CJK fonts
-        run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+      # Its package is cached, so apt is reached only when the cache is cold.
+      - id: cjk-fonts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/cjk-fonts
+          key: cjk-fonts-${{ runner.os }}-noto-cjk
+      - name: Download the CJK fonts
+        if: steps.cjk-fonts.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -q
+          mkdir -p ~/cjk-fonts
+          cd ~/cjk-fonts && apt-get download fonts-noto-cjk
+      - name: Install the CJK fonts
+        run: sudo dpkg -i ~/cjk-fonts/*.deb
       - run: bun run docs:build
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
