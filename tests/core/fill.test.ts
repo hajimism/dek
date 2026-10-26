@@ -20,6 +20,8 @@ function element(fields: Partial<MeasuredElement>): MeasuredElement {
     decorative: false,
     picture: false,
     paints: false,
+    inline: false,
+    tilted: false,
     ...fields,
   };
 }

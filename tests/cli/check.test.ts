@@ -175,7 +175,7 @@ more
             {
               check: "visual",
               reason: "Playwright is not installed",
-              hint: "bun add -d playwright && bunx playwright install chromium, then run `dekc check intro` to measure overflow and contrast",
+              hint: "bun add -d playwright && bunx playwright install chromium, then run `dekc check intro` to measure overflow, contrast, line breaks, and alignment",
             },
           ]);
         });

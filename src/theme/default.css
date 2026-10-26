@@ -20,6 +20,9 @@
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-body);
+  /* Japanese breaks between phrases, and no paragraph ends on a word left alone. */
+  word-break: auto-phrase;
+  text-wrap: pretty;
 }
 
 .slide .slide-title {
@@ -27,6 +30,7 @@
   font-family: var(--font-title);
   font-size: var(--size-title);
   line-height: 1.2;
+  text-wrap: balance;
 }
 
 /* @layout title

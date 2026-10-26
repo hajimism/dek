@@ -17,7 +17,9 @@ export type Scope = "project" | "deck" | "slide";
  * (DEK044), an empty heading (DEK024), which a slide script may fill, and a step bound by
  * position where the beat has an id (DEK025), which is right until a beat is inserted, and a
  * style several slides repeat (DEK026), which works but belongs in the theme. Text under
- * aria-hidden (DEK029) is right on a sample the talk shows as unreadable.
+ * aria-hidden (DEK029) is right on a sample the talk shows as unreadable. A line break that
+ * reads wrong (DEK035) is fixed by a choice of words or of where to break, which is the author's,
+ * and an edge a few pixels off (DEK036) can be meant, as in a picture of something out of line.
  */
 export const RULES = {
   DEK001: { severity: "error", scopes: ["slide"] },
@@ -54,6 +56,8 @@ export const RULES = {
   DEK032: { severity: "error", scopes: ["slide"] },
   DEK033: { severity: "error", scopes: ["slide"] },
   DEK034: { severity: "error", scopes: ["slide"] },
+  DEK035: { severity: "warning", scopes: ["slide"] },
+  DEK036: { severity: "warning", scopes: ["slide"] },
   DEK040: { severity: "warning", scopes: ["slide"] },
   DEK041: { severity: "warning", scopes: ["deck"] },
   DEK042: { severity: "warning", scopes: ["slide"] },

@@ -83,7 +83,7 @@ async function visualDeck(
     return { diagnostics: [], fills: [] };
   }
 
-  const actions: PageAction[] = ["overflow", "contrast", "fill"];
+  const actions: PageAction[] = ["overflow", "contrast", "fill", "breaks", "alignment"];
   const viewport = logicalSize(deck.deck.ratio);
   const cache = visualCache(deck.dir, { viewport, actions });
   const keyed = pages.map((page) => {
@@ -137,6 +137,8 @@ async function visualDeck(
         contrasts: all.flatMap((page) => page.contrasts),
         drawErrors: all.flatMap((page) => page.drawErrors),
         collisions: all.flatMap((page) => page.collisions ?? []),
+        lineBreaks: all.flatMap((page) => page.lineBreaks ?? []),
+        misalignments: all.flatMap((page) => page.misalignments ?? []),
       },
       deck.dir,
     ),
@@ -147,13 +149,20 @@ async function visualDeck(
   };
 }
 
-const NOTHING_FOUND: PageFindings = {
-  overflows: [],
-  contrasts: [],
-  drawErrors: [],
-  collisions: [],
-  fills: [],
-};
+/** A page's findings before any is found, each list its own to push to. */
+function noFindings(): PageFindings {
+  return {
+    overflows: [],
+    contrasts: [],
+    drawErrors: [],
+    collisions: [],
+    fills: [],
+    lineBreaks: [],
+    misalignments: [],
+  };
+}
+
+const NOTHING_FOUND: PageFindings = noFindings();
 
 /** A page's findings name its slide and step, which no two pages of one run share. */
 function pageId(page: { slug: string; step: string }): string {
@@ -165,13 +174,7 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   const pages = new Map<string, PageFindings>();
   const of = (finding: { slug: string; step: string }): PageFindings => {
     const id = pageId(finding);
-    const found = pages.get(id) ?? {
-      overflows: [],
-      contrasts: [],
-      drawErrors: [],
-      collisions: [],
-      fills: [],
-    };
+    const found = pages.get(id) ?? noFindings();
     pages.set(id, found);
     return found;
   };
@@ -189,6 +192,12 @@ function findingsByPage(response: PagesResponse): Map<string, PageFindings> {
   }
   for (const finding of response.fills ?? []) {
     of(finding).fills.push(finding);
+  }
+  for (const finding of response.lineBreaks ?? []) {
+    of(finding).lineBreaks.push(finding);
+  }
+  for (const finding of response.misalignments ?? []) {
+    of(finding).misalignments.push(finding);
   }
   return pages;
 }
@@ -352,7 +361,137 @@ function visualDiagnostics(response: PagesResponse, deckDir: string): Diagnostic
     ...groupBySteps(response.collisions ?? [], collisionKey).map((group) =>
       collisionDiagnostic(group, paths),
     ),
+    ...groupBySteps(response.lineBreaks ?? [], lineBreakKey).map((group) =>
+      lineBreakDiagnostic(group, paths),
+    ),
+    ...groupBySteps(response.misalignments ?? [], misalignmentKey).map((group) =>
+      misalignmentDiagnostic(group, paths),
+    ),
   ];
+}
+
+type MisalignmentSample = NonNullable<PagesResponse["misalignments"]>[number];
+
+function misalignmentKey(m: MisalignmentSample): string {
+  return [m.slug, m.box, m.text ?? "", m.other, m.otherText ?? "", m.edge, m.of].join("\0");
+}
+
+/** How the message names an edge two items share. */
+const EDGE_NAMES: Record<MisalignmentSample["edge"], string> = {
+  top: "tops",
+  middle: "middles",
+  bottom: "bottoms",
+  left: "left edges",
+  center: "centers",
+  right: "right edges",
+};
+
+/**
+ * Two items that nearly line up and do not. The fix depends on the edge: a start lines up with
+ * the same space before it, an end with one size, a middle with one way of centering, and text in
+ * cards that line up with one padding.
+ */
+function misalignmentDiagnostic(
+  { first, items, steps }: StepGroup<MisalignmentSample>,
+  paths: DeckPaths,
+): Diagnostic {
+  // By the most they miss at any step, so the fix covers the worst beat.
+  const by = Math.max(...items.map((item) => item.by));
+  const pair = `${describeTarget(first.box, first.text)}and ${describeTarget(first.other, first.otherText).trimEnd()}`;
+  const where =
+    first.of === "text"
+      ? `almost start their text ${first.edge === "left" ? "at one left edge" : "on one line"}`
+      : `almost line up at their ${EDGE_NAMES[first.edge]}`;
+  const css = `slides/${first.slug}.css`;
+  const both = `${first.box} and ${first.other}`;
+  const why = "an edge a few pixels off reads as a mistake, not a choice";
+  const hint =
+    first.of === "text"
+      ? `give ${both} the same padding in ${css}, so their text starts on one line`
+      : first.edge === "top" || first.edge === "left"
+        ? `line ${first.box} up with ${first.other} in ${css}, with the same margin, padding, or alignment: ${why}`
+        : first.edge === "bottom" || first.edge === "right"
+          ? `give ${both} one ${first.edge === "bottom" ? "height" : "width"} in ${css}, with align-items: stretch or the same size: ${why}`
+          : `center ${both} on one line in ${css}, with align-items: center or the same margins: ${why}`;
+  return diag("DEK036", {
+    message: `${pair} ${where}, ${by}px apart, ${atSteps(steps)}`,
+    path: paths.slide(first.slug, ".html"),
+    slug: first.slug,
+    hint,
+    data: {
+      box: first.box,
+      ...(first.text ? { text: first.text } : {}),
+      other: first.other,
+      ...(first.otherText ? { otherText: first.otherText } : {}),
+      edge: first.edge,
+      of: first.of,
+      by,
+      steps,
+    },
+  });
+}
+
+type LineBreakSample = NonNullable<PagesResponse["lineBreaks"]>[number];
+
+function lineBreakKey(b: LineBreakSample): string {
+  return [b.slug, b.box, b.text ?? "", b.kind, ...b.lines].join("\0");
+}
+
+/** Where a line ends: the end of one line and the start of the next, as far as either reads. */
+function breakAt(lines: string[], phrased: string[]): string {
+  const differs = lines.findIndex((line, at) => line !== phrased[at]);
+  const at = Math.max(0, Math.min(differs, lines.length - 2));
+  const end = [...(lines[at] ?? "")];
+  const start = [...(lines[at + 1] ?? "")];
+  const half = SNIPPET_CHARS / 2;
+  const before = end.length > half ? `…${end.slice(-half).join("")}` : end.join("");
+  const after = start.length > half ? `${start.slice(0, half).join("")}…` : start.join("");
+  return `${before} / ${after}`;
+}
+
+/**
+ * A line break the audience trips over. One inside a phrase is fixed where Japanese is told to
+ * break by phrase: on `.slide` in theme.css, for every slide, unless a rule takes it away from
+ * this text. A remnant on a last line is the text's own to fix, or the theme's text-wrap.
+ */
+function lineBreakDiagnostic(
+  { first, steps }: StepGroup<LineBreakSample>,
+  paths: DeckPaths,
+): Diagnostic {
+  const target = describeTarget(first.box, first.text);
+  const css = `slides/${first.slug}.css`;
+  const yourself = "break the line yourself with <br>";
+  const common = {
+    slug: first.slug,
+    data: {
+      kind: first.kind,
+      box: first.box,
+      ...(first.text ? { text: first.text } : {}),
+      lines: first.lines,
+      ...(first.kind === "split" ? { phrased: first.phrased } : { tail: first.tail }),
+      steps,
+    },
+  };
+  if (first.kind === "split") {
+    const theme = first.wordBreak !== "auto-phrase";
+    return diag("DEK035", {
+      message: `${target}breaks a line inside a phrase, at "${breakAt(first.lines, first.phrased)}", ${atSteps(steps)}`,
+      path: theme ? paths.theme : paths.slide(first.slug, ".html"),
+      hint: theme
+        ? `add word-break: auto-phrase to .slide in theme.css, so Japanese breaks between phrases on every slide; or ${yourself} where its sense breaks`
+        : `a rule gives it word-break: normal where .slide breaks by phrase: remove it from ${css} or theme.css, or ${yourself} where its sense breaks`,
+      ...common,
+    });
+  }
+  const evened = first.textWrap === "pretty" || first.textWrap === "balance";
+  return diag("DEK035", {
+    message: `${target}leaves "${first.tail}" alone on its last line ${atSteps(steps)}`,
+    path: paths.slide(first.slug, ".html"),
+    hint: evened
+      ? `reword it so its last line holds more, or ${yourself} earlier`
+      : `even out its lines with text-wrap: pretty, or balance for a heading, in ${css} or for every slide in theme.css; or reword it, or ${yourself}`,
+    ...common,
+  });
 }
 
 type CollisionSample = NonNullable<PagesResponse["collisions"]>[number];

@@ -46,6 +46,22 @@ export type MeasuredElement = {
   /** Whether it paints its own box: a background, or a border in a color that shows. */
   paints: boolean;
   /**
+   * Whether it is laid out on a line of text, as `<strong>` or an inline-block chip is, rather
+   * than as a box of its own: it sits on the line's baseline.
+   */
+  inline: boolean;
+  /**
+   * Whether a transform turns or skews it, its own or an ancestor's: its box is then the box
+   * around its shape, not the shape the audience sees.
+   */
+  tilted: boolean;
+  /**
+   * Where the first line of its own text sits, in viewport pixels from the top: the baseline of
+   * its first text node's first line, which is not its first line when an inline element such as
+   * `<strong>` opens it.
+   */
+  baseline?: number;
+  /**
    * What an ancestor inside the slide cuts it to, with `overflow` other than `visible`: the
    * nearest such ancestor, and the box every one of them leaves visible. `intended` when the cut is
    * a truncation the author asked for, an ellipsis or a line clamp.
@@ -196,6 +212,35 @@ export function measureSlideInPage(): SlideMeasure {
         .map(toBox);
     });
 
+  // Turned or skewed, by its own transform or rotate, or an ancestor's.
+  const tilts = new Map<Element, boolean>();
+  const tilted = (el: Element | null): boolean => {
+    if (!el || el === slide) {
+      return false;
+    }
+    const known = tilts.get(el);
+    if (known !== undefined) {
+      return known;
+    }
+    const style = getComputedStyle(el);
+    const matrix = style.transform === "none" ? undefined : new DOMMatrixReadOnly(style.transform);
+    const own =
+      (matrix !== undefined && (matrix.b !== 0 || matrix.c !== 0)) ||
+      (style.rotate !== "none" && style.rotate !== "");
+    const found = own || tilted(el.parentElement);
+    tilts.set(el, found);
+    return found;
+  };
+  // A line's baseline sits the font's ascent below the top of the box its text is drawn in.
+  const metrics = document.createElement("canvas").getContext("2d");
+  const baselineOf = (style: CSSStyleDeclaration, line: Box | undefined): number | undefined => {
+    if (!line || !metrics) {
+      return undefined;
+    }
+    metrics.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    return line.top + metrics.measureText("x").fontBoundingBoxAscent;
+  };
+
   const all = [...slide.querySelectorAll("*")];
   const indexOf = new Map(all.map((el, index) => [el, index]));
   const elements = all.map((el): MeasuredElement => {
@@ -209,19 +254,24 @@ export function measureSlideInPage(): SlideMeasure {
     const whole = el instanceof HTMLElement ? el.innerText : el.textContent;
     const text = own || squash(whole ?? "");
     const parentEl = el.parentElement;
+    const textRects = lineBoxes(textNodes);
+    const baseline = baselineOf(style, textRects[0]);
     return {
       box: describe(el),
       parent: parentEl ? (indexOf.get(parentEl) ?? -1) : -1,
       rect: extent(el, textNodes),
       ...(text ? { text } : {}),
       ownText: own !== "",
-      textRects: lineBoxes(textNodes),
+      textRects,
+      ...(baseline !== undefined ? { baseline } : {}),
       opacity: opacityOf(el),
       fontSize: Number.parseFloat(style.fontSize),
       fontWeight: Number(style.fontWeight) || 400,
       decorative: el.closest('[aria-hidden="true"]') !== null,
       picture: pictures.has(el.tagName.toLowerCase()) || style.backgroundImage.includes("url("),
       paints: paints(style),
+      inline: style.display.startsWith("inline"),
+      tilted: tilted(el),
       ...clipped(clipOf(el)),
     };
   });

@@ -54,6 +54,8 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK033` | `slide` | Two texts are drawn over each other, a folio or a running head a pseudo-element draws included | — |
 | `DEK032` | `slide` | A slide script's `draw` misbehaves while drawing the end of a beat: it throws, changes the page outside its slide, or draws the end differently after drawing the beat's start | — |
 | `DEK034` | `slide` | A picture with nothing for a screen reader to say: an `<img>` without `alt`, an `<svg>` with no text and no name, or an element with `role="img"` and no name. `alt=""`, `aria-hidden="true"`, and `role="presentation"` or `role="none"` say a picture is decoration and pass | — |
+| `DEK035` | `slide` | A line that ends inside a phrase, where Japanese broken phrase by phrase would end it elsewhere, or a paragraph whose last line holds two letters or fewer. Warning | — |
+| `DEK036` | `slide` | Two items side by side or stacked whose edges nearly line up and do not, two to eight pixels apart, or cards whose text nearly starts on one line. Warning | — |
 | `DEK040` | `slide` | An ASCII word missing from the pronunciation dictionary. Warning | — |
 | `DEK041` | `deck` | The talk's length far from the `duration` budget: narrated length with a Timeline, the reading-time estimate without. Warning | — |
 | `DEK042` | `slide` | A beat with visible content (list, code, table) but no spoken paragraph. Warning | — |
@@ -63,10 +65,10 @@ Each finding is about one of three things, and the command that reports it follo
 
 ## Conditions
 
-- `DEK030` through `DEK033` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
+- `DEK030` through `DEK033`, `DEK035`, and `DEK036` run only with `--visual` and require Playwright. They measure each beat as it ends, with every animation and transition run to its end; see [What a still shows](/guide/steps#what-a-still-shows).
 - `DEK040`, `DEK042`, `DEK043`, and `DEK045` apply only to decks with `voice/`; `DEK044` applies to every deck. `dekc cues` reports `DEK042` regardless.
 - `DEK041` applies to decks with a `duration`. With a Timeline it measures the narration (20% margin); without one it uses the reading-time estimate (35% margin). `data` carries `actualSeconds`, `budgetSeconds`, and `source` (`timeline` or `estimate`).
-- `DEK008`, `DEK024` through `DEK026`, `DEK028`, `DEK029`, and `DEK040` through `DEK045` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
+- `DEK008`, `DEK024` through `DEK026`, `DEK028`, `DEK029`, `DEK035`, `DEK036`, and `DEK040` through `DEK045` are warnings: reported with `"severity": "warning"`, and they do not fail lint. Every other rule is an error. Voice never makes a live-only deck fail.
 
 ## Notes
 
@@ -170,7 +172,7 @@ Two texts whose lines cross by a few pixels each way, and share a fifth of the s
 
 ### DEK034
 
-A picture is either content, which needs words a screen reader can say, or decoration, which says so. Lint cannot tell which, and does not judge whether the words are good; it asks that every picture be one or the other. The built HTML file passes the words on to the audience's screen readers as they are, and `dekc pptx` makes them the alternative text of each slide's picture.
+A picture is either content, which needs words a screen reader can say, or decoration, which says so. Lint cannot tell which, and does not judge whether the words are good; it asks that every picture be one or the other. The built HTML file passes the words on to the audience's screen readers as they are, and `dekc pptx` makes them the alternative text of each picture it lays over the slide, and of the slide's picture for what stays in it.
 
 - An `<img>` takes `alt`. `alt=""` is decoration, as the theme's `full-bleed` layout writes it; any other `alt` is what the picture shows. `aria-label`, `aria-labelledby`, and `title` name it as well.
 - An `<svg>` that holds text, such as a diagram's `<text>` labels or a `<title>`, is read as it is, and passes. One with nothing to read takes `role="img"` and an `aria-label`, or `aria-hidden="true"` when it is decoration. The hint offers `aria-hidden` only for an SVG with no text, so following it never makes a `DEK029`.
@@ -178,6 +180,28 @@ A picture is either content, which needs words a screen reader can say, or decor
 - Anything under `aria-hidden="true"`, and an element with `role="presentation"` or `role="none"`, is decoration and passes. An SVG inside another SVG is part of the outer picture.
 
 Each picture is its own finding, at its tag. `data` carries `tag`, the `src` of an `<img>`, and `role` when the finding is about `role="img"`. `<video>`, `<iframe>`, and `<object>` are not checked: a video's alternative is captions, which no attribute says are right, and a frame or object in a self-contained deck is rare enough that a rule would mostly be in the way.
+
+### DEK035
+
+A line ends wherever the browser runs out of room, so a slide's HTML never shows where. Each text that takes more than one line is measured as the audience sees it, the inline elements in it such as `<strong>` and `<a>` included; code (`<pre>`, `<code>`, `<kbd>`, `<samp>`), SVG, MathML, and decoration under `aria-hidden` are left out. Two breaks read wrong, and `data.kind` says which:
+
+- `split`: a line ends inside a phrase. The text is laid out again beside itself with only `word-break: auto-phrase` changed, and where that starts its lines elsewhere, one of the page's lines ends inside a phrase. Chromium breaks by phrase only where `lang` is a language it knows phrases for, such as `ja`, so English is never reported, and neither is text whose `word-break` its rules set to something other than `normal`, nor a phrase too long for any line, which breaks the same both times. `data.phrased` holds the lines broken phrase by phrase. When `.slide` does not break by phrase, the finding goes to `theme.css`, where one line fixes every slide; when it does and a rule takes that away from this text, the finding goes to the slide.
+- `short`: a paragraph's last line holds two letters or digits or fewer, as 「す。」 or `AI` does. An inline box, such as a chip set `inline-block`, counts as the text it holds. `data.tail` is that line. A line that a `<br>`, a block, or a newline `white-space` keeps starts is the author's, and passes. When the text's `text-wrap` is neither `pretty` nor `balance`, the hint names them; otherwise it says to reword.
+
+A text with a phrase broken reports only that, since breaking it by phrase moves every line after the break. `data` carries `kind`, `box`, `text`, `lines`, `phrased` or `tail`, and `steps`. It is a warning: the fix is a choice of words, or of where to break, that only the author can make.
+
+### DEK036
+
+An edge a few pixels off reads as a mistake, not a choice, and the markup never shows it. Items are the boxes in one parent. Inline boxes, which sit on a line of text, are not items, and neither are decoration under `aria-hidden`, what the beat has not shown, anything a transform turns or skews, whose box is not its shape, or the parts of a picture, such as an SVG's shapes. Two items are compared only when they sit side by side, by their tops, middles, and bottoms, or stacked, by their left edges, centers, and right edges. Several items in a row under one item, or stacked beside it, are compared with it as the row or the stack they form.
+
+Edges under half a pixel apart are one line, and under a pixel and a half apart they look like one; two to eight pixels apart is a near miss, and farther is a choice. Two items line up when they share an edge: a heading over a wider list shares its left edge, and an icon centered beside a line of text its middle. Text side by side that shares a baseline lines up too, as a number and its unit do, unless both are boxes the audience sees. Four things are reported:
+
+- Two items that share no edge, where the nearest is a near miss.
+- Side by side, items that hold text whose bottoms meet and whose tops nearly do. A bar chart's bars hold no text, and pass.
+- A row of items of one kind that paint their box and hold text, a row of cards, one of which shares the others' top and nearly their bottom: it is a little shorter. Stacked items take the width their words give them, as tags set flush right do, so their width is left alone.
+- Cards of one kind that start on one line but whose first lines of text nearly do not, as uneven padding makes them; `data.of` is `"text"`. Text centered in its card lines up by its middle, whatever its length.
+
+Of two items that miss each other, the one fewer others line up with is named as off the line, and of two alike the later, once for each of its edges; the hint names the fix its edge takes. `data` carries `box`, `other`, their texts, `edge` (`top`, `middle`, `bottom`, `left`, `center`, or `right`), `of` (`"box"` or `"text"`), `by`, the most pixels apart at any beat, and `steps`. It is a warning: an offset that small can be meant, as in a picture of something drawn out of line.
 
 ### DEK042
 

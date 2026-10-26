@@ -2,11 +2,14 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
+import type { AlignedEdge, Misalignment } from "./alignment.ts";
 import { DekError } from "./error.ts";
 import type { Fill } from "./fill.ts";
+import type { LineBreakKind } from "./line-break.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
-import type { PptxTextBox } from "./pptx-package.ts";
+import type { PptxFill, PptxLayer, PptxTextBox } from "./pptx-package.ts";
+import type { PptxPageTheme } from "./pptx-theme.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
 import { exitWorker, readWorkerRequest, runJsonWorker, workerCommand } from "./spawn.ts";
 import type { Position } from "./step.ts";
@@ -41,7 +44,7 @@ export type MotionSpec = {
 };
 
 /** What to measure on each page; a screenshot is asked for by the page's `screenshotPath`. */
-export type PageAction = "overflow" | "contrast" | "fill";
+export type PageAction = "overflow" | "contrast" | "fill" | "breaks" | "alignment";
 
 type Viewport = { width: number; height: number };
 
@@ -84,8 +87,9 @@ export type MotionRequest = {
 };
 
 /**
- * Each slide's still page drawn for a PPTX, at twice its size: its text measured line by line,
- * then the page shot without it, to `screenshotPath`.
+ * Each slide's still page drawn for a PPTX, at twice its size: its text, boxes, and pictures
+ * measured, each picture drawn alone beside `screenshotPath`, then the page shot without what
+ * is laid over it, to `screenshotPath`.
  */
 export type PptxRequest = {
   kind: "pptx";
@@ -93,9 +97,22 @@ export type PptxRequest = {
   pages: Array<{ html: string; slug: string; screenshotPath: string }>;
 };
 
-/** Each page's text, in the order of the request's pages, with the font each run was drawn in. */
+/** A picture on its way to the package: the PNG the worker wrote, and the SVG it read. */
+export type PptxPictureFile = { png: string; svg?: string };
+
+/** Each page's layers, in the order of the request's pages, with the font each run was drawn in. */
 export type PptxResponse = {
-  slides: Array<{ slug: string; description: string; boxes: PptxTextBox[] }>;
+  slides: Array<{
+    slug: string;
+    description: string;
+    layers: PptxLayer<PptxPictureFile>[];
+    /** Whether anything is left in the slide's picture; false for nothing. */
+    picture?: boolean;
+    /** The slide's background, when PowerPoint paints it. */
+    background?: PptxFill;
+    /** What the slide says of the deck's theme. */
+    theme?: PptxPageTheme;
+  }>;
 };
 
 /** What the Playwright worker is asked; the kind says which payload comes with it. */
@@ -144,6 +161,30 @@ type CollisionFinding = Collision & { slug: string; step: string };
 /** How much of the frame one page fills, and where. */
 export type FillFinding = Fill & { slug: string; step: string };
 
+/**
+ * A line break that reads wrong on one page, with what decides where the fix goes: the slide's own
+ * `word-break` and the text's `text-wrap`, as the page computes them.
+ */
+type LineBreakFinding = {
+  slug: string;
+  step: string;
+  box: string;
+  text?: string;
+  lines: string[];
+  wordBreak: string;
+  textWrap: string;
+} & LineBreakKind;
+
+/** Two items on one page that nearly line up and do not, each named as the page shows it. */
+type MisalignmentFinding = Omit<Misalignment, "element" | "other"> & {
+  slug: string;
+  step: string;
+  box: string;
+  text?: string;
+  other: string;
+  otherText?: string;
+};
+
 export type PagesResponse = {
   overflows: OverflowFinding[];
   contrasts: ContrastFinding[];
@@ -153,6 +194,10 @@ export type PagesResponse = {
   collisions?: CollisionFinding[];
   /** One for each page, when `fill` was asked for; absent from a runner that has none. */
   fills?: FillFinding[];
+  /** Absent from a runner that has none to report. */
+  lineBreaks?: LineBreakFinding[];
+  /** Absent from a runner that has none to report. */
+  misalignments?: MisalignmentFinding[];
 };
 
 export type MotionResponse = {
@@ -318,13 +363,23 @@ function spawnRunner(
 const RESPONSE_PARSERS: {
   [K in keyof VisualResponses]: (fields: Record<string, unknown>) => VisualResponses[K] | null;
 } = {
-  pages: ({ overflows, contrasts, drawErrors = [], collisions = [], fills = [] }) =>
+  pages: ({
+    overflows,
+    contrasts,
+    drawErrors = [],
+    collisions = [],
+    fills = [],
+    lineBreaks = [],
+    misalignments = [],
+  }) =>
     isArrayOf(overflows, isOverflowFinding) &&
     isArrayOf(contrasts, isContrastFinding) &&
     isArrayOf(drawErrors, isDrawErrorFinding) &&
     isArrayOf(collisions, isCollisionFinding) &&
-    isArrayOf(fills, isFillFinding)
-      ? { overflows, contrasts, drawErrors, collisions, fills }
+    isArrayOf(fills, isFillFinding) &&
+    isArrayOf(lineBreaks, isLineBreakFinding) &&
+    isArrayOf(misalignments, isMisalignmentFinding)
+      ? { overflows, contrasts, drawErrors, collisions, fills, lineBreaks, misalignments }
       : null,
   pdf: () => ({}),
   morph: () => ({}),
@@ -401,6 +456,37 @@ function isFillFinding(value: unknown): value is FillFinding {
   );
 }
 
+function isLineBreakFinding(value: unknown): value is LineBreakFinding {
+  if (!isFinding(value)) {
+    return false;
+  }
+  const { kind, lines, phrased, tail, wordBreak, textWrap } = value;
+  return (
+    isArrayOf(lines, isString) &&
+    isString(wordBreak) &&
+    isString(textWrap) &&
+    ((kind === "split" && isArrayOf(phrased, isString)) || (kind === "short" && isString(tail)))
+  );
+}
+
+const ALIGNED_EDGES: ReadonlySet<unknown> = new Set<AlignedEdge>([
+  "top",
+  "middle",
+  "bottom",
+  "left",
+  "center",
+  "right",
+]);
+
+function isMisalignmentFinding(value: unknown): value is MisalignmentFinding {
+  // Both name two elements by their boxes and their texts, as a collision does.
+  if (!isCollisionFinding(value)) {
+    return false;
+  }
+  const { edge, of, by } = value as Record<string, unknown>;
+  return ALIGNED_EDGES.has(edge) && (of === "box" || of === "text") && isNumber(by);
+}
+
 function isDrawErrorFinding(value: unknown): value is DrawErrorFinding {
   if (!value || typeof value !== "object") {
     return false;
@@ -453,8 +539,97 @@ function isPptxSlide(value: unknown): value is PptxResponse["slides"][number] {
   if (!value || typeof value !== "object") {
     return false;
   }
-  const { slug, description, boxes } = value as Record<string, unknown>;
-  return isString(slug) && isString(description) && isArrayOf(boxes, isPptxBox);
+  const { slug, description, layers, picture, background, theme } = value as Record<
+    string,
+    unknown
+  >;
+  return (
+    isString(slug) &&
+    isString(description) &&
+    isArrayOf(layers, isPptxLayer) &&
+    (picture === undefined || typeof picture === "boolean") &&
+    (background === undefined || isFill(background)) &&
+    (theme === undefined || (Boolean(theme) && typeof theme === "object"))
+  );
+}
+
+function isFill(value: unknown): value is PptxFill {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const fill = value as Record<string, unknown>;
+  return fill.kind === "solid"
+    ? isPaint(fill.paint)
+    : fill.kind === "linear" &&
+        isNumber(fill.angle) &&
+        isArrayOf(
+          fill.stops,
+          (stop: unknown): stop is object =>
+            Boolean(stop) &&
+            typeof stop === "object" &&
+            isNumber((stop as Record<string, unknown>).at) &&
+            isPaint((stop as Record<string, unknown>).paint),
+        );
+}
+
+function isPptxLayer(value: unknown): value is PptxLayer<PptxPictureFile> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const layer = value as Record<string, unknown>;
+  const at = ["x", "y", "width", "height"].every((key) => isNumber(layer[key]));
+  switch (layer.kind) {
+    case "text":
+      return isPptxBox(layer);
+    case "rule":
+      return (
+        ["x1", "y1", "x2", "y2", "width"].every((key) => isNumber(layer[key])) &&
+        isPaint(layer.paint)
+      );
+    case "picture":
+      return (
+        at &&
+        isString(layer.png) &&
+        isString(layer.description) &&
+        (layer.svg === undefined || isString(layer.svg))
+      );
+    case "shape":
+      return (
+        at &&
+        isNumber(layer.radius) &&
+        (layer.fill === undefined || isPaint(layer.fill)) &&
+        isArrayOf(layer.layers, isPptxLayer) &&
+        (layer.text === undefined || isShapeText(layer.text))
+      );
+    default:
+      return false;
+  }
+}
+
+function isPaint(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const { color, alpha } = value as Record<string, unknown>;
+  return isArrayOf(color, isNumber) && isNumber(alpha);
+}
+
+function isShapeText(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const { inset, paragraphs } = value as Record<string, unknown>;
+  return (
+    Boolean(inset) &&
+    typeof inset === "object" &&
+    isArrayOf(paragraphs, (paragraph: unknown): paragraph is object => {
+      if (!paragraph || typeof paragraph !== "object") {
+        return false;
+      }
+      const { runs, lineHeight } = paragraph as Record<string, unknown>;
+      return isNumber(lineHeight) && isArrayOf(runs, isPptxRun);
+    })
+  );
 }
 
 function isPptxBox(value: unknown): value is PptxTextBox {
@@ -464,20 +639,22 @@ function isPptxBox(value: unknown): value is PptxTextBox {
   const box = value as Record<string, unknown>;
   return (
     ["x", "y", "width", "height", "lineHeight"].every((key) => isNumber(box[key])) &&
-    isArrayOf(box.runs, (run: unknown): run is PptxTextBox["runs"][number] => {
-      if (!run || typeof run !== "object") {
-        return false;
-      }
-      const { text, size, alpha, letterSpacing, color, font } = run as Record<string, unknown>;
-      return (
-        isString(text) &&
-        isNumber(size) &&
-        isNumber(alpha) &&
-        isNumber(letterSpacing) &&
-        isArrayOf(color, isNumber) &&
-        (font === undefined || isString(font))
-      );
-    })
+    isArrayOf(box.runs, isPptxRun)
+  );
+}
+
+function isPptxRun(run: unknown): run is PptxTextBox["runs"][number] {
+  if (!run || typeof run !== "object") {
+    return false;
+  }
+  const { text, size, alpha, letterSpacing, color, font } = run as Record<string, unknown>;
+  return (
+    isString(text) &&
+    isNumber(size) &&
+    isNumber(alpha) &&
+    isNumber(letterSpacing) &&
+    isArrayOf(color, isNumber) &&
+    (font === undefined || isString(font))
   );
 }
 

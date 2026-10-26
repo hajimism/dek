@@ -28,7 +28,7 @@ description: 'コマンド、フラグ、環境変数。'
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc [deck] [--visual] [--port N] [--remote]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、発表者ビュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出しとコントラストも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
+| `dekc [deck] [--visual] [--port N] [--remote]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、発表者ビュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出し、コントラスト、改行、揃えも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
 | `dekc --remote` | LAN に公開。発表者ビュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断は、起動のたびに dek が作って表示する 10 文字のパスワードが必要。ターミナルではその下の QR コードでスマホから発表者ビューを開ける（1 回だけ、5 分以内。Enter で新しいコード） |
 | `dekc rehearse [deck] [slug] [--remote]` | Timeline に沿って自走。何も録画しない。`--remote` を付けると `dekc --remote` と同じく LAN に公開する |
 
@@ -83,7 +83,7 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | lint。`--fix` は先に `dekc sync` を実行する。`--visual` ははみ出しとコントラストを足す |
+| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | lint。`--fix` は先に `dekc sync` を実行する。`--visual` ははみ出し、コントラスト、改行、揃えを足す |
 | `dekc cues [deck]` | 喋りの Cue を `Cue[]` で出力。段落だけ。エンジン不要 |
 | `dekc voice [deck]` | 変わった文を `.cache/voice/` に合成。保存時にも走る |
 | `dekc voice [deck] speakers` | エンジンの話者一覧 |
@@ -92,7 +92,7 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 | `dekc voice [deck] pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
 | `dekc build [deck] [--root-dist] [--url <url>] [--public]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dekc lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。`--public` はリンクを知る誰もが開くページを作り、発表者ビューから台本のト書きと HTML コメントを外す。付けなければ、URL の有無にかかわらず発表者ビューに台本がすべて入る。 |
 | `dekc video [deck] [slug] [--fps N] [--root-dist]` | `dekc voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` も書く。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
-| `dekc pptx [deck] [--root-dist] [--public]` | `dist/<deck>.pptx` を書く。`##` 1 つが最終ビートの 1 枚で、2 倍の大きさで描いた画像の上に、文字を 1 行ずつ編集できるテキストボックスとして置き、台本をノートに入れる。`--public` は `build --public` と同じく、ノートからト書きとコメントを除く。各ボックスには Chromium が描いたフォントの名前を入れ、フォントは埋め込まない。SVG、`aria-hidden` の飾り、疑似要素の文字、回した文字、影は画像に残る。動かないスライドスクリプトがあると `dekc pdf` と同じく止まる。`--json` は `outs` を返す。Playwright が必要 |
+| `dekc pptx [deck] [--root-dist] [--public]` | `dist/<deck>.pptx` を書く。`##` 1 つが最終ビートの 1 枚で、台本をノートに入れる。色と実線の枠と角丸だけの箱を図形に、`<img>`、`<canvas>`、`<svg>` をそれぞれ 1 枚の画像にして、含むものとグループにし、図形の中の文字を段落に、それ以外の文字を 1 行ずつのテキストボックスにして、残りを 2 倍の大きさで描いた画像の上に置く。画像に残るものを覆う箱は画像に残す。テーマのトークンをファイルのテーマに、単色かまっすぐなグラデーションの背景を PowerPoint の背景にする。何も取り出せなかったスライドは出力に名前が出る。`--public` は `build --public` と同じく、ノートからト書きとコメントを除く。文字には Chromium が描いたフォントかテーマのフォントの名前を入れ、フォントは埋め込まない。[PPTX](/ja/guide/present#pptx) を参照。動かないスライドスクリプトがあると `dekc pdf` と同じく止まる。`--json` は `outs` を返す。Playwright が必要 |
 | `dekc pdf [deck] [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く。各ページは 2 倍の大きさで描いたスライドの画像（PNG、写真のスライドは JPEG）で、選択・検索・コピーできる文字を見えない形で重ねるので、どのビューアでも同じに見える。動かないスライドスクリプトがあると `dekc video` と同じく止まる。どちらも診断を返す場所がなく、スクリプトが走らなかったかのような枚を出してしまうから |
 
 ## ヘルプ

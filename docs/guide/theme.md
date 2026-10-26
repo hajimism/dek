@@ -69,6 +69,25 @@ Pass them to a CSS counter to print them in any counter style:
 
 Which slides show a folio is the theme's call, as it is in a book: hide it on the cover with `.slide[data-layout="cover"]::after { content: none; }`, and the cover still counts as slide 1.
 
+## Line breaks
+
+A line ends wherever the browser runs out of room, which neither the script nor the slide's HTML shows. The bundled theme asks for lines that end where a reader would pause:
+
+```css
+.slide {
+  word-break: auto-phrase;
+  text-wrap: pretty;
+}
+
+.slide .slide-title {
+  text-wrap: balance;
+}
+```
+
+`word-break: auto-phrase` breaks Japanese between phrases instead of between any two characters. It works when the deck's `lang` is `ja`, which dek reads from the script when the frontmatter leaves it out. `text-wrap: pretty` keeps a paragraph from ending on a word left alone, and `text-wrap: balance` evens out a heading's lines. The player, the shots, the PDF, and the video are all drawn in Chromium, so they all break the same way.
+
+A deck owns its copy of the theme, so a deck made before these lines keeps breaking as it did until you copy them into its `theme.css`; `dekc lint --visual` points it out as [`DEK035`](/reference/lint#dek035), a line that ends inside a phrase or a paragraph that ends on a remnant. Where you want a break the browser would not choose, write `<br>` in the slide.
+
 ## Copy, then freeze
 
 The project's `theme.css` is the starting point for new decks. Edits flow in one direction: down into a new deck on creation, and back up by hand when you decide something is worth keeping.

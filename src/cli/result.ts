@@ -13,15 +13,18 @@ export function skippedChecks(skipped: SkippedCheck[]): { skipped?: SkippedCheck
   return skipped.length > 0 ? { skipped } : {};
 }
 
+/** What `--visual` measures in a browser, as a hint or a reason names it. */
+export const RENDERED_RULES = "overflow, contrast, line breaks, and alignment";
+
 /**
- * The overflow and contrast rules, when a run leaves them out: why, and `rerun`, the command that
+ * The rules a browser measures, when a run leaves them out: why, and `rerun`, the command that
  * measures them. Without Playwright, installing it comes first, whatever the reason was.
  */
 export function visualSkipped(
   rerun: string,
   options: { reason: string; runner?: PlaywrightRunner },
 ): SkippedCheck {
-  const measure = `run \`${rerun}\` to measure overflow and contrast`;
+  const measure = `run \`${rerun}\` to measure ${RENDERED_RULES}`;
   return playwrightReady(options.runner)
     ? { check: "visual", reason: options.reason, hint: measure }
     : {

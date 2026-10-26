@@ -6,6 +6,10 @@ Date: 2026-10-06
 
 Accepted
 
+Amended by [22. Lay boxes, pictures, and the text in them over a PPTX's picture as PowerPoint's own with dekc pptx --shapes](0022-lay-boxes-pictures-and-the-text-in-them-over-a-pptx-s-picture-as-powerpoint-s-own-with-dekc-pptx-shapes.md)
+
+Amended by [24. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0024-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
+
 ## Context
 
 A talk often has to reach people who work in PowerPoint or Keynote: an organizer who collects every speaker's slides, a co-presenter, a company that keeps decks in its own template. dek hands over a single HTML file, a PDF, and a video, none of which they can edit. Slidev and open-slide export PPTX with native shapes and text boxes; Marp exports pictures, with an experimental editable mode through LibreOffice. `docs/guide/why.md` and the FAQ listed PPTX export among what dek is not for.
