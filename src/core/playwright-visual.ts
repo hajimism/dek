@@ -1,7 +1,9 @@
 import type { Browser, BrowserContext, Page } from "playwright";
+import { findMisalignments } from "./alignment.ts";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
 import { measureFill } from "./fill.ts";
 import { finishBeat } from "./finish-beat.ts";
+import { findLineBreaks, measureTextFlowsInPage } from "./line-break.ts";
 import {
   crossesEdge,
   findClippedText,
@@ -240,6 +242,8 @@ async function visitPages(context: BrowserContext, request: PagesRequest): Promi
     drawErrors: found.flatMap((page) => page.drawErrors ?? []),
     collisions: found.flatMap((page) => page.collisions ?? []),
     fills: found.flatMap((page) => page.fills ?? []),
+    lineBreaks: found.flatMap((page) => page.lineBreaks ?? []),
+    misalignments: found.flatMap((page) => page.misalignments ?? []),
   };
 }
 
@@ -343,7 +347,14 @@ async function visitPage(
   pageReq: VisualPage,
   { actions, viewport }: Pick<PagesRequest, "actions" | "viewport">,
 ): Promise<PagesResponse> {
-  const response: PagesResponse = { overflows: [], contrasts: [], collisions: [], fills: [] };
+  const response: PagesResponse = {
+    overflows: [],
+    contrasts: [],
+    collisions: [],
+    fills: [],
+    lineBreaks: [],
+    misalignments: [],
+  };
   const failing: Failing[] = [];
   const crossing: Crossing[] = [];
   await page.setContent(pageReq.html, { waitUntil: "load" });
@@ -361,6 +372,36 @@ async function visitPage(
     };
     if (actions.includes("fill") && frame) {
       response.fills?.push({ slug, step, ...measureFill(frame, measured.elements) });
+    }
+    if (actions.includes("alignment")) {
+      for (const { element, other, ...miss } of findMisalignments(measured.elements)) {
+        const [one, two] = [measured.elements[element], measured.elements[other]];
+        response.misalignments?.push({
+          slug,
+          step,
+          box: one?.box ?? "",
+          ...(one?.text ? { text: one.text } : {}),
+          other: two?.box ?? "",
+          ...(two?.text ? { otherText: two.text } : {}),
+          ...miss,
+        });
+      }
+    }
+    if (actions.includes("breaks")) {
+      const { wordBreak, flows } = await page.evaluate(measureTextFlowsInPage);
+      const textWraps = new Map(flows.map((flow) => [flow.element, flow.textWrap]));
+      for (const { element, ...found } of findLineBreaks(flows)) {
+        const el = measured.elements[element];
+        response.lineBreaks?.push({
+          slug,
+          step,
+          box: el?.box ?? "",
+          ...(el?.text ? { text: el.text } : {}),
+          ...found,
+          wordBreak,
+          textWrap: textWraps.get(element) ?? "wrap",
+        });
+      }
     }
     if (actions.includes("overflow") && frame) {
       for (const { element, ...overflow } of [

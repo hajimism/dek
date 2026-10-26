@@ -165,8 +165,9 @@ describe("buildCommand link preview", () => {
         });
         expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
           check: "visual",
-          reason: "overflow and contrast are measured only by `dekc lint --visual`",
-          hint: "run `dekc lint --visual` to measure overflow and contrast",
+          reason:
+            "overflow, contrast, line breaks, and alignment are measured only by `dekc lint --visual`",
+          hint: "run `dekc lint --visual` to measure overflow, contrast, line breaks, and alignment",
         });
       },
     );

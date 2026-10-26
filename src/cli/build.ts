@@ -5,7 +5,7 @@ import { lintDeck, lintProject } from "../core/lint.ts";
 import { parsePublicUrl } from "../core/ogp.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "../core/playwright.ts";
 import { playerScript } from "../runtime/player.ts";
-import { type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
+import { RENDERED_RULES, type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
 import type { DecksTarget } from "./scope.ts";
 
 /**
@@ -77,7 +77,7 @@ export async function buildCommand(
     ...skippedChecks([
       ...skipped,
       visualSkipped("dekc lint --visual", {
-        reason: "overflow and contrast are measured only by `dekc lint --visual`",
+        reason: `${RENDERED_RULES} are measured only by \`dekc lint --visual\``,
         ...(options.runner ? { runner: options.runner } : {}),
       }),
     ]),

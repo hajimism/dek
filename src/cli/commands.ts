@@ -659,7 +659,7 @@ export const COMMANDS = {
     group: "Output",
     overview: [
       ["dekc lint [--fix]", "check script.md against slides; --fix syncs first"],
-      ["dekc lint --visual", "add overflow and contrast rules"],
+      ["dekc lint --visual", "add overflow, contrast, line-break, and alignment rules"],
       ["dekc lint --format sarif", "print diagnostics as SARIF, for code scanning"],
     ],
     agent: ["dekc lint [--fix] [--visual] [--format sarif]"],

@@ -76,7 +76,7 @@ Claude Code では `/plugin install dek-design@dek` です。npm パッケージ
 
 - `error` は必ず `message` を持ち、dek が次の一手を知っていれば `hint` を、失敗に場所があれば `path` と `line` を持ちます。
 - 診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は、成否に関わらず必ず `diagnostics` 配列を持ちます。各診断は `severity`、場所があれば `path`・`line`・`column`、直し方が決まっていれば `hint`、メッセージに含まれる値を `data` として持ちます。失敗になるのは error だけで、warning だけなら `"ok": true` です。
-- 実行しなかったチェックは `skipped` の要素になり、空の合格にはなりません。`{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }` のような形です。すべて実行できたときはこのフィールド自体がありません。`--visual` を付けない `dekc lint` と `dekc build` は、必ず `visual` を載せます。はみ出しもコントラストも測っていないからで、hint は測るためのコマンドです。
+- 実行しなかったチェックは `skipped` の要素になり、空の合格にはなりません。`{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }` のような形です。すべて実行できたときはこのフィールド自体がありません。`--visual` を付けない `dekc lint` と `dekc build` は、必ず `visual` を載せます。はみ出しも、コントラストも、改行も、揃えも測っていないからで、hint は測るためのコマンドです。
 - 対象のデッキごとにファイルを書くコマンドは、1 デッキでもリストを返します。`build` と `pdf` は `outs` を返します。
 - `dekc lint --format sarif` は同じ診断を SARIF 2.1.0 で返します。
 - 各コマンドの形は JSON Schema として [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しています。`$defs` にコマンドごとの定義があり、実行できなかった行は `failure` です。どのオブジェクトも閉じているので、名前のないフィールドが増えるのは契約の変更です。スキーマ、CLI 自身の型、テストで dek が出力するものは 1 つの定義に対して検査されるので、互いにずれることはありません。

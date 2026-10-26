@@ -26,7 +26,7 @@ On every save:
 - **`slides/*.css`** — styles re-apply in place, and lint runs.
 - **`slides/*.ts`** — the page reloads, because slide scripts register once at load, and lint runs.
 - **`voice/voice.toml`** — the deck is re-timed from cached clips.
-- With `--visual` and Playwright installed, the saved slide is also measured for overflow and contrast.
+- With `--visual` and Playwright installed, the saved slide is also measured for overflow, contrast, line breaks, and alignment.
 
 Only one server runs per project. A second `dekc` finds the first one's lock in `.dek/server.json` and tells you where it is.
 

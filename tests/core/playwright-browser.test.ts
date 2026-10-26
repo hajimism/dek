@@ -10,6 +10,7 @@ import { finishBeat } from "../../src/core/finish-beat.ts";
 import { holdStarted, seekStarted, startGoPaused } from "../../src/core/in-page-go.ts";
 import {
   importPlaywright,
+  type PageAction,
   playwrightResolved,
   requirePlaywright,
   type VisualRequest,
@@ -17,6 +18,7 @@ import {
 import { runVisualRequest } from "../../src/core/playwright-visual.ts";
 import { overviewSheets, sheetLayout } from "../../src/core/sheet.ts";
 import { shotMotion } from "../../src/core/shot/motion.ts";
+import { measureSlideInPage } from "../../src/core/slide-measure.ts";
 import { contrastRatio } from "../../src/core/text-contrast.ts";
 import { playerScript } from "../../src/runtime/player.ts";
 import { slideDocument } from "../helpers/html.ts";
@@ -382,6 +384,125 @@ p { margin: 0 }
   });
 });
 
+// An edge a few pixels off reads as a mistake, and a shot shows it where markup does not.
+describe("playwright worker alignment", () => {
+  const measure = async (body: string, css = "", actions: PageAction[] = ["alignment"]) =>
+    render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions,
+      pages: [
+        {
+          html: `<html><head><style>
+body { margin: 0 }
+.slide { box-sizing: border-box; width: 1280px; height: 720px; padding: 64px; font: 400 24px sans-serif }
+h2, p, ul { margin: 0 }
+.row { display: flex; gap: 32px }
+.card { width: 300px; padding: 24px; background: #eee }
+</style><style id="dek-slide-css">${css}</style></head><body><section class="slide">${body}</section></body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+  const cards = `<div class="row"><div class="card">速い</div><div class="card nudged">安い</div><div class="card">うまい</div></div>`;
+
+  browserTest("reports the card a few pixels off the row the others share", async () => {
+    const response = await measure(cards, ".nudged { margin-top: 3px }");
+    expect(response.misalignments).toEqual([
+      {
+        slug: "intro",
+        step: "1",
+        box: "div.card",
+        text: "安い",
+        other: "div.card",
+        otherText: "速い",
+        edge: "top",
+        of: "box",
+        by: 3,
+      },
+    ]);
+  });
+
+  browserTest("reports cards whose text starts a few pixels apart", async () => {
+    const response = await measure(cards, ".nudged { padding-top: 28px }");
+    expect(
+      (response.misalignments ?? []).map(({ text, edge, of, by }) => ({ text, edge, of, by })),
+    ).toEqual([{ text: "安い", edge: "top", of: "text", by: 4 }]);
+  });
+
+  browserTest("passes a heading over a list, and an icon centered beside its words", async () => {
+    const response = await measure(
+      `<h2>見出し</h2><ul><li>一つめ</li><li>二つめ</li></ul>
+<div class="row" style="align-items: center"><svg width="40" height="40"><rect width="40" height="40"/></svg><p>アイコンの横の文</p></div>`,
+    );
+    expect(response.misalignments).toEqual([]);
+  });
+
+  browserTest("measures where text sits on its baseline, whatever its size and font", async () => {
+    if (!browser) {
+      throw new Error("no browser");
+    }
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    try {
+      await page.setContent(`<section class="slide" style="display:flex; align-items:baseline; gap:12px; font-family:sans-serif">
+<span class="stat" style="font-size:96px; line-height:1">322</span>
+<span class="unit" style="font-size:20px; line-height:1.6">KiB</span>
+<span class="mono" style="font: 700 32px/2 monospace">ok</span>
+<span class="ja" style="font-size:28px">日本語</span>
+</section>`);
+      const { elements } = await page.evaluate(measureSlideInPage);
+      const baselines = elements.map(({ baseline }) => baseline ?? Number.NaN);
+      const [first = 0] = baselines;
+      expect(baselines.every((baseline) => Math.abs(baseline - first) < 1)).toBe(true);
+    } finally {
+      await page.close();
+    }
+  });
+
+  browserTest(
+    "counts a turn or a skew as tilting, its own or an ancestor's, but not a flip",
+    async () => {
+      if (!browser) {
+        throw new Error("no browser");
+      }
+      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      try {
+        await page.setContent(`<section class="slide">
+<div class="turned" style="rotate: 0.6deg"><p class="inside">中</p></div>
+<div class="skewed" style="transform: skewX(4deg)"></div>
+<div class="flipped" style="transform: scaleY(-1)"></div>
+<div class="moved" style="transform: translateY(12px)"></div>
+</section>`);
+        const { elements } = await page.evaluate(measureSlideInPage);
+        expect(Object.fromEntries(elements.map(({ box, tilted }) => [box, tilted]))).toEqual({
+          "div.turned": true,
+          "p.inside": true,
+          "div.skewed": true,
+          "div.flipped": false,
+          "div.moved": false,
+        });
+      } finally {
+        await page.close();
+      }
+    },
+  );
+
+  browserTest("passes a number and its unit set on one baseline, and a tilted window", async () => {
+    const response = await measure(
+      `<div class="row" style="align-items: baseline"><span class="stat" style="font-size:96px; line-height:1">322</span><span class="unit" style="font-size:20px">KiB</span></div>
+<div class="row" style="margin-top: 40px"><div class="card">速い</div><div class="card" style="rotate: 1deg">安い</div></div>
+<p>本文の中の<span class="card" style="display:inline-block; padding: 2px">チップ</span>は文字の並び</p>`,
+    );
+    expect(response.misalignments).toEqual([]);
+  });
+
+  browserTest("measures alignment only when asked", async () => {
+    const response = await measure(cards, ".nudged { margin-top: 3px }", ["fill"]);
+    expect(response.misalignments).toEqual([]);
+  });
+});
+
 describe("playwright worker files", () => {
   browserTest(
     "shoots a page that names a screenshotPath, and measures nothing unasked",
@@ -408,6 +529,8 @@ describe("playwright worker files", () => {
           drawErrors: [],
           collisions: [],
           fills: [],
+          lineBreaks: [],
+          misalignments: [],
         });
         expect((await pixelAt(screenshotPath, 10, 10)).slice(0, 5)).toEqual([320, 180, 255, 0, 0]);
       } finally {
@@ -1161,6 +1284,8 @@ describe("contact sheets in a real Chromium", () => {
         drawErrors: [],
         collisions: [],
         fills: [],
+        lineBreaks: [],
+        misalignments: [],
       });
       expect(await Bun.file(spec.path).exists()).toBe(true);
       const { size, boxes } = sheetLayout(spec);

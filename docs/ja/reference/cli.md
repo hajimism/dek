@@ -28,7 +28,7 @@ description: 'コマンド、フラグ、環境変数。'
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc [deck] [--visual] [--port N] [--remote]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、発表者ビュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出しとコントラストも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
+| `dekc [deck] [--visual] [--port N] [--remote]` | 開発サーバを起動。起動時と保存のたびの sync、ライブリロード、保存時 lint、発表者ビュー。`127.0.0.1` と `localhost` でだけ応答し、別オリジンからの操作（WebSocket、`goto`）は拒否する。`--visual` で保存時にはみ出し、コントラスト、改行、揃えも測る。`--port` でポートを固定する。省くと空いているポートを OS が選ぶ。Ctrl-C のほか、起動したプロセスが終了したときにも止まるので、ポートを握ったサーバが残らない |
 | `dekc --remote` | LAN に公開。発表者ビュー、`goto`、`current`、音声のタイムラインとオーディオ、配信される診断は、起動のたびに dek が作って表示する 10 文字のパスワードが必要。ターミナルではその下の QR コードでスマホから発表者ビューを開ける（1 回だけ、5 分以内。Enter で新しいコード） |
 | `dekc rehearse [deck] [slug] [--remote]` | Timeline に沿って自走。何も録画しない。`--remote` を付けると `dekc --remote` と同じく LAN に公開する |
 
@@ -83,7 +83,7 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | lint。`--fix` は先に `dekc sync` を実行する。`--visual` ははみ出しとコントラストを足す |
+| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | lint。`--fix` は先に `dekc sync` を実行する。`--visual` ははみ出し、コントラスト、改行、揃えを足す |
 | `dekc cues [deck]` | 喋りの Cue を `Cue[]` で出力。段落だけ。エンジン不要 |
 | `dekc voice [deck]` | 変わった文を `.cache/voice/` に合成。保存時にも走る |
 | `dekc voice [deck] speakers` | エンジンの話者一覧 |

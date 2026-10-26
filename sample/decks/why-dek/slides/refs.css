@@ -99,6 +99,6 @@
 
 .stage > .code {
   grid-column: 9 / -1;
-  margin-top: calc(var(--gap) * 1.4);
+  margin-top: calc(var(--gap) * 1.2);
   font-size: var(--size-caption);
 }

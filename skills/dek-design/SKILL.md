@@ -5,7 +5,7 @@ description: Make dek slides that read at a glance - a heading that states a cla
 
 # dek-design
 
-The audience sees a slide, holds it in mind, then understands it. Make each step cost as little as it can. Lint measures overflow and contrast; this skill is for what it cannot measure. Use only the classes, tokens, and layouts `bunx dekc theme` lists.
+The audience sees a slide, holds it in mind, then understands it. Make each step cost as little as it can. Lint measures what a rule can decide, such as overflow and contrast; this skill is for what it cannot. Use only the classes, tokens, and layouts `bunx dekc theme` lists.
 
 ## Before you start
 

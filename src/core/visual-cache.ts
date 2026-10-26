@@ -19,10 +19,12 @@ export type PageFindings = Required<PagesResponse>;
  * its source is part of every key, and a cache written by another dek is never read.
  */
 const MEASURERS = [
+  "alignment.ts",
   "playwright-visual.ts",
   "slide-measure.ts",
   "text-contrast.ts",
   "fill.ts",
+  "line-break.ts",
   "overflow.ts",
   "pseudo-text.ts",
   "finish-beat.ts",

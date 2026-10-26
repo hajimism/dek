@@ -28,7 +28,7 @@ Create a project with `bunx @hajimism/dek init`, then install dek into it with `
 
 | Command | Purpose |
 | --- | --- |
-| `dekc [deck] [--visual] [--port N] [--remote]` | Start the dev server: sync on start and on every save, live reload, lint on save, presenter view. It answers only at `127.0.0.1` or `localhost`, and refuses a move (a WebSocket, `goto`) from another origin. `--visual` adds overflow and contrast on save. `--port` fixes the port; without it the OS picks a free one. It stops on Ctrl-C, or when the process that started it exits, so no server is left holding a port. |
+| `dekc [deck] [--visual] [--port N] [--remote]` | Start the dev server: sync on start and on every save, live reload, lint on save, presenter view. It answers only at `127.0.0.1` or `localhost`, and refuses a move (a WebSocket, `goto`) from another origin. `--visual` adds overflow, contrast, line breaks, and alignment on save. `--port` fixes the port; without it the OS picks a free one. It stops on Ctrl-C, or when the process that started it exits, so no server is left holding a port. |
 | `dekc --remote` | Serve on the LAN. The presenter view, `goto`, `current`, the voice timeline and audio, and the streamed diagnostics require the 10-letter password dek makes and prints on each start. On a terminal, a QR code under it opens the presenter view on a phone: once, within five minutes; Enter prints a new one. |
 | `dekc rehearse [deck] [slug] [--remote]` | Auto-advance from the Timeline. Records nothing. `--remote` serves it on the LAN as `dekc --remote` does. |
 
@@ -83,7 +83,7 @@ A deck the reader cannot reach on GitHub travels as a pack: `dekc pack` writes i
 
 | Command | Purpose |
 | --- | --- |
-| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | Lint. `--fix` runs `dekc sync` first. `--visual` adds overflow and contrast. |
+| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | Lint. `--fix` runs `dekc sync` first. `--visual` adds overflow, contrast, line breaks, and alignment. |
 | `dekc cues [deck]` | Print the spoken cues as `Cue[]`. Paragraphs only. No engine needed. |
 | `dekc voice [deck]` | Synthesize changed sentences into `.cache/voice/`. Also runs on save. |
 | `dekc voice [deck] speakers` | List the engine's speakers. |
