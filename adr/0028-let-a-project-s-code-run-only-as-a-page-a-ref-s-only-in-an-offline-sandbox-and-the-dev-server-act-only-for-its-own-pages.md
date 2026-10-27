@@ -8,7 +8,7 @@ Accepted
 
 Amended by [29. Say whenever Chromium draws without its sandbox, and draw a ref so only with DEK_ALLOW_UNSANDBOXED](0029-say-whenever-chromium-draws-without-its-sandbox-and-draw-a-ref-so-only-with-dek-allow-unsandboxed.md)
 
-Amended by [28. Keep a ref's words out of dek's hints, and mark what a ref wrote wherever dek prints it](0028-keep-a-ref-s-words-out-of-dek-s-hints-and-mark-what-a-ref-wrote-wherever-dek-prints-it.md)
+Amended by [30. Keep a ref's words out of dek's hints, and mark what a ref wrote wherever dek prints it](0030-keep-a-ref-s-words-out-of-dek-s-hints-and-mark-what-a-ref-wrote-wherever-dek-prints-it.md)
 
 ## Context
 
