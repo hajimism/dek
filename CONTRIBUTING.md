@@ -25,7 +25,7 @@ CI runs each of these; run them locally first.
 bunx biome ci .        # format and lint
 bun run typecheck
 bun run knip           # unused files, exports, dependencies
-bun test
+bun test --timeout=20000   # every file under tests/setup.ts's default
 bun run docs:build     # docs and the sample decks
 bash scripts/check-package.sh   # the tarball npm would ship, installed and run
 ```

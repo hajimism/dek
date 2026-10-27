@@ -1885,27 +1885,22 @@ describe("startDevServer --remote exposure", () => {
 });
 
 describe("startDevServer requests", () => {
-  // The preload's default timeout reaches only the first test file, so this one names its own.
-  test(
-    "closes while more than one browser holds /events open",
-    async () => {
-      await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-        const server = await startDevServer({ cwd: join(root, "decks", "demo"), port: 0 });
-        const streams = await Promise.all(
-          [0, 1].map(() => fetch(new URL("/events", server.url)).then((res) => res.body)),
-        );
-        for (const stream of streams) {
-          await stream?.getReader().read();
-        }
-        const closed = await Promise.race([
-          server.close().then(() => true),
-          Bun.sleep(WAIT_MS).then(() => false),
-        ]);
-        expect(closed).toBe(true);
-      });
-    },
-    WAIT_MS * 2,
-  );
+  test("closes while more than one browser holds /events open", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const server = await startDevServer({ cwd: join(root, "decks", "demo"), port: 0 });
+      const streams = await Promise.all(
+        [0, 1].map(() => fetch(new URL("/events", server.url)).then((res) => res.body)),
+      );
+      for (const stream of streams) {
+        await stream?.getReader().read();
+      }
+      const closed = await Promise.race([
+        server.close().then(() => true),
+        Bun.sleep(WAIT_MS).then(() => false),
+      ]);
+      expect(closed).toBe(true);
+    });
+  });
 
   test("refuses an asset symlink that leads out of the deck", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {

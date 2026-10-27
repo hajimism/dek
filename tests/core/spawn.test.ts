@@ -102,22 +102,17 @@ describe("runJsonWorker", () => {
 });
 
 describe("runPiped", () => {
-  // The preload's default timeout reaches only the first test file, so this one names its own.
-  test(
-    "writes stdin, closes it, and returns the output and the exit code",
-    async () => {
-      const piped = await runPiped(
-        [
-          "bun",
-          "-e",
-          "const t = await Bun.stdin.text(); console.log(t.toUpperCase()); console.error('e'); process.exit(3)",
-        ],
-        { label: "echo failed", hint: "", stdin: "hello", timeoutMs: WAIT_MS },
-      );
-      expect(piped).toEqual({ stdout: "HELLO\n", stderr: "e\n", exitCode: 3 });
-    },
-    WAIT_MS * 2,
-  );
+  test("writes stdin, closes it, and returns the output and the exit code", async () => {
+    const piped = await runPiped(
+      [
+        "bun",
+        "-e",
+        "const t = await Bun.stdin.text(); console.log(t.toUpperCase()); console.error('e'); process.exit(3)",
+      ],
+      { label: "echo failed", hint: "", stdin: "hello", timeoutMs: WAIT_MS },
+    );
+    expect(piped).toEqual({ stdout: "HELLO\n", stderr: "e\n", exitCode: 3 });
+  });
 
   test("kills a command that runs past timeoutMs and says so", async () => {
     // The fake outlasts the test's timeout, so only killing it settles this in time.

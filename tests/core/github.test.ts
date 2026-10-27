@@ -5,7 +5,7 @@ import { authorization, downloadTarball, resolveRev } from "../../src/core/githu
 import { withEnv } from "../helpers/env.ts";
 import { deckRepoFiles, SHA_A, SHA_B, withFakeGithub } from "../helpers/fake-github.ts";
 import { withTempDir } from "../helpers/fs.ts";
-import { WAIT_MS, waitFor } from "../helpers/wait.ts";
+import { waitFor } from "../helpers/wait.ts";
 
 const repos = {
   "someone/talks": {
@@ -141,35 +141,30 @@ describe("downloadTarball", () => {
     });
   });
 
-  // The preload's default timeout reaches only the first test file, so this one names its own.
-  test.serial(
-    "stops reading a chunked tarball as soon as it passes the size cap",
-    async () => {
-      await withFakeGithub(repos, async (fake) => {
-        // A body that never ends: the download can only fail by giving up on it.
-        let cancelled = false;
-        fake.tarballBytes = () =>
-          new ReadableStream<Uint8Array>({
-            async pull(controller) {
-              await Bun.sleep(1);
-              controller.enqueue(new Uint8Array(1024));
-            },
-            cancel() {
-              cancelled = true;
-            },
-          });
-        await expect(
-          downloadTarball("someone", "talks", SHA_A, { maxBytes: 4096 }),
-        ).rejects.toMatchObject({
-          name: "DekError",
-          message: expect.stringContaining("is larger than"),
-          hint: expect.stringContaining("smaller repository"),
+  test.serial("stops reading a chunked tarball as soon as it passes the size cap", async () => {
+    await withFakeGithub(repos, async (fake) => {
+      // A body that never ends: the download can only fail by giving up on it.
+      let cancelled = false;
+      fake.tarballBytes = () =>
+        new ReadableStream<Uint8Array>({
+          async pull(controller) {
+            await Bun.sleep(1);
+            controller.enqueue(new Uint8Array(1024));
+          },
+          cancel() {
+            cancelled = true;
+          },
         });
-        await waitFor(() => cancelled);
+      await expect(
+        downloadTarball("someone", "talks", SHA_A, { maxBytes: 4096 }),
+      ).rejects.toMatchObject({
+        name: "DekError",
+        message: expect.stringContaining("is larger than"),
+        hint: expect.stringContaining("smaller repository"),
       });
-    },
-    WAIT_MS * 2,
-  );
+      await waitFor(() => cancelled);
+    });
+  });
 
   test.serial("a tarball that stalls times out instead of hanging", async () => {
     await withFakeGithub(repos, async (fake) => {

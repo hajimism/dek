@@ -43,8 +43,8 @@
     "ai-agents"
   ],
   "scripts": {
-    "test": "bun test --parallel=4",
-    "test:watch": "bun test --watch",
+    "test": "bun test --parallel=4 --timeout=20000",
+    "test:watch": "bun test --watch --timeout=20000",
     "typecheck": "tsc --noEmit",
     "knip": "knip",
     "schema": "bun scripts/cli-schema.ts",

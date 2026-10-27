@@ -64,7 +64,7 @@ bun run dev            # or bun run lint:visual / bun run build
 ```bash
 bun install
 bunx playwright install chromium   # once, for the tests that drive a real browser
-bun test --watch
+bun test --watch --timeout=20000
 bun run typecheck
 bun run check             # Biome format + lint
 bun run docs:dev          # VitePress

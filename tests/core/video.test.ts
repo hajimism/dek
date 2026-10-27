@@ -371,42 +371,37 @@ describe("muxVideo", () => {
     });
   });
 
-  test.serial(
-    "resolves when ffmpeg writes a megabyte of stderr",
-    async () => {
-      await withTempDir(async (dir) => {
-        const a = join(dir, "a.png");
-        writeFileSync(a, PNG);
-        const wav = join(dir, "audio.wav");
-        writeFileSync(wav, silentWav(200));
-        const out = join(dir, "out.mp4");
-        const previous = process.env.DEK_FFMPEG;
-        process.env.DEK_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
-        try {
-          // A full stderr pipe would hang for good; the bound only has to beat the test timeout,
-          // named here since the preload's reaches only the first test file.
-          await Promise.race([
-            muxVideo({
-              frames: [{ path: a, durationMs: 100 }],
-              audioPath: wav,
-              outPath: out,
-            }),
-            new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error("hung")), WAIT_MS);
-            }),
-          ]);
-          expect(await Bun.file(out).exists()).toBe(true);
-        } finally {
-          if (previous === undefined) {
-            delete process.env.DEK_FFMPEG;
-          } else {
-            process.env.DEK_FFMPEG = previous;
-          }
+  test.serial("resolves when ffmpeg writes a megabyte of stderr", async () => {
+    await withTempDir(async (dir) => {
+      const a = join(dir, "a.png");
+      writeFileSync(a, PNG);
+      const wav = join(dir, "audio.wav");
+      writeFileSync(wav, silentWav(200));
+      const out = join(dir, "out.mp4");
+      const previous = process.env.DEK_FFMPEG;
+      process.env.DEK_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
+      try {
+        // A full stderr pipe would hang for good; the bound only has to beat the test timeout.
+        await Promise.race([
+          muxVideo({
+            frames: [{ path: a, durationMs: 100 }],
+            audioPath: wav,
+            outPath: out,
+          }),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("hung")), WAIT_MS);
+          }),
+        ]);
+        expect(await Bun.file(out).exists()).toBe(true);
+      } finally {
+        if (previous === undefined) {
+          delete process.env.DEK_FFMPEG;
+        } else {
+          process.env.DEK_FFMPEG = previous;
         }
-      });
-    },
-    WAIT_MS * 2,
-  );
+      }
+    });
+  });
 
   test.serial(
     "gives up on an ffmpeg on PATH that never answers -version, even one that ignores SIGTERM",

@@ -64,7 +64,7 @@ bun run dev            # または bun run lint:visual / bun run build
 ```bash
 bun install
 bunx playwright install chromium   # 最初に一度。実ブラウザを動かすテストに使う
-bun test --watch
+bun test --watch --timeout=20000
 bun run typecheck
 bun run check             # Biome の format + lint
 bun run docs:dev          # VitePress

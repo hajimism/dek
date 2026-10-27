@@ -4,8 +4,7 @@ import { importPlaywright } from "../../src/core/playwright.ts";
 
 /**
  * How long a test that drives Chromium may take. A loaded machine (a parallel run, CI) stretches
- * a page's second into tens of seconds, and the preload's default timeout reaches only the first
- * test file, so the rest would run under Bun's 5s.
+ * a page's second into tens of seconds, past the suite's default.
  */
 export const BROWSER_TEST_MS = 60_000;
 
