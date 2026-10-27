@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runJsonWorker, runPiped, workerCommand } from "../../src/core/spawn.ts";
+import { withTempDir } from "../helpers/fs.ts";
 
 const helpers = join(import.meta.dir, "..", "helpers");
 const parse = (text: string): Record<string, unknown> | null => {
@@ -12,6 +15,18 @@ const parse = (text: string): Record<string, unknown> | null => {
   }
 };
 const options = { label: "Playwright worker failed", hint: "install it" };
+
+/** Kills the process whose pid a test's shell wrote to `path`, if it got that far. */
+async function killRecorded(path: string): Promise<void> {
+  const pid = Number((await readFile(path, "utf8").catch(() => "")).trim());
+  if (pid > 0) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
+}
 
 describe("workerCommand", () => {
   test("runs a .ts worker with bun and anything else as is", () => {
@@ -59,6 +74,25 @@ describe("runJsonWorker", () => {
     });
   });
 
+  test(
+    "a worker whose output a process it left behind cut short says so, not invalid JSON",
+    async () => {
+      await withTempDir(async (dir) => {
+        const pid = join(dir, "pid");
+        try {
+          const worker = `printf '{"overflows":'; sleep 30 & echo $! > '${pid}'`;
+          await expect(
+            runJsonWorker(["sh", "-c", worker], {}, parse, options),
+          ).rejects.toMatchObject({ name: "DekError", hint: expect.stringContaining("cut short") });
+          expect(existsSync(pid)).toBe(true);
+        } finally {
+          await killRecorded(pid);
+        }
+      });
+    },
+    { timeout: 40_000 },
+  );
+
   test("a worker that prints something else fails as invalid JSON", async () => {
     await expect(
       runJsonWorker(["bun", "-e", "console.log('nope')"], {}, parse, options),
@@ -94,6 +128,86 @@ describe("runPiped", () => {
     });
     expect(Date.now() - started).toBeLessThan(3000);
   });
+
+  // Each command would hold dek for the 30 s of its sleep; the bound only has to be well short of
+  // it. The timeout is well past a shell's start on a busy machine, and the file the shell writes
+  // before it proves the SIGTERM came after the trap or the fork, not before.
+  test(
+    "kills a command that ignores SIGTERM",
+    async () => {
+      await withTempDir(async (dir) => {
+        const ready = join(dir, "ready");
+        const started = Date.now();
+        try {
+          // exec: the shell becomes the sleep, so the SIGKILL ends it and nothing is left behind.
+          await expect(
+            runPiped(["sh", "-c", `trap '' TERM; echo $$ > '${ready}'; exec sleep 30`], {
+              label: "ffmpeg failed",
+              hint: "",
+              timeoutMs: 4000,
+            }),
+          ).rejects.toMatchObject({
+            name: "DekError",
+            hint: expect.stringContaining("did not finish"),
+          });
+          expect(existsSync(ready)).toBe(true);
+          expect(Date.now() - started).toBeLessThan(20_000);
+        } finally {
+          await killRecorded(ready);
+        }
+      });
+    },
+    { timeout: 40_000 },
+  );
+
+  test(
+    "stops waiting for output a process left behind holds open",
+    async () => {
+      await withTempDir(async (dir) => {
+        const pid = join(dir, "pid");
+        const started = Date.now();
+        try {
+          await expect(
+            runPiped(["sh", "-c", `sleep 30 & echo $! > '${pid}'; wait`], {
+              label: "ffmpeg failed",
+              hint: "",
+              timeoutMs: 4000,
+            }),
+          ).rejects.toMatchObject({
+            name: "DekError",
+            hint: expect.stringContaining("did not finish"),
+          });
+          expect(existsSync(pid)).toBe(true);
+          expect(Date.now() - started).toBeLessThan(20_000);
+        } finally {
+          await killRecorded(pid);
+        }
+      });
+    },
+    { timeout: 40_000 },
+  );
+
+  test(
+    "returns once the command exits, whatever it left running",
+    async () => {
+      await withTempDir(async (dir) => {
+        const pid = join(dir, "pid");
+        const started = Date.now();
+        try {
+          const piped = await runPiped(["sh", "-c", `echo done; sleep 30 & echo $! > '${pid}'`], {
+            label: "ffmpeg failed",
+            hint: "",
+            timeoutMs: 60_000,
+          });
+          expect(piped).toEqual({ stdout: "done\n", stderr: "", exitCode: 0, cutShort: true });
+          expect(Date.now() - started).toBeLessThan(20_000);
+        } finally {
+          await killRecorded(pid);
+        }
+      });
+    },
+    { timeout: 40_000 },
+  );
 
   test("a command that cannot start fails with the hint", async () => {
     await expect(
