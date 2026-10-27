@@ -34,10 +34,15 @@ export function isPidAlive(pid: number): boolean {
 /** The hosts a dev server's URL in its lock names: it writes this machine's loopback address. */
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
+/** The URL a dev server on `port` writes in its lock, as `URL` spells it: port 80 takes none. */
+export function devServerUrl(port: number): string {
+  return new URL(`http://127.0.0.1:${port}/`).href;
+}
+
 /**
  * The lock's URL in the form the dev server writes it, `http://<loopback>:<port>/`, or nothing
  * for any other. A server.json a repository brings along is its text, and the URL goes into
- * hints and into the requests `dekc goto` sends.
+ * hints and into the requests `dekc goto` sends. Port 80 is read with or without `:80`.
  */
 function serverUrl(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -52,13 +57,13 @@ function serverUrl(value: unknown): string | undefined {
   const served =
     url.protocol === "http:" &&
     LOOPBACK_HOSTS.has(url.hostname) &&
-    url.port !== "" &&
     url.pathname === "/" &&
     url.search === "" &&
     url.hash === "" &&
     url.username === "" &&
     url.password === "";
-  return served && url.href === value ? url.href : undefined;
+  const written = url.port === "" ? [url.href, `http://${url.hostname}:80/`] : [url.href];
+  return served && written.includes(value) ? url.href : undefined;
 }
 
 export function readDevServerLock(root: string): DevServerLock | undefined {

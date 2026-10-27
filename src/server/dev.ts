@@ -14,7 +14,12 @@ import {
 } from "./auth.ts";
 import type { EventFeed } from "./hub.ts";
 import { generateRemotePassword, lanUrls } from "./lan.ts";
-import { assertNoDevServer, removeDevServerLock, writeDevServerLock } from "./lock.ts";
+import {
+  assertNoDevServer,
+  devServerUrl,
+  removeDevServerLock,
+  writeDevServerLock,
+} from "./lock.ts";
 import { createDevPages } from "./pages.ts";
 import { createPairings, type Pairings } from "./pairing.ts";
 import { createProjectWatch } from "./project-watch.ts";
@@ -119,7 +124,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   }
 
   const port = server.port ?? 0;
-  const url = `http://127.0.0.1:${port}/`;
+  const url = devServerUrl(port);
   const remoteUrls = [...new Set([url, ...(access.remote ? lanUrls(port) : [])])];
   try {
     writeDevServerLock(project.root, url, access.password, scopedDeckName);

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
   assertNoDevServer,
+  devServerUrl,
   isPidAlive,
   readDevServerLock,
   removeDevServerLock,
@@ -102,7 +103,8 @@ describe("a lock a repository brings along", () => {
         "http://127.0.0.1:5173/x",
         "http://127.0.0.1:5173/?a=b",
         "http://user@127.0.0.1:5173/",
-        "http://127.0.0.1/",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:080/",
         "javascript:alert(1)",
       ]) {
         await lockAt(root, { url, pid: process.pid });
@@ -117,6 +119,19 @@ describe("a lock a repository brings along", () => {
         await lockAt(root, { url, pid: process.pid });
         expect(readDevServerLock(root)?.url).toBe(url);
       }
+    });
+  });
+
+  test("reads the lock the server writes on port 80, where the URL takes no port", async () => {
+    await withTempDir(async (root) => {
+      for (const url of [devServerUrl(80), "http://127.0.0.1:80/", "http://127.0.0.1/"]) {
+        await lockAt(root, { url, pid: process.pid });
+        expect({ url, lock: readDevServerLock(root)?.url }).toEqual({
+          url,
+          lock: "http://127.0.0.1/",
+        });
+      }
+      expect(devServerUrl(5173)).toBe("http://127.0.0.1:5173/");
     });
   });
 
