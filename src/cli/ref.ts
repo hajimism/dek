@@ -132,6 +132,7 @@ export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
     });
   }
   const project = requireProject(cwd);
+  refuseSharedFolders(project, source.name);
   const { pinned: from, dir, fetched } = refState(project, source.name);
   // Said before a download that the write would refuse anyway.
   refuseLinkUnderRefs(project.root, dir);
@@ -172,6 +173,24 @@ export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
   };
 }
 
+/**
+ * Refuses a pin whose folders another pin already takes. refs/ and packs/ are named by the ref,
+ * and macOS and Windows read a name without its case, so `file/Talk` and `file/talk` would share
+ * one snapshot and one pack, and adding the second would replace the first's.
+ */
+function refuseSharedFolders(project: { configPath: string }, name: string): void {
+  const folded = (ref: string) => ref.normalize("NFC").toLowerCase();
+  const other = Object.keys(loadConfig(project.configPath).refs ?? {}).find(
+    (pinned) => pinned !== name && folded(pinned) === folded(name),
+  );
+  if (other !== undefined) {
+    throw new DekError(`${name} would share its folders with ${other}, which dek.toml pins`, {
+      path: project.configPath,
+      hint: `a ref's folders are named without their case on macOS and Windows; to pin ${name} in its place, run \`dekc ref rm ${shellQuote(other)}\` first`,
+    });
+  }
+}
+
 /** An argument that ends in .tgz or .tar.gz is a pack's path, never a ref name. */
 function isPackPath(arg: string): boolean {
   return /\.(tgz|tar\.gz)$/i.test(arg);
@@ -193,6 +212,7 @@ async function addPack(cwd: string, arg: string): Promise<RefAddResult> {
   }
   const read = await readPackFile(given, undefined);
   const { source, bytes } = read;
+  refuseSharedFolders(project, source.name);
   const rev = await snapshotDigest(read);
   const { pinned: from, dir, fetched } = refState(project, source.name);
   const stored = join(project.root, packFile(source.deck));

