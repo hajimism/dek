@@ -8,6 +8,8 @@ Accepted
 
 Amended by [16. Hand a pack over under CC0 unless dek.toml says otherwise](0016-hand-a-pack-over-under-cc0-unless-dek-toml-says-otherwise.md)
 
+Amended by [31. Read a pack's or a repository's tar with dek's own reader, so nothing unpacks beyond what was counted](0031-read-a-pack-s-or-a-repository-s-tar-with-dek-s-own-reader-so-nothing-unpacks-beyond-what-was-counted.md)
+
 ## Context
 
 A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model: `ls`, `show`, `theme`, and `shot` read it, every other command refuses it, and AGENTS.md lists it as a deck the agent may learn from but not edit. Until now the only source of a ref was GitHub: `dekc ref owner/repo/deck` resolves a rev to a commit, downloads the repository's tarball, and keeps one deck of it under `refs/`. The pin in `dek.toml` is the ref; the snapshot is a copy that the next read fetches again, so `refs/` is gitignored.
