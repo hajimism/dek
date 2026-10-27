@@ -332,6 +332,10 @@ more
         expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<LintOk>(result);
         expect(json.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
+        // Without --visual, the rerun would not measure the overflow it says to fix.
+        expect(json.error?.hint).toBe(
+          "fix each error in diagnostics, then run `dekc lint --visual` again",
+        );
       },
     );
   });

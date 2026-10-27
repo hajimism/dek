@@ -494,6 +494,30 @@ describe("writeSuccess", () => {
     return { stdout: out.join(""), stderr: err.join("") };
   }
 
+  // A rerun without --visual would not measure the errors it says to fix.
+  test("a failing lint --visual says to run lint --visual again, from the project too", () => {
+    const failing = {
+      command: "lint" as const,
+      data: { diagnostics: [{ id: "DEK031", severity: "error" as const, message: "faint" }] },
+    };
+    const hint = (options: Parameters<typeof writeSuccess>[1]) =>
+      JSON.parse(captured(() => writeSuccess(failing, options)).stdout).error.hint;
+    expect(hint({ json: true, flags: { visual: true, fix: true } })).toBe(
+      "fix each error in diagnostics, then run `dekc lint --visual` again",
+    );
+    expect(
+      hint({
+        json: true,
+        flags: { visual: true },
+        cwd: "/talks",
+        deck: { name: "demo", dir: "/talks/decks/demo" },
+      }),
+    ).toBe("fix each error in diagnostics, then run `dekc lint demo --visual` again");
+    expect(hint({ json: true, flags: { fix: true } })).toBe(
+      "fix each error in diagnostics, then run `dekc lint` again",
+    );
+  });
+
   test("a failing check carries error first, then its own fields", () => {
     const { stdout } = captured(() =>
       writeSuccess(

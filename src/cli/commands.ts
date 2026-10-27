@@ -71,8 +71,8 @@ export type Output<D> = {
   json?(data: D): object;
   /** The data with every path into the source tree as `display` shows it. */
   paths?(data: D, display: (path: string) => string): D;
-  /** The error of a run that did its job and found one. */
-  failure?(data: D): FormattedError | undefined;
+  /** The error of a run that did its job and found one; `flags` are the run's, for its rerun. */
+  failure?(data: D, flags: FlagValues): FormattedError | undefined;
   /** `--format sarif`. */
   sarif?(data: D): object;
 };
@@ -674,7 +674,9 @@ export const COMMANDS = {
       notes: (data, color) => formatSkipped(data.skipped, color) || undefined,
       json: ({ rumdlSarif: _rumdlSarif, ...data }) => data,
       paths: withDisplayDiagnostics,
-      failure: (data) => diagnosticFailure("lint", data, "dekc lint"),
+      // The rerun measures what this run did: without --visual, the errors it found may not show.
+      failure: (data, flags) =>
+        diagnosticFailure("lint", data, flags.visual ? "dekc lint --visual" : "dekc lint"),
       sarif: (data) => {
         const dek = data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEK"));
         return mergeSarif(toSarif(dek, { skipped: data.skipped ?? [] }), data.rumdlSarif);

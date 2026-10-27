@@ -3,6 +3,7 @@ import { DekError } from "../core/error.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner, playwrightReady } from "../core/playwright.ts";
 import { addressHint, deckAround, type HintDeck } from "./address.ts";
 import { type CliResult, outputOf } from "./commands.ts";
+import type { FlagValues } from "./flags.ts";
 import { displayPath, formatError, formatErrorText } from "./format.ts";
 import { shouldColor, terminalSafe } from "./tty.ts";
 
@@ -41,6 +42,8 @@ export type WriteSuccessOptions = {
   cwd?: string;
   /** The one deck the command worked on, which hints that name no path are about. */
   deck?: HintDeck;
+  /** The flags it ran with, which a failure's rerun repeats where they change what is checked. */
+  flags?: FlagValues;
 };
 
 /** Where a run's hints are read: the directory it ran in, and the deck it worked on, if one. */
@@ -86,7 +89,7 @@ export function writeSuccess(original: CliResult, options: WriteSuccessOptions):
   const { cwd } = options;
   const addressed = cwd === undefined ? original : addressResult(original, { cwd, ...options });
   const result = cwd === undefined ? addressed : displayPaths(addressed, cwd);
-  const failed = output.failure?.(result.data);
+  const failed = output.failure?.(result.data, options.flags ?? {});
   const failure =
     failed?.hint === undefined || cwd === undefined
       ? failed
