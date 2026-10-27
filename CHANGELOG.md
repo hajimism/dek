@@ -2,6 +2,31 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.3.4](https://github.com/hajimism/dek/compare/v0.3.3...v0.3.4) (2026-10-27)
+
+
+### Features
+
+* **pptx:** lay out boxes, pictures, text, the theme, and backgrounds as PowerPoint's own ([#27](https://github.com/hajimism/dek/issues/27)) ([eb854e9](https://github.com/hajimism/dek/commit/eb854e9835508792d3e8cfb9dd4046e8750dab7f))
+* **skills:** teach the review in the browser, and add an optional dek-design skill ([2c18b0e](https://github.com/hajimism/dek/commit/2c18b0e339160fb03ca6ce3915b89e37d82c9522))
+* **skills:** teach the review in the browser, and add an optional dek-design skill ([1b04394](https://github.com/hajimism/dek/commit/1b04394023a239706a2fa29d168811e1a1be05d2))
+* **visual:** report awkward line breaks and edges a few pixels off (DEK035, DEK036) ([#28](https://github.com/hajimism/dek/issues/28)) ([ce75fc1](https://github.com/hajimism/dek/commit/ce75fc14937d76ab457298a5aca9116a0fe3778e))
+
+
+### Bug Fixes
+
+* refuse a slide script's imports before Bun reads it, so none runs while dek compiles ([2752356](https://github.com/hajimism/dek/commit/275235647869f1e0a040c080476141d3aaa1aaa6))
+* refuse a slide script's imports before Bun reads it, so none runs while dek compiles ([198930c](https://github.com/hajimism/dek/commit/198930c1d41639cc9943f36a3a187ff6eab0f364))
+
+
+### Documentation
+
+* **adr:** keep dependency code away from the tokens that publish ([103f17c](https://github.com/hajimism/dek/commit/103f17cebb37dd1750caa4cc242acedf55703809))
+* **adr:** renumber the PPTX records after the line-break ones ([ca43352](https://github.com/hajimism/dek/commit/ca4335267b6eeed7131c4123a8a543a230d65875))
+* **adr:** renumber the PPTX records after the line-break ones ([bef6e12](https://github.com/hajimism/dek/commit/bef6e12915ac301843297fb972cf36288bbf612c))
+* **adr:** ship an optional design skill and raise the official skill's floor to 0.2.2 ([6f39dd1](https://github.com/hajimism/dek/commit/6f39dd1e8234297cb0fb72d93722a419d1921f23))
+* name the optional dek-design skill, and the review the official skill teaches ([6908fa1](https://github.com/hajimism/dek/commit/6908fa195e16d79c75d5b77cda72f708798de34c))
+
 ## [0.3.3](https://github.com/hajimism/dek/compare/v0.3.2...v0.3.3) (2026-10-21)
 
 
