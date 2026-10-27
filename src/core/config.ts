@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { z } from "zod";
 import { isPackLicense, PACK_LICENSES, type PackLicense } from "./licenses.ts";
 import { parsePublicUrl } from "./ogp.ts";
 import { isPinFor, isPlainRefName, packFile, parseRefSource } from "./ref-name.ts";
+import { readSourceIfExists } from "./safe-fs.ts";
 import { DeckSettings } from "./schema.ts";
 import { parseTomlWith } from "./zod.ts";
 
@@ -108,9 +109,8 @@ export function parseDekToml(source: string, path?: string): DekConfig {
   };
 }
 
+/** The project's dek.toml, which sits at its root; a link out of the project is an error. */
 export function loadConfig(configPath: string): DekConfig {
-  if (!existsSync(configPath)) {
-    return {};
-  }
-  return parseDekToml(readFileSync(configPath, "utf8"), configPath);
+  const source = readSourceIfExists(configPath, dirname(configPath));
+  return source === undefined ? {} : parseDekToml(source, configPath);
 }

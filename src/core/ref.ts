@@ -7,7 +7,7 @@ import { DekError } from "./error.ts";
 import { walkUp } from "./optional.ts";
 import { parseRefSource, type RefSource } from "./ref-name.ts";
 import { listSlides, type Project, resolveProject } from "./resolve.ts";
-import { outputDir } from "./safe-fs.ts";
+import { followInside, outputDir } from "./safe-fs.ts";
 
 export {
   isPinnedRev,
@@ -45,8 +45,10 @@ export function refDir(root: string, name: string): string {
 
 /** The marker of a snapshot, or nothing when it is missing or not one dek wrote. */
 export function readRefMeta(dir: string): RefMeta | undefined {
-  const path = join(dir, REF_MARKER);
-  if (!existsSync(path)) {
+  const marker = join(dir, REF_MARKER);
+  // dek writes the marker as a plain file; a link out of the snapshot is none of its.
+  const path = existsSync(marker) ? followInside(marker, dir) : undefined;
+  if (path === undefined) {
     return undefined;
   }
   try {

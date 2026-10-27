@@ -7,7 +7,7 @@ import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { refuseInsideRef } from "../core/ref.ts";
-import { readTextIfExists } from "../core/resolve.ts";
+import { readSourceIfExists } from "../core/safe-fs.ts";
 import {
   defaultTsconfig,
   dekFilePaths,
@@ -85,7 +85,7 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
 /** The tokens every deck needs that the project's theme.css does not publish on `.slide`. */
 function missingThemeTokens(root: string): string[] {
   const published = new Set(
-    publishedTokens(parseCss(readTextIfExists(join(root, "theme.css")) ?? "")).map(
+    publishedTokens(parseCss(readSourceIfExists(join(root, "theme.css"), root) ?? "")).map(
       (token) => token.name,
     ),
   );
@@ -101,8 +101,10 @@ function syncDeckFiles(deckDir: string, created: string[]): FileChanges {
 /** Everything init writes but `.dek/` and AGENTS.md, in the order a reader meets it. */
 function projectPlan(root: string, deck: string | undefined): PlannedPath[] {
   const themePath = join(root, "theme.css");
-  // A first deck is drawn in the theme that will be there: the one kept, or dek's.
-  const theme = readTextIfExists(themePath) ?? defaultTheme();
+  // A first deck is drawn in the theme that will be there: the one kept, or dek's. A folder that
+  // is not there yet holds no theme.
+  const theme =
+    (existsSync(root) ? readSourceIfExists(themePath, root) : undefined) ?? defaultTheme();
   return [
     { path: join(root, "dek.toml"), contents: defaultToml() },
     { path: themePath, contents: defaultTheme() },

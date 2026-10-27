@@ -132,7 +132,7 @@ export function syncDeck(input: string | ResolvedDeck): SyncResult {
     const skeleton = sectionSkeleton(deck.deck, index, layouts);
     const current = existing.get(section.slug);
     if (current) {
-      const html = readFileSync(current, "utf8");
+      const html = readSourceIfExists(current, project.root) ?? "";
       if (!record.owns(html, skeleton)) {
         continue;
       }
@@ -170,7 +170,7 @@ function removeOrphanSkeletons(
   const removed: string[] = [];
   const kept: string[] = [];
   for (const [slug, path] of orphans) {
-    const html = readFileSync(path, "utf8");
+    const html = readSourceIfExists(path, root) ?? "";
     const beside = ([...SLIDE_SIDECARS, ".js"] as const).some((ext) =>
       existsSync(paths.slide(slug, ext)),
     );

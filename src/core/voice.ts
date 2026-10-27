@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
@@ -269,10 +269,8 @@ export function parseTimelineJson(text: string, path?: string): Timeline {
 
 export function loadCachedTimeline(deckDir: string): Timeline | undefined {
   const path = voiceCacheFile(deckDir, "timeline.json");
-  if (!existsSync(path)) {
-    return undefined;
-  }
-  return parseTimelineJson(readFileSync(path, "utf8"), path);
+  const source = readDeckFile(deckDir, path);
+  return source === undefined ? undefined : parseTimelineJson(source, path);
 }
 
 export function tryLoadCachedTimeline(deckDir: string): Timeline | undefined {

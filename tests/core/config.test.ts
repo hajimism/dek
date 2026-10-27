@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { writeFile } from "node:fs/promises";
+import { symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadConfig, parseDekToml } from "../../src/core/config.ts";
 import { unknownFrontmatterKeys } from "../../src/core/config-keys.ts";
@@ -142,5 +142,22 @@ describe("unknownFrontmatterKeys", () => {
         2,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("loadConfig", () => {
+  test("refuses a dek.toml that links out of the project", async () => {
+    await withTempDir(async (outside) => {
+      await writeFile(join(outside, "dek.toml"), 'url = "https://example.com/"\n');
+      await withTempDir(async (root) => {
+        await symlink(join(outside, "dek.toml"), join(root, "dek.toml"));
+        expect(() => loadConfig(join(root, "dek.toml"))).toThrow(
+          expect.objectContaining({
+            message: "dek.toml leads outside the project",
+            hint: expect.stringContaining("copy the file instead"),
+          }),
+        );
+      });
+    });
   });
 });

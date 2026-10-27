@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
@@ -32,11 +32,6 @@ export type ResolvedDeck = {
   project: Project;
   deck: ProjectDeck;
 };
-
-/** The file's text, or nothing when there is no such file. */
-export function readTextIfExists(path: string): string | undefined {
-  return existsSync(path) ? readFileSync(path, "utf8") : undefined;
-}
 
 /**
  * A file of the deck's, or nothing when there is none. It may be a symlink to elsewhere in the

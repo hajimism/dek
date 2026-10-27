@@ -8,7 +8,9 @@ import { escapeAttr, escapeHtml } from "../core/escape.ts";
 import { deckSlides, htmlShell, slidePlace, stampSlide } from "../core/html.ts";
 import { decodePosition } from "../core/live-protocol.ts";
 import { markedPositions, toggleMark } from "../core/marks.ts";
+import { deckProjectRoot } from "../core/path.ts";
 import type { Project, ProjectDeck } from "../core/resolve.ts";
+import { followInside } from "../core/safe-fs.ts";
 import { voiceCacheFile } from "../core/voice.ts";
 import { deckRoutePath, parseDeckRoute, splitDeckPath, type VoiceFile } from "../runtime/routes.ts";
 import { EVENT_EXPOSURE, type Exposure, mayRead, type Route } from "./auth.ts";
@@ -149,7 +151,8 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
 const MISSING: Routed = { route: "missing", respond: notFound };
 
 function voiceResponse(deck: ProjectDeck | undefined, file: VoiceFile): Response {
-  const path = deck && voiceCacheFile(deck.dir, file);
+  // A link out of the project is no voice of the deck's, and is not served.
+  const path = deck && followInside(voiceCacheFile(deck.dir, file), deckProjectRoot(deck.dir));
   if (!path || !existsSync(path)) {
     return notFound();
   }

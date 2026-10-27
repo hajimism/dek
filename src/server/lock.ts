@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
-import { writeInside } from "../core/safe-fs.ts";
+import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
 
 export type DevServerLock = {
   url: string;
@@ -30,7 +30,7 @@ export function readDevServerLock(root: string): DevServerLock | undefined {
     return undefined;
   }
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as DevServerLock;
+    const parsed = JSON.parse(readSourceIfExists(path, root) ?? "") as DevServerLock;
     if (typeof parsed.url === "string" && typeof parsed.pid === "number") {
       return {
         url: parsed.url,

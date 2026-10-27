@@ -16,6 +16,7 @@ import { livePlayerScript } from "../../src/runtime/player.ts";
 import { startDevServer } from "../../src/server/dev.ts";
 import { POLL_INTERVAL_MS } from "../../src/server/watch.ts";
 import { spawnDekServer } from "../helpers/cli.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument, slidePlaces } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
@@ -1788,6 +1789,35 @@ describe("startDevServer --remote exposure", () => {
         });
       },
     );
+  });
+
+  test("serves no voice file that links out of the project", async () => {
+    await withTempDir(async (outside) => {
+      await writeFile(join(outside, "timeline.json"), '{"audio":"audio.wav","beats":[]}\n');
+      await writeFile(join(outside, "audio.wav"), "RIFF");
+      await withTempProject(
+        { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+        async (root) => {
+          const deckDir = join(root, "decks", "demo");
+          const voiceDir = join(deckDir, ".cache", "voice");
+          await mkdir(voiceDir, { recursive: true });
+          for (const name of ["timeline.json", "audio.wav"]) {
+            await symlink(join(outside, name), join(voiceDir, name));
+          }
+          await withDevServer(
+            { cwd: deckDir, remote: true, password: "secret" },
+            async (server) => {
+              for (const path of ["/voice/timeline.json", "/voice/audio.wav"]) {
+                const response = await fetch(new URL(path, server.url), {
+                  headers: { authorization: basicAuth("secret") },
+                });
+                expect({ path, status: response.status }).toEqual({ path, status: 404 });
+              }
+            },
+          );
+        },
+      );
+    });
   });
 
   test("streams diagnostics to the presenter only, and reloads to everyone", async () => {

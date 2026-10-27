@@ -1,10 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { isRefName } from "../core/ref-name.ts";
+import { readDeckFile } from "../core/resolve.ts";
+import { readSourceIfExists } from "../core/safe-fs.ts";
 import { syncDeck } from "../core/sync.ts";
 import { applyPlan, deckPlan, nextSteps } from "./files.ts";
 import { type RefInfo, requireDeckFromCwd, requireProject, resolveTarget } from "./scope.ts";
@@ -44,12 +46,17 @@ export function newCommand(options: { cwd: string; name: string; themeFrom?: str
       ? resolveTarget(options.cwd, "deck", { refs: true, deck: options.themeFrom })
       : undefined;
   const ref = fromRef?.ref;
-  const themeSource = fromRef
-    ? deckPaths(fromRef.deck.dir).theme
+  const fromDeck = fromRef
+    ? fromRef.deck
     : options.themeFrom
-      ? deckPaths(requireDeckFromCwd(options.cwd, options.themeFrom).deck.dir).theme
-      : join(project.root, "theme.css");
-  if (!existsSync(themeSource)) {
+      ? requireDeckFromCwd(options.cwd, options.themeFrom).deck
+      : undefined;
+  const themeSource = fromDeck ? deckPaths(fromDeck.dir).theme : join(project.root, "theme.css");
+  // What is copied is published with the new deck: a link out of its project is refused.
+  const source = fromDeck
+    ? readDeckFile(fromDeck.dir, themeSource)
+    : readSourceIfExists(themeSource, project.root);
+  if (source === undefined) {
     throw new DekError("theme.css not found", {
       path: themeSource,
       hint: ref
@@ -60,7 +67,7 @@ export function newCommand(options: { cwd: string; name: string; themeFrom?: str
     });
   }
 
-  const theme = `${ref ? provenance(ref) : ""}${readFileSync(themeSource, "utf8")}`;
+  const theme = `${ref ? provenance(ref) : ""}${source}`;
   const { created } = applyPlan(
     deckPlan(project.root, name, theme, loadConfig(project.configPath)),
   );

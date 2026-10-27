@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { chmod, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { renameSection, reorderSection } from "../../src/core/mv.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -111,6 +112,30 @@ body
 });
 
 describe("renameSection and voice.toml", () => {
+  test("refuses a voice.toml that links out of the project, and leaves what it points at", async () => {
+    await withTempDir(async (outside) => {
+      const elsewhere = join(outside, "voice.toml");
+      const kept = "[beats.intro]\nlead = 600\n";
+      await writeFile(elsewhere, kept);
+      await withTempProject(
+        { decks: [{ name: "demo", slides: { intro: problemHtml } }] },
+        async (root) => {
+          const deckDir = join(root, "decks", "demo");
+          await mkdir(join(deckDir, "voice"));
+          await symlink(elsewhere, join(deckDir, "voice", "voice.toml"));
+          expect(() => renameSection(deckDir, "intro", "cover")).toThrow(
+            expect.objectContaining({
+              message: "decks/demo/voice/voice.toml leads outside the project",
+              hint: expect.stringContaining("copy the file instead"),
+            }),
+          );
+          expect(await readFile(elsewhere, "utf8")).toBe(kept);
+          expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);
+        },
+      );
+    });
+  });
+
   test("rewrites [beats] keys for the slide and its beats, leaving other slides alone", async () => {
     await withTempProject(
       {

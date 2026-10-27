@@ -20,7 +20,6 @@ import {
   writeSnapshot,
 } from "../core/ref.ts";
 import type { FileRefSource, GithubRefSource } from "../core/ref-name.ts";
-import { readTextIfExists } from "../core/resolve.ts";
 import { readSourceIfExists, removeInside, requireInside, writeInside } from "../core/safe-fs.ts";
 import { writeAgentsMd } from "../core/sync.ts";
 import { setTableKey } from "../core/toml-keys.ts";
@@ -141,7 +140,7 @@ export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
     changed = true;
   }
   if (from !== rev) {
-    const toml = readTextIfExists(project.configPath) ?? "";
+    const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(project.configPath, setTableKey(toml, "refs", source.name, rev), project.root);
     changed = true;
   }
@@ -201,7 +200,7 @@ async function addPack(cwd: string, arg: string): Promise<RefAddResult> {
     changed = true;
   }
   if (from !== rev) {
-    const toml = readTextIfExists(project.configPath) ?? "";
+    const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(project.configPath, setTableKey(toml, "refs", source.name, rev), project.root);
     changed = true;
   }
@@ -265,7 +264,7 @@ export function removeRef(cwd: string, arg: string): RefRmResult {
     });
   }
   if (pinned !== undefined) {
-    const toml = readFileSync(project.configPath, "utf8");
+    const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(
       project.configPath,
       setTableKey(toml, "refs", source.name, undefined),

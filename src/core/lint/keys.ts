@@ -6,7 +6,8 @@ import {
 } from "../config-keys.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import { readFrontmatterYaml } from "../parse.ts";
-import { type Project, readTextIfExists } from "../resolve.ts";
+import type { Project } from "../resolve.ts";
+import { readSourceIfExists } from "../safe-fs.ts";
 import type { DeckSettings } from "../schema.ts";
 import type { LintContext } from "./context.ts";
 
@@ -17,7 +18,7 @@ import type { LintContext } from "./context.ts";
 
 /** DEK008 for dek.toml: a project finding, the same for every deck. */
 export function tomlKeyDiagnostics(project: Project): Diagnostic[] {
-  return unknownTomlKeys(readTextIfExists(project.configPath) ?? "").map((key) =>
+  return unknownTomlKeys(readSourceIfExists(project.configPath, project.root) ?? "").map((key) =>
     unknownKeyDiagnostic(key, { file: "dek.toml", path: project.configPath }),
   );
 }
