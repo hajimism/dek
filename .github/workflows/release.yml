@@ -75,4 +75,6 @@ jobs:
         with:
           name: package
           path: package
-      - run: npm publish package/*.tgz --ignore-scripts
+      # A path without `./` is a GitHub repository to npm 11, so `package/<file>.tgz`
+      # became `github:package/<file>` and the publish stopped at an SSH login.
+      - run: npm publish ./package/*.tgz --ignore-scripts
