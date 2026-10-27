@@ -1,18 +1,5 @@
 import { DekError } from "./error.ts";
 
-export async function awaitPiped(proc: {
-  stdout: ReadableStream<Uint8Array> | number;
-  stderr: ReadableStream<Uint8Array> | number;
-  exited: Promise<number>;
-}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout as ReadableStream<Uint8Array>).text(),
-    new Response(proc.stderr as ReadableStream<Uint8Array>).text(),
-    proc.exited,
-  ]);
-  return { stdout, stderr, exitCode };
-}
-
 /**
  * How dek runs bun: with no auto install, and without the working directory's `.env` or
  * `bunfig.toml`, which a repository someone else wrote can commit to set variables or preload code.
@@ -46,6 +33,10 @@ type PipedOptions = {
   stdin?: string;
   /** Covers the whole run, from spawn to exit. */
   timeoutMs: number;
+  /** Where the command runs; dek's working directory when left out. */
+  cwd?: string;
+  /** The command's environment; left out, Bun passes the one dek started with. */
+  env?: Record<string, string | undefined>;
 };
 
 type Piped = {
@@ -56,6 +47,9 @@ type Piped = {
   cutShort?: true;
 };
 
+/** What `runPiped` throws for a command it stopped at its timeout, unlike one that cannot start. */
+export class OverrunError extends DekError {}
+
 /**
  * Runs `cmd` to its exit with its output piped back. A command that cannot start, or runs past
  * `timeoutMs` and is killed, is a DekError named `label`; any exit code is the caller's to judge.
@@ -63,7 +57,13 @@ type Piped = {
 export async function runPiped(cmd: string[], options: PipedOptions): Promise<Piped> {
   let proc: Bun.Subprocess<"pipe", "pipe", "pipe">;
   try {
-    proc = Bun.spawn(cmd, { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+    proc = Bun.spawn(cmd, {
+      ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+      ...(options.env !== undefined ? { env: options.env } : {}),
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
   } catch (error) {
     throw new DekError(options.label, { hint: options.hint, cause: error });
   }
@@ -71,7 +71,7 @@ export async function runPiped(cmd: string[], options: PipedOptions): Promise<Pi
   const output = readOutput(proc);
   const stop = stopAfter(proc, options.timeoutMs);
   const overrun = () =>
-    new DekError(options.label, {
+    new OverrunError(options.label, {
       hint: `it did not finish within ${Math.round(options.timeoutMs / 1000)}s and was stopped`,
     });
   try {

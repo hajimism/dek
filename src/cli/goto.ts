@@ -13,22 +13,42 @@ export type NavResult = {
   viewers: number;
 };
 
-export async function gotoCommand(target: DeckTarget, slug: string): Promise<NavResult> {
+type NavOptions = {
+  /** Covers the whole request, from connecting to the last byte of the answer. */
+  timeoutMs?: number;
+};
+
+/** The dev server answers a nav request at once; a stall this long is a server that is stuck. */
+const NAV_TIMEOUT_MS = 10 * 1000;
+
+export async function gotoCommand(
+  target: DeckTarget,
+  slug: string,
+  options: NavOptions = {},
+): Promise<NavResult> {
   requireSection(target.deck, slug);
-  return requestDevServer(target, {
-    method: "POST",
-    path: "goto",
-    body: { slug },
-  });
+  return requestDevServer(
+    target,
+    { method: "POST", path: "goto", body: { slug } },
+    options.timeoutMs ?? NAV_TIMEOUT_MS,
+  );
 }
 
-export async function currentCommand(target: DeckTarget): Promise<NavResult> {
-  return requestDevServer(target, { method: "GET", path: "current" });
+export async function currentCommand(
+  target: DeckTarget,
+  options: NavOptions = {},
+): Promise<NavResult> {
+  return requestDevServer(
+    target,
+    { method: "GET", path: "current" },
+    options.timeoutMs ?? NAV_TIMEOUT_MS,
+  );
 }
 
 async function requestDevServer(
   { project, deck }: DeckTarget,
   request: { method: "GET" | "POST"; path: "goto" | "current"; body?: { slug: string } },
+  timeoutMs: number,
 ): Promise<NavResult> {
   const deckName = deck.name;
   const lock = readDevServerLock(project.root);
@@ -45,16 +65,26 @@ async function requestDevServer(
   if (lock.password) {
     headers.authorization = `Basic ${btoa(`:${lock.password}`)}`;
   }
+  // A server that takes the connection but never answers is stuck; say so instead of waiting.
+  const signal = AbortSignal.timeout(timeoutMs);
+  const unlessStuck = (error: unknown): never => {
+    throw signal.aborted
+      ? new DekError(`the dev server at ${lock.url} did not answer within ${timeoutMs / 1000}s`, {
+          hint: "restart it: stop `dekc` and run it again",
+        })
+      : error;
+  };
   const response = await fetch(url, {
     method: request.method,
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: request.body ? JSON.stringify(request.body) : undefined,
-  });
+    signal,
+  }).catch(unlessStuck);
   // Only the nav routes answer JSON; a 404, 401, or 405 from the server itself is plain text.
   if (!response.headers.get("content-type")?.includes("application/json")) {
     throw refusal(response.status, lock, deckName, request.path);
   }
-  const json = (await response.json()) as {
+  const json = (await response.json().catch(unlessStuck)) as {
     ok?: boolean;
     slug?: string;
     slideIndex?: number;

@@ -37,41 +37,78 @@ export function engineBaseUrl(engine: string): string {
   return `http://127.0.0.1:${resolved}`;
 }
 
-export async function fetchSpeakers(baseUrl: string): Promise<VoiceSpeaker[]> {
-  const res = await engineFetch(baseUrl, "/speakers");
-  return (await res.json()) as VoiceSpeaker[];
+export type EngineOptions = {
+  /** Covers the whole call, from connecting to the last byte of the answer. */
+  timeoutMs?: number;
+};
+
+/** /speakers and /version answer from what the engine has loaded; a stall this long is a hang. */
+const PROBE_TIMEOUT_MS = 10 * 1000;
+
+/** Reading a sentence's accents takes well under a second; this leaves room for a busy machine. */
+const QUERY_TIMEOUT_MS = 60 * 1000;
+
+/** Synthesis on a CPU can take longer than the sentence lasts; a long one fits inside this. */
+const SYNTHESIS_TIMEOUT_MS = 5 * 60 * 1000;
+
+export async function fetchSpeakers(
+  baseUrl: string,
+  options: EngineOptions = {},
+): Promise<VoiceSpeaker[]> {
+  return engineFetch(
+    baseUrl,
+    "/speakers",
+    options.timeoutMs ?? PROBE_TIMEOUT_MS,
+    (res) => res.json() as Promise<VoiceSpeaker[]>,
+  );
 }
 
-export async function fetchEngineVersion(baseUrl: string): Promise<string> {
-  const res = await engineFetch(baseUrl, "/version");
-  const text = (await res.text()).trim();
-  return text.replace(/^"|"$/g, "");
+export async function fetchEngineVersion(
+  baseUrl: string,
+  options: EngineOptions = {},
+): Promise<string> {
+  const text = await engineFetch(
+    baseUrl,
+    "/version",
+    options.timeoutMs ?? PROBE_TIMEOUT_MS,
+    (res) => res.text(),
+  );
+  return text.trim().replace(/^"|"$/g, "");
 }
 
 export async function fetchAudioQuery(
   baseUrl: string,
   text: string,
   speaker: number,
+  options: EngineOptions = {},
 ): Promise<AudioQuery> {
-  const res = await engineFetch(
+  return engineFetch(
     baseUrl,
     `/audio_query?text=${encodeURIComponent(text)}&speaker=${speaker}`,
+    options.timeoutMs ?? QUERY_TIMEOUT_MS,
+    (res) => res.json() as Promise<AudioQuery>,
     { method: "POST" },
   );
-  return (await res.json()) as AudioQuery;
 }
 
 export async function fetchSynthesis(
   baseUrl: string,
   query: AudioQuery,
   speaker: number,
+  options: EngineOptions = {},
 ): Promise<Buffer> {
-  const res = await engineFetch(baseUrl, `/synthesis?speaker=${speaker}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(query),
-  });
-  return Buffer.from(await res.arrayBuffer());
+  const body = await engineFetch(
+    baseUrl,
+    `/synthesis?speaker=${speaker}`,
+    options.timeoutMs ?? SYNTHESIS_TIMEOUT_MS,
+    (res) => res.arrayBuffer(),
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(query),
+    },
+  );
+  return Buffer.from(body);
 }
 
 export function resolveStyleId(speakers: VoiceSpeaker[], speaker: string): number {
@@ -161,11 +198,29 @@ export async function withEngine<T>(
   }
 }
 
-async function engineFetch(baseUrl: string, path: string, init?: RequestInit): Promise<Response> {
+/**
+ * What the engine answers at `path`, read by `read` within `timeoutMs`. An engine that cannot be
+ * reached is missing; one that is reached but does not answer in time is stuck, and says so.
+ */
+async function engineFetch<T>(
+  baseUrl: string,
+  path: string,
+  timeoutMs: number,
+  read: (res: Response) => Promise<T>,
+  init?: RequestInit,
+): Promise<T> {
+  const signal = AbortSignal.timeout(timeoutMs);
+  const timedOut = () =>
+    new DekError(`voice engine did not answer ${path.split("?")[0]} within ${timeoutMs / 1000}s`, {
+      hint: "check the engine log, and restart the engine if it is stuck, then run the command again",
+    });
   let res: Response;
   try {
-    res = await fetch(`${baseUrl}${path}`, init);
+    res = await fetch(`${baseUrl}${path}`, { ...init, signal });
   } catch {
+    if (signal.aborted) {
+      throw timedOut();
+    }
     throw engineMissingError(engineNameForUrl(baseUrl) ?? "voice engine", baseUrl);
   }
   if (!res.ok) {
@@ -173,5 +228,12 @@ async function engineFetch(baseUrl: string, path: string, init?: RequestInit): P
       hint: "check the engine log",
     });
   }
-  return res;
+  try {
+    return await read(res);
+  } catch (error) {
+    if (signal.aborted) {
+      throw timedOut();
+    }
+    throw error;
+  }
 }

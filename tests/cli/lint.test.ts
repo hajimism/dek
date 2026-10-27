@@ -359,6 +359,35 @@ more
     );
   });
 
+  test.serial("stops running rumdl after it hangs, and says what to do instead", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "a", slides: { intro: introHtml } },
+          { name: "b", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const reason = "rumdl did not finish within 30s and was stopped";
+        let runs = 0;
+        const rumdl = async () => {
+          runs += 1;
+          return { reason, hung: true as const };
+        };
+        await withEnv({ DEK_RUMDL: fakeRumdl }, async () => {
+          const result = await lintCommand(resolveDecks(root), { cwd: root, rumdl });
+          expect(runs).toBe(1);
+          expect(result.skipped?.[0]).toEqual({
+            check: "rumdl",
+            reason,
+            hint: expect.stringContaining("DEK_RUMDL"),
+          });
+          expect(result.skipped?.[0]?.hint).not.toContain("to see why");
+        });
+      },
+    );
+  });
+
   test.serial("says how to see why when rumdl runs but gives no result", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

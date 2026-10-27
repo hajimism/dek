@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { defaultRumdlRunner, resolveRumdlBin, rumdlDiagnostics } from "../../src/core/rumdl.ts";
+import {
+  defaultRumdlRunner,
+  resolveRumdlBin,
+  rumdlDiagnostics,
+  runRumdl,
+} from "../../src/core/rumdl.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -37,7 +42,7 @@ describe("rumdlDiagnostics", () => {
   });
 
   test("returns an empty list when rumdl is missing", async () => {
-    expect(await rumdlDiagnostics("script.md", async () => null)).toEqual([]);
+    expect(await rumdlDiagnostics("script.md", async () => ({}))).toEqual([]);
   });
 
   test("returns an empty list for invalid JSON", async () => {
@@ -94,6 +99,24 @@ describe("defaultRumdlRunner", () => {
           }),
         ]);
         expect(stdout).toContain("ok");
+      });
+    });
+  });
+
+  test.serial("stops a rumdl that hangs and skips it, saying why", async () => {
+    const slow = join(import.meta.dir, "..", "helpers", "fake-rumdl-slow.ts");
+    await withTempDir(async (dir) => {
+      const scriptPath = join(dir, "script.md");
+      await writeFile(scriptPath, "# demo\n");
+      await withEnv({ DEK_RUMDL: slow }, async () => {
+        const started = Date.now();
+        const run = (path: string) => defaultRumdlRunner(path, { timeoutMs: 300 });
+        expect(await runRumdl(scriptPath, run)).toEqual({
+          diagnostics: [],
+          skipped: { reason: "rumdl did not finish within 0.3s and was stopped", hung: true },
+        });
+        // The fake sleeps for 30 s; the bound only has to be well short of it.
+        expect(Date.now() - started).toBeLessThan(15_000);
       });
     });
   });

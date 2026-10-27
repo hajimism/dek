@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
+import { type AddressInfo, createServer, type Server as NetServer, type Socket } from "node:net";
 import { join } from "node:path";
 import { outputOf } from "../../src/cli/commands.ts";
 import { currentCommand, gotoCommand } from "../../src/cli/goto.ts";
@@ -120,3 +123,51 @@ describe("gotoCommand against a server for another deck", () => {
     });
   });
 });
+
+describe("gotoCommand against a server that never answers", () => {
+  test("times out with a hint instead of waiting for good", async () => {
+    const sockets = new Set<Socket>();
+    const silent = createServer((socket) => sockets.add(socket));
+    try {
+      await expectStuck(await listening(silent));
+    } finally {
+      for (const socket of sockets) {
+        socket.destroy();
+      }
+      silent.close();
+    }
+  });
+
+  test("times out on an answer that stops part way", async () => {
+    const stalled = createHttpServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write("{");
+    });
+    try {
+      await expectStuck(await listening(stalled));
+    } finally {
+      stalled.closeAllConnections();
+      stalled.close();
+    }
+  });
+});
+
+/** The URL of `server`, listening on a free port of 127.0.0.1. */
+async function listening(server: NetServer | HttpServer): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+}
+
+/** `dekc current` against a dev server at `url` that is stuck gives up with a hint. */
+async function expectStuck(url: string): Promise<void> {
+  await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+    await mkdir(join(root, ".dek"), { recursive: true });
+    await writeFile(join(root, ".dek", "server.json"), JSON.stringify({ url, pid: process.pid }));
+    const target = requireDeckFromCwd(join(root, "decks", "demo"));
+    await expect(currentCommand(target, { timeoutMs: 50 })).rejects.toMatchObject({
+      name: "DekError",
+      message: `the dev server at ${url} did not answer within 0.05s`,
+      hint: expect.stringContaining("dekc"),
+    });
+  });
+}

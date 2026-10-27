@@ -9,6 +9,10 @@ export type FakeVoicevox = {
   syntheses: Array<{ speaker: number; speedScale: number }>;
   /** Answer this path with this status, as an engine that is up but unwell does. */
   failWith?: { path: string; status: number };
+  /** Never answer this path, as an engine stuck on it does. */
+  hang?: string;
+  /** Answer this path with its headers and the start of a WAV, then nothing more. */
+  stall?: string;
 };
 
 export async function startFakeVoicevox(): Promise<FakeVoicevox> {
@@ -17,6 +21,14 @@ export async function startFakeVoicevox(): Promise<FakeVoicevox> {
   const fake: FakeVoicevox = { url: "", queries, syntheses, close: () => Promise.resolve() };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    if (url.pathname === fake.hang) {
+      return;
+    }
+    if (url.pathname === fake.stall) {
+      res.writeHead(200, { "content-type": "audio/wav" });
+      res.write("RIFF");
+      return;
+    }
     if (fake.failWith && url.pathname === fake.failWith.path) {
       res.writeHead(fake.failWith.status);
       res.end();
@@ -91,6 +103,8 @@ export async function startFakeVoicevox(): Promise<FakeVoicevox> {
   fake.close = () =>
     new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
+      // A request it never answered would hold the close open.
+      server.closeAllConnections();
     });
   return fake;
 }
