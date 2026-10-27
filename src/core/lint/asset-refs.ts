@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { classifyAssetRef, isCanonicalAssetPath } from "../assets.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { isPlainWord } from "../escape.ts";
 import type { HtmlRef } from "../html-scan.ts";
 import { isInside } from "../path.ts";
 
@@ -95,7 +96,9 @@ function missingImageHint(value: string, deckDir: string): { hint?: string } {
   if (!existsSync(projectFile)) {
     return {};
   }
-  return { hint: `the project has it: copy ../../${name} into the deck's assets/` };
+  // The name is the slide's text: one that is no plain word is left out of the hint.
+  const copy = isPlainWord(name) ? `../../${name}` : "it from the project's assets/";
+  return { hint: `the project has it: copy ${copy} into the deck's assets/` };
 }
 
 function remoteHint(value: string): string {

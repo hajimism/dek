@@ -2,7 +2,7 @@ import { existsSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
-import { escapeRegExp, shellName } from "./escape.ts";
+import { escapeRegExp, isPlainWord, shellName } from "./escape.ts";
 import { joinLines, sectionChunks, splitLines } from "./lines.ts";
 import {
   asResolvedDeck,
@@ -138,7 +138,7 @@ function bothHold(fromPath: string, toPath: string, from: string, to: string): D
   const what = fromPath.endsWith(".html") ? "hold a slide you wrote" : "exist";
   return new DekError(`${fromName} and ${toName} both ${what}`, {
     path: fromPath,
-    hint: `merge them into ${toName} and remove ${fromName}, then run ${again(from, to)}`,
+    hint: `merge them into ${toName} and remove ${isPlainWord(from) ? fromName : "the other"}, then run ${again(from, to)}`,
   });
 }
 

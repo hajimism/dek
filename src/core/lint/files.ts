@@ -2,6 +2,7 @@ import { type Diagnostic, diag } from "../diagnostic.ts";
 import { shellName } from "../escape.ts";
 import { either } from "../prose.ts";
 import { listSlideFiles, SLIDE_SIDECARS } from "../resolve.ts";
+import { Id } from "../schema.ts";
 import type { LintContext } from "./context.ts";
 
 /** DEK001 for a section without slides/<slug>.html; DEK002 for a slide file without its section. */
@@ -61,9 +62,13 @@ export function pairingDiagnostics(ctx: LintContext): Diagnostic[] {
 
 /**
  * What to do with a slide file the script does not name, when no rename explains it: give it a
- * section, or take it out of the talk. Which one is the author's call.
+ * section, or take it out of the talk. Which one is the author's call. A name that is no section
+ * id cannot head one, and is the file's text, so the hint names it nowhere.
  */
 function orphanHint(slug: string, file: string): string {
+  if (!Id.safeParse(slug).success) {
+    return "its name is no section id, which uses a-z, 0-9, and -: rename it to one and add that section to script.md, or remove it if the slide is gone from the talk";
+  }
   const title = slug.charAt(0).toUpperCase() + slug.slice(1).replaceAll("-", " ");
   return `add a section for it to script.md, like \`## ${title} {#${slug}}\`, or remove ${file} if the slide is gone from the talk`;
 }
