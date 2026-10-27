@@ -13,10 +13,16 @@ export type HintDeck = { name: string; dir: string };
  * needs its name: as the first word outside every deck, and as `--deck` inside another deck,
  * where a first word names something in that deck instead, or where the name would read as a
  * subcommand or a flag. The name is one shell word, however it is spelled, or `<deck>` when no
- * word holds it alike in every shell, with where to find it. A command that already names a
- * deck, or takes none, is left as written.
+ * word holds it alike in every shell, with where to find it unless `note` is false, for a hint
+ * that joins several and says it once. A command that already names a deck, or takes none, is
+ * left as written.
  */
-export function addressHint(hint: string, deck: HintDeck | undefined, cwd: string): string {
+export function addressHint(
+  hint: string,
+  deck: HintDeck | undefined,
+  cwd: string,
+  { note: noted = true }: { note?: boolean } = {},
+): string {
   if (deck === undefined || isInside(cwd, deck.dir)) {
     return hint;
   }
@@ -43,7 +49,14 @@ export function addressHint(hint: string, deck: HintDeck | undefined, cwd: strin
       return `\`dekc ${command} ${flag ? deckFlag(deck.name) : deckWord(deck.name)}${rest}\``;
     },
   );
-  return placed && note < 0 ? `${addressed}${PLACEHOLDER_NOTE}` : addressed;
+  return placed && note < 0 && noted ? `${addressed}${PLACEHOLDER_NOTE}` : addressed;
+}
+
+/** `hint` with where to find a deck's name, once, when one of its commands has `<deck>` for it. */
+export function withPlaceholderNote(hint: string): string {
+  return hint.includes(DECK_PLACEHOLDER) && !hint.includes(PLACEHOLDER_NOTE)
+    ? `${hint}${PLACEHOLDER_NOTE}`
+    : hint;
 }
 
 /** Where a hint with `<deck>` in it says to find the deck's name. */

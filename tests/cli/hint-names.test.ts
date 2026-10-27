@@ -66,9 +66,17 @@ describe("a hint about a deck whose name a shell reads", () => {
     const many = { decks: ["a\\b", "c", "d", "e"].map((name) => ({ name })) };
     await withTempProject(many, async (root) => {
       expect((await failure(["theme"], root)).hint).toBe(
-        "run `dekc theme <deck> --json`; for <deck>, name the deck as `dekc ls` lists it, or name another deck in place of <deck>; `dekc ls` lists them",
+        "run `dekc theme <deck> --json`, or name another deck in place of <deck>; `dekc ls` lists them; for <deck>, name the deck as `dekc ls` lists it",
       );
     });
+    await withTempProject(
+      { decks: [{ name: "a\\b" }, { name: "demo" }, { name: "it's" }] },
+      async (root) => {
+        expect((await failure(["show", "intro"], root)).hint).toBe(
+          "run `dekc show <deck> intro --json`, `dekc show demo intro --json`, or `dekc show <deck> intro --json`; for <deck>, name the deck as `dekc ls` lists it",
+        );
+      },
+    );
   });
 
   hintTest("is retyped with the deck named, and in place of it", async () => {

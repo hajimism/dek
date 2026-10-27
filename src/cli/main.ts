@@ -3,7 +3,7 @@ import { shellQuote } from "../core/escape.ts";
 import { either } from "../core/prose.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { resolveProject } from "../core/resolve.ts";
-import { addressHint, deckWord } from "./address.ts";
+import { addressHint, deckWord, type HintDeck, withPlaceholderNote } from "./address.ts";
 import {
   type AnySpec,
   type CliResult,
@@ -197,12 +197,14 @@ function retypedWithDeck<T>(line: CommandLine, cwd: string, resolve: () => T): T
     }
     const typed = `\`dekc ${line.typed.map(shellQuote).join(" ")}\``;
     const [first] = error.decks;
+    // Each command is retyped for one deck; where to find a name left as <deck> is said once.
+    const retyped = (deck: HintDeck) => addressHint(typed, deck, cwd, { note: false });
     const hint = !first
       ? "run `dekc new <name>` to make a deck"
       : error.decks.length > NAMED_DECKS
-        ? `run ${addressHint(typed, first, cwd)}, or name another deck in place of ${deckWord(first.name)}; \`dekc ls\` lists them`
-        : `run ${either(error.decks.map((deck) => addressHint(typed, deck, cwd)))}`;
-    throw new DekError(error.message, { hint, cause: error });
+        ? `run ${retyped(first)}, or name another deck in place of ${deckWord(first.name)}; \`dekc ls\` lists them`
+        : `run ${either(error.decks.map(retyped))}`;
+    throw new DekError(error.message, { hint: withPlaceholderNote(hint), cause: error });
   }
 }
 
