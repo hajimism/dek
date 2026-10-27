@@ -38,7 +38,7 @@ export async function defaultRumdlRunner(
   try {
     const args = ["check", scriptPath, "--output-format", "sarif"];
     // A rumdl that cannot start is skipped below, so its label and hint never reach the user.
-    const { stdout, exitCode } = await runPiped(workerCommand(bin, args), {
+    const { stdout, exitCode, cutShort } = await runPiped(workerCommand(bin, args), {
       label: "rumdl failed",
       hint: "",
       cwd: dirname(scriptPath),
@@ -49,6 +49,12 @@ export async function defaultRumdlRunner(
     });
     if (exitCode === 2) {
       return {};
+    }
+    if (cutShort) {
+      return {
+        reason:
+          "rumdl exited while a process it started still held its output, so it was cut short",
+      };
     }
     return stdout;
   } catch (error) {
@@ -84,23 +90,23 @@ export async function runRumdl(
   return parseRumdlSarif(text);
 }
 
-function parseRumdlSarif(text: string | null): {
+/** rumdl prints SARIF even for a clean script, so anything else is a check that did not happen. */
+const NOT_SARIF: RumdlSkip = { reason: "rumdl printed something other than SARIF" };
+
+function parseRumdlSarif(text: string): {
   diagnostics: Diagnostic[];
   sarif?: SarifLog;
+  skipped?: RumdlSkip;
 } {
-  if (!text?.trim()) {
-    return { diagnostics: [] };
-  }
-
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { diagnostics: [] };
+    return { diagnostics: [], skipped: NOT_SARIF };
   }
 
   if (!parsed || typeof parsed !== "object" || !("runs" in parsed) || !Array.isArray(parsed.runs)) {
-    return { diagnostics: [] };
+    return { diagnostics: [], skipped: NOT_SARIF };
   }
 
   const sarif = parsed as SarifLog;
