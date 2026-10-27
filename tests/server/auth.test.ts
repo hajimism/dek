@@ -3,6 +3,7 @@ import { hostname } from "node:os";
 import {
   clearance,
   EVENT_EXPOSURE,
+  keepToOwnOrigin,
   mayRead,
   ROUTE_EXPOSURE,
   requestGuard,
@@ -125,5 +126,20 @@ describe("requestGuard", () => {
         local,
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("keepToOwnOrigin", () => {
+  test("keeps an answer from being sniffed, embedded, or framed by another origin", () => {
+    const response = keepToOwnOrigin(
+      new Response("{}", { status: 404, headers: { "content-type": "application/json" } }),
+    );
+    expect(response.status).toBe(404);
+    expect(Object.fromEntries(response.headers)).toEqual({
+      "content-type": "application/json",
+      "x-content-type-options": "nosniff",
+      "cross-origin-resource-policy": "same-origin",
+      "content-security-policy": "frame-ancestors 'self'",
+    });
   });
 });

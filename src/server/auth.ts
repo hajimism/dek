@@ -79,6 +79,27 @@ function forbidden(reason: string): Response {
 }
 
 /**
+ * What every answer tells the browser: take its type as given, hand it to no other origin's
+ * page, and show it in no other origin's frame. Another site can still make the browser ask, but
+ * gets nothing to play, apply as a stylesheet, tell apart by whether it loaded, or frame. The
+ * frame rule goes on every answer, not only pages: the voice or a listing opened in a frame is
+ * a page too.
+ */
+const SAME_ORIGIN_ONLY = {
+  "x-content-type-options": "nosniff",
+  "cross-origin-resource-policy": "same-origin",
+  "content-security-policy": "frame-ancestors 'self'",
+} as const;
+
+/** `response` with SAME_ORIGIN_ONLY set; the server passes every answer through it. */
+export function keepToOwnOrigin(response: Response): Response {
+  for (const [name, value] of Object.entries(SAME_ORIGIN_ONLY)) {
+    response.headers.set(name, value);
+  }
+  return response;
+}
+
+/**
  * Who may read a response. The audience sees the slides as they are shown; the presenter also
  * sees what they are made from, and may move the deck.
  */

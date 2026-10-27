@@ -18,6 +18,8 @@ dekc --port 3030
 
 Without `--port`, the OS picks a free port and `dekc` prints the URL. Fix it when another tool needs to know the address in advance.
 
+Open the URL in a browser tab. The dev server lets no page of another origin show it in a frame, so an editor preview that frames the page, such as VS Code's Simple Browser, stays blank.
+
 On every save:
 
 - **`script.md`** — a skeleton is generated for any new heading, orphaned HTML is flagged in the browser, and presenter notes refresh. If the deck has `voice/`, only the changed sentences are re-synthesized.
@@ -119,7 +121,7 @@ This serves on the LAN. Everything made from the script is behind HTTP Basic aut
 
 To skip typing it on a phone, scan the QR code dek prints under the password: it opens the presenter view signed in. The code in it works once and for five minutes, so a photo of a projected terminal is useless by the time anyone tries it. Press Enter in the terminal for a new code for the next device. With several decks, the code opens the deck list, where each deck has a presenter link. The phone stays signed in until the server stops.
 
-The server answers only to its IP addresses and this machine's own name, so a web page cannot reach it under a name of its own (DNS rebinding). `dekc <deck> --remote` shares that deck and no other deck in the project. The password travels over plain HTTP, so use a network you trust.
+The server answers only to its IP addresses and this machine's own name, so a web page cannot reach it under a name of its own (DNS rebinding). A page on another site open in the same browser cannot play the voice, apply the theme, or show the presenter view in a frame, even once the browser has the password. `dekc <deck> --remote` shares that deck and no other deck in the project. The password travels over plain HTTP, so use a network you trust.
 
 The one file on a USB stick is the fallback that always works. Everything else is optional.
 
