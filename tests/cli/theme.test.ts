@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { formatText } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
@@ -12,6 +13,7 @@ import { themeFacts } from "../../src/core/theme-facts.ts";
 
 const themeLayouts = (css: string) => themeFacts(parseCss(css)).layouts;
 
+import { runMain } from "../helpers/cli.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 const repo = join(import.meta.dir, "..", "..");
@@ -152,6 +154,25 @@ describe("a ref's layouts that are no plain word", () => {
       expect(text).not.toContain("$(id)");
       expect(text).toContain("  and 2 whose names dek does not print\n");
       expect(text).toEndWith("Markup for a layout: dekc theme someone/talks/talk <layout>");
+    });
+  });
+
+  test("are left out of --json too, which counts them", async () => {
+    await withTempProject({ decks: [{ name: "mine" }], refs: [ref] }, async (root) => {
+      const args = ["theme", "someone/talks/talk", "--json"];
+      const json = JSON.parse((await runMain(args, root)).stdout);
+      expect(contractIssues(printedBy(args), json)).toEqual([]);
+      expect(json.layouts.map((layout: { name: string }) => layout.name)).toEqual([
+        "bare",
+        "split",
+      ]);
+      expect(json.unprintedLayouts).toBe(2);
+    });
+    await withTempProject({ decks: [{ name: "demo", theme }] }, async (root) => {
+      const json = JSON.parse(
+        (await runMain(["theme", "--json"], join(root, "decks", "demo"))).stdout,
+      );
+      expect(json).not.toHaveProperty("unprintedLayouts");
     });
   });
 

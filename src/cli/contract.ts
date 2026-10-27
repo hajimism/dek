@@ -214,7 +214,15 @@ export const RESULT_FIELDS = {
         "State classes the theme selects that the player sets at runtime (is-current, is-shown); never written in markup.",
       ),
     tokens: z.array(z.strictObject({ name: z.string(), value: z.string() })),
-    layouts: z.array(z.strictObject({ name: z.string(), example: z.string().optional() })),
+    layouts: z
+      .array(z.strictObject({ name: z.string(), example: z.string().optional() }))
+      .describe("The layouts whose names are plain words, which dek prints."),
+    unprintedLayouts: z
+      .number()
+      .optional()
+      .describe(
+        "How many layouts the theme has whose names are no plain word, left out of layouts; absent when none.",
+      ),
     layout: z.strictObject({ name: z.string(), example: z.string() }).optional(),
     ref: RefInfo.optional(),
   }),

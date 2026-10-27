@@ -663,7 +663,12 @@
                   "name"
                 ],
                 "additionalProperties": false
-              }
+              },
+              "description": "The layouts whose names are plain words, which dek prints."
+            },
+            "unprintedLayouts": {
+              "description": "How many layouts the theme has whose names are no plain word, left out of layouts; absent when none.",
+              "type": "number"
             },
             "layout": {
               "type": "object",
