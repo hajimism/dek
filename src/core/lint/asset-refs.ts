@@ -106,7 +106,8 @@ function remoteHint(value: string): string {
   try {
     name = posix.basename(new URL(value.trim(), "https://dek.invalid").pathname);
   } catch {}
-  return name
+  // The name is the remote URL's: one that is no plain word is left out of the hint.
+  return name && isPlainWord(name)
     ? `download it into assets/ and use assets/${name}`
     : "download it into assets/ and reference it from there";
 }
