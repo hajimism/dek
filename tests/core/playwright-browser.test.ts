@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -22,33 +22,19 @@ import { shotMotion } from "../../src/core/shot/motion.ts";
 import { measureSlideInPage } from "../../src/core/slide-measure.ts";
 import { contrastRatio } from "../../src/core/text-contrast.ts";
 import { playerScript } from "../../src/runtime/player.ts";
+import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 
 // What the Playwright worker measures, in a real Chromium. They live apart from the runner's own
 // tests, which swap DEK_PLAYWRIGHT while tests in one file run at once.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-// One page set at a time: concurrent tests would crowd the machine past the timeout.
-const browserTest = test.serial.skipIf(skip);
-
-let browser: Browser | undefined;
-
-beforeAll(async () => {
-  if (!skip) {
-    browser = await (await importPlaywright()).chromium.launch({ headless: true });
-  }
-});
-
-afterAll(async () => {
-  await browser?.close();
-});
+const browserTest = serialBrowserTest(skip);
+const withBrowser = sharedBrowser();
 
 /** The worker's work in one shared browser: all of it but the spawn and the launch. */
 function render<R extends VisualRequest>(request: R) {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  return runVisualRequest(browser, request);
+  return withBrowser((browser) => runVisualRequest(browser, request));
 }
 
 describe("playwright worker", () => {
@@ -441,10 +427,9 @@ h2, p, ul { margin: 0 }
   });
 
   browserTest("measures where text sits on its baseline, whatever its size and font", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    const page = await withBrowser((browser) =>
+      browser.newPage({ viewport: { width: 1280, height: 720 } }),
+    );
     try {
       await page.setContent(`<section class="slide" style="display:flex; align-items:baseline; gap:12px; font-family:sans-serif">
 <span class="stat" style="font-size:96px; line-height:1">322</span>
@@ -464,10 +449,9 @@ h2, p, ul { margin: 0 }
   browserTest(
     "counts a turn or a skew as tilting, its own or an ancestor's, but not a flip",
     async () => {
-      if (!browser) {
-        throw new Error("no browser");
-      }
-      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      const page = await withBrowser((browser) =>
+        browser.newPage({ viewport: { width: 1280, height: 720 } }),
+      );
       try {
         await page.setContent(`<section class="slide">
 <div class="turned" style="rotate: 0.6deg"><p class="inside">中</p></div>
@@ -746,10 +730,7 @@ describe("Chromium's sandbox", () => {
   test.serial.skipIf(skip || process.platform === "win32")(
     "is off in the renderers of a Chromium launched as Playwright leaves it",
     async () => {
-      if (!browser) {
-        throw new Error("no browser");
-      }
-      const commands = await rendererCommands(browser);
+      const commands = await withBrowser((browser) => rendererCommands(browser));
       expect(commands.length).toBeGreaterThan(0);
       for (const command of commands) {
         expect(command).toContain("--no-sandbox");
@@ -1250,10 +1231,7 @@ describe("view transitions in a real Chromium", () => {
 
   /** The duration the bundled theme's slide-in animation runs for, mid-transition. */
   async function slideInDuration(css: string): Promise<string> {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage();
+    const page = await withBrowser((browser) => browser.newPage());
     try {
       await page.setContent(
         `<html><head><style>${css}</style></head><body><div style="view-transition-name: slide"><section class="slide">a</section></div></body></html>`,
@@ -1291,10 +1269,7 @@ describe("seeking one go in a real Chromium", () => {
   browserTest(
     "moves what the go started and leaves an earlier beat's animation finished",
     async () => {
-      if (!browser) {
-        throw new Error("no browser");
-      }
-      const page = await browser.newPage();
+      const page = await withBrowser((browser) => browser.newPage());
       try {
         await page.setContent(`<style>
 @keyframes draw { to { stroke-dashoffset: 0; } }
@@ -1327,10 +1302,7 @@ p { opacity: 1; }
 
 describe("a skipped view transition in a real Chromium", () => {
   browserTest("starts the go without a transition, as the talk carries on past it", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage();
+    const page = await withBrowser((browser) => browser.newPage());
     try {
       // Two elements sharing a view-transition-name make Chromium skip the transition.
       await page.setContent(`<style>.dup { view-transition-name: dup; }</style>
@@ -1354,10 +1326,7 @@ describe("a skipped view transition in a real Chromium", () => {
 
 describe("ending a seeked go in a real Chromium", () => {
   browserTest("ends an animation seeked past its own end, so the go settles", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage();
+    const page = await withBrowser((browser) => browser.newPage());
     try {
       await page.setContent(`<style>
 .a, .b { opacity: 0; }
@@ -1390,10 +1359,9 @@ describe("ending a seeked go in a real Chromium", () => {
 
 describe("holding a go at its start in a real Chromium", () => {
   browserTest("draws a transition the go began before any of it has run", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage({ viewport: { width: 200, height: 200 } });
+    const page = await withBrowser((browser) =>
+      browser.newPage({ viewport: { width: 200, height: 200 } }),
+    );
     const dir = await mkdtemp(join(tmpdir(), "dek-hold-"));
     try {
       await page.setContent(`<style>
@@ -1423,10 +1391,7 @@ div { width: 200px; height: 200px; background: #000; opacity: 0; transition: opa
 
 /** The colour of one pixel of a PNG on disk, read by the browser that drew it. */
 async function pixelAt(path: string, x: number, y: number): Promise<number[]> {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = await browser.newPage();
+  const page = await withBrowser((browser) => browser.newPage());
   try {
     const src = `data:image/png;base64,${readFileSync(path).toString("base64")}`;
     return await page.evaluate(

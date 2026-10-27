@@ -1,27 +1,16 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Browser } from "playwright";
 import { measureTextFlowsInPage } from "../../src/core/line-break.ts";
-import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
+import { playwrightResolved } from "../../src/core/playwright.ts";
 import { runVisualRequest } from "../../src/core/playwright-visual.ts";
 import { measureSlideInPage } from "../../src/core/slide-measure.ts";
+import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 
 // Where a real Chromium breaks a slide's lines: what a theme asks for, and what lint measures.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-const browserTest = test.serial.skipIf(skip);
-
-let browser: Browser | undefined;
-
-beforeAll(async () => {
-  if (!skip) {
-    browser = await (await importPlaywright()).chromium.launch({ headless: true });
-  }
-});
-
-afterAll(async () => {
-  await browser?.close();
-});
+const browserTest = serialBrowserTest(skip);
+const withBrowser = sharedBrowser();
 
 const theme = readFileSync(
   join(import.meta.dir, "..", "..", "src", "theme", "default.css"),
@@ -30,10 +19,9 @@ const theme = readFileSync(
 
 /** Each element's text as the page breaks it into lines, by the element's id. */
 async function linesOf(html: string): Promise<Record<string, string[]>> {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = await withBrowser((browser) =>
+    browser.newPage({ viewport: { width: 1280, height: 720 } }),
+  );
   try {
     await page.setContent(html);
     return await page.evaluate(() =>
@@ -93,10 +81,9 @@ describe("the bundled theme's line breaks", () => {
  * measurements name it, with its lines as text; and whether measuring left the slide as it was.
  */
 async function flowsOf(body: string, css = "", lang = "ja") {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = await withBrowser((browser) =>
+    browser.newPage({ viewport: { width: 1280, height: 720 } }),
+  );
   try {
     await page.setContent(`<html lang="${lang}"><head><style>
 body { margin: 0 }
@@ -239,26 +226,25 @@ describe("playwright worker line breaks", () => {
     css = "",
     actions: Array<"breaks" | "fill"> = ["breaks"],
   ) => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    return runVisualRequest(browser, {
-      kind: "pages",
-      viewport: { width: 1280, height: 720 },
-      actions,
-      pages: [
-        {
-          html: `<html lang="ja"><head><style>
+    return withBrowser((browser) =>
+      runVisualRequest(browser, {
+        kind: "pages",
+        viewport: { width: 1280, height: 720 },
+        actions,
+        pages: [
+          {
+            html: `<html lang="ja"><head><style>
 body { margin: 0 }
 .slide { width: 1280px; height: 720px; font: 400 32px sans-serif }
 p, h2 { margin: 0 }
 ${css}
 </style></head><body><section class="slide">${body}</section></body></html>`,
-          slug: "intro",
-          step: "1",
-        },
-      ],
-    });
+            slug: "intro",
+            step: "1",
+          },
+        ],
+      }),
+    );
   };
 
   // Widths in em and ch hold as many characters whatever fonts the machine has.
