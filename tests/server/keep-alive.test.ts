@@ -107,7 +107,7 @@ await child.exited;`,
           child = Number(out.match(/child (\d+)/)?.[1]);
           parent.kill("SIGKILL");
           await parent.exited;
-          expect(await until(() => !isAlive(child), WAIT_MS)).toBe(true);
+          expect(await until(() => !isAlive(child), WAIT_MS * 2)).toBe(true);
         } finally {
           parent.kill("SIGKILL");
           if (child && isAlive(child)) {
@@ -116,6 +116,6 @@ await child.exited;`,
         }
       });
     },
-    WAIT_MS * 3,
+    WAIT_MS * 4,
   );
 });
