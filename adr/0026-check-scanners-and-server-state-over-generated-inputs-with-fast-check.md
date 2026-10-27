@@ -1,4 +1,4 @@
-# 29. Check scanners and server state over generated inputs with fast-check
+# 26. Check scanners and server state over generated inputs with fast-check
 
 Date: 2026-10-27
 

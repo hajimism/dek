@@ -4,7 +4,7 @@ import fc from "fast-check";
 
 /**
  * How every generated-input test runs, set in one place so the suite's cost and its seed are one
- * decision (ADR 29). Each property runs `RUNS` times from a seed chosen once per run of the suite.
+ * decision (ADR 26). Each property runs `RUNS` times from a seed chosen once per run of the suite.
  * A synchronous one gives up early, as passed, past `TIME_LIMIT_MS`. An asynchronous one runs every
  * run to its end: fast-check would stop waiting for the run in flight and leave it running into
  * the next test, so it names a count small enough to need no limit. A failure prints its seed, the

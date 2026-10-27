@@ -38,7 +38,7 @@ bash scripts/check-package.sh   # the tarball npm would ship, installed and run
 
 ## Tests with generated inputs
 
-Some tests check a property over inputs [fast-check](https://fast-check.dev) generates: stylesheets, attribute values, TOML documents, and sequences of what the dev server is asked to do ([ADR 29](./adr/0029-check-scanners-and-server-state-over-generated-inputs-with-fast-check.md)). Each run of `bun test` starts them from a new seed. One that fails prints the input it shrank the failure to, what that input failed on, and the line that replays it:
+Some tests check a property over inputs [fast-check](https://fast-check.dev) generates: stylesheets, attribute values, TOML documents, and sequences of what the dev server is asked to do ([ADR 26](./adr/0026-check-scanners-and-server-state-over-generated-inputs-with-fast-check.md)). Each run of `bun test` starts them from a new seed. One that fails prints the input it shrank the failure to, what that input failed on, and the line that replays it:
 
 ```bash
 FC_SEED=1234 FC_PATH=0:1:2 bun test tests/core/css-scan.test.ts -t 'closes every block where it was closed'
