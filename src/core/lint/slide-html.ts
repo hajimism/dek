@@ -375,24 +375,22 @@ const EVENT_HANDLER_RE = /^on[a-z]+$/;
 /** Tags that load a URL as a document of its own, so an SVG there runs its scripts. */
 const DOCUMENT_TAGS = new Set(["iframe", "frame", "object", "embed"]);
 
+/** What a relative URL resolves against; only a URL's own scheme can run script. */
+const SOME_PAGE = "https://dek.invalid/";
+
 /**
  * The scheme of a URL that runs script, or undefined: `javascript:` and `vbscript:` always, and a
  * `data:` URL holding HTML, or SVG where a tag loads it as a document. An image's `data:` stays.
- * Read the way the URL parser reads it: tabs and newlines dropped, leading space trimmed, any case.
+ * The value comes decoded, and the URL parser reads it as the browser's does: C0 controls and
+ * spaces trimmed, tabs and newlines dropped anywhere, the scheme in any case.
  */
 function scriptUrlScheme(tag: string, value: string): string | undefined {
-  const url = value
-    .replace(/[\t\n\r]/g, "")
-    .trimStart()
-    .toLowerCase();
-  if (url.startsWith("javascript:")) {
-    return "javascript:";
+  const url = URL.parse(value, SOME_PAGE);
+  if (url?.protocol === "javascript:" || url?.protocol === "vbscript:") {
+    return url.protocol;
   }
-  if (url.startsWith("vbscript:")) {
-    return "vbscript:";
-  }
-  if (url.startsWith("data:")) {
-    const type = url.slice("data:".length).split(/[;,]/, 1)[0]?.trim();
+  if (url?.protocol === "data:") {
+    const type = url.href.slice("data:".length).split(/[;,]/, 1)[0]?.trim().toLowerCase();
     const runs =
       type === "text/html" ||
       type === "application/xhtml+xml" ||

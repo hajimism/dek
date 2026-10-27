@@ -2582,6 +2582,31 @@ describe("markup rules report every occurrence where it is written", () => {
     ]);
   });
 
+  test("DEK011: a javascript: URL written with references or controls, read as the browser does", async () => {
+    const diagnostics = await lintMarkup(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <a href="&#106;avascript:alert(1)">a</a>
+  <a href="\x01javascript:alert(1)">b</a>
+  <a href="java&#x09;script:alert(1)">c</a>
+  <a href="#&#106;avascript:">d</a>
+  <a href="&#35;top">e</a>
+  <a href="notes.html?next=javascript:go">f</a>
+  <a href="\u00A0javascript:go">g</a>
+  <iframe src="data:&nbsp;text/html,<p>h</p>"></iframe>
+  <img src="data:image/png;base64,iVBORw0KGgo=" alt="">
+</section>
+`);
+    expect(
+      diagnostics
+        .filter((d) => d.id === "DEK011")
+        .map(({ line, message, data }) => ({ line, message, value: data?.value })),
+    ).toEqual([
+      { line: 3, message: "slide contains a javascript: URL", value: "javascript:alert(1)" },
+      { line: 4, message: "slide contains a javascript: URL", value: "\x01javascript:alert(1)" },
+      { line: 5, message: "slide contains a javascript: URL", value: "java\tscript:alert(1)" },
+    ]);
+  });
+
   test("DEK020: a remote URL in srcset, poster, or a media source", async () => {
     const diagnostics = await lintMarkup(
       `<section class="slide" data-layout="title">
