@@ -62,6 +62,9 @@ export function foreignLine(text: string, max: number): string {
   return `${kept.join("")}…`;
 }
 
+/** The longest message dek gives that quotes someone else's text, such as Bun's on their source. */
+export const MESSAGE_MAX = 200;
+
 /** The longest name a list shows: a deck's folder names a deck, it does not describe one. */
 const NAME_MAX = 40;
 

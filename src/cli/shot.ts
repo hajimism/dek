@@ -1,5 +1,8 @@
+import { basename, dirname, extname } from "node:path";
+import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
-import { shellQuote } from "../core/escape.ts";
+import { shellName, shellQuote } from "../core/escape.ts";
+import { foreignLine, MESSAGE_MAX } from "../core/foreign-text.ts";
 import { refPlaywrightRunner } from "../core/playwright.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
@@ -33,6 +36,37 @@ export type ShotMode =
   | { kind: "morph"; from: string; to: string; at: number };
 
 export async function shotCommand(
+  target: ReadableDeck,
+  options: ShotCommandOptions,
+): Promise<ShotCliResult> {
+  try {
+    return await shoot(target, options);
+  } catch (error) {
+    throw refShotError(error, target);
+  }
+}
+
+/**
+ * A ref's slide script that does not compile stops its slide's shot, as one of the project's
+ * would; Bun's message quotes the ref's source, so it is one foreignLine, and the fix is not lint,
+ * which refuses a ref, but its author's.
+ */
+function refShotError(error: unknown, { deck, ref }: ReadableDeck): unknown {
+  if (!ref || !(error instanceof DekError) || error.path === undefined) {
+    return error;
+  }
+  const path = error.path;
+  if (extname(path) !== ".ts" || dirname(path) !== deckPaths(deck.dir).slides) {
+    return error;
+  }
+  return new DekError(foreignLine(error.message, MESSAGE_MAX), {
+    path,
+    hint: `a ref's slide scripts are its author's to fix; \`dekc shot ${ref.name} <slug>\` still draws each of its other slides, and \`dekc show ${ref.name} ${shellName(basename(path, ".ts")) ?? "<slug>"}\` prints this one's`,
+    cause: error,
+  });
+}
+
+async function shoot(
   { project, deck, ref }: ReadableDeck,
   options: ShotCommandOptions,
 ): Promise<ShotCliResult> {
