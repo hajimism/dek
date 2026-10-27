@@ -33,7 +33,7 @@ bash scripts/check-package.sh   # the tarball npm would ship, installed and run
 - **Agents are users.** Read the [Agent Usability Criteria](https://hajimism.github.io/dek/guide/agent-criteria.html) before changing a command, a diagnostic, or a convention.
 - **Docs come in two languages.** A change to `docs/` or a README lands in both English and Japanese.
 - **The command is `dekc`.** Write the product, the package, and its files as dek; write anything you type to run it as `dekc`.
-- If you change the shape of a command's `--json`, run `bun run schema` and commit the result. A change that takes away or loosens what a command prints is breaking: CI fails the pull request unless a commit is marked with `!`, and fails `main` when a squash merge leaves the mark out of the commit it makes ([ADR 30](./adr/0030-fail-a-pull-request-that-narrows-json-without-a-commit-marked-breaking.md)), and `bun scripts/schema-compat.ts origin/main` lists such changes before you push.
+- If you change the shape of a command's `--json`, run `bun run schema` and commit the result. A change that takes away or loosens what a command prints is breaking: CI fails the pull request unless a commit is marked with `!`, and fails `main` when a squash merge leaves the mark out of the commit it makes ([ADR 31](./adr/0031-fail-a-pull-request-that-narrows-json-without-a-commit-marked-breaking.md)), and `bun scripts/schema-compat.ts origin/main` lists such changes before you push.
 - If you add or change a command, a lint rule, or a docs page's `description`, run `bun run llms` and commit `docs/public/llms.txt`.
 
 ## Tests with generated inputs

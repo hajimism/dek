@@ -1,4 +1,4 @@
-# 30. Fail a pull request that narrows --json without a commit marked breaking
+# 31. Fail a pull request that narrows --json without a commit marked breaking
 
 Date: 2026-10-27
 

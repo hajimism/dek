@@ -1,7 +1,7 @@
 /**
  * What a change to the `--json` contract takes from a consumer, read from the JSON Schema that
  * `bun run schema` writes, as it was at two commits. scripts/schema-compat.ts runs it on every
- * pull request and every push to main; ADR 30 says which changes count and why.
+ * pull request and every push to main; ADR 31 says which changes count and why.
  *
  * A consumer, as this reads one, picks a command's schema by name, reads the properties it knows
  * and ignores the rest, tells a result's forms apart by their constants (`ok`, `action`), and acts

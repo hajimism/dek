@@ -7,7 +7,7 @@
  * Compares docs/public/cli.schema.json where the branch left <base> with the working tree's, or
  * <head>'s, and prints each change that can break a consumer of the output by its JSON Pointer.
  * Exits 1 when there is one and no commit since then is marked breaking, as `feat!:` or with a
- * `BREAKING CHANGE:` footer; 2 when it cannot compare. ADR 30 says which changes count. It needs
+ * `BREAKING CHANGE:` footer; 2 when it cannot compare. ADR 31 says which changes count. It needs
  * git and Bun and nothing from node_modules, so CI runs it without installing dependencies: on a
  * pull request against its base, and on a push to main against main before it.
  */
@@ -150,7 +150,7 @@ try {
   if (error instanceof UncomparedKeyword) {
     console.error(
       `hint: teach scripts/schema-breaks.ts what ${error.keyword} means for a reader of --json, ` +
-        "with a test (ADR 30)",
+        "with a test (ADR 31)",
     );
   } else if (error instanceof Stop) {
     console.error(`hint: ${error.hint}`);
