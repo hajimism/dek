@@ -1,5 +1,6 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
+import { decodeAttribute } from "./attribute-value.ts";
 import { parseCss } from "./css.ts";
 import {
   type CssEditor,
@@ -10,9 +11,10 @@ import {
   shareTokensWithTransitions,
 } from "./css-transform.ts";
 import { deckPaths } from "./deck-paths.ts";
+import { escapeAttr } from "./escape.ts";
 import { isInside } from "./path.ts";
 import { listSlideFiles, readDeckFile } from "./resolve.ts";
-import { attributeUrls } from "./url-attributes.ts";
+import { attributeUrls, trimUrl } from "./url-attributes.ts";
 
 /** Where one reference from a slide or a stylesheet points. */
 export type AssetRef =
@@ -35,13 +37,14 @@ const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
  * Resolves a reference the one way lint, show, and the build agree on: the
  * deck root first, which is where the dev server and the build look for
  * `assets/`, then next to the file that names it, so `../assets/x` from
- * slides/ still resolves. A query string or fragment is not part of the path.
+ * slides/ still resolves. A query string or fragment is not part of the path, and only the C0
+ * controls and spaces at its ends are trimmed, as the URL parser trims them.
  */
 export function classifyAssetRef(
   raw: string,
   options: { deckDir: string; from: string },
 ): AssetRef {
-  const value = raw.trim().split(/[?#]/)[0] ?? "";
+  const value = trimUrl(raw).split(/[?#]/)[0] ?? "";
   if (!value) {
     return { kind: "skip" };
   }
@@ -93,7 +96,7 @@ export function fileInside(
 
 /** True when a reference is written as `assets/...` from the deck root, or is not a local path at all. */
 export function isCanonicalAssetPath(raw: string): boolean {
-  const value = raw.trim();
+  const value = trimUrl(raw);
   if (!value || value.startsWith("#") || SCHEME_RE.test(value) || REMOTE_RE.test(value)) {
     return true;
   }
@@ -118,8 +121,10 @@ export function inlineAssets(
 
 /**
  * The rewriter handler `inlineAssets` runs, for a pass that rewrites more than URLs. The URLs are
- * the ones lint checks, read by the same parser: every candidate of a `srcset` keeps its
- * descriptors, links and text stay as written.
+ * the ones lint checks, read by the same parser and decoded as the browser decodes them: every
+ * candidate of a `srcset` keeps its descriptors, links and text stay as written. The rewriter
+ * writes a value as it is given, escaping only `"`, so each data: URI goes in escaped, in place
+ * of the URL as written, and an attribute with nothing to inline is never written at all.
  */
 export function assetInliner(
   deckDir: string,
@@ -128,7 +133,8 @@ export function assetInliner(
   return {
     element(el) {
       const tag = el.tagName.toLowerCase();
-      for (const [name, value] of [...el.attributes]) {
+      for (const [name, written] of [...el.attributes]) {
+        const { value, writtenAt } = decodeAttribute(written);
         const named = attributeUrls(tag, name.toLowerCase(), value);
         if (named?.use !== "resource") {
           continue;
@@ -137,9 +143,11 @@ export function assetInliner(
           const uri = inlinedUri(url, deckDir, from);
           return uri === undefined
             ? rewritten
-            : rewritten.slice(0, offset) + uri + rewritten.slice(offset + url.length);
-        }, value);
-        if (inlined !== value) {
+            : rewritten.slice(0, writtenAt(offset)) +
+                escapeAttr(uri) +
+                rewritten.slice(writtenAt(offset + url.length));
+        }, written);
+        if (inlined !== written) {
           el.setAttribute(name, inlined);
         }
       }

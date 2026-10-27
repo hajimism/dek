@@ -1,6 +1,13 @@
+import { attributeTokens } from "../attribute-value.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import { isPlainWord } from "../escape.ts";
-import type { HtmlAttribute, HtmlScan, Picture, SourceSpot } from "../html-scan.ts";
+import {
+  type HtmlAttribute,
+  type HtmlScan,
+  isName,
+  type Picture,
+  type SourceSpot,
+} from "../html-scan.ts";
 import type { Section } from "../schema.ts";
 import { beatAt, formatStepChoices, resolveStep, stepChoices } from "../step.ts";
 import { suggest } from "../suggest.ts";
@@ -478,14 +485,12 @@ function unnamedPicture({
 }: Picture): { message: string; hint: string; data: Record<string, string> } | undefined {
   const value = (name: string): string | undefined =>
     element.attributes.find((attribute) => attribute.name === name)?.value;
-  const named = [value("aria-label"), value("aria-labelledby"), value("title")].some(
-    (name) => name !== undefined && name.trim() !== "",
-  );
+  const named = [value("aria-label"), value("aria-labelledby"), value("title")].some(isName);
   const { tag } = element;
   if (named || (tag === "img" && value("alt") !== undefined)) {
     return undefined;
   }
-  if ((value("role") ?? "").trim().toLowerCase().split(/\s+/)[0] === "img") {
+  if (attributeTokens(value("role"))[0]?.toLowerCase() === "img") {
     if (titled) {
       return undefined;
     }
@@ -543,7 +548,7 @@ function unknownClassDiagnostics(
       : `define it in slides/${section.slug}.css, or use one of: ${shown.join(", ")}${scriptHint}`;
   const unknown = new Map<string, HtmlAttribute>();
   for (const attribute of attributesNamed(scan, "class")) {
-    for (const name of attribute.value.split(/\s+/).filter(Boolean)) {
+    for (const name of attributeTokens(attribute.value)) {
       if (!classes.has(name) && !unknown.has(name)) {
         unknown.set(name, attribute);
       }

@@ -2361,6 +2361,72 @@ describe("asset references resolve the same way lint, show, and build resolve th
     );
   });
 
+  test("a file name the markup escapes, as Q&amp;A.png, is the file it names", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/Q&amp;A.png" alt="a chart">
+</section>`),
+            },
+            assets: { "Q&A.png": "png" },
+          },
+        ],
+      },
+      async (root) => {
+        const ids = lintDeck(join(root, "decks", "demo")).map((d) => d.id);
+        expect(ids).not.toContain("DEK021");
+      },
+    );
+  });
+
+  test("a no-break space written as &nbsp; before a path is part of it, as the browser reads it", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="&nbsp;assets/pixel.png" alt="">
+  <img src="assets/pixel.png&#x3000;" alt="">
+  <img src="assets/gone.png&nbsp;" alt="">
+</section>`),
+            },
+            assets: { "pixel.png": "png" },
+          },
+        ],
+      },
+      async (root) => {
+        const missing = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK021");
+        expect(
+          missing.map(({ message, hint, data }) => ({ message, hint, src: data?.src })),
+        ).toEqual([
+          {
+            message: 'missing image "\\u00A0assets/pixel.png"',
+            hint: "remove the no-break space (U+00A0) before assets/pixel.png: the browser keeps it as part of the path, which then names no file",
+            src: "\u00A0assets/pixel.png",
+          },
+          {
+            message: 'missing image "assets/pixel.png\\u3000"',
+            hint: "remove the space (U+3000) after assets/pixel.png: the browser keeps it as part of the path, which then names no file",
+            src: "assets/pixel.png\u3000",
+          },
+          {
+            message: 'missing image "assets/gone.png\\u00A0"',
+            hint: undefined,
+            src: "assets/gone.png\u00A0",
+          },
+        ]);
+      },
+    );
+  });
+
   test("a remote url() in a slide stylesheet gets the same hint as a remote src", async () => {
     await withTempProject(
       {
@@ -2456,6 +2522,15 @@ describe("markup rules report every occurrence where it is written", () => {
     diagnostics
       .filter((d) => d.id === id)
       .map(({ line, column, data }) => ({ line, column, data }));
+
+  test("DEK007: a class a no-break space joins to slide is not a slide", async () => {
+    const diagnostics = await lintMarkup(`<section class="intro&nbsp;slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+</section>
+`);
+    expect(diagnostics.map((d) => d.id)).toContain("DEK007");
+    expect(diagnostics.map((d) => d.id)).not.toContain("DEK010");
+  });
 
   test("DEK011: every inline style and script, event handler, and javascript: URL", async () => {
     const diagnostics = await lintMarkup(`<section class="slide" data-layout="title">
