@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import fc from "fast-check";
 import {
   blankStringsAndComments,
   consumeString,
@@ -6,6 +7,8 @@ import {
   splitTopLevel,
   stripComments,
 } from "../../src/core/css-scan.ts";
+import { propertyTest } from "../helpers/fc.ts";
+import { paddings, sheetPlan, writeSheet } from "../helpers/stylesheets.ts";
 
 /** Where the block opening at the first `{` closes, as an index into `css`. */
 const closeOfFirst = (css: string) => matchBrace(css, css.indexOf("{"));
@@ -58,6 +61,20 @@ describe("matchBrace closes a block where Chromium does", () => {
     const css = 'a{content:"\\41\n} b{color:red}"} c{color:red}';
     expect(closeOfFirst(css)).toBe(css.indexOf('"}') + 1);
   });
+});
+
+describe("matchBrace over generated stylesheets", () => {
+  // Every `{` is closed by the `}` written for it, or by the end of a sheet left open, whatever
+  // strings, comments, url()s, escapes, and padding lie between them.
+  propertyTest(
+    "closes every block where it was closed",
+    fc.property(sheetPlan, paddings, (plan, padding) => {
+      const { css, blocks } = writeSheet(plan, padding);
+      expect(blocks.map((block) => matchBrace(css, block.open))).toEqual(
+        blocks.map((block) => block.close),
+      );
+    }),
+  );
 });
 
 describe("an unquoted url() is one token", () => {

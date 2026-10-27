@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import fc from "fast-check";
 import {
   cssAtRules,
   cssClassNames,
@@ -11,6 +12,7 @@ import {
   publishedTokens,
   type Stylesheet,
 } from "../../src/core/css.ts";
+import { consumeToken } from "../../src/core/css-scan.ts";
 import {
   minifyCss,
   replaceUrls,
@@ -20,8 +22,10 @@ import {
 } from "../../src/core/css-transform.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { themeExcerpt } from "../../src/core/theme-excerpt.ts";
+import { propertyTest } from "../helpers/fc.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { paddings, sheetPlan, type WrittenBlock, writeSheet } from "../helpers/stylesheets.ts";
 
 const tokenNames = (sheet: Stylesheet) => publishedTokens(sheet).map((token) => token.name);
 const scopeSlideCss = (css: string, slug: string) => rewriteCss(parseCss(css), scopeToSlide(slug));
@@ -633,4 +637,98 @@ describe("nesting in the rewrites", () => {
     expect(excerpt).not.toContain(".tag");
     expect(excerpt).toContain("--fg: #111;");
   });
+});
+
+const CSS_WHITESPACE_RE = /[ \t\n\r\f]/g;
+
+/** The rules parseCss reads, written down as the stylesheet generator writes its blocks. */
+function readRules(css: string): WrittenBlock[] {
+  return parseCss(css).rules.map((rule) => ({
+    kind: rule.kind,
+    prelude: rule.prelude.replace(CSS_WHITESPACE_RE, ""),
+    open: rule.bodyStart - 1,
+    close: rule.bodyEnd,
+    properties: rule.decls.map((decl) => decl.property),
+  }));
+}
+
+/** The rules parseCss reads, each with the index of the rule it is nested in, offsets left out. */
+function ruleTree(css: string) {
+  const rules = parseCss(css).rules;
+  return readRules(css).map(({ open, close, ...rule }, at) => ({
+    ...rule,
+    parent: rules.findLastIndex(
+      (outer, before) =>
+        before < at && outer.bodyStart <= open && close <= outer.bodyEnd && open < outer.bodyEnd,
+    ),
+  }));
+}
+
+/** The whitespace a hex escape that ends a name takes as its own, which reads as no space. */
+const ESCAPE_SPACE_RE = /(\\[0-9a-fA-F]{1,6})(?:\r\n|[ \t\n\r\f])$/;
+
+/** Each token but whitespace and comments, and whether whitespace parts it from the one before. */
+function tokensOf(css: string): Array<{ text: string; spaced: boolean }> {
+  const tokens: Array<{ text: string; spaced: boolean }> = [];
+  let spaced = false;
+  for (let i = 0; i < css.length; ) {
+    const next = consumeToken(css, i);
+    const text = css.slice(i, next);
+    if (/^[ \t\n\r\f]$/.test(text)) {
+      spaced = tokens.length > 0;
+    } else if (!text.startsWith("/*")) {
+      tokens.push({ text: text.replace(ESCAPE_SPACE_RE, "$1"), spaced });
+      spaced = false;
+    }
+    i = next;
+  }
+  return tokens;
+}
+
+describe("parseCss over generated stylesheets", () => {
+  // Every rule the generator wrote is read, in order, with its block where it was written, its
+  // prelude, and the declarations written directly in it; no block inside a custom property's
+  // value, a string, a comment, or a url() is read as a rule.
+  propertyTest(
+    "reads the rules that were written, where they were written",
+    fc.property(sheetPlan, paddings, (plan, padding) => {
+      const { css, blocks } = writeSheet(plan, padding);
+      expect(readRules(css)).toEqual(blocks.filter((block) => block.kind !== "value"));
+    }),
+  );
+
+  propertyTest(
+    "reads the same rules whatever comments and whitespace lie between tokens",
+    fc.property(sheetPlan, paddings, (plan, padding) => {
+      expect(ruleTree(writeSheet(plan, padding).css)).toEqual(ruleTree(writeSheet(plan).css));
+    }),
+  );
+});
+
+describe("minifyCss over generated stylesheets", () => {
+  // Minifying only shrinks whitespace and drops comments: every other token stays as written, with
+  // whitespace wherever there was some, so the stylesheet reads as its source does.
+  propertyTest(
+    "keeps every token, and whitespace where there was some",
+    fc.property(sheetPlan, paddings, (plan, padding) => {
+      const { css } = writeSheet(plan, padding);
+      expect(tokensOf(minifyCss(css))).toEqual(tokensOf(css));
+    }),
+  );
+
+  propertyTest(
+    "leaves a stylesheet with the rules its source has",
+    fc.property(sheetPlan, paddings, (plan, padding) => {
+      const { css } = writeSheet(plan, padding);
+      expect(ruleTree(minifyCss(css))).toEqual(ruleTree(css));
+    }),
+  );
+
+  propertyTest(
+    "changes nothing it already minified",
+    fc.property(sheetPlan, paddings, (plan, padding) => {
+      const once = minifyCss(writeSheet(plan, padding).css);
+      expect(minifyCss(once)).toBe(once);
+    }),
+  );
 });
