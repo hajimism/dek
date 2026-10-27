@@ -3,11 +3,11 @@ import { type CssToken, parseCss } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { isPlainWord } from "../core/escape.ts";
-import { foreignList } from "../core/foreign-text.ts";
+import { foreignList, type HiddenText, hiddenText } from "../core/foreign-text.ts";
 import { listShown, unprinted } from "../core/prose.ts";
 import { readDeckFile } from "../core/resolve.ts";
 import { type ThemeLayout, themeFacts } from "../core/theme-facts.ts";
-import type { ReadableDeck, RefInfo } from "./scope.ts";
+import { hiddenField, type ReadableDeck, type RefInfo } from "./scope.ts";
 
 export type ThemeResult = {
   /** The deck's theme.css: the one lint and the slides use. */
@@ -26,6 +26,8 @@ export type ThemeResult = {
   layout?: { name: string; example: string };
   /** Set when the deck is a ref. */
   ref?: RefInfo;
+  /** A ref's lines of theme.css that hold characters a person cannot see. */
+  hidden?: HiddenText[];
 };
 
 /** The deck's theme, or one layout's example markup when `name` is given. */
@@ -37,9 +39,8 @@ export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeR
       hint: "copy the project theme.css into the deck, or run `dekc new <name>` for a fresh deck",
     });
   }
-  const { classes, stateClasses, layouts, tokens } = themeFacts(
-    parseCss(readDeckFile(deck.dir, path) ?? ""),
-  );
+  const css = readDeckFile(deck.dir, path) ?? "";
+  const { classes, stateClasses, layouts, tokens } = themeFacts(parseCss(css));
   const printed = layouts.filter((layout) => isPlainWord(layout.name));
   const left = layouts.length - printed.length;
   const result: ThemeResult = {
@@ -50,6 +51,7 @@ export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeR
     layouts: printed,
     ...(left > 0 ? { unprintedLayouts: left } : {}),
     ...(ref ? { ref } : {}),
+    ...hiddenField(ref, hiddenText(css, path)),
   };
   if (!name) {
     return result;

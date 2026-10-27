@@ -313,6 +313,98 @@ describe("reading a ref", () => {
   });
 });
 
+describe("what a ref holds that a person cannot see", () => {
+  // A zero-width space in the script, tag characters a model reads as "hi" and a right-to-left
+  // override in the slide, and bidi isolates in a comment of the theme.
+  const html = slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="card">timing\u{E0068}\u{E0069}\u{202E}</h2>
+</section>`);
+  const hiding: RefSpec = {
+    ...ref,
+    deck: {
+      script: "---\ntitle: Why dek\n---\n\n## timing\n\nsay this\u{200B}\n",
+      slides: { timing: html },
+      theme:
+        ".slide { --fg: #111; color: var(--fg); }\n/* \u{2066}note\u{2069} */\n.slide .card { padding: 0; }\n",
+    },
+  };
+  const deckDir = (root: string) => join(snapshotDir(root), "decks", "why-dek");
+  const htmlLine = html.split("\n").findIndex((line) => line.includes("\u{E0068}"));
+  const inScript = (dir: string) => ({
+    path: join(dir, "script.md"),
+    line: 7,
+    column: 9,
+    codePoints: ["U+200B"],
+  });
+  const inSlide = (dir: string) => ({
+    path: join(dir, "slides", "timing.html"),
+    line: htmlLine + 1,
+    column: (html.split("\n")[htmlLine] ?? "").indexOf("\u{E0068}") + 1,
+    codePoints: ["U+E0068", "U+E0069", "U+202E"],
+  });
+  const inTheme = (dir: string) => ({
+    path: join(dir, "theme.css"),
+    line: 2,
+    column: 4,
+    codePoints: ["U+2066", "U+2069"],
+  });
+
+  test.serial(
+    "show reports each by file, line, and code point, and shows it in its text",
+    async () => {
+      await withTempProject({ ...project, refs: [hiding] }, async (root) => {
+        const json = jsonStdout<{ hidden: unknown }>(
+          await runMain(["show", REF, "timing", "--json"], root),
+        );
+        const shown = <T extends { path: string }>(finding: T): T => ({
+          ...finding,
+          path: relative(root, finding.path),
+        });
+        expect(json.hidden).toEqual(
+          [inScript, inSlide, inTheme].map((at) => shown(at(deckDir(root)))),
+        );
+        const text = await runMain(["show", REF, "timing"], root);
+        expect(text.stdout).toContain("timing⟨U+E0068⟩⟨U+E0069⟩⟨U+202E⟩</h2>");
+        expect(text.stdout).toContain("say this⟨U+200B⟩");
+        expect(text.stdout).not.toMatch(/[\u{200B}\u{202E}\u{E0068}]/u);
+        const slide = shown(inSlide(deckDir(root)));
+        expect(text.stderr).toContain(
+          `warning: ${slide.path}:${slide.line}:${slide.column}: 3 characters that show as nothing or reorder the text: U+E0068, U+E0069, U+202E\n`,
+        );
+        expect(text.stderr).toContain(
+          "help: text output shows each as ⟨U+XXXX⟩; a person reading the deck sees none of them, so leave them out of what you write from it",
+        );
+      });
+    },
+  );
+
+  test.serial("theme, ls, and shot report the ones in the files each read", async () => {
+    await withTempProject({ ...project, refs: [hiding] }, async (root) => {
+      const target = () => resolveTarget(root, "deck", { refs: true, deck: REF });
+      const dir = deckDir(root);
+      expect(themeCommand(target()).hidden).toEqual([inTheme(dir)]);
+      const listed = lsCommand(resolveTarget(root, "decks", { refs: true, deck: REF }));
+      expect(listed.kind === "deck" && listed.hidden).toEqual([inScript(dir)]);
+      await chmod(fakePlaywright, 0o755);
+      const shot = await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, () =>
+        shotCommand(target(), { slug: "timing" }),
+      );
+      expect(shot.hidden).toEqual([inSlide(dir), inTheme(dir)]);
+    });
+  });
+
+  test("a deck of the project's own reports none: its characters are its author's", async () => {
+    const own = { name: "mine", ...hiding.deck };
+    await withTempProject({ decks: [own] }, async (root) => {
+      const result = showCommand(
+        resolveTarget(root, "deck", { refs: true, deck: "mine" }),
+        "timing",
+      );
+      expect(result).not.toHaveProperty("hidden");
+    });
+  });
+});
+
 describe("refs are read-only", () => {
   test("every command takes a ref name as its deck, so resolveScope refuses it", async () => {
     await withTempProject(project, async (root) => {

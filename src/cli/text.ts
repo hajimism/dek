@@ -2,6 +2,7 @@
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
+import type { HiddenText } from "../core/foreign-text.ts";
 import { compareCodeUnits } from "../core/order.ts";
 import { unprinted } from "../core/prose.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
@@ -68,6 +69,39 @@ export function formatSkipped(skipped: SkippedCheck[] | undefined, color = false
       ...(entry.hint ? [`  ${c.yellow("help:")} ${entry.hint}`] : []),
     ])
     .join("\n");
+}
+
+/** How many code points a warning names before it leaves the rest to `--json`. */
+const CODE_POINTS_SHOWN = 6;
+
+/** What to do about the characters a person cannot see in a ref that a command read. */
+const HIDDEN_HELP =
+  "text output shows each as ⟨U+XXXX⟩; a person reading the deck sees none of them, so leave them out of what you write from it";
+
+/**
+ * A warning per line of a ref's files that holds characters a person cannot see, where they
+ * are and which, then `help`, what to do about them, once, for stderr.
+ */
+export function formatHidden(
+  hidden: HiddenText[] | undefined,
+  color = false,
+  help = HIDDEN_HELP,
+): string {
+  if (hidden === undefined || hidden.length === 0) {
+    return "";
+  }
+  const c = ansi(color);
+  const lines = hidden.map(({ path, line, column, codePoints }) => {
+    const distinct = [...new Set(codePoints)];
+    const named = distinct.slice(0, CODE_POINTS_SHOWN).join(", ");
+    const rest = distinct.length > CODE_POINTS_SHOWN ? ", …" : "";
+    const count =
+      codePoints.length === 1
+        ? "1 character that shows as nothing or reorders the text"
+        : `${codePoints.length} characters that show as nothing or reorder the text`;
+    return `${c.yellow("warning:")} ${path}:${line}:${column}: ${count}: ${named}${rest}`;
+  });
+  return [...lines, `  ${c.yellow("help:")} ${help}`].join("\n");
 }
 
 /**

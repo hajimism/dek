@@ -20,6 +20,9 @@ const HIDDEN_RE =
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
 const SPACE_RE = /[\s\x00-\x1f\x7f-\x9f]/u;
 
+/** HIDDEN_RE for every match. */
+const HIDDEN_ALL_RE = new RegExp(HIDDEN_RE.source, "gu");
+
 /** True when `text` holds a character that shows as nothing or moves the text around it. */
 export function holdsHidden(text: string): boolean {
   return HIDDEN_RE.test(text);
@@ -33,6 +36,40 @@ function codePoint(char: string): string {
 /** A hidden character as dek shows it, so a reader sees it is there and which it is. */
 function marker(char: string): string {
   return `⟨${codePoint(char)}⟩`;
+}
+
+/** `text` with each hidden character as dek shows it, `⟨U+XXXX⟩`, and the rest as it is. */
+export function revealHidden(text: string): string {
+  return text.replace(HIDDEN_ALL_RE, marker);
+}
+
+/** A line of a file someone else wrote that holds characters a person cannot see. */
+export type HiddenText = {
+  path: string;
+  line: number;
+  /** 1-based, in UTF-16 units as editors count: where the first of them is. */
+  column: number;
+  /** Each of them on the line, in order, as U+XXXX. */
+  codePoints: string[];
+};
+
+/** Each line of `text`, read from `path` and starting at line `firstLine`, that holds any. */
+export function hiddenText(text: string, path: string, firstLine = 1): HiddenText[] {
+  return text.split("\n").flatMap((line, index) => {
+    const found = [...line.matchAll(HIDDEN_ALL_RE)];
+    const [first] = found;
+    if (first === undefined) {
+      return [];
+    }
+    return [
+      {
+        path,
+        line: firstLine + index,
+        column: first.index + 1,
+        codePoints: found.map((match) => codePoint(match[0])),
+      },
+    ];
+  });
 }
 
 /**

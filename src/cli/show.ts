@@ -1,12 +1,13 @@
 import { classifyAssetRef } from "../core/assets.ts";
 import { cssUrls, parseCss } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
+import { type HiddenText, hiddenText } from "../core/foreign-text.ts";
 import { type HtmlScan, scanSlideHtml } from "../core/html-scan.ts";
 import { sectionChunks, splitLines } from "../core/lines.ts";
 import { readDeckFile } from "../core/resolve.ts";
 import type { Section } from "../core/schema.ts";
 import { themeExcerpt } from "../core/theme-excerpt.ts";
-import { type ReadableDeck, type RefInfo, requireSection } from "./scope.ts";
+import { hiddenField, type ReadableDeck, type RefInfo, requireSection } from "./scope.ts";
 
 /**
  * Everything one slide is made of, read in one call: enough to learn how it is
@@ -34,6 +35,8 @@ export type ShowResult = {
   assets: string[];
   /** Set when the deck is a ref. */
   ref?: RefInfo;
+  /** A ref's lines, in the files show read, that hold characters a person cannot see. */
+  hidden?: HiddenText[];
 };
 
 export function showCommand({ deck, ref }: ReadableDeck, slug: string): ShowResult {
@@ -64,11 +67,14 @@ export function showCommand({ deck, ref }: ReadableDeck, slug: string): ShowResu
     ...(scan?.refs.map((ref) => ref.value) ?? []),
     ...(sheet ? cssUrls(sheet).map((url) => url.value) : []),
   ];
+  const script = sectionSource(deck, section);
+  const hiddenIn = (path: string, text: string | null) =>
+    text === null ? [] : hiddenText(text, path);
 
   return {
     slug: section.slug,
     title: section.title,
-    script: sectionSource(deck, section),
+    script,
     beats: section.beats.map(({ id, title, line }) => ({ ...(id ? { id } : {}), title, line })),
     html,
     css,
@@ -76,6 +82,13 @@ export function showCommand({ deck, ref }: ReadableDeck, slug: string): ShowResu
     theme,
     assets: existingRefs(refs, paths.slides, deck.dir),
     ...(ref ? { ref } : {}),
+    ...hiddenField(ref, [
+      ...hiddenText(script, deck.scriptPath, section.line),
+      ...hiddenIn(paths.slide(slug, ".html"), html),
+      ...hiddenIn(paths.slide(slug, ".css"), css),
+      ...hiddenIn(paths.slide(slug, ".ts"), ts),
+      ...hiddenIn(paths.theme, themeCss),
+    ]),
   };
 }
 

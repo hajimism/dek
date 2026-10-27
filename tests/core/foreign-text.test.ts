@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { foreignLine, foreignList } from "../../src/core/foreign-text.ts";
+import { foreignLine, foreignList, hiddenText, revealHidden } from "../../src/core/foreign-text.ts";
 
 describe("foreignLine", () => {
   test("leaves a plain line as it is", () => {
@@ -43,5 +43,32 @@ describe("foreignList", () => {
     expect(foreignList(["y".repeat(50)])).toBe(`${"y".repeat(39)}…`);
     const names = Array.from({ length: 13 }, (_, i) => `n${i}`);
     expect(foreignList(names)).toBe("n0, n1, n2, n3, n4, n5, n6, n7, n8, n9, and 3 more");
+  });
+});
+
+describe("hiddenText", () => {
+  test("names each line that holds any, where the first is, and each in order", () => {
+    const text = "plain\nsay\u{200B} this\u{202E}\n\u{E0068}\u{E0069}\u{E0068}";
+    expect(hiddenText(text, "/r/script.md", 10)).toEqual([
+      { path: "/r/script.md", line: 11, column: 4, codePoints: ["U+200B", "U+202E"] },
+      { path: "/r/script.md", line: 12, column: 1, codePoints: ["U+E0068", "U+E0069", "U+E0068"] },
+    ]);
+  });
+
+  test("finds a Hangul filler and a soft hyphen, and passes an emoji's variation selector", () => {
+    expect(hiddenText("\u{2764}\u{FE0F} x\u{3164}y\u{AD}", "a")).toEqual([
+      { path: "a", line: 1, column: 5, codePoints: ["U+3164", "U+00AD"] },
+    ]);
+  });
+
+  test("counts columns in UTF-16 units, as editors do, and finds none in plain text", () => {
+    expect(hiddenText("😀\u{FEFF}", "a")[0]?.column).toBe(3);
+    expect(hiddenText("なぜ dek なのか\n", "a")).toEqual([]);
+  });
+});
+
+describe("revealHidden", () => {
+  test("shows each by its code point and leaves the rest, line breaks included", () => {
+    expect(revealHidden("a\u{2066}b\u{2069}\nc")).toBe("a⟨U+2066⟩b⟨U+2069⟩\nc");
   });
 });

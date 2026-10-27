@@ -3,13 +3,20 @@ import { join } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
+import { type HiddenText, hiddenText } from "../core/foreign-text.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { readDeckFile } from "../core/resolve.ts";
 import { readSourceIfExists } from "../core/safe-fs.ts";
 import { syncDeck } from "../core/sync.ts";
 import { applyPlan, deckPlan, nextSteps } from "./files.ts";
-import { type RefInfo, requireDeckFromCwd, requireProject, resolveTarget } from "./scope.ts";
+import {
+  hiddenField,
+  type RefInfo,
+  requireDeckFromCwd,
+  requireProject,
+  resolveTarget,
+} from "./scope.ts";
 
 export type NewResult = {
   name: string;
@@ -21,6 +28,11 @@ export type NewResult = {
   next: string[];
   /** Set when the theme came from a ref with no license. */
   warnings: string[];
+  /**
+   * A ref's theme's lines, now the new deck's theme.css, that hold characters a person cannot
+   * see: the copy is the deck's own, so they are its author's to remove.
+   */
+  hidden?: HiddenText[];
 };
 
 export function newCommand(options: { cwd: string; name: string; themeFrom?: string }): NewResult {
@@ -87,6 +99,7 @@ export function newCommand(options: { cwd: string; name: string; themeFrom?: str
             `${ref.name} has no license; ask its author before you present or share a deck built on its theme`,
           ]
         : [],
+    ...hiddenField(ref, ref ? hiddenText(theme, deckPaths(dir).theme) : []),
   };
 }
 

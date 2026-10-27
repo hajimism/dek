@@ -81,6 +81,27 @@ const RefInfo = z
   })
   .meta({ id: "RefInfo", description: "Set when the deck read is a ref." });
 
+const HiddenText = z
+  .strictObject({
+    path: z.string(),
+    line: z.number().int(),
+    column: z
+      .number()
+      .int()
+      .describe("1-based, in UTF-16 units as editors count: where the first of them is."),
+    codePoints: z.array(z.string()).describe("Each of them on the line, in order, as U+XXXX."),
+  })
+  .meta({
+    id: "HiddenText",
+    description:
+      "A line of a ref's file that holds characters a person cannot see: those Unicode marks default-ignorable, such as tag characters, zero-width characters, the byte order mark, bidi controls, and Hangul fillers, but not variation selectors; the line and paragraph separators; and the interlinear annotation marks. Text output shows each as ⟨U+XXXX⟩.",
+  });
+
+const hidden = z
+  .array(HiddenText)
+  .optional()
+  .describe("A ref's lines that hold characters a person cannot see; absent when none does.");
+
 const Position = z
   .strictObject({ slideIndex: z.number().int(), beatIndex: z.number().int() })
   .meta({ id: "Position" });
@@ -128,6 +149,7 @@ export const RESULT_FIELDS = {
     updated: paths,
     next: z.array(z.string()),
     warnings: z.array(z.string()).describe("Set when the theme came from a ref with no license."),
+    hidden,
   }),
   ls: z.union([
     z.strictObject({
@@ -165,6 +187,7 @@ export const RESULT_FIELDS = {
       diagnostics,
       skipped,
       ref: RefInfo.optional(),
+      hidden,
     }),
   ]),
   ref: z.union([
@@ -218,6 +241,7 @@ export const RESULT_FIELDS = {
       ),
     assets: paths,
     ref: RefInfo.optional(),
+    hidden,
   }),
   theme: z.strictObject({
     path: z.string(),
@@ -241,6 +265,7 @@ export const RESULT_FIELDS = {
       ),
     layout: z.strictObject({ name: z.string(), example: z.string() }).optional(),
     ref: RefInfo.optional(),
+    hidden,
   }),
   check: z.strictObject({
     slug: z.string(),
@@ -307,6 +332,7 @@ export const RESULT_FIELDS = {
       .optional()
       .describe("With --motion, each beat in order with its frames, the settled end last."),
     unsandboxed,
+    hidden,
   }),
   mv: z.strictObject({
     from: z.string(),

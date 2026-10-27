@@ -2,13 +2,14 @@ import { basename, dirname, extname } from "node:path";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { shellName, shellQuote } from "../core/escape.ts";
-import { foreignLine, MESSAGE_MAX } from "../core/foreign-text.ts";
+import { foreignLine, type HiddenText, MESSAGE_MAX } from "../core/foreign-text.ts";
 import { refPlaywrightRunner } from "../core/playwright.ts";
+import { SLIDE_SIDECARS } from "../core/resolve.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
 import { type ShotFile, shotDeck, shotSheet } from "../core/shot/still.ts";
 import { playerScript } from "../runtime/player.ts";
-import type { ReadableDeck } from "./scope.ts";
+import { hiddenField, hiddenInFiles, type ReadableDeck } from "./scope.ts";
 import { usageError } from "./usage.ts";
 
 export type ShotCliResult = {
@@ -17,6 +18,11 @@ export type ShotCliResult = {
   sheets?: string[];
   /** With --motion, each beat's frames and the ms into its go each shows. */
   motion?: ShotMotion["beats"];
+  /**
+   * A ref's lines, in the files of the slides drawn and in its theme, that hold characters a
+   * person cannot see.
+   */
+  hidden?: HiddenText[];
 };
 
 type ShotCommandOptions = {
@@ -39,11 +45,33 @@ export async function shotCommand(
   target: ReadableDeck,
   options: ShotCommandOptions,
 ): Promise<ShotCliResult> {
+  const mode = parseShotMode(options);
   try {
-    return await shoot(target, options);
+    const result = await shoot(target, mode);
+    return target.ref
+      ? { ...result, ...hiddenField(target.ref, drawnHidden(target, mode)) }
+      : result;
   } catch (error) {
     throw refShotError(error, target);
   }
+}
+
+/** What the files of the slides a shot drew, and its theme, hold that a person cannot see. */
+function drawnHidden({ deck }: ReadableDeck, mode: ShotMode): HiddenText[] {
+  const all = deck.deck.sections.map((section) => section.slug);
+  const slugs =
+    mode.kind === "sheet"
+      ? all
+      : mode.kind === "morph"
+        ? [mode.from, mode.to]
+        : mode.slug === undefined
+          ? all
+          : [mode.slug];
+  const paths = deckPaths(deck.dir);
+  const files = slugs.flatMap((slug) =>
+    ([".html", ...SLIDE_SIDECARS] as const).map((ext) => paths.slide(slug, ext)),
+  );
+  return hiddenInFiles(deck.dir, [...new Set(files), paths.theme]);
 }
 
 /**
@@ -66,11 +94,7 @@ function refShotError(error: unknown, { deck, ref }: ReadableDeck): unknown {
   });
 }
 
-async function shoot(
-  { project, deck, ref }: ReadableDeck,
-  options: ShotCommandOptions,
-): Promise<ShotCliResult> {
-  const mode = parseShotMode(options);
+async function shoot({ project, deck, ref }: ReadableDeck, mode: ShotMode): Promise<ShotCliResult> {
   // A ref's slide scripts are someone else's: Chromium runs them only in its sandbox (ADR 29).
   const runner = ref ? { runner: refPlaywrightRunner } : {};
   switch (mode.kind) {

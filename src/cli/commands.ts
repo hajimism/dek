@@ -1,5 +1,6 @@
 import { hasErrors } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
+import type { HiddenText } from "../core/foreign-text.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { mergeSarif, toSarif } from "../core/sarif.ts";
 import type { CheckCliResult } from "./check.ts";
@@ -15,6 +16,7 @@ import {
   formatBuild,
   formatCheck,
   formatCues,
+  formatHidden,
   formatInit,
   formatKept,
   formatKeptTheme,
@@ -65,7 +67,10 @@ type AnyCtx = Omit<Ctx<[], DeckScope | undefined>, "args"> & {
 /** How a command's result is printed. Only `text` is required. */
 export type Output<D> = {
   text(data: D, color: boolean): string;
-  /** What did not happen, for stderr next to the text: the result on stdout stays the result. */
+  /**
+   * What did not happen, or what is worth a look, such as what a ref hides, for stderr next to the
+   * text: the result on stdout stays the result.
+   */
   notes?(data: D, color: boolean): string | undefined;
   /** The `--json` fields next to `ok`; the data as-is when absent. */
   json?(data: D): object;
@@ -194,6 +199,20 @@ function withDisplayDiagnostics<D extends { diagnostics: CheckCliResult["diagnos
   return { ...data, diagnostics: displayDiagnostics(data.diagnostics, display) };
 }
 
+/** What to do about the characters a person cannot see that a ref's theme brought into a new deck. */
+const COPIED_HIDDEN_HELP =
+  "they came in with the ref's theme, and a person reading the deck sees none of them; remove them from theme.css unless you mean them";
+
+/** The data with each hidden-character report's path as `display` shows it. */
+function withDisplayHidden<D extends { hidden?: HiddenText[] }>(
+  data: D,
+  display: (path: string) => string,
+): D {
+  return data.hidden === undefined
+    ? data
+    : { ...data, hidden: data.hidden.map((entry) => ({ ...entry, path: display(entry.path) })) };
+}
+
 /**
  * Every command, in the order `dekc help` lists them: the words and flags it takes, its help,
  * what it works on, how it runs, and how its result prints. Each module loads only when its
@@ -289,11 +308,12 @@ export const COMMANDS = {
     },
     output: {
       text: formatNew,
-      paths: (data, display) => ({
-        ...data,
-        created: data.created.map(display),
-        updated: data.updated.map(display),
-      }),
+      notes: (data, color) => formatHidden(data.hidden, color, COPIED_HIDDEN_HELP) || undefined,
+      paths: (data, display) =>
+        withDisplayHidden(
+          { ...data, created: data.created.map(display), updated: data.updated.map(display) },
+          display,
+        ),
     },
   }),
   ls: result({
@@ -312,10 +332,12 @@ export const COMMANDS = {
     },
     output: {
       text: formatLs,
+      notes: (data, color) =>
+        (data.kind === "deck" && formatHidden(data.hidden, color)) || undefined,
       json: ({ kind: _kind, ...data }) => data,
       paths: (data, display) =>
         data.kind === "deck"
-          ? withDisplayDiagnostics(data, display)
+          ? withDisplayHidden(withDisplayDiagnostics(data, display), display)
           : {
               ...withDisplayDiagnostics(data, display),
               decks: data.decks.map((deck) => withDisplayDiagnostics(deck, display)),
@@ -399,7 +421,11 @@ export const COMMANDS = {
       const { showCommand } = await import("./show.ts");
       return showCommand(target, args.slug);
     },
-    output: { text: formatShow },
+    output: {
+      text: formatShow,
+      notes: (data, color) => formatHidden(data.hidden, color) || undefined,
+      paths: withDisplayHidden,
+    },
   }),
   theme: result({
     scope: "deck",
@@ -424,7 +450,8 @@ export const COMMANDS = {
     },
     output: {
       text: formatTheme,
-      paths: (data, display) => ({ ...data, path: display(data.path) }),
+      notes: (data, color) => formatHidden(data.hidden, color) || undefined,
+      paths: (data, display) => withDisplayHidden({ ...data, path: display(data.path) }, display),
     },
   }),
   check: result({
@@ -486,7 +513,11 @@ export const COMMANDS = {
         motion: flags.motion,
       });
     },
-    output: { text: formatShot },
+    output: {
+      text: formatShot,
+      notes: (data, color) => formatHidden(data.hidden, color) || undefined,
+      paths: withDisplayHidden,
+    },
   }),
   mv: result({
     scope: "deck",

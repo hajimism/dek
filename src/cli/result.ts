@@ -1,5 +1,6 @@
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
+import { revealHidden } from "../core/foreign-text.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner, playwrightReady } from "../core/playwright.ts";
 import { addressHint, deckAround, type HintDeck } from "./address.ts";
 import { type CliResult, outputOf } from "./commands.ts";
@@ -101,7 +102,10 @@ export function writeSuccess(original: CliResult, options: WriteSuccessOptions):
     const data = output.json ? output.json(result.data) : (result.data as object);
     process.stdout.write(`${JSON.stringify({ ...envelope, ...data })}\n`);
   } else {
-    const plain = { ...result, data: plainStrings(result.data) } as CliResult;
+    const plain = {
+      ...result,
+      data: plainStrings(result.data, isAboutRef(result.data)),
+    } as CliResult;
     const text = formatText(plain, shouldColor(process.stdout));
     process.stdout.write(`${terminalSafe(text)}\n`);
     const notes = output.notes?.(plain.data, shouldColor(process.stderr));
@@ -130,16 +134,23 @@ export function displayPaths(result: CliResult, cwd: string): CliResult {
   return { ...result, data: paths(result.data, (path) => displayPath(path, cwd)) } as CliResult;
 }
 
+/** A result that read a ref, as `ls`, `show`, and `theme` mark theirs. */
+function isAboutRef(data: unknown): boolean {
+  return typeof data === "object" && data !== null && "ref" in data && data.ref !== undefined;
+}
+
 /**
  * Every string in a result as plainText, so the text a deck or a ref wrote reaches the terminal
- * with no escape of its own; the text formatters paint dek's colors after.
+ * with no escape of its own; the text formatters paint dek's colors after. In a result about a
+ * ref, each character a person cannot see shows as `⟨U+XXXX⟩` too.
  */
-function plainStrings<T>(value: T): T {
+function plainStrings<T>(value: T, reveal: boolean): T {
   if (typeof value === "string") {
-    return plainText(value) as T;
+    const plain = plainText(value);
+    return (reveal ? revealHidden(plain) : plain) as T;
   }
   if (Array.isArray(value)) {
-    return value.map(plainStrings) as T;
+    return value.map((entry) => plainStrings(entry, reveal)) as T;
   }
   if (
     value !== null &&
@@ -147,7 +158,7 @@ function plainStrings<T>(value: T): T {
     Object.getPrototypeOf(value) === Object.prototype
   ) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, plainStrings(entry)]),
+      Object.entries(value).map(([key, entry]) => [key, plainStrings(entry, reveal)]),
     ) as T;
   }
   return value;

@@ -1,7 +1,7 @@
 import { join, relative } from "node:path";
 import { DekError } from "../core/error.ts";
 import { shellName, shellQuote } from "../core/escape.ts";
-import { foreignLine, MESSAGE_MAX } from "../core/foreign-text.ts";
+import { foreignLine, type HiddenText, hiddenText, MESSAGE_MAX } from "../core/foreign-text.ts";
 import {
   isRefName,
   packFile,
@@ -16,6 +16,7 @@ import {
   locateDeck,
   type Project,
   type ProjectDeck,
+  readDeckFile,
   requireSection,
   resolveProject,
 } from "../core/resolve.ts";
@@ -223,6 +224,25 @@ export type RefInfo = {
 
 /** One deck to read: the project's own, or a ref. */
 export type ReadableDeck = DeckTarget & { ref?: RefInfo };
+
+/**
+ * `{ hidden }` when a ref's files hold characters a person cannot see, nothing otherwise. Only a
+ * ref's are reported: a deck of the project's own is its author's, emoji joiners and all.
+ */
+export function hiddenField(
+  ref: RefInfo | undefined,
+  found: HiddenText[],
+): { hidden?: HiddenText[] } {
+  return ref && found.length > 0 ? { hidden: found } : {};
+}
+
+/** What the files at `paths` in the deck hold that a person cannot see, file by file. */
+export function hiddenInFiles(deckDir: string, paths: string[]): HiddenText[] {
+  return paths.flatMap((path) => {
+    const text = readDeckFile(deckDir, path);
+    return text === undefined ? [] : hiddenText(text, path);
+  });
+}
 
 /**
  * What a command declares it works on, resolved: one deck or the decks in scope. Only a command
