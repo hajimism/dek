@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { addRef, listRefs, removeRef, restoreRef } from "../../src/cli/ref.ts";
 import { formatText } from "../../src/cli/result.ts";
@@ -191,6 +191,30 @@ describe("dekc ref (list) and dekc ref rm", () => {
         );
         expect(existsSync(join(root, "refs"))).toBe(false);
         expect(await readFile(join(root, "AGENTS.md"), "utf8")).not.toContain("## References");
+      });
+    });
+  });
+
+  refTest("rm follows no link under refs/, and removes nothing it points at", async () => {
+    await withTempProject(project, async (root) => {
+      await withFakeGithub(talks(), async () => {
+        await addRef(root, REF);
+        await rm(join(root, "refs"), { recursive: true });
+        await mkdir(join(root, "refs", "someone"), { recursive: true });
+        await symlink(join(root, "decks"), join(root, "refs", "someone", "talks"));
+        await mkdir(join(root, "decks", "why-dek"));
+        await writeFile(join(root, "decks", "why-dek", "script.md"), "# mine\n");
+        const toml = await readFile(join(root, "dek.toml"), "utf8");
+        expect(() => removeRef(root, REF)).toThrow(
+          expect.objectContaining({
+            message: "refs/someone/talks is a symlink; dek follows no link under refs/",
+            hint: expect.stringContaining("remove refs/someone/talks"),
+          }),
+        );
+        expect(await readFile(join(root, "decks", "why-dek", "script.md"), "utf8")).toBe(
+          "# mine\n",
+        );
+        expect(await readFile(join(root, "dek.toml"), "utf8")).toBe(toml);
       });
     });
   });

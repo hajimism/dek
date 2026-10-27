@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { chmod, readdir } from "node:fs/promises";
+import { chmod, readdir, rename, symlink } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { parseCommandLine } from "../../src/cli/flags.ts";
 import { initCommand } from "../../src/cli/init.ts";
@@ -276,6 +276,24 @@ describe("refs are read-only", () => {
       expect(await filesUnder(snapshotDir(root))).toEqual(before);
     });
   });
+
+  test.serial(
+    "a ref reached through a link under refs/ is not read, and the link is named",
+    async () => {
+      await withTempProject(project, async (root) => {
+        await rename(join(root, "refs", "someone"), join(root, "moved"));
+        await symlink(join(root, "moved"), join(root, "refs", "someone"));
+        const result = await runMain(["show", REF, "timing", "--json"], root);
+        expect(jsonStdout(result)).toMatchObject({
+          ok: false,
+          error: {
+            message: "refs/someone is a symlink; dek follows no link under refs/",
+            hint: expect.stringContaining("remove refs/someone"),
+          },
+        });
+      });
+    },
+  );
 
   test("the project's own decks leave refs out", async () => {
     await withTempProject(project, async (root) => {

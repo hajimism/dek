@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
@@ -419,21 +419,67 @@ describe("installSnapshot", () => {
         await symlink(join(home, ".ssh"), join(root, "refs", "o", "r"));
         await expect(
           installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek"))),
-        ).rejects.toThrow("leads outside the project");
+        ).rejects.toThrow("refs/o/r is a symlink; dek follows no link under refs/");
         expect(await readFile(join(home, ".ssh", "why-dek"), "utf8")).toBe("ssh-ed25519 AAAA mine");
       });
     });
   });
 
-  test("replaces a snapshot that is a link with a real one, leaving what it pointed at", async () => {
+  test("refuses a snapshot that is a link, leaving what it pointed at", async () => {
     await withTempDir(async (root) => {
       await mkdir(join(root, "elsewhere"));
       await writeFile(join(root, "elsewhere", "keep.txt"), "mine");
       await mkdir(join(root, "refs", "o", "r"), { recursive: true });
       await symlink(join(root, "elsewhere"), join(root, "refs", "o", "r", "why-dek"));
-      await installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek")));
-      expect(readRefMeta(refDir(root, "o/r/why-dek"))?.rev).toBe(SHA_A);
+      await expect(
+        installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek"))),
+      ).rejects.toMatchObject({
+        message: "refs/o/r/why-dek is a symlink; dek follows no link under refs/",
+        hint: expect.stringContaining("remove refs/o/r/why-dek"),
+      });
+      expect(await readdir(join(root, "elsewhere"))).toEqual(["keep.txt"]);
       expect(await readFile(join(root, "elsewhere", "keep.txt"), "utf8")).toBe("mine");
+    });
+  });
+
+  test("never follows a link under refs/ that stays in the project", async () => {
+    // A cloned project can commit refs/; what a link there points at is the project's own.
+    for (const [link, target] of [
+      ["refs/o/r", "decks"],
+      ["refs/o", "decks"],
+      ["refs", "decks"],
+    ] as const) {
+      await withTempDir(async (root) => {
+        await mkdir(join(root, "decks", "o", "r", "why-dek"), { recursive: true });
+        await mkdir(join(root, "decks", "why-dek"));
+        await writeFile(join(root, "decks", "why-dek", "script.md"), "# mine\n");
+        await writeFile(join(root, "decks", "o", "r", "why-dek", "script.md"), "# mine too\n");
+        await mkdir(join(root, link, ".."), { recursive: true });
+        await symlink(join(root, target), join(root, link));
+        const before = await listFiles(join(root, "decks"));
+        await expect(
+          installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek"))),
+        ).rejects.toMatchObject({
+          message: `${link} is a symlink; dek follows no link under refs/`,
+          hint: expect.stringContaining(`remove ${link}`),
+        });
+        expect({ link, files: await listFiles(join(root, "decks")) }).toEqual({
+          link,
+          files: before,
+        });
+        expect(await readFile(join(root, "decks", "why-dek", "script.md"), "utf8")).toBe(
+          "# mine\n",
+        );
+      });
+    }
+  });
+
+  test("a snapshot reached through a link under refs/ is not fetched", async () => {
+    await withTempProject({ refs: [{ name: "o/r/why-dek" }] }, async (root) => {
+      expect(refState(resolveProject(root), "o/r/why-dek").fetched).toBe(true);
+      await rename(join(root, "refs", "o"), join(root, "moved"));
+      await symlink(join(root, "moved"), join(root, "refs", "o"));
+      expect(refState(resolveProject(root), "o/r/why-dek").fetched).toBe(false);
     });
   });
 

@@ -15,6 +15,7 @@ import {
   refLicense,
   refState,
   refTitle,
+  refuseLinkUnderRefs,
   type Snapshot,
   snapshotDigest,
   writeSnapshot,
@@ -57,10 +58,12 @@ export type RefCliResult = RefAddResult | RefListResult | RefRmResult;
 export async function restoreRef(cwd: string, arg: string): Promise<void> {
   const source = parseRefSource(arg);
   const project = requireProject(cwd);
-  const { pinned, fetched } = refState(project, source.name);
+  const { pinned, dir, fetched } = refState(project, source.name);
   if (pinned === undefined || fetched) {
     return;
   }
+  // Said before a download that the write would refuse anyway.
+  refuseLinkUnderRefs(project.root, dir);
   if (source.kind === "file") {
     await unpackSnapshot(project.root, source, pinned);
     return;
@@ -128,6 +131,8 @@ export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
   }
   const project = requireProject(cwd);
   const { pinned: from, dir, fetched } = refState(project, source.name);
+  // Said before a download that the write would refuse anyway.
+  refuseLinkUnderRefs(project.root, dir);
   const rev =
     source.rev !== undefined && isPinnedRev(source.rev)
       ? source.rev
@@ -263,6 +268,8 @@ export function removeRef(cwd: string, arg: string): RefRmResult {
       hint: "run `dekc ref` to list refs",
     });
   }
+  // Before anything changes: the delete below must not reach what a link there points to.
+  refuseLinkUnderRefs(project.root, dir);
   if (pinned !== undefined) {
     const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(

@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
@@ -23,6 +23,35 @@ function isLink(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The first link on the way from `<root>/refs` down to `dir`, both included, if any. */
+function linkUnderRefs(root: string, dir: string): string | undefined {
+  let at = join(root, "refs");
+  for (const segment of ["", ...relative(at, dir).split(sep)]) {
+    at = join(at, segment);
+    if (isLink(at)) {
+      return at;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Refuses a link on the way to the snapshot at `dir`. refs/ is dek's own folder, which a cloned
+ * project can still commit: a link there, even one that stays in the project, would aim a
+ * snapshot's swap and its delete at what it points to, such as a deck under decks/.
+ */
+export function refuseLinkUnderRefs(root: string, dir: string): void {
+  const link = linkUnderRefs(root, dir);
+  if (link === undefined) {
+    return;
+  }
+  const rel = relative(root, link);
+  throw new DekError(`${rel} is a symlink; dek follows no link under refs/`, {
+    path: link,
+    hint: `remove ${rel}: refs/ holds only the snapshots \`dekc ref\` writes, and the next read of a pinned ref fetches it again`,
+  });
 }
 
 /** Written into each snapshot; its presence is what makes a directory a ref. */
@@ -129,7 +158,11 @@ export function refState(project: { root: string; configPath: string }, name: st
     name,
     ...(pinned !== undefined ? { pinned } : {}),
     dir,
-    fetched: pinned !== undefined && readRefMeta(dir)?.rev === pinned,
+    // Never through a link under refs/: one is fetched again, which refuses the link.
+    fetched:
+      pinned !== undefined &&
+      linkUnderRefs(project.root, dir) === undefined &&
+      readRefMeta(dir)?.rev === pinned,
   };
 }
 
@@ -367,13 +400,11 @@ export async function writeSnapshot(
   pin: string,
   snapshot: Snapshot,
 ): Promise<{ dir: string; license: string | null; path: string }> {
-  // refs/ is dek's; a link on the way would aim the swap below, and its delete, elsewhere.
   const refsDir = join(root, "refs");
   const dir = refDir(root, name);
+  // A link on the way would aim the swap below, and its delete, at what it points to.
+  refuseLinkUnderRefs(root, dir);
   outputDir(dirname(dir), root);
-  if (isLink(dir)) {
-    await rm(dir);
-  }
   const suffix = `${process.pid}-${Date.now().toString(36)}`;
   const temp = join(refsDir, `.tmp-${suffix}`);
   const old = join(refsDir, `.old-${suffix}`);
