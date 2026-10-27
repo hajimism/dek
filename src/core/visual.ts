@@ -4,7 +4,6 @@ import { EDGES, type Edge } from "./overflow.ts";
 import { renderPdfHtml } from "./pdf.ts";
 import {
   askPlaywright,
-  type ContrastOrigin,
   type FillFinding,
   type PageAction,
   type PagesResponse,
@@ -315,9 +314,14 @@ function groupBySteps<T extends { step: string }>(items: T[], key: (item: T) => 
 /**
  * Where to fix low contrast. Text the theme alone draws too faint is fixed once in theme.css
  * for every slide that uses the pair; a slide that fixed it in its own CSS would leave the rest.
+ * Text only the slide's CSS shows was never measured on the theme alone, so both are named.
  */
-function contrastHint(origin: ContrastOrigin | undefined, threshold: number, slug: string): string {
+function contrastHint(sample: ContrastSample, threshold: number): string {
+  const { origin, slug } = sample;
   const own = `slides/${slug}.css`;
+  if (sample.onlyWithSlideCss) {
+    return `without ${own} it does not show, so dek cannot tell whether theme.css alone draws it below ${threshold}:1: fix the pair in ${own}, or in theme.css if the colors are the theme's`;
+  }
   switch (origin) {
     case "theme":
       return `theme.css alone draws it below ${threshold}:1: fix the pair in theme.css, where one change reaches every slide that uses it`;
@@ -333,8 +337,17 @@ function contrastHint(origin: ContrastOrigin | undefined, threshold: number, slu
   }
 }
 
-/** The file to change: the one the origin names, or the slide itself when it is not known. */
-function contrastPath(origin: ContrastOrigin | undefined, slug: string, paths: DeckPaths): string {
+/**
+ * The file to change: the one the origin names, or the slide itself when it is not known. Text
+ * only the slide's CSS shows goes to that CSS, which the hint names first.
+ */
+function contrastPath(
+  { origin, slug, onlyWithSlideCss }: ContrastSample,
+  paths: DeckPaths,
+): string {
+  if (onlyWithSlideCss) {
+    return paths.slide(slug, ".css");
+  }
   switch (origin) {
     case "theme":
       return paths.theme;
@@ -583,9 +596,15 @@ function shownRatio(sample: ContrastSample): number {
 }
 
 function contrastKey(c: ContrastSample): string {
-  return [c.slug, c.box, c.text ?? "", shownRatio(c), contrastThreshold(c), c.origin ?? ""].join(
-    "\0",
-  );
+  return [
+    c.slug,
+    c.box,
+    c.text ?? "",
+    shownRatio(c),
+    contrastThreshold(c),
+    c.origin ?? "",
+    c.onlyWithSlideCss ?? "",
+  ].join("\0");
 }
 
 function overflowWhere(amounts: Partial<Record<Edge, number>>): string {
@@ -681,9 +700,9 @@ function contrastDiagnostic(
   const colors = fg && bg ? ` (${fg} on ${bg})` : "";
   return diag("DEK031", {
     message: `${describeTarget(first.box, first.text)}has contrast ${ratio}${colors}, below ${threshold}:1${size} ${atSteps(steps)}`,
-    path: contrastPath(first.origin, first.slug, paths),
+    path: contrastPath(first, paths),
     slug: first.slug,
-    hint: contrastHint(first.origin, threshold, first.slug),
+    hint: contrastHint(first, threshold),
     data: {
       box: first.box,
       ...(first.text ? { text: first.text } : {}),

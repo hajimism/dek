@@ -1048,6 +1048,137 @@ body { margin: 0; background: #fff }
     expect(found.fine).toBeDefined();
     expect(found.fine?.origin).toBeUndefined();
   });
+
+  /**
+   * Cards the theme stacks, so the last two fall below the frame, and the slide's CSS sets in a
+   * row. It hatches the fourth, as on why-dek's refs, where the theme's grey reads below 4.5:1 on a
+   * stripe; the fifth holds a pair the theme alone makes faint. It also hides `.dimmed`.
+   */
+  const LAID_OUT_THEME = `.slide { box-sizing: border-box; width: 1280px; height: 720px; overflow: hidden; background: #f3f1ec; color: #141414; font: 400 18px sans-serif }
+.card { padding: 48px 24px; background: #e8e5dd }
+.big { margin: 0; font-size: 96px; line-height: 1.1 }
+.note { margin: 0; color: #5b5a56 }
+.dim { margin: 0; color: #aaa }
+.dimmed { margin: 0 }
+.later { visibility: hidden }`;
+  const LAID_OUT_CSS = `.row { display: flex; gap: 24px }
+.card { flex: 1 }
+.hatched { background: repeating-linear-gradient(135deg, #c8c4ba 0 1px, transparent 1px 9px), #e8e5dd }
+.dimmed { opacity: 0 }`;
+  const LAID_OUT_SLIDE = `<div class="row">
+  <div class="card"><p class="big">A</p><p class="dim">theme pair</p><p class="dimmed">dimmed by the draw</p></div>
+  <div class="card"><p class="big">B</p><p class="note">second</p></div>
+  <div class="card"><p class="big">C</p><p class="note">third</p></div>
+  <div class="card hatched"><p class="big">D</p><p class="note">a copy fetched again when read</p><p class="later">revealed later</p></div>
+  <div class="card"><p class="big">E</p><p class="dim">faint below the frame</p></div>
+</div>`;
+
+  const laidOut = async (draw = "") => {
+    const { stillPageScript } = await import("../../src/core/slide-script.ts");
+    const script = draw
+      ? `<script>(window.__dekSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
+      : "";
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["contrast"],
+      pages: [
+        {
+          html: `<html><head><style>body { margin: 0; background: #fff }
+${LAID_OUT_THEME}</style><style id="dek-slide-css">${LAID_OUT_CSS}</style></head><body><section class="slide" data-slug="intro" data-dek-step="1" data-dek-beat="0">${LAID_OUT_SLIDE}</section>${script}</body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+    return Object.fromEntries((response?.contrasts ?? []).map((sample) => [sample.text, sample]));
+  };
+
+  // Without the slide's CSS both texts are below the frame and show no glyph, so the theme alone
+  // was never measured: the hatch under the one is the slide's, the faint pair of the other the
+  // theme's, and nothing measured tells them apart.
+  browserTest(
+    "names no origin for text only the slide's stylesheet shows, and marks it so",
+    async () => {
+      const found = await laidOut();
+      for (const text of ["a copy fetched again when read", "faint below the frame"]) {
+        expect(found[text]?.ratio).toBeLessThan(4.5);
+        expect({ text, origin: found[text]?.origin, only: found[text]?.onlyWithSlideCss }).toEqual({
+          text,
+          origin: undefined,
+          only: true,
+        });
+      }
+    },
+  );
+
+  browserTest("still blames the theme for its own pair on a slide whose CSS moves it", async () => {
+    const found = await laidOut();
+    expect(found["theme pair"]?.origin).toBe("theme");
+  });
+
+  // Undoing the draw hides the text it shows, and so does the theme with the slide's CSS gone:
+  // nothing measured it on the theme alone, and the draw's color and its showing it are one change.
+  browserTest(
+    "names no origin for text only the draw shows, which the theme alone hides",
+    async () => {
+      const found = await laidOut(
+        `const later = slide.querySelector(".later"); later.style.visibility = "visible"; later.style.color = "#aaa";`,
+      );
+      expect(found["revealed later"]?.ratio).toBeLessThan(4.5);
+      expect(found["revealed later"]?.origin).toBeUndefined();
+      expect(found["revealed later"]?.onlyWithSlideCss).toBeUndefined();
+    },
+  );
+
+  // The slide's CSS hides it and the draw dims it inline: once the draw is undone it is hidden,
+  // and once the CSS goes too it shows in full, so its passing there says nothing of which dimmed
+  // it, and the slide's CSS, which no stylesheet rule can make win over an inline style, is not it.
+  browserTest("names no origin for text the draw dims where the slide's CSS hides it", async () => {
+    const found = await laidOut(`slide.querySelector(".dimmed").style.opacity = "0.25";`);
+    expect(found["dimmed by the draw"]?.ratio).toBeLessThan(4.5);
+    expect(found["dimmed by the draw"]?.origin).toBeUndefined();
+  });
+
+  browserTest(
+    "sends text only the slide's stylesheet shows to that stylesheet, naming theme.css too",
+    async () => {
+      const { lintVisualDeck } = await import("../../src/core/visual.ts");
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              theme: LAID_OUT_THEME,
+              slides: {
+                intro: slideDocument(`<section class="slide">${LAID_OUT_SLIDE}</section>`),
+              },
+              styles: { intro: LAID_OUT_CSS },
+            },
+          ],
+        },
+        async (root) => {
+          const deck = join(root, "decks", "demo");
+          const diagnostics = await lintVisualDeck(deck, { runner: (request) => render(request) });
+          const faint = (diagnostics ?? []).filter(
+            (found) =>
+              found.id === "DEK031" &&
+              ["a copy fetched again when read", "faint below the frame"].includes(
+                String(found.data?.text),
+              ),
+          );
+          expect(faint).toHaveLength(2);
+          for (const found of faint) {
+            expect(found.path).toBe(join(deck, "slides", "intro.css"));
+            expect(found.hint).toBe(
+              "without slides/intro.css it does not show, so dek cannot tell whether theme.css alone draws it below 4.5:1: fix the pair in slides/intro.css, or in theme.css if the colors are the theme's",
+            );
+            expect(found.data?.origin).toBeUndefined();
+          }
+        },
+      );
+    },
+  );
 });
 
 describe("view transitions in a real Chromium", () => {

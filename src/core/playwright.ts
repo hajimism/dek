@@ -136,9 +136,15 @@ export type ContrastFinding = {
   /**
    * For text below its threshold, which stylesheet draws it so: "theme" when it stays below
    * with the slide's own CSS taken away, "slide" when that CSS brings it there. Absent when the
-   * text passes, or shows no glyph without the slide's CSS.
+   * text passes, or shows no glyph without the slide's CSS. Absent too when it shows none with the
+   * slide script's draw undone and clears without the slide's CSS: either may have drawn it so.
    */
   origin?: ContrastOrigin;
+  /**
+   * For text below its threshold that shows with the slide's own CSS and no glyph without it: the
+   * theme alone was never measured, so either stylesheet may hold its colors.
+   */
+  onlyWithSlideCss?: true;
 };
 
 export type ContrastOrigin = "theme" | "slide" | "script";
@@ -524,14 +530,15 @@ function isContrastFinding(value: unknown): value is ContrastFinding {
   if (!isFinding(value)) {
     return false;
   }
-  const { ratio, fg, bg, fontSize, fontWeight, origin } = value;
+  const { ratio, fg, bg, fontSize, fontWeight, origin, onlyWithSlideCss } = value;
   return (
     isNumber(ratio) &&
     isString(fg) &&
     isString(bg) &&
     isNumber(fontSize) &&
     isNumber(fontWeight) &&
-    (origin === undefined || origin === "theme" || origin === "slide" || origin === "script")
+    (origin === undefined || origin === "theme" || origin === "slide" || origin === "script") &&
+    (onlyWithSlideCss === undefined || onlyWithSlideCss === true)
   );
 }
 

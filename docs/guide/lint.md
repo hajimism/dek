@@ -74,7 +74,7 @@ A diagnostic points at the file to change: `DEK001` at the section heading in `s
   "id": "DEK031",
   "severity": "error",
   "message": "p.note \"補足\" has contrast 1.5 (#333333 on #111111), below 4.5:1 at step 1",
-  "path": "slides/objection.html",
+  "path": "theme.css",
   "slug": "objection",
   "hint": "theme.css alone draws it below 4.5:1: fix the pair in theme.css, where one change reaches every slide that uses it",
   "data": { "box": "p.note", "text": "補足", "ratio": 1.5, "threshold": 4.5, "fg": "#333333", "bg": "#111111", "origin": "theme", "steps": ["1"] }
