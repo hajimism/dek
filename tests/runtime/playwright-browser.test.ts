@@ -12,6 +12,7 @@ import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { chartScript } from "../helpers/chart-deck.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 // The player in a real Chromium: print media, the accessibility tree, and view transitions are
 // what happy-dom does not have. Run from sample/, where playwright is installed.
@@ -176,7 +177,7 @@ describe("printing the player", () => {
             document.querySelector('#deck > .slide[data-slug="chart"] .bar')?.textContent ===
             "2:growth:40",
           undefined,
-          { timeout: 2000 },
+          { timeout: WAIT_MS },
         );
         await page.emulateMedia({ media: "screen" });
         await page.waitForFunction(
@@ -184,7 +185,7 @@ describe("printing the player", () => {
             document.querySelector('#deck > .slide[data-slug="chart"] .bar')?.textContent ===
             "1:base:0",
           undefined,
-          { timeout: 2000 },
+          { timeout: WAIT_MS },
         );
       } finally {
         await page.close();
@@ -257,7 +258,7 @@ describe("rapid moves", () => {
       for (let i = 0; i < 10; i++) {
         await page.keyboard.press("PageDown", { delay: 0 });
       }
-      await page.waitForFunction(() => location.hash === "#seven", undefined, { timeout: 3000 });
+      await page.waitForFunction(() => location.hash === "#seven", undefined, { timeout: WAIT_MS });
       await page.waitForTimeout(500);
       expect(errors).toEqual([]);
     } finally {

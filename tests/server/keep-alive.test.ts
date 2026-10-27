@@ -25,56 +25,69 @@ async function until(check: () => boolean, timeoutMs: number): Promise<boolean> 
   return check();
 }
 
+// The preload's default timeout reaches only the first test file, so a test that waits names its
+// own, above its waits.
 describe("onOrphaned", () => {
-  test("fires once the parent process id changes, and not before", async () => {
-    let ppid = 4242;
-    let fired = 0;
-    const stop = onOrphaned(() => fired++, { ppid: () => ppid, intervalMs: 5 });
-    try {
-      await Bun.sleep(30);
-      expect(fired).toBe(0);
-      ppid = 1;
-      expect(await until(() => fired === 1, 500)).toBe(true);
-      await Bun.sleep(30);
-      expect(fired).toBe(1);
-    } finally {
-      stop();
-    }
-  });
+  test(
+    "fires once the parent process id changes, and not before",
+    async () => {
+      let ppid = 4242;
+      let fired = 0;
+      const stop = onOrphaned(() => fired++, { ppid: () => ppid, intervalMs: 5 });
+      try {
+        await Bun.sleep(30);
+        expect(fired).toBe(0);
+        ppid = 1;
+        expect(await until(() => fired === 1, WAIT_MS)).toBe(true);
+        await Bun.sleep(30);
+        expect(fired).toBe(1);
+      } finally {
+        stop();
+      }
+    },
+    WAIT_MS * 2,
+  );
 });
 
 describe("stopOnce", () => {
-  test("closes once however many reasons arrive, then exits", async () => {
-    let closes = 0;
-    const exits: number[] = [];
-    const stop = stopOnce(
-      async () => {
-        closes++;
-      },
-      (code) => exits.push(code),
-    );
-    stop();
-    stop();
-    expect(await until(() => exits.length > 0, 500)).toBe(true);
-    expect(closes).toBe(1);
-    expect(exits).toEqual([0]);
-  });
+  test(
+    "closes once however many reasons arrive, then exits",
+    async () => {
+      let closes = 0;
+      const exits: number[] = [];
+      const stop = stopOnce(
+        async () => {
+          closes++;
+        },
+        (code) => exits.push(code),
+      );
+      stop();
+      stop();
+      expect(await until(() => exits.length > 0, WAIT_MS)).toBe(true);
+      expect(closes).toBe(1);
+      expect(exits).toEqual([0]);
+    },
+    WAIT_MS * 2,
+  );
 
-  test("exits after the grace period when close never finishes", async () => {
-    const exits: number[] = [];
-    const stop = stopOnce(
-      () => new Promise<void>(() => undefined),
-      (code) => exits.push(code),
-      20,
-    );
-    stop();
-    expect(await until(() => exits.length > 0, 500)).toBe(true);
-  });
+  test(
+    "exits after the grace period when close never finishes",
+    async () => {
+      const exits: number[] = [];
+      const stop = stopOnce(
+        () => new Promise<void>(() => undefined),
+        (code) => exits.push(code),
+        20,
+      );
+      stop();
+      expect(await until(() => exits.length > 0, WAIT_MS)).toBe(true);
+    },
+    WAIT_MS * 2,
+  );
 });
 
 describe("dek dev server lifetime", () => {
-  // The preload's default timeout reaches only the first test file, so this one names its own,
-  // above the wait for the server and the wait for its exit together.
+  // Its timeout is above the wait for the server and the wait for its exit together.
   test(
     "exits when the process that started it dies without cleaning up",
     async () => {

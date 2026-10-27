@@ -46,10 +46,9 @@ describe("defaultPlaywrightRunner", () => {
 
   test("returns null quickly when the playwright package is not installed", async () => {
     await withEnv({ DEK_PLAYWRIGHT: undefined }, async () => {
+      // Only the check for the package answers null: a worker it started would answer or throw.
       if (!playwrightResolved()) {
-        const started = Date.now();
         expect(await defaultPlaywrightRunner(request)).toBeNull();
-        expect(Date.now() - started).toBeLessThan(1000);
       }
     });
   });

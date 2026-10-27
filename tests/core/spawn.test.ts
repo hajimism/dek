@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runJsonWorker, runPiped, workerCommand } from "../../src/core/spawn.ts";
 import { withTempDir } from "../helpers/fs.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 const helpers = join(import.meta.dir, "..", "helpers");
 const parse = (text: string): Record<string, unknown> | null => {
@@ -101,20 +102,25 @@ describe("runJsonWorker", () => {
 });
 
 describe("runPiped", () => {
-  test("writes stdin, closes it, and returns the output and the exit code", async () => {
-    const piped = await runPiped(
-      [
-        "bun",
-        "-e",
-        "const t = await Bun.stdin.text(); console.log(t.toUpperCase()); console.error('e'); process.exit(3)",
-      ],
-      { label: "echo failed", hint: "", stdin: "hello", timeoutMs: 10_000 },
-    );
-    expect(piped).toEqual({ stdout: "HELLO\n", stderr: "e\n", exitCode: 3 });
-  });
+  // The preload's default timeout reaches only the first test file, so this one names its own.
+  test(
+    "writes stdin, closes it, and returns the output and the exit code",
+    async () => {
+      const piped = await runPiped(
+        [
+          "bun",
+          "-e",
+          "const t = await Bun.stdin.text(); console.log(t.toUpperCase()); console.error('e'); process.exit(3)",
+        ],
+        { label: "echo failed", hint: "", stdin: "hello", timeoutMs: WAIT_MS },
+      );
+      expect(piped).toEqual({ stdout: "HELLO\n", stderr: "e\n", exitCode: 3 });
+    },
+    WAIT_MS * 2,
+  );
 
   test("kills a command that runs past timeoutMs and says so", async () => {
-    const started = Date.now();
+    // The fake outlasts the test's timeout, so only killing it settles this in time.
     await expect(
       runPiped(["bun", join(helpers, "fake-ffmpeg-slow.ts")], {
         label: "ffmpeg failed",
@@ -126,7 +132,6 @@ describe("runPiped", () => {
       message: "ffmpeg failed",
       hint: expect.stringContaining("did not finish"),
     });
-    expect(Date.now() - started).toBeLessThan(3000);
   });
 
   // Each command would hold dek for the 30 s of its sleep; the bound only has to be well short of

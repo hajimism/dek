@@ -16,6 +16,7 @@ import { annotateScript, playerScript } from "../../src/runtime/player.ts";
 import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 // Annotate mode in a real Chromium: hit testing, shadow DOM retargeting, and the clipboard are
 // what happy-dom does not have.
@@ -300,7 +301,7 @@ describe("annotate mode in a browser", () => {
             .getElementById("dek-annotate")
             ?.shadowRoot?.querySelector("[data-part=marker]") !== null,
         undefined,
-        { timeout: 5_000 },
+        { timeout: WAIT_MS },
       );
       // Its pin's tip is on the place clicked, not on a corner of the slide.
       const at = await onScreen(page, 1100, 600);
@@ -321,7 +322,7 @@ describe("annotate mode in a browser", () => {
             ?.shadowRoot?.querySelector("[data-part=manual]")
             ?.hasAttribute("hidden") === false,
         undefined,
-        { timeout: 5_000 },
+        { timeout: WAIT_MS },
       );
       const text = (await inView(page, "[data-part=manual]"))?.value;
       expect(text).toMatch(

@@ -9,6 +9,7 @@ import {
 } from "../../src/core/rumdl.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 const sample = JSON.stringify({
   version: "2.1.0",
@@ -125,23 +126,28 @@ describe("resolveRumdlBin", () => {
 });
 
 describe("defaultRumdlRunner", () => {
-  test.serial("returns stdout when rumdl writes a megabyte of stderr", async () => {
-    const noisy = join(import.meta.dir, "..", "helpers", "fake-noisy.ts");
-    await withTempDir(async (dir) => {
-      const scriptPath = join(dir, "script.md");
-      await writeFile(scriptPath, "# demo\n");
-      await withEnv({ DEK_RUMDL: noisy }, async () => {
-        // A full stderr pipe would hang for good; the bound only has to beat the test timeout.
-        const stdout = await Promise.race([
-          defaultRumdlRunner(scriptPath),
-          new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("hung")), 4000);
-          }),
-        ]);
-        expect(stdout).toContain("ok");
+  test.serial(
+    "returns stdout when rumdl writes a megabyte of stderr",
+    async () => {
+      const noisy = join(import.meta.dir, "..", "helpers", "fake-noisy.ts");
+      await withTempDir(async (dir) => {
+        const scriptPath = join(dir, "script.md");
+        await writeFile(scriptPath, "# demo\n");
+        await withEnv({ DEK_RUMDL: noisy }, async () => {
+          // A full stderr pipe would hang for good; the bound only has to beat the test timeout,
+          // named here since the preload's reaches only the first test file.
+          const stdout = await Promise.race([
+            defaultRumdlRunner(scriptPath),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error("hung")), WAIT_MS);
+            }),
+          ]);
+          expect(stdout).toContain("ok");
+        });
       });
-    });
-  });
+    },
+    WAIT_MS * 2,
+  );
 
   test.serial("stops a rumdl that hangs and skips it, saying why", async () => {
     const slow = join(import.meta.dir, "..", "helpers", "fake-rumdl-slow.ts");

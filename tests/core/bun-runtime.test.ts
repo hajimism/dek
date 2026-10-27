@@ -31,6 +31,7 @@ describe("the Bun dek runs on", () => {
   // ChildProcess was collected, taking down whatever held the fd numbers by then. Playwright talks
   // to Chromium over stdio[3] and stdio[4], so a browser test closed dev servers' sockets in
   // whichever test ran next: ECONNRESET, ConnectionRefused.
+  // A full collection crawls on a loaded machine: 0.4s alone, past 20s with every core busy.
   test("closes a finished child's extra stdio pipe once", async () => {
     const runChild = async (): Promise<void> => {
       const child = spawn("/bin/sh", ["-c", "exit 0"], {
@@ -58,5 +59,5 @@ describe("the Bun dek runs on", () => {
         server.stop(true);
       }
     }
-  });
+  }, 60_000);
 });

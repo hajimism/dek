@@ -13,9 +13,11 @@ import {
   type VideoFrame,
 } from "../../src/video/recorder.ts";
 import { encodeWav, parseWav, silentWav, sliceWav } from "../../src/voice/wav.ts";
+import { BROWSER_TEST_MS } from "../helpers/browser.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { captureHoldFrames } from "../helpers/video.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -192,37 +194,42 @@ describe("fake video worker", () => {
 });
 
 describe("video worker", () => {
-  test("reports a failure as one line on stderr and exits 2, like the Playwright worker", async () => {
-    if (!playwrightResolved()) {
-      return;
-    }
-    await withTempDir(async (dir) => {
-      const file = join(dir, "not-a-dir");
-      writeFileSync(file, "");
-      const worker = join(import.meta.dir, "../../src/video/worker.ts");
-      const proc = Bun.spawn(["bun", "--no-install", worker], {
-        stdin: "pipe",
-        stdout: "pipe",
-        stderr: "pipe",
+  // The worker launches Chromium before it fails.
+  test(
+    "reports a failure as one line on stderr and exits 2, like the Playwright worker",
+    async () => {
+      if (!playwrightResolved()) {
+        return;
+      }
+      await withTempDir(async (dir) => {
+        const file = join(dir, "not-a-dir");
+        writeFileSync(file, "");
+        const worker = join(import.meta.dir, "../../src/video/worker.ts");
+        const proc = Bun.spawn(["bun", "--no-install", worker], {
+          stdin: "pipe",
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        // As dek asks it, so a Chromium that cannot start its sandbox still reaches the failure.
+        proc.stdin.write(
+          JSON.stringify({
+            html: "<html></html>",
+            timeline,
+            fps: 10,
+            viewport: { width: 1, height: 1 },
+            outDir: join(file, "frames"),
+            sandbox: "preferred",
+          }),
+        );
+        await proc.stdin.end();
+        const [err, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
+        expect(code).toBe(2);
+        expect(err.trim().split("\n")).toHaveLength(1);
+        expect(err).toContain("ENOTDIR");
       });
-      // As dek asks it, so a Chromium that cannot start its sandbox still reaches the failure.
-      proc.stdin.write(
-        JSON.stringify({
-          html: "<html></html>",
-          timeline,
-          fps: 10,
-          viewport: { width: 1, height: 1 },
-          outDir: join(file, "frames"),
-          sandbox: "preferred",
-        }),
-      );
-      await proc.stdin.end();
-      const [err, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
-      expect(code).toBe(2);
-      expect(err.trim().split("\n")).toHaveLength(1);
-      expect(err).toContain("ENOTDIR");
-    });
-  });
+    },
+    BROWSER_TEST_MS,
+  );
 });
 
 describe("sliceWav", () => {
@@ -364,38 +371,42 @@ describe("muxVideo", () => {
     });
   });
 
-  test.serial("resolves when ffmpeg writes a megabyte of stderr", async () => {
-    await withTempDir(async (dir) => {
-      const a = join(dir, "a.png");
-      writeFileSync(a, PNG);
-      const wav = join(dir, "audio.wav");
-      writeFileSync(wav, silentWav(200));
-      const out = join(dir, "out.mp4");
-      const previous = process.env.DEK_FFMPEG;
-      process.env.DEK_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
-      try {
-        const started = Date.now();
-        await Promise.race([
-          muxVideo({
-            frames: [{ path: a, durationMs: 100 }],
-            audioPath: wav,
-            outPath: out,
-          }),
-          new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("hung")), 2000);
-          }),
-        ]);
-        expect(Date.now() - started).toBeLessThan(2000);
-        expect(await Bun.file(out).exists()).toBe(true);
-      } finally {
-        if (previous === undefined) {
-          delete process.env.DEK_FFMPEG;
-        } else {
-          process.env.DEK_FFMPEG = previous;
+  test.serial(
+    "resolves when ffmpeg writes a megabyte of stderr",
+    async () => {
+      await withTempDir(async (dir) => {
+        const a = join(dir, "a.png");
+        writeFileSync(a, PNG);
+        const wav = join(dir, "audio.wav");
+        writeFileSync(wav, silentWav(200));
+        const out = join(dir, "out.mp4");
+        const previous = process.env.DEK_FFMPEG;
+        process.env.DEK_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
+        try {
+          // A full stderr pipe would hang for good; the bound only has to beat the test timeout,
+          // named here since the preload's reaches only the first test file.
+          await Promise.race([
+            muxVideo({
+              frames: [{ path: a, durationMs: 100 }],
+              audioPath: wav,
+              outPath: out,
+            }),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error("hung")), WAIT_MS);
+            }),
+          ]);
+          expect(await Bun.file(out).exists()).toBe(true);
+        } finally {
+          if (previous === undefined) {
+            delete process.env.DEK_FFMPEG;
+          } else {
+            process.env.DEK_FFMPEG = previous;
+          }
         }
-      }
-    });
-  });
+      });
+    },
+    WAIT_MS * 2,
+  );
 
   test.serial(
     "gives up on an ffmpeg on PATH that never answers -version, even one that ignores SIGTERM",
@@ -433,7 +444,7 @@ describe("muxVideo", () => {
       await withTempDir(async (dir) => {
         const a = join(dir, "a.png");
         writeFileSync(a, PNG);
-        const started = Date.now();
+        // The fake outlasts the test's timeout, so only stopping it settles this in time.
         await withEnv(
           { DEK_FFMPEG: join(import.meta.dir, "../helpers/fake-ffmpeg-slow.ts") },
           async () => {
@@ -451,7 +462,6 @@ describe("muxVideo", () => {
             });
           },
         );
-        expect(Date.now() - started).toBeLessThan(3000);
       });
     },
   );

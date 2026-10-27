@@ -7,7 +7,7 @@ import { importPlaywright } from "../../src/core/playwright.ts";
  * a page's second into tens of seconds, and the preload's default timeout reaches only the first
  * test file, so the rest would run under Bun's 5s.
  */
-const BROWSER_TEST_MS = 60_000;
+export const BROWSER_TEST_MS = 60_000;
 
 /**
  * How many browser tests Bun has timed out. Each timeout killed the browser then running: Bun

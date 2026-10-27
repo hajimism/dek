@@ -25,6 +25,7 @@ import { playerScript } from "../../src/runtime/player.ts";
 import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 // What the Playwright worker measures, in a real Chromium. They live apart from the runner's own
 // tests, which swap DEK_PLAYWRIGHT while tests in one file run at once.
@@ -1344,11 +1345,13 @@ describe("ending a seeked go in a real Chromium", () => {
       expect(await page.evaluate(holdStarted)).toBe(400);
       await page.evaluate(seekStarted, 300);
       await page.evaluate(finishBeat);
-      const settled = await page.evaluate(() =>
-        Promise.race([
-          window.__dekPendingGo?.then(() => true),
-          new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
-        ]),
+      const settled = await page.evaluate(
+        (ms) =>
+          Promise.race([
+            window.__dekPendingGo?.then(() => true),
+            new Promise((resolve) => setTimeout(() => resolve(false), ms)),
+          ]),
+        WAIT_MS,
       );
       expect(settled).toBe(true);
     } finally {
