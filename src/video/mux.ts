@@ -6,23 +6,39 @@ import { DekError } from "../core/error.ts";
 import { runPiped, workerCommand } from "../core/spawn.ts";
 import type { VideoFrame } from "./recorder.ts";
 
-export function ffmpegResolved(): boolean {
+/** `ffmpeg -version` prints and exits at once; one that takes longer is stuck. */
+const FFMPEG_PROBE_TIMEOUT_MS = 10_000;
+
+/**
+ * True when ffmpeg is there to run: DEK_FFMPEG names one, or `ffmpeg -version` on PATH exits 0.
+ * An ffmpeg that does not answer within `timeoutMs` is killed, and is an error that says so.
+ */
+export function ffmpegResolved(timeoutMs = FFMPEG_PROBE_TIMEOUT_MS): boolean {
   if (process.env.DEK_FFMPEG) {
     return true;
   }
+  let result: Bun.SyncSubprocess<"ignore", "ignore">;
   try {
     // The environment as it is now, as runPiped passes it: left out, Bun passes the one dek
-    // started with.
-    // biome-ignore lint/nursery/noJsRestrictedProperties: ffmpegResolved is synchronous, for tests too, and ffmpeg -version exits at once; the encode runs through runPiped.
-    const result = Bun.spawnSync(["ffmpeg", "-version"], {
-      stdout: "pipe",
-      stderr: "pipe",
+    // started with. Nothing is piped, so a process it leaves behind cannot hold dek.
+    // biome-ignore lint/nursery/noJsRestrictedProperties: ffmpegResolved is synchronous, for tests too; the probe has its own timeout and SIGKILL, and the encode runs through runPiped.
+    result = Bun.spawnSync(["ffmpeg", "-version"], {
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
       env: process.env,
+      timeout: timeoutMs,
+      killSignal: "SIGKILL",
     });
-    return result.exitCode === 0;
   } catch {
     return false;
   }
+  if (result.exitedDueToTimeout) {
+    throw new DekError(`ffmpeg did not answer \`ffmpeg -version\` within ${timeoutMs / 1000}s`, {
+      hint: "check the ffmpeg on PATH, or set DEK_FFMPEG to an ffmpeg that runs, then run the command again",
+    });
+  }
+  return result.exitCode === 0;
 }
 
 function ffmpegCommand(args: string[]): string[] {

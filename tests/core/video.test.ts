@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { playwrightResolved } from "../../src/core/playwright.ts";
 import { DEFAULT_LEAD_MS, type Timeline } from "../../src/core/timeline.ts";
@@ -394,6 +394,36 @@ describe("muxVideo", () => {
       }
     });
   });
+
+  test.serial(
+    "gives up on an ffmpeg on PATH that never answers -version, even one that ignores SIGTERM",
+    async () => {
+      await withTempDir(async (bin) => {
+        // It ends on its own after 15s, so a probe that waits does not hang the suite.
+        const ffmpeg = join(bin, "ffmpeg");
+        writeFileSync(
+          ffmpeg,
+          "#!/bin/sh\ntrap '' TERM\ni=0\nwhile [ $i -lt 15 ]; do sleep 1; i=$((i+1)); done\n",
+        );
+        chmodSync(ffmpeg, 0o755);
+        const started = Date.now();
+        let error: unknown;
+        await withEnv({ DEK_FFMPEG: undefined, PATH: `${bin}:${process.env.PATH}` }, async () => {
+          try {
+            ffmpegResolved(500);
+          } catch (caught) {
+            error = caught;
+          }
+        });
+        expect(error).toMatchObject({
+          name: "DekError",
+          message: expect.stringContaining("did not answer"),
+          hint: expect.stringContaining("DEK_FFMPEG"),
+        });
+        expect(Date.now() - started).toBeLessThan(5000);
+      });
+    },
+  );
 
   test.serial(
     "stops an ffmpeg that runs past timeoutMs, so a hung encode cannot hang dek",
