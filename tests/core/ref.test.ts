@@ -16,6 +16,7 @@ import {
   refDir,
   refState,
   snapshotDigest,
+  writeSnapshot,
 } from "../../src/core/ref.ts";
 import type { GithubRefSource } from "../../src/core/ref-name.ts";
 import { resolveProject } from "../../src/core/resolve.ts";
@@ -472,6 +473,23 @@ describe("installSnapshot", () => {
         );
       });
     }
+  });
+
+  test("never unpacks a pack's ref through a link at refs/file", async () => {
+    await withTempDir(async (root) => {
+      await mkdir(join(root, "decks", "talk"), { recursive: true });
+      await writeFile(join(root, "decks", "talk", "script.md"), "# mine\n");
+      await mkdir(join(root, "refs"));
+      await symlink(join(root, "decks"), join(root, "refs", "file"));
+      const snapshot = pickSnapshot(repoFiles(deckRepoFiles("talk")), parseRefSource("file/talk"));
+      await expect(
+        writeSnapshot(root, "file/talk", await snapshotDigest(snapshot), snapshot),
+      ).rejects.toMatchObject({
+        message: "refs/file is a symlink; dek follows no link under refs/",
+      });
+      expect(await listFiles(join(root, "decks"))).toEqual(["talk/script.md"]);
+      expect(await readFile(join(root, "decks", "talk", "script.md"), "utf8")).toBe("# mine\n");
+    });
   });
 
   test("a snapshot reached through a link under refs/ is not fetched", async () => {
