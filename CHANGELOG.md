@@ -2,6 +2,44 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.4.0](https://github.com/hajimism/dek/compare/v0.3.4...v0.4.0) (2026-10-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **theme:** `dekc theme --json` lists in `layouts` only layouts whose names are plain words: letters, marks, and digits of any script and `@%+=:,./_-`, not starting with `=`. A layout whose name holds anything else, such as a space, a quote, `$`, `;`, or a backtick, is no longer in `layouts`; `unprintedLayouts`, present only when there are some, says how many were left out. `dekc theme <layout>` still prints such a layout's example.
+* **ref:** a dek.toml whose [refs] pins a deck name with any other character, starting with a dash, not in NFC, or longer than 64 characters or 200 bytes, such as `owner/repo/talk(1)` or `file/a+b`, no longer loads. Delete the line the error points at, and for a pack its packs/<deck>.tgz and refs/file/<deck>, then pin the deck again under a name a ref can carry.
+
+### Bug Fixes
+
+* **annotations:** show a deck, slide, or beat that is no plain word as a placeholder in the notes ([3b04e89](https://github.com/hajimism/dek/commit/3b04e89dc22f9ea421919c920594f53a9c02d3be))
+* **cli:** say once where to find a deck's name a retyped command leaves as &lt;deck&gt; ([d4a57d9](https://github.com/hajimism/dek/commit/d4a57d9f7836b2ba2433dc634a136bb7e97be509))
+* **config:** show a key that is no plain word as &lt;key&gt; in an error ([22476a7](https://github.com/hajimism/dek/commit/22476a712ecf0ee4e3c552b1e0fe6f35ac10cacf))
+* **dev:** read .dek/server.json only as the dev server writes it ([c402cb6](https://github.com/hajimism/dek/commit/c402cb6282783425611274fbc0337cd6652add7e))
+* **dev:** read the lock a dev server on port 80 writes ([665e0e2](https://github.com/hajimism/dek/commit/665e0e237c3a639a45fa36dc14ed8bd2e7ad9168))
+* keep reads, writes, and suggested commands inside what the project and dek wrote ([23a667d](https://github.com/hajimism/dek/commit/23a667d199ee5f0b34040c4c33f0c0bcfd47f819))
+* **lint:** name a remote file in DEK020's hint only when it is a plain word ([fb77d02](https://github.com/hajimism/dek/commit/fb77d028db1bb38bea6b43695838d52776b192a7))
+* **lint:** name a slide or asset file in a hint only when it is a plain word ([eeb240c](https://github.com/hajimism/dek/commit/eeb240c418b615067bd66ff45ac6b70361d3bd1b))
+* **lint:** show an unknown key that is no plain word as &lt;key&gt; in DEK008 ([f950def](https://github.com/hajimism/dek/commit/f950def7f80f06da46bd8c913ae84c8c849d5ddf))
+* never follow a link under refs/ when writing a snapshot ([0c843ea](https://github.com/hajimism/dek/commit/0c843ea4193270dd1cc0fde4a04768e210efd911))
+* never write or remove a pack's copy through a link under packs/ ([95980a6](https://github.com/hajimism/dek/commit/95980a631e90ee97eda24784ded50b042111512d))
+* quote every name in a command dek suggests ([d1e608d](https://github.com/hajimism/dek/commit/d1e608d5676e46b7947bd5f43a3315269fd27773))
+* read a project's files only through links that stay inside it ([7ae3815](https://github.com/hajimism/dek/commit/7ae38152eadd6f58d67034169ade9dd749038002))
+* **ref:** accept only letters, digits, dots, dashes, and underscores in a ref's deck name ([1b430e1](https://github.com/hajimism/dek/commit/1b430e1ea3d0f66af2642a5f257af1cefcae3ac0))
+* **ref:** fold names as macOS does when telling whether two refs share a folder ([fdb32ee](https://github.com/hajimism/dek/commit/fdb32ee103facc5a661f20dabf79fe8f91ae48cd))
+* **ref:** refuse a pin whose folders another ref already takes ([0d550d8](https://github.com/hajimism/dek/commit/0d550d897b0cdad86ac3de181bf7fd031061bd66))
+* refuse a decks folder that links out of the project ([83f2ff0](https://github.com/hajimism/dek/commit/83f2ff00079893b8e2dbb2fc5d5b7588435aa4dd))
+* refuse to serve or write inside a ref, as every other command does ([665b2de](https://github.com/hajimism/dek/commit/665b2de7a3e6aa3b67ce6140d3eb2a15fb398ee6))
+* serve a deck's assets only from inside the project ([86743cf](https://github.com/hajimism/dek/commit/86743cf731d97f664e95b75f1441dd238f0eeb11))
+* take a folder for a ref only where dek wrote one, and name it from there ([62cc8df](https://github.com/hajimism/dek/commit/62cc8df0a509a99a55d9db7698683bc3be5523d4))
+* **theme:** leave layouts whose names are no plain word out of --json ([625f6d3](https://github.com/hajimism/dek/commit/625f6d3dab0dfe16dacb272e371b551214621a86))
+* **theme:** print only layout names that are plain words ([62b15d1](https://github.com/hajimism/dek/commit/62b15d18afb91d6adbc2641376d9ca899cb6bf20))
+
+
+### Documentation
+
+* say dek follows no link under packs/ either ([5a11b2c](https://github.com/hajimism/dek/commit/5a11b2ca9960a134e261f09f80408fc770aa44da))
+
 ## [0.3.4](https://github.com/hajimism/dek/compare/v0.3.3...v0.3.4) (2026-10-27)
 
 
