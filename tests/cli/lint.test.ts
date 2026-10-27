@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { lintCommand } from "../../src/cli/lint.ts";
@@ -146,6 +147,30 @@ describe("lintCommand", () => {
           cwd: join(root, "decks", "demo"),
         });
         expect(result.diagnostics).toEqual([]);
+      },
+    );
+  });
+
+  // Bun would run the macro in dek's own process while it read the script, before any refusal.
+  test("refuses a slide script's macro import without running it", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const mark = join(root, "macro-ran");
+        await writeFile(
+          join(deckDir, "slides", "intro.ts"),
+          `import { writeFileSync } from "node:fs" with { type: "macro" };\nwriteFileSync(${JSON.stringify(mark)}, "ran");\nexport default {};\n`,
+        );
+        const result = await lintCommand(resolveDecks(deckDir), { cwd: deckDir });
+        expect(existsSync(mark)).toBe(false);
+        expect(result.diagnostics.filter((d) => d.id === "DEK016")).toEqual([
+          expect.objectContaining({
+            message: "imports are not supported; keep the slide script self-contained",
+            line: 1,
+            hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
+          }),
+        ]);
       },
     );
   });
