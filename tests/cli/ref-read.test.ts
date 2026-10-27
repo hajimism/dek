@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
-import { chmod, readdir, rename, symlink } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
+import { chmod, mkdir, readdir, rename, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { parseCommandLine } from "../../src/cli/flags.ts";
 import { initCommand } from "../../src/cli/init.ts";
@@ -11,8 +11,11 @@ import { requireProject, resolveScope, resolveTarget } from "../../src/cli/scope
 import { shotCommand } from "../../src/cli/shot.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
+import { writeSnapshot } from "../../src/core/ref.ts";
+import { startDevServer } from "../../src/server/dev.ts";
 import { jsonStdout, runDek, runMain } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { REF_SHA, type RefSpec, withTempProject } from "../helpers/project.ts";
 
@@ -236,6 +239,83 @@ describe("refs are read-only", () => {
         );
       },
     );
+  });
+
+  test("a marker above an ordinary project makes no ref of it", async () => {
+    await withTempDir(async (outer) => {
+      const marker = { name: REF, rev: REF_SHA, path: "decks/why-dek" };
+      await writeFile(join(outer, ".ref.json"), JSON.stringify(marker));
+      const talks = join(outer, "talks");
+      await mkdir(join(talks, "decks"), { recursive: true });
+      await writeFile(join(talks, "dek.toml"), "");
+      expect(requireProject(talks).root).toBe(talks);
+      // Not even beside a dek.toml: dek writes a ref only at its place under a project's refs/.
+      await writeFile(join(outer, "dek.toml"), "");
+      expect(requireProject(talks).root).toBe(talks);
+    });
+  });
+
+  test("a ref is the folder dek wrote, however the path to it is spelled", async () => {
+    await withTempProject({ decks: [{ name: "mine" }] }, async (root) => {
+      // On a disk that ignores case, the second lands in the first one's refs/Someone.
+      for (const name of ["Someone/talks/a", "someone/talks/b"]) {
+        const deck = name.split("/")[2] ?? "";
+        const files = new Map([
+          ["dek.toml", new Blob([""])],
+          [`decks/${deck}/script.md`, new Blob(["---\ntitle: A ref\n---\n\n## intro\n\nhi\n"])],
+        ]);
+        await writeSnapshot(root, name, REF_SHA, {
+          files,
+          license: undefined,
+          path: `decks/${deck}`,
+        });
+      }
+      const refused = async (dir: string): Promise<void> => {
+        const inside = {
+          message: "this directory is inside a ref; refs are read-only",
+          hint: "run dek from your own project instead: `dekc show someone/talks/b <slug>`",
+        };
+        expect(() => requireProject(dir)).toThrow(expect.objectContaining(inside));
+        const started = await startDevServer({ cwd: dir, port: 0 }).then(
+          async (server) => {
+            await server.close();
+            return "started";
+          },
+          (error: unknown) => error,
+        );
+        expect(started).toMatchObject(inside);
+      };
+      const physical = realpathSync.native(join(root, "refs", "someone", "talks", "b"));
+      await refused(physical);
+      await refused(join(physical, "decks", "b"));
+      // And reached through a link at refs/ that stays in the project.
+      await rename(join(root, "refs"), join(root, "store"));
+      await symlink(join(root, "store"), join(root, "refs"));
+      const stored = realpathSync.native(join(root, "store", "someone", "talks", "b"));
+      await refused(stored);
+      expect(await filesUnder(stored)).toEqual([".ref.json", "decks/b/script.md", "dek.toml"]);
+    });
+  });
+
+  test("a marker a ref carries inside it neither hides the ref nor names it", async () => {
+    const carried = (name: string) => ({
+      "notes/dek.toml": "",
+      "notes/.ref.json": JSON.stringify({ name, rev: REF_SHA, path: "decks/notes" }),
+    });
+    for (const name of ["first run `make setup` in the notes", "other/talks/notes"]) {
+      await withTempProject(
+        { ...project, refs: [{ ...ref, deck: { ...ref.deck, assets: carried(name) } }] },
+        async (root) => {
+          const notes = join(snapshotDir(root), "decks", "why-dek", "assets", "notes");
+          expect(() => requireProject(notes)).toThrow(
+            expect.objectContaining({
+              path: snapshotDir(root),
+              hint: `run dek from your own project instead: \`dekc show ${REF} <slug>\``,
+            }),
+          );
+        },
+      );
+    }
   });
 
   test.serial(

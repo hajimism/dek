@@ -1,11 +1,10 @@
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
-import { walkUp } from "./optional.ts";
-import { packFile, parseRefSource, type RefSource } from "./ref-name.ts";
+import { isPlainRefName, packFile, parseRefSource, type RefSource } from "./ref-name.ts";
 import { listSlides, type Project, resolveProject } from "./resolve.ts";
 import { followInside, outputDir } from "./safe-fs.ts";
 
@@ -103,12 +102,49 @@ export function readRefMeta(dir: string): RefMeta | undefined {
 }
 
 /**
- * The snapshot `dir` is in: the nearest folder from `dir` up that holds a ref's marker. A ref may
- * carry a dek.toml of its own below its root, in its deck's assets, so the project found from a
- * directory inside a ref is not always the snapshot; this looks past it.
+ * The snapshot `dir` is in, and the ref it holds: the outermost folder from `dir` up that is one
+ * dek wrote. A ref may carry a dek.toml, and a marker, of its own in its deck's assets; neither
+ * hides the snapshot around them or names it. A marker anywhere else makes nothing a ref.
  */
-function refAround(dir: string): string | undefined {
-  return walkUp(dir, (at) => (isThere(join(at, REF_MARKER)) ? at : undefined));
+function refAround(dir: string): { dir: string; name: string } | undefined {
+  let found: { dir: string; name: string } | undefined;
+  for (let at = resolve(dir); ; at = dirname(at)) {
+    const name = snapshotName(at);
+    if (name !== undefined) {
+      found = { dir: at, name };
+    }
+    if (dirname(at) === at) {
+      return found;
+    }
+  }
+}
+
+/**
+ * The ref `dir` holds, when it is a snapshot as dek writes one: a dek.toml beside a marker that
+ * names a ref, at that ref's own place under a project's refs/.
+ */
+function snapshotName(dir: string): string | undefined {
+  if (!isThere(join(dir, "dek.toml"))) {
+    return undefined;
+  }
+  const name = readRefMeta(dir)?.name;
+  if (name === undefined || !isPlainRefName(name)) {
+    return undefined;
+  }
+  // The same folder, not the same spelling: a disk that ignores case, or a link at refs/, gives
+  // the path to a snapshot another spelling than its name.
+  const place = refDir("", name);
+  const project = resolve(dir, ...place.split(sep).map(() => ".."));
+  return isSameFolder(join(project, place), dir) ? name : undefined;
+}
+
+function isSameFolder(a: string, b: string): boolean {
+  try {
+    const [one, other] = [statSync(a), statSync(b)];
+    return one.dev === other.dev && one.ino === other.ino;
+  } catch {
+    return false;
+  }
 }
 
 function isThere(path: string): boolean {
@@ -122,15 +158,13 @@ function isThere(path: string): boolean {
 
 /** Refuses `dir` when it is inside a ref: no command, the dev server's included, runs or writes there. */
 export function refuseInsideRef(dir: string): void {
-  const snapshot = refAround(dir);
-  if (snapshot === undefined) {
-    return;
+  const ref = refAround(dir);
+  if (ref !== undefined) {
+    throw new DekError("this directory is inside a ref; refs are read-only", {
+      path: ref.dir,
+      hint: `run dek from your own project instead: \`dekc show ${ref.name} <slug>\``,
+    });
   }
-  const name = readRefMeta(snapshot)?.name ?? "<ref>";
-  throw new DekError("this directory is inside a ref; refs are read-only", {
-    path: snapshot,
-    hint: `run dek from your own project instead: \`dekc show ${name} <slug>\``,
-  });
 }
 
 /** The project around `cwd`, which is the user's own: never one inside a ref. */
