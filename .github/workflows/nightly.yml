@@ -167,3 +167,62 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/rumdl" --version
       - run: bun test
+
+  # How long lint, check, and build take on the sample decks: a record to compare a night
+  # against when a change might slow the agent loop, kept as the bench artifact. Nothing fails on
+  # a time.
+  bench:
+    runs-on: ubuntu-latest
+    # Minutes on a laptop; a runner can be several times slower.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(bun -p 'require("playwright/package.json").version')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        run: bunx playwright install chromium
+      # The sample themes ask for Hiragino, which Linux lacks; Noto CJK is the closest fallback,
+      # as in the Pages build.
+      - id: cjk-fonts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/cjk-fonts
+          key: cjk-fonts-${{ runner.os }}-noto-cjk
+      - name: Download the CJK fonts
+        if: steps.cjk-fonts.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -q
+          mkdir -p ~/cjk-fonts
+          cd ~/cjk-fonts && apt-get download fonts-noto-cjk
+      - name: Install the CJK fonts
+        run: sudo dpkg -i ~/cjk-fonts/*.deb
+      # lint runs rumdl when it is installed, as a project's own lint does.
+      - name: Install rumdl
+        env:
+          RUMDL_VERSION: 0.2.73
+          RUMDL_SHA256: d56a8e40471af32fe3229e845f3e299e3691665b15cd4ca28f2deb502c487666
+        run: |
+          curl -fsSL -o rumdl.tar.gz "https://github.com/rvben/rumdl/releases/download/v$RUMDL_VERSION/rumdl-v$RUMDL_VERSION-x86_64-unknown-linux-gnu.tar.gz"
+          echo "$RUMDL_SHA256  rumdl.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf rumdl.tar.gz -C "$HOME/.local/bin"
+          rm rumdl.tar.gz
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/rumdl" --version
+      - run: bun scripts/bench.ts > bench.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench
+          path: bench.json
+          if-no-files-found: error
