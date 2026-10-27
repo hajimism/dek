@@ -80,7 +80,7 @@ Claude Code では `/plugin install dek-design@dek` です。npm パッケージ
 - sandbox が起動しない環境で Chromium が sandbox なしで描いたページがあると、描くコマンドはどれも結果の横に `unsandboxed` を載せます。`{ "reason": "Running as root without --no-sandbox is not supported. See https://crbug.com/638180.", "hint": "run dekc as a user other than root, …" }` のような形です。ページは描いたので、指摘はそのまま有効です。すべて sandbox の中で描いたときはこのフィールド自体がありません。
 - 対象のデッキごとにファイルを書くコマンドは、1 デッキでもリストを返します。`build` と `pdf` は `outs` を返します。
 - `dekc lint --format sarif` は同じ診断を SARIF 2.1.0 で返します。
-- 各コマンドの形は JSON Schema として [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しています。`$defs` にコマンドごとの定義があり、実行できなかった行は `failure` です。どのオブジェクトも閉じているので、名前のないフィールドが増えるのは契約の変更です。スキーマ、CLI 自身の型、テストで dek が出力するものは 1 つの定義に対して検査されるので、互いにずれることはありません。
+- 各コマンドの形は JSON Schema として [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しています。`$defs` にコマンドごとの定義があり、実行できなかった行は `failure` です。どのオブジェクトも閉じていて、dek が出力するフィールドにはすべて名前があり、名前のないフィールドが出ればテストが失敗します。それでもリリースでフィールドが増えることはあるので、知っているフィールドを読み、ほかは無視してください。読んでいるもの、つまりフィールド、その型、enum が挙げる値を取り除いたり緩めたりするリリースは破壊的変更として記され、dek が 0.x のあいだはマイナーバージョンが上がります。スキーマ、CLI 自身の型、テストで dek が出力するものは 1 つの定義に対して検査されるので、互いにずれることはありません。
 
 dek が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID は再利用しません。廃止した ID は廃止のままです。
 
