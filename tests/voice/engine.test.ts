@@ -5,8 +5,11 @@ import {
   engineMissingError,
   engineNameForUrl,
   engineSetupHint,
+  fetchSpeakers,
+  fetchSynthesis,
   resolveStyleId,
 } from "../../src/voice/engine.ts";
+import { startFakeVoicevox } from "../helpers/fake-voicevox.ts";
 
 const speakers = [
   {
@@ -94,6 +97,45 @@ describe("engineMissingError", () => {
     expect(error).toBeInstanceOf(DekError);
     expect(error.message).toBe("voicevox was not found at http://127.0.0.1:50021");
     expect(error.hint).toContain("https://voicevox.hiroshiba.jp/");
+  });
+});
+
+const query = {
+  accent_phrases: [],
+  speedScale: 1,
+  prePhonemeLength: 0,
+  postPhonemeLength: 0,
+  outputSamplingRate: 24000,
+};
+
+describe("an engine that never answers", () => {
+  test("times out on /speakers with a hint, not as a missing engine", async () => {
+    const fake = await startFakeVoicevox();
+    fake.hang = "/speakers";
+    try {
+      await expect(fetchSpeakers(fake.url, { timeoutMs: 50 })).rejects.toMatchObject({
+        name: "DekError",
+        message: "voice engine did not answer /speakers within 0.05s",
+        hint: expect.stringContaining("restart"),
+      });
+    } finally {
+      await fake.close();
+    }
+  });
+
+  test("times out on /synthesis, before the answer or part way through it", async () => {
+    for (const stuck of ["hang", "stall"] as const) {
+      const fake = await startFakeVoicevox();
+      fake[stuck] = "/synthesis";
+      try {
+        await expect(fetchSynthesis(fake.url, query, 3, { timeoutMs: 50 })).rejects.toMatchObject({
+          name: "DekError",
+          message: "voice engine did not answer /synthesis within 0.05s",
+        });
+      } finally {
+        await fake.close();
+      }
+    }
   });
 });
 

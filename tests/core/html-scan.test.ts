@@ -76,12 +76,83 @@ describe("scanSlideHtml reads every attribute that names a URL", () => {
   });
 });
 
+describe("scanSlideHtml reads each attribute value as the browser does", () => {
+  test("a reference in a class separates the classes or names one as it decodes", () => {
+    const scan = scanSlideHtml(
+      `<section class="intro&#32;slide"><p class="a&amp;b">x</p></section>`,
+    );
+    expect(scan.slides).toHaveLength(1);
+    expect(scan.classes).toEqual(["intro", "slide", "a&b"]);
+    expect(scan.elements[1]?.attributes).toEqual([
+      { name: "class", value: "a&b", line: 1, column: 37 },
+    ]);
+  });
+
+  test("a srcset with &#44; between candidates names each, located where it is written", () => {
+    const scan = scanSlideHtml(
+      `<img srcset="assets/a.png 1x&#44; assets/b.png 2x" src="&#32;assets/c.png">`,
+    );
+    expect(scan.refs.map((ref) => [ref.attr, ref.value, ref.column])).toEqual([
+      ["srcset", "assets/a.png", 14],
+      ["srcset", "assets/b.png", 35],
+      ["src", "assets/c.png", 62],
+    ]);
+  });
+
+  test("a query string separated by &amp; is the URL the browser loads", () => {
+    const scan = scanSlideHtml(`<img src="assets/a.png?v=1&amp;w=2" alt="">`);
+    expect(scan.refs.map((ref) => ref.value)).toEqual(["assets/a.png?v=1&w=2"]);
+  });
+
+  test("an aria-label of a reference to a space names nothing", () => {
+    const scan = scanSlideHtml(`<section class="slide"><h2 aria-label="&#32;"></h2></section>`);
+    expect(scan.emptyHeadings.map((element) => element.tag)).toEqual(["h2"]);
+  });
+});
+
+// HTML splits and trims only ASCII whitespace, and the URL parser strips only C0 controls and
+// spaces, so a no-break space, written as &nbsp; or as itself, is part of the value.
+describe("scanSlideHtml keeps a no-break space inside a value, as the browser does", () => {
+  test("in a class, where it joins two words into one class", () => {
+    const scan = scanSlideHtml(
+      `<section class="intro&nbsp;slide"><p class="a\u00A0b">x</p></section>`,
+    );
+    expect(scan.slides).toEqual([]);
+    expect(scan.classes).toEqual(["intro\u00A0slide", "a\u00A0b"]);
+  });
+
+  test("in a URL, at either end, and between a srcset URL and its descriptor", () => {
+    const scan = scanSlideHtml(
+      `<img src="&nbsp;assets/a.png" srcset="assets/b.png&nbsp;2x"><img src="\u00A0assets/c.png\u00A0">`,
+    );
+    expect(scan.refs.map((ref) => ref.value)).toEqual([
+      "\u00A0assets/a.png",
+      "assets/b.png\u00A02x",
+      "\u00A0assets/c.png\u00A0",
+    ]);
+  });
+
+  test("in a role, where it makes a token no role names", () => {
+    const scan = scanSlideHtml(`<span role="&nbsp;img">x</span><span role=" img ">y</span>`);
+    expect(scan.pictures.map((picture) => picture.element.column)).toEqual([32]);
+  });
+
+  test("in an aria-label, which Chromium reads as a name", () => {
+    const scan = scanSlideHtml(
+      `<section class="slide"><h2 aria-label="&nbsp;"></h2><h3 aria-label="&#9;&#10; "></h3></section>`,
+    );
+    expect(scan.emptyHeadings.map((element) => element.tag)).toEqual(["h3"]);
+  });
+});
+
 describe("srcsetUrls", () => {
   test.each([
     ["a.png", ["a.png"]],
     ["a.png 1x, b.png 2x", ["a.png", "b.png"]],
     ["a.png 480w,b.png 800w", ["a.png", "b.png"]],
     ["  a.png,  b.png 2x  ", ["a.png", "b.png"]],
+    ["a.png\f1x,\tb.png\n2x", ["a.png", "b.png"]],
+    ["a.png\u00A01x, b.png 2x", ["a.png\u00A01x", "b.png"]],
     ["data:image/png;base64,AA 1x, b.png 2x", ["data:image/png;base64,AA", "b.png"]],
     ["", []],
   ])("%j", (value, urls) => {

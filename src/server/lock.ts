@@ -1,7 +1,7 @@
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
-import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
+import { readSourceIfExists, removeInside, writeInside } from "../core/safe-fs.ts";
 
 export type DevServerLock = {
   url: string;
@@ -133,8 +133,8 @@ export function removeDevServerLock(root: string): void {
     return;
   }
   try {
-    unlinkSync(serverLockPath(root));
+    removeInside(serverLockPath(root), root);
   } catch {
-    /* already gone */
+    /* a lock left behind names a process that is gone, which the next server sees */
   }
 }

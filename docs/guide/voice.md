@@ -34,7 +34,7 @@ speed   = 1
 pause   = { sentence = 350, beat = 700 }
 ```
 
-`dekc voice` needs a running VOICEVOX-compatible engine; `rehearse` and `video` need only the Timeline it writes. If no engine is found, only the command that needs one fails, and the hint tells you how to install one.
+`dekc voice` needs a running VOICEVOX-compatible engine; `rehearse` and `video` need only the Timeline it writes. If no engine is found, only the command that needs one fails, and the hint tells you how to install one. An engine that takes the connection but stops answering fails the command too: dek waits 10 s for its speakers and version, 60 s for a sentence's reading, and 5 minutes for its audio.
 
 - **VOICEVOX** at port 50021: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/), or `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
 - **AivisSpeech** at port 10101 with `engine = "aivis"`: [aivis-project.com](https://aivis-project.com/), or `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`

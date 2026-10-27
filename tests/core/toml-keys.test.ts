@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { renameTableKeys, scanTomlKeys, setTableKey } from "../../src/core/toml-keys.ts";
+import fc from "fast-check";
+import {
+  renameTableKeys,
+  scanTomlKeys,
+  setTableKey,
+  type TomlKey,
+} from "../../src/core/toml-keys.ts";
+import { propertyTest } from "../helpers/fc.ts";
 
 const SHA = "a".repeat(40);
 
@@ -145,6 +152,35 @@ describe("scanTomlKeys edge cases", () => {
     ]);
   });
 
+  test("steps over an array or an inline table written over several lines", () => {
+    const source = [
+      "arr = [ # [not.a.table]",
+      "  [1],",
+      '  "]", # ]',
+      '  { a = "[x]" },',
+      "]",
+      "k = 1",
+      "voice = {",
+      "  speed = 1,",
+      "  sped = { x = [",
+      "    2,",
+      "  ] },",
+      "}",
+      "[t]",
+      "z = 1",
+    ].join("\n");
+    expect(scan(source)).toEqual([
+      ["key", "arr", 1],
+      ["key", "k", 6],
+      ["key", "voice", 7],
+      ["inline", "voice.speed", 8],
+      ["inline", "voice.sped", 9],
+      ["inline", "voice.sped.x", 9],
+      ["table", "t", 13],
+      ["key", "t.z", 14],
+    ]);
+  });
+
   test("reads an empty inline table and one left open at the end of its line", () => {
     expect(scan("t = {}\nu = { a = 1\nb = 2")).toEqual([
       ["key", "t", 1],
@@ -226,4 +262,419 @@ describe("setTableKey around quoted keys and multi-line values", () => {
       "[refs]\nb = 1\n",
     );
   });
+});
+
+/**
+ * A key as generated: the characters it holds before it is made unique, and how it may be
+ * written. `any` holds only what a bare key may, so each time it is written it may be bare or
+ * quoted either way, as one key may be written differently on two lines.
+ */
+type Name = { quote: "any" | "basic" | "literal"; base: string };
+
+/** A key and its value, or a dotted group of keys under one name: `a.b = 1` and `a.c = 2`. */
+type Entry =
+  | { kind: "value"; name: Name; value: Value }
+  | { kind: "group"; name: Name; entries: Entry[] };
+
+type Value =
+  | { kind: "scalar"; text: string }
+  /** An inline table, one key to a line where `spread` says so. */
+  | { kind: "inline"; entries: Entry[]; spread?: boolean }
+  /** A multi-line string, which holds lines that read as headers, keys, and comments. */
+  | { kind: "multiline"; quote: '"""' | "'''"; lines: string[] }
+  /** An array one item to a line, with items and comments that read as headers and keys. */
+  | { kind: "array"; items: string[]; trailing: boolean };
+
+/** A `[table]`, or each of an `[[array]]`'s tables, and the tables under it. */
+type TableNode = {
+  name: Name;
+  array: boolean;
+  entries: Entry[][];
+  children: TableNode[];
+  /** A table with tables under it may go unwritten, made only by their headers. */
+  written: boolean;
+  /** Written after the tables under it, as `[a.b]` before `[a]`. */
+  after: boolean;
+};
+
+type TomlPlan = {
+  root: Entry[];
+  tables: TableNode[];
+  /** Choices taken in turn wherever the document can be written more than one way. */
+  turns: number[];
+  crlf: boolean;
+};
+
+const nameArb: fc.Arbitrary<Name> = fc.oneof(
+  fc
+    .array(fc.constantFrom("a", "Z", "0", "_", "-"), { maxLength: 3 })
+    .map((chars): Name => ({ quote: "any", base: chars.join("") })),
+  fc
+    .array(fc.constantFrom("a", " ", ".", "=", "#", "[", "]", "{", "}", ",", "é", "'"), {
+      maxLength: 4,
+    })
+    .map((chars): Name => ({ quote: "basic", base: chars.join("") })),
+  fc
+    .array(fc.constantFrom("a", " ", ".", "=", "#", "]", "}", '"', "\\", "é"), { maxLength: 4 })
+    .map((chars): Name => ({ quote: "literal", base: chars.join("") })),
+);
+
+const scalar = fc.constantFrom(
+  "1",
+  "-2",
+  "3.5",
+  "true",
+  '"s"',
+  '"a = [b] # c"',
+  '"q\\"x } y"',
+  "'lit \\ # {'",
+  '"{ x = 1 }"',
+  "[1, 2]",
+  '["a]", "b,", "}"]',
+  "[[1], [2]]",
+  "1979-05-27",
+);
+
+const multiline = fc
+  .tuple(
+    fc.constantFrom('"""' as const, "'''" as const),
+    fc.array(
+      fc.constantFrom(
+        "[fake]",
+        "x = 1",
+        "# not a comment",
+        "[[arr]]",
+        "  y.z = { a = 1 }",
+        "",
+        "plain",
+      ),
+      { maxLength: 3 },
+    ),
+  )
+  .map(([quote, lines]): Value => ({ kind: "multiline", quote, lines }));
+
+const spreadArray = fc
+  .tuple(
+    fc.array(
+      fc.constantFrom(
+        "[1]",
+        '"]"',
+        '"[x] = 1"',
+        "[ [2], 3 ]",
+        "'[t]'",
+        '"""\n]\n[t]\n"""',
+        "# [not.a.table]",
+      ),
+      { maxLength: 4 },
+    ),
+    fc.boolean(),
+  )
+  .map(([items, trailing]): Value => ({ kind: "array", items, trailing }));
+
+/**
+ * Entries `depth` groups or inline tables deep. A value over several lines, a multi-line string,
+ * an array, or an inline table, only where `lines` allows.
+ */
+function entries(depth: number, lines: boolean): fc.Arbitrary<Entry[]> {
+  const value: fc.Arbitrary<Value> = fc.oneof(
+    { weight: 4, arbitrary: scalar.map((text): Value => ({ kind: "scalar", text })) },
+    ...(lines ? [multiline, spreadArray] : []),
+    ...(depth > 0
+      ? [
+          fc.tuple(entries(depth - 1, false), fc.boolean()).map(
+            ([inner, spread]): Value => ({
+              kind: "inline",
+              entries: inner,
+              spread: lines && spread,
+            }),
+          ),
+        ]
+      : []),
+  );
+  return fc.array(
+    fc.oneof(
+      {
+        weight: 3,
+        arbitrary: fc.record({ kind: fc.constant("value" as const), name: nameArb, value }),
+      },
+      ...(depth > 0
+        ? [
+            fc.record({
+              kind: fc.constant("group" as const),
+              name: nameArb,
+              entries: entries(depth - 1, lines).filter((inner) => inner.length > 0),
+            }),
+          ]
+        : []),
+    ),
+    { maxLength: 3 },
+  );
+}
+
+function tableNode(depth: number): fc.Arbitrary<TableNode> {
+  return fc
+    .record({
+      name: nameArb,
+      array: fc.boolean(),
+      entries: fc.array(entries(1, true), { minLength: 1, maxLength: 2 }),
+      children:
+        depth > 0 ? fc.array(tableNode(depth - 1), { maxLength: 2 }) : fc.constant<TableNode[]>([]),
+      written: fc.boolean(),
+      after: fc.boolean(),
+    })
+    .map((node) => ({
+      ...node,
+      // One table where only an array has many; one that goes unwritten holds no keys.
+      entries: node.array ? node.entries : node.entries.slice(0, 1),
+      written: node.array || node.written || node.children.length === 0,
+    }));
+}
+
+const tomlPlan: fc.Arbitrary<TomlPlan> = fc.record({
+  root: entries(1, true),
+  tables: fc.array(tableNode(2), { maxLength: 3 }),
+  turns: fc.array(fc.nat(11), { minLength: 1, maxLength: 8 }),
+  crlf: fc.boolean(),
+});
+
+/** A key as scanTomlKeys reports it: its kind, full path, line, and its segments as written. */
+type ExpectedKey = { kind: TomlKey["kind"]; path: string[]; line: number; written: string[] };
+
+/**
+ * The document written out, and every key and header in it as scanTomlKeys must report them.
+ * Every key is made unique by a number after it, so the document is valid TOML whatever it holds.
+ */
+function writeToml(plan: TomlPlan): { source: string; keys: ExpectedKey[] } {
+  const lines: string[] = [];
+  const keys: ExpectedKey[] = [];
+  const unique = new Map<Name, string>();
+  let turn = 0;
+  const next = () => plan.turns[turn++ % plan.turns.length] ?? 0;
+  const keyOf = (name: Name) => {
+    let key = unique.get(name);
+    if (key === undefined) {
+      key = `${name.base}${unique.size}`;
+      unique.set(name, key);
+    }
+    return key;
+  };
+  const segment = (name: Name) => {
+    const key = keyOf(name);
+    const quote = name.quote === "any" ? ["", "", '"', "'"][next() % 4] : name.quote;
+    return quote === "basic" || quote === '"'
+      ? `"${key}"`
+      : quote === "literal" || quote === "'"
+        ? `'${key}'`
+        : key;
+  };
+  const dot = () => [".", " . ", ".\t"][next() % 3] ?? ".";
+  const space = () => ["", " ", "\t", "  "][next() % 4] ?? "";
+  const comment = () => (next() % 4 === 0 ? ` # [x] = "y" '''` : "");
+
+  /** A key's segments as written, from its group names down to its own. */
+  const writePath = (names: Name[]) => {
+    const written = names.map(segment);
+    return { written, text: written.join(dot()) };
+  };
+
+  const writeInline = (inner: Entry[], prefix: string[], groups: Name[], line: number): string => {
+    const parts = flatten(inner, groups).map(({ names, value }) => {
+      const { written, text } = writePath(names);
+      const path = [...prefix, ...names.map(keyOf)];
+      keys.push({ kind: "inline", path, line, written });
+      return `${text}${space()}=${space()}${valueText(value, path, line)}`;
+    });
+    return parts.length === 0 ? `{${space()}}` : `{ ${parts.join(`,${space()}`)} }`;
+  };
+
+  /** A value on its line, or what opens it; inline tables' keys recorded as they are written. */
+  const valueText = (value: Value, path: string[], line: number): string =>
+    value.kind === "scalar"
+      ? value.text
+      : value.kind === "inline"
+        ? value.spread
+          ? "{"
+          : writeInline(value.entries, path, [], line)
+        : value.kind === "multiline"
+          ? value.quote
+          : "[";
+
+  /** The lines after the first of a value written over several, inline tables' keys recorded. */
+  const valueLines = (value: Value, path: string[]): string[] => {
+    const out: string[] = [];
+    if (value.kind === "multiline") {
+      out.push(...value.lines, `${value.quote}${comment()}`);
+    } else if (value.kind === "array") {
+      value.items.forEach((item, at) => {
+        const last = at === value.items.length - 1 && !value.trailing;
+        const comma = item.startsWith("#") || last ? "" : ",";
+        out.push(...`  ${item}${comma}${comment()}`.split("\n"));
+      });
+      out.push(`]${comment()}`);
+    } else if (value.kind === "inline" && value.spread) {
+      const parts = flatten(value.entries, []);
+      parts.forEach(({ names, value: inner }, at) => {
+        if (next() % 4 === 0) {
+          out.push("  # [not.a.table] = 1");
+        }
+        const line = lines.length + out.length + 2;
+        const { written, text } = writePath(names);
+        const keyPath = [...path, ...names.map(keyOf)];
+        keys.push({ kind: "inline", path: keyPath, line, written });
+        const comma = at === parts.length - 1 ? "" : ",";
+        const valueAt = valueText(inner, keyPath, line);
+        out.push(`  ${text}${space()}=${space()}${valueAt}${comma}${comment()}`);
+      });
+      out.push(`}${comment()}`);
+    }
+    return out;
+  };
+
+  const writeEntries = (list: Entry[], table: string[]) => {
+    for (const { names, value } of flatten(list, [])) {
+      maybeComment();
+      const line = lines.length + 1;
+      const { written, text } = writePath(names);
+      const path = [...table, ...names.map(keyOf)];
+      keys.push({ kind: "key", path, line, written });
+      const head = `${space()}${text}${space()}=${space()}`;
+      const rest = valueText(value, path, line);
+      const spread =
+        value.kind === "multiline" ||
+        value.kind === "array" ||
+        (value.kind === "inline" && value.spread === true);
+      if (spread) {
+        // What opens the value ends the line; its content and what closes it follow.
+        const opened = `${head}${rest}${value.kind === "multiline" ? "" : comment()}`;
+        const rest2 = valueLines(value, path);
+        lines.push(opened, ...rest2);
+      } else {
+        lines.push(`${head}${rest}${comment()}`);
+      }
+    }
+  };
+
+  const maybeComment = () => {
+    const choice = next() % 6;
+    if (choice === 0) {
+      lines.push("# [not.a.table]");
+    } else if (choice === 1) {
+      lines.push("");
+    }
+  };
+
+  const writeHeader = (node: TableNode, path: Name[], instance: number) => {
+    maybeComment();
+    const { written, text } = writePath(path);
+    const [open, close] = node.array ? ["[[", "]]"] : ["[", "]"];
+    keys.push({
+      kind: node.array ? "array" : "table",
+      path: path.map(keyOf),
+      line: lines.length + 1,
+      written,
+    });
+    lines.push(`${space()}${open}${space()}${text}${space()}${close}${comment()}`);
+    writeEntries(node.entries[instance] ?? [], path.map(keyOf));
+  };
+
+  const writeTable = (node: TableNode, parent: Name[]) => {
+    const path = [...parent, node.name];
+    const children = () => {
+      for (const child of node.children) {
+        writeTable(child, path);
+      }
+    };
+    if (node.array) {
+      for (const instance of node.entries.keys()) {
+        writeHeader(node, path, instance);
+      }
+      children();
+    } else if (node.after) {
+      children();
+      if (node.written) {
+        writeHeader(node, path, 0);
+      }
+    } else {
+      if (node.written) {
+        writeHeader(node, path, 0);
+      }
+      children();
+    }
+  };
+
+  writeEntries(plan.root, []);
+  for (const node of plan.tables) {
+    writeTable(node, []);
+  }
+  return { source: lines.join(plan.crlf ? "\r\n" : "\n"), keys };
+}
+
+/** Each key's value with the names of the groups it is under, in the order they are written. */
+function flatten(list: Entry[], groups: Name[]): Array<{ names: Name[]; value: Value }> {
+  return list.flatMap((entry) =>
+    entry.kind === "value"
+      ? [{ names: [...groups, entry.name], value: entry.value }]
+      : flatten(entry.entries, [...groups, entry.name]),
+  );
+}
+
+/** Every key path in what Bun.TOML.parse read, tables in an array of tables walked into. */
+function parsedPaths(value: unknown, prefix: string[] = []): string[][] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return [];
+  }
+  return Object.entries(value).flatMap(([key, inner]) => {
+    const path = [...prefix, key];
+    const tables =
+      Array.isArray(inner) && inner.length > 0 && inner.every((item) => isTable(item))
+        ? inner
+        : [inner];
+    return [path, ...tables.flatMap((table) => parsedPaths(table, path))];
+  });
+}
+
+function isTable(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The paths and every path they pass through, as one sorted list. */
+function withPrefixes(paths: string[][]): string[] {
+  const all = new Set(
+    paths.flatMap((path) => path.map((_, at) => JSON.stringify(path.slice(0, at + 1)))),
+  );
+  return [...all].sort();
+}
+
+describe("scanTomlKeys over generated documents", () => {
+  // In a document of tables, arrays of tables, dotted and quoted keys, inline tables, comments,
+  // multi-line strings, and arrays and inline tables written over several lines, every key and
+  // header is reported once, on its line, with its full path and its segments as written, and
+  // nothing inside a string, an array, or a comment is.
+  propertyTest(
+    "reports every key and header where it is written",
+    fc.property(tomlPlan, (plan) => {
+      const { source, keys } = writeToml(plan);
+      const lines = source.split("\n");
+      expect(
+        scanTomlKeys(source).map((key) => ({
+          kind: key.kind,
+          path: key.path,
+          line: key.line,
+          written: key.segments.map((at) => (lines[key.index] ?? "").slice(at.start, at.end)),
+        })),
+      ).toEqual(keys);
+    }),
+  );
+
+  // The full key paths it reports, and the tables they pass through, are the ones Bun's own
+  // TOML parser reads from the same text.
+  propertyTest(
+    "reports the key paths Bun.TOML.parse reads",
+    fc.property(tomlPlan, (plan) => {
+      const { source } = writeToml(plan);
+      expect(withPrefixes(scanTomlKeys(source).map((key) => key.path))).toEqual(
+        withPrefixes(parsedPaths(Bun.TOML.parse(source))),
+      );
+    }),
+  );
 });

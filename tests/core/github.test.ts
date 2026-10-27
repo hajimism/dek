@@ -5,6 +5,7 @@ import { authorization, downloadTarball, resolveRev } from "../../src/core/githu
 import { withEnv } from "../helpers/env.ts";
 import { deckRepoFiles, SHA_A, SHA_B, withFakeGithub } from "../helpers/fake-github.ts";
 import { withTempDir } from "../helpers/fs.ts";
+import { waitFor } from "../helpers/wait.ts";
 
 const repos = {
   "someone/talks": {
@@ -161,10 +162,7 @@ describe("downloadTarball", () => {
         message: expect.stringContaining("is larger than"),
         hint: expect.stringContaining("smaller repository"),
       });
-      for (let i = 0; i < 50 && !cancelled; i++) {
-        await Bun.sleep(10);
-      }
-      expect(cancelled).toBe(true);
+      await waitFor(() => cancelled);
     });
   });
 

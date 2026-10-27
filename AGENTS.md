@@ -16,7 +16,7 @@ A build system for talks, written in TypeScript on Bun. This file is for working
 - **The command is `dekc`.** Write the product, the package, and its files as dek; write anything typed to run it as `dekc` ([ADR 2](adr/0002-keep-the-name-dek-and-run-it-as-dekc.md)).
 - **Docs come in two languages.** A change to `docs/` or a README lands in both English and Japanese.
 - **Commits are the release notes.** Conventional Commits, `!` for a breaking change; release-please turns them into versions and CHANGELOG.md ([ADR 3](adr/0003-release-through-release-please-and-npm-trusted-publishing.md)).
-- If a command's `--json` shape changes, run `bun run schema` and commit the result.
+- If a command's `--json` shape changes, run `bun run schema` and commit the result. If the change takes away or loosens what a command prints, mark the commit breaking; `bun scripts/schema-compat.ts origin/main` lists such changes, and CI fails without the mark ([ADR 31](adr/0031-fail-a-pull-request-that-narrows-json-without-a-commit-marked-breaking.md)).
 - If a command, a rule, or a docs page's `description` changes, run `bun run llms` and commit `docs/public/llms.txt`. The skill in `skills/dek/` names only commands every dek since its floor has; see [ADR 9](adr/0009-generate-llms-txt-from-its-sources-and-ship-one-skill-that-defers-to-the-installed-dek.md).
 
 ## Decisions go in `adr/`

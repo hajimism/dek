@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,6 +10,7 @@ import { finishBeat } from "../../src/core/finish-beat.ts";
 import { holdStarted, seekStarted, startGoPaused } from "../../src/core/in-page-go.ts";
 import {
   importPlaywright,
+  launchChromium,
   type PageAction,
   playwrightResolved,
   requirePlaywright,
@@ -21,33 +22,20 @@ import { shotMotion } from "../../src/core/shot/motion.ts";
 import { measureSlideInPage } from "../../src/core/slide-measure.ts";
 import { contrastRatio } from "../../src/core/text-contrast.ts";
 import { playerScript } from "../../src/runtime/player.ts";
+import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 // What the Playwright worker measures, in a real Chromium. They live apart from the runner's own
 // tests, which swap DEK_PLAYWRIGHT while tests in one file run at once.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-// One page set at a time: concurrent tests would crowd the machine past the timeout.
-const browserTest = test.serial.skipIf(skip);
-
-let browser: Browser | undefined;
-
-beforeAll(async () => {
-  if (!skip) {
-    browser = await (await importPlaywright()).chromium.launch({ headless: true });
-  }
-});
-
-afterAll(async () => {
-  await browser?.close();
-});
+const browserTest = serialBrowserTest(skip);
+const withBrowser = sharedBrowser();
 
 /** The worker's work in one shared browser: all of it but the spawn and the launch. */
 function render<R extends VisualRequest>(request: R) {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  return runVisualRequest(browser, request);
+  return withBrowser((browser) => runVisualRequest(browser, request));
 }
 
 describe("playwright worker", () => {
@@ -440,10 +428,9 @@ h2, p, ul { margin: 0 }
   });
 
   browserTest("measures where text sits on its baseline, whatever its size and font", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    const page = await withBrowser((browser) =>
+      browser.newPage({ viewport: { width: 1280, height: 720 } }),
+    );
     try {
       await page.setContent(`<section class="slide" style="display:flex; align-items:baseline; gap:12px; font-family:sans-serif">
 <span class="stat" style="font-size:96px; line-height:1">322</span>
@@ -463,10 +450,9 @@ h2, p, ul { margin: 0 }
   browserTest(
     "counts a turn or a skew as tilting, its own or an ancestor's, but not a flip",
     async () => {
-      if (!browser) {
-        throw new Error("no browser");
-      }
-      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      const page = await withBrowser((browser) =>
+        browser.newPage({ viewport: { width: 1280, height: 720 } }),
+      );
       try {
         await page.setContent(`<section class="slide">
 <div class="turned" style="rotate: 0.6deg"><p class="inside">中</p></div>
@@ -695,6 +681,63 @@ describe("playwright worker slide scripts", () => {
     });
     expect(response?.drawErrors).toEqual([]);
   });
+});
+
+/**
+ * The command line of each renderer `browser` runs, once a page is open: Chromium tells a renderer
+ * it starts without a sandbox `--no-sandbox`. The processes are Chromium's own answer, over CDP.
+ */
+async function rendererCommands(browser: Browser): Promise<string[]> {
+  const page = await browser.newPage();
+  await page.setContent("<p>hello</p>");
+  const session = await browser.newBrowserCDPSession();
+  const { processInfo } = (await session.send("SystemInfo.getProcessInfo")) as {
+    processInfo: Array<{ type: string; id: number }>;
+  };
+  // Read while the page is open: its renderer exits with it.
+  const commands = processInfo
+    .filter((entry) => entry.type === "renderer")
+    .map(({ id }) =>
+      Bun.spawnSync(["ps", "-ww", "-o", "command=", "-p", String(id)]).stdout.toString(),
+    );
+  await session.detach();
+  await page.close();
+  return commands;
+}
+
+// Slide scripts run in the renderer, a ref's included; only `ps` reads another process's arguments.
+describe("Chromium's sandbox", () => {
+  test.serial.skipIf(skip || process.platform === "win32")(
+    "is on in the renderers of the Chromium dek launches",
+    async () => {
+      const launched = await launchChromium((await importPlaywright()).chromium, "required");
+      if (!launched.browser) {
+        throw new Error(`Chromium did not start with its sandbox here: ${launched.unsandboxed}`);
+      }
+      try {
+        const commands = await rendererCommands(launched.browser);
+        expect(commands.length).toBeGreaterThan(0);
+        for (const command of commands) {
+          expect(command).toContain("--type=renderer");
+          expect(command).not.toContain("--no-sandbox");
+        }
+      } finally {
+        await launched.browser.close();
+      }
+    },
+  );
+
+  // The check above can tell: Playwright's own default is no sandbox, as these tests launch it.
+  test.serial.skipIf(skip || process.platform === "win32")(
+    "is off in the renderers of a Chromium launched as Playwright leaves it",
+    async () => {
+      const commands = await withBrowser((browser) => rendererCommands(browser));
+      expect(commands.length).toBeGreaterThan(0);
+      for (const command of commands) {
+        expect(command).toContain("--no-sandbox");
+      }
+    },
+  );
 });
 
 // A draw must be a function of t that touches only its own slide: video and shots seek it, and the
@@ -1048,6 +1091,137 @@ body { margin: 0; background: #fff }
     expect(found.fine).toBeDefined();
     expect(found.fine?.origin).toBeUndefined();
   });
+
+  /**
+   * Cards the theme stacks, so the last two fall below the frame, and the slide's CSS sets in a
+   * row. It hatches the fourth, as on why-dek's refs, where the theme's grey reads below 4.5:1 on a
+   * stripe; the fifth holds a pair the theme alone makes faint. It also hides `.dimmed`.
+   */
+  const LAID_OUT_THEME = `.slide { box-sizing: border-box; width: 1280px; height: 720px; overflow: hidden; background: #f3f1ec; color: #141414; font: 400 18px sans-serif }
+.card { padding: 48px 24px; background: #e8e5dd }
+.big { margin: 0; font-size: 96px; line-height: 1.1 }
+.note { margin: 0; color: #5b5a56 }
+.dim { margin: 0; color: #aaa }
+.dimmed { margin: 0 }
+.later { visibility: hidden }`;
+  const LAID_OUT_CSS = `.row { display: flex; gap: 24px }
+.card { flex: 1 }
+.hatched { background: repeating-linear-gradient(135deg, #c8c4ba 0 1px, transparent 1px 9px), #e8e5dd }
+.dimmed { opacity: 0 }`;
+  const LAID_OUT_SLIDE = `<div class="row">
+  <div class="card"><p class="big">A</p><p class="dim">theme pair</p><p class="dimmed">dimmed by the draw</p></div>
+  <div class="card"><p class="big">B</p><p class="note">second</p></div>
+  <div class="card"><p class="big">C</p><p class="note">third</p></div>
+  <div class="card hatched"><p class="big">D</p><p class="note">a copy fetched again when read</p><p class="later">revealed later</p></div>
+  <div class="card"><p class="big">E</p><p class="dim">faint below the frame</p></div>
+</div>`;
+
+  const laidOut = async (draw = "") => {
+    const { stillPageScript } = await import("../../src/core/slide-script.ts");
+    const script = draw
+      ? `<script>(window.__dekSlides ||= {}).intro = { draw(slide) { ${draw} } };</script>${stillPageScript([])}`
+      : "";
+    const response = await render({
+      kind: "pages",
+      viewport: { width: 1280, height: 720 },
+      actions: ["contrast"],
+      pages: [
+        {
+          html: `<html><head><style>body { margin: 0; background: #fff }
+${LAID_OUT_THEME}</style><style id="dek-slide-css">${LAID_OUT_CSS}</style></head><body><section class="slide" data-slug="intro" data-dek-step="1" data-dek-beat="0">${LAID_OUT_SLIDE}</section>${script}</body></html>`,
+          slug: "intro",
+          step: "1",
+        },
+      ],
+    });
+    return Object.fromEntries((response?.contrasts ?? []).map((sample) => [sample.text, sample]));
+  };
+
+  // Without the slide's CSS both texts are below the frame and show no glyph, so the theme alone
+  // was never measured: the hatch under the one is the slide's, the faint pair of the other the
+  // theme's, and nothing measured tells them apart.
+  browserTest(
+    "names no origin for text only the slide's stylesheet shows, and marks it so",
+    async () => {
+      const found = await laidOut();
+      for (const text of ["a copy fetched again when read", "faint below the frame"]) {
+        expect(found[text]?.ratio).toBeLessThan(4.5);
+        expect({ text, origin: found[text]?.origin, only: found[text]?.onlyWithSlideCss }).toEqual({
+          text,
+          origin: undefined,
+          only: true,
+        });
+      }
+    },
+  );
+
+  browserTest("still blames the theme for its own pair on a slide whose CSS moves it", async () => {
+    const found = await laidOut();
+    expect(found["theme pair"]?.origin).toBe("theme");
+  });
+
+  // Undoing the draw hides the text it shows, and so does the theme with the slide's CSS gone:
+  // nothing measured it on the theme alone, and the draw's color and its showing it are one change.
+  browserTest(
+    "names no origin for text only the draw shows, which the theme alone hides",
+    async () => {
+      const found = await laidOut(
+        `const later = slide.querySelector(".later"); later.style.visibility = "visible"; later.style.color = "#aaa";`,
+      );
+      expect(found["revealed later"]?.ratio).toBeLessThan(4.5);
+      expect(found["revealed later"]?.origin).toBeUndefined();
+      expect(found["revealed later"]?.onlyWithSlideCss).toBeUndefined();
+    },
+  );
+
+  // The slide's CSS hides it and the draw dims it inline: once the draw is undone it is hidden,
+  // and once the CSS goes too it shows in full, so its passing there says nothing of which dimmed
+  // it, and the slide's CSS, which no stylesheet rule can make win over an inline style, is not it.
+  browserTest("names no origin for text the draw dims where the slide's CSS hides it", async () => {
+    const found = await laidOut(`slide.querySelector(".dimmed").style.opacity = "0.25";`);
+    expect(found["dimmed by the draw"]?.ratio).toBeLessThan(4.5);
+    expect(found["dimmed by the draw"]?.origin).toBeUndefined();
+  });
+
+  browserTest(
+    "sends text only the slide's stylesheet shows to that stylesheet, naming theme.css too",
+    async () => {
+      const { lintVisualDeck } = await import("../../src/core/visual.ts");
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              theme: LAID_OUT_THEME,
+              slides: {
+                intro: slideDocument(`<section class="slide">${LAID_OUT_SLIDE}</section>`),
+              },
+              styles: { intro: LAID_OUT_CSS },
+            },
+          ],
+        },
+        async (root) => {
+          const deck = join(root, "decks", "demo");
+          const diagnostics = await lintVisualDeck(deck, { runner: (request) => render(request) });
+          const faint = (diagnostics ?? []).filter(
+            (found) =>
+              found.id === "DEK031" &&
+              ["a copy fetched again when read", "faint below the frame"].includes(
+                String(found.data?.text),
+              ),
+          );
+          expect(faint).toHaveLength(2);
+          for (const found of faint) {
+            expect(found.path).toBe(join(deck, "slides", "intro.css"));
+            expect(found.hint).toBe(
+              "without slides/intro.css it does not show, so dek cannot tell whether theme.css alone draws it below 4.5:1: fix the pair in slides/intro.css, or in theme.css if the colors are the theme's",
+            );
+            expect(found.data?.origin).toBeUndefined();
+          }
+        },
+      );
+    },
+  );
 });
 
 describe("view transitions in a real Chromium", () => {
@@ -1058,10 +1232,7 @@ describe("view transitions in a real Chromium", () => {
 
   /** The duration the bundled theme's slide-in animation runs for, mid-transition. */
   async function slideInDuration(css: string): Promise<string> {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage();
+    const page = await withBrowser((browser) => browser.newPage());
     try {
       await page.setContent(
         `<html><head><style>${css}</style></head><body><div style="view-transition-name: slide"><section class="slide">a</section></div></body></html>`,
@@ -1099,10 +1270,7 @@ describe("seeking one go in a real Chromium", () => {
   browserTest(
     "moves what the go started and leaves an earlier beat's animation finished",
     async () => {
-      if (!browser) {
-        throw new Error("no browser");
-      }
-      const page = await browser.newPage();
+      const page = await withBrowser((browser) => browser.newPage());
       try {
         await page.setContent(`<style>
 @keyframes draw { to { stroke-dashoffset: 0; } }
@@ -1135,10 +1303,7 @@ p { opacity: 1; }
 
 describe("a skipped view transition in a real Chromium", () => {
   browserTest("starts the go without a transition, as the talk carries on past it", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage();
+    const page = await withBrowser((browser) => browser.newPage());
     try {
       // Two elements sharing a view-transition-name make Chromium skip the transition.
       await page.setContent(`<style>.dup { view-transition-name: dup; }</style>
@@ -1162,10 +1327,7 @@ describe("a skipped view transition in a real Chromium", () => {
 
 describe("ending a seeked go in a real Chromium", () => {
   browserTest("ends an animation seeked past its own end, so the go settles", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage();
+    const page = await withBrowser((browser) => browser.newPage());
     try {
       await page.setContent(`<style>
 .a, .b { opacity: 0; }
@@ -1183,11 +1345,13 @@ describe("ending a seeked go in a real Chromium", () => {
       expect(await page.evaluate(holdStarted)).toBe(400);
       await page.evaluate(seekStarted, 300);
       await page.evaluate(finishBeat);
-      const settled = await page.evaluate(() =>
-        Promise.race([
-          window.__dekPendingGo?.then(() => true),
-          new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
-        ]),
+      const settled = await page.evaluate(
+        (ms) =>
+          Promise.race([
+            window.__dekPendingGo?.then(() => true),
+            new Promise((resolve) => setTimeout(() => resolve(false), ms)),
+          ]),
+        WAIT_MS,
       );
       expect(settled).toBe(true);
     } finally {
@@ -1198,10 +1362,9 @@ describe("ending a seeked go in a real Chromium", () => {
 
 describe("holding a go at its start in a real Chromium", () => {
   browserTest("draws a transition the go began before any of it has run", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const page = await browser.newPage({ viewport: { width: 200, height: 200 } });
+    const page = await withBrowser((browser) =>
+      browser.newPage({ viewport: { width: 200, height: 200 } }),
+    );
     const dir = await mkdtemp(join(tmpdir(), "dek-hold-"));
     try {
       await page.setContent(`<style>
@@ -1231,10 +1394,7 @@ div { width: 200px; height: 200px; background: #000; opacity: 0; transition: opa
 
 /** The colour of one pixel of a PNG on disk, read by the browser that drew it. */
 async function pixelAt(path: string, x: number, y: number): Promise<number[]> {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = await browser.newPage();
+  const page = await withBrowser((browser) => browser.newPage());
   try {
     const src = `data:image/png;base64,${readFileSync(path).toString("base64")}`;
     return await page.evaluate(

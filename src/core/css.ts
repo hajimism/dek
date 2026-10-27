@@ -2,6 +2,7 @@ import {
   blankStringsAndComments,
   consumeComment,
   consumeString,
+  consumeToken,
   matchBrace,
   scanTopLevel,
   splitTopLevel,
@@ -131,16 +132,11 @@ class SheetReader {
     const { source } = this;
     let i = 0;
     while (i < source.length) {
-      const ch = source[i];
-      if (ch === '"' || ch === "'") {
-        i = consumeString(source, i);
-      } else if (ch === "/" && source[i + 1] === "*") {
-        const close = consumeComment(source, i);
-        this.comments.push([i, close]);
-        i = close;
-      } else {
-        i += ch === "\\" ? 2 : 1;
+      const next = consumeToken(source, i);
+      if (source[i] === "/" && source[i + 1] === "*") {
+        this.comments.push([i, next]);
       }
+      i = next;
     }
     const locate = lineLocator(sheet.source);
     this.lineOf = (offset) => locate(offset).line;
@@ -181,13 +177,23 @@ class SheetReader {
     return i;
   }
 
-  /** A prelude's span with its trailing spaces trimmed off. */
+  /**
+   * A prelude's span with the spaces and comments at its end trimmed off; a string it ends on,
+   * such as the name of `@keyframes "pop"`, stays.
+   */
   trimEnd(start: number, end: number): number {
     let j = end;
-    while (j > start && WHITESPACE_RE.test(this.blank[j - 1] ?? "")) {
-      j--;
+    while (j > start) {
+      const comment = this.comments.find(([, close]) => close === j);
+      if (comment) {
+        j = comment[0];
+      } else if (WHITESPACE_RE.test(this.source[j - 1] ?? "")) {
+        j--;
+      } else {
+        break;
+      }
     }
-    return j;
+    return Math.max(j, start);
   }
 
   atRule(start: number, end: number, scope: Scope): number {

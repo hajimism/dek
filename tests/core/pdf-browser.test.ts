@@ -1,10 +1,9 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
-import type { Browser } from "playwright";
 import {
   keepOnlyTextInPage,
   PDF_SLIDES,
@@ -12,24 +11,14 @@ import {
   pdfPictureType,
   setSlidePictureInPage,
 } from "../../src/core/pdf-text.ts";
-import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
+import { playwrightResolved } from "../../src/core/playwright.ts";
 import { runVisualRequest } from "../../src/core/playwright-visual.ts";
+import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 
 // A PDF in a real Chromium: each slide a picture, with its text laid over it, unseen.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-const browserTest = test.serial.skipIf(skip);
-
-let browser: Browser | undefined;
-
-beforeAll(async () => {
-  if (!skip) {
-    browser = await (await importPlaywright()).chromium.launch({ headless: true });
-  }
-});
-
-afterAll(async () => {
-  await browser?.close();
-});
+const browserTest = serialBrowserTest(skip);
+const withBrowser = sharedBrowser();
 
 /** A photograph, which the PDF keeps as a JPEG, unlike type and flat shapes. */
 const photo = readFileSync(
@@ -72,18 +61,17 @@ describe("pdfPictureType", () => {
 
 describe("dekc pdf in Chromium", () => {
   browserTest("prints each slide as one picture, with its text and no soft mask", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
     const dir = await mkdtemp(join(tmpdir(), "dek-pdf-"));
     try {
       const pdfPath = join(dir, "demo.pdf");
-      const response = await runVisualRequest(browser, {
-        kind: "pdf",
-        viewport: { width: 1280, height: 720 },
-        html: `<html><head><style>@page { size: 1280px 720px; margin: 0 } body { margin: 0 } .slide { width: 1280px; height: 720px; break-after: page; overflow: hidden }</style></head><body>${slides}</body></html>`,
-        pdfPath,
-      });
+      const response = await withBrowser((browser) =>
+        runVisualRequest(browser, {
+          kind: "pdf",
+          viewport: { width: 1280, height: 720 },
+          html: `<html><head><style>@page { size: 1280px 720px; margin: 0 } body { margin: 0 } .slide { width: 1280px; height: 720px; break-after: page; overflow: hidden }</style></head><body>${slides}</body></html>`,
+          pdfPath,
+        }),
+      );
       expect(response).toEqual({});
       const bytes = readFileSync(pdfPath);
       const text = bytes.toString("latin1");
@@ -114,10 +102,9 @@ describe("dekc pdf in Chromium", () => {
   });
 
   browserTest("lays the text where it was laid out, and paints nothing else", async () => {
-    if (!browser) {
-      throw new Error("no browser");
-    }
-    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const context = await withBrowser((browser) =>
+      browser.newContext({ viewport: { width: 1280, height: 720 } }),
+    );
     try {
       const page = await context.newPage();
       await page.setContent(`<html><head><style>

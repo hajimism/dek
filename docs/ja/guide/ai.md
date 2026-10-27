@@ -77,9 +77,10 @@ Claude Code では `/plugin install dek-design@dek` です。npm パッケージ
 - `error` は必ず `message` を持ち、dek が次の一手を知っていれば `hint` を、失敗に場所があれば `path` と `line` を持ちます。
 - 診断を返すコマンド（`lint`、`check`、`build`、`ls`、`cues`）は、成否に関わらず必ず `diagnostics` 配列を持ちます。各診断は `severity`、場所があれば `path`・`line`・`column`、直し方が決まっていれば `hint`、メッセージに含まれる値を `data` として持ちます。失敗になるのは error だけで、warning だけなら `"ok": true` です。
 - 実行しなかったチェックは `skipped` の要素になり、空の合格にはなりません。`{ "check": "rumdl", "reason": "rumdl is not installed", "hint": "bun add -d rumdl; …" }` のような形です。すべて実行できたときはこのフィールド自体がありません。`--visual` を付けない `dekc lint` と `dekc build` は、必ず `visual` を載せます。はみ出しも、コントラストも、改行も、揃えも測っていないからで、hint は測るためのコマンドです。
+- sandbox が起動しない環境で Chromium が sandbox なしで描いたページがあると、描くコマンドはどれも結果の横に `unsandboxed` を載せます。`{ "reason": "Running as root without --no-sandbox is not supported. See https://crbug.com/638180.", "hint": "run dekc as a user other than root, …" }` のような形です。ページは描いたので、指摘はそのまま有効です。すべて sandbox の中で描いたときはこのフィールド自体がありません。
 - 対象のデッキごとにファイルを書くコマンドは、1 デッキでもリストを返します。`build` と `pdf` は `outs` を返します。
 - `dekc lint --format sarif` は同じ診断を SARIF 2.1.0 で返します。
-- 各コマンドの形は JSON Schema として [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しています。`$defs` にコマンドごとの定義があり、実行できなかった行は `failure` です。どのオブジェクトも閉じているので、名前のないフィールドが増えるのは契約の変更です。スキーマ、CLI 自身の型、テストで dek が出力するものは 1 つの定義に対して検査されるので、互いにずれることはありません。
+- 各コマンドの形は JSON Schema として [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しています。`$defs` にコマンドごとの定義があり、実行できなかった行は `failure` です。どのオブジェクトも閉じていて、dek が出力するフィールドにはすべて名前があり、名前のないフィールドが出ればテストが失敗します。それでもリリースでフィールドが増えることはあるので、知っているフィールドを読み、ほかは無視してください。読んでいるもの、つまりフィールド、その型、enum が挙げる値を取り除いたり緩めたりするリリースは破壊的変更として記され、dek が 0.x のあいだはマイナーバージョンが上がります。スキーマ、CLI 自身の型、テストで dek が出力するものは 1 つの定義に対して検査されるので、互いにずれることはありません。
 
 dek が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID は再利用しません。廃止した ID は廃止のままです。
 
@@ -159,7 +160,7 @@ dekc show why-dek timing
 
 `show` は、1枚のスライドを作っているものを1回で、ファイルごとに見出しを付けて返します。セクションの台本、スライドの HTML・CSS・TS、`theme.css` のうちそのスライドが実際に使うルール（たどれるトークンと `@keyframes` だけを含む）、参照している assets です。エージェントは theme を全部読まずにそのスライドの組み方を知り、自分のデッキのテーマで書けます。見本のクラスやトークンをうっかり持ち込んでも、lint が拾います。
 
-見本は他人のデッキでも構いません。`dekc ref owner/repo/deck` で固定すれば、`ls`・`show`・`theme`・`shot` に `owner/repo/deck` をデッキとして渡せます。作者が `dekc pack` で書き出したファイルなら、`dekc ref <file>.tgz` で固定して `file/<deck>` として読みます。固定した ref は AGENTS.md に載るので、エージェントはどのデッキを見本にしてよいかが分かります。ref は読み取り専用で、エージェントは必要な部分を自分のデッキにコピーします。ref の流儀でデッキを作るよう頼まれたら、エージェントは `dekc new <name> --theme-from <ref>` でデッキを始めます。そうすれば、`dekc theme <ref> <layout>` が出すレイアウトが自分のデッキのものになり、lint を通ります。
+見本は他人のデッキでも構いません。`dekc ref owner/repo/deck` で固定すれば、`ls`・`show`・`theme`・`shot` に `owner/repo/deck` をデッキとして渡せます。作者が `dekc pack` で書き出したファイルなら、`dekc ref <file>.tgz` で固定して `file/<deck>` として読みます。固定した ref は AGENTS.md に載るので、エージェントはどのデッキを見本にしてよいかが分かります。ref は読み取り専用で、エージェントは必要な部分を自分のデッキにコピーします。ref の文章は dek ではなく作者のものです。hint が ref を引用することはなく、ref のファイルに人には見えない文字があれば、ref を読むコマンドが `hidden` にその場所を示すので、エージェントは自分の書くものにそれを持ち込みません。ref の流儀でデッキを作るよう頼まれたら、エージェントは `dekc new <name> --theme-from <ref>` でデッキを始めます。そうすれば、`dekc theme <ref> <layout>` が出すレイアウトが自分のデッキのものになり、lint を通ります。
 
 ## うまくいくプロンプト
 

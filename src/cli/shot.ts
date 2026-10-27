@@ -1,10 +1,15 @@
+import { basename, dirname, extname } from "node:path";
+import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
-import { shellQuote } from "../core/escape.ts";
+import { shellName, shellQuote } from "../core/escape.ts";
+import { foreignLine, type HiddenText, MESSAGE_MAX } from "../core/foreign-text.ts";
+import { refPlaywrightRunner } from "../core/playwright.ts";
+import { SLIDE_SIDECARS } from "../core/resolve.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
 import { type ShotFile, shotDeck, shotSheet } from "../core/shot/still.ts";
 import { playerScript } from "../runtime/player.ts";
-import type { ReadableDeck } from "./scope.ts";
+import { hiddenField, hiddenInFiles, type ReadableDeck } from "./scope.ts";
 import { usageError } from "./usage.ts";
 
 export type ShotCliResult = {
@@ -13,6 +18,11 @@ export type ShotCliResult = {
   sheets?: string[];
   /** With --motion, each beat's frames and the ms into its go each shows. */
   motion?: ShotMotion["beats"];
+  /**
+   * A ref's lines, in the files of the slides drawn and in its theme, that hold characters a
+   * person cannot see.
+   */
+  hidden?: HiddenText[];
 };
 
 type ShotCommandOptions = {
@@ -32,13 +42,64 @@ export type ShotMode =
   | { kind: "morph"; from: string; to: string; at: number };
 
 export async function shotCommand(
-  { project, deck }: ReadableDeck,
+  target: ReadableDeck,
   options: ShotCommandOptions,
 ): Promise<ShotCliResult> {
   const mode = parseShotMode(options);
+  try {
+    const result = await shoot(target, mode);
+    return target.ref
+      ? { ...result, ...hiddenField(target.ref, drawnHidden(target, mode)) }
+      : result;
+  } catch (error) {
+    throw refShotError(error, target);
+  }
+}
+
+/** What the files of the slides a shot drew, and its theme, hold that a person cannot see. */
+function drawnHidden({ deck }: ReadableDeck, mode: ShotMode): HiddenText[] {
+  const all = deck.deck.sections.map((section) => section.slug);
+  const slugs =
+    mode.kind === "sheet"
+      ? all
+      : mode.kind === "morph"
+        ? [mode.from, mode.to]
+        : mode.slug === undefined
+          ? all
+          : [mode.slug];
+  const paths = deckPaths(deck.dir);
+  const files = slugs.flatMap((slug) =>
+    ([".html", ...SLIDE_SIDECARS] as const).map((ext) => paths.slide(slug, ext)),
+  );
+  return hiddenInFiles(deck.dir, [...new Set(files), paths.theme]);
+}
+
+/**
+ * A ref's slide script that does not compile stops its slide's shot, as one of the project's
+ * would; Bun's message quotes the ref's source, so it is one foreignLine, and the fix is not lint,
+ * which refuses a ref, but its author's.
+ */
+function refShotError(error: unknown, { deck, ref }: ReadableDeck): unknown {
+  if (!ref || !(error instanceof DekError) || error.path === undefined) {
+    return error;
+  }
+  const path = error.path;
+  if (extname(path) !== ".ts" || dirname(path) !== deckPaths(deck.dir).slides) {
+    return error;
+  }
+  return new DekError(foreignLine(error.message, MESSAGE_MAX), {
+    path,
+    hint: `a ref's slide scripts are its author's to fix; \`dekc shot ${ref.name} <slug>\` still draws each of its other slides, and \`dekc show ${ref.name} ${shellName(basename(path, ".ts")) ?? "<slug>"}\` prints this one's`,
+    cause: error,
+  });
+}
+
+async function shoot({ project, deck, ref }: ReadableDeck, mode: ShotMode): Promise<ShotCliResult> {
+  // A ref's slide scripts are someone else's: Chromium runs them only in its sandbox (ADR 29).
+  const runner = ref ? { runner: refPlaywrightRunner } : {};
   switch (mode.kind) {
     case "sheet": {
-      const { sheets, shots } = await shotSheet({ project, deck });
+      const { sheets, shots } = await shotSheet({ project, deck }, runner);
       return { shots, sheets };
     }
     case "motion": {
@@ -48,6 +109,7 @@ export async function shotCommand(
           slug: mode.slug,
           ...(mode.step === undefined ? {} : { step: mode.step }),
           playerScript: await playerScript(),
+          ...runner,
         },
       );
       return { shots: [], sheets, motion: beats };
@@ -55,12 +117,21 @@ export async function shotCommand(
     case "morph": {
       const shots = await shotMorph(
         { project, deck },
-        { from: mode.from, to: mode.to, at: mode.at, playerScript: await playerScript() },
+        {
+          from: mode.from,
+          to: mode.to,
+          at: mode.at,
+          playerScript: await playerScript(),
+          ...runner,
+        },
       );
       return { shots };
     }
     case "still": {
-      const shots = await shotDeck({ project, deck }, { slug: mode.slug, step: mode.step });
+      const shots = await shotDeck(
+        { project, deck },
+        { slug: mode.slug, step: mode.step, ...runner },
+      );
       return { shots };
     }
   }

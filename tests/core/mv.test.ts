@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
@@ -299,7 +299,7 @@ describe("renameSection and voice.toml", () => {
 });
 
 describe("renameSection when a write fails", () => {
-  // chmod 444 does not stop root from writing, so the failure cannot be staged there.
+  // chmod does not stop root from writing, so the failure cannot be staged there.
   test.skipIf(process.getuid?.() === 0)("puts every file back as it was", async () => {
     await withIntroDeck(async (deckDir, voiceToml) => {
       const slides = join(deckDir, "slides");
@@ -308,11 +308,12 @@ describe("renameSection when a write fails", () => {
       await Bun.write(voiceToml, "[beats.intro]\nlead = 1\n");
       const script = await readFile(join(deckDir, "script.md"), "utf8");
       const html = await readFile(join(slides, "intro.html"), "utf8");
-      await chmod(voiceToml, 0o444);
+      // A write goes to a new file beside voice.toml, which a read-only folder refuses.
+      await chmod(join(deckDir, "voice"), 0o555);
       try {
         expect(() => renameSection(deckDir, "intro", "cover")).toThrow();
       } finally {
-        await chmod(voiceToml, 0o644);
+        await chmod(join(deckDir, "voice"), 0o755);
       }
       expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(script);
       expect(await readFile(join(slides, "intro.html"), "utf8")).toBe(html);
@@ -324,6 +325,46 @@ describe("renameSection when a write fails", () => {
       expect(await readFile(voiceToml, "utf8")).toBe("[beats.intro]\nlead = 1\n");
     });
   });
+});
+
+describe("renameSection and reorderSection", () => {
+  // A file written in place keeps its inode, and a crash part way leaves it cut short; one
+  // renamed into place is new, and a reader sees the old file or the new one, whole.
+  test("write script.md and voice.toml to a new file renamed into place, mode kept", async () => {
+    await withIntroDeck(async (deckDir, voiceToml) => {
+      const script = join(deckDir, "script.md");
+      await writeFile(script, `${await readFile(script, "utf8")}\n## outro\n\nbye\n`);
+      await Bun.write(voiceToml, "[beats.intro]\nlead = 1\n");
+      await chmod(script, 0o600);
+      const before = { script: statSync(script).ino, voice: statSync(voiceToml).ino };
+      renameSection(deckDir, "intro", "cover");
+      const renamed = statSync(script).ino;
+      expect(renamed).not.toBe(before.script);
+      expect(statSync(voiceToml).ino).not.toBe(before.voice);
+      reorderSection(deckDir, "outro", { before: "cover" });
+      expect(statSync(script).ino).not.toBe(renamed);
+      expect(statSync(script).mode & 0o777).toBe(0o600);
+      const leftovers = [deckDir, join(deckDir, "slides"), join(deckDir, "voice")].flatMap((dir) =>
+        readdirSync(dir).filter((name) => name.endsWith(".tmp")),
+      );
+      expect(leftovers).toEqual([]);
+    });
+  });
+
+  // Renaming a file into place needs a folder that can be written, not the file: a read-only
+  // script.md is replaced, read-only still, where a write in place failed and took the move back.
+  test.skipIf(process.getuid?.() === 0)(
+    "rename in a read-only script.md, keeping it so",
+    async () => {
+      await withIntroDeck(async (deckDir) => {
+        const script = join(deckDir, "script.md");
+        await chmod(script, 0o444);
+        renameSection(deckDir, "intro", "cover");
+        expect(await readFile(script, "utf8")).toContain("{#cover}");
+        expect(statSync(script).mode & 0o777).toBe(0o444);
+      });
+    },
+  );
 });
 
 async function withIntroDeck(fn: (deckDir: string, voiceToml: string) => Promise<void>) {

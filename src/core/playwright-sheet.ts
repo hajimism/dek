@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: mkdirSync, in a worker, for the folder its parent chose in dek's cache, which Chromium writes into.
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Page } from "playwright";

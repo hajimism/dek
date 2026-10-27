@@ -1,3 +1,9 @@
+import {
+  attributeOf,
+  attributeTokens,
+  decodeAttribute,
+  trimAsciiWhitespace,
+} from "./attribute-value.ts";
 import { hasSlideClass, uniqueMark } from "./html.ts";
 import { lineLocator } from "./lines.ts";
 import { attributeUrls, type UrlUse } from "./url-attributes.ts";
@@ -5,7 +11,7 @@ import { attributeUrls, type UrlUse } from "./url-attributes.ts";
 /** Where something is written: 1-based line, and 1-based column in UTF-16 units, as editors count. */
 export type SourceSpot = { line: number; column: number };
 
-/** One attribute as the parser read it, located at its name. */
+/** One attribute, its value as the browser reads it, located at its name. */
 export type HtmlAttribute = SourceSpot & { name: string; value: string };
 
 /**
@@ -59,7 +65,8 @@ const UNDRAWN_TAGS = new Set(["title", "desc"]);
 /**
  * What a slide's markup uses and references, read in one pass of the real parser and located in
  * the source. The parser has no positions, so each start tag gets a marker in front of it; where
- * the markers land, less their own length, is where the tags were written.
+ * the markers land, less their own length, is where the tags were written. Each value is read as
+ * the browser reads it, its character references decoded.
  */
 export function scanSlideHtml(html: string): HtmlScan {
   const mark = uniqueMark(html);
@@ -81,9 +88,10 @@ export function scanSlideHtml(html: string): HtmlScan {
       element(el) {
         el.before(mark, { html: true });
         const tag = el.tagName.toLowerCase();
-        const attributes = [...el.attributes].map(([name, value]): [string, string] => [
+        // As written: each is decoded once the tag is located, which maps a URL back into it.
+        const attributes = [...el.attributes].map(([name, written]): [string, string] => [
           name.toLowerCase(),
-          value,
+          written,
         ]);
         if (CONTENT_TAGS.has(tag)) {
           for (const heading of open) {
@@ -99,7 +107,7 @@ export function scanSlideHtml(html: string): HtmlScan {
               undrawn--;
             });
           }
-        } else if (el.getAttribute("aria-hidden")?.trim() === "true" && el.canHaveContent) {
+        } else if (isAriaHidden(attributeOf(el, "aria-hidden")) && el.canHaveContent) {
           const entry = { index: parsed.length, text: "" };
           hidden.push(entry);
           hiding = entry;
@@ -116,8 +124,8 @@ export function scanSlideHtml(html: string): HtmlScan {
           }
         } else if (
           !hiding &&
-          el.getAttribute("aria-hidden")?.trim() !== "true" &&
-          isPicture(tag, el.getAttribute("role"))
+          !isAriaHidden(attributeOf(el, "aria-hidden")) &&
+          isPicture(tag, attributeOf(el, "role"))
         ) {
           const entry = { index: parsed.length, text: false, titled: false };
           pictures.push(entry);
@@ -131,7 +139,7 @@ export function scanSlideHtml(html: string): HtmlScan {
         if (HEADING_TAGS.has(tag) && el.canHaveContent) {
           const heading = {
             index: parsed.length,
-            content: (el.getAttribute("aria-label") ?? "").trim() !== "",
+            content: isName(attributeOf(el, "aria-label")),
           };
           headings.push(heading);
           open.push(heading);
@@ -139,7 +147,7 @@ export function scanSlideHtml(html: string): HtmlScan {
             open.splice(open.indexOf(heading), 1);
           });
         }
-        if (tag === "section" && hasSlideClass(el.getAttribute("class")) && el.canHaveContent) {
+        if (tag === "section" && hasSlideClass(attributeOf(el, "class")) && el.canHaveContent) {
           slidesOpen++;
           el.onEndTag(() => {
             slidesOpen--;
@@ -181,23 +189,24 @@ export function scanSlideHtml(html: string): HtmlScan {
       inSlide: false,
     };
     const offsets = attributeOffsets(html, start);
+    const decoded = attributes.map(([name, written]) => ({ name, ...decodeAttribute(written) }));
     const element: HtmlElement = {
       tag,
       inSlide,
       ...spot(start),
-      attributes: attributes.map(([name, value]) => ({
+      attributes: decoded.map(({ name, value }) => ({
         name,
         value,
         ...spot(offsets.get(name)?.name ?? start),
       })),
     };
     elements.push(element);
-    for (const attribute of element.attributes) {
-      const valueAt = offsets.get(attribute.name)?.value;
+    for (const { name, value, writtenAt } of decoded) {
+      const valueAt = offsets.get(name)?.value;
       refs.push(
-        ...attributeRefs(element.tag, attribute).map(({ ref, offset }) => ({
+        ...attributeRefs(element.tag, name, value).map(({ ref, offset }) => ({
           ...ref,
-          ...(valueAt === undefined ? spot(start) : spot(valueAt + offset)),
+          ...(valueAt === undefined ? spot(start) : spot(valueAt + writtenAt(offset))),
         })),
       );
     }
@@ -213,9 +222,7 @@ export function scanSlideHtml(html: string): HtmlScan {
     slides,
     ...(slug === undefined ? {} : { slug }),
     ...(layout === undefined ? {} : { layout }),
-    classes: elements.flatMap((element) =>
-      (attributeValue(element, "class") ?? "").split(/\s+/).filter(Boolean),
-    ),
+    classes: elements.flatMap((element) => attributeTokens(attributeValue(element, "class"))),
     refs,
     emptyHeadings: headings
       .filter((heading) => !heading.content)
@@ -237,14 +244,28 @@ export function scanSlideHtml(html: string): HtmlScan {
  * or `"none"` says it is decoration, as `aria-hidden` does.
  */
 function isPicture(tag: string, role: string | null): boolean {
-  const roles = (role ?? "").trim().toLowerCase().split(/\s+/);
-  if (roles[0] === "presentation" || roles[0] === "none") {
+  const first = attributeTokens(role)[0]?.toLowerCase();
+  if (first === "presentation" || first === "none") {
     return false;
   }
-  return tag === "img" || tag === "svg" || roles[0] === "img";
+  return tag === "img" || tag === "svg" || first === "img";
 }
 
-/** The value of `name` on `element`, as the parser read it. */
+/** Whether `aria-hidden` marks decoration: `true`, give or take ASCII whitespace. */
+function isAriaHidden(value: string | null): boolean {
+  return value !== null && trimAsciiWhitespace(value) === "true";
+}
+
+/**
+ * Whether a label gives a name. Chromium's accessible name keeps an `aria-label` of no-break
+ * spaces or other spaces outside ASCII, and drops one of ASCII whitespace alone; dek reads a
+ * `title` or an `aria-labelledby` of whitespace alone as no name too.
+ */
+export function isName(label: string | null | undefined): boolean {
+  return label != null && trimAsciiWhitespace(label) !== "";
+}
+
+/** The value of `name` on `element`, as the browser reads it. */
 function attributeValue(element: HtmlElement, name: string): string | undefined {
   return element.attributes.find((attribute) => attribute.name === name)?.value;
 }
@@ -253,24 +274,25 @@ function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined;
 }
 
-/** The URLs one attribute names, each with its offset into the value. */
+/** The URLs one attribute names, each with its offset into the decoded value. */
 function attributeRefs(
   tag: string,
-  attribute: HtmlAttribute,
+  attr: string,
+  value: string,
 ): Array<{ ref: Omit<HtmlRef, keyof SourceSpot>; offset: number }> {
-  const named = attributeUrls(tag, attribute.name, attribute.value);
+  const named = attributeUrls(tag, attr, value);
   if (!named) {
     return [];
   }
   return named.urls.map(({ url, offset }) => ({
-    ref: { tag, attr: attribute.name, value: url, use: named.use },
+    ref: { tag, attr, value: url, use: named.use },
     offset,
   }));
 }
 
 /**
- * Where each attribute of the start tag at `start` is written: its name, and its value when it
- * has one. Only positions come from here; names and values are the parser's.
+ * Where each attribute of the start tag at `start` is written: its name, and its value as
+ * written when it has one. Only positions come from here; names and values are the parser's.
  */
 function attributeOffsets(
   html: string,

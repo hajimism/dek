@@ -1,5 +1,5 @@
 import { outermostStyleRules, type Stylesheet, splitSelectorList, startsAtSlide } from "./css.ts";
-import { consumeComment, consumeString, cssIdents } from "./css-scan.ts";
+import { consumeComment, consumeToken, cssIdents } from "./css-scan.ts";
 
 /** Text to put in place of `[start, end)` of the stylesheet as it was read. */
 type CssEdit = { start: number; end: number; text: string };
@@ -108,32 +108,78 @@ export function replaceUrls(replace: (value: string) => string | undefined): Css
 
 /** Whitespace as CSS defines it. U+3000 and NBSP are content, not whitespace. */
 const CSS_WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
+const CSS_NEWLINES = new Set(["\n", "\r", "\f"]);
+
+/** A token that runs on into the next with nothing between: a name, a number, or `#@.+/`. */
+const RUNS_ON_RE = /^[-\w\u0080-\uffff\0\\#@.+/]/;
+/** What such a token runs on into: a name, a number, `(`, `%`, or the `*` that opens a comment. */
+const RUNS_INTO_RE = /^[-\w\u0080-\uffff\0\\.+(%*]/;
 
 /**
- * Drops comments and collapses whitespace to one space, leaving strings byte for byte, so
- * `content: "a　b"` or `"  "` renders in the build as it does on the dev server.
+ * Whether the token `last` and the one that starts with `next` would read as one with nothing
+ * between them: `x` and `url(` as `xurl(`, `/` and `*` as a comment, or `--` and `>`, `<` and
+ * `!`, `!` and `--` as the `-->` and `<!--` a stylesheet skips.
+ */
+function runTogether(last: string, next: string): boolean {
+  return (
+    (RUNS_ON_RE.test(last) && RUNS_INTO_RE.test(next)) ||
+    (last.endsWith("--") && next === ">") ||
+    (last === "<" && next === "!") ||
+    (last === "!" && next === "-")
+  );
+}
+
+/** A hex escape at the end of a token, which takes one whitespace after it as its own. */
+const HEX_ESCAPE_END_RE = /\\[0-9a-fA-F]{1,6}$/;
+
+/**
+ * Drops comments and collapses whitespace to one space, leaving strings and `url()`s byte for
+ * byte, so `content: "a　b"` or `"  "` renders in the build as it does on the dev server. The
+ * result reads as the source does: a newline after a string stays one, since it is what ends a
+ * string cut short, and a comment between two tokens that would run into one, as `x` and `url(`
+ * into `xurl(`, stays as an empty one, since a space would make `div` and `p` two selectors. A
+ * hex escape that a comment ends, such as `\41` before a comment and ` x`, is followed by two
+ * spaces, since it takes one as its own.
  */
 export function minifyCss(css: string): string {
   let out = "";
-  let space = false;
+  let last = "";
+  // What parts the last token written from the next: "", "comment", a space, or the newline that
+  // ends a string.
+  let gap = "";
   let i = 0;
   while (i < css.length) {
     const ch = css[i] ?? "";
     if (ch === "/" && css[i + 1] === "*") {
       i = consumeComment(css, i);
+      gap ||= "comment";
       continue;
     }
     if (CSS_WHITESPACE.has(ch)) {
-      space = true;
-      i++;
+      const whitespace = ch === "\r" && css[i + 1] === "\n" ? "\r\n" : ch;
+      if (gap === "" && CSS_NEWLINES.has(ch) && (last[0] === '"' || last[0] === "'")) {
+        // One LF, unless the string ends on a CR it escapes, which an LF would join into a CRLF.
+        gap = last.endsWith("\r") ? whitespace : "\n";
+      } else if (gap === "" || gap === "comment") {
+        gap = " ";
+      }
+      i += whitespace.length;
       continue;
     }
-    if (space && out !== "") {
-      out += " ";
+    if (out !== "") {
+      out +=
+        gap === "comment"
+          ? runTogether(last, ch)
+            ? "/**/"
+            : ""
+          : gap === " " && HEX_ESCAPE_END_RE.test(last)
+            ? "  "
+            : gap;
     }
-    space = false;
-    const end = ch === '"' || ch === "'" ? consumeString(css, i) : ch === "\\" ? i + 2 : i + 1;
-    out += css.slice(i, end);
+    gap = "";
+    const end = consumeToken(css, i);
+    last = css.slice(i, end);
+    out += last;
     i = end;
   }
   return out;

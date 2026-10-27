@@ -1,9 +1,8 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect } from "bun:test";
 import { realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Browser } from "playwright";
 import {
   AnnotationOp,
   applyAnnotationOp,
@@ -11,16 +10,19 @@ import {
   listAnnotations,
 } from "../../src/core/annotations.ts";
 import { renderDeckHtml } from "../../src/core/document.ts";
-import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
+import { playwrightResolved } from "../../src/core/playwright.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { annotateScript, playerScript } from "../../src/runtime/player.ts";
+import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 // Annotate mode in a real Chromium: hit testing, shadow DOM retargeting, and the clipboard are
 // what happy-dom does not have.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-const browserTest = test.serial.skipIf(skip);
+const browserTest = serialBrowserTest(skip);
+const withBrowser = sharedBrowser();
 
 /** The part of Playwright's page these tests drive. */
 type Page = {
@@ -77,7 +79,6 @@ const theme = `.slide { position: relative; width: 1280px; height: 720px; }
 `;
 
 let root = "";
-let browser: Browser | undefined;
 
 beforeAll(async () => {
   if (skip) {
@@ -87,12 +88,9 @@ beforeAll(async () => {
   await writeProject(root, {
     decks: [{ name: "plan", script, theme, slides: { plan: planHtml } }],
   });
-  const playwright = await importPlaywright();
-  browser = await playwright.chromium.launch({ headless: true });
 });
 
 afterAll(async () => {
-  await browser?.close();
   if (root) {
     await rm(root, { recursive: true, force: true });
   }
@@ -110,12 +108,11 @@ async function openDevPage(): Promise<{ page: Page; errors: Error[] }> {
       annotateScript: await annotateScript(),
     },
   });
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = (await browser.newPage({
-    viewport: { width: 1280, height: 720 },
-  })) as unknown as Page;
+  const page = (await withBrowser((browser) =>
+    browser.newPage({
+      viewport: { width: 1280, height: 720 },
+    }),
+  )) as unknown as Page;
   const errors: Error[] = [];
   page.on("pageerror", (error) => errors.push(error));
   await page.route("http://deck.test/", (route) =>
@@ -304,7 +301,7 @@ describe("annotate mode in a browser", () => {
             .getElementById("dek-annotate")
             ?.shadowRoot?.querySelector("[data-part=marker]") !== null,
         undefined,
-        { timeout: 5_000 },
+        { timeout: WAIT_MS },
       );
       // Its pin's tip is on the place clicked, not on a corner of the slide.
       const at = await onScreen(page, 1100, 600);
@@ -325,7 +322,7 @@ describe("annotate mode in a browser", () => {
             ?.shadowRoot?.querySelector("[data-part=manual]")
             ?.hasAttribute("hidden") === false,
         undefined,
-        { timeout: 5_000 },
+        { timeout: WAIT_MS },
       );
       const text = (await inView(page, "[data-part=manual]"))?.value;
       expect(text).toMatch(

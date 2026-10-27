@@ -1,11 +1,11 @@
-import { copyFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { loadConfig } from "./config.ts";
 import { renderDeckDocument } from "./document.ts";
 import { type DistOptions, distFile } from "./path.ts";
 import type { PlaywrightRunner } from "./playwright.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
-import { outputPath, removeInside, writeInside } from "./safe-fs.ts";
+import { removeInside, writeInside } from "./safe-fs.ts";
 import { coverShot } from "./shot/still.ts";
 import { logicalSize } from "./size.ts";
 
@@ -43,7 +43,7 @@ export async function buildDeck(
   const shot = baseUrl ? await coverShot(deck, options.runner) : undefined;
 
   if (shot) {
-    copyFileSync(shot, outputPath(imagePath, project.root));
+    writeInside(imagePath, readFileSync(shot), project.root);
   } else {
     // An image from an earlier build would outlive the tag that pointed at it.
     removeInside(imagePath, project.root);

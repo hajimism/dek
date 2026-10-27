@@ -72,6 +72,22 @@ describe("theme.css is read as CSS reads it", () => {
     ]);
   });
 
+  test("DEK012 sees a page rule after a url() whose address holds a quote or /*", async () => {
+    const found = await lintWith({
+      theme: `.slide .a { background: url(assets/o'brien.png); }
+body { color: var(--fg); }
+.slide .b { background: url(https://cdn.example/*.png); }
+html { color: var(--fg); }
+`,
+    });
+    expect(
+      found.filter((d) => d.id === "DEK012").map(({ line, data }) => ({ line, data })),
+    ).toEqual([
+      { line: 10, data: { selector: "body" } },
+      { line: 12, data: { selector: "html" } },
+    ]);
+  });
+
   test("DEK012 leaves a rule nested under .slide alone", async () => {
     const found = await lintWith({ theme: ".slide { .slide-title { color: var(--fg); } }\n" });
     expect(ids(found)).not.toContain("DEK012");
@@ -217,6 +233,16 @@ describe("DEK008 in dek.toml", () => {
     const found = await lintWith({ toml: '# project\nvoice = { speaker = "a", sped = 1.2 }\n' });
     expect(found.filter((d) => d.id === "DEK008")).toMatchObject([
       { line: 2, data: { key: "voice.sped", suggestion: "voice.speed" } },
+    ]);
+  });
+
+  test("finds a misspelled key's line past a table or an array written over several lines", async () => {
+    const toml =
+      '# project\nvoice = {\n  speaker = "a",\n  sped = 1.2,\n}\nextra = [\n  [1],\n]\nlatin_per_minut = 1\n';
+    expect((await lintWith({ toml })).filter((d) => d.id === "DEK008")).toMatchObject([
+      { line: 4, data: { key: "voice.sped", suggestion: "voice.speed" } },
+      { line: 6, data: { key: "extra" } },
+      { line: 9, data: { key: "latin_per_minut", suggestion: "latin_per_minute" } },
     ]);
   });
 

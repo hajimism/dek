@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { createSerialTask } from "../../src/server/serial.ts";
 
 describe("createSerialTask", () => {
@@ -22,19 +22,26 @@ describe("createSerialTask", () => {
     expect(runs).toBe(2);
   });
 
-  test("runs the queued follow-up after a thrown task", async () => {
+  test.serial("logs a thrown task to stderr and runs the queued follow-up", async () => {
     let runs = 0;
+    const boom = new Error("boom");
     const task = createSerialTask(async () => {
       runs += 1;
       if (runs === 1) {
         await new Promise((resolve) => setTimeout(resolve, 20));
-        throw new Error("boom");
+        throw boom;
       }
     });
 
-    task();
-    task();
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    expect(runs).toBe(2);
+    const logged = spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      task();
+      task();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      expect(runs).toBe(2);
+      expect(logged).toHaveBeenCalledWith(boom);
+    } finally {
+      logged.mockRestore();
+    }
   });
 });

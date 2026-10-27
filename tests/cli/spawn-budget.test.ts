@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const SPAWN_BUDGET = 36;
+// One more for the sandbox: the runs that choose how the stand-in worker's Chromium fails share a
+// call site, since only a subprocess sets a worker's environment, which Bun takes from the one dek
+// started in, not from process.env as a test changes it.
+const SPAWN_BUDGET = 37;
 
 describe("cli test spawn budget", () => {
   test("keeps subprocess CLI runs to wiring checks", () => {

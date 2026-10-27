@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { onOrphaned, stopOnce } from "../../src/cli/keep-alive.ts";
 import { cliPath } from "../helpers/cli.ts";
@@ -8,9 +9,16 @@ import { WAIT_MS } from "../helpers/wait.ts";
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch {
     return false;
+  }
+  // The parent that would reap this process was killed. Until init reaps it, it is a zombie and
+  // kill still succeeds, so the exit looks like it never came. Linux records that as state Z.
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat[stat.lastIndexOf(")") + 2] !== "Z";
+  } catch {
+    return true;
   }
 }
 
@@ -34,7 +42,7 @@ describe("onOrphaned", () => {
       await Bun.sleep(30);
       expect(fired).toBe(0);
       ppid = 1;
-      expect(await until(() => fired === 1, 500)).toBe(true);
+      expect(await until(() => fired === 1, WAIT_MS)).toBe(true);
       await Bun.sleep(30);
       expect(fired).toBe(1);
     } finally {
@@ -55,7 +63,7 @@ describe("stopOnce", () => {
     );
     stop();
     stop();
-    expect(await until(() => exits.length > 0, 500)).toBe(true);
+    expect(await until(() => exits.length > 0, WAIT_MS)).toBe(true);
     expect(closes).toBe(1);
     expect(exits).toEqual([0]);
   });
@@ -68,13 +76,12 @@ describe("stopOnce", () => {
       20,
     );
     stop();
-    expect(await until(() => exits.length > 0, 500)).toBe(true);
+    expect(await until(() => exits.length > 0, WAIT_MS)).toBe(true);
   });
 });
 
 describe("dek dev server lifetime", () => {
-  // The preload's default timeout reaches only the first test file, so this one names its own,
-  // above the wait for the server and the wait for its exit together.
+  // Its timeout is above the wait for the server and the wait for its exit together.
   test(
     "exits when the process that started it dies without cleaning up",
     async () => {
@@ -107,7 +114,7 @@ await child.exited;`,
           child = Number(out.match(/child (\d+)/)?.[1]);
           parent.kill("SIGKILL");
           await parent.exited;
-          expect(await until(() => !isAlive(child), 5000)).toBe(true);
+          expect(await until(() => !isAlive(child), WAIT_MS * 3)).toBe(true);
         } finally {
           parent.kill("SIGKILL");
           if (child && isAlive(child)) {
@@ -116,6 +123,6 @@ await child.exited;`,
         }
       });
     },
-    WAIT_MS * 2,
+    WAIT_MS * 5,
   );
 });

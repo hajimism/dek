@@ -1,5 +1,11 @@
 import { cutText } from "./annotation-rows.ts";
 import { assetInliner } from "./assets.ts";
+import {
+  attributeOf,
+  attributeTokens,
+  decodeAttribute,
+  trimAsciiWhitespace,
+} from "./attribute-value.ts";
 import { deckPaths } from "./deck-paths.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { type LineColumn, lineLocator } from "./lines.ts";
@@ -33,7 +39,7 @@ export function htmlShell(options: {
 }
 
 export function hasSlideClass(className: string | null | undefined): boolean {
-  return (className ?? "").split(/\s+/).some((token) => token.toLowerCase() === "slide");
+  return attributeTokens(className).some((token) => token.toLowerCase() === "slide");
 }
 
 /**
@@ -54,7 +60,7 @@ function locateSlideSection(html: string): { section: string; start: number } | 
   const marked = rewriteHtml(html, (rewriter) => {
     rewriter.on("section", {
       element(el) {
-        if (found || !hasSlideClass(el.getAttribute("class"))) {
+        if (found || !hasSlideClass(attributeOf(el, "class"))) {
           return;
         }
         found = true;
@@ -182,16 +188,17 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
   return rewriteHtml(html, (rewriter) => {
     rewriter.on("section", {
       element(el) {
-        if (done || !hasSlideClass(el.getAttribute("class"))) {
+        if (done || !hasSlideClass(attributeOf(el, "class"))) {
           return;
         }
         done = true;
         if (el.getAttribute("data-slug") === null) {
           el.setAttribute("data-slug", stamp.slug);
         }
-        // Ahead of the author's own style, so a slide can still set its own.
+        // Ahead of the author's own style, so a slide can still set its own. The style goes back
+        // into the markup, so it stays as written.
         const place = `--dek-slide-number: ${stamp.place.number}; --dek-slide-count: ${stamp.place.count}`;
-        const own = el.getAttribute("style")?.trim();
+        const own = trimAsciiWhitespace(el.getAttribute("style") ?? "");
         el.setAttribute("style", own ? `${place}; ${own}` : place);
         if (stamp.shown) {
           addClass(el, "is-current");
@@ -206,7 +213,7 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
     if (shown) {
       rewriter.on("[data-step]", {
         element(el) {
-          const step = el.getAttribute("data-step");
+          const step = attributeOf(el, "data-step");
           if (step !== null && shown.has(step)) {
             addClass(el, "is-shown");
           }
@@ -225,7 +232,7 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
           if (spot) {
             el.setAttribute("data-dek-source", `${spot.line}:${spot.column}`);
             if (spot.classes !== undefined) {
-              el.setAttribute("data-dek-class", spot.classes);
+              el.setAttribute("data-dek-class", escapeAttr(spot.classes));
             }
           }
         },
@@ -235,8 +242,8 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
 }
 
 /**
- * Where a start tag is written, its tag, its classes as written (none when it has no `class`),
- * and the text inside it as written, whitespace collapsed.
+ * Where a start tag is written, its tag, its classes as written and read as the browser reads
+ * them (none when it has no `class`), and the text inside it as written, whitespace collapsed.
  */
 type TagSpot = LineColumn & { tag: string; classes?: string; text: string };
 
@@ -254,7 +261,7 @@ function startTagSpots(html: string, source: SlideSource): TagSpot[] {
       element(el) {
         el.before(mark, { html: true });
         const index = tags.length;
-        tags.push({ tag: el.tagName.toLowerCase(), classes: el.getAttribute("class"), text: "" });
+        tags.push({ tag: el.tagName.toLowerCase(), classes: attributeOf(el, "class"), text: "" });
         if (el.canHaveContent) {
           open.push(index);
           el.onEndTag(() => {
@@ -283,9 +290,7 @@ function startTagSpots(html: string, source: SlideSource): TagSpot[] {
       offset += before.length;
       const { tag = "", classes = null, text = "" } = tags[index] ?? {};
       const found = { ...spot(offset), tag, text: text.replace(/\s+/g, " ").trim() };
-      return classes === null
-        ? found
-        : { ...found, classes: classes.split(/\s+/).filter(Boolean).join(" ") };
+      return classes === null ? found : { ...found, classes: attributeTokens(classes).join(" ") };
     });
 }
 
@@ -334,12 +339,13 @@ export function collectSlidesHtml(
     .join("");
 }
 
+/** `className` added to the classes as written, unless the browser reads it among them already. */
 function addClass(el: HTMLRewriterTypes.Element, className: string): void {
   const current = el.getAttribute("class");
-  const tokens = current ? current.split(/\s+/).filter(Boolean) : [];
-  if (tokens.includes(className)) {
+  if (current !== null && attributeTokens(decodeAttribute(current).value).includes(className)) {
     return;
   }
+  const tokens = attributeTokens(current);
   tokens.push(className);
   el.setAttribute("class", tokens.join(" "));
 }

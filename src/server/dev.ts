@@ -6,6 +6,7 @@ import { locateDeck, type Project } from "../core/resolve.ts";
 import { annotateScript, livePlayerScript, liveReloadScript } from "../runtime/player.ts";
 import {
   clearance,
+  keepToOwnOrigin,
   mayRead,
   pairingResponse,
   ROUTE_EXPOSURE,
@@ -199,10 +200,17 @@ function listen(port: number | undefined, access: Access, routes: ServedRoutes) 
     port: port ?? 0,
     // Never Bun's development error page: it shows the source and absolute paths to anyone.
     development: false,
-    fetch: (req, server) => answer(req, server, access, routes),
+    // Every answer dek writes leaves through one of these two, so none goes without
+    // keepToOwnOrigin. Bun answers a few requests itself before either runs: one its parser
+    // refuses (a bad request line, no Host, a body or headers too large) and an upgrade it
+    // cannot take; none of those has a body a page could use.
+    fetch: async (req, server) => {
+      const response = await answer(req, server, access, routes);
+      return response && keepToOwnOrigin(response);
+    },
     error(error) {
       console.error(error);
-      return new Response("Internal Server Error\n", { status: 500 });
+      return keepToOwnOrigin(new Response("Internal Server Error\n", { status: 500 }));
     },
     websocket: roomSockets(routes.rooms),
   });
@@ -233,7 +241,7 @@ function answer(req: Request, server: Bun.Server<WsData>, access: Access, routes
 }
 
 /** Each socket joins its deck's room; only a presenter's socket may move it or point in it. */
-function roomSockets(rooms: RouteContext["rooms"]): Bun.WebSocketHandler<WsData> {
+export function roomSockets(rooms: RouteContext["rooms"]): Bun.WebSocketHandler<WsData> {
   return {
     // A position or a point is a few dozen bytes; anything near this is neither.
     maxPayloadLength: 4 * 1024,

@@ -1,11 +1,12 @@
 import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
+// biome-ignore lint/style/noRestrictedImports: mkdir, writeFile, rename, and rm, which write a snapshot into a fresh folder in refs/, which outputDir checked, and swap it in whole.
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
 import { shellQuote } from "./escape.ts";
-import { listShown } from "./prose.ts";
+import { foreignList } from "./foreign-text.ts";
 import {
   isPlainRefName,
   isRefDeckName,
@@ -16,6 +17,7 @@ import {
 } from "./ref-name.ts";
 import { listSlides, type Project, resolveProject } from "./resolve.ts";
 import { followInside, outputDir } from "./safe-fs.ts";
+import { readTar } from "./tar.ts";
 
 export {
   isPinnedRev,
@@ -132,7 +134,7 @@ function refAround(dir: string): { dir: string; name: string } | undefined {
  * The ref `dir` holds, when it is a snapshot as dek writes one: a dek.toml beside a marker that
  * names a ref, at that ref's own place under a project's refs/.
  */
-function snapshotName(dir: string): string | undefined {
+export function snapshotName(dir: string): string | undefined {
   if (!isThere(join(dir, "dek.toml"))) {
     return undefined;
   }
@@ -233,42 +235,84 @@ export const MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024;
 /** A pack's tar, unzipped, may hold its files and their headers, not much more. */
 const MAX_PACK_TAR_BYTES = 2 * MAX_SNAPSHOT_BYTES;
 
+/**
+ * A repository's tar, unzipped. A repository of text inflates some 3.5 times, so about five
+ * times the 200 MB dek downloads of it: 1 GB.
+ */
+const MAX_TARBALL_TAR_BYTES = 1024 * 1024 * 1024;
+
+/** A deck is a few hundred files; a pack of more is not one `dekc pack` made. */
+const MAX_PACK_ENTRIES = 10_000;
+
+/** A repository's files, folders, and the headers before them, as many as a large one holds. */
+const MAX_TARBALL_ENTRIES = 200_000;
+
 const PACK_HINT = "ask for a pack its author made with `dekc pack <deck>`";
 
-/**
- * Reads a GitHub tarball. Bun leaves out links; a path that is absolute, has
- * an empty segment, or climbs with `..` is dropped here, so nothing written
- * later can land outside the snapshot.
- */
-export async function readTarball(bytes: Uint8Array): Promise<RepoFiles> {
-  const files: RepoFiles = new Map();
-  for (const [path, blob] of await new Bun.Archive(bytes).files()) {
-    const [, ...segments] = path.split("/");
-    const safe =
-      segments.length > 0 &&
-      !path.includes("\\") &&
-      segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
-    if (safe && !path.startsWith("/")) {
-      files.set(segments.join("/"), blob);
-    }
-  }
-  return files;
+/** Reads a GitHub tarball, as `readGzippedTar` reads any. */
+export async function readTarball(
+  bytes: Uint8Array,
+  limits: { maxTarBytes?: number; maxEntries?: number } = {},
+): Promise<RepoFiles> {
+  const maxTarBytes = limits.maxTarBytes ?? MAX_TARBALL_TAR_BYTES;
+  const maxEntries = limits.maxEntries ?? MAX_TARBALL_ENTRIES;
+  return readGzippedTar(
+    bytes,
+    { maxTarBytes, maxEntries },
+    {
+      tooLarge: () =>
+        new DekError(`the repository unpacks to more than ${formatMb(maxTarBytes)}`, {
+          hint: "dekc ref downloads and unpacks the whole repository, so keep decks in a smaller repository, or ask the deck's author for a pack made with `dekc pack <deck>` and add it with `dekc ref <file>.tgz`",
+        }),
+      notTar: () =>
+        new DekError("GitHub's tarball of the repository is not a gzipped tar", {
+          hint: "run the command again",
+        }),
+      holds: (what) =>
+        new DekError(`the repository's tarball holds ${what}, which dek does not read`, {
+          hint: "the repository holds something dek cannot read; ask the deck's author for a pack made with `dekc pack <deck>` and pin the deck from it with `dekc ref <file>.tgz`",
+        }),
+    },
+  );
 }
 
-/**
- * Reads a pack from someone else. It is gunzipped through a count that stops at `maxTarBytes`
- * before Bun takes any of it apart, so a small file that inflates without end is refused rather
- * than held in memory; the tar is then read as a GitHub tarball is.
- */
+/** Reads a pack from someone else, no larger than `maxBytes`, as `readGzippedTar` reads any. */
 export async function readPack(
   bytes: Uint8Array,
-  limits: { maxBytes?: number; maxTarBytes?: number } = {},
+  limits: { maxBytes?: number; maxTarBytes?: number; maxEntries?: number } = {},
 ): Promise<RepoFiles> {
   const maxBytes = limits.maxBytes ?? MAX_SNAPSHOT_BYTES;
   const maxTarBytes = limits.maxTarBytes ?? MAX_PACK_TAR_BYTES;
+  const maxEntries = limits.maxEntries ?? MAX_PACK_ENTRIES;
   if (bytes.byteLength > maxBytes) {
     throw new DekError(`the pack is larger than ${formatMb(maxBytes)}`, { hint: PACK_HINT });
   }
+  return readGzippedTar(
+    bytes,
+    { maxTarBytes, maxEntries },
+    {
+      tooLarge: () =>
+        new DekError(`the pack unpacks to more than ${formatMb(maxTarBytes)}`, { hint: PACK_HINT }),
+      notTar: () =>
+        new DekError("the file is not a pack: a pack is a gzipped tar", { hint: PACK_HINT }),
+      holds: (what) =>
+        new DekError(`the pack holds ${what}, which dek does not read`, { hint: PACK_HINT }),
+    },
+  );
+}
+
+/**
+ * The files of a gzipped tar from elsewhere. It is gunzipped through a count that stops at
+ * `maxTarBytes`, so a small file that inflates without end is refused rather than held in
+ * memory, and the tar is then read by dek's own reader (`readTar`), whose files are the bytes
+ * the tar stores and no more. The top folder is dropped, and so is a path that is absolute, has
+ * an empty segment, or climbs with `..`, so nothing written later can land outside the snapshot.
+ */
+async function readGzippedTar(
+  bytes: Uint8Array,
+  { maxTarBytes, maxEntries }: { maxTarBytes: number; maxEntries: number },
+  errors: { tooLarge: () => DekError; notTar: () => DekError; holds: (what: string) => DekError },
+): Promise<RepoFiles> {
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
@@ -284,9 +328,7 @@ export async function readPack(
       size += value.byteLength;
       if (size > maxTarBytes) {
         await reader.cancel();
-        throw new DekError(`the pack unpacks to more than ${formatMb(maxTarBytes)}`, {
-          hint: PACK_HINT,
-        });
+        throw errors.tooLarge();
       }
       chunks.push(value);
     }
@@ -294,7 +336,7 @@ export async function readPack(
     if (error instanceof DekError) {
       throw error;
     }
-    throw new DekError("the file is not a pack: a pack is a gzipped tar", { hint: PACK_HINT });
+    throw errors.notTar();
   }
   const tar = new Uint8Array(size);
   let offset = 0;
@@ -302,15 +344,36 @@ export async function readPack(
     tar.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  try {
-    return await readTarball(tar);
-  } catch {
-    throw new DekError("the file is not a pack: a pack is a gzipped tar", { hint: PACK_HINT });
+  // The tar holds them all now; let them go before its files are made.
+  chunks.length = 0;
+  const entries = readTar(tar, { maxBytes: maxTarBytes, maxEntries });
+  if (!(entries instanceof Map)) {
+    throw entries.kind === "too large"
+      ? errors.tooLarge()
+      : entries.kind === "not a tar"
+        ? errors.notTar()
+        : errors.holds(entries.what);
   }
+  const files: RepoFiles = new Map();
+  for (const [path, blob] of entries) {
+    const [, ...segments] = path.split("/");
+    const safe =
+      segments.length > 0 &&
+      !path.includes("\\") &&
+      segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
+    if (safe && !path.startsWith("/")) {
+      files.set(segments.join("/"), blob);
+    }
+  }
+  return files;
 }
 
 function formatMb(bytes: number): string {
-  return bytes >= 1024 * 1024 ? `${bytes / 1024 / 1024} MB` : `${bytes} bytes`;
+  const mb = 1024 * 1024;
+  if (bytes >= 1024 * mb && bytes % (1024 * mb) === 0) {
+    return `${bytes / 1024 / mb} GB`;
+  }
+  return bytes >= mb ? `${bytes / mb} MB` : `${bytes} bytes`;
 }
 
 const DECK_SCRIPT_RE = /^(?:(.*)\/)?decks\/([^/]+)\/script\.md$/;
@@ -324,16 +387,37 @@ function repoDecks(files: RepoFiles): Array<{ name: string; prefix: string }> {
   });
 }
 
-/** Deck names as a hint lists them: only those a ref can carry. */
+/**
+ * Names from someone else's repository or pack as a message lists them: those `shows` passes,
+ * as foreignList shows them, then how many others there are, in the words of `others`.
+ */
+function listCarried(
+  names: string[],
+  shows: (name: string) => boolean,
+  others: (count: number) => string,
+): string {
+  const shown = names.filter(shows);
+  const left = names.length - shown.length;
+  if (left === 0) {
+    return foreignList(shown);
+  }
+  return shown.length === 0 ? others(left) : `${foreignList(shown)}, and ${others(left)}`;
+}
+
+/** Deck names as a message lists them: only those a ref can carry. */
 function listDecks(names: string[]): string {
-  return listShown(
+  return listCarried(
     names,
     isRefDeckName,
     (count) => `${count} whose ${count === 1 ? "name" : "names"} a ref cannot carry`,
   );
 }
 
-/** The name of the one deck a pack holds; a pack of none, of more, or of one no ref can name is refused. */
+/**
+ * The name of the one deck a pack holds; a pack of none, of more, or of one no ref can name is
+ * refused. The names are the pack author's, so the message lists them as listDecks does, and the
+ * hint is dek's.
+ */
 export function deckOfPack(files: RepoFiles): string {
   const names = [...new Set(repoDecks(files).map((deck) => deck.name))].sort();
   const [name, ...others] = names;
@@ -355,7 +439,11 @@ export function deckOfPack(files: RepoFiles): string {
   return name;
 }
 
-/** The directory of the project that holds the deck, as a prefix: "" or "sample/". */
+/**
+ * The directory of the project that holds the deck, as a prefix: "" or "sample/". The folder
+ * names the source holds are its author's: an error lists them in its message, as foreignList
+ * does, and its hint is dek's words alone.
+ */
 export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
   const repo = source.kind === "file" ? "the pack" : `${source.owner}/${source.repo}`;
   const path = source.kind === "github" ? source.path : undefined;
@@ -368,22 +456,32 @@ export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
   const [match, ...others] = matches;
   if (!match) {
     const names = [...new Set(decks.map((deck) => deck.name))].sort();
-    throw new DekError(`${repo} has no deck "${source.deck}"`, {
+    if (names.length === 0) {
+      throw new DekError(`${repo} has no deck "${source.deck}"`, {
+        hint: `${repo} holds no dek project (decks/<name>/script.md beside a dek.toml)`,
+      });
+    }
+    throw new DekError(`${repo} has no deck "${source.deck}", only ${listDecks(names)}`, {
       hint:
-        names.length > 0
-          ? `decks in ${repo}: ${listDecks(names)}`
-          : `${repo} holds no dek project (decks/<name>/script.md beside a dek.toml)`,
+        source.kind === "file"
+          ? `add the pack you were sent with \`dekc ref <file>.tgz\`, which pins the deck it holds`
+          : names.some(isRefDeckName)
+            ? `pin one of them: \`dekc ref ${repo}/<deck>\``
+            : `${REF_DECK_NAME_RULE}; ask its author to rename the deck's folder`,
     });
   }
   if (others.length > 0) {
     const paths = matches.map((deck) => `${deck.prefix}decks/${deck.name}`).sort();
-    const listed = listShown(
+    const listed = listCarried(
       paths,
       (path) => path.split("/").every(isRefDeckName),
-      (count) => `${count} whose ${count === 1 ? "path" : "paths"} a hint cannot show`,
+      (count) => `${count} whose ${count === 1 ? "path" : "paths"} dek does not print`,
     );
-    throw new DekError(`${repo} has more than one deck named "${source.deck}"`, {
-      hint: `pass the GitHub link to the one you mean; they are at ${listed}`,
+    throw new DekError(`${repo} has more than one deck named "${source.deck}", at ${listed}`, {
+      hint:
+        source.kind === "file"
+          ? `a pack is one deck; ${PACK_HINT}`
+          : `pass the GitHub link to the folder of the one you mean, https://github.com/${repo}/tree/<rev>/<path>`,
     });
   }
   return match.prefix;

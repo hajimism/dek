@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { lintCommand } from "../../src/cli/lint.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
 import { mergeSarif, toSarif } from "../../src/core/sarif.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDek, runMain } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -332,9 +332,47 @@ more
         expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<LintOk>(result);
         expect(json.diagnostics.some((d) => d.id === "DEK030")).toBe(true);
+        // Without --visual, the rerun would not measure the overflow it says to fix.
+        expect(json.error?.hint).toBe(
+          "fix each error in diagnostics, then run `dekc lint --visual` again",
+        );
       },
     );
   });
+
+  // Each deck is measured in a worker of its own, and each worker finds the sandbox will not start.
+  test.serial(
+    "says once that Chromium drew without its sandbox, however many decks it measured",
+    async () => {
+      await withTempProject(
+        {
+          decks: [
+            { name: "demo", slides: { intro: introHtml } },
+            { name: "other", slides: { intro: introHtml } },
+          ],
+        },
+        async (root) => {
+          const sandboxless = join(
+            import.meta.dir,
+            "..",
+            "helpers",
+            "fake-playwright-sandboxless.ts",
+          );
+          const result = await withEnv(
+            { DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: "" },
+            () => runMain(["lint", "--visual", "--json"], root),
+          );
+          expect(result).toMatchObject({ exitCode: 0 });
+          type Linted = { unsandboxed?: { reason: string; hint: string } };
+          expect(jsonStdout<Linted>(result).unsandboxed).toEqual({
+            reason: expect.any(String),
+            hint: expect.stringContaining("DEK_ALLOW_UNSANDBOXED=1"),
+          });
+          expect(result.stderr.split("warning: Chromium drew without its sandbox").length).toBe(2);
+        },
+      );
+    },
+  );
 
   test.serial("marks rumdl as skipped when the binary is missing without failing", async () => {
     await withTempProject(
@@ -350,6 +388,35 @@ more
             reason: "rumdl is not installed",
             hint: "bun add -d rumdl; or put rumdl on PATH, or set DEK_RUMDL to its path",
           });
+        });
+      },
+    );
+  });
+
+  test.serial("stops running rumdl after it hangs, and says what to do instead", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "a", slides: { intro: introHtml } },
+          { name: "b", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const reason = "rumdl did not finish within 30s and was stopped";
+        let runs = 0;
+        const rumdl = async () => {
+          runs += 1;
+          return { reason, hung: true as const };
+        };
+        await withEnv({ DEK_RUMDL: fakeRumdl }, async () => {
+          const result = await lintCommand(resolveDecks(root), { cwd: root, rumdl });
+          expect(runs).toBe(1);
+          expect(result.skipped?.[0]).toEqual({
+            check: "rumdl",
+            reason,
+            hint: expect.stringContaining("DEK_RUMDL"),
+          });
+          expect(result.skipped?.[0]?.hint).not.toContain("to see why");
         });
       },
     );

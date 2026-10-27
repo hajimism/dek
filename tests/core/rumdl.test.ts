@@ -1,9 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { defaultRumdlRunner, resolveRumdlBin, rumdlDiagnostics } from "../../src/core/rumdl.ts";
+import {
+  defaultRumdlRunner,
+  resolveRumdlBin,
+  rumdlDiagnostics,
+  runRumdl,
+} from "../../src/core/rumdl.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 const sample = JSON.stringify({
   version: "2.1.0",
@@ -37,12 +43,52 @@ describe("rumdlDiagnostics", () => {
   });
 
   test("returns an empty list when rumdl is missing", async () => {
-    expect(await rumdlDiagnostics("script.md", async () => null)).toEqual([]);
+    expect(await rumdlDiagnostics("script.md", async () => ({}))).toEqual([]);
   });
 
   test("returns an empty list for invalid JSON", async () => {
     expect(await rumdlDiagnostics("script.md", async () => "not json")).toEqual([]);
   });
+});
+
+describe("runRumdl", () => {
+  // Lint would pass a script rumdl never checked; it says it skipped rumdl instead.
+  test("skips rumdl when what it printed is not SARIF, saying so", async () => {
+    for (const text of ["not json", "", '{"version":"2.1.0"}']) {
+      expect(await runRumdl("script.md", async () => text)).toEqual({
+        diagnostics: [],
+        skipped: { reason: "rumdl printed something other than SARIF" },
+      });
+    }
+  });
+
+  test.serial(
+    "skips rumdl when a process it left behind cut its output short",
+    async () => {
+      await withTempDir(async (dir) => {
+        const scriptPath = join(dir, "script.md");
+        await writeFile(scriptPath, "# demo\n");
+        const pid = join(dir, "pid");
+        const rumdl = join(dir, "rumdl");
+        await writeFile(rumdl, `#!/bin/sh\nprintf '{"runs":'\nsleep 30 & echo $! > '${pid}'\n`);
+        await chmod(rumdl, 0o755);
+        try {
+          await withEnv({ DEK_RUMDL: rumdl }, async () => {
+            expect(await runRumdl(scriptPath)).toEqual({
+              diagnostics: [],
+              skipped: { reason: expect.stringContaining("cut short") },
+            });
+          });
+        } finally {
+          const left = Number((await readFile(pid, "utf8").catch(() => "")).trim());
+          if (left > 0) {
+            process.kill(left, "SIGKILL");
+          }
+        }
+      });
+    },
+    { timeout: 40_000 },
+  );
 });
 
 describe("resolveRumdlBin", () => {
@@ -90,10 +136,28 @@ describe("defaultRumdlRunner", () => {
         const stdout = await Promise.race([
           defaultRumdlRunner(scriptPath),
           new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("hung")), 4000);
+            setTimeout(() => reject(new Error("hung")), WAIT_MS);
           }),
         ]);
         expect(stdout).toContain("ok");
+      });
+    });
+  });
+
+  test.serial("stops a rumdl that hangs and skips it, saying why", async () => {
+    const slow = join(import.meta.dir, "..", "helpers", "fake-rumdl-slow.ts");
+    await withTempDir(async (dir) => {
+      const scriptPath = join(dir, "script.md");
+      await writeFile(scriptPath, "# demo\n");
+      await withEnv({ DEK_RUMDL: slow }, async () => {
+        const started = Date.now();
+        const run = (path: string) => defaultRumdlRunner(path, { timeoutMs: 300 });
+        expect(await runRumdl(scriptPath, run)).toEqual({
+          diagnostics: [],
+          skipped: { reason: "rumdl did not finish within 0.3s and was stopped", hung: true },
+        });
+        // The fake sleeps for 30 s; the bound only has to be well short of it.
+        expect(Date.now() - started).toBeLessThan(15_000);
       });
     });
   });

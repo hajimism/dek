@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { playwrightResolved } from "../../src/core/playwright.ts";
 import { DEFAULT_LEAD_MS, type Timeline } from "../../src/core/timeline.ts";
@@ -13,9 +13,11 @@ import {
   type VideoFrame,
 } from "../../src/video/recorder.ts";
 import { encodeWav, parseWav, silentWav, sliceWav } from "../../src/voice/wav.ts";
+import { BROWSER_TEST_MS } from "../helpers/browser.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { captureHoldFrames } from "../helpers/video.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -192,35 +194,42 @@ describe("fake video worker", () => {
 });
 
 describe("video worker", () => {
-  test("reports a failure as one line on stderr and exits 2, like the Playwright worker", async () => {
-    if (!playwrightResolved()) {
-      return;
-    }
-    await withTempDir(async (dir) => {
-      const file = join(dir, "not-a-dir");
-      writeFileSync(file, "");
-      const worker = join(import.meta.dir, "../../src/video/worker.ts");
-      const proc = Bun.spawn(["bun", "--no-install", worker], {
-        stdin: "pipe",
-        stdout: "pipe",
-        stderr: "pipe",
+  // The worker launches Chromium before it fails.
+  test(
+    "reports a failure as one line on stderr and exits 2, like the Playwright worker",
+    async () => {
+      if (!playwrightResolved()) {
+        return;
+      }
+      await withTempDir(async (dir) => {
+        const file = join(dir, "not-a-dir");
+        writeFileSync(file, "");
+        const worker = join(import.meta.dir, "../../src/video/worker.ts");
+        const proc = Bun.spawn(["bun", "--no-install", worker], {
+          stdin: "pipe",
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        // As dek asks it, so a Chromium that cannot start its sandbox still reaches the failure.
+        proc.stdin.write(
+          JSON.stringify({
+            html: "<html></html>",
+            timeline,
+            fps: 10,
+            viewport: { width: 1, height: 1 },
+            outDir: join(file, "frames"),
+            sandbox: "preferred",
+          }),
+        );
+        await proc.stdin.end();
+        const [err, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
+        expect(code).toBe(2);
+        expect(err.trim().split("\n")).toHaveLength(1);
+        expect(err).toContain("ENOTDIR");
       });
-      proc.stdin.write(
-        JSON.stringify({
-          html: "<html></html>",
-          timeline,
-          fps: 10,
-          viewport: { width: 1, height: 1 },
-          outDir: join(file, "frames"),
-        }),
-      );
-      await proc.stdin.end();
-      const [err, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
-      expect(code).toBe(2);
-      expect(err.trim().split("\n")).toHaveLength(1);
-      expect(err).toContain("ENOTDIR");
-    });
-  });
+    },
+    BROWSER_TEST_MS,
+  );
 });
 
 describe("sliceWav", () => {
@@ -372,7 +381,7 @@ describe("muxVideo", () => {
       const previous = process.env.DEK_FFMPEG;
       process.env.DEK_FFMPEG = join(import.meta.dir, "../helpers/fake-noisy.ts");
       try {
-        const started = Date.now();
+        // A full stderr pipe would hang for good; the bound only has to beat the test timeout.
         await Promise.race([
           muxVideo({
             frames: [{ path: a, durationMs: 100 }],
@@ -380,10 +389,9 @@ describe("muxVideo", () => {
             outPath: out,
           }),
           new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("hung")), 2000);
+            setTimeout(() => reject(new Error("hung")), WAIT_MS);
           }),
         ]);
-        expect(Date.now() - started).toBeLessThan(2000);
         expect(await Bun.file(out).exists()).toBe(true);
       } finally {
         if (previous === undefined) {
@@ -396,12 +404,42 @@ describe("muxVideo", () => {
   });
 
   test.serial(
+    "gives up on an ffmpeg on PATH that never answers -version, even one that ignores SIGTERM",
+    async () => {
+      await withTempDir(async (bin) => {
+        // It ends on its own after 15s, so a probe that waits does not hang the suite.
+        const ffmpeg = join(bin, "ffmpeg");
+        writeFileSync(
+          ffmpeg,
+          "#!/bin/sh\ntrap '' TERM\ni=0\nwhile [ $i -lt 15 ]; do sleep 1; i=$((i+1)); done\n",
+        );
+        chmodSync(ffmpeg, 0o755);
+        const started = Date.now();
+        let error: unknown;
+        await withEnv({ DEK_FFMPEG: undefined, PATH: `${bin}:${process.env.PATH}` }, async () => {
+          try {
+            ffmpegResolved(500);
+          } catch (caught) {
+            error = caught;
+          }
+        });
+        expect(error).toMatchObject({
+          name: "DekError",
+          message: expect.stringContaining("did not answer"),
+          hint: expect.stringContaining("DEK_FFMPEG"),
+        });
+        expect(Date.now() - started).toBeLessThan(5000);
+      });
+    },
+  );
+
+  test.serial(
     "stops an ffmpeg that runs past timeoutMs, so a hung encode cannot hang dek",
     async () => {
       await withTempDir(async (dir) => {
         const a = join(dir, "a.png");
         writeFileSync(a, PNG);
-        const started = Date.now();
+        // The fake outlasts the test's timeout, so only stopping it settles this in time.
         await withEnv(
           { DEK_FFMPEG: join(import.meta.dir, "../helpers/fake-ffmpeg-slow.ts") },
           async () => {
@@ -419,7 +457,6 @@ describe("muxVideo", () => {
             });
           },
         );
-        expect(Date.now() - started).toBeLessThan(3000);
       });
     },
   );

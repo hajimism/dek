@@ -94,6 +94,31 @@ hello
     );
   });
 
+  test("inlines an image whose name the markup escapes, as Q&amp;A.png", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="assets/Q&amp;A.png" alt="a chart">
+</section>`),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "Q&A.png"));
+        const html = await readFile((await build(deckDir)).outPath, "utf8");
+        expect(html).toContain('<img src="data:image/png;base64,iVBOR');
+        expect(html).not.toContain("Q&amp;A.png");
+      },
+    );
+  });
+
   test("writes a single inlined HTML file without touching source slides", async () => {
     await withTempProject(
       {

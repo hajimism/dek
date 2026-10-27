@@ -2,7 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { renderDeckDocument, renderDeckHtml, renderRailHtml } from "../../src/core/document.ts";
-import { extractSlideSection, htmlShell, stampSlide } from "../../src/core/html.ts";
+import {
+  type DeckSlides,
+  extractSlideSection,
+  htmlShell,
+  stampSlide,
+  writtenElements,
+} from "../../src/core/html.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { stepValuesForBeat } from "../../src/core/step.ts";
 import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
@@ -99,6 +105,18 @@ describe("extractSlideSection", () => {
     expect(extracted).not.toContain("</body>");
   });
 
+  test("finds a slide whose class a reference separates, as the browser does", () => {
+    expect(extractSlideSection(`<section class="intro&#32;slide"><h2>intro</h2></section>`)).toBe(
+      `<section class="intro&#32;slide"><h2>intro</h2></section>`,
+    );
+  });
+
+  test("finds no slide in a class a no-break space joins, as the browser does", () => {
+    expect(extractSlideSection(`<section class="intro&nbsp;slide"><h2>intro</h2></section>`)).toBe(
+      undefined,
+    );
+  });
+
   test("ignores a section whose only slide token is data-slide", () => {
     const html = `<body>
 <section data-slide="note"><p>notes</p></section>
@@ -148,6 +166,35 @@ describe("stampSlide", () => {
     expect(unquoted).toContain("is-shown");
     expect(unquoted).toContain("slide");
     expect(unquoted).toContain("node");
+  });
+
+  test("adds a class to the classes as written, and none the browser reads there already", () => {
+    const html = stampSlide(
+      `<section class="slide a&amp;lt;"><p class="b&#32;is-shown" data-step="h&amp;k">a</p><p class="c" data-step="h&amp;k">b</p></section>`,
+      { slug: "s", place, shown: new Set(["h&k"]) },
+    );
+    expect(html).toContain('<section class="slide a&amp;lt; is-current"');
+    expect(html).toContain('<p class="b&#32;is-shown" data-step="h&amp;k">');
+    expect(html).toContain('<p class="c is-shown" data-step="h&amp;k">');
+  });
+
+  test("keeps a no-break space in a class as written, where it is part of the class", () => {
+    const html = stampSlide(`<section class="slide a\u00A0is-current">x</section>`, {
+      slug: "s",
+      place,
+      shown: new Set(),
+    });
+    expect(html).toContain('<section class="slide a\u00A0is-current is-current"');
+  });
+
+  test("keeps the author's style as written after the place", () => {
+    const html = stampSlide(`<section class="slide" style='content: "&amp;lt;"'>b</section>`, {
+      slug: "b",
+      place,
+    });
+    expect(html).toContain(
+      'style="--dek-slide-number: 1; --dek-slide-count: 1; content: &quot;&amp;lt;&quot;"',
+    );
   });
 
   test("gives the slide its place in the script as custom properties", () => {
@@ -230,6 +277,28 @@ describe("stampSlide with the slide's source", () => {
       ["svg", "ring"],
       ["line", null],
       ["i", null],
+    ]);
+  });
+
+  test("names each tag by its classes as the browser reads them, as annotate mode does", () => {
+    const file = `<section class="slide">
+  <div class="a&#32;b">x</div><p class="c&amp;lt;d">y</p>
+</section>`;
+    const html = stampFile(file);
+    expect(html).toContain('<div class="a&#32;b" data-dek-source="2:3" data-dek-class="a b">');
+    expect(html).toContain(
+      '<p class="c&amp;lt;d" data-dek-source="2:31" data-dek-class="c&amp;lt;d">',
+    );
+    const slides: DeckSlides = {
+      has: () => true,
+      written: () => file,
+      section: () => file,
+      source: () => ({ file, start: 0 }),
+    };
+    expect(writtenElements(slides, "s")?.map((element) => element.name)).toEqual([
+      "section.slide",
+      "div.a.b",
+      "p.c&lt;d",
     ]);
   });
 

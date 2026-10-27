@@ -1,10 +1,8 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Window } from "happy-dom";
-import type { Browser } from "playwright";
 import {
-  importPlaywright,
   type PlaywrightRunner,
   type PptxPictureFile,
   type PptxResponse,
@@ -19,24 +17,14 @@ import { resolveDeck } from "../../src/core/resolve.ts";
 import { logicalSize } from "../../src/core/size.ts";
 import { lastStop } from "../../src/core/step.ts";
 import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
+import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { readZip } from "../helpers/zip.ts";
 
 // A PPTX in a real Chromium: where the text is laid out, line by line, and the picture without it.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-const browserTest = test.serial.skipIf(skip);
-
-let browser: Browser | undefined;
-
-beforeAll(async () => {
-  if (!skip) {
-    browser = await (await importPlaywright()).chromium.launch({ headless: true });
-  }
-});
-
-afterAll(async () => {
-  await browser?.close();
-});
+const browserTest = serialBrowserTest(skip);
+const withBrowser = sharedBrowser();
 
 type Seen = PptxResponse["slides"][number] & { boxes: PptxTextBox[] };
 
@@ -50,10 +38,7 @@ function textLayers(layers: PptxLayer<PptxPictureFile>[]): PptxTextBox[] {
 /** The worker's work in one shared browser, recording what each slide came back as. */
 const seen: Seen[] = [];
 const runner: PlaywrightRunner = async (request: VisualRequest) => {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const response = await runVisualRequest(browser, request);
+  const response = await withBrowser((browser) => runVisualRequest(browser, request));
   if (request.kind === "pptx") {
     seen.push(
       ...(response as PptxResponse).slides.map((slide) => ({
@@ -228,10 +213,7 @@ const themedFade = `<section class="slide fade">
 
 /** The color of a pixel of a PNG, as the browser decodes it. */
 async function pixel(png: Uint8Array, x: number, y: number): Promise<number[]> {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = await browser.newPage();
+  const page = await withBrowser((browser) => browser.newPage());
   try {
     return await page.evaluate(
       async ({ src, x, y }) => {
@@ -264,10 +246,7 @@ function allLayers(layers: PptxLayer<PptxPictureFile>[]): PptxLayer<PptxPictureF
  * on a page of its own, apart from what the file makes of it, sorted.
  */
 async function measuredInk(html: string, size: { width: number; height: number }): Promise<string> {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = await browser.newPage();
+  const page = await withBrowser((browser) => browser.newPage());
   try {
     await page.setViewportSize(size);
     await page.setContent(html, { waitUntil: "load" });

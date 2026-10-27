@@ -93,6 +93,7 @@ async function request(
   const auth = authorization(base);
   let response: Response;
   try {
+    // biome-ignore lint/style/noRestrictedGlobals: the deadline's signal bounds the request, and readBody cancels a read that outlasts it.
     response = await fetch(`${base}${path}`, {
       headers: {
         accept,

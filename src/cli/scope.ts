@@ -1,10 +1,12 @@
 import { join, relative } from "node:path";
 import { DekError } from "../core/error.ts";
 import { shellName, shellQuote } from "../core/escape.ts";
+import { foreignLine, type HiddenText, hiddenText, MESSAGE_MAX } from "../core/foreign-text.ts";
 import {
   isRefName,
   packFile,
   parseRefSource,
+  type RefSource,
   refLicense,
   refReadOnlyError,
   refState,
@@ -14,6 +16,7 @@ import {
   locateDeck,
   type Project,
   type ProjectDeck,
+  readDeckFile,
   requireSection,
   resolveProject,
 } from "../core/resolve.ts";
@@ -223,6 +226,25 @@ export type RefInfo = {
 export type ReadableDeck = DeckTarget & { ref?: RefInfo };
 
 /**
+ * `{ hidden }` when a ref's files hold characters a person cannot see, nothing otherwise. Only a
+ * ref's are reported: a deck of the project's own is its author's, emoji joiners and all.
+ */
+export function hiddenField(
+  ref: RefInfo | undefined,
+  found: HiddenText[],
+): { hidden?: HiddenText[] } {
+  return ref && found.length > 0 ? { hidden: found } : {};
+}
+
+/** What the files at `paths` in the deck hold that a person cannot see, file by file. */
+export function hiddenInFiles(deckDir: string, paths: string[]): HiddenText[] {
+  return paths.flatMap((path) => {
+    const text = readDeckFile(deckDir, path);
+    return text === undefined ? [] : hiddenText(text, path);
+  });
+}
+
+/**
  * What a command declares it works on, resolved: one deck or the decks in scope. Only a command
  * whose spec says `refs` reads a ref; it never writes, so a ref cannot reach a command that
  * would change it. For every other command resolveScope refuses a ref.
@@ -287,7 +309,7 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
   if (!found) {
     const failed = snapshot.failed.find((entry) => entry.name === source.deck);
     if (failed) {
-      throw failed.error;
+      throw unreadableRef(failed.error, source);
     }
     throw new DekError(`ref "${source.name}" has no deck "${source.deck}"`, {
       path: dir,
@@ -303,4 +325,21 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
     },
     ref: { name: source.name, rev: pinned, dir, license: refLicense(dir) },
   };
+}
+
+/**
+ * A ref whose script.md cannot be read. The error's hint would say how to fix the file, quoting
+ * it, and a ref is not the reader's to fix: the message stays, on one line, and the hint is dek's.
+ */
+function unreadableRef(error: Error, source: RefSource): DekError {
+  const fields = error instanceof DekError ? error : undefined;
+  return new DekError(foreignLine(error.message, MESSAGE_MAX), {
+    ...(fields?.path !== undefined ? { path: fields.path } : {}),
+    ...(fields?.line !== undefined ? { line: fields.line } : {}),
+    hint:
+      source.kind === "file"
+        ? "a ref is read-only, so its script.md is its author's to fix; ask them for a pack that reads, and add it with `dekc ref <file>.tgz`"
+        : `a ref is read-only, so its script.md is its author's to fix; pin a commit where it reads with \`dekc ref ${source.name}@<rev>\``,
+    cause: error,
+  });
 }

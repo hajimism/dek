@@ -581,13 +581,18 @@ async function visitPage(
  * measuring again: first what the slide's script drew, then the slide's own CSS. A text that
  * clears its threshold, or an element that no longer crosses an edge, once a layer is gone is
  * that layer's to fix. With both gone, a text that still fails is the theme's, and an element that
- * still overflows is its content's: too much for the theme's sizes. The page is not put back.
+ * still overflows is its content's: too much for the theme's sizes. A text that shows no glyph
+ * once a layer is gone is no longer measured as the audience sees it: one the slide's CSS alone
+ * shows is marked so, and one the draw alone shows is no layer's unless it still fails with both
+ * gone. The page is not put back.
  */
 async function attributeFindings(
   page: Page,
   pending: { failing: Failing[]; crossing: Crossing[] },
 ): Promise<void> {
   let { failing, crossing } = pending;
+  // Texts that showed no glyph the last time they were measured.
+  const unseen = new Set<Failing>();
   for (const layer of LAYERS) {
     if (failing.length === 0 && crossing.length === 0) {
       return;
@@ -615,20 +620,32 @@ async function attributeFindings(
     const texts = await pageTexts(page, measured);
     const contrasts = await textContrasts(page, texts);
     const now = new Map(texts.map((text, at) => [text.key, { text, contrast: contrasts[at] }]));
-    failing = failing.filter(({ finding, key }) => {
-      const measuredText = now.get(key);
-      if (
-        measuredText?.contrast &&
-        measuredText.contrast.ratio >= contrastThreshold(measuredText.text)
-      ) {
-        finding.origin = layer.origin;
+    failing = failing.filter((entry) => {
+      const measuredText = now.get(entry.key);
+      const seen = !unseen.has(entry);
+      if (!measuredText?.contrast) {
+        if (layer.origin === "slide" && seen) {
+          entry.finding.onlyWithSlideCss = true;
+          return false;
+        }
+        unseen.add(entry);
+        return true;
+      }
+      if (measuredText.contrast.ratio >= contrastThreshold(measuredText.text)) {
+        // Hidden with the layer before gone, it may owe its low contrast to that layer as well.
+        if (seen) {
+          entry.finding.origin = layer.origin;
+        }
         return false;
       }
+      unseen.delete(entry);
       return true;
     });
   }
-  for (const { finding } of failing) {
-    finding.origin = "theme";
+  for (const entry of failing) {
+    if (!unseen.has(entry)) {
+      entry.finding.origin = "theme";
+    }
   }
   for (const { finding } of crossing) {
     finding.origin = "content";

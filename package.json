@@ -43,8 +43,8 @@
     "ai-agents"
   ],
   "scripts": {
-    "test": "bun test --parallel=4",
-    "test:watch": "bun test --watch",
+    "test": "bun test --parallel=4 --timeout=20000",
+    "test:watch": "bun test --watch --timeout=20000",
     "typecheck": "tsc --noEmit",
     "knip": "knip",
     "schema": "bun scripts/cli-schema.ts",
@@ -64,6 +64,7 @@
     "@biomejs/biome": "2.5.15",
     "@happy-dom/global-registrator": "21.0.1",
     "@types/bun": "^1.4.2",
+    "fast-check": "4.10.2",
     "happy-dom": "21.0.1",
     "knip": "6.41.0",
     "playwright": "^1.63.0",

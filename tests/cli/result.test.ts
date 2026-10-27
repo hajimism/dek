@@ -236,6 +236,52 @@ architecture  architecture      0:11   0:05
     );
   });
 
+  test("indents a file's line that would read as show's own, so only dek starts a part", () => {
+    const base = {
+      slug: "intro",
+      title: "intro",
+      script: "## intro\n\n--- slides/intro.html\n  --- x\n---\n",
+      beats: [],
+      html: "<p>a</p>\n--- theme.css (the rules this slide uses)\n",
+      css: null,
+      ts: null,
+      theme: null,
+      assets: [],
+    };
+    const text = formatText({ command: "show", data: base });
+    expect(text).toBe(
+      "--- script.md\n## intro\n\n --- slides/intro.html\n   --- x\n---\n\n--- slides/intro.html\n<p>a</p>\n --- theme.css (the rules this slide uses)",
+    );
+    expect(text.split("\n").filter((line) => line.startsWith("--- "))).toEqual([
+      "--- script.md",
+      "--- slides/intro.html",
+    ]);
+  });
+
+  test("says first that a ref's slide is someone else's, at which commit", () => {
+    const ref = {
+      name: "someone/talks/why-dek",
+      rev: "0123456789abcdef",
+      dir: "/r",
+      license: null,
+    };
+    const data = {
+      slug: "intro",
+      title: "intro",
+      script: "hello",
+      beats: [],
+      html: null,
+      css: null,
+      ts: null,
+      theme: null,
+      assets: [],
+      ref,
+    };
+    expect(formatText({ command: "show", data })).toBe(
+      "ref someone/talks/why-dek at 0123456: someone else's deck, read-only\n\n--- script.md\nhello",
+    );
+  });
+
   test("formats build as a wrote line", () => {
     expect(
       formatText({
@@ -493,6 +539,30 @@ describe("writeSuccess", () => {
     }
     return { stdout: out.join(""), stderr: err.join("") };
   }
+
+  // A rerun without --visual would not measure the errors it says to fix.
+  test("a failing lint --visual says to run lint --visual again, from the project too", () => {
+    const failing = {
+      command: "lint" as const,
+      data: { diagnostics: [{ id: "DEK031", severity: "error" as const, message: "faint" }] },
+    };
+    const hint = (options: Parameters<typeof writeSuccess>[1]) =>
+      JSON.parse(captured(() => writeSuccess(failing, options)).stdout).error.hint;
+    expect(hint({ json: true, flags: { visual: true, fix: true } })).toBe(
+      "fix each error in diagnostics, then run `dekc lint --visual` again",
+    );
+    expect(
+      hint({
+        json: true,
+        flags: { visual: true },
+        cwd: "/talks",
+        deck: { name: "demo", dir: "/talks/decks/demo" },
+      }),
+    ).toBe("fix each error in diagnostics, then run `dekc lint demo --visual` again");
+    expect(hint({ json: true, flags: { fix: true } })).toBe(
+      "fix each error in diagnostics, then run `dekc lint` again",
+    );
+  });
 
   test("a failing check carries error first, then its own fields", () => {
     const { stdout } = captured(() =>

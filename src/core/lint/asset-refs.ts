@@ -5,6 +5,7 @@ import { type Diagnostic, diag } from "../diagnostic.ts";
 import { isPlainWord } from "../escape.ts";
 import type { HtmlRef } from "../html-scan.ts";
 import { isInside } from "../path.ts";
+import { trimUrl } from "../url-attributes.ts";
 
 /**
  * DEK020 to DEK023 for one reference, whether it comes from a slide's markup
@@ -56,9 +57,9 @@ export function assetRefDiagnostics(
   if (kind === "missing") {
     return [
       diag("DEK021", {
-        message: `missing ${ref.tag === "img" ? "image" : "file"} "${ref.value}"`,
+        message: `missing ${ref.tag === "img" ? "image" : "file"} "${visibleSpaces(ref.value)}"`,
         ...location,
-        ...missingImageHint(ref.value, deckDir),
+        ...(strayedSpaceHint(ref.value, deckDir, from) ?? missingImageHint(ref.value, deckDir)),
         data: { src: ref.value },
       }),
     ];
@@ -66,7 +67,7 @@ export function assetRefDiagnostics(
   if (!isCanonicalAssetPath(ref.value)) {
     return [
       diag("DEK023", {
-        message: `asset "${ref.value}" must be referenced as assets/${posix.basename(ref.value.trim())}`,
+        message: `asset "${ref.value}" must be referenced as assets/${posix.basename(trimUrl(ref.value))}`,
         ...location,
         data: { src: ref.value },
       }),
@@ -76,11 +77,48 @@ export function assetRefDiagnostics(
 }
 
 function leavesFromEither(value: string, deckDir: string, from: string): boolean {
-  const path = value.trim().split(/[?#]/)[0] ?? "";
+  const path = trimUrl(value).split(/[?#]/)[0] ?? "";
   return (
     path !== "" &&
     [resolve(deckDir, path), resolve(from, path)].some((target) => !isInside(target, deckDir))
   );
+}
+
+/** `value` with each space but the plain one written as `\uXXXX`, so a message shows it. */
+function visibleSpaces(value: string): string {
+  return value.replace(
+    /[^\S ]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`,
+  );
+}
+
+/**
+ * The hint for a path that names a deck file once the spaces outside ASCII at its ends are gone,
+ * as `&nbsp;assets/a.png` does: the browser keeps those spaces, so the path names nothing.
+ */
+function strayedSpaceHint(
+  value: string,
+  deckDir: string,
+  from: string,
+): { hint: string } | undefined {
+  const url = trimUrl(value);
+  const bare = url.trim();
+  if (bare === url || classifyAssetRef(bare, { deckDir, from }).kind !== "file") {
+    return undefined;
+  }
+  const at = url.indexOf(bare);
+  const before = url.slice(0, at);
+  const after = url.slice(at + bare.length);
+  const where = before && after ? "around" : before ? "before" : "after";
+  const spaces = [...new Set(before + after)].map((char) => {
+    const point = `U+${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`;
+    return char === "\u00A0" ? `no-break space (${point})` : `space (${point})`;
+  });
+  // The path is the slide's text: one that is no plain word is left out of the hint.
+  const path = isPlainWord(bare) ? bare : "the path";
+  return {
+    hint: `remove the ${spaces.join(" and the ")} ${where} ${path}: the browser keeps ${spaces.length > 1 ? "them" : "it"} as part of the path, which then names no file`,
+  };
 }
 
 /**
@@ -88,7 +126,7 @@ function leavesFromEither(value: string, deckDir: string, from: string): boolean
  * when the project has the file, the fix is that copy.
  */
 function missingImageHint(value: string, deckDir: string): { hint?: string } {
-  const name = value.trim().split(/[?#]/)[0] ?? "";
+  const name = trimUrl(value).split(/[?#]/)[0] ?? "";
   if (!name.startsWith("assets/")) {
     return {};
   }
@@ -104,7 +142,7 @@ function missingImageHint(value: string, deckDir: string): { hint?: string } {
 function remoteHint(value: string): string {
   let name = "";
   try {
-    name = posix.basename(new URL(value.trim(), "https://dek.invalid").pathname);
+    name = posix.basename(new URL(trimUrl(value), "https://dek.invalid").pathname);
   } catch {}
   // The name is the remote URL's: one that is no plain word is left out of the hint.
   return name && isPlainWord(name)

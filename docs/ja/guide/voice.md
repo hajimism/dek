@@ -34,7 +34,7 @@ speed   = 1
 pause   = { sentence = 350, beat = 700 }
 ```
 
-`dekc voice` には起動中の VOICEVOX 互換エンジンが必要です。`rehearse` と `video` に要るのは、それが書く Timeline だけです。エンジンが見つからなければ、それを必要とするコマンドだけが失敗し、hint にインストール方法が表示されます。
+`dekc voice` には起動中の VOICEVOX 互換エンジンが必要です。`rehearse` と `video` に要るのは、それが書く Timeline だけです。エンジンが見つからなければ、それを必要とするコマンドだけが失敗し、hint にインストール方法が表示されます。接続はできても応えなくなったエンジンでもコマンドは失敗します。dek が待つのは、話者とバージョンに 10 秒、文の読みに 60 秒、音声に 5 分までです。
 
 - **VOICEVOX**（ポート 50021）: [voicevox.hiroshiba.jp](https://voicevox.hiroshiba.jp/) か `docker run --rm -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest`
 - **AivisSpeech**（ポート 10101、`engine = "aivis"`）: [aivis-project.com](https://aivis-project.com/) か `docker run --rm -p 127.0.0.1:10101:10101 ghcr.io/aivis-project/aivisspeech-engine:cpu-latest`

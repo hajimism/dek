@@ -197,6 +197,28 @@ describe("newCommand", () => {
     },
   );
 
+  // A deck dek can make is one it can pack: a pack's ref takes the deck's name, as AGENTS.md and
+  // every hint about the ref show it, so it holds nothing a person cannot see.
+  // U+3164, a Hangul filler, shows blank: a deck named only one would print as no name at all.
+  test.each([
+    "talk\u{E0041}",
+    "talk\u{200B}",
+    "talk\u{202E}",
+    "talk\x9b",
+    "\u{3164}",
+    "talk\u{AD}",
+  ])("fails on %j, which holds a character a person cannot see or a control", async (name) => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      expect(() => newCommand({ cwd: root, name })).toThrow(
+        expect.objectContaining({
+          message: expect.stringContaining("invalid deck name"),
+          hint: expect.stringContaining("no control character or one a person cannot see"),
+        }),
+      );
+      expect(existsSync(join(root, "decks", name))).toBe(false);
+    });
+  });
+
   test("names next commands that paste as printed, from wherever new ran", async () => {
     await withTempProject({ theme: defaultTheme(), decks: [{ name: "demo" }] }, async (root) => {
       const inDeck = join(root, "decks", "demo");
@@ -283,6 +305,36 @@ describe("dekc new --theme-from <ref>", () => {
       },
     );
   });
+
+  test.serial(
+    "reports what the copied theme holds that a person cannot see, where it now is",
+    async () => {
+      // Bidi isolates around a comment's words, and tag characters a model reads as "hi".
+      const hiding = `${theme}/* \u{2066}keep\u{2069} */\n.slide .tag { gap: 0; } /*\u{E0068}\u{E0069}*/\n`;
+      await withTempProject(
+        { decks: [{ name: "mine", theme: hiding }], refs: [{ ...ref, deck: { theme: hiding } }] },
+        async (root) => {
+          const copy = join(root, "decks", "talk", "theme.css");
+          // The copy's first line names the ref, so each line is one further down than the ref's.
+          expect(newCommand({ cwd: root, name: "talk", themeFrom: REF }).hidden).toEqual([
+            { path: copy, line: 4, column: 4, codePoints: ["U+2066", "U+2069"] },
+            { path: copy, line: 5, column: 27, codePoints: ["U+E0068", "U+E0069"] },
+          ]);
+          const text = await runMain(["new", "other", "--theme-from", REF], root);
+          expect(text.stderr).toContain(
+            "warning: decks/other/theme.css:4:4: 2 characters that show as nothing or reorder the text: U+2066, U+2069\n",
+          );
+          expect(text.stderr).toContain(
+            "help: they came in with the ref's theme, and a person reading the deck sees none of them; remove them from theme.css unless you mean them",
+          );
+          // A deck of the project's own is its author's: copying its theme reports nothing.
+          expect(newCommand({ cwd: root, name: "third", themeFrom: "mine" })).not.toHaveProperty(
+            "hidden",
+          );
+        },
+      );
+    },
+  );
 
   test("a ref that is not pinned, or whose deck has no theme, says what to run", async () => {
     await withTempProject({ refs: [{ ...ref, declared: false }] }, async (root) => {

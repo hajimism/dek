@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: mkdtempSync and rmSync, for a folder of the shots' own in the system's temp folder, removed after.
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

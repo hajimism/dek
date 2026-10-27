@@ -454,6 +454,26 @@ describe("lintVisualDeck", () => {
     );
   });
 
+  test("sends a DEK031 only the slide's stylesheet shows to it, naming theme.css too", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const diagnostics = await lintVisualDeck(join(root, "decks", "demo"), {
+          runner: async () => ({
+            overflows: [],
+            contrasts: [{ ...sample, ratio: 2.1, fontSize: 16, onlyWithSlideCss: true }],
+          }),
+        });
+        const dek031 = diagnostics?.find((d) => d.id === "DEK031");
+        expect(dek031?.hint).toBe(
+          "without slides/intro.css it does not show, so dek cannot tell whether theme.css alone draws it below 4.5:1: fix the pair in slides/intro.css, or in theme.css if the colors are the theme's",
+        );
+        expect(dek031?.data?.origin).toBeUndefined();
+        expect(dek031?.path).toBe(join(root, "decks", "demo", "slides", "intro.css"));
+      },
+    );
+  });
+
   test("sends a DEK031 a slide script's draw causes to the script", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

@@ -215,6 +215,14 @@ describe("formatReport", () => {
     expect(report.split("\n")).toHaveLength(5);
   });
 
+  test("names rules with as many findings by character code, the same on every machine", () => {
+    expect(
+      formatReport([found("b"), found("B"), found("a")])
+        .split("\n")
+        .at(-1),
+    ).toBe("3 errors: B ×1, a ×1, b ×1");
+  });
+
   test("counts one in the singular, and names no errors when there are none", () => {
     expect(
       formatReport([found("DEK040", "warning")])
@@ -259,6 +267,14 @@ describe("formatErrorText", () => {
     expect(text).toContain("\x1b[31m");
     expect(text).toContain("error:");
     expect(text).toContain("not a dek project");
+  });
+
+  test("paints dek's colors over the error's own text, which carries none of its own", () => {
+    // A ref's text in a message could hide itself with conceal (8), or wear dek's own red.
+    const error = new DekError("deck \x1b[8mhidden\x1b[0m \x1b[31mred", { hint: "a\x1b[2mb" });
+    expect(formatErrorText(error, { color: true })).toBe(
+      "\x1b[1m\x1b[31merror:\x1b[0m\x1b[0m deck \uFFFD[8mhidden\uFFFD[0m \uFFFD[31mred\n  \x1b[33mhelp:\x1b[0m a\uFFFD[2mb",
+    );
   });
 });
 

@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: mkdtempSync, rmSync, and writeFileSync, for ffmpeg's frame list in a folder of its own in the system's temp folder.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,16 +6,39 @@ import { DekError } from "../core/error.ts";
 import { runPiped, workerCommand } from "../core/spawn.ts";
 import type { VideoFrame } from "./recorder.ts";
 
-export function ffmpegResolved(): boolean {
+/** `ffmpeg -version` prints and exits at once; one that takes longer is stuck. */
+const FFMPEG_PROBE_TIMEOUT_MS = 10_000;
+
+/**
+ * True when ffmpeg is there to run: DEK_FFMPEG names one, or `ffmpeg -version` on PATH exits 0.
+ * An ffmpeg that does not answer within `timeoutMs` is killed, and is an error that says so.
+ */
+export function ffmpegResolved(timeoutMs = FFMPEG_PROBE_TIMEOUT_MS): boolean {
   if (process.env.DEK_FFMPEG) {
     return true;
   }
+  let result: Bun.SyncSubprocess<"ignore", "ignore">;
   try {
-    const result = Bun.spawnSync(["ffmpeg", "-version"], { stdout: "pipe", stderr: "pipe" });
-    return result.exitCode === 0;
+    // The environment as it is now, as runPiped passes it: left out, Bun passes the one dek
+    // started with. Nothing is piped, so a process it leaves behind cannot hold dek.
+    // biome-ignore lint/nursery/noJsRestrictedProperties: ffmpegResolved is synchronous, for tests too; the probe has its own timeout and SIGKILL, and the encode runs through runPiped.
+    result = Bun.spawnSync(["ffmpeg", "-version"], {
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+      env: process.env,
+      timeout: timeoutMs,
+      killSignal: "SIGKILL",
+    });
   } catch {
     return false;
   }
+  if (result.exitedDueToTimeout) {
+    throw new DekError(`ffmpeg did not answer \`ffmpeg -version\` within ${timeoutMs / 1000}s`, {
+      hint: "check the ffmpeg on PATH, or set DEK_FFMPEG to an ffmpeg that runs, then run the command again",
+    });
+  }
+  return result.exitCode === 0;
 }
 
 function ffmpegCommand(args: string[]): string[] {

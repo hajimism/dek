@@ -119,6 +119,13 @@
               },
               "description": "Set when the theme came from a ref with no license."
             },
+            "hidden": {
+              "description": "A ref's lines that hold characters a person cannot see; absent when none does.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HiddenText"
+              }
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -310,6 +317,13 @@
             },
             "ref": {
               "$ref": "#/$defs/RefInfo"
+            },
+            "hidden": {
+              "description": "A ref's lines that hold characters a person cannot see; absent when none does.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HiddenText"
+              }
             },
             "ok": {
               "type": "boolean",
@@ -568,6 +582,13 @@
             "ref": {
               "$ref": "#/$defs/RefInfo"
             },
+            "hidden": {
+              "description": "A ref's lines that hold characters a person cannot see; absent when none does.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HiddenText"
+              }
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -689,6 +710,13 @@
             "ref": {
               "$ref": "#/$defs/RefInfo"
             },
+            "hidden": {
+              "description": "A ref's lines that hold characters a person cannot see; absent when none does.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HiddenText"
+              }
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -743,6 +771,10 @@
               "items": {
                 "$ref": "#/$defs/SkippedCheck"
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "shot": {
               "type": "string"
@@ -899,6 +931,10 @@
               "items": {
                 "$ref": "#/$defs/SkippedCheck"
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "shot": {
               "type": "string"
@@ -1142,6 +1178,17 @@
                   "frames"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
+            "hidden": {
+              "description": "A ref's lines that hold characters a person cannot see; absent when none does.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HiddenText"
               }
             },
             "ok": {
@@ -1783,6 +1830,10 @@
                 "$ref": "#/$defs/SkippedCheck"
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -1809,6 +1860,10 @@
               "items": {
                 "$ref": "#/$defs/SkippedCheck"
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "ok": {
               "type": "boolean",
@@ -2136,6 +2191,10 @@
                 "$ref": "#/$defs/SkippedCheck"
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2185,6 +2244,10 @@
             "credits": {
               "type": "string"
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2226,6 +2289,10 @@
                 "type": "string"
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2266,6 +2333,10 @@
               "items": {
                 "type": "string"
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "ok": {
               "type": "boolean",
@@ -2463,6 +2534,40 @@
       ],
       "additionalProperties": false
     },
+    "HiddenText": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "column": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "1-based, in UTF-16 units as editors count: where the first of them is."
+        },
+        "codePoints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Each of them on the line, in order, as U+XXXX."
+        }
+      },
+      "required": [
+        "path",
+        "line",
+        "column",
+        "codePoints"
+      ],
+      "additionalProperties": false,
+      "description": "A line of a ref's file that holds characters a person cannot see: those Unicode marks default-ignorable, such as tag characters, zero-width characters, the byte order mark, bidi controls, and Hangul fillers, but not variation selectors; the line and paragraph separators; and the interlinear annotation marks. Text output shows each as ⟨U+XXXX⟩."
+    },
     "Diagnostic": {
       "type": "object",
       "properties": {
@@ -2606,6 +2711,25 @@
       ],
       "additionalProperties": false,
       "description": "Set when the deck read is a ref."
+    },
+    "Unsandboxed": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "What Chromium said when it did not start with its sandbox."
+        },
+        "hint": {
+          "type": "string",
+          "description": "What lets the sandbox start, and, unless already set, DEK_ALLOW_UNSANDBOXED=1."
+        }
+      },
+      "required": [
+        "reason",
+        "hint"
+      ],
+      "additionalProperties": false,
+      "description": "Chromium drew without its sandbox, which did not start here, as in a container running as root. A ref is never drawn so unless DEK_ALLOW_UNSANDBOXED=1."
     },
     "Position": {
       "type": "object",

@@ -2,7 +2,7 @@ import { isAbsolute, relative } from "node:path";
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { type ErrorFields, errorFields } from "../core/error.ts";
 import type { LiveEvent } from "../core/live-protocol.ts";
-import { ansi, displayWidth, padEndWidth, padStartWidth } from "./tty.ts";
+import { ansi, displayWidth, padEndWidth, padStartWidth, plainText } from "./tty.ts";
 
 function formatLocation(location: { path?: string; line?: number; column?: number }): string {
   if (location.path !== undefined && location.line !== undefined) {
@@ -56,17 +56,18 @@ export function formatError(error: unknown, opts?: { cwd?: string }): FormattedE
     : { ...fields, path: displayPath(fields.path, opts?.cwd) };
 }
 
+/** An error as the terminal shows it: its own text plain, and dek's colors around it. */
 export function formatErrorText(error: unknown, opts?: { color?: boolean; cwd?: string }): string {
   const formatted = formatError(error, opts);
   const c = ansi(opts?.color === true);
-  const parts = [`${c.bold(c.red("error:"))} ${formatted.message}`];
+  const parts = [`${c.bold(c.red("error:"))} ${plainText(formatted.message)}`];
   if (formatted.path) {
     const loc =
       formatted.line !== undefined ? `${formatted.path}:${formatted.line}` : formatted.path;
-    parts.push(` ${c.cyan("-->")} ${loc}`);
+    parts.push(` ${c.cyan("-->")} ${plainText(loc)}`);
   }
   if (formatted.hint) {
-    parts.push(`  ${c.yellow("help:")} ${formatted.hint}`);
+    parts.push(`  ${c.yellow("help:")} ${plainText(formatted.hint)}`);
   }
   return parts.join("\n");
 }

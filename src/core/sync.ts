@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "./config.ts";
 import { type DeckPaths, deckPaths } from "./deck-paths.ts";
+import { foreignLine, TITLE_MAX } from "./foreign-text.ts";
 import { parseRefSource, refDir, refTitle } from "./ref.ts";
 import { asResolvedDeck, listSlides, type ResolvedDeck, SLIDE_SIDECARS } from "./resolve.ts";
 import { outputDir, readSourceIfExists, removeInside, writeInside } from "./safe-fs.ts";
@@ -293,23 +294,13 @@ For commands, run \`dekc help --agent\`.
 `;
 }
 
-/** The longest ref title AGENTS.md shows: a title names a deck, it does not describe one. */
-const REF_TITLE_MAX = 80;
-
 /**
  * A ref's title as it goes into AGENTS.md. Someone else wrote it, and agents read dek's block as
  * dek's own guidance, so a title must not start a line of its own there, such as a heading or an
- * instruction: line breaks and control characters become one space, and it is cut to
- * REF_TITLE_MAX characters.
+ * instruction, nor hold what a person cannot see: it is one foreignLine of TITLE_MAX.
  */
 function refTitleLine(title: string | undefined): string | undefined {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
-  const line = title?.replace(/[\s\x00-\x1f\x7f-\x9f]+/gu, " ").trim();
-  if (!line) {
-    return undefined;
-  }
-  const chars = [...line];
-  return chars.length > REF_TITLE_MAX ? `${chars.slice(0, REF_TITLE_MAX - 1).join("")}…` : line;
+  return title === undefined ? undefined : foreignLine(title, TITLE_MAX) || undefined;
 }
 
 /**

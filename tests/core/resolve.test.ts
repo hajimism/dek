@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
-import { resolveDeck, resolveProject } from "../../src/core/resolve.ts";
+import { listSlideFiles, resolveDeck, resolveProject } from "../../src/core/resolve.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { projectFixturesDir } from "../helpers/paths.ts";
 import { defaultScript } from "../helpers/project.ts";
@@ -168,6 +168,36 @@ hello
       await writeFile(join(dir, "dek.toml"), "# empty\n");
       await mkdir(join(dir, "decks"));
       expect(() => resolveDeck(dir)).toThrow("not a deck directory");
+    });
+  });
+});
+
+// Names whose order differs between a locale's collation and character codes, none of them
+// equal but for case, which a case-insensitive file system would take for one file.
+const unevenNames = ["b-c", "b10", "B2", "bc"];
+const byCharacterCode = ["B2", "b-c", "b10", "bc"];
+
+describe("the order of decks and slide files", () => {
+  test("lists decks by character code, the same on every machine", async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(join(dir, "dek.toml"), "# empty\n");
+      for (const name of unevenNames) {
+        await mkdir(join(dir, "decks", name), { recursive: true });
+        await writeFile(join(dir, "decks", name, "script.md"), defaultScript());
+      }
+      expect(resolveProject(dir).decks.map((deck) => deck.name)).toEqual(byCharacterCode);
+    });
+  });
+
+  test("lists slide files by character code, the same on every machine", async () => {
+    await withTempDir(async (dir) => {
+      await mkdir(join(dir, "decks", "demo", "slides"), { recursive: true });
+      await writeFile(join(dir, "dek.toml"), "# empty\n");
+      for (const name of unevenNames) {
+        await writeFile(join(dir, "decks", "demo", "slides", `${name}.html`), "");
+      }
+      const slugs = listSlideFiles(join(dir, "decks", "demo"), ".html").map((file) => file.slug);
+      expect(slugs).toEqual(byCharacterCode);
     });
   });
 });

@@ -1,0 +1,50 @@
+name: Contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A pull request's run gives way to its next push; every push to main is compared in full.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # A change that narrows what `--json` promises an agent comes in a commit marked breaking, so
+  # release-please does not ship it as a patch (ADR 30). The script imports nothing from
+  # node_modules, so nothing is installed and no dependency's code runs.
+  json:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    name: "--json narrows only in a breaking change"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The base and every commit since, to compare with and to read.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+      # The checkout is the pull request merged into its base: HEAD^1 is the base, the working
+      # tree is the result, and HEAD^1..HEAD holds the pull request's commits.
+      - name: Compare with the pull request's base
+        if: github.event_name == 'pull_request'
+        run: bun scripts/schema-compat.ts HEAD^1
+      # A squash merge writes a commit of its own, and `feat!:` in a pull request's commits is
+      # only a line in its body, which release-please does not read. Comparing each push with
+      # main before it fails such a narrowing on main, before the release pull request takes it.
+      - name: Compare with main before the push
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [[ ! "$BEFORE" =~ ^[0-9a-f]{40,64}$ || "$BEFORE" =~ ^0+$ ]]; then
+            echo "::notice::This push has no commit before it on main to compare with."
+            exit 0
+          fi
+          bun scripts/schema-compat.ts "$BEFORE" HEAD

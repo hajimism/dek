@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { addressHint, deckAround } from "../../src/cli/address.ts";
 import { lintCommand } from "../../src/cli/lint.ts";
 import { addressResult } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
-import { withTempProject } from "../helpers/project.ts";
+import { REF_MARKER } from "../../src/core/ref.ts";
+import { REF_SHA, withTempProject } from "../helpers/project.ts";
 import { AWKWARD_NAMES, hintCommands, UNWRITABLE_NAMES } from "../helpers/shell.ts";
 
 // Hints are written as if run inside the deck they are about. The CLI knows where it ran, so it
@@ -115,6 +117,34 @@ describe("deckAround", () => {
       expect(deckAround(join(dir, "slides", "intro.html"))).toEqual({ name: "demo", dir });
       expect(deckAround(join(dir, "theme.css"))).toEqual({ name: "demo", dir });
       expect(deckAround(join(root, "dek.toml"))).toBeUndefined();
+    });
+  });
+
+  test("names a ref's deck by the ref, as the commands that read it take it", async () => {
+    await withTempProject({ refs: [{ name: "o/r/d" }] }, async (root) => {
+      const dir = join(root, "refs", "o", "r", "d", "decks", "d");
+      expect(deckAround(join(dir, "script.md"))).toEqual({ name: "o/r/d", dir });
+      expect(addressHint("run `dekc ls`", deckAround(join(dir, "script.md")), root)).toBe(
+        "run `dekc ls o/r/d`",
+      );
+    });
+  });
+
+  test("names a deck by a ref only in a snapshot dek wrote", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      const marker = { name: "o/r/d", rev: REF_SHA, path: "decks/demo" };
+      await writeFile(join(root, REF_MARKER), JSON.stringify(marker));
+      const dir = join(root, "decks", "demo");
+      expect(deckAround(join(dir, "script.md"))).toEqual({ name: "demo", dir });
+    });
+  });
+
+  test("finds none where no deck is, so a missing deck's hint does not name it", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      expect(deckAround(join(root, "decks", "nope"))).toBeUndefined();
+      expect(addressHint("run `dekc ls`", deckAround(join(root, "decks", "nope")), root)).toBe(
+        "run `dekc ls`",
+      );
     });
   });
 });

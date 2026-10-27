@@ -1896,7 +1896,7 @@ describe("startDevServer requests", () => {
       }
       const closed = await Promise.race([
         server.close().then(() => true),
-        Bun.sleep(2000).then(() => false),
+        Bun.sleep(WAIT_MS).then(() => false),
       ]);
       expect(closed).toBe(true);
     });
@@ -1950,10 +1950,122 @@ describe("startDevServer requests", () => {
             expect(body).not.toContain(root);
             expect(body).not.toContain("dev.ts");
             expect(logged).toHaveBeenCalled();
+            // The error handler's answer is the server's own, like every other one.
+            expect(browserHeaders("/slide/intro", res)).toEqual(sameOriginOnly("/slide/intro"));
           });
         } finally {
           logged.mockRestore();
         }
+      },
+    );
+  });
+});
+
+/** What an answer tells the browser to do with it, whichever route or refusal it came from. */
+function browserHeaders(path: string, res: Response) {
+  return {
+    path,
+    sniff: res.headers.get("x-content-type-options"),
+    resource: res.headers.get("cross-origin-resource-policy"),
+    policy: res.headers.get("content-security-policy"),
+  };
+}
+
+const sameOriginOnly = (path: string) => ({
+  path,
+  sniff: "nosniff",
+  resource: "same-origin",
+  policy: "frame-ancestors 'self'",
+});
+
+describe("startDevServer response headers", () => {
+  test("keeps every answer to the server's own origin, refusals included", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: notesScript,
+            slides: { intro: introHtml },
+            assets: { "plan.txt": "a plan" },
+          },
+        ],
+      },
+      async (root) => {
+        const voiceDir = join(root, "decks", "demo", ".cache", "voice");
+        await mkdir(voiceDir, { recursive: true });
+        await writeFile(join(voiceDir, "timeline.json"), '{"audio":"audio.wav","beats":[]}\n');
+        await writeFile(join(voiceDir, "audio.wav"), "RIFF");
+        await withDevServer({ cwd: root }, async (server) => {
+          const post = (body: string, headers: Record<string, string> = {}) => ({
+            method: "POST",
+            headers: { "content-type": "application/json", ...headers },
+            body,
+          });
+          const answers: Array<[string, RequestInit, number]> = [
+            ["/", {}, 200],
+            ["/decks/demo/", {}, 200],
+            ["/decks/demo/presenter", {}, 200],
+            ["/decks/demo/slide/intro", {}, 200],
+            ["/decks/demo/slide/nowhere", {}, 404],
+            ["/decks/demo/theme", {}, 200],
+            ["/decks/demo/assets/plan.txt", {}, 200],
+            ["/decks/demo/voice/audio.wav", {}, 200],
+            ["/decks/demo/voice/audio.wav", { headers: { range: "bytes=0-1" } }, 206],
+            ["/decks/demo/voice/timeline.json", {}, 200],
+            ["/decks/demo/current", {}, 200],
+            ["/decks/demo/goto", {}, 405],
+            ["/decks/demo/goto", post("{}"), 400],
+            ["/decks/demo/marks", {}, 200],
+            ["/decks/demo/annotations", {}, 200],
+            ["/decks/nowhere/marks", {}, 404],
+            ["/nowhere", {}, 404],
+            ["/decks/demo/ws", {}, 400],
+            ["/decks/demo/slide/%E0%A4%A", {}, 400],
+            ["/decks/demo/goto", post('{"slug":"intro"}', { origin: "https://site.example" }), 403],
+            ["/", { headers: { host: "site.example" } }, 403],
+          ];
+          for (const [path, init, status] of answers) {
+            const res = await fetch(new URL(path, server.url), init);
+            await res.arrayBuffer();
+            expect({ status: res.status, ...browserHeaders(path, res) }).toEqual({
+              status,
+              ...sameOriginOnly(path),
+            });
+          }
+          const events = await fetch(new URL("/decks/demo/events", server.url));
+          await events.body?.cancel();
+          expect(browserHeaders("/decks/demo/events", events)).toEqual(
+            sameOriginOnly("/decks/demo/events"),
+          );
+        });
+      },
+    );
+  });
+
+  test("keeps the password's and the pairing's answers to the server's own origin", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script: notesScript, slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer(
+          { cwd: join(root, "decks", "demo"), remote: true, password: "secret" },
+          async (server) => {
+            const code = (server.pair as () => string)();
+            const answers: Array<[string, number]> = [
+              ["/presenter", 401],
+              ["/presenter?pair=wrong", 403],
+              [`/presenter?pair=${code}`, 303],
+            ];
+            for (const [path, status] of answers) {
+              const res = await fetch(new URL(path, server.url), { redirect: "manual" });
+              await res.arrayBuffer();
+              expect({ status: res.status, ...browserHeaders(path, res) }).toEqual({
+                status,
+                ...sameOriginOnly(path),
+              });
+            }
+          },
+        );
       },
     );
   });

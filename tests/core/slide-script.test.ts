@@ -416,7 +416,9 @@ describe("evaluateSlideScripts", () => {
     expect(ticked).toBe(true);
   });
 
-  test("answers what the synchronous check does", async () => {
+  // Alone, as the test above is: concurrent tests' synchronous checks each hold the loop for up
+  // to a second, and enough of them run this evaluation past its budget, unanswered.
+  test.serial("answers what the synchronous check does", async () => {
     const code = `${uniqueStatement()}\nexport default { motion: { 2: 1 } };`;
     expect(
       (await evaluateSlideScripts([{ code, ...steps }])).map((found) =>
@@ -425,16 +427,20 @@ describe("evaluateSlideScripts", () => {
     ).toEqual([['motion key "2" is not a beat of this slide']]);
   });
 
-  test("lets the synchronous check answer from the cache without a new evaluation", async () => {
-    const code = hang();
-    await evaluateSlideScripts([{ code, steps: ["1"] }]);
-    const started = performance.now();
-    expect(slideScriptProblems(code, steps)).toEqual([
-      "top-level code did not finish; touch the slide only inside draw",
-    ]);
-    // A fresh evaluation waits out the sandbox's 1s timeout.
-    expect(performance.now() - started).toBeLessThan(500);
-  });
+  // Alone for the same reason: an evaluation stopped at its budget leaves nothing in the cache.
+  test.serial(
+    "lets the synchronous check answer from the cache without a new evaluation",
+    async () => {
+      const code = hang();
+      await evaluateSlideScripts([{ code, steps: ["1"] }]);
+      const started = performance.now();
+      expect(slideScriptProblems(code, steps)).toEqual([
+        "top-level code did not finish; touch the slide only inside draw",
+      ]);
+      // A fresh evaluation waits out the sandbox's 1s timeout.
+      expect(performance.now() - started).toBeLessThan(500);
+    },
+  );
 });
 
 describe("compiled slide scripts", () => {

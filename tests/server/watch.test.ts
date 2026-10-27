@@ -1,11 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import type { LiveEvent } from "../../src/core/live-protocol.ts";
+import { takeUnsandboxed } from "../../src/core/sandbox.ts";
 import { syncDeck } from "../../src/core/sync.ts";
 import { createEventHub, type EventHub } from "../../src/server/hub.ts";
 import { voiceFailureLine, watchDeck, watchErrorDiagnostic } from "../../src/server/watch.ts";
+import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -339,6 +341,60 @@ describe("watchDeck", () => {
       },
     );
   });
+});
+
+describe("watchDeck where Chromium's sandbox cannot start", () => {
+  // The dev server runs until stopped and prints no --json, so stderr is where it says so, once:
+  // each pass whose pages changed starts a worker, and each worker finds no sandbox.
+  test.serial(
+    "says once on stderr that Chromium drew without its sandbox, pass after pass",
+    async () => {
+      takeUnsandboxed();
+      await withTempProject(
+        { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+        async (root) => {
+          const sandboxless = join(
+            import.meta.dir,
+            "..",
+            "helpers",
+            "fake-playwright-sandboxless.ts",
+          );
+          const stderr = spyOn(process.stderr, "write").mockImplementation(() => true);
+          const hub = createEventHub();
+          const warnings = () =>
+            stderr.mock.calls
+              .map(([chunk]) => String(chunk))
+              .filter((text) => text.includes("warning: Chromium drew without its sandbox"));
+          try {
+            await withEnv({ DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: "" }, async () => {
+              const first = waitForEvent(hub, (event) => event.type === "diagnostics");
+              const watcher = watchDeck(deckDir(root), emitTo(hub), {
+                pollIntervalMs: 20,
+                visual: true,
+              });
+              try {
+                await first;
+                expect(warnings()).toHaveLength(1);
+                const second = waitForEvent(hub, (event) => event.type === "diagnostics");
+                await writeFile(
+                  join(deckDir(root), "slides", "intro.html"),
+                  introHtml.replace(">intro<", ">intro, again<"),
+                );
+                await second;
+              } finally {
+                watcher.close();
+              }
+            });
+            expect(warnings()).toHaveLength(1);
+          } finally {
+            stderr.mockRestore();
+            hub.close();
+            takeUnsandboxed();
+          }
+        },
+      );
+    },
+  );
 });
 
 describe("watchDeck diagnostics", () => {

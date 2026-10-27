@@ -1,11 +1,12 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
+import type { HiddenText } from "../core/foreign-text.ts";
 import { lintDeck, lintProject } from "../core/lint.ts";
 import { listSlides, type Project, type ProjectDeck } from "../core/resolve.ts";
 import { slideVideoSeconds, timelineSeconds } from "../core/timeline.ts";
 import { sectionTiming } from "../core/timing.ts";
 import { tryLoadCachedTimeline } from "../core/voice.ts";
 import { type SkippedCheck, skippedChecks } from "./result.ts";
-import type { DecksTarget, RefInfo } from "./scope.ts";
+import { type DecksTarget, hiddenField, hiddenInFiles, type RefInfo } from "./scope.ts";
 
 export type LsListResult = {
   kind: "list";
@@ -46,6 +47,8 @@ export type LsDeckResult = {
   skipped?: SkippedCheck[];
   /** Set when the deck is a ref. */
   ref?: RefInfo;
+  /** A ref's lines of script.md that hold characters a person cannot see. */
+  hidden?: HiddenText[];
 };
 
 /** The one deck in scope, a ref included, or else every deck of the project. */
@@ -58,6 +61,7 @@ export function lsCommand(target: DecksTarget): LsListResult | LsDeckResult {
         { check: "lint", reason: "a ref is read-only; its problems are not yours to fix" },
       ]),
       ref,
+      ...hiddenField(ref, hiddenInFiles(deck.dir, [deck.scriptPath])),
     };
   }
   if (deck) {

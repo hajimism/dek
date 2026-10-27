@@ -27,6 +27,11 @@ declare module "playwright" {
     }): Promise<Buffer>;
     close(): Promise<void>;
     context(): BrowserContext;
+    mainFrame(): Frame;
+    frames(): Frame[];
+  };
+  export type Frame = {
+    url(): string;
   };
   /** A DevTools protocol session: Chromium's own answers, for what the page does not expose. */
   export type CDPSession = {
@@ -44,10 +49,16 @@ declare module "playwright" {
       viewport?: Viewport;
       deviceScaleFactor?: number;
       offline?: boolean;
+      httpCredentials?: { username: string; password: string };
     }): Promise<BrowserContext>;
+    newBrowserCDPSession(): Promise<CDPSession>;
     close(): Promise<void>;
   };
   export const chromium: {
-    launch(options?: { headless?: boolean; chromiumSandbox?: boolean }): Promise<Browser>;
+    launch(options?: {
+      headless?: boolean;
+      chromiumSandbox?: boolean;
+      executablePath?: string;
+    }): Promise<Browser>;
   };
 }

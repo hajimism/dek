@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// biome-ignore lint/style/noRestrictedImports: mkdirSync, in a worker, for the folder its parent made with outputDir, which Chromium writes into.
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Browser } from "playwright";

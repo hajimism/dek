@@ -1,4 +1,5 @@
 import { DekError } from "./error.ts";
+import { holdsHidden } from "./foreign-text.ts";
 
 /**
  * A ref is someone else's deck, kept as a read-only snapshot to read as a
@@ -50,7 +51,7 @@ const DIGEST_RE = /^[0-9a-f]{64}$/;
 
 /** What a ref's deck name may hold, as a hint says it. */
 export const REF_DECK_NAME_RULE =
-  "a ref names its deck with up to 64 letters, digits, dots, dashes, and underscores, not first a dash, each accented letter one character (NFC)";
+  "a ref names its deck with up to 64 letters, digits, dots, dashes, and underscores, none a person cannot see, not first a dash, each accented letter one character (NFC)";
 
 const REF_HINT = `name a ref as owner/repo/deck, e.g. hajimism/dek/why-dek or hajimism/dek/why-dek@v1, or a pack's as file/<deck>; ${REF_DECK_NAME_RULE}`;
 
@@ -91,8 +92,10 @@ export function isPinFor(source: RefSource, pin: string): boolean {
 }
 
 /**
- * True for a deck name a ref can carry: see DECK_RE; not . or ..; and composed (NFC), since a
- * file system that ignores the form would give two spellings of one name one folder.
+ * True for a deck name a ref can carry: see DECK_RE; not . or ..; composed (NFC), since a file
+ * system that ignores the form would give two spellings of one name one folder; and with no
+ * character a person cannot see. A pack's author chooses it, and dek prints it as the ref's name,
+ * as in AGENTS.md.
  */
 export function isRefDeckName(deck: string | undefined): deck is string {
   return (
@@ -100,6 +103,8 @@ export function isRefDeckName(deck: string | undefined): deck is string {
     DECK_RE.test(deck) &&
     deck === deck.normalize("NFC") &&
     Buffer.byteLength(deck) <= DECK_MAX_BYTES &&
+    // DECK_RE takes no control character; a letter or a mark can still be one a person cannot see.
+    !holdsHidden(deck) &&
     deck !== "." &&
     deck !== ".."
   );

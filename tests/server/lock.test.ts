@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import fc from "fast-check";
 import { DekError } from "../../src/core/error.ts";
 import {
   assertNoDevServer,
@@ -11,6 +13,7 @@ import {
   removeDevServerLock,
   writeDevServerLock,
 } from "../../src/server/lock.ts";
+import { propertyTest } from "../helpers/fc.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 describe("writeDevServerLock", () => {
@@ -150,4 +153,217 @@ describe("a lock a repository brings along", () => {
       }
     });
   });
+});
+
+/**
+ * Who holds a lock file: this process, another live one, one that is gone, or a pid this user may
+ * not signal (pid 1), as when a lock outlives its server and a system process takes the pid. Every
+ * lock is written for its owner alone, so that last is never another user's server: dek takes it,
+ * like a gone one, for a stale lock.
+ */
+type Holder = "self" | "live" | "dead" | "reused";
+
+const PIDS: Record<Holder, number> = {
+  self: process.pid,
+  live: process.ppid,
+  dead: 2_147_483_647,
+  reused: 1,
+};
+
+type LockFile = { url: string; holder: Holder; password?: string; deck?: string } | "corrupt";
+
+/** What the lock promises for each project root: the file there, and the claim this process holds. */
+type LockModel = Array<{ file?: LockFile; claimed?: string }>;
+
+type LockReal = { roots: string[] };
+
+/** The URL of the server holding `root`, as any server about to start must see it. */
+function runningAt(state: LockModel[number]): string | undefined {
+  const { file } = state;
+  return state.claimed ?? (typeof file === "object" && isLive(file.holder) ? file.url : undefined);
+}
+
+function isLive(holder: Holder): boolean {
+  return holder === "self" || holder === "live";
+}
+
+function lockPath(root: string): string {
+  return join(root, ".dek", "server.json");
+}
+
+/** What another process writes: its own lock, as writeDevServerLock writes one. */
+function plant(root: string, file: Exclude<LockFile, "corrupt">): void {
+  mkdirSync(join(root, ".dek"), { recursive: true });
+  writeFileSync(
+    lockPath(root),
+    `${JSON.stringify({ url: file.url, pid: PIDS[file.holder], ...(file.deck ? { deck: file.deck } : {}) })}\n`,
+  );
+}
+
+/** After each step, every root reads as the model says, and refuses a server exactly when it says. */
+function lockAgrees(model: LockModel, real: LockReal): void {
+  real.roots.forEach((root, at) => {
+    const state = model[at] ?? {};
+    const { file } = state;
+    expect({ at, read: readDevServerLock(root) }).toEqual({
+      at,
+      read:
+        typeof file === "object"
+          ? {
+              url: file.url,
+              pid: PIDS[file.holder],
+              ...(file.password ? { password: file.password } : {}),
+              ...(file.deck ? { deck: file.deck } : {}),
+            }
+          : undefined,
+    });
+    const running = runningAt(state);
+    const refused = (() => {
+      try {
+        assertNoDevServer(root);
+        return undefined;
+      } catch (error) {
+        return (error as DekError).hint;
+      }
+    })();
+    expect({ at, refused }).toEqual({ at, refused: running && `open ${running}` });
+  });
+}
+
+type LockCommand = fc.Command<LockModel, LockReal>;
+
+function lockCommand(
+  name: string,
+  check: (model: Readonly<LockModel>) => boolean,
+  run: (model: LockModel, real: LockReal) => void,
+): LockCommand {
+  return {
+    check,
+    run(model, real) {
+      run(model, real);
+      lockAgrees(model, real);
+    },
+    toString: () => name,
+  };
+}
+
+const rootAt = fc.nat(1);
+const url = fc.nat(9).map((port) => `http://127.0.0.1:${5170 + port}/`);
+const deckName = fc.option(fc.constantFrom("a", "b"), { nil: undefined });
+
+/** This process starts a server, scoped to a deck or not: refused while any live server holds the root. */
+const start = fc
+  .tuple(rootAt, url, fc.option(fc.constant("secret"), { nil: undefined }), deckName)
+  .map(([at, address, password, deck]) =>
+    lockCommand(
+      `start(${at}, ${address}${deck ? `, ${deck}` : ""})`,
+      () => true,
+      (model, real) => {
+        const state = model[at] ?? {};
+        const running = runningAt(state);
+        const root = real.roots[at] ?? "";
+        if (running !== undefined) {
+          expect(() => writeDevServerLock(root, address, password, deck)).toThrow(
+            `dev server already running at ${running}`,
+          );
+          return;
+        }
+        writeDevServerLock(root, address, password, deck);
+        model[at] = { file: { url: address, holder: "self", password, deck }, claimed: address };
+      },
+    ),
+  );
+
+/** This process's server stops: its claim and its own file go, another's file stays. */
+const stop = rootAt.map((at) =>
+  lockCommand(
+    `stop(${at})`,
+    () => true,
+    (model, real) => {
+      removeDevServerLock(real.roots[at] ?? "");
+      const { file } = model[at] ?? {};
+      model[at] = typeof file === "object" && file.holder !== "self" ? { file } : {};
+    },
+  ),
+);
+
+/** Another process starts a server, as it may when it sees no live lock. */
+const otherStarts = fc
+  .tuple(rootAt, url, fc.constantFrom<Holder>("live"), deckName)
+  .map(([at, address, holder, deck]) =>
+    lockCommand(
+      `other starts(${at}, ${address}, ${holder})`,
+      (model) => {
+        const { file } = model[at] ?? {};
+        return typeof file !== "object" || !isLive(file.holder);
+      },
+      (model, real) => {
+        const file = { url: address, holder, deck };
+        plant(real.roots[at] ?? "", file);
+        model[at] = { ...model[at], file };
+      },
+    ),
+  );
+
+/** Another process's server dies without removing its lock, which is then stale. */
+const otherDies = fc.tuple(rootAt, fc.constantFrom<Holder>("dead", "reused")).map(([at, holder]) =>
+  lockCommand(
+    `other dies(${at}, ${holder})`,
+    (model) => {
+      const { file } = model[at] ?? {};
+      return typeof file === "object" && file.holder === "live";
+    },
+    (model, real) => {
+      const { file } = model[at] ?? {};
+      if (typeof file === "object") {
+        const stale = { ...file, holder };
+        plant(real.roots[at] ?? "", stale);
+        model[at] = { ...model[at], file: stale };
+      }
+    },
+  ),
+);
+
+/** The lock file is lost or broken: deleted with `.dek`, or left half-written. */
+const mangle = fc
+  .tuple(rootAt, fc.constantFrom(undefined, "", "{", '{"url":1,"pid":2}', "null"))
+  .map(([at, text]) =>
+    lockCommand(
+      `mangle(${at}, ${JSON.stringify(text)})`,
+      () => true,
+      (model, real) => {
+        const root = real.roots[at] ?? "";
+        if (text === undefined) {
+          rmSync(join(root, ".dek"), { recursive: true, force: true });
+        } else {
+          mkdirSync(join(root, ".dek"), { recursive: true });
+          writeFileSync(lockPath(root), text);
+        }
+        model[at] = { ...model[at], file: text === undefined ? undefined : "corrupt" };
+      },
+    ),
+  );
+
+describe("the dev server lock, against a model of what it promises", () => {
+  // Whatever servers start and stop, in this process or another, and whatever becomes of the
+  // file: one server holds a project at a time, a deck-scoped one included; a lock whose server
+  // is gone, or that cannot be read, is no lock; and a server that stops leaves no lock of its own.
+  propertyTest(
+    "refuses and reads every root as the model says",
+    fc.property(
+      fc.commands([start, stop, otherStarts, otherDies, mangle], { maxCommands: 20 }),
+      (commands) => {
+        const roots = [0, 1].map(() => realpathSync(mkdtempSync(join(tmpdir(), "dek-lock-"))));
+        try {
+          fc.modelRun(() => ({ model: [{}, {}], real: { roots } }), commands);
+        } finally {
+          for (const root of roots) {
+            removeDevServerLock(root);
+            rmSync(root, { recursive: true, force: true });
+          }
+        }
+      },
+    ),
+    { runs: 50 },
+  );
 });

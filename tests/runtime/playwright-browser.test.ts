@@ -1,22 +1,24 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect } from "bun:test";
 import { realpathSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Browser } from "playwright";
 import { renderDeckHtml } from "../../src/core/document.ts";
 import { renderPdfHtml } from "../../src/core/pdf.ts";
-import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
+import { playwrightResolved } from "../../src/core/playwright.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { playerScript } from "../../src/runtime/player.ts";
+import { serialBrowserTest, sharedBrowser } from "../helpers/browser.ts";
 import { chartScript } from "../helpers/chart-deck.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
+import { WAIT_MS } from "../helpers/wait.ts";
 
 // The player in a real Chromium: print media, the accessibility tree, and view transitions are
 // what happy-dom does not have. Run from sample/, where playwright is installed.
 const skip = !playwrightResolved() || Boolean(process.env.DEK_PLAYWRIGHT);
-const browserTest = test.serial.skipIf(skip);
+const browserTest = serialBrowserTest(skip);
+const withBrowser = sharedBrowser();
 
 /** The part of Playwright's page these tests drive; dek's own typing covers only what dek calls. */
 type Page = {
@@ -45,10 +47,9 @@ type Locator = {
 };
 
 async function newPage(): Promise<Page> {
-  if (!browser) {
-    throw new Error("no browser");
-  }
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = await withBrowser((browser) =>
+    browser.newPage({ viewport: { width: 1280, height: 720 } }),
+  );
   return page as unknown as Page;
 }
 
@@ -77,7 +78,6 @@ ${extra.map((slug) => `## ${slug}\n\n${slug}\n`).join("\n")}`;
 
 let root = "";
 let deckDir = "";
-let browser: Browser | undefined;
 
 beforeAll(async () => {
   if (skip) {
@@ -110,12 +110,9 @@ beforeAll(async () => {
   });
   deckDir = join(root, "decks", "demo");
   await writeFile(join(deckDir, "slides", "chart.ts"), chartScript);
-  const playwright = await importPlaywright();
-  browser = await playwright.chromium.launch({ headless: true });
 });
 
 afterAll(async () => {
-  await browser?.close();
   if (root) {
     await rm(root, { recursive: true, force: true });
   }
@@ -180,7 +177,7 @@ describe("printing the player", () => {
             document.querySelector('#deck > .slide[data-slug="chart"] .bar')?.textContent ===
             "2:growth:40",
           undefined,
-          { timeout: 2000 },
+          { timeout: WAIT_MS },
         );
         await page.emulateMedia({ media: "screen" });
         await page.waitForFunction(
@@ -188,7 +185,7 @@ describe("printing the player", () => {
             document.querySelector('#deck > .slide[data-slug="chart"] .bar')?.textContent ===
             "1:base:0",
           undefined,
-          { timeout: 2000 },
+          { timeout: WAIT_MS },
         );
       } finally {
         await page.close();
@@ -261,7 +258,7 @@ describe("rapid moves", () => {
       for (let i = 0; i < 10; i++) {
         await page.keyboard.press("PageDown", { delay: 0 });
       }
-      await page.waitForFunction(() => location.hash === "#seven", undefined, { timeout: 3000 });
+      await page.waitForFunction(() => location.hash === "#seven", undefined, { timeout: WAIT_MS });
       await page.waitForTimeout(500);
       expect(errors).toEqual([]);
     } finally {

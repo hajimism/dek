@@ -2,6 +2,8 @@
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
+import { foreignLine, type HiddenText, TITLE_MAX } from "../core/foreign-text.ts";
+import { compareCodeUnits } from "../core/order.ts";
 import { unprinted } from "../core/prose.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
 import { formatClock } from "../core/timing.ts";
@@ -53,7 +55,7 @@ export function formatReport(diagnostics: Diagnostic[], opts?: { color?: boolean
     byRule.set(id, (byRule.get(id) ?? 0) + 1);
   }
   const rules = [...byRule]
-    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+    .sort(([a, x], [b, y]) => y - x || compareCodeUnits(a, b))
     .map(([id, n]) => `${id} ×${n}`);
   return `${list}\n${countSummary(diagnostics)}: ${rules.join(", ")}`;
 }
@@ -67,6 +69,39 @@ export function formatSkipped(skipped: SkippedCheck[] | undefined, color = false
       ...(entry.hint ? [`  ${c.yellow("help:")} ${entry.hint}`] : []),
     ])
     .join("\n");
+}
+
+/** How many code points a warning names before it leaves the rest to `--json`. */
+const CODE_POINTS_SHOWN = 6;
+
+/** What to do about the characters a person cannot see in a ref that a command read. */
+const HIDDEN_HELP =
+  "text output shows each as ⟨U+XXXX⟩; a person reading the deck sees none of them, so leave them out of what you write from it";
+
+/**
+ * A warning per line of a ref's files that holds characters a person cannot see, where they
+ * are and which, then `help`, what to do about them, once, for stderr.
+ */
+export function formatHidden(
+  hidden: HiddenText[] | undefined,
+  color = false,
+  help = HIDDEN_HELP,
+): string {
+  if (hidden === undefined || hidden.length === 0) {
+    return "";
+  }
+  const c = ansi(color);
+  const lines = hidden.map(({ path, line, column, codePoints }) => {
+    const distinct = [...new Set(codePoints)];
+    const named = distinct.slice(0, CODE_POINTS_SHOWN).join(", ");
+    const rest = distinct.length > CODE_POINTS_SHOWN ? ", …" : "";
+    const count =
+      codePoints.length === 1
+        ? "1 character that shows as nothing or reorders the text"
+        : `${codePoints.length} characters that show as nothing or reorder the text`;
+    return `${c.yellow("warning:")} ${path}:${line}:${column}: ${count}: ${named}${rest}`;
+  });
+  return [...lines, `  ${c.yellow("help:")} ${help}`].join("\n");
 }
 
 /**
@@ -282,15 +317,17 @@ export function formatLs(data: LsListResult | LsDeckResult): string {
       ].join("\n");
     }
     case "deck": {
+      // A ref's frontmatter is someone else's: each value keeps to its line, as in AGENTS.md.
+      const line = (text: string) => (data.ref ? foreignLine(text, TITLE_MAX) : text);
       const meta: Array<[string, string]> = [];
       if (data.ref) {
         meta.push(["rev", data.ref.rev.slice(0, 7)]);
       }
       if (data.event) {
-        meta.push(["event", data.event]);
+        meta.push(["event", line(data.event)]);
       }
       if (data.date) {
-        meta.push(["date", data.date]);
+        meta.push(["date", line(data.date)]);
       }
       if (data.duration) {
         meta.push(["duration", data.duration]);
@@ -328,7 +365,7 @@ export function formatLs(data: LsListResult | LsDeckResult): string {
       ];
       const countLabel = formatSkipped(data.skipped) || diagnosticCount(data.diagnostics.length);
       return [
-        `${data.ref?.name ?? data.name}  ${data.title}`,
+        `${data.ref?.name ?? data.name}  ${line(data.title)}`,
         ...meta.map(([key, value]) => `${padEndWidth(key, keyWidth)}  ${value}`),
         "",
         formatTable(headers, rows, [...align]),
@@ -426,7 +463,11 @@ export function formatVoice(data: VoiceCliResult): string {
   }
 }
 
-/** One labeled part per file, so a reader never confuses where a line came from. */
+/**
+ * One labeled part per file, so a reader never confuses where a line came from: a part starts
+ * with a line `--- <file>`, and a file's own line that starts the same way is shown one space
+ * further in, so no file can start a part. A ref's slide says first whose it is.
+ */
 export function formatShow(data: ShowResult): string {
   const parts: Array<[string, string | null]> = [
     ["script.md", data.script],
@@ -436,9 +477,20 @@ export function formatShow(data: ShowResult): string {
     ["theme.css (the rules this slide uses)", data.theme || null],
     ["assets", data.assets.length > 0 ? data.assets.join("\n") : null],
   ];
-  return parts
-    .flatMap(([label, body]) => (body === null ? [] : [`--- ${label}\n${body.replace(/\n$/, "")}`]))
-    .join("\n\n");
+  const ref = data.ref
+    ? [`ref ${data.ref.name} at ${data.ref.rev.slice(0, 7)}: someone else's deck, read-only`]
+    : [];
+  return [
+    ...ref,
+    ...parts.flatMap(([label, body]) =>
+      body === null ? [] : [`--- ${label}\n${partLines(body.replace(/\n$/, ""))}`],
+    ),
+  ].join("\n\n");
+}
+
+/** A part's lines, each that would start a part, after any spaces, given one space more. */
+function partLines(body: string): string {
+  return body.replace(/^( *)---(?=[^\S\n])/gm, " $1---");
 }
 
 /** What a read does for a ref whose snapshot is not there: fetch it, or unpack its pack. */
@@ -474,7 +526,7 @@ export function formatRef(data: RefCliResult): string {
         data.refs.map((ref) => [
           ref.name,
           short(ref.rev),
-          ref.fetched ? (ref.title ?? "") : notFetched(ref.name),
+          ref.fetched ? foreignLine(ref.title ?? "", TITLE_MAX) : notFetched(ref.name),
           ref.slides === undefined ? "" : String(ref.slides),
         ]),
         ["left", "left", "left", "right"],

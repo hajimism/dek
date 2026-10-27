@@ -221,6 +221,39 @@ describe("inlineAssets", () => {
     });
   });
 
+  test("reads each URL as the browser does, and writes what it inlines escaped", async () => {
+    await withTempDir(async (root) => {
+      const deckDir = await deckWith(root, ["assets/Q&A.png", "assets/s.svg"]);
+      const html =
+        '<img src="assets/Q&amp;A.png" alt="Q&amp;A"><svg><use href="assets/s.svg#a&amp;b&quot;c&lt;d"/></svg>';
+      expect(inlineAssets(html, deckDir)).toBe(
+        `<img src="${x("image/png")}" alt="Q&amp;A"><svg><use href="${x("image/svg+xml")}#a&amp;b&quot;c&lt;d" /></svg>`,
+      );
+    });
+  });
+
+  test("inlines no path a no-break space starts, which names no file in the browser", async () => {
+    await withTempDir(async (root) => {
+      const deckDir = await deckWith(root, ["assets/a.png"]);
+      const html = '<img src="&nbsp;assets/a.png" alt=""><img src="\u00A0assets/a.png" alt="">';
+      expect(inlineAssets(html, deckDir)).toBe(html);
+    });
+  });
+
+  test("leaves what it does not inline byte for byte as written", async () => {
+    await withTempDir(async (root) => {
+      const deckDir = await deckWith(root, ["assets/a.png"]);
+      const kept =
+        '<img src="https://cdn.example.com/a.png?q=&quot;1&quot;&amp;r=&lt;&s" alt=\'say "hi"\'><img src=assets/b.png&amp;c>';
+      expect(inlineAssets(kept, deckDir)).toBe(kept);
+      const html =
+        "<img srcset='assets/a.png 1x, https://cdn.example.com/b.png?x=&quot;&amp;y=&lt;z&w 2x' alt=\"\">";
+      expect(inlineAssets(html, deckDir)).toBe(
+        `<img srcset="${x("image/png")} 1x, https://cdn.example.com/b.png?x=&quot;&amp;y=&lt;z&w 2x" alt="">`,
+      );
+    });
+  });
+
   test("leaves links alone, and text a pattern would mistake for an attribute", async () => {
     await withTempDir(async (root) => {
       const deckDir = await deckWith(root, ["assets/a.png"]);
