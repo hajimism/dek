@@ -15,6 +15,7 @@ import {
   refLicense,
   refState,
   refTitle,
+  refuseLinkUnderPacks,
   refuseLinkUnderRefs,
   type Snapshot,
   snapshotDigest,
@@ -194,6 +195,8 @@ async function addPack(cwd: string, arg: string): Promise<RefAddResult> {
   const rev = await snapshotDigest(read);
   const { pinned: from, dir, fetched } = refState(project, source.name);
   const stored = join(project.root, packFile(source.deck));
+  // Before the first write: the copy below is written by name.
+  refuseLinkUnderPacks(project.root, source.deck);
 
   let changed = false;
   if (!(fetched && from === rev)) {
@@ -268,8 +271,11 @@ export function removeRef(cwd: string, arg: string): RefRmResult {
       hint: "run `dekc ref` to list refs",
     });
   }
-  // Before anything changes: the delete below must not reach what a link there points to.
+  // Before anything changes: the deletes below must not reach what a link there points to.
   refuseLinkUnderRefs(project.root, dir);
+  if (source.kind === "file") {
+    refuseLinkUnderPacks(project.root, source.deck);
+  }
   if (pinned !== undefined) {
     const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(

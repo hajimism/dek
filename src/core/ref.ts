@@ -5,7 +5,7 @@ import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
 import { walkUp } from "./optional.ts";
-import { parseRefSource, type RefSource } from "./ref-name.ts";
+import { packFile, parseRefSource, type RefSource } from "./ref-name.ts";
 import { listSlides, type Project, resolveProject } from "./resolve.ts";
 import { followInside, outputDir } from "./safe-fs.ts";
 
@@ -25,10 +25,10 @@ function isLink(path: string): boolean {
   }
 }
 
-/** The first link on the way from `<root>/refs` down to `dir`, both included, if any. */
-function linkUnderRefs(root: string, dir: string): string | undefined {
-  let at = join(root, "refs");
-  for (const segment of ["", ...relative(at, dir).split(sep)]) {
+/** The first link on the way from `<root>/<top>` down to `path`, both included, if any. */
+function linkUnder(root: string, top: "refs" | "packs", path: string): string | undefined {
+  let at = join(root, top);
+  for (const segment of ["", ...relative(at, path).split(sep)]) {
     at = join(at, segment);
     if (isLink(at)) {
       return at;
@@ -43,15 +43,29 @@ function linkUnderRefs(root: string, dir: string): string | undefined {
  * snapshot's swap and its delete at what it points to, such as a deck under decks/.
  */
 export function refuseLinkUnderRefs(root: string, dir: string): void {
-  const link = linkUnderRefs(root, dir);
-  if (link === undefined) {
-    return;
+  const link = linkUnder(root, "refs", dir);
+  if (link !== undefined) {
+    const rel = relative(root, link);
+    throw new DekError(`${rel} is a symlink; dek follows no link under refs/`, {
+      path: link,
+      hint: `remove ${rel}: refs/ holds only the snapshots \`dekc ref\` writes, and the next read of a pinned ref fetches it again`,
+    });
   }
-  const rel = relative(root, link);
-  throw new DekError(`${rel} is a symlink; dek follows no link under refs/`, {
-    path: link,
-    hint: `remove ${rel}: refs/ holds only the snapshots \`dekc ref\` writes, and the next read of a pinned ref fetches it again`,
-  });
+}
+
+/**
+ * Refuses a link at packs/, or at the copy of `deck`'s pack kept there. dek writes and removes
+ * that copy by name, so through a link it would overwrite, or delete, what the link points to.
+ */
+export function refuseLinkUnderPacks(root: string, deck: string): void {
+  const link = linkUnder(root, "packs", join(root, packFile(deck)));
+  if (link !== undefined) {
+    const rel = relative(root, link);
+    throw new DekError(`${rel} is a symlink; dek follows no link under packs/`, {
+      path: link,
+      hint: `remove ${rel}, then run \`dekc ref <file>.tgz\` with the pack you were sent: packs/ holds the copies it keeps, as plain files`,
+    });
+  }
 }
 
 /** Written into each snapshot; its presence is what makes a directory a ref. */
@@ -161,7 +175,7 @@ export function refState(project: { root: string; configPath: string }, name: st
     // Never through a link under refs/: one is fetched again, which refuses the link.
     fetched:
       pinned !== undefined &&
-      linkUnderRefs(project.root, dir) === undefined &&
+      linkUnder(project.root, "refs", dir) === undefined &&
       readRefMeta(dir)?.rev === pinned,
   };
 }

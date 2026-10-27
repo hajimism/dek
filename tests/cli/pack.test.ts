@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { chmod, copyFile, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 import { addRef, listRefs, removeRef, restoreRef } from "../../src/cli/ref.ts";
@@ -310,6 +320,56 @@ describe("a pack's slide script", () => {
         expect(jsonStdout<{ error: { message: string } }>(result).error.message).toBe(
           'invalid slide script "intro": imports are not supported; keep the slide script self-contained',
         );
+      });
+    });
+  });
+});
+
+describe("a link at packs/", () => {
+  test.serial("adding a pack writes nothing through it, in the project or out", async () => {
+    await withTempDir(async (inbox) => {
+      const pack = await packOf(inbox, talk);
+      await withTempProject(receiver, async (root) => {
+        await mkdir(join(root, "decks", "mine", "assets"), { recursive: true });
+        await symlink(join(root, "decks", "mine", "assets"), join(root, "packs"));
+        const toml = await readFile(join(root, "dek.toml"), "utf8");
+        await expect(addRef(root, pack)).rejects.toMatchObject({
+          message: "packs is a symlink; dek follows no link under packs/",
+          hint: expect.stringContaining("remove packs"),
+        });
+        expect(await readdir(join(root, "decks", "mine", "assets"))).toEqual([]);
+        expect(existsSync(join(root, "refs"))).toBe(false);
+        expect(await readFile(join(root, "dek.toml"), "utf8")).toBe(toml);
+      });
+    });
+  });
+
+  test.serial("rm removes nothing through it, nor through a pack that is a link", async () => {
+    await withTempDir(async (inbox) => {
+      const pack = await packOf(inbox, talk);
+      await withTempProject(receiver, async (root) => {
+        await addRef(root, pack);
+        const assets = join(root, "decks", "mine", "assets");
+        await mkdir(assets, { recursive: true });
+        await rename(join(root, "packs", "talk.tgz"), join(assets, "talk.tgz"));
+        await rm(join(root, "packs"), { recursive: true });
+        await symlink(assets, join(root, "packs"));
+        const toml = await readFile(join(root, "dek.toml"), "utf8");
+        expect(() => removeRef(root, REF)).toThrow(
+          expect.objectContaining({
+            message: "packs is a symlink; dek follows no link under packs/",
+          }),
+        );
+        await rm(join(root, "packs"));
+        await mkdir(join(root, "packs"));
+        await symlink(join(assets, "talk.tgz"), join(root, "packs", "talk.tgz"));
+        expect(() => removeRef(root, REF)).toThrow(
+          expect.objectContaining({
+            message: "packs/talk.tgz is a symlink; dek follows no link under packs/",
+          }),
+        );
+        expect(await readdir(assets)).toEqual(["talk.tgz"]);
+        expect(await readFile(join(root, "dek.toml"), "utf8")).toBe(toml);
       });
     });
   });
