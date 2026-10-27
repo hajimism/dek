@@ -1,5 +1,6 @@
 import { join, relative } from "node:path";
 import { DekError } from "../core/error.ts";
+import { shellName, shellQuote } from "../core/escape.ts";
 import {
   isRefName,
   packFile,
@@ -134,10 +135,11 @@ export function resolveScope(cwd: string, options: { deck?: string } = {}): Scop
     if (failed) {
       throw failed.error;
     }
-    const guess = suggest(name, [
+    const near = suggest(name, [
       ...project.decks.map((entry) => entry.name),
       ...project.failed.map((entry) => entry.name),
     ]);
+    const guess = near === undefined ? undefined : shellName(near);
     throw new DekError(`deck "${name}" not found`, {
       path: join(project.root, "decks", name),
       hint: guess ? `did you mean \`${guess}\`? run \`dekc ls\` for every deck` : "run `dekc ls`",
@@ -262,18 +264,16 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
       hint:
         source.kind === "file"
           ? "add it from the pack you were sent: `dekc ref <file>.tgz`"
-          : `run \`dekc ref ${arg}\``,
+          : `run \`dekc ref ${shellQuote(arg)}\``,
     });
   }
   // What adds the ref again: a pack's ref from its file, any other from its name.
-  const again =
-    source.kind === "file"
-      ? `dekc ref ${packFile(source.deck)}`
-      : `dekc ref ${source.name}@${pinned}`;
+  const added = source.kind === "file" ? packFile(source.deck) : `${source.name}@${pinned}`;
+  const again = `dekc ref ${shellQuote(added)}`;
   if (source.kind === "github" && source.rev !== undefined && source.rev !== pinned) {
     throw new DekError(`"${arg}" is not the pinned version, ${pinned.slice(0, 7)}`, {
       path: project.configPath,
-      hint: `run \`dekc ref ${arg}\` to pin that version, or drop @${source.rev}`,
+      hint: `run \`dekc ref ${shellQuote(arg)}\` to pin that version, or drop @${source.rev}`,
     });
   }
   if (!fetched) {

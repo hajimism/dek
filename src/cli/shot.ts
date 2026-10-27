@@ -1,4 +1,5 @@
 import { DekError } from "../core/error.ts";
+import { shellQuote } from "../core/escape.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
 import { type ShotFile, shotDeck, shotSheet } from "../core/shot/still.ts";
@@ -91,7 +92,7 @@ export function parseShotMode(options: ShotCommandOptions): ShotMode {
     if (slug) {
       refuse(
         "--sheet with a slug",
-        `--sheet tiles every slide; for one slide's beats, run \`dekc shot ${slug} --motion\``,
+        `--sheet tiles every slide; for one slide's beats, run \`dekc shot ${shellQuote(slug)} --motion\``,
       );
     }
     return { kind: "sheet" };

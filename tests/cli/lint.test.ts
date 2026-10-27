@@ -9,6 +9,7 @@ import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { shellWords } from "../helpers/shell.ts";
 
 const introHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">intro</h2>
@@ -370,6 +371,22 @@ more
             hint: `run \`${rumdl} check decks/demo/script.md\` to see why`,
           });
           expect(result.rumdlSarif).toBeUndefined();
+        });
+      },
+    );
+  });
+
+  test.serial("names rumdl and the script as one word each when it gives no result", async () => {
+    await withTempProject(
+      { decks: [{ name: "it's", slides: { intro: introHtml } }] },
+      async (root) => {
+        const rumdl = join(root, "my rumdl");
+        await writeFile(rumdl, "#!/bin/sh\nexit 2\n");
+        await chmod(rumdl, 0o755);
+        await withEnv({ DEK_RUMDL: rumdl }, async () => {
+          const result = await lintCommand(resolveDecks(root), { cwd: root });
+          const command = result.skipped?.[0]?.hint?.match(/`([^`]*)`/)?.[1] ?? "";
+          expect(shellWords(command)).toEqual([rumdl, "check", "decks/it's/script.md"]);
         });
       },
     );

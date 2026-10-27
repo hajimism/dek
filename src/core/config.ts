@@ -1,6 +1,7 @@
 import { dirname } from "node:path";
 import { z } from "zod";
 import { DekError } from "./error.ts";
+import { shellQuote } from "./escape.ts";
 import { isPackLicense, PACK_LICENSES, type PackLicense } from "./licenses.ts";
 import { parsePublicUrl } from "./ogp.ts";
 import {
@@ -63,8 +64,8 @@ export const DekToml = z.object({
           path: [name],
           message:
             source.kind === "file"
-              ? `pin a pack's ref to the 64-character sha256 of its files; run \`dekc ref ${packFile(source.deck)}\` to pin one`
-              : `pin a ref to a 40-character commit sha; run \`dekc ref ${name}\` to pin one`,
+              ? `pin a pack's ref to the 64-character sha256 of its files; run \`dekc ref ${shellQuote(packFile(source.deck))}\` to pin one`
+              : `pin a ref to a 40-character commit sha; run \`dekc ref ${shellQuote(name)}\` to pin one`,
         });
       }
     })

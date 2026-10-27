@@ -8,6 +8,7 @@ import { renameSection, reorderSection } from "../../src/core/mv.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { hintCommands } from "../helpers/shell.ts";
 
 const problemHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">keep heading</h2>
@@ -81,6 +82,33 @@ body
         expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(before);
         expect(existsSync(join(deckDir, "slides", "problem.html"))).toBe(true);
         expect(await readFile(dest, "utf8")).toBe(problemHtml);
+      },
+    );
+  });
+
+  test("names a slide file a shell reads as one word in the command to run again", async () => {
+    const file = "x`;echo hi;`";
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: problemHtml, [file]: problemHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        try {
+          renameSection(deckDir, file, "intro");
+          throw new Error("expected renameSection to fail");
+        } catch (error) {
+          expect(hintCommands((error as DekError).hint)).toEqual([["dekc", "mv", file, "intro"]]);
+        }
+      },
+    );
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: problemHtml, "it's": problemHtml } }] },
+      async (root) => {
+        try {
+          renameSection(join(root, "decks", "demo"), "it's", "intro");
+          throw new Error("expected renameSection to fail");
+        } catch (error) {
+          expect((error as DekError).hint).toEndWith(", then run that `dekc mv` again");
+        }
       },
     );
   });

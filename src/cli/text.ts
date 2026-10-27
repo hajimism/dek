@@ -1,6 +1,7 @@
 // How each command's result reads as text; commands.ts says which command prints which.
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
+import { shellQuote } from "../core/escape.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
 import { formatClock } from "../core/timing.ts";
 import type { AnnotationsCliResult } from "./annotations.ts";
@@ -459,7 +460,7 @@ export function formatRef(data: RefCliResult): string {
         head,
         ...data.warnings.map((warning) => `warning: ${warning}`),
         ...(data.pack ? [`commit ${data.pack}: a clone unpacks the ref from it`] : []),
-        `read it with \`dekc ls ${data.name}\` and \`dekc show ${data.name} <slug>\``,
+        `read it with \`dekc ls ${shellQuote(data.name)}\` and \`dekc show ${shellQuote(data.name)} <slug>\``,
       ].join("\n");
     }
     case "list":

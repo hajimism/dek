@@ -3,6 +3,7 @@ import { basename, join, resolve } from "node:path";
 import { parseCss, publishedTokens } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
+import { shellQuote } from "../core/escape.ts";
 import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
@@ -26,7 +27,6 @@ import {
   nextSteps,
   type PlannedPath,
   playwrightStep,
-  shellQuote,
 } from "./files.ts";
 
 export type InitResult = {

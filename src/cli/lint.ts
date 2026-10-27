@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
 import type { Diagnostic } from "../core/diagnostic.ts";
+import { shellQuote } from "../core/escape.ts";
 import { lintDeck, lintProject, unreadableScriptDiagnostics } from "../core/lint.ts";
 import { playwrightMissingError } from "../core/playwright.ts";
 import { resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
@@ -79,6 +80,6 @@ function rumdlSkipped(scriptPath: string, cwd: string): SkippedCheck {
   return {
     check: "rumdl",
     reason: "rumdl ran but gave no result",
-    hint: `run \`${bin} check ${relative(cwd, scriptPath) || scriptPath}\` to see why`,
+    hint: `run \`${shellQuote(bin)} check ${shellQuote(relative(cwd, scriptPath) || scriptPath)}\` to see why`,
   };
 }

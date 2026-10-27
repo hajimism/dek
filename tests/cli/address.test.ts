@@ -5,6 +5,7 @@ import { lintCommand } from "../../src/cli/lint.ts";
 import { addressResult } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { AWKWARD_NAMES, hintCommands, UNWRITABLE_NAMES } from "../helpers/shell.ts";
 
 // Hints are written as if run inside the deck they are about. The CLI knows where it ran, so it
 // names the deck in every command that takes one, and a hint runs as written from anywhere.
@@ -52,6 +53,54 @@ describe("addressHint", () => {
     ]) {
       expect(addressHint(hint, demo, root)).toBe(hint);
     }
+  });
+
+  test("names a deck a shell reads as one word, once, without a backtick", async () => {
+    await withTempProject({ decks: [{ name: "other" }] }, async (project) => {
+      for (const name of [...AWKWARD_NAMES, "講演"]) {
+        const deck = { name, dir: join(project, "decks", name) };
+        const outside = addressHint("run `dekc theme`, then `dekc check intro`", deck, project);
+        expect(hintCommands(outside)).toEqual([
+          ["dekc", "theme", name],
+          ["dekc", "check", name, "intro"],
+        ]);
+        expect([...outside].filter((char) => char === "`").length).toBe(4);
+        expect(addressHint(outside, deck, project)).toBe(outside);
+        const inOther = addressHint("run `dekc theme`", deck, join(project, "decks", "other"));
+        expect(hintCommands(inOther)).toEqual([["dekc", "theme", "--deck", name]]);
+        expect(addressHint(inOther, deck, join(project, "decks", "other"))).toBe(inOther);
+      }
+      expect(addressHint("run `dekc theme`", { name: "講演", dir: "/p/decks/講演" }, "/p")).toBe(
+        "run `dekc theme 講演`",
+      );
+    });
+  }, 30_000);
+
+  test("writes a placeholder for a deck no word holds alike in every shell, and says where it is", () => {
+    for (const name of UNWRITABLE_NAMES) {
+      const deck = { name, dir: `/p/decks/${name}` };
+      const hint = addressHint("run `dekc theme`, then `dekc check intro`", deck, "/p");
+      expect(hint).toBe(
+        "run `dekc theme <deck>`, then `dekc check <deck> intro`; for <deck>, name the deck as `dekc ls` lists it",
+      );
+      expect(addressHint(hint, deck, "/p")).toBe(hint);
+    }
+  });
+
+  test("names a deck that would read as a flag or a subcommand with --deck", () => {
+    const deck = (name: string) => ({ name, dir: `/p/decks/${name}` });
+    const cases: Array<[string, string, string]> = [
+      ["-x", "run `dekc theme`", "run `dekc theme --deck=-x`"],
+      ["--before=intro", "run `dekc mv a b`", "run `dekc mv --deck=--before=intro a b`"],
+      ["clear", "run `dekc marks clear`", "run `dekc marks --deck clear clear`"],
+      ["pin", "run `dekc voice pin`", "run `dekc voice --deck pin pin`"],
+      ["dict", "run `dekc voice dict add a b`", "run `dekc voice --deck dict dict add a b`"],
+    ];
+    for (const [name, hint, addressed] of cases) {
+      expect(addressHint(hint, deck(name), "/p")).toBe(addressed);
+      expect(addressHint(addressed, deck(name), "/p")).toBe(addressed);
+    }
+    expect(addressHint("run `dekc theme`", deck("clear"), "/p")).toBe("run `dekc theme clear`");
   });
 
   test("leaves every hint alone when there is no deck to name", () => {

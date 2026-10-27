@@ -1,5 +1,6 @@
 import type { Diagnostic } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
+import { shellQuote } from "../core/escape.ts";
 import type { Fill } from "../core/fill.ts";
 import { lintDeck } from "../core/lint.ts";
 import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
@@ -53,7 +54,7 @@ export async function checkCommand(
 
   const skipped: SkippedCheck[] = visual
     ? []
-    : [visualSkipped(`dekc check ${slug}`, { reason: "Playwright is not installed" })];
+    : [visualSkipped(`dekc check ${shellQuote(slug)}`, { reason: "Playwright is not installed" })];
 
   // A live-only deck is done without voice, so asking for it skips the check rather than failing,
   // the way a missing Playwright skips visual.

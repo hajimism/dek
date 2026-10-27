@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync } from "nod
 import { dirname, join, resolve } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { DekError } from "../core/error.ts";
+import { shellQuote } from "../core/escape.ts";
 import { downloadTarball, resolveRev } from "../core/github.ts";
 import {
   deckOfPack,
@@ -91,7 +92,7 @@ async function unpackSnapshot(root: string, source: FileRefSource, pin: string):
   if ((await snapshotDigest(snapshot)) !== pin) {
     throw new DekError(`${rel} is not the pack ${source.name} is pinned to`, {
       path,
-      hint: `run \`dekc ref ${rel}\` to pin the pack that is there, or put back the one dek.toml pins`,
+      hint: `run \`dekc ref ${shellQuote(rel)}\` to pin the pack that is there, or put back the one dek.toml pins`,
     });
   }
   await writeSnapshot(root, source.name, pin, snapshot);

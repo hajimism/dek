@@ -10,7 +10,8 @@ import {
 } from "../../src/core/annotations.ts";
 import { DekError } from "../../src/core/error.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
-import { type ProjectSpec, withTempProject } from "../helpers/project.ts";
+import { type DeckSpec, type ProjectSpec, withTempProject } from "../helpers/project.ts";
+import { shellWords } from "../helpers/shell.ts";
 
 const script = `---
 title: Plan
@@ -134,6 +135,62 @@ describe("annotations", () => {
       expect(annotations[0]?.shot).toBe("dekc shot plan plan --step 0");
     });
   });
+
+  test("names the deck and the beat of its shot as one word each, whatever they hold", async () => {
+    const awkward: ProjectSpec = { decks: [{ ...spec.decks?.[0], name: "my plan" } as DeckSpec] };
+    await withTempProject(awkward, async (root) => {
+      const deck = deckIn(root, "my plan");
+      const [note] = applyAnnotationOp(root, deck, {
+        op: "add",
+        slug: "plan",
+        step: "base",
+        text: "",
+        targets: [{ source: "3:5", box }],
+      }).annotations;
+      expect(shellWords(note?.shot ?? "")).toEqual([
+        "dekc",
+        "shot",
+        "my plan",
+        "plan",
+        "--step",
+        "base",
+      ]);
+      // A note's slug and beat are as the file keeps them, which a cloned project brings along.
+      const kept = async (fields: { slug?: string; step?: string }) => {
+        const file = JSON.parse(await readFile(annotationsPath(root), "utf8"));
+        Object.assign(file.decks["my plan"][0], fields);
+        await writeFile(annotationsPath(root), JSON.stringify(file));
+        return listAnnotations(root, deck)[0]?.shot ?? "";
+      };
+      expect(shellWords(await kept({ step: "x`;echo hi;`" }))).toEqual([
+        "dekc",
+        "shot",
+        "my plan",
+        "plan",
+        "--step",
+        "x`;echo hi;`",
+      ]);
+      expect(await kept({ slug: "-x", step: "base" })).toBe(
+        "dekc shot --step base -- 'my plan' -x",
+      );
+      expect(await kept({ slug: "plan", step: "it's" })).toBe(
+        "dekc shot 'my plan' plan --step <step>",
+      );
+    });
+    await withTempProject(
+      { decks: [{ ...spec.decks?.[0], name: "it's" } as DeckSpec] },
+      async (root) => {
+        const [note] = applyAnnotationOp(root, deckIn(root, "it's"), {
+          op: "add",
+          slug: "plan",
+          step: "base",
+          text: "",
+          targets: [{ source: "3:5", box }],
+        }).annotations;
+        expect(note?.shot).toBe("dekc shot <deck> plan --step base");
+      },
+    );
+  }, 30_000);
 
   test("numbers the notes in talk order, then as they were written", async () => {
     await withTempProject(spec, async (root) => {

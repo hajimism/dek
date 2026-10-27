@@ -4,6 +4,7 @@ import { bundledTheme } from "../core/bundled-theme.ts";
 import type { DekConfig } from "../core/config.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
+import { shellQuote } from "../core/escape.ts";
 import { walkUp } from "../core/optional.ts";
 import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
 import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
@@ -315,9 +316,4 @@ function inNodeModules(root: string, ...path: string[]): boolean {
   return (
     walkUp(root, (dir) => existsSync(join(dir, "node_modules", ...path)) || undefined) === true
   );
-}
-
-/** `word` as one shell word: as it is when that is safe, else single-quoted. */
-export function shellQuote(word: string): string {
-  return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", "'\\''")}'`;
 }

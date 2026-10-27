@@ -2,7 +2,7 @@ import { existsSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
-import { escapeRegExp } from "./escape.ts";
+import { escapeRegExp, shellName } from "./escape.ts";
 import { joinLines, sectionChunks, splitLines } from "./lines.ts";
 import {
   asResolvedDeck,
@@ -138,8 +138,21 @@ function bothHold(fromPath: string, toPath: string, from: string, to: string): D
   const what = fromPath.endsWith(".html") ? "hold a slide you wrote" : "exist";
   return new DekError(`${fromName} and ${toName} both ${what}`, {
     path: fromPath,
-    hint: `merge them into ${toName} and remove ${fromName}, then run \`dekc mv ${from} ${to}\` again`,
+    hint: `merge them into ${toName} and remove ${fromName}, then run ${again(from, to)}`,
   });
+}
+
+/**
+ * The rename to run again: as a command when each name has a word every shell reads alike, after
+ * `--` when one starts with a dash; else as the one that was run.
+ */
+function again(from: string, to: string): string {
+  const [source, target] = [shellName(from), shellName(to)];
+  if (source === undefined || target === undefined) {
+    return "that `dekc mv` again";
+  }
+  const end = from.startsWith("-") || to.startsWith("-") ? "-- " : "";
+  return `\`dekc mv ${end}${source} ${target}\` again`;
 }
 
 /** One file change `dekc mv` makes, with how to take it back. */

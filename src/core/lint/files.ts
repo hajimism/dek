@@ -1,4 +1,5 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { shellName } from "../escape.ts";
 import { either } from "../prose.ts";
 import { listSlideFiles, SLIDE_SIDECARS } from "../resolve.ts";
 import type { LintContext } from "./context.ts";
@@ -91,10 +92,16 @@ export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diag
   }
   const [orphan] = orphans;
   const [target] = targets;
-  if (orphans.size === 1 && targets.length === 1 && orphan?.slug && target) {
+  if (
+    orphans.size === 1 &&
+    targets.length === 1 &&
+    orphan?.slug &&
+    target &&
+    movable(orphan.slug)
+  ) {
     // An orphan beside a section without its own slide is a rename, made in the script or in the
     // files: which one is the author's to say, and each command finishes it from this state.
-    const hint = `run \`dekc mv ${orphan.slug} ${target}\` to move the files to the script's id, or \`dekc mv ${target} ${orphan.slug}\` to give the section the files' id`;
+    const hint = `run ${mvCommand(orphan.slug, target)} to move the files to the script's id, or ${mvCommand(target, orphan.slug)} to give the section the files' id`;
     return diagnostics.map((diagnostic) =>
       diagnostic === orphan
         ? { ...diagnostic, hint, data: { ...diagnostic.data, renames: targets } }
@@ -104,14 +111,27 @@ export function suggestRename(diagnostics: Diagnostic[], ctx: LintContext): Diag
     );
   }
   return diagnostics.map((diagnostic) => {
-    if (!orphans.has(diagnostic) || !diagnostic.slug) {
+    const file = diagnostic.slug;
+    if (!orphans.has(diagnostic) || !file || !movable(file)) {
       return diagnostic;
     }
-    const commands = targets.map((slug) => `\`dekc mv ${diagnostic.slug} ${slug}\``);
+    const commands = targets.map((slug) => mvCommand(file, slug));
     return {
       ...diagnostic,
       hint: `run ${either(commands)} to move the files to the section they now belong to`,
       data: { ...diagnostic.data, renames: targets },
     };
   });
+}
+
+/** Whether a slide file's name can be written in a command: see `shellName`. */
+function movable(slug: string): boolean {
+  return shellName(slug) !== undefined;
+}
+
+/** `dekc mv from to`, with `--` first when a name starts with a dash, which would read as a flag. */
+function mvCommand(from: string, to: string): string {
+  const words = [from, to].map((slug) => shellName(slug) ?? slug);
+  const end = [from, to].some((slug) => slug.startsWith("-")) ? "-- " : "";
+  return `\`dekc mv ${end}${words.join(" ")}\``;
 }

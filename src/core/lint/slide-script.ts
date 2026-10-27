@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { shellName } from "../escape.ts";
 import { listSlideFiles } from "../resolve.ts";
 import type { Section } from "../schema.ts";
 import type { SlideScriptProblem } from "../slide-script.ts";
@@ -54,15 +55,16 @@ export function slideScriptDiagnostics(
 
 /** DEK016 for a slides/<slug>.js, which dek does not load: motion is written in TypeScript. */
 export function javascriptDiagnostics(ctx: LintContext): Diagnostic[] {
-  return listSlideFiles(ctx.deck.dir, ".js").map((file) =>
-    diag("DEK016", {
+  return listSlideFiles(ctx.deck.dir, ".js").map((file) => {
+    const [from, to] = [`slides/${file.slug}.js`, `slides/${file.slug}.ts`].map(shellName);
+    return diag("DEK016", {
       message: `slide scripts are TypeScript; rename ${file.slug}.js to ${file.slug}.ts`,
       path: file.path,
       slug: file.slug,
-      hint: `run \`mv slides/${file.slug}.js slides/${file.slug}.ts\`; plain JavaScript is valid TypeScript`,
+      hint: `${from && to ? `run \`mv ${from} ${to}\`` : "rename it to .ts"}; plain JavaScript is valid TypeScript`,
       data: { file: `slides/${file.slug}.js` },
-    }),
-  );
+    });
+  });
 }
 
 export type SeekProblem = {

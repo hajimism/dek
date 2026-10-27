@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
+import { shellQuote } from "./escape.ts";
 import {
   isPlainRefName,
   isRefDeckName,
@@ -183,8 +184,9 @@ export function requireProject(cwd: string): Project {
 
 /** What a command that writes says when it is handed a ref by name. */
 export function refReadOnlyError(name: string): DekError {
+  const ref = shellQuote(name);
   return new DekError(`"${name}" is a ref; refs are read-only`, {
-    hint: `start a deck on its theme with \`dekc new <name> --theme-from ${name}\`, or read it with \`dekc show ${name} <slug>\` and write what you need in your own deck's theme`,
+    hint: `start a deck on its theme with \`dekc new <name> --theme-from ${ref}\`, or read it with \`dekc show ${ref} <slug>\` and write what you need in your own deck's theme`,
   });
 }
 
