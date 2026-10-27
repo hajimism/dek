@@ -19,7 +19,7 @@ description: 'コマンド、フラグ、環境変数。'
 - **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dek が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
 - **実行しなかったチェックは `"skipped"` に並びます。** 各要素は `check`、`reason`、実行する方法があれば `hint` を持ちます。Playwright がない `dekc check` は `visual` を、`voice/` のないデッキでの `dekc check --voice` は `voice` を、rumdl がない `dekc lint` は `rumdl` を、URL か Playwright がない `dekc build` は `preview`（リンクプレビュー画像）を、ref に対する `dekc ls` は `lint` を飛ばします。テキストでは `<check>: skipped (<reason>)` と出て、hint が `help:` 行に続きます。`lint`、`check`、`build` はこれを標準エラーに出すので、標準出力には結果だけが残ります。すべて実行できたときはこのフィールド自体がありません。
 - **デッキごとにファイルを書くコマンドはリストを返す。** `build` と `pdf` は、1 デッキでも対象のデッキごとのパスを `outs` で返します。
-- **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`、pack なら `file/<deck>`）を受け取ります。`dekc new --theme-from` は ref のテーマを新しいデッキにコピーします。それ以外のコマンドは ref を受け取りません。[ref](#ref) を参照してください。
+- **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`、pack なら `file/<deck>`）を受け取ります。`dekc new --theme-from` は ref のテーマを新しいデッキにコピーします。それ以外のコマンドは ref を受け取りません。開発サーバーを含め、どのコマンドも ref のスナップショットの中のディレクトリでは動きません。[ref](#ref) を参照してください。
 - **ヘルプはコマンドごとに出る。** `dekc help <command>`、`dekc <command> --help`、`-h` で、そのコマンドの使い方、やること、受け付けるフラグをすべて表示します。`dekc --version`（`-v`）はバージョンを表示します。コマンド名やデッキ名を打ち間違えると `did you mean …?` で候補を示します。
 - **フラグはコマンドごとに確かめる。** `--json`、`--help`、`--version` はどこでも使えます。それ以外のフラグは受け付けるコマンドでだけ使え、`--deck` は `new`・`ref`・`help` 以外のすべてで使えます。綴りを間違えたフラグや別のコマンドのフラグは知らないうちに無視されることはなく、エラーになります。hint にはそのコマンドが受け付けるフラグと `dekc help <command>` が並びます。値も何かを実行する前に確かめます。`--port` は 1 から 65535 の整数、`--fps` は 0 より大きい数、`--accent` は 0 以上の整数、`--format` は `sarif` だけを受け付け、それ以外は空の値も含めて `invalid --<flag> "<value>"` になり、hint にそのフラグが受け付ける値が出ます。
 - **引数もコマンドごとに確かめる。** 足りない引数は `missing <slug> for dekc show`、コマンドが受け付ける数を超えた引数は `unexpected argument "extra" for dekc ls` になり、どちらも hint にそのコマンドの使い方と `dekc help <command>` が出ます。サブコマンドを打ち間違えると `did you mean …?` で候補を示します。`dekc voice speakr` なら `dekc voice speakers` です。
@@ -56,7 +56,7 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 | `dekc new <name> --theme-from <ref>` | ref の `theme.css` のコピーで新しいデッキを始める。ref のレイアウトの上に組み立てるため。`dekc theme <ref> <layout>` が出すマークアップが、そのデッキでは lint を通る。実体が無い ref は先に取得するか、pack から展開する。コピーは新しいデッキのもので、ref はそのまま |
 | `dekc ls <ref>` | ref の概要。尺は ref 自身の話速で計算する。`skipped` に `lint` を入れる（ref は直す対象ではないため） |
 | `dekc show <ref> <slug>` | 自分のスライドと同じ内容に加えて、`ref`（名前、rev、実体のディレクトリ、LICENSE ファイル）を返す |
-| `dekc theme <ref>`、`dekc shot <ref> <slug>` | ref のテーマと、1枚のスクリーンショット |
+| `dekc theme <ref>`、`dekc shot <ref> <slug>` | ref のテーマと、1枚のスクリーンショット。ref のスクリーンショットはスナップショットの中ではなく、自分のプロジェクトの `.cache/refs/<ref>/shots/` に置かれる |
 
 ## スライド
 

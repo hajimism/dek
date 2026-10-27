@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import pkg from "../../../package.json";
 import { DekError } from "../error.ts";
-import { deckProjectRoot } from "../path.ts";
 import { type PlaywrightRunner, requirePlaywright } from "../playwright.ts";
 import { deckStops, retreat } from "../position.ts";
 import { asResolvedDeck, type ResolvedDeck, requireSection } from "../resolve.ts";
@@ -103,7 +102,7 @@ export async function shotMotion(
   const key = `${JSON.stringify([pkg.version, SHEET_LAYOUT_VERSION, MOTION_FRACTIONS, plan.from, beats, title])}\0${html}`;
   // Each step keeps its own entry, so runs of different steps neither evict nor race each other.
   const capture = options.step === undefined ? [section.slug] : [section.slug, String(first)];
-  const bundle = bundleEntry(deck.dir, "motion", capture, key);
+  const bundle = bundleEntry(deck, "motion", capture, key);
   const manifest = join(bundle.dir, "motion.json");
   const cached = readMotionManifest(manifest, bundle.dir);
   if (cached) {
@@ -112,7 +111,7 @@ export async function shotMotion(
   }
   // Chromium writes the frames and sheets by name, so no link may stand where one goes.
   dropLinks(bundle.dir);
-  dropLinks(outputDir(join(bundle.dir, "frames"), deckProjectRoot(deck.dir)));
+  dropLinks(outputDir(join(bundle.dir, "frames"), bundle.root));
 
   const response = await requirePlaywright(
     {

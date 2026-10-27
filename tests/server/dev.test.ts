@@ -1,7 +1,16 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import {
+  copyFile,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { join, relative } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { livePlayerScript } from "../../src/runtime/player.ts";
 import { startDevServer } from "../../src/server/dev.ts";
@@ -109,6 +118,26 @@ async function waitForPage(
     await Bun.sleep(50);
   }
   throw new Error(`timed out waiting for ${url} to change`);
+}
+
+/** The error a start fails with; a server that starts is closed, so a test that expected none fails cleanly. */
+async function startOrError(options: { cwd: string; deck?: string }): Promise<unknown> {
+  try {
+    const server = await startDevServer({ port: 0, ...options });
+    await server.close();
+    return "started";
+  } catch (error) {
+    return error;
+  }
+}
+
+/** Every file under `dir`, by its path there. */
+async function filesUnder(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => !entry.isDirectory())
+    .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
+    .sort();
 }
 
 describe("startDevServer", () => {
@@ -1007,6 +1036,46 @@ body
           message: 'deck "missing" not found',
           path: join(root, "decks", "missing"),
           hint: "run `dekc ls`",
+        });
+        expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
+      },
+    );
+  });
+
+  test("refuses to start inside a ref, and writes nothing there", async () => {
+    const ref = "someone/talks/intro";
+    await withTempProject(
+      {
+        decks: [{ name: "demo", slides: { intro: introHtml } }],
+        refs: [{ name: ref, deck: { slides: {}, assets: { "inner/dek.toml": "" } } }],
+      },
+      async (root) => {
+        const snapshot = join(root, "refs", "someone", "talks", "intro");
+        const before = await filesUnder(snapshot);
+        // The ref's root, its deck, and a folder under a dek.toml the ref's assets carry.
+        for (const cwd of [
+          snapshot,
+          join(snapshot, "decks", "intro"),
+          join(snapshot, "decks", "intro", "assets", "inner"),
+        ]) {
+          expect(await startOrError({ cwd })).toMatchObject({
+            message: "this directory is inside a ref; refs are read-only",
+            hint: `run dek from your own project instead: \`dekc show ${ref} <slug>\``,
+          });
+        }
+        expect(await filesUnder(snapshot)).toEqual(before);
+      },
+    );
+  });
+
+  test("refuses a ref by name as every command that writes does, before it starts", async () => {
+    const ref = "someone/talks/intro";
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }], refs: [{ name: ref }] },
+      async (root) => {
+        expect(await startOrError({ cwd: root, deck: ref })).toMatchObject({
+          message: `"${ref}" is a ref; refs are read-only`,
+          hint: expect.stringContaining(`dekc show ${ref} <slug>`),
         });
         expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
       },

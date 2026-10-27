@@ -1,14 +1,13 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { DekError } from "../core/error.ts";
 import {
   isRefName,
   packFile,
   parseRefSource,
-  REF_MARKER,
-  readRefMeta,
   refLicense,
+  refReadOnlyError,
   refState,
+  requireProject,
 } from "../core/ref.ts";
 import {
   locateDeck,
@@ -19,7 +18,7 @@ import {
 } from "../core/resolve.ts";
 import { suggest } from "../core/suggest.ts";
 
-export { requireSection };
+export { requireProject, requireSection };
 
 export type Scope = {
   project: Project;
@@ -51,18 +50,6 @@ export type DecksTarget = {
   /** Set when the deck is a ref. */
   ref?: RefInfo;
 };
-
-export function requireProject(cwd: string): Project {
-  const project = resolveProject(cwd);
-  if (existsSync(join(project.root, REF_MARKER))) {
-    const name = readRefMeta(project.root)?.name ?? "<ref>";
-    throw new DekError("this directory is inside a ref; refs are read-only", {
-      path: project.root,
-      hint: `run dek from your own project instead: \`dekc show ${name} <slug>\``,
-    });
-  }
-  return project;
-}
 
 export function inferDeckName(project: Project, cwd: string): string | undefined {
   const located = locateDeck(project.root, cwd);
@@ -139,9 +126,7 @@ export function resolveScope(cwd: string, options: { deck?: string } = {}): Scop
     return { project };
   }
   if (isRefName(name)) {
-    throw new DekError(`"${name}" is a ref; refs are read-only`, {
-      hint: `start a deck on its theme with \`dekc new <name> --theme-from ${name}\`, or read it with \`dekc show ${name} <slug>\` and write what you need in your own deck's theme`,
-    });
+    throw refReadOnlyError(name);
   }
   const deck = project.decks.find((entry) => entry.name === name);
   if (!deck) {
@@ -311,7 +296,11 @@ function resolveRef(cwd: string, arg: string): ReadableDeck & { ref: RefInfo } {
   }
   return {
     project: snapshot,
-    deck: found,
+    // Read where it is, but cached in this project: nothing is written in a snapshot.
+    deck: {
+      ...found,
+      cache: { dir: join(project.root, ".cache", relative(project.root, dir)), root: project.root },
+    },
     ref: { name: source.name, rev: pinned, dir, license: refLicense(dir) },
   };
 }

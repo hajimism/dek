@@ -14,6 +14,11 @@ export type ProjectDeck = {
   dir: string;
   scriptPath: string;
   deck: Deck;
+  /**
+   * Set on a ref's deck: the folder that stands for its `.cache`, in the project that reads it,
+   * and that project's root. A snapshot is never written once `dekc ref` wrote it.
+   */
+  cache?: { dir: string; root: string };
 };
 
 export type Project = {

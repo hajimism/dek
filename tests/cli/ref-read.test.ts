@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { chmod } from "node:fs/promises";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { chmod, readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { parseCommandLine } from "../../src/cli/flags.ts";
+import { initCommand } from "../../src/cli/init.ts";
 import { lsCommand } from "../../src/cli/ls.ts";
 import { bindCommandLine } from "../../src/cli/main.ts";
 import { formatText } from "../../src/cli/result.ts";
@@ -9,7 +11,7 @@ import { requireProject, resolveScope, resolveTarget } from "../../src/cli/scope
 import { shotCommand } from "../../src/cli/shot.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDek, runMain } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { REF_SHA, type RefSpec, withTempProject } from "../helpers/project.ts";
@@ -45,6 +47,15 @@ const project = { decks: [{ name: "mine" }], refs: [ref] };
 
 function snapshotDir(root: string): string {
   return join(root, "refs", "someone", "talks", "why-dek");
+}
+
+/** Every file under `dir`, by its path there. */
+async function filesUnder(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => !entry.isDirectory())
+    .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
+    .sort();
 }
 
 describe("reading a ref", () => {
@@ -119,6 +130,32 @@ describe("reading a ref", () => {
     });
   });
 
+  test.serial(
+    "reading a ref, shots and sheets included, leaves its snapshot as dek wrote it",
+    async () => {
+      await withTempProject(project, async (root) => {
+        await chmod(fakePlaywright, 0o755);
+        const before = await filesUnder(snapshotDir(root));
+        const target = () => resolveTarget(root, "deck", { refs: true, deck: REF });
+        lsCommand(resolveTarget(root, "decks", { refs: true, deck: REF }));
+        showCommand(target(), "timing");
+        themeCommand(target());
+        const { still, sheet } = await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, async () => ({
+          still: await shotCommand(target(), { slug: "timing" }),
+          sheet: await shotCommand(target(), { sheet: true }),
+        }));
+        expect(await filesUnder(snapshotDir(root))).toEqual(before);
+        // They are the reading project's cache, as its own decks' shots are.
+        const cache = join(root, ".cache", "refs", "someone", "talks", "why-dek", "shots");
+        for (const path of [...still.shots, ...sheet.shots].map((shot) => shot.path)) {
+          expect(path.startsWith(`${cache}/`)).toBe(true);
+          expect(existsSync(path)).toBe(true);
+        }
+        expect(sheet.sheets?.every((path) => path.startsWith(`${cache}/sheets/`))).toBe(true);
+      });
+    },
+  );
+
   test("a ref that dek.toml does not pin points to dekc ref", async () => {
     await withTempProject(
       { decks: [{ name: "mine" }], refs: [{ ...ref, declared: false }] },
@@ -183,6 +220,60 @@ describe("refs are read-only", () => {
           hint: expect.stringContaining(`dekc show ${REF} <slug>`),
         }),
       );
+    });
+  });
+
+  test("a folder under a dek.toml that a ref's assets carry is inside the ref too", async () => {
+    await withTempProject(
+      { ...project, refs: [{ ...ref, deck: { ...ref.deck, assets: { "inner/dek.toml": "" } } }] },
+      async (root) => {
+        const inner = join(snapshotDir(root), "decks", "why-dek", "assets", "inner");
+        expect(() => requireProject(inner)).toThrow(
+          expect.objectContaining({
+            message: "this directory is inside a ref; refs are read-only",
+            path: snapshotDir(root),
+          }),
+        );
+      },
+    );
+  });
+
+  test.serial(
+    "the dev server and rehearse refuse a ref, and every directory inside one",
+    async () => {
+      await withTempProject(project, async (root) => {
+        const inside = join(snapshotDir(root), "decks", "why-dek");
+        const before = await filesUnder(snapshotDir(root));
+        const cases: Array<[string[], string, string]> = [
+          [[], inside, "this directory is inside a ref; refs are read-only"],
+          [[REF], root, `"${REF}" is a ref; refs are read-only`],
+          [["--deck", REF], root, `"${REF}" is a ref; refs are read-only`],
+          [["rehearse"], inside, "this directory is inside a ref; refs are read-only"],
+          [["rehearse", REF], root, `"${REF}" is a ref; refs are read-only`],
+        ];
+        for (const [argv, cwd, message] of cases) {
+          const result = await runMain(argv, cwd);
+          expect({ argv, exitCode: result.exitCode }).toEqual({ argv, exitCode: 1 });
+          expect(result.stderr).toContain(message);
+          expect(result.stderr).toContain(`dekc show ${REF} <slug>`);
+        }
+        expect(await filesUnder(snapshotDir(root))).toEqual(before);
+      });
+    },
+  );
+
+  test("init makes no project inside a ref", async () => {
+    await withTempProject(project, async (root) => {
+      const before = await filesUnder(snapshotDir(root));
+      for (const dir of [undefined, "decks/why-dek/assets/talk"]) {
+        expect(() => initCommand({ cwd: snapshotDir(root), dir })).toThrow(
+          expect.objectContaining({
+            message: "this directory is inside a ref; refs are read-only",
+            hint: expect.stringContaining(`dekc show ${REF} <slug>`),
+          }),
+        );
+      }
+      expect(await filesUnder(snapshotDir(root))).toEqual(before);
     });
   });
 

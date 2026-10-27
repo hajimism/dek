@@ -62,7 +62,7 @@ export async function shotMorph(
   const step = stepKey(fromSection.beats, from.beatIndex);
 
   const html = videoDocument(resolved, options.playerScript);
-  const entry = morphEntry(deck.dir, options.from, options.to, at, html);
+  const entry = morphEntry(deck, options.from, options.to, at, html);
   if (!entry.cached) {
     await requirePlaywright(
       {

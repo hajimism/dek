@@ -84,7 +84,7 @@ export async function shotSheet(
   }));
   // The tiles' paths hash what they show, so the key changes whenever a tile does.
   const bundle = bundleEntry(
-    deck.dir,
+    deck,
     "sheets",
     [],
     JSON.stringify([SHEET_LAYOUT_VERSION, deck.deck.title, cells]),
@@ -136,7 +136,7 @@ export function still(
   step: string = stepKey(section.beats, beatIndex),
 ): Still {
   const html = renderSlideHtml(sources, section.slug, beatIndex);
-  const entry = stillEntry(deck.dir, section, beatIndex, html);
+  const entry = stillEntry(deck, section, beatIndex, html);
   return { html, slug: section.slug, step, screenshotPath: entry.path, entry };
 }
 

@@ -4,8 +4,9 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
+import { walkUp } from "./optional.ts";
 import { parseRefSource, type RefSource } from "./ref-name.ts";
-import { listSlides, resolveProject } from "./resolve.ts";
+import { listSlides, type Project, resolveProject } from "./resolve.ts";
 import { outputDir } from "./safe-fs.ts";
 
 export {
@@ -54,6 +55,51 @@ export function readRefMeta(dir: string): RefMeta | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The snapshot `dir` is in: the nearest folder from `dir` up that holds a ref's marker. A ref may
+ * carry a dek.toml of its own below its root, in its deck's assets, so the project found from a
+ * directory inside a ref is not always the snapshot; this looks past it.
+ */
+function refAround(dir: string): string | undefined {
+  return walkUp(dir, (at) => (isThere(join(at, REF_MARKER)) ? at : undefined));
+}
+
+function isThere(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Refuses `dir` when it is inside a ref: no command, the dev server's included, runs or writes there. */
+export function refuseInsideRef(dir: string): void {
+  const snapshot = refAround(dir);
+  if (snapshot === undefined) {
+    return;
+  }
+  const name = readRefMeta(snapshot)?.name ?? "<ref>";
+  throw new DekError("this directory is inside a ref; refs are read-only", {
+    path: snapshot,
+    hint: `run dek from your own project instead: \`dekc show ${name} <slug>\``,
+  });
+}
+
+/** The project around `cwd`, which is the user's own: never one inside a ref. */
+export function requireProject(cwd: string): Project {
+  const project = resolveProject(cwd);
+  refuseInsideRef(project.root);
+  return project;
+}
+
+/** What a command that writes says when it is handed a ref by name. */
+export function refReadOnlyError(name: string): DekError {
+  return new DekError(`"${name}" is a ref; refs are read-only`, {
+    hint: `start a deck on its theme with \`dekc new <name> --theme-from ${name}\`, or read it with \`dekc show ${name} <slug>\` and write what you need in your own deck's theme`,
+  });
 }
 
 export const LICENSE_NAMES = ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"];

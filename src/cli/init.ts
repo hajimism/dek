@@ -6,6 +6,7 @@ import { DekError } from "../core/error.ts";
 import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
+import { refuseInsideRef } from "../core/ref.ts";
 import { readTextIfExists } from "../core/resolve.ts";
 import {
   defaultTsconfig,
@@ -123,6 +124,8 @@ function checkTarget(root: string): void {
   if (existsSync(root) && !statSync(root).isDirectory()) {
     throw new DekError("not a directory", { path: root, hint: "pass a directory to init" });
   }
+  // A ref is someone else's project, read where it is: init would write its files into it.
+  refuseInsideRef(root);
   const outer = walkUp(root, (dir) => {
     const config = join(dir, "dek.toml");
     return existsSync(config) && statSync(config).isFile() ? dir : undefined;
