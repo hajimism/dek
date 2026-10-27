@@ -17,7 +17,8 @@ export type TomlKey = {
 /**
  * Every key and table header in a TOML file, in order, with where each is written: the one reader
  * dek.toml lint, `dekc mv`, and `dekc ref` share. It reads `[table]`, `[[array]]`, (dotted) keys, and
- * one-line inline tables, and steps over comments and multi-line strings.
+ * inline tables, and steps over comments, multi-line strings, and arrays and inline tables written
+ * over several lines, as Bun's TOML parser reads them.
  */
 export function scanTomlKeys(source: string): TomlKey[] {
   const lines = source.split("\n");
@@ -38,10 +39,7 @@ export function scanTomlKeys(source: string): TomlKey[] {
     }
     const path = [...table, ...names(assignment.segments)];
     keys.push(keyAt("key", path, assignment.segments, index));
-    if (line[assignment.value] === "{") {
-      inlineKeys(line, assignment.value, path, index, keys);
-    }
-    index = valueLastLine(lines, index, assignment.value);
+    index = readValue(lines, { index, at: assignment.value }, path, keys).index;
   }
   return keys;
 }
@@ -82,64 +80,131 @@ function readAssignment(
   return { segments: path.segments, value: skipSpace(line, path.end + 1) };
 }
 
-/** The keys of the inline table opening at `open`, nested ones too; returns the index past it. */
-function inlineKeys(
-  line: string,
-  open: number,
-  prefix: string[],
-  index: number,
-  keys: TomlKey[],
-): number {
-  let i = skipSpace(line, open + 1);
-  while (i < line.length && line[i] !== "}") {
-    const assignment = readAssignment(line, i);
-    if (!assignment) {
-      return line.length;
-    }
-    const path = [...prefix, ...names(assignment.segments)];
-    keys.push(keyAt("inline", path, assignment.segments, index));
-    const { value } = assignment;
-    i = skipSpace(
-      line,
-      line[value] === "{" ? inlineKeys(line, value, path, index, keys) : skipValue(line, value),
-    );
-    if (line[i] === ",") {
-      i = skipSpace(line, i + 1);
-    }
-  }
-  return i + 1;
-}
+/** A place in a file split into lines: the line's index, and the character's on it. */
+type Cursor = { index: number; at: number };
 
-const NESTING: Record<string, number> = { "[": 1, "{": 1, "]": -1, "}": -1 };
 const VALUE_ENDS = new Set([",", "#", "]", "}"]);
 
-/** The index past one value on a line: a string, an array or inline table, or a bare word. */
-function skipValue(line: string, from: number): number {
-  let depth = 0;
-  let i = from;
-  while (i < line.length) {
-    const ch = line[i] ?? "";
-    if (depth === 0 && VALUE_ENDS.has(ch)) {
-      return i;
-    }
-    depth += NESTING[ch] ?? 0;
-    i = isQuote(ch) ? skipString(line, i) : i + 1;
+/**
+ * The place past the value at `from`: a string, multi-line or not, an array, an inline table, or
+ * a bare word. An inline table's keys are recorded under `path`, nested ones too; one in an
+ * array is not, as no key path names it.
+ */
+function readValue(
+  lines: string[],
+  from: Cursor,
+  path: string[] | undefined,
+  keys: TomlKey[],
+): Cursor {
+  const line = lines[from.index] ?? "";
+  const ch = line[from.at];
+  const delimiter = tripleQuote(line, from.at);
+  if (delimiter) {
+    return skipMultilineString(lines, from, delimiter);
   }
-  return i;
+  if (isQuote(ch)) {
+    return { index: from.index, at: Math.min(skipString(line, from.at), lineEnd(line)) };
+  }
+  if (ch === "[" || ch === "{") {
+    return readItems(lines, { index: from.index, at: from.at + 1 }, ch, path, keys);
+  }
+  let at = from.at;
+  while (at < lineEnd(line) && !VALUE_ENDS.has(line[at] ?? "")) {
+    at++;
+  }
+  return { index: from.index, at };
 }
 
 /**
- * The line the value starting at `start` ends on: its own, unless it opens a multi-line string it
- * does not close there. An unclosed one runs to the end of the file.
+ * The place past the array or inline table whose items start at `from`, which may run on over
+ * lines. A table's keys are recorded under `path`. One that breaks off, as at a key with no comma
+ * before it, ends with the line it broke off on, so what follows is read as the file's own.
  */
-function valueLastLine(lines: string[], index: number, start: number): number {
-  const line = lines[index] ?? "";
-  const delimiter = tripleQuote(line, start);
-  if (!delimiter || line.includes(delimiter, start + 3)) {
-    return index;
+function readItems(
+  lines: string[],
+  from: Cursor,
+  open: "[" | "{",
+  path: string[] | undefined,
+  keys: TomlKey[],
+): Cursor {
+  const close = open === "[" ? "]" : "}";
+  let last = from;
+  let next = skipBlank(lines, from);
+  for (;;) {
+    const line = lines[next.index] ?? "";
+    const ch = line[next.at];
+    if (ch === close) {
+      return { index: next.index, at: next.at + 1 };
+    }
+    if (ch === undefined || next.at >= lineEnd(line)) {
+      return next;
+    }
+    let valueAt = next;
+    let itemPath: string[] | undefined;
+    if (open === "{") {
+      const assignment = readAssignment(line, next.at);
+      if (!assignment) {
+        return { index: last.index, at: lineEnd(lines[last.index] ?? "") };
+      }
+      itemPath = path && [...path, ...names(assignment.segments)];
+      if (itemPath) {
+        keys.push(keyAt("inline", itemPath, assignment.segments, next.index));
+      }
+      valueAt = { index: next.index, at: assignment.value };
+    }
+    last = readValue(lines, valueAt, itemPath, keys);
+    next = skipBlank(lines, last);
+    const after = lines[next.index]?.[next.at];
+    if (after === ",") {
+      last = { index: next.index, at: next.at + 1 };
+      next = skipBlank(lines, last);
+    } else if (after !== close) {
+      return { index: last.index, at: lineEnd(lines[last.index] ?? "") };
+    }
   }
-  const close = lines.findIndex((next, i) => i > index && next.includes(delimiter));
-  return close === -1 ? lines.length - 1 : close;
+}
+
+/** The place past the spaces, comments, and line breaks at `from`; the end of the file at most. */
+function skipBlank(lines: string[], from: Cursor): Cursor {
+  let { index, at } = from;
+  for (;;) {
+    const line = lines[index] ?? "";
+    at = skipSpace(line, at);
+    if ((at < lineEnd(line) && line[at] !== "#") || index >= lines.length - 1) {
+      return { index, at };
+    }
+    index++;
+    at = 0;
+  }
+}
+
+/** The place past the multi-line string opening at `from`; an unclosed one runs to the end. */
+function skipMultilineString(lines: string[], from: Cursor, delimiter: string): Cursor {
+  let at = from.at + 3;
+  for (let index = from.index; index < lines.length; index++, at = 0) {
+    const line = lines[index] ?? "";
+    const close = line.indexOf(delimiter, at);
+    if (close !== -1) {
+      // Up to two quotes of the string's own may come right before its closing three.
+      let end = close + 3;
+      while (end < close + 5 && line[end] === delimiter[0]) {
+        end++;
+      }
+      return { index, at: end };
+    }
+  }
+  const index = lines.length - 1;
+  return { index, at: lineEnd(lines[index] ?? "") };
+}
+
+/** Where a line's text ends, before the CR of a CRLF. */
+function lineEnd(line: string): number {
+  return line.endsWith("\r") ? line.length - 1 : line.length;
+}
+
+/** The line the value starting at `start` ends on, a later one when it runs on over lines. */
+function valueLastLine(lines: string[], index: number, start: number): number {
+  return readValue(lines, { index, at: start }, undefined, []).index;
 }
 
 /** Reads `a . "b" . 'c'` from `from`; `end` is the first non-space after it. */

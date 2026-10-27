@@ -145,6 +145,35 @@ describe("scanTomlKeys edge cases", () => {
     ]);
   });
 
+  test("steps over an array or an inline table written over several lines", () => {
+    const source = [
+      "arr = [ # [not.a.table]",
+      "  [1],",
+      '  "]", # ]',
+      '  { a = "[x]" },',
+      "]",
+      "k = 1",
+      "voice = {",
+      "  speed = 1,",
+      "  sped = { x = [",
+      "    2,",
+      "  ] },",
+      "}",
+      "[t]",
+      "z = 1",
+    ].join("\n");
+    expect(scan(source)).toEqual([
+      ["key", "arr", 1],
+      ["key", "k", 6],
+      ["key", "voice", 7],
+      ["inline", "voice.speed", 8],
+      ["inline", "voice.sped", 9],
+      ["inline", "voice.sped.x", 9],
+      ["table", "t", 13],
+      ["key", "t.z", 14],
+    ]);
+  });
+
   test("reads an empty inline table and one left open at the end of its line", () => {
     expect(scan("t = {}\nu = { a = 1\nb = 2")).toEqual([
       ["key", "t", 1],

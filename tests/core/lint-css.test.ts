@@ -236,6 +236,16 @@ describe("DEK008 in dek.toml", () => {
     ]);
   });
 
+  test("finds a misspelled key's line past a table or an array written over several lines", async () => {
+    const toml =
+      '# project\nvoice = {\n  speaker = "a",\n  sped = 1.2,\n}\nextra = [\n  [1],\n]\nlatin_per_minut = 1\n';
+    expect((await lintWith({ toml })).filter((d) => d.id === "DEK008")).toMatchObject([
+      { line: 4, data: { key: "voice.sped", suggestion: "voice.speed" } },
+      { line: 6, data: { key: "extra" } },
+      { line: 9, data: { key: "latin_per_minut", suggestion: "latin_per_minute" } },
+    ]);
+  });
+
   test("names an unknown table once, not each key in it", async () => {
     const found = await lintWith({ toml: '[voyce]\nspeaker = "a"\nspeed = 1\n' });
     expect(found.filter((d) => d.id === "DEK008")).toMatchObject([
