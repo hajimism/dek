@@ -117,6 +117,15 @@ describe("deckAround", () => {
       expect(deckAround(join(root, "dek.toml"))).toBeUndefined();
     });
   });
+
+  test("finds none where no deck is, so a missing deck's hint does not name it", async () => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      expect(deckAround(join(root, "decks", "nope"))).toBeUndefined();
+      expect(addressHint("run `dekc ls`", deckAround(join(root, "decks", "nope")), root)).toBe(
+        "run `dekc ls`",
+      );
+    });
+  });
 });
 
 describe("addressResult", () => {
