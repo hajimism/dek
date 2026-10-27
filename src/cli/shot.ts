@@ -37,7 +37,7 @@ export async function shotCommand(
   options: ShotCommandOptions,
 ): Promise<ShotCliResult> {
   const mode = parseShotMode(options);
-  // A ref's slide scripts are someone else's: Chromium runs them only in its sandbox (ADR 27).
+  // A ref's slide scripts are someone else's: Chromium runs them only in its sandbox (ADR 29).
   const runner = ref ? { runner: refPlaywrightRunner } : {};
   switch (mode.kind) {
     case "sheet": {

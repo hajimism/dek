@@ -23,7 +23,7 @@ function accepted(): boolean {
 
 /**
  * How a worker may draw: a ref's slide scripts are someone else's, so only in the sandbox unless
- * the user accepted otherwise; the project's own wherever Chromium starts (ADR 27).
+ * the user accepted otherwise; the project's own wherever Chromium starts (ADR 29).
  */
 export function sandboxMode(ref: boolean): SandboxMode {
   return ref && !accepted() ? "required" : "preferred";

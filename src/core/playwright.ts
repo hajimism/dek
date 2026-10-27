@@ -393,7 +393,7 @@ export async function defaultPlaywrightRunner(
 
 /**
  * The default runner for a ref's pages: someone else's slide scripts, which Chromium runs only in
- * its sandbox unless the user set DEK_ALLOW_UNSANDBOXED=1 (ADR 27).
+ * its sandbox unless the user set DEK_ALLOW_UNSANDBOXED=1 (ADR 29).
  */
 export function refPlaywrightRunner(request: VisualRequest): Promise<VisualResponse | null> {
   return defaultPlaywrightRunner(request, { ref: true });

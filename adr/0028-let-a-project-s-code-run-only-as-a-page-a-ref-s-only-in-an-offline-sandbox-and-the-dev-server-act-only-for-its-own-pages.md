@@ -6,7 +6,7 @@ Date: 2026-10-27
 
 Accepted
 
-Amended by [27. Say whenever Chromium draws without its sandbox, and draw a ref so only with DEK_ALLOW_UNSANDBOXED](0027-say-whenever-chromium-draws-without-its-sandbox-and-draw-a-ref-so-only-with-dek-allow-unsandboxed.md)
+Amended by [29. Say whenever Chromium draws without its sandbox, and draw a ref so only with DEK_ALLOW_UNSANDBOXED](0029-say-whenever-chromium-draws-without-its-sandbox-and-draw-a-ref-so-only-with-dek-allow-unsandboxed.md)
 
 ## Context
 
