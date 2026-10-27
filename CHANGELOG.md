@@ -2,6 +2,79 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.5.0](https://github.com/hajimism/dek/compare/v0.4.0...v0.5.0) (2026-10-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ref:** a dek.toml that pins a ref whose name holds a control character or a character a person cannot see no longer loads until that line is removed; `dekc pack` refuses a deck so named until its folder is renamed; and `dekc new` and `dekc init --deck` refuse such a name, which they took before. Every other name works as before.
+* where Chromium's sandbox does not start, `dekc shot <ref>` fails until DEK_ALLOW_UNSANDBOXED=1 is set.
+
+### Features
+
+* **ref:** report the characters in a ref that a person cannot see ([5ca233e](https://github.com/hajimism/dek/commit/5ca233e186125e821f1341cc790636f26654274a))
+
+
+### Bug Fixes
+
+* **build:** keep a minified stylesheet reading as its source where an escape meets a newline or a comment ([41fd1ba](https://github.com/hajimism/dek/commit/41fd1ba08abc63c8af1d9deb8e2b9d70bb5ceab5))
+* **build:** minify a stylesheet into one that reads as its source does ([bdcffb9](https://github.com/hajimism/dek/commit/bdcffb9edaf7238b33bdf740dc4072c6f8cdaaa1))
+* **cli:** at the project root, hint a command only for the decks that have what it names ([fe3f8fb](https://github.com/hajimism/dek/commit/fe3f8fb12c178a7d8bfcb40b4ed16b52d03a08ae))
+* **cli:** hint `dekc ls` for a deck that is not there, not `dekc ls <it>` ([1ee4554](https://github.com/hajimism/dek/commit/1ee455439734f57eaf03c6c91fd78a9423f4812f))
+* **cli:** name a ref by the ref in the hints about it ([e9d1a47](https://github.com/hajimism/dek/commit/e9d1a47fe282b766bed189212891f1aafcc38a94))
+* **dev:** print a failure of the dev server's lint or voice run instead of dropping it ([14a8e8c](https://github.com/hajimism/dek/commit/14a8e8ceb75247d850407aeeef3bba56f5525a88))
+* give up on a voice engine, a dev server, or a rumdl that never answers ([19023f2](https://github.com/hajimism/dek/commit/19023f2c3987c4e60f2fe7440d4e1d5369ec2f10))
+* keep a file's mode when dek writes it anew ([085d7e8](https://github.com/hajimism/dek/commit/085d7e8e4be2895c975cd76668d4c7af91937d96))
+* **lint:** list rumdl as skipped when what it printed is not SARIF ([74582e0](https://github.com/hajimism/dek/commit/74582e07153aeb77211083e87309cbe6214e8ba3))
+* **lint:** name the path beside a stray space in DEK021's hint only when it is a plain word ([b030691](https://github.com/hajimism/dek/commit/b03069178ab6b318749c0296aca5fc916ebc2cec))
+* **lint:** read a URL in DEK011 as the browser's URL parser reads it ([c0950a5](https://github.com/hajimism/dek/commit/c0950a59b6c25f1c561c101a07750b89c0a87283))
+* **lint:** say to run lint --visual again after lint --visual fails ([a00da44](https://github.com/hajimism/dek/commit/a00da4437aadf6373a4e888213f26d6efdd7462a))
+* **ls:** keep a ref's title, event, and date to one line, as AGENTS.md does ([af85b6e](https://github.com/hajimism/dek/commit/af85b6e8ef63175cfb3166465e533e6b361f166e))
+* **mv:** write script.md, slides, and voice.toml whole, never over the old file ([a7a22b3](https://github.com/hajimism/dek/commit/a7a22b34a1fb073181966bec4a7c7e88b88757ce))
+* print no color code a deck or a ref wrote, only dek's own ([27b6751](https://github.com/hajimism/dek/commit/27b6751eb48d84e2538983c618889f74389d5caa))
+* read a pack's or a GitHub tarball's tar with dek's own reader, so it unpacks no more than was counted ([bdda596](https://github.com/hajimism/dek/commit/bdda596bf5974e6c30f5d273090327d0ed114a6b))
+* read each attribute value as the browser does, its character references decoded ([65a58d1](https://github.com/hajimism/dek/commit/65a58d11497648690c539c8caa4bbe49c246a4c8))
+* read the keys after an array or inline table written over several lines ([fa8f268](https://github.com/hajimism/dek/commit/fa8f2680bec36c3b092f5b7eef5749cd4146d64a))
+* read url() and a string cut short by CR or FF where the browser does ([55296f2](https://github.com/hajimism/dek/commit/55296f2a8f04ffdea958b835132bc2ad4c8054d5))
+* **ref:** keep a ref's names out of hints, and to one short line in messages ([67f7d19](https://github.com/hajimism/dek/commit/67f7d19268cb1032978d62a1a0fe1ec2a209197c))
+* **ref:** refuse a pack whose deck's name holds a control character or one a person cannot see ([373f14f](https://github.com/hajimism/dek/commit/373f14f368057677c33d9c8bbaccc427e048d790))
+* **sample:** set the note on why-dek's read-only card in ink ([586d09d](https://github.com/hajimism/dek/commit/586d09d7e706ae56b731ee9c5a4b6f1b03406d2e))
+* say whenever Chromium draws without its sandbox, and draw a ref there only when asked ([293b3ff](https://github.com/hajimism/dek/commit/293b3ffd0fd12ff042831fc4816e96025d7336af))
+* **server:** keep what the dev server serves out of other sites' pages and frames ([260b0f0](https://github.com/hajimism/dek/commit/260b0f081de5d9821312456abbec2849dfac7fd7))
+* **shot:** send a ref's broken slide script to its author, not to lint ([c1045fa](https://github.com/hajimism/dek/commit/c1045faf8583ca61281b825811a172a72ec0bb6c))
+* **show:** keep the name of keyframes written as a string in the theme excerpt ([072b078](https://github.com/hajimism/dek/commit/072b07848a2799f7d2e98f42962330c2e407bbee))
+* **show:** say a slide is a ref's, and start a part on a line no file can write ([b6b2389](https://github.com/hajimism/dek/commit/b6b2389fe5cf8dfc9dac4fefa1eab88737d7075a))
+* sort dict.toml, decks, and slide files the same way on every machine ([29a3f3c](https://github.com/hajimism/dek/commit/29a3f3c4c6073fbdc5808c9921d296fa8e4125cf))
+* start every program dek runs with the environment as it is now ([ee6b319](https://github.com/hajimism/dek/commit/ee6b319d2772ff39ea82cf3dd8fd763d4fb130c8))
+* stop a command at its timeout, even one that ignores SIGTERM or leaves a process behind ([3b05db7](https://github.com/hajimism/dek/commit/3b05db7ee9c17e68e5d580d744dc457856c29678))
+* **tar:** leave AppleDouble names out, and number that record 27 ([c4fb0ef](https://github.com/hajimism/dek/commit/c4fb0efbb9cd0a73f5335f078fb9b08bca1d35ef))
+* **video:** give up on an ffmpeg that never answers -version ([c0d3c6a](https://github.com/hajimism/dek/commit/c0d3c6a22d0dd8328782661ebc22384313d33487))
+* **visual:** stop sending a DEK031 to theme.css when the theme alone was never measured ([b3321b3](https://github.com/hajimism/dek/commit/b3321b3302389743dd5f0606e2a6367e2635f14d))
+* **voice:** stop waiting on a player that never ends after a say clip ([fc1082b](https://github.com/hajimism/dek/commit/fc1082bf3e8eb012bda822256fe51a067eb086b8))
+
+
+### Refactoring
+
+* write the link preview image and remove the dev server's lock through safe-fs ([3ae94c8](https://github.com/hajimism/dek/commit/3ae94c8db6ae9bef4243bec3cc334e1a4a2b9e11))
+
+
+### Documentation
+
+* **adr:** keep a ref's words out of dek's hints, and mark what a ref wrote wherever dek prints it ([e4f0787](https://github.com/hajimism/dek/commit/e4f07878aee0f0f887484b800778324a55e0f97d))
+* **adr:** number the --json contract record 31 ([8108f37](https://github.com/hajimism/dek/commit/8108f3770b3c2b24efb57b2ed1064949a998e95b))
+* **adr:** number the fast-check record 26, where this stack adds it ([389948e](https://github.com/hajimism/dek/commit/389948e6e8ef79842d8b429fac5e2d8e5d2ddeb2))
+* **adr:** number the ref-words record 30, and point it at the trust record ([6925755](https://github.com/hajimism/dek/commit/692575572ab5a235ac1256c7b7b11e31a4ddc01f))
+* **adr:** number the sandbox record 29, and point it at the trust record ([e082487](https://github.com/hajimism/dek/commit/e08248711777c3acabd8ac46c1c8a080302de961))
+* **adr:** number the trust record 28, after the records already on this branch ([7a7fbd8](https://github.com/hajimism/dek/commit/7a7fbd8b9cb6f18af2d27f26a1fb962c3e85f30a))
+* **adr:** read a pack's or a repository's tar with dek's own reader ([ba896c8](https://github.com/hajimism/dek/commit/ba896c84daec4a39fdc5d7fdd34c1cf5ccb52394))
+* **adr:** read every attribute value as the browser does ([6a1c698](https://github.com/hajimism/dek/commit/6a1c698fbc74da129c034f175063d8c99a83f9bc))
+* **adr:** say what dek does where Chromium's sandbox cannot start ([f2f940a](https://github.com/hajimism/dek/commit/f2f940ad4c0a216f9f0ec0085da72cfd15414282))
+* **adr:** say whom dek trusts, and what each of them may make it do ([8f26099](https://github.com/hajimism/dek/commit/8f260990674b3c3105b40b276f9e90c6e013e1db))
+* pass the suite timeout on every bun test line in CONTRIBUTING ([6c7182c](https://github.com/hajimism/dek/commit/6c7182cab0564f91088be06b5209c32b6f191efa))
+* say how dek keeps a ref's words apart from its own ([756ba7c](https://github.com/hajimism/dek/commit/756ba7ca74ff05cbd109ef0eab270dea92c52b78))
+* say how long dek waits on rumdl, a voice engine, and the dev server, and how large a ref may be ([e196cd8](https://github.com/hajimism/dek/commit/e196cd81ad83cd90286a91977258bb7c0882eaee))
+* say lint reads an attribute's value and URL as the browser does ([4c67184](https://github.com/hajimism/dek/commit/4c671849309e7ff8015341862b9fc8ec860d0cb7))
+
 ## [0.4.0](https://github.com/hajimism/dek/compare/v0.3.4...v0.4.0) (2026-10-27)
 
 
