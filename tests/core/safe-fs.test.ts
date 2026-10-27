@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { lstatSync, readFileSync, statSync } from "node:fs";
-import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
@@ -118,6 +118,20 @@ describe("writeInside", () => {
       writeInside(path, "{}", root, { mode: 0o600 });
       expect(await readFile(path, "utf8")).toBe("{}");
       expect(statSync(path).mode & 0o777).toBe(0o600);
+    });
+  });
+
+  test("keeps the mode of the file it replaces, as a write in place does", async () => {
+    await withProject(async (root) => {
+      const path = join(root, "dek.toml");
+      await writeFile(path, "old");
+      await chmod(path, 0o600);
+      writeInside(path, "new", root);
+      expect(await readFile(path, "utf8")).toBe("new");
+      expect(statSync(path).mode & 0o777).toBe(0o600);
+      // A mode passed in still wins, as the dev server's lock file needs.
+      writeInside(path, "newer", root, { mode: 0o640 });
+      expect(statSync(path).mode & 0o777).toBe(0o640);
     });
   });
 

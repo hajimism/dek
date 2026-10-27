@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -146,7 +147,8 @@ export function writeInside(
 /**
  * Write `data` as a new file at `path`, in a folder already known to be inside the project: a
  * link at `path`, such as one planted at a cache entry's predictable name, is replaced, never
- * written through.
+ * written through. The new file takes `mode`, else the mode of the file it replaces, as a write
+ * in place keeps it, so a script.md only its owner may read stays that way.
  */
 export function replaceFile(
   path: string,
@@ -154,15 +156,30 @@ export function replaceFile(
   options: { mode?: number } = {},
 ): void {
   const temp = join(dirname(path), `.${basename(path)}.${randomUUID().slice(0, 8)}.tmp`);
+  const mode = options.mode ?? modeOf(path);
   writeFileSync(temp, data, {
     flag: "wx",
-    ...(options.mode !== undefined ? { mode: options.mode } : {}),
+    ...(mode !== undefined ? { mode } : {}),
   });
   try {
+    // The mode as it was, not as the umask leaves it on a new file.
+    if (options.mode === undefined && mode !== undefined) {
+      chmodSync(temp, mode);
+    }
     renameSync(temp, path);
   } catch (error) {
     rmSync(temp, { force: true });
     throw error;
+  }
+}
+
+/** The permission bits of the plain file at `path`, if one is there; a link's target is not asked. */
+function modeOf(path: string): number | undefined {
+  try {
+    const stat = lstatSync(path);
+    return stat.isFile() ? stat.mode & 0o777 : undefined;
+  } catch {
+    return undefined;
   }
 }
 
