@@ -1,4 +1,4 @@
-import { existsSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, renameSync, unlinkSync } from "node:fs";
 import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
@@ -11,6 +11,7 @@ import {
   requireSection,
   SLIDE_SIDECARS,
 } from "./resolve.ts";
+import { writeInside } from "./safe-fs.ts";
 import { Id } from "./schema.ts";
 import { deckLayouts, skeletonHtml } from "./skeleton.ts";
 import { skeletonRecord } from "./skeleton-record.ts";
@@ -22,11 +23,11 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   if (!Id.safeParse(to).success) {
     throw new DekError(`invalid id "${to}"`, { hint: "use [a-z0-9-] with at least one letter" });
   }
-  const { deck } = asResolvedDeck(input);
+  const { project, deck } = asResolvedDeck(input);
   const has = (slug: string): boolean => deck.deck.sections.some((entry) => entry.slug === slug);
   if (!has(from) && has(to)) {
     // script.md was edited first; only the files still carry the old id.
-    const steps = slideFileSteps(deck, from, to);
+    const steps = slideFileSteps(project.root, deck, from, to);
     if (steps.length === 0 && !existsSync(deckPaths(deck.dir).slide(to, ".html"))) {
       throw new DekError(`slide "${from}" not found`, {
         path: deckPaths(deck.dir).slide(from, ".html"),
@@ -56,8 +57,8 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   }
   lines[headingIndex] = rewriteHeadingId(heading, from, to);
   applySteps([
-    writeStep(deck.scriptPath, source, joinLines(source, lines)),
-    ...slideFileSteps(deck, from, to),
+    writeStep(project.root, deck.scriptPath, source, joinLines(source, lines)),
+    ...slideFileSteps(project.root, deck, from, to),
   ]);
 }
 
@@ -69,7 +70,12 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
  * the author wrote, one under each id, stop the rename; everything that could stop it is worked
  * out before any file changes.
  */
-function slideFileSteps(deck: ResolvedDeck["deck"], from: string, to: string): FileStep[] {
+function slideFileSteps(
+  root: string,
+  deck: ResolvedDeck["deck"],
+  from: string,
+  to: string,
+): FileStep[] {
   const paths = deckPaths(deck.dir);
   const layouts = deckLayouts(deck.dir);
   const record = skeletonRecord(deck.dir);
@@ -100,16 +106,16 @@ function slideFileSteps(deck: ResolvedDeck["deck"], from: string, to: string): F
   const kept = source && (source.authored || !target) ? source : target;
   if (source && kept === source) {
     steps.push(
-      target ? writeStep(toPath, target.html, source.html) : renameStep(source.path, toPath),
+      target ? writeStep(root, toPath, target.html, source.html) : renameStep(source.path, toPath),
     );
   }
   if (source && target) {
-    steps.push(removeStep(source.path, source.html));
+    steps.push(removeStep(root, source.path, source.html));
   }
   if (kept) {
     const next = relabel(kept.html, from, to);
     if (next !== kept.html) {
-      steps.push(writeStep(toPath, kept.html, next));
+      steps.push(writeStep(root, toPath, kept.html, next));
     }
   }
   for (const ext of SLIDE_SIDECARS) {
@@ -119,7 +125,7 @@ function slideFileSteps(deck: ResolvedDeck["deck"], from: string, to: string): F
     }
   }
   if (voice) {
-    steps.push(writeStep(voice.path, voice.source, voice.next));
+    steps.push(writeStep(root, voice.path, voice.source, voice.next));
   }
   return steps;
 }
@@ -155,19 +161,22 @@ function again(from: string, to: string): string {
   return `\`dekc mv ${end}${source} ${target}\` again`;
 }
 
-/** One file change `dekc mv` makes, with how to take it back. */
+/**
+ * One file change `dekc mv` makes, with how to take it back. A write goes to a new file renamed
+ * into place, so a crash part way leaves the old file or the new one, never half of one.
+ */
 type FileStep = { path: string; apply: () => void; undo: () => void };
 
-function writeStep(path: string, before: string, after: string): FileStep {
+function writeStep(root: string, path: string, before: string, after: string): FileStep {
   return {
     path,
-    apply: () => writeFileSync(path, after),
-    undo: () => writeFileSync(path, before),
+    apply: () => writeInside(path, after, root),
+    undo: () => writeInside(path, before, root),
   };
 }
 
-function removeStep(path: string, before: string): FileStep {
-  return { path, apply: () => unlinkSync(path), undo: () => writeFileSync(path, before) };
+function removeStep(root: string, path: string, before: string): FileStep {
+  return { path, apply: () => unlinkSync(path), undo: () => writeInside(path, before, root) };
 }
 
 function renameStep(from: string, to: string): FileStep {
@@ -268,7 +277,7 @@ export function reorderSection(
   place: SectionPlace,
 ): void {
   const target = "before" in place ? place.before : place.after;
-  const { deck } = asResolvedDeck(input);
+  const { project, deck } = asResolvedDeck(input);
   const sections = deck.deck.sections;
   const fromIndex = sections.findIndex((entry) => entry.slug === slug);
   if (fromIndex < 0) {
@@ -301,7 +310,7 @@ export function reorderSection(
   });
   const insertAt = "before" in place ? remainingTarget : remainingTarget + 1;
   chunks.splice(insertAt, 0, moved);
-  writeFileSync(deck.scriptPath, joinLines(source, [...head, ...chunks.flat()]));
+  writeInside(deck.scriptPath, joinLines(source, [...head, ...chunks.flat()]), project.root);
 }
 
 function rewriteHeadingId(heading: string, from: string, to: string): string {
