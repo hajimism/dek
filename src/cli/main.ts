@@ -1,8 +1,11 @@
+import { parseCss } from "../core/css.ts";
+import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
 import { shellQuote } from "../core/escape.ts";
 import { either } from "../core/prose.ts";
 import { isRefName } from "../core/ref-name.ts";
-import { resolveProject } from "../core/resolve.ts";
+import { type ProjectDeck, readDeckFile, resolveProject } from "../core/resolve.ts";
+import { themeFacts } from "../core/theme-facts.ts";
 import { addressHint, deckWord, type HintDeck, withPlaceholderNote } from "./address.ts";
 import {
   type AnySpec,
@@ -158,7 +161,7 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
   }
   const scope = spec.scope;
   const target = scope
-    ? retypedWithDeck(line, cwd, () =>
+    ? retypedWithDeck(line, cwd, call, () =>
         resolveTarget(cwd, scope, {
           deck: call.deck,
           refs: spec.refs === true,
@@ -186,9 +189,10 @@ const NAMED_DECKS = 3;
 
 /**
  * `resolve`, with a missing deck hinted as the line that was typed, the deck named where the
- * command takes it: one command per deck of the project, so the hint runs as written.
+ * command takes it: one command per deck of the project that has what the line names, so the
+ * hint runs as written.
  */
-function retypedWithDeck<T>(line: CommandLine, cwd: string, resolve: () => T): T {
+function retypedWithDeck<T>(line: CommandLine, cwd: string, call: Call, resolve: () => T): T {
   try {
     return resolve();
   } catch (error) {
@@ -196,16 +200,41 @@ function retypedWithDeck<T>(line: CommandLine, cwd: string, resolve: () => T): T
       throw error;
     }
     const typed = `\`dekc ${line.typed.map(shellQuote).join(" ")}\``;
-    const [first] = error.decks;
+    const decks = error.decks.filter((deck) => runsIn(call, deck));
+    const [first] = decks;
     // Each command is retyped for one deck; where to find a name left as <deck> is said once.
     const retyped = (deck: HintDeck) => addressHint(typed, deck, cwd, { note: false });
-    const hint = !first
-      ? "run `dekc new <name>` to make a deck"
-      : error.decks.length > NAMED_DECKS
-        ? `run ${retyped(first)}, or name another deck in place of ${deckWord(first.name)}; \`dekc ls\` lists them`
-        : `run ${either(error.decks.map(retyped))}`;
+    const hint =
+      error.decks.length === 0
+        ? "run `dekc new <name>` to make a deck"
+        : !first
+          ? "run `dekc ls`"
+          : decks.length > NAMED_DECKS
+            ? `run ${retyped(first)}, or name another deck in place of ${deckWord(first.name)}; \`dekc ls\` lists them`
+            : `run ${either(decks.map(retyped))}`;
     throw new DekError(error.message, { hint: withPlaceholderNote(hint), cause: error });
   }
+}
+
+/**
+ * Whether `call` finds in `deck` what it names: a section, the one `dekc mv` renames or the name
+ * script.md already gives it, and a layout of the deck's theme.
+ */
+function runsIn(call: Call, deck: ProjectDeck): boolean {
+  const { slug, old, layout } = call.args;
+  const has = (name: string | undefined) =>
+    deck.deck.sections.some((section) => section.slug === name);
+  return (
+    (slug === undefined || has(slug)) &&
+    (old === undefined || has(old) || has(call.args.new)) &&
+    (layout === undefined || themeLayouts(deck).includes(layout))
+  );
+}
+
+/** The layouts a deck's theme defines; none when it has no theme.css. */
+function themeLayouts(deck: ProjectDeck): string[] {
+  const css = readDeckFile(deck.dir, deckPaths(deck.dir).theme) ?? "";
+  return themeFacts(parseCss(css)).layouts.map((entry) => entry.name);
 }
 
 /** A session prints no result, so --json has nothing to shape, and a reader would wait forever. */

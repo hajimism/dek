@@ -271,6 +271,25 @@ describe("deck scope", () => {
     });
   });
 
+  test.serial("only a deck with what the command names gets its command", async () => {
+    const script = (slug: string) => `---\ntitle: Demo\n---\n\n## ${slug}\n\nx\n`;
+    const spec = {
+      decks: [
+        { name: "demo", script: script("intro") },
+        { name: "other", script: script("end") },
+      ],
+    };
+    await withTempProject(spec, async (root) => {
+      expect((await failure(["show", "end"], root)).hint).toBe("run `dekc show other end --json`");
+      expect((await failure(["mv", "end", "outro"], root)).hint).toBe(
+        "run `dekc mv other end outro --json`",
+      );
+      // No deck has the section, or the layout: the decks and their slides are where to look.
+      expect((await failure(["check", "nope"], root)).hint).toBe("run `dekc ls`");
+      expect((await failure(["theme", "nope"], root)).hint).toBe("run `dekc ls`");
+    });
+  });
+
   test.serial("a deck the command line names before a subcommand goes there", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const error = await failure(["marks", "clear"], root);
