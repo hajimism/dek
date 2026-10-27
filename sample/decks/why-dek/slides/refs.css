@@ -57,6 +57,11 @@
   color: var(--fg);
 }
 
+/* The hatch runs under the note, and muted grey reads below 4.5:1 where a stripe crosses it. */
+.is-ref .note {
+  color: var(--fg);
+}
+
 .chain .is-mine {
   border-top-color: var(--accent);
 }
