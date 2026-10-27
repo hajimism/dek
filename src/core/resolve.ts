@@ -1,10 +1,10 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { walkUp } from "./optional.ts";
 import { parseScript } from "./parse.ts";
-import { deckProjectRoot } from "./path.ts";
+import { deckProjectRoot, isInside } from "./path.ts";
 import { readSourceIfExists, requireInside } from "./safe-fs.ts";
 import type { Deck, Section } from "./schema.ts";
 import { suggest } from "./suggest.ts";
@@ -150,14 +150,25 @@ function loadDecks(root: string): {
   if (!existsSync(decksDir)) {
     return { decks: [], failed: [] };
   }
-  if (!statSync(decksDir).isDirectory()) {
+  // A link out of the project would list, serve, and watch the folders of wherever it leads. It
+  // may lead elsewhere in the project, but not into a hidden folder; a folder has no kind to keep.
+  const realRoot = realpathSync(root);
+  const realDecks = realpathSync(decksDir);
+  const rel = relative(realRoot, realDecks);
+  if (!isInside(realDecks, realRoot) || rel.split(sep).some((part) => part.startsWith("."))) {
+    throw new DekError("decks leads outside the project", {
+      path: decksDir,
+      hint: "dek follows decks/ only to a folder inside the project and outside hidden folders; move the decks into the project instead",
+    });
+  }
+  if (!statSync(realDecks).isDirectory()) {
     throw new DekError("decks is not a directory", { path: decksDir });
   }
 
   const decks: ProjectDeck[] = [];
   const failed: Project["failed"] = [];
 
-  for (const entry of readdirSync(decksDir, { withFileTypes: true })
+  for (const entry of readdirSync(realDecks, { withFileTypes: true })
     .filter((item) => item.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
     const loaded = readDeck(root, entry.name);
