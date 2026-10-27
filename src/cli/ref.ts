@@ -1,7 +1,8 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { loadConfig } from "../core/config.ts";
 import { DekError } from "../core/error.ts";
+import { isPlainWord, shellQuote } from "../core/escape.ts";
 import { downloadTarball, resolveRev } from "../core/github.ts";
 import {
   deckOfPack,
@@ -12,15 +13,17 @@ import {
   pickSnapshot,
   readPack,
   readTarball,
+  refDir,
   refLicense,
   refState,
   refTitle,
+  refuseLinkUnderPacks,
+  refuseLinkUnderRefs,
   type Snapshot,
   snapshotDigest,
   writeSnapshot,
 } from "../core/ref.ts";
-import type { FileRefSource, GithubRefSource } from "../core/ref-name.ts";
-import { readTextIfExists } from "../core/resolve.ts";
+import type { FileRefSource, GithubRefSource, RefSource } from "../core/ref-name.ts";
 import { readSourceIfExists, removeInside, requireInside, writeInside } from "../core/safe-fs.ts";
 import { writeAgentsMd } from "../core/sync.ts";
 import { setTableKey } from "../core/toml-keys.ts";
@@ -58,10 +61,12 @@ export type RefCliResult = RefAddResult | RefListResult | RefRmResult;
 export async function restoreRef(cwd: string, arg: string): Promise<void> {
   const source = parseRefSource(arg);
   const project = requireProject(cwd);
-  const { pinned, fetched } = refState(project, source.name);
+  const { pinned, dir, fetched } = refState(project, source.name);
   if (pinned === undefined || fetched) {
     return;
   }
+  // Said before a download that the write would refuse anyway.
+  refuseLinkUnderRefs(project.root, dir);
   if (source.kind === "file") {
     await unpackSnapshot(project.root, source, pinned);
     return;
@@ -88,7 +93,7 @@ async function unpackSnapshot(root: string, source: FileRefSource, pin: string):
   if ((await snapshotDigest(snapshot)) !== pin) {
     throw new DekError(`${rel} is not the pack ${source.name} is pinned to`, {
       path,
-      hint: `run \`dekc ref ${rel}\` to pin the pack that is there, or put back the one dek.toml pins`,
+      hint: `run \`dekc ref ${shellQuote(rel)}\` to pin the pack that is there, or put back the one dek.toml pins`,
     });
   }
   await writeSnapshot(root, source.name, pin, snapshot);
@@ -128,7 +133,10 @@ export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
     });
   }
   const project = requireProject(cwd);
+  refuseSharedFolders(project, source);
   const { pinned: from, dir, fetched } = refState(project, source.name);
+  // Said before a download that the write would refuse anyway.
+  refuseLinkUnderRefs(project.root, dir);
   const rev =
     source.rev !== undefined && isPinnedRev(source.rev)
       ? source.rev
@@ -141,7 +149,7 @@ export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
     changed = true;
   }
   if (from !== rev) {
-    const toml = readTextIfExists(project.configPath) ?? "";
+    const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(project.configPath, setTableKey(toml, "refs", source.name, rev), project.root);
     changed = true;
   }
@@ -166,6 +174,72 @@ export async function addRef(cwd: string, arg: string): Promise<RefAddResult> {
   };
 }
 
+/**
+ * Refuses a pin whose folders another pin, or a folder already on disk, takes. refs/ and packs/
+ * are named by the ref, and macOS and Windows read a name without its case, so `file/Talk` and
+ * `file/talk` would share one snapshot and one pack, and adding the second would replace the
+ * first's.
+ */
+function refuseSharedFolders(
+  project: { root: string; configPath: string },
+  source: RefSource,
+): void {
+  const { name } = source;
+  const other = Object.keys(loadConfig(project.configPath).refs ?? {}).find(
+    (pinned) => pinned !== name && folded(pinned) === folded(name),
+  );
+  if (other !== undefined) {
+    throw new DekError(`${name} would share its folders with ${other}, which dek.toml pins`, {
+      path: project.configPath,
+      hint: `a ref's folders are named without their case on macOS and Windows; to pin ${name} in its place, run \`dekc ref rm ${shellQuote(other)}\` first`,
+    });
+  }
+  const paths = [relative(project.root, refDir(project.root, name))];
+  if (source.kind === "file") {
+    paths.push(packFile(source.deck));
+  }
+  const left = paths
+    .map((path) => spelledOtherwise(project.root, path))
+    .find((path) => path !== undefined);
+  if (left !== undefined) {
+    const shown = isPlainWord(left) ? left : "another folder";
+    throw new DekError(
+      `${name} would share a folder with ${shown}, which is already in the project`,
+      {
+        path: join(project.root, left),
+        hint: "no ref in dek.toml pins it, so a ref removed by hand left it; delete it and add the ref again",
+      },
+    );
+  }
+}
+
+/** A name as a file system blind to case and form reads it: APFS folds ς as σ, and ﬁ as fi. */
+function folded(name: string): string {
+  return name.normalize("NFKC").toUpperCase().toLowerCase();
+}
+
+/**
+ * The path, under `root`, of a folder or file a file system blind to case and form would read as
+ * `path` though it is spelled otherwise, found segment by segment.
+ */
+function spelledOtherwise(root: string, path: string): string | undefined {
+  let dir = root;
+  const walked: string[] = [];
+  for (const segment of path.split(sep)) {
+    const entries = existsSync(dir) && statSync(dir).isDirectory() ? readdirSync(dir) : [];
+    const other = entries.find((entry) => entry !== segment && folded(entry) === folded(segment));
+    if (other !== undefined) {
+      return join(...walked, other);
+    }
+    if (!entries.includes(segment)) {
+      return undefined;
+    }
+    walked.push(segment);
+    dir = join(dir, segment);
+  }
+  return undefined;
+}
+
 /** An argument that ends in .tgz or .tar.gz is a pack's path, never a ref name. */
 function isPackPath(arg: string): boolean {
   return /\.(tgz|tar\.gz)$/i.test(arg);
@@ -187,9 +261,12 @@ async function addPack(cwd: string, arg: string): Promise<RefAddResult> {
   }
   const read = await readPackFile(given, undefined);
   const { source, bytes } = read;
+  refuseSharedFolders(project, source);
   const rev = await snapshotDigest(read);
   const { pinned: from, dir, fetched } = refState(project, source.name);
   const stored = join(project.root, packFile(source.deck));
+  // Before the first write: the copy below is written by name.
+  refuseLinkUnderPacks(project.root, source.deck);
 
   let changed = false;
   if (!(fetched && from === rev)) {
@@ -201,7 +278,7 @@ async function addPack(cwd: string, arg: string): Promise<RefAddResult> {
     changed = true;
   }
   if (from !== rev) {
-    const toml = readTextIfExists(project.configPath) ?? "";
+    const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(project.configPath, setTableKey(toml, "refs", source.name, rev), project.root);
     changed = true;
   }
@@ -264,8 +341,13 @@ export function removeRef(cwd: string, arg: string): RefRmResult {
       hint: "run `dekc ref` to list refs",
     });
   }
+  // Before anything changes: the deletes below must not reach what a link there points to.
+  refuseLinkUnderRefs(project.root, dir);
+  if (source.kind === "file") {
+    refuseLinkUnderPacks(project.root, source.deck);
+  }
   if (pinned !== undefined) {
-    const toml = readFileSync(project.configPath, "utf8");
+    const toml = readSourceIfExists(project.configPath, project.root) ?? "";
     writeInside(
       project.configPath,
       setTableKey(toml, "refs", source.name, undefined),

@@ -9,7 +9,7 @@ import {
   type ResolvedDeck,
   requireSection,
 } from "../core/resolve.ts";
-import { dropLinks, outputDir, outputPath, replaceFile } from "../core/safe-fs.ts";
+import { dropLinks, outputDir, outputPath, replaceFile, requireInside } from "../core/safe-fs.ts";
 import { logicalSize } from "../core/size.ts";
 import { sliceTimeline, slideTimeRange, type Timeline } from "../core/timeline.ts";
 import { videoDocument } from "../core/video-document.ts";
@@ -69,7 +69,11 @@ async function bakeProjectDeck(
       hint: "run `dekc voice`",
     });
   }
-  let timeline = { ...loaded, audio: resolveTimelineAudio(loaded, timelinePath) };
+  // ffmpeg opens the audio itself, so it is resolved here: a link out of the project is an error.
+  let timeline = {
+    ...loaded,
+    audio: requireInside(resolveTimelineAudio(loaded, timelinePath), project.root),
+  };
   const fps = options.fps ?? 30;
   const size = logicalSize(deck.deck.ratio);
   const html = videoDocument({ project, deck }, await playerScript());

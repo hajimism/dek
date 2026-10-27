@@ -1,6 +1,8 @@
 import { DekError } from "../core/error.ts";
 import { deckRoutePath } from "../runtime/routes.ts";
 import { isPidAlive, readDevServerLock } from "../server/lock.ts";
+import { deckFlag, deckWord } from "./address.ts";
+import { isTypedCommand } from "./commands.ts";
 import { type DeckTarget, requireSection } from "./scope.ts";
 
 export type NavResult = {
@@ -82,7 +84,7 @@ function refusal(
 ): DekError {
   if (status === 404 && lock.deck !== undefined && lock.deck !== deckName) {
     return new DekError(`the running dev server serves deck "${lock.deck}", not "${deckName}"`, {
-      hint: `pass --deck ${lock.deck}, or stop the server at ${lock.url} and run \`dekc ${deckName}\``,
+      hint: `pass ${deckFlag(lock.deck)}, or stop the server at ${lock.url} and run \`dekc ${isTypedCommand(deckName) ? deckFlag(deckName) : deckWord(deckName)}\``,
     });
   }
   if (status === 401) {

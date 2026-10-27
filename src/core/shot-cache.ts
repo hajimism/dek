@@ -3,6 +3,7 @@ import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { escapeRegExp } from "./escape.ts";
 import { cacheDir, deckProjectRoot } from "./path.ts";
+import type { ProjectDeck } from "./resolve.ts";
 import { isCachedFile, outputDir } from "./safe-fs.ts";
 import type { Section } from "./schema.ts";
 import { lastStop, stepKey } from "./step.ts";
@@ -26,12 +27,22 @@ export type CacheEntry = {
 /** A cached folder of files, such as a set of contact sheets. */
 type CacheBundle = {
   dir: string;
+  /** The project the folder is in, for what a capture writes inside it. */
+  root: string;
   commit(): void;
 };
 
-/** `.cache/shots`, made if missing, where it really is; a link out of the project is an error. */
-function shotsDir(deckDir: string): string {
-  return outputDir(cacheDir(deckDir, "shots"), deckProjectRoot(deckDir));
+/** The deck a capture is of: its folder, and for a ref, where its cache is instead. */
+type ShotDeck = Pick<ProjectDeck, "dir" | "cache">;
+
+/**
+ * `.cache/shots`, made if missing, where it really is, and the project it is in; a link out of
+ * the project is an error. A ref's shots go in the cache of the project that reads it.
+ */
+function shotsDir(deck: ShotDeck): { dir: string; root: string } {
+  const root = deck.cache?.root ?? deckProjectRoot(deck.dir);
+  const dir = deck.cache ? join(deck.cache.dir, "shots") : cacheDir(deck.dir, "shots");
+  return { dir: outputDir(dir, root), root };
 }
 
 function contentHash(text: string): string {
@@ -52,7 +63,7 @@ export function shotName(parts: string[], content: string): string {
  * `--step 2` and a still at the last beat, `dekc build`'s link preview included, are one file.
  */
 export function stillEntry(
-  deckDir: string,
+  deck: ShotDeck,
   section: Section,
   beatIndex: number,
   html: string,
@@ -64,18 +75,18 @@ export function stillEntry(
     `${section.slug}-${step}`,
     `${section.slug}-${beatIndex}`,
   ];
-  return fileEntry(deckDir, [section.slug, step], html, legacy);
+  return fileEntry(deck, [section.slug, step], html, legacy);
 }
 
 /** The frame `at` of the move from `from` into `to`. */
 export function morphEntry(
-  deckDir: string,
+  deck: ShotDeck,
   from: string,
   to: string,
   at: number,
   html: string,
 ): CacheEntry {
-  return fileEntry(deckDir, [from, to, String(at)], `${at}\0${html}`, [`${from}-to-${to}-${at}`]);
+  return fileEntry(deck, [from, to, String(at)], `${at}\0${html}`, [`${from}-to-${to}-${at}`]);
 }
 
 /**
@@ -83,29 +94,26 @@ export function morphEntry(
  * folder, so runs of different captures neither evict nor race each other.
  */
 export function bundleEntry(
-  deckDir: string,
+  deck: ShotDeck,
   kind: "sheets" | "motion",
   parts: string[],
   content: string,
 ): CacheBundle {
-  const root = deckProjectRoot(deckDir);
-  const parent = outputDir(join(shotsDir(deckDir), kind), root);
+  const shots = shotsDir(deck);
+  const { root } = shots;
+  const parent = outputDir(join(shots.dir, kind), root);
   const base = parts.join(SEPARATOR);
   const name = base ? `${base}.${contentHash(content)}` : contentHash(content);
   const pattern = new RegExp(`^${base ? `${escapeRegExp(base)}\\.` : ""}${HASH}$`);
   return {
     dir: outputDir(join(parent, name), root),
+    root,
     commit: () => prune(parent, [pattern], name, { recursive: true }),
   };
 }
 
-function fileEntry(
-  deckDir: string,
-  parts: string[],
-  content: string,
-  legacy: string[],
-): CacheEntry {
-  const dir = shotsDir(deckDir);
+function fileEntry(deck: ShotDeck, parts: string[], content: string, legacy: string[]): CacheEntry {
+  const { dir } = shotsDir(deck);
   const name = shotName(parts, content);
   const path = join(dir, name);
   const patterns = [

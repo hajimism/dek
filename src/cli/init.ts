@@ -3,10 +3,12 @@ import { basename, join, resolve } from "node:path";
 import { parseCss, publishedTokens } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
+import { shellQuote } from "../core/escape.ts";
 import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
-import { readTextIfExists } from "../core/resolve.ts";
+import { refuseInsideRef } from "../core/ref.ts";
+import { readSourceIfExists } from "../core/safe-fs.ts";
 import {
   defaultTsconfig,
   dekFilePaths,
@@ -25,7 +27,6 @@ import {
   nextSteps,
   type PlannedPath,
   playwrightStep,
-  shellQuote,
 } from "./files.ts";
 
 export type InitResult = {
@@ -84,7 +85,7 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
 /** The tokens every deck needs that the project's theme.css does not publish on `.slide`. */
 function missingThemeTokens(root: string): string[] {
   const published = new Set(
-    publishedTokens(parseCss(readTextIfExists(join(root, "theme.css")) ?? "")).map(
+    publishedTokens(parseCss(readSourceIfExists(join(root, "theme.css"), root) ?? "")).map(
       (token) => token.name,
     ),
   );
@@ -100,8 +101,10 @@ function syncDeckFiles(deckDir: string, created: string[]): FileChanges {
 /** Everything init writes but `.dek/` and AGENTS.md, in the order a reader meets it. */
 function projectPlan(root: string, deck: string | undefined): PlannedPath[] {
   const themePath = join(root, "theme.css");
-  // A first deck is drawn in the theme that will be there: the one kept, or dek's.
-  const theme = readTextIfExists(themePath) ?? defaultTheme();
+  // A first deck is drawn in the theme that will be there: the one kept, or dek's. A folder that
+  // is not there yet holds no theme.
+  const theme =
+    (existsSync(root) ? readSourceIfExists(themePath, root) : undefined) ?? defaultTheme();
   return [
     { path: join(root, "dek.toml"), contents: defaultToml() },
     { path: themePath, contents: defaultTheme() },
@@ -123,6 +126,8 @@ function checkTarget(root: string): void {
   if (existsSync(root) && !statSync(root).isDirectory()) {
     throw new DekError("not a directory", { path: root, hint: "pass a directory to init" });
   }
+  // A ref is someone else's project, read where it is: init would write its files into it.
+  refuseInsideRef(root);
   const outer = walkUp(root, (dir) => {
     const config = join(dir, "dek.toml");
     return existsSync(config) && statSync(config).isFile() ? dir : undefined;

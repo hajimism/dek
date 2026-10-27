@@ -1,4 +1,5 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { isPlainWord } from "../escape.ts";
 import type { HtmlAttribute, HtmlScan, Picture, SourceSpot } from "../html-scan.ts";
 import type { Section } from "../schema.ts";
 import { beatAt, formatStepChoices, resolveStep, stepChoices } from "../step.ts";
@@ -159,7 +160,8 @@ function layoutDiagnostics({ section, path, scan }: SlideHtml, layouts: Set<stri
     return [];
   }
   const known = [...layouts].sort();
-  const guess = suggest(scan.layout, known);
+  // A layout's name is the theme's text: one that is no plain word is never a guess.
+  const guess = suggest(scan.layout, known.filter(isPlainWord));
   return [
     diag("DEK019", {
       message: `data-layout "${scan.layout}" is not a layout of the theme`,

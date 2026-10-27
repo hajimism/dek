@@ -1,12 +1,22 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import {
+  copyFile,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { join, relative } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { livePlayerScript } from "../../src/runtime/player.ts";
 import { startDevServer } from "../../src/server/dev.ts";
 import { POLL_INTERVAL_MS } from "../../src/server/watch.ts";
 import { spawnDekServer } from "../helpers/cli.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument, slidePlaces } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
@@ -109,6 +119,26 @@ async function waitForPage(
     await Bun.sleep(50);
   }
   throw new Error(`timed out waiting for ${url} to change`);
+}
+
+/** The error a start fails with; a server that starts is closed, so a test that expected none fails cleanly. */
+async function startOrError(options: { cwd: string; deck?: string }): Promise<unknown> {
+  try {
+    const server = await startDevServer({ port: 0, ...options });
+    await server.close();
+    return "started";
+  } catch (error) {
+    return error;
+  }
+}
+
+/** Every file under `dir`, by its path there. */
+async function filesUnder(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => !entry.isDirectory())
+    .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
+    .sort();
 }
 
 describe("startDevServer", () => {
@@ -1013,6 +1043,46 @@ body
     );
   });
 
+  test("refuses to start inside a ref, and writes nothing there", async () => {
+    const ref = "someone/talks/intro";
+    await withTempProject(
+      {
+        decks: [{ name: "demo", slides: { intro: introHtml } }],
+        refs: [{ name: ref, deck: { slides: {}, assets: { "inner/dek.toml": "" } } }],
+      },
+      async (root) => {
+        const snapshot = join(root, "refs", "someone", "talks", "intro");
+        const before = await filesUnder(snapshot);
+        // The ref's root, its deck, and a folder under a dek.toml the ref's assets carry.
+        for (const cwd of [
+          snapshot,
+          join(snapshot, "decks", "intro"),
+          join(snapshot, "decks", "intro", "assets", "inner"),
+        ]) {
+          expect(await startOrError({ cwd })).toMatchObject({
+            message: "this directory is inside a ref; refs are read-only",
+            hint: `run dek from your own project instead: \`dekc show ${ref} <slug>\``,
+          });
+        }
+        expect(await filesUnder(snapshot)).toEqual(before);
+      },
+    );
+  });
+
+  test("refuses a ref by name as every command that writes does, before it starts", async () => {
+    const ref = "someone/talks/intro";
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }], refs: [{ name: ref }] },
+      async (root) => {
+        expect(await startOrError({ cwd: root, deck: ref })).toMatchObject({
+          message: `"${ref}" is a ref; refs are read-only`,
+          hint: expect.stringContaining(`dekc show ${ref} <slug>`),
+        });
+        expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
+      },
+    );
+  });
+
   test("refuses to start when another server lock is alive", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
@@ -1719,6 +1789,74 @@ describe("startDevServer --remote exposure", () => {
         });
       },
     );
+  });
+
+  test("serves no asset behind an assets folder that links out of the project", async () => {
+    await withTempDir(async (outside) => {
+      await writeFile(join(outside, "notes.txt"), "not the deck's\n");
+      await mkdir(join(outside, ".ssh"));
+      await writeFile(join(outside, ".ssh", "id_ed25519"), "not the deck's either\n");
+      await withTempProject(
+        {
+          decks: [{ name: "demo", slides: { intro: introHtml } }],
+          assets: { "logo.txt": "ours\n" },
+        },
+        async (root) => {
+          const deckDir = join(root, "decks", "demo");
+          await rm(join(deckDir, "assets"), { recursive: true });
+          await symlink(outside, join(deckDir, "assets"));
+          // The audience, with no password, from the project root and from inside the deck.
+          for (const [cwd, prefix] of [
+            [root, "/decks/demo/assets"],
+            [deckDir, "/assets"],
+          ] as const) {
+            await withDevServer({ cwd, remote: true, password: "secret" }, async (server) => {
+              for (const name of ["notes.txt", ".ssh/id_ed25519"]) {
+                const response = await fetch(new URL(`${prefix}/${name}`, server.url));
+                expect({ name, status: response.status }).toEqual({ name, status: 404 });
+              }
+            });
+          }
+          // An assets folder that links elsewhere in the project still serves.
+          await rm(join(deckDir, "assets"));
+          await symlink(join(root, "assets"), join(deckDir, "assets"));
+          await withDevServer({ cwd: root, remote: true, password: "secret" }, async (server) => {
+            const response = await fetch(new URL("/decks/demo/assets/logo.txt", server.url));
+            expect(response.status).toBe(200);
+            expect(await response.text()).toBe("ours\n");
+          });
+        },
+      );
+    });
+  });
+
+  test("serves no voice file that links out of the project", async () => {
+    await withTempDir(async (outside) => {
+      await writeFile(join(outside, "timeline.json"), '{"audio":"audio.wav","beats":[]}\n');
+      await writeFile(join(outside, "audio.wav"), "RIFF");
+      await withTempProject(
+        { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+        async (root) => {
+          const deckDir = join(root, "decks", "demo");
+          const voiceDir = join(deckDir, ".cache", "voice");
+          await mkdir(voiceDir, { recursive: true });
+          for (const name of ["timeline.json", "audio.wav"]) {
+            await symlink(join(outside, name), join(voiceDir, name));
+          }
+          await withDevServer(
+            { cwd: deckDir, remote: true, password: "secret" },
+            async (server) => {
+              for (const path of ["/voice/timeline.json", "/voice/audio.wav"]) {
+                const response = await fetch(new URL(path, server.url), {
+                  headers: { authorization: basicAuth("secret") },
+                });
+                expect({ path, status: response.status }).toEqual({ path, status: 404 });
+              }
+            },
+          );
+        },
+      );
+    });
   });
 
   test("streams diagnostics to the presenter only, and reloads to everyone", async () => {

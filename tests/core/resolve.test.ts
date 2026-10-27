@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { realpathSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { resolveDeck, resolveProject } from "../../src/core/resolve.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { projectFixturesDir } from "../helpers/paths.ts";
+import { defaultScript } from "../helpers/project.ts";
 
 const simpleRoot = realpathSync(join(projectFixturesDir, "simple"));
 
@@ -75,6 +76,48 @@ hello
       expect(project.failed).toHaveLength(1);
       expect(project.failed[0]?.name).toBe("orphan");
       expect(project.failed[0]?.error).toBeInstanceOf(DekError);
+    });
+  });
+});
+
+describe("a decks folder that is a link", () => {
+  test("out of the project is refused, and nothing there is listed", async () => {
+    await withTempDir(async (outside) => {
+      await mkdir(join(outside, "private-folder"));
+      await withTempDir(async (root) => {
+        await writeFile(join(root, "dek.toml"), "");
+        await symlink(outside, join(root, "decks"));
+        expect(() => resolveProject(root)).toThrow(
+          expect.objectContaining({
+            message: "decks leads outside the project",
+            hint: expect.stringContaining("move the decks into the project"),
+          }),
+        );
+      });
+    });
+  });
+
+  test("elsewhere in the project still holds the decks, a dot in its name or not", async () => {
+    for (const folder of ["talks", "talks.v2"]) {
+      await withTempDir(async (root) => {
+        await writeFile(join(root, "dek.toml"), "");
+        await mkdir(join(root, folder, "demo"), { recursive: true });
+        await writeFile(join(root, folder, "demo", "script.md"), defaultScript());
+        await symlink(join(root, folder), join(root, "decks"));
+        expect({ folder, decks: resolveProject(root).decks.map((deck) => deck.name) }).toEqual({
+          folder,
+          decks: ["demo"],
+        });
+      });
+    }
+  });
+
+  test("in a hidden folder of the project is refused", async () => {
+    await withTempDir(async (root) => {
+      await writeFile(join(root, "dek.toml"), "");
+      await mkdir(join(root, ".git", "talks"), { recursive: true });
+      await symlink(join(root, ".git", "talks"), join(root, "decks"));
+      expect(() => resolveProject(root)).toThrow("decks leads outside the project");
     });
   });
 });

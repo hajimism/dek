@@ -5,8 +5,10 @@ import {
   unknownTomlKeys,
 } from "../config-keys.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { isPlainWord } from "../escape.ts";
 import { readFrontmatterYaml } from "../parse.ts";
-import { type Project, readTextIfExists } from "../resolve.ts";
+import type { Project } from "../resolve.ts";
+import { readSourceIfExists } from "../safe-fs.ts";
 import type { DeckSettings } from "../schema.ts";
 import type { LintContext } from "./context.ts";
 
@@ -17,7 +19,7 @@ import type { LintContext } from "./context.ts";
 
 /** DEK008 for dek.toml: a project finding, the same for every deck. */
 export function tomlKeyDiagnostics(project: Project): Diagnostic[] {
-  return unknownTomlKeys(readTextIfExists(project.configPath) ?? "").map((key) =>
+  return unknownTomlKeys(readSourceIfExists(project.configPath, project.root) ?? "").map((key) =>
     unknownKeyDiagnostic(key, { file: "dek.toml", path: project.configPath }),
   );
 }
@@ -79,8 +81,10 @@ function unknownKeyDiagnostic(
     where.file === "dek.toml"
       ? `see ${REFERENCE_URL}#dek-toml`
       : `the keys are ${FRONTMATTER_KEYS.join(", ")}; see ${REFERENCE_URL}#frontmatter`;
+  // The key is the file's text, which a cloned project brings along: see formatZodIssues.
+  const shown = isPlainWord(key) ? key : "<key>";
   return diag("DEK008", {
-    message: `unknown key ${key} in ${place}; dek ignores it`,
+    message: `unknown key ${shown} in ${place}; dek ignores it`,
     path: where.path,
     line,
     hint: suggestion ? `did you mean ${suggestion}?` : known,

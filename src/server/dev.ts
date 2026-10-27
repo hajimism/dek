@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
-import { locateDeck, type Project, resolveProject } from "../core/resolve.ts";
+import { isRefName, refReadOnlyError, requireProject } from "../core/ref.ts";
+import { locateDeck, type Project } from "../core/resolve.ts";
 import { annotateScript, livePlayerScript, liveReloadScript } from "../runtime/player.ts";
 import {
   clearance,
@@ -13,7 +14,12 @@ import {
 } from "./auth.ts";
 import type { EventFeed } from "./hub.ts";
 import { generateRemotePassword, lanUrls } from "./lan.ts";
-import { assertNoDevServer, removeDevServerLock, writeDevServerLock } from "./lock.ts";
+import {
+  assertNoDevServer,
+  devServerUrl,
+  removeDevServerLock,
+  writeDevServerLock,
+} from "./lock.ts";
 import { createDevPages } from "./pages.ts";
 import { createPairings, type Pairings } from "./pairing.ts";
 import { createProjectWatch } from "./project-watch.ts";
@@ -63,7 +69,12 @@ type Access = {
 type ServedRoutes = Omit<RouteContext, "upgrade">;
 
 export async function startDevServer(options: DevServerOptions): Promise<DevServer> {
-  const project = resolveProject(options.cwd);
+  // A ref is read where it is, never served: the server syncs into what it serves, and runs its
+  // slides' scripts in the browser at its own origin.
+  const project = requireProject(options.cwd);
+  if (options.deck !== undefined && isRefName(options.deck)) {
+    throw refReadOnlyError(options.deck);
+  }
   // Before the port and the watchers; writing the lock checks again, for a server that raced us.
   assertNoDevServer(project.root);
   const { scopedDeckName, deckDir } = serverScope(project, options);
@@ -113,7 +124,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   }
 
   const port = server.port ?? 0;
-  const url = `http://127.0.0.1:${port}/`;
+  const url = devServerUrl(port);
   const remoteUrls = [...new Set([url, ...(access.remote ? lanUrls(port) : [])])];
   try {
     writeDevServerLock(project.root, url, access.password, scopedDeckName);

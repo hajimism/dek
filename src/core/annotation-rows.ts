@@ -3,6 +3,8 @@
 // edit, and the Markdown Copy writes. No DOM and no file system here, so all of it is decided by
 // these functions alone.
 
+import { isPlainWord } from "./escape.ts";
+
 /** A box on the slide, in logical pixels, from its top left. */
 export type Box = { x: number; y: number; width: number; height: number };
 
@@ -115,8 +117,10 @@ export function formatNotes(
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
 
+  // The deck's folder and the notes file are the project's text, which a clone brings along.
+  const folder = shown(deck, "<deck>");
   const lines = [
-    `## Notes on decks/${deck}`,
+    `## Notes on decks/${folder}`,
     "",
     "Boxes and points are in the slide's own pixels, from its top left.",
   ];
@@ -129,11 +133,11 @@ export function formatNotes(
     const title = slides[index]?.title;
     lines.push(
       "",
-      `### Slide ${index + 1} of ${slides.length}, ${first.slug}${title ? ` (${JSON.stringify(title)})` : ""}, ${beatLabel(first.step)}`,
+      `### Slide ${index + 1} of ${slides.length}, ${shown(first.slug, "<slug>")}${title ? ` (${JSON.stringify(title)})` : ""}, ${beatLabel(first.step)}`,
     );
     for (const row of group) {
       const where = (target: TargetRow): string =>
-        `${describe(target)} at decks/${deck}/slides/${row.slug}.html:${target.line}:${target.column} (${measure(target)})${target.found ? "" : ", as written before an edit; the line may have moved"}`;
+        `${describe(target)} at decks/${folder}/slides/${shown(row.slug, "<slug>")}.html:${target.line}:${target.column} (${measure(target)})${target.found ? "" : ", as written before an edit; the line may have moved"}`;
       lines.push("");
       if (row.targets.length === 1 && row.targets[0]) {
         lines.push(`${row.number}. ${where(row.targets[0])}`);
@@ -159,7 +163,15 @@ function beatLabel(step: string): string {
   if (step === "0") {
     return "as it arrives";
   }
-  return /^\d+$/.test(step) ? `at beat ${step}` : `at beat \`${step}\``;
+  if (/^\d+$/.test(step)) {
+    return `at beat ${step}`;
+  }
+  return isPlainWord(step) ? `at beat \`${step}\`` : "at beat <step>";
+}
+
+/** `word` as it is when it is plain, else `placeholder`: see `isPlainWord`. */
+function shown(word: string, placeholder: string): string {
+  return isPlainWord(word) ? word : placeholder;
 }
 
 function describe(target: TargetRow): string {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { newCommand } from "../../src/cli/new.ts";
@@ -122,6 +122,59 @@ describe("newCommand", () => {
       },
     );
   });
+
+  test("refuses a theme.css that links out of the project, and makes no deck", async () => {
+    await withTempDir(async (outside) => {
+      const elsewhere = join(outside, "theme.css");
+      await writeFile(elsewhere, "/* not the project's */\n");
+      await withTempProject({ decks: [{ name: "old" }] }, async (root) => {
+        await rm(join(root, "theme.css"), { force: true });
+        await symlink(elsewhere, join(root, "theme.css"));
+        await rm(join(root, "decks", "old", "theme.css"));
+        await symlink(elsewhere, join(root, "decks", "old", "theme.css"));
+        for (const [themeFrom, path] of [
+          [undefined, "theme.css"],
+          ["old", "decks/old/theme.css"],
+        ] as const) {
+          expect(() => newCommand({ cwd: root, name: "talk", themeFrom })).toThrow(
+            expect.objectContaining({
+              message: `${path} leads outside the project`,
+              hint: expect.stringContaining("copy the file instead"),
+            }),
+          );
+          expect(existsSync(join(root, "decks", "talk"))).toBe(false);
+        }
+      });
+    });
+  });
+
+  test.serial(
+    "dekc new refuses a dek.toml or theme.css that links out of the project",
+    async () => {
+      await withTempDir(async (outside) => {
+        await writeFile(join(outside, "theme.css"), "/* not the project's */\n");
+        await writeFile(join(outside, "dek.toml"), "");
+        await withTempProject({ theme: defaultTheme() }, async (root) => {
+          for (const name of ["theme.css", "dek.toml"]) {
+            const before = await readFile(join(root, name), "utf8");
+            await rm(join(root, name));
+            await symlink(join(outside, name), join(root, name));
+            const result = await runMain(["new", "talk", "--json"], root);
+            expect(jsonStdout(result)).toMatchObject({
+              ok: false,
+              error: {
+                message: `${name} leads outside the project`,
+                hint: expect.stringContaining("copy the file instead"),
+              },
+            });
+            expect(existsSync(join(root, "decks", "talk"))).toBe(false);
+            await rm(join(root, name));
+            await writeFile(join(root, name), before);
+          }
+        });
+      });
+    },
+  );
 
   test("fails on a name with path separators", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {

@@ -19,6 +19,7 @@ import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts"
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { shellWords } from "../helpers/shell.ts";
 
 type Registry = Record<string, { motion?: Record<string, number>; draw?: unknown }>;
 
@@ -565,6 +566,20 @@ describe("TypeScript slide scripts", () => {
         ],
       ]);
       expect(readSlideScripts(deckDir, { strict: true })).toEqual([]);
+    });
+  });
+
+  test("DEK016: the rename a .js file is hinted moves it, whatever its name holds", async () => {
+    await withTempProject(chartDeck, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      const name = "x`;echo hi;`";
+      await Bun.write(join(deckDir, "slides", `${name}.js`), "export default {};");
+      const [found] = lintDeck(deckDir).filter((d) => d.id === "DEK016");
+      const command = found?.hint?.match(/^run `([^`]*)`;/)?.[1] ?? "";
+      expect(shellWords(command)).toEqual(["mv", `slides/${name}.js`, `slides/${name}.ts`]);
+      await Bun.write(join(deckDir, "slides", "it's.js"), "export default {};");
+      const quoted = lintDeck(deckDir).find((d) => d.id === "DEK016" && d.slug === "it's");
+      expect(quoted?.hint).toBe("rename it to .ts; plain JavaScript is valid TypeScript");
     });
   });
 

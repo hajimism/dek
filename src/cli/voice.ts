@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import { deckProjectRoot } from "../core/path.ts";
-import { isCachedFile, writeInside } from "../core/safe-fs.ts";
+import { isCachedFile, requireInside, writeInside } from "../core/safe-fs.ts";
 import { loadVoiceDict, loadVoiceSettings, voiceCacheFile, writeVoiceDict } from "../core/voice.ts";
 import {
   engineBaseUrl,
@@ -91,8 +91,9 @@ export function pinVoice({ deck }: DeckTarget): VoiceCliResult {
   const pinDir = join(deck.dir, "voice", "pin");
   const pinTimeline = join(pinDir, "timeline.json");
   const pinAudio = join(pinDir, "master.wav");
-  writeInside(pinTimeline, readFileSync(timelinePath), root);
-  writeInside(pinAudio, readFileSync(audioPath), root);
+  // The folders on the way may be links too; what is pinned comes from inside the project.
+  writeInside(pinTimeline, readFileSync(requireInside(timelinePath, root)), root);
+  writeInside(pinAudio, readFileSync(requireInside(audioPath, root)), root);
   return { action: "pin", timelinePath: pinTimeline, audioPath: pinAudio };
 }
 

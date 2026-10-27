@@ -1,4 +1,5 @@
 import { hasErrors } from "../core/diagnostic.ts";
+import { shellQuote } from "../core/escape.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { mergeSarif, toSarif } from "../core/sarif.ts";
 import type { CheckCliResult } from "./check.ts";
@@ -445,7 +446,7 @@ export const COMMANDS = {
       text: formatCheck,
       notes: (data, color) => formatSkipped(data.skipped, color) || undefined,
       paths: withDisplayDiagnostics,
-      failure: (data) => diagnosticFailure("check", data, `dekc check ${data.slug}`),
+      failure: (data) => diagnosticFailure("check", data, `dekc check ${shellQuote(data.slug)}`),
     },
   }),
   shot: result({

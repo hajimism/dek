@@ -1,10 +1,16 @@
-import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
-import { escapeRegExp } from "./escape.ts";
+import { escapeRegExp, isPlainWord, shellName } from "./escape.ts";
 import { joinLines, sectionChunks, splitLines } from "./lines.ts";
-import { asResolvedDeck, type ResolvedDeck, requireSection, SLIDE_SIDECARS } from "./resolve.ts";
+import {
+  asResolvedDeck,
+  type ResolvedDeck,
+  readDeckFile,
+  requireSection,
+  SLIDE_SIDECARS,
+} from "./resolve.ts";
 import { Id } from "./schema.ts";
 import { deckLayouts, skeletonHtml } from "./skeleton.ts";
 import { skeletonRecord } from "./skeleton-record.ts";
@@ -38,7 +44,7 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
     });
   }
 
-  const source = readFileSync(deck.scriptPath, "utf8");
+  const source = readDeckFile(deck.dir, deck.scriptPath) ?? "";
   const lines = splitLines(source);
   const headingIndex = section.line - 1;
   const heading = lines[headingIndex];
@@ -69,10 +75,11 @@ function slideFileSteps(deck: ResolvedDeck["deck"], from: string, to: string): F
   const record = skeletonRecord(deck.dir);
   const read = (slug: string): SlideFile | undefined => {
     const path = paths.slide(slug, ".html");
-    if (!existsSync(path)) {
+    // What is read here may be written under the other id: a link out of the project is refused.
+    const html = readDeckFile(deck.dir, path);
+    if (html === undefined) {
       return undefined;
     }
-    const html = readFileSync(path, "utf8");
     return { path, html, authored: !record.owns(html, skeletonHtml(deck.deck, slug, layouts)) };
   };
   const source = read(from);
@@ -131,8 +138,21 @@ function bothHold(fromPath: string, toPath: string, from: string, to: string): D
   const what = fromPath.endsWith(".html") ? "hold a slide you wrote" : "exist";
   return new DekError(`${fromName} and ${toName} both ${what}`, {
     path: fromPath,
-    hint: `merge them into ${toName} and remove ${fromName}, then run \`dekc mv ${from} ${to}\` again`,
+    hint: `merge them into ${toName} and remove ${isPlainWord(from) ? fromName : "the other"}, then run ${again(from, to)}`,
   });
+}
+
+/**
+ * The rename to run again: as a command when each name has a word every shell reads alike, after
+ * `--` when one starts with a dash; else as the one that was run.
+ */
+function again(from: string, to: string): string {
+  const [source, target] = [shellName(from), shellName(to)];
+  if (source === undefined || target === undefined) {
+    return "that `dekc mv` again";
+  }
+  const end = from.startsWith("-") || to.startsWith("-") ? "-- " : "";
+  return `\`dekc mv ${end}${source} ${target}\` again`;
 }
 
 /** One file change `dekc mv` makes, with how to take it back. */
@@ -192,10 +212,10 @@ function planVoiceBeatKeys(
   to: string,
 ): { path: string; source: string; next: string } | undefined {
   const path = deckPaths(deckDir).voiceToml;
-  if (!existsSync(path)) {
+  const source = readDeckFile(deckDir, path);
+  if (source === undefined) {
     return undefined;
   }
-  const source = readFileSync(path, "utf8");
   let parsed: Record<string, unknown>;
   try {
     parsed = Bun.TOML.parse(source) as Record<string, unknown>;
@@ -259,7 +279,7 @@ export function reorderSection(
     requireSection(deck, target);
   }
 
-  const source = readFileSync(deck.scriptPath, "utf8");
+  const source = readDeckFile(deck.dir, deck.scriptPath) ?? "";
   const lines = splitLines(source);
   const firstLine = sections[0]?.line;
   if (firstLine === undefined) {

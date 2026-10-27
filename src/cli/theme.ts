@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { type CssToken, parseCss } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
+import { isPlainWord } from "../core/escape.ts";
+import { listShown, unprinted } from "../core/prose.ts";
 import { readDeckFile } from "../core/resolve.ts";
 import { type ThemeLayout, themeFacts } from "../core/theme-facts.ts";
 import type { ReadableDeck, RefInfo } from "./scope.ts";
@@ -15,7 +17,10 @@ export type ThemeResult = {
   stateClasses: string[];
   /** The tokens every slide can `var()`. */
   tokens: CssToken[];
+  /** The layouts whose names are plain words. A name is the theme's text, maybe a pack's. */
   layouts: ThemeLayout[];
+  /** How many layouts the theme has whose names are no plain word, left out of `layouts`. */
+  unprintedLayouts?: number;
   /** Set when one layout was asked for; text output prints its example alone. */
   layout?: { name: string; example: string };
   /** Set when the deck is a ref. */
@@ -34,12 +39,15 @@ export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeR
   const { classes, stateClasses, layouts, tokens } = themeFacts(
     parseCss(readDeckFile(deck.dir, path) ?? ""),
   );
+  const printed = layouts.filter((layout) => isPlainWord(layout.name));
+  const left = layouts.length - printed.length;
   const result: ThemeResult = {
     path,
     classes: [...classes].sort(),
     stateClasses: [...stateClasses].sort(),
     tokens,
-    layouts,
+    layouts: printed,
+    ...(left > 0 ? { unprintedLayouts: left } : {}),
     ...(ref ? { ref } : {}),
   };
   if (!name) {
@@ -49,7 +57,13 @@ export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeR
   if (!layout) {
     throw new DekError(`layout "${name}" is not defined in theme.css`, {
       path,
-      hint: `use one of: ${layouts.map((entry) => entry.name).join(", ") || "(none)"}`,
+      hint: `use one of: ${
+        listShown(
+          layouts.map((entry) => entry.name),
+          isPlainWord,
+          unprinted,
+        ) || "(none)"
+      }`,
     });
   }
   if (layout.example === undefined) {

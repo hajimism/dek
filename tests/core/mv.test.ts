@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { chmod, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { renameSection, reorderSection } from "../../src/core/mv.ts";
+import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
+import { hintCommands } from "../helpers/shell.ts";
 
 const problemHtml = slideDocument(`<section class="slide" data-layout="title">
   <h2 class="slide-title">keep heading</h2>
@@ -84,6 +86,37 @@ body
     );
   });
 
+  test("names a slide file a shell reads as one word in the command to run again", async () => {
+    const file = "x`;echo hi;`";
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: problemHtml, [file]: problemHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        try {
+          renameSection(deckDir, file, "intro");
+          throw new Error("expected renameSection to fail");
+        } catch (error) {
+          const { hint } = error as DekError;
+          expect(hintCommands(hint)).toEqual([["dekc", "mv", file, "intro"]]);
+          expect(hint).toStartWith(
+            "merge them into slides/intro.html and remove the other, then run ",
+          );
+        }
+      },
+    );
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: problemHtml, "it's": problemHtml } }] },
+      async (root) => {
+        try {
+          renameSection(join(root, "decks", "demo"), "it's", "intro");
+          throw new Error("expected renameSection to fail");
+        } catch (error) {
+          expect((error as DekError).hint).toEndWith(", then run that `dekc mv` again");
+        }
+      },
+    );
+  });
+
   test("rewrites data-slug in the moved HTML so DEK006 does not fire", async () => {
     await withTempProject(
       {
@@ -111,6 +144,30 @@ body
 });
 
 describe("renameSection and voice.toml", () => {
+  test("refuses a voice.toml that links out of the project, and leaves what it points at", async () => {
+    await withTempDir(async (outside) => {
+      const elsewhere = join(outside, "voice.toml");
+      const kept = "[beats.intro]\nlead = 600\n";
+      await writeFile(elsewhere, kept);
+      await withTempProject(
+        { decks: [{ name: "demo", slides: { intro: problemHtml } }] },
+        async (root) => {
+          const deckDir = join(root, "decks", "demo");
+          await mkdir(join(deckDir, "voice"));
+          await symlink(elsewhere, join(deckDir, "voice", "voice.toml"));
+          expect(() => renameSection(deckDir, "intro", "cover")).toThrow(
+            expect.objectContaining({
+              message: "decks/demo/voice/voice.toml leads outside the project",
+              hint: expect.stringContaining("copy the file instead"),
+            }),
+          );
+          expect(await readFile(elsewhere, "utf8")).toBe(kept);
+          expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);
+        },
+      );
+    });
+  });
+
   test("rewrites [beats] keys for the slide and its beats, leaving other slides alone", async () => {
     await withTempProject(
       {

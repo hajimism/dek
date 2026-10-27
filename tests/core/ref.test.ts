@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
@@ -16,6 +16,7 @@ import {
   refDir,
   refState,
   snapshotDigest,
+  writeSnapshot,
 } from "../../src/core/ref.ts";
 import type { GithubRefSource } from "../../src/core/ref-name.ts";
 import { resolveProject } from "../../src/core/resolve.ts";
@@ -93,6 +94,32 @@ describe("parseRefSource with a pack's name", () => {
     }
   });
 
+  test("a deck's name is letters and digits of any script, dots, dashes, and underscores", () => {
+    const names = ["2026-10-talk", "why_dek.v2", "講演", "हिन्दी", "café", "a".repeat(64)];
+    for (const deck of [...names, "講".repeat(64), "_x", "x-"]) {
+      expect(parseRefSource(`file/${deck}`)).toMatchObject({ kind: "file", deck });
+      expect(parseRefSource(`o/r/${deck}`)).toMatchObject({ kind: "github", deck });
+    }
+  });
+
+  test("refuses any other character in a deck's name, and a name past 64, saying what it holds", () => {
+    const names = ["x`y", "a$b", "a;b", "a|b", "a&b", "a'b", 'a"b', "a(b)", "a<b>", "a%60b"];
+    for (const deck of [...names, "a!b", "a~b", "a*b", "a=b", "a,b", "a:b", "a".repeat(65)]) {
+      for (const input of [`file/${deck}`, `o/r/${deck}`]) {
+        expect(refError(input).hint).toContain("letters, digits, dots, dashes, and underscores");
+      }
+    }
+  });
+
+  test("refuses a deck's name that starts with a dash, is not composed, or is past 200 bytes", () => {
+    // NFD café, which a case- and form-blind file system reads as NFC café's folder.
+    for (const deck of ["-x", "--before=intro", "cafe\u0301", "𠀋".repeat(51)]) {
+      for (const input of [`file/${deck}`, `o/r/${deck}`]) {
+        expect(refError(input).hint).toContain("letters, digits, dots, dashes, and underscores");
+      }
+    }
+  });
+
   test("file is no GitHub owner, in any case", () => {
     for (const input of ["file/talks/why-dek", "File/talks/why-dek@v1"]) {
       const error = refError(input);
@@ -124,6 +151,23 @@ describe("parseRefSource with a GitHub link", () => {
         "https://github.com/hajimism/dek/blob/main/sample/decks/why-dek/slides/a.html",
       ),
     ).toEqual(expected);
+  });
+
+  test("reads the deck's folder from a link as GitHub writes it, percent-encoded", () => {
+    expect(
+      parseRefSource("https://github.com/o/r/tree/main/talks/decks/%E8%AC%9B%E6%BC%94/slides"),
+    ).toMatchObject({ name: "o/r/講演", deck: "講演", path: "talks/decks/講演" });
+    for (const input of [
+      "https://github.com/o/r/tree/main/decks/x%60%3Bcurl%20y",
+      "https://github.com/o/r/tree/main/decks/x`;curl",
+    ]) {
+      const error = refError(input);
+      expect(error.message).toBe(`"${input}" is not a link to a deck a ref can name`);
+      expect(error.hint).toContain("letters, digits, dots, dashes, and underscores");
+    }
+    expect(refError("https://github.com/o/r/tree/main/decks/%E8%AC").message).toContain(
+      "is not a link to a deck on GitHub",
+    );
   });
 
   test("a link that names no deck says what link to pass", () => {
@@ -285,6 +329,25 @@ describe("deckOfPack", () => {
       }),
     );
   });
+
+  test("never names a deck a ref cannot carry, and refuses a pack of one", () => {
+    const bad = "x`;curl$IFSy|sh;`";
+    expect(() => deckOfPack(repoFiles(deckRepoFiles(bad)))).toThrow(
+      expect.objectContaining({
+        message: "the pack's deck has a name a ref cannot carry",
+        hint: expect.stringContaining("letters, digits, dots, dashes, and underscores"),
+      }),
+    );
+    expect(() =>
+      deckOfPack(
+        repoFiles({ ...deckRepoFiles("a"), ...deckRepoFiles(bad), ...deckRepoFiles("$b") }),
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        message: "the pack holds more than one deck: a, and 2 whose names a ref cannot carry",
+      }),
+    );
+  });
 });
 
 describe("snapshotDigest", () => {
@@ -332,6 +395,33 @@ describe("findDeckInRepo", () => {
     );
     expect(() => findDeckInRepo(repoFiles({ "README.md": "" }), parseRefSource("o/r/c"))).toThrow(
       expect.objectContaining({ hint: expect.stringContaining("no dek project") }),
+    );
+  });
+
+  test("lists only the decks a ref can name, and counts the others", () => {
+    const bad = "x`;curl$IFSy|sh;`";
+    const files = repoFiles({
+      ...deckRepoFiles("a"),
+      ...deckRepoFiles(bad),
+      ...deckRepoFiles("b$(id)", { prefix: "p/" }),
+    });
+    expect(() => findDeckInRepo(files, parseRefSource("o/r/c"))).toThrow(
+      expect.objectContaining({ hint: "decks in o/r: a, and 2 whose names a ref cannot carry" }),
+    );
+    expect(() => findDeckInRepo(repoFiles(deckRepoFiles(bad)), parseRefSource("o/r/c"))).toThrow(
+      expect.objectContaining({ hint: "decks in o/r: 1 whose name a ref cannot carry" }),
+    );
+  });
+
+  test("two decks with the name are told apart only by paths a hint can show", () => {
+    const files = repoFiles({
+      ...deckRepoFiles("d", { prefix: "x/" }),
+      ...deckRepoFiles("d", { prefix: "y`;sh;`/" }),
+    });
+    expect(() => findDeckInRepo(files, parseRefSource("o/r/d"))).toThrow(
+      expect.objectContaining({
+        hint: "pass the GitHub link to the one you mean; they are at x/decks/d, and 1 whose path a hint cannot show",
+      }),
     );
   });
 
@@ -419,21 +509,84 @@ describe("installSnapshot", () => {
         await symlink(join(home, ".ssh"), join(root, "refs", "o", "r"));
         await expect(
           installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek"))),
-        ).rejects.toThrow("leads outside the project");
+        ).rejects.toThrow("refs/o/r is a symlink; dek follows no link under refs/");
         expect(await readFile(join(home, ".ssh", "why-dek"), "utf8")).toBe("ssh-ed25519 AAAA mine");
       });
     });
   });
 
-  test("replaces a snapshot that is a link with a real one, leaving what it pointed at", async () => {
+  test("refuses a snapshot that is a link, leaving what it pointed at", async () => {
     await withTempDir(async (root) => {
       await mkdir(join(root, "elsewhere"));
       await writeFile(join(root, "elsewhere", "keep.txt"), "mine");
       await mkdir(join(root, "refs", "o", "r"), { recursive: true });
       await symlink(join(root, "elsewhere"), join(root, "refs", "o", "r", "why-dek"));
-      await installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek")));
-      expect(readRefMeta(refDir(root, "o/r/why-dek"))?.rev).toBe(SHA_A);
+      await expect(
+        installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek"))),
+      ).rejects.toMatchObject({
+        message: "refs/o/r/why-dek is a symlink; dek follows no link under refs/",
+        hint: expect.stringContaining("remove refs/o/r/why-dek"),
+      });
+      expect(await readdir(join(root, "elsewhere"))).toEqual(["keep.txt"]);
       expect(await readFile(join(root, "elsewhere", "keep.txt"), "utf8")).toBe("mine");
+    });
+  });
+
+  test("never follows a link under refs/ that stays in the project", async () => {
+    // A cloned project can commit refs/; what a link there points at is the project's own.
+    for (const [link, target] of [
+      ["refs/o/r", "decks"],
+      ["refs/o", "decks"],
+      ["refs", "decks"],
+    ] as const) {
+      await withTempDir(async (root) => {
+        await mkdir(join(root, "decks", "o", "r", "why-dek"), { recursive: true });
+        await mkdir(join(root, "decks", "why-dek"));
+        await writeFile(join(root, "decks", "why-dek", "script.md"), "# mine\n");
+        await writeFile(join(root, "decks", "o", "r", "why-dek", "script.md"), "# mine too\n");
+        await mkdir(join(root, link, ".."), { recursive: true });
+        await symlink(join(root, target), join(root, link));
+        const before = await listFiles(join(root, "decks"));
+        await expect(
+          installSnapshot(root, source, SHA_A, repoFiles(deckRepoFiles("why-dek"))),
+        ).rejects.toMatchObject({
+          message: `${link} is a symlink; dek follows no link under refs/`,
+          hint: expect.stringContaining(`remove ${link}`),
+        });
+        expect({ link, files: await listFiles(join(root, "decks")) }).toEqual({
+          link,
+          files: before,
+        });
+        expect(await readFile(join(root, "decks", "why-dek", "script.md"), "utf8")).toBe(
+          "# mine\n",
+        );
+      });
+    }
+  });
+
+  test("never unpacks a pack's ref through a link at refs/file", async () => {
+    await withTempDir(async (root) => {
+      await mkdir(join(root, "decks", "talk"), { recursive: true });
+      await writeFile(join(root, "decks", "talk", "script.md"), "# mine\n");
+      await mkdir(join(root, "refs"));
+      await symlink(join(root, "decks"), join(root, "refs", "file"));
+      const snapshot = pickSnapshot(repoFiles(deckRepoFiles("talk")), parseRefSource("file/talk"));
+      await expect(
+        writeSnapshot(root, "file/talk", await snapshotDigest(snapshot), snapshot),
+      ).rejects.toMatchObject({
+        message: "refs/file is a symlink; dek follows no link under refs/",
+      });
+      expect(await listFiles(join(root, "decks"))).toEqual(["talk/script.md"]);
+      expect(await readFile(join(root, "decks", "talk", "script.md"), "utf8")).toBe("# mine\n");
+    });
+  });
+
+  test("a snapshot reached through a link under refs/ is not fetched", async () => {
+    await withTempProject({ refs: [{ name: "o/r/why-dek" }] }, async (root) => {
+      expect(refState(resolveProject(root), "o/r/why-dek").fetched).toBe(true);
+      await rename(join(root, "refs", "o"), join(root, "moved"));
+      await symlink(join(root, "moved"), join(root, "refs", "o"));
+      expect(refState(resolveProject(root), "o/r/why-dek").fetched).toBe(false);
     });
   });
 

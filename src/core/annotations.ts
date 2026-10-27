@@ -9,6 +9,7 @@ import {
 } from "./annotation-rows.ts";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
+import { shellName } from "./escape.ts";
 import { deckSlides, type WrittenElement, writtenElements } from "./html.ts";
 import { type ProjectDeck, readDeckFile } from "./resolve.ts";
 import { readSourceIfExists, writeInside } from "./safe-fs.ts";
@@ -306,9 +307,26 @@ function toRow(
     text: note.text,
     targets,
     changed,
-    shot: `dekc shot ${deck.name} ${note.slug} --step ${note.step}`,
+    shot: shotCommand(deck.name, note.slug, note.step),
     createdAt: note.createdAt,
   };
+}
+
+/**
+ * The shot of a note's slide at its beat, as a command to paste. Each name is the file's, so one
+ * that no word holds alike in every shell is a placeholder, and one that starts with a dash goes
+ * after `--`, where it reads as no flag.
+ */
+function shotCommand(deck: string, slug: string, step: string): string {
+  const [name, slide, beat] = [
+    shellName(deck) ?? "<deck>",
+    shellName(slug) ?? "<slug>",
+    shellName(step) ?? "<step>",
+  ];
+  const flag = step.startsWith("-") ? `--step=${beat}` : `--step ${beat}`;
+  return deck.startsWith("-") || slug.startsWith("-")
+    ? `dekc shot ${flag} -- ${name} ${slide}`
+    : `dekc shot ${name} ${slide} ${flag}`;
 }
 
 /** A hash of each of the slide's own files there is, by its extension. */

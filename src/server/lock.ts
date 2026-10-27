@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
-import { writeInside } from "../core/safe-fs.ts";
+import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
 
 export type DevServerLock = {
   url: string;
@@ -15,7 +15,14 @@ function serverLockPath(root: string): string {
   return join(root, ".dek", "server.json");
 }
 
+/**
+ * Whether a process with this pid runs. Only a positive whole number names one process: 0 and a
+ * negative pid signal a whole group, which `kill` reports as alive.
+ */
 export function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
   try {
     process.kill(pid, 0);
     return true;
@@ -24,16 +31,52 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
+/** The hosts a dev server's URL in its lock names: it writes this machine's loopback address. */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+/** The URL a dev server on `port` writes in its lock, as `URL` spells it: port 80 takes none. */
+export function devServerUrl(port: number): string {
+  return new URL(`http://127.0.0.1:${port}/`).href;
+}
+
+/**
+ * The lock's URL in the form the dev server writes it, `http://<loopback>:<port>/`, or nothing
+ * for any other. A server.json a repository brings along is its text, and the URL goes into
+ * hints and into the requests `dekc goto` sends. Port 80 is read with or without `:80`.
+ */
+function serverUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const served =
+    url.protocol === "http:" &&
+    LOOPBACK_HOSTS.has(url.hostname) &&
+    url.pathname === "/" &&
+    url.search === "" &&
+    url.hash === "" &&
+    url.username === "" &&
+    url.password === "";
+  const written = url.port === "" ? [url.href, `http://${url.hostname}:80/`] : [url.href];
+  return served && written.includes(value) ? url.href : undefined;
+}
+
 export function readDevServerLock(root: string): DevServerLock | undefined {
   const path = serverLockPath(root);
   if (!existsSync(path)) {
     return undefined;
   }
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as DevServerLock;
-    if (typeof parsed.url === "string" && typeof parsed.pid === "number") {
+    const parsed = JSON.parse(readSourceIfExists(path, root) ?? "") as DevServerLock;
+    const url = serverUrl(parsed.url);
+    if (url !== undefined && typeof parsed.pid === "number") {
       return {
-        url: parsed.url,
+        url,
         pid: parsed.pid,
         ...(typeof parsed.password === "string" ? { password: parsed.password } : {}),
         ...(typeof parsed.deck === "string" ? { deck: parsed.deck } : {}),

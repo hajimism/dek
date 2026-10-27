@@ -1,6 +1,8 @@
 // How each command's result reads as text; commands.ts says which command prints which.
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
+import { shellQuote } from "../core/escape.ts";
+import { unprinted } from "../core/prose.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
 import { formatClock } from "../core/timing.ts";
 import type { AnnotationsCliResult } from "./annotations.ts";
@@ -368,6 +370,7 @@ export function formatTheme(data: ThemeResult): string {
     ...data.layouts.map(
       (layout) => `  ${layout.name}${layout.example === undefined ? "  (no example)" : ""}`,
     ),
+    ...(data.unprintedLayouts ? [`  and ${unprinted(data.unprintedLayouts)}`] : []),
     "",
     "CLASSES",
     `  ${data.classes.join(" ")}`,
@@ -382,7 +385,7 @@ export function formatTheme(data: ThemeResult): string {
     "TOKENS",
     ...data.tokens.map((token) => `  ${token.name.padEnd(width)}  ${token.value}`),
     "",
-    "Markup for a layout: dekc theme <layout>",
+    `Markup for a layout: dekc theme ${data.ref ? `${shellQuote(data.ref.name)} ` : ""}<layout>`,
   ].join("\n");
 }
 
@@ -459,7 +462,7 @@ export function formatRef(data: RefCliResult): string {
         head,
         ...data.warnings.map((warning) => `warning: ${warning}`),
         ...(data.pack ? [`commit ${data.pack}: a clone unpacks the ref from it`] : []),
-        `read it with \`dekc ls ${data.name}\` and \`dekc show ${data.name} <slug>\``,
+        `read it with \`dekc ls ${shellQuote(data.name)}\` and \`dekc show ${shellQuote(data.name)} <slug>\``,
       ].join("\n");
     }
     case "list":

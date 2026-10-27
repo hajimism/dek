@@ -5,7 +5,7 @@ import { DekError } from "./error.ts";
 import { licenseText } from "./licenses.ts";
 import { type DistOptions, distFile } from "./path.ts";
 import { keepsInDeck, LICENSE_NAMES, MAX_SNAPSHOT_BYTES } from "./ref.ts";
-import { isRefDeckName } from "./ref-name.ts";
+import { isRefDeckName, REF_DECK_NAME_RULE } from "./ref-name.ts";
 import { followInside, requireInside, writeInside } from "./safe-fs.ts";
 
 /**
@@ -22,7 +22,7 @@ export async function packDeck(
   if (!isRefDeckName(deck.name)) {
     throw new DekError(`deck "${deck.name}" cannot be read as a ref by that name`, {
       path: deck.dir,
-      hint: "a ref names its deck with no space or @; rename the deck's folder, e.g. to 2026-10-talk, and pack it again",
+      hint: `${REF_DECK_NAME_RULE}; rename the deck's folder, e.g. to 2026-10-talk, and pack it again`,
     });
   }
   // Each file by its path in the pack and where it really is, measured before any is read.

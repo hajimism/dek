@@ -35,12 +35,24 @@ const PACK_OWNER = "file";
 
 const OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
 const REPO_RE = /^[A-Za-z0-9._-]+$/;
-const DECK_RE = /^[^/\\\s@]+$/;
+/**
+ * A ref's deck name: letters, marks, and digits of any script, dots, dashes, and underscores, not
+ * first a dash. It is chosen by whoever made the pack or the repository, and dek prints it in the
+ * commands it suggests and in AGENTS.md, inside a code span: no shell, code span, or command line
+ * reads anything in it.
+ */
+const DECK_RE = /^[\p{L}\p{M}\p{N}._][\p{L}\p{M}\p{N}._-]{0,63}$/u;
+
+/** Bytes a ref's deck name may take: its pack, `<deck>.tgz`, stays within a file name's 255. */
+const DECK_MAX_BYTES = 200;
 const SHA_RE = /^[0-9a-f]{40}$/;
 const DIGEST_RE = /^[0-9a-f]{64}$/;
 
-const REF_HINT =
-  "name a ref as owner/repo/deck, e.g. hajimism/dek/why-dek or hajimism/dek/why-dek@v1, or a pack's as file/<deck>";
+/** What a ref's deck name may hold, as a hint says it. */
+export const REF_DECK_NAME_RULE =
+  "a ref names its deck with up to 64 letters, digits, dots, dashes, and underscores, not first a dash, each accented letter one character (NFC)";
+
+const REF_HINT = `name a ref as owner/repo/deck, e.g. hajimism/dek/why-dek or hajimism/dek/why-dek@v1, or a pack's as file/<deck>; ${REF_DECK_NAME_RULE}`;
 
 /** Where a pack's ref keeps its pack, relative to the project root: committed, never ignored. */
 export function packFile(deck: string): string {
@@ -78,9 +90,19 @@ export function isPinFor(source: RefSource, pin: string): boolean {
   return source.kind === "file" ? DIGEST_RE.test(pin) : SHA_RE.test(pin);
 }
 
-/** True for a deck name a ref can carry: no slash, space, or @, and not . or .. */
+/**
+ * True for a deck name a ref can carry: see DECK_RE; not . or ..; and composed (NFC), since a
+ * file system that ignores the form would give two spellings of one name one folder.
+ */
 export function isRefDeckName(deck: string | undefined): deck is string {
-  return deck !== undefined && DECK_RE.test(deck) && deck !== "." && deck !== "..";
+  return (
+    deck !== undefined &&
+    DECK_RE.test(deck) &&
+    deck === deck.normalize("NFC") &&
+    Buffer.byteLength(deck) <= DECK_MAX_BYTES &&
+    deck !== "." &&
+    deck !== ".."
+  );
 }
 
 export function parseRefSource(input: string): RefSource {
@@ -133,17 +155,25 @@ export function parseRefSource(input: string): RefSource {
  */
 function parseGithubUrl(input: string): GithubRefSource {
   const url = new URL(input);
-  const [owner = "", repo = "", kind, rev, ...rest] = url.pathname.split("/").filter(Boolean);
-  const decks = rest.indexOf("decks");
-  const deck = decks === -1 ? undefined : rest[decks + 1];
+  const [owner = "", repo = "", kind, rev, ...encoded] = url.pathname.split("/").filter(Boolean);
+  // The folders after the rev as the repository names them; GitHub's link encodes any but ASCII.
+  const rest = decodeSegments(encoded);
+  const decks = rest?.indexOf("decks") ?? -1;
+  const deck = decks === -1 ? undefined : rest?.[decks + 1];
   if (
     url.hostname !== "github.com" ||
     (kind !== "tree" && kind !== "blob") ||
     !rev ||
+    rest === undefined ||
     deck === undefined
   ) {
     throw new DekError(`"${input}" is not a link to a deck on GitHub`, {
       hint: "link to the deck's folder, e.g. https://github.com/hajimism/dek/tree/main/sample/decks/why-dek, or name it as owner/repo/deck",
+    });
+  }
+  if (!isRefDeckName(deck)) {
+    throw new DekError(`"${input}" is not a link to a deck a ref can name`, {
+      hint: REF_DECK_NAME_RULE,
     });
   }
   const source = parseRefSource(`${owner}/${repo.replace(/\.git$/, "")}/${deck}@${rev}`);
@@ -151,4 +181,13 @@ function parseGithubUrl(input: string): GithubRefSource {
     throw new DekError(`"${input}" is not a link to a deck on GitHub`, { hint: REF_HINT });
   }
   return { ...source, path: rest.slice(0, decks + 2).join("/") };
+}
+
+/** Each segment of a link's path decoded, or nothing when one is not valid percent-encoding. */
+function decodeSegments(segments: string[]): string[] | undefined {
+  try {
+    return segments.map((segment) => decodeURIComponent(segment));
+  } catch {
+    return undefined;
+  }
 }

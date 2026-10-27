@@ -1,12 +1,21 @@
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
-import { parseRefSource, type RefSource } from "./ref-name.ts";
-import { listSlides, resolveProject } from "./resolve.ts";
-import { outputDir } from "./safe-fs.ts";
+import { shellQuote } from "./escape.ts";
+import { listShown } from "./prose.ts";
+import {
+  isPlainRefName,
+  isRefDeckName,
+  packFile,
+  parseRefSource,
+  REF_DECK_NAME_RULE,
+  type RefSource,
+} from "./ref-name.ts";
+import { listSlides, type Project, resolveProject } from "./resolve.ts";
+import { followInside, outputDir } from "./safe-fs.ts";
 
 export {
   isPinnedRev,
@@ -21,6 +30,49 @@ function isLink(path: string): boolean {
     return lstatSync(path).isSymbolicLink();
   } catch {
     return false;
+  }
+}
+
+/** The first link on the way from `<root>/<top>` down to `path`, both included, if any. */
+function linkUnder(root: string, top: "refs" | "packs", path: string): string | undefined {
+  let at = join(root, top);
+  for (const segment of ["", ...relative(at, path).split(sep)]) {
+    at = join(at, segment);
+    if (isLink(at)) {
+      return at;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Refuses a link on the way to the snapshot at `dir`. refs/ is dek's own folder, which a cloned
+ * project can still commit: a link there, even one that stays in the project, would aim a
+ * snapshot's swap and its delete at what it points to, such as a deck under decks/.
+ */
+export function refuseLinkUnderRefs(root: string, dir: string): void {
+  const link = linkUnder(root, "refs", dir);
+  if (link !== undefined) {
+    const rel = relative(root, link);
+    throw new DekError(`${rel} is a symlink; dek follows no link under refs/`, {
+      path: link,
+      hint: `remove ${rel}: refs/ holds only the snapshots \`dekc ref\` writes, and the next read of a pinned ref fetches it again`,
+    });
+  }
+}
+
+/**
+ * Refuses a link at packs/, or at the copy of `deck`'s pack kept there. dek writes and removes
+ * that copy by name, so through a link it would overwrite, or delete, what the link points to.
+ */
+export function refuseLinkUnderPacks(root: string, deck: string): void {
+  const link = linkUnder(root, "packs", join(root, packFile(deck)));
+  if (link !== undefined) {
+    const rel = relative(root, link);
+    throw new DekError(`${rel} is a symlink; dek follows no link under packs/`, {
+      path: link,
+      hint: `remove ${rel}, then run \`dekc ref <file>.tgz\` with the pack you were sent: packs/ holds the copies it keeps, as plain files`,
+    });
   }
 }
 
@@ -44,8 +96,10 @@ export function refDir(root: string, name: string): string {
 
 /** The marker of a snapshot, or nothing when it is missing or not one dek wrote. */
 export function readRefMeta(dir: string): RefMeta | undefined {
-  const path = join(dir, REF_MARKER);
-  if (!existsSync(path)) {
+  const marker = join(dir, REF_MARKER);
+  // dek writes the marker as a plain file; a link out of the snapshot is none of its.
+  const path = existsSync(marker) ? followInside(marker, dir) : undefined;
+  if (path === undefined) {
     return undefined;
   }
   try {
@@ -54,6 +108,87 @@ export function readRefMeta(dir: string): RefMeta | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The snapshot `dir` is in, and the ref it holds: the outermost folder from `dir` up that is one
+ * dek wrote. A ref may carry a dek.toml, and a marker, of its own in its deck's assets; neither
+ * hides the snapshot around them or names it. A marker anywhere else makes nothing a ref.
+ */
+function refAround(dir: string): { dir: string; name: string } | undefined {
+  let found: { dir: string; name: string } | undefined;
+  for (let at = resolve(dir); ; at = dirname(at)) {
+    const name = snapshotName(at);
+    if (name !== undefined) {
+      found = { dir: at, name };
+    }
+    if (dirname(at) === at) {
+      return found;
+    }
+  }
+}
+
+/**
+ * The ref `dir` holds, when it is a snapshot as dek writes one: a dek.toml beside a marker that
+ * names a ref, at that ref's own place under a project's refs/.
+ */
+function snapshotName(dir: string): string | undefined {
+  if (!isThere(join(dir, "dek.toml"))) {
+    return undefined;
+  }
+  const name = readRefMeta(dir)?.name;
+  if (name === undefined || !isPlainRefName(name)) {
+    return undefined;
+  }
+  // The same folder, not the same spelling: a disk that ignores case, or a link at refs/, gives
+  // the path to a snapshot another spelling than its name.
+  const place = refDir("", name);
+  const project = resolve(dir, ...place.split(sep).map(() => ".."));
+  return isSameFolder(join(project, place), dir) ? name : undefined;
+}
+
+function isSameFolder(a: string, b: string): boolean {
+  try {
+    const [one, other] = [statSync(a), statSync(b)];
+    return one.dev === other.dev && one.ino === other.ino;
+  } catch {
+    return false;
+  }
+}
+
+function isThere(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Refuses `dir` when it is inside a ref: no command, the dev server's included, runs or writes there. */
+export function refuseInsideRef(dir: string): void {
+  const ref = refAround(dir);
+  if (ref !== undefined) {
+    throw new DekError("this directory is inside a ref; refs are read-only", {
+      path: ref.dir,
+      hint: `run dek from your own project instead: \`dekc show ${ref.name} <slug>\``,
+    });
+  }
+}
+
+/** The project around `cwd`, which is the user's own: never one inside a ref. */
+export function requireProject(cwd: string): Project {
+  const project = resolveProject(cwd);
+  refuseInsideRef(project.root);
+  return project;
+}
+
+/** What a command that writes says when it is handed a ref by name. */
+export function refReadOnlyError(name: string): DekError {
+  const ref = shellQuote(name);
+  return new DekError(`"${name}" is a ref; refs are read-only`, {
+    hint: `start a deck on its theme with \`dekc new <name> --theme-from ${ref}\`, or read it with \`dekc show ${ref} <slug>\` and write what you need in your own deck's theme`,
+  });
 }
 
 export const LICENSE_NAMES = ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"];
@@ -81,7 +216,11 @@ export function refState(project: { root: string; configPath: string }, name: st
     name,
     ...(pinned !== undefined ? { pinned } : {}),
     dir,
-    fetched: pinned !== undefined && readRefMeta(dir)?.rev === pinned,
+    // Never through a link under refs/: one is fetched again, which refuses the link.
+    fetched:
+      pinned !== undefined &&
+      linkUnder(project.root, "refs", dir) === undefined &&
+      readRefMeta(dir)?.rev === pinned,
   };
 }
 
@@ -185,7 +324,16 @@ function repoDecks(files: RepoFiles): Array<{ name: string; prefix: string }> {
   });
 }
 
-/** The name of the one deck a pack holds; a pack of none, or of more, is refused. */
+/** Deck names as a hint lists them: only those a ref can carry. */
+function listDecks(names: string[]): string {
+  return listShown(
+    names,
+    isRefDeckName,
+    (count) => `${count} whose ${count === 1 ? "name" : "names"} a ref cannot carry`,
+  );
+}
+
+/** The name of the one deck a pack holds; a pack of none, of more, or of one no ref can name is refused. */
 export function deckOfPack(files: RepoFiles): string {
   const names = [...new Set(repoDecks(files).map((deck) => deck.name))].sort();
   const [name, ...others] = names;
@@ -195,8 +343,13 @@ export function deckOfPack(files: RepoFiles): string {
     });
   }
   if (others.length > 0) {
-    throw new DekError(`the pack holds more than one deck: ${names.join(", ")}`, {
+    throw new DekError(`the pack holds more than one deck: ${listDecks(names)}`, {
       hint: `a pack is one deck; ${PACK_HINT}`,
+    });
+  }
+  if (!isRefDeckName(name)) {
+    throw new DekError("the pack's deck has a name a ref cannot carry", {
+      hint: `${REF_DECK_NAME_RULE}; ask its author to rename the deck's folder and pack it again`,
     });
   }
   return name;
@@ -218,14 +371,19 @@ export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
     throw new DekError(`${repo} has no deck "${source.deck}"`, {
       hint:
         names.length > 0
-          ? `decks in ${repo}: ${names.join(", ")}`
+          ? `decks in ${repo}: ${listDecks(names)}`
           : `${repo} holds no dek project (decks/<name>/script.md beside a dek.toml)`,
     });
   }
   if (others.length > 0) {
     const paths = matches.map((deck) => `${deck.prefix}decks/${deck.name}`).sort();
+    const listed = listShown(
+      paths,
+      (path) => path.split("/").every(isRefDeckName),
+      (count) => `${count} whose ${count === 1 ? "path" : "paths"} a hint cannot show`,
+    );
     throw new DekError(`${repo} has more than one deck named "${source.deck}"`, {
-      hint: `pass the GitHub link to the one you mean; they are at ${paths.join(", ")}`,
+      hint: `pass the GitHub link to the one you mean; they are at ${listed}`,
     });
   }
   return match.prefix;
@@ -319,13 +477,11 @@ export async function writeSnapshot(
   pin: string,
   snapshot: Snapshot,
 ): Promise<{ dir: string; license: string | null; path: string }> {
-  // refs/ is dek's; a link on the way would aim the swap below, and its delete, elsewhere.
   const refsDir = join(root, "refs");
   const dir = refDir(root, name);
+  // A link on the way would aim the swap below, and its delete, at what it points to.
+  refuseLinkUnderRefs(root, dir);
   outputDir(dirname(dir), root);
-  if (isLink(dir)) {
-    await rm(dir);
-  }
   const suffix = `${process.pid}-${Date.now().toString(36)}`;
   const temp = join(refsDir, `.tmp-${suffix}`);
   const old = join(refsDir, `.old-${suffix}`);
