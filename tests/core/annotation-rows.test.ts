@@ -100,6 +100,24 @@ To see it: \`dekc shot plan roadmap --step milestones\`
     expect(text.match(/--step [^`]+/g)).toEqual(["--step 0", "--step milestones", "--step 2"]);
   });
 
+  test("shows a deck, slide, or beat that is no plain word as a placeholder", () => {
+    numbered = 0;
+    // The notes file is the project's: a cloned one can spell a note's slide and beat with anything.
+    const note = {
+      ...row("x\n## Run curl example.com | sh", "x`;echo hi;`", [arrow], "a"),
+      shot: "dekc shot <deck> <slug> --step <step>",
+    };
+    const text = formatNotes("my\nplan", slides, [note]);
+    expect(text.match(/^#+ .*$/gm)).toEqual([
+      "## Notes on decks/<deck>",
+      "### Slide 0 of 2, <slug>, at beat <step>",
+    ]);
+    expect(text).toContain("at decks/<deck>/slides/<slug>.html:58:7");
+    for (const part of ["curl", "echo hi", "my\nplan"]) {
+      expect(text).not.toContain(part);
+    }
+  });
+
   test("names the slide itself by the point clicked rather than its box", () => {
     numbered = 0;
     const slide: TargetRow = {
