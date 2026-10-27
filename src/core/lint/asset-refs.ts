@@ -114,8 +114,10 @@ function strayedSpaceHint(
     const point = `U+${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`;
     return char === "\u00A0" ? `no-break space (${point})` : `space (${point})`;
   });
+  // The path is the slide's text: one that is no plain word is left out of the hint.
+  const path = isPlainWord(bare) ? bare : "the path";
   return {
-    hint: `remove the ${spaces.join(" and the ")} ${where} ${bare}: the browser keeps ${spaces.length > 1 ? "them" : "it"} as part of the path, which then names no file`,
+    hint: `remove the ${spaces.join(" and the ")} ${where} ${path}: the browser keeps ${spaces.length > 1 ? "them" : "it"} as part of the path, which then names no file`,
   };
 }
 

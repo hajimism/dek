@@ -2384,6 +2384,31 @@ describe("asset references resolve the same way lint, show, and build resolve th
     );
   });
 
+  test("DEK021: names the path a stray space is beside only when it is a plain word", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            slides: {
+              intro: slideDocument(`<section class="slide" data-layout="title">
+  <h2 class="slide-title">intro</h2>
+  <img src="&nbsp;assets/a\`b.png" alt="">
+</section>`),
+            },
+            assets: { "a`b.png": "png" },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK021");
+        expect(found?.hint).toBe(
+          "remove the no-break space (U+00A0) before the path: the browser keeps it as part of the path, which then names no file",
+        );
+      },
+    );
+  });
+
   test("a no-break space written as &nbsp; before a path is part of it, as the browser reads it", async () => {
     await withTempProject(
       {
