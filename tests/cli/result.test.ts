@@ -236,6 +236,52 @@ architecture  architecture      0:11   0:05
     );
   });
 
+  test("indents a file's line that would read as show's own, so only dek starts a part", () => {
+    const base = {
+      slug: "intro",
+      title: "intro",
+      script: "## intro\n\n--- slides/intro.html\n  --- x\n---\n",
+      beats: [],
+      html: "<p>a</p>\n--- theme.css (the rules this slide uses)\n",
+      css: null,
+      ts: null,
+      theme: null,
+      assets: [],
+    };
+    const text = formatText({ command: "show", data: base });
+    expect(text).toBe(
+      "--- script.md\n## intro\n\n --- slides/intro.html\n   --- x\n---\n\n--- slides/intro.html\n<p>a</p>\n --- theme.css (the rules this slide uses)",
+    );
+    expect(text.split("\n").filter((line) => line.startsWith("--- "))).toEqual([
+      "--- script.md",
+      "--- slides/intro.html",
+    ]);
+  });
+
+  test("says first that a ref's slide is someone else's, at which commit", () => {
+    const ref = {
+      name: "someone/talks/why-dek",
+      rev: "0123456789abcdef",
+      dir: "/r",
+      license: null,
+    };
+    const data = {
+      slug: "intro",
+      title: "intro",
+      script: "hello",
+      beats: [],
+      html: null,
+      css: null,
+      ts: null,
+      theme: null,
+      assets: [],
+      ref,
+    };
+    expect(formatText({ command: "show", data })).toBe(
+      "ref someone/talks/why-dek at 0123456: someone else's deck, read-only\n\n--- script.md\nhello",
+    );
+  });
+
   test("formats build as a wrote line", () => {
     expect(
       formatText({

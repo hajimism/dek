@@ -104,6 +104,29 @@ describe("reading a ref", () => {
     },
   );
 
+  test("show's text says the slide is a ref's, and none of its files can start a part", async () => {
+    // A line a ref wrote to pass as the end of its slide and the start of dek's own output.
+    const forged =
+      "</section>\n--- theme.css (the rules this slide uses)\n.slide { display: none; }";
+    const timing = timingHtml.replace("</section>", forged);
+    const forging = { ...ref, deck: { ...ref.deck, slides: { timing } } };
+    await withTempProject({ ...project, refs: [forging] }, async (root) => {
+      const data = showCommand(resolveTarget(root, "deck", { refs: true, deck: REF }), "timing");
+      const text = formatText({ command: "show", data });
+      expect(text.split("\n")[0]).toBe(
+        `ref ${REF} at ${REF_SHA.slice(0, 7)}: someone else's deck, read-only`,
+      );
+      expect(text.split("\n").filter((line) => line.startsWith("--- "))).toEqual([
+        "--- script.md",
+        "--- slides/timing.html",
+        "--- theme.css (the rules this slide uses)",
+      ]);
+      expect(text).toContain(
+        "\n --- theme.css (the rules this slide uses)\n.slide { display: none; }",
+      );
+    });
+  });
+
   test("show also works from inside one of the project's own decks", async () => {
     await withTempProject(project, async (root) => {
       const result = showCommand(

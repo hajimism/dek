@@ -427,7 +427,11 @@ export function formatVoice(data: VoiceCliResult): string {
   }
 }
 
-/** One labeled part per file, so a reader never confuses where a line came from. */
+/**
+ * One labeled part per file, so a reader never confuses where a line came from: a part starts
+ * with a line `--- <file>`, and a file's own line that starts the same way is shown one space
+ * further in, so no file can start a part. A ref's slide says first whose it is.
+ */
 export function formatShow(data: ShowResult): string {
   const parts: Array<[string, string | null]> = [
     ["script.md", data.script],
@@ -437,9 +441,20 @@ export function formatShow(data: ShowResult): string {
     ["theme.css (the rules this slide uses)", data.theme || null],
     ["assets", data.assets.length > 0 ? data.assets.join("\n") : null],
   ];
-  return parts
-    .flatMap(([label, body]) => (body === null ? [] : [`--- ${label}\n${body.replace(/\n$/, "")}`]))
-    .join("\n\n");
+  const ref = data.ref
+    ? [`ref ${data.ref.name} at ${data.ref.rev.slice(0, 7)}: someone else's deck, read-only`]
+    : [];
+  return [
+    ...ref,
+    ...parts.flatMap(([label, body]) =>
+      body === null ? [] : [`--- ${label}\n${partLines(body.replace(/\n$/, ""))}`],
+    ),
+  ].join("\n\n");
+}
+
+/** A part's lines, each that would start a part, after any spaces, given one space more. */
+function partLines(body: string): string {
+  return body.replace(/^( *)---(?=[^\S\n])/gm, " $1---");
 }
 
 /** What a read does for a ref whose snapshot is not there: fetch it, or unpack its pack. */
