@@ -65,6 +65,28 @@ A nightly workflow runs the suite in random order, on the pinned Bun and the lat
 
 The same workflow times the agent loop. `bun scripts/bench.ts` copies `sample/` to a temporary directory and runs `dekc lint`, `dekc lint --visual`, `dekc check` on each deck's first slide, and `dekc build`, each with `--json`: one run to warm up, then five timed runs (`--runs <n>` for another count), once with the deck's `.cache` removed before every run, as after an edit, and once with it kept. It prints the median, fastest, and slowest run of each as JSON. The nightly run keeps that JSON as the `bench` artifact, so a change that might slow the loop can be compared with the nights before it; run the script on `main` and on your branch, on the same machine, to compare them yourself. It is a record, not a gate: nothing fails on a time.
 
+## Watching an agent use dek
+
+Before you change a command, a diagnostic, a hint, or what dek writes into a project's `AGENTS.md`, watch an agent work with dek, then watch again after the change. Each scenario in `evals/agent/scenarios/` makes a small project with one defect in a temporary directory outside this repository, gives the agent a task in a user's words, and checks what the agent left.
+
+```bash
+bun scripts/agent-eval.ts                              # every scenario once, with Claude Code
+bun scripts/agent-eval.ts --scenario renamed-section --runs 3
+bun scripts/agent-eval.ts --agent 'my-agent --cwd {dir} {prompt}'
+```
+
+`--agent` takes any command line, run in the project: `{prompt}` becomes the task and `{dir}` the project, and without `{prompt}` the task arrives on stdin. The default is `claude -p` with the shell commands the scenarios need allowed by name; otherwise the agent runs with your own settings. Every `dekc` the agent runs, or `bunx dekc`, goes through a shim that logs what it printed, so the report covers any agent.
+
+The report is `report.md` and `report.json` under `.cache/agent-eval/<time>/` (or `--out <dir>`), next to each run's transcript, its `dekc` log, and the project as the agent left it. Look at:
+
+- whether the run passed, how long it took, and how many `dekc` runs it took;
+- repeats: the same command run again with the same answer, a sign that what dek said did not help;
+- every error and hint the agent saw, and the errors that came without a hint;
+- whether the agent ran a command a hint named, and whether that command worked;
+- refused tool calls: such a run measured the agent's permissions, not dek, so widen `--agent`.
+
+A run costs model usage and takes minutes, so it is never run in CI; one run is an anecdote, so compare a few before and after. To add a scenario, give it a known solution as well: `AGENT_EVAL_TESTS=1 bun test --timeout=20000 tests/scripts/agent-eval.test.ts` checks that every scenario fails as set up and passes once solved, with no model. Without the variable, `bun test --timeout=20000` runs only the report's unit tests and skips these, which take a minute and a browser.
+
 ## Commits and releases
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, and so on, with `!` for a breaking change. They are the release notes: release-please reads them to keep a release PR open, and merging that PR tags the version, writes [CHANGELOG.md](./CHANGELOG.md), and publishes to npm.
