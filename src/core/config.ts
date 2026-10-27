@@ -1,10 +1,18 @@
 import { dirname } from "node:path";
 import { z } from "zod";
+import { DekError } from "./error.ts";
 import { isPackLicense, PACK_LICENSES, type PackLicense } from "./licenses.ts";
 import { parsePublicUrl } from "./ogp.ts";
-import { isPinFor, isPlainRefName, packFile, parseRefSource } from "./ref-name.ts";
+import {
+  isPinFor,
+  isPlainRefName,
+  packFile,
+  parseRefSource,
+  REF_DECK_NAME_RULE,
+} from "./ref-name.ts";
 import { readSourceIfExists } from "./safe-fs.ts";
 import { DeckSettings } from "./schema.ts";
+import { scanTomlKeys } from "./toml-keys.ts";
 import { parseTomlWith } from "./zod.ts";
 
 export const Voice = z.object({
@@ -33,20 +41,21 @@ export const DekToml = z.object({
   ...DeckSettings.partial().shape,
   voice: Voice.optional(),
   pack: Pack.optional(),
+  // Each key is checked before its value, so a key that names no ref is never repeated.
   refs: z
-    .record(z.string(), z.string())
+    .record(z.string(), z.unknown())
     .superRefine((refs, ctx) => {
       for (const [name, rev] of Object.entries(refs)) {
         if (!isPlainRefName(name)) {
           ctx.addIssue({
             code: "custom",
-            path: [name],
-            message: "a ref is named owner/repo/deck, or file/<deck> for a pack",
+            path: [],
+            message: `${REFUSED_REF_KEY}; ${REFUSED_REF_HINT}`,
           });
           continue;
         }
         const source = parseRefSource(name);
-        if (isPinFor(source, rev)) {
+        if (typeof rev === "string" && isPinFor(source, rev)) {
           continue;
         }
         ctx.addIssue({
@@ -59,8 +68,43 @@ export const DekToml = z.object({
         });
       }
     })
+    .transform((refs) => refs as Record<string, string>)
     .optional(),
 });
+
+const REFUSED_REF_KEY = "a key in [refs] names no ref";
+
+const REFUSED_REF_HINT = `delete that line, and for a pack its packs/<deck>.tgz and refs/file/<deck>, then pin the deck again under a name a ref can carry: a ref is named owner/repo/deck, or file/<deck> for a pack, and ${REF_DECK_NAME_RULE}`;
+
+/**
+ * The first key in [refs] that names no ref, by its line when the file says it plainly. Such a
+ * key may be someone else's text, from a project cloned or a pack added before dek checked it, so
+ * the error points at it and never repeats it.
+ */
+function refusedRefKey(source: string): { line?: number } | undefined {
+  let parsed: unknown;
+  try {
+    parsed = Bun.TOML.parse(source);
+  } catch {
+    return undefined;
+  }
+  const refs = (parsed as { refs?: unknown } | null)?.refs;
+  const name =
+    refs !== null && typeof refs === "object"
+      ? Object.keys(refs).find((key) => !isPlainRefName(key))
+      : undefined;
+  if (name === undefined) {
+    return undefined;
+  }
+  const written = scanTomlKeys(source).filter(
+    (entry) => entry.path[0] === "refs" && entry.path.length === 2,
+  );
+  // A key written with escapes reads differently on its line; any key there that names no ref is it.
+  const entry =
+    written.find((key) => key.path[1] === name) ??
+    written.find((key) => !isPlainRefName(key.path[1] ?? ""));
+  return entry === undefined ? {} : { line: entry.line };
+}
 
 type VoiceDefaults = {
   engine: string;
@@ -84,6 +128,10 @@ export type DekConfig = {
 };
 
 export function parseDekToml(source: string, path?: string): DekConfig {
+  const refused = refusedRefKey(source);
+  if (refused) {
+    throw new DekError(REFUSED_REF_KEY, { path, ...refused, hint: REFUSED_REF_HINT });
+  }
   const data = parseTomlWith(DekToml, source, {
     label: "dek.toml",
     anchor: "dek-toml",

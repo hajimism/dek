@@ -48,9 +48,9 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc ref <owner/repo/deck>[@rev]` | ref を既定のブランチ、または `@` の後の tag・branch・sha に固定して、実体を取得する。デッキのフォルダを指す GitHub のリンクも渡せる。もう一度実行すると最新に固定し直す。`--json` は `rev`・`from`・`changed` を返す。リポジトリに LICENSE が無ければ警告する |
+| `dekc ref <owner/repo/deck>[@rev]` | ref を既定のブランチ、または `@` の後の tag・branch・sha に固定して、実体を取得する。デッキのフォルダを指す GitHub のリンクも渡せる。ref のデッキ名に使えるのは、どの文字体系の文字と数字、ドット、ハイフン、アンダースコアで、64 文字まで。先頭はハイフンにできない（規則の全体は[設定](/ja/reference/config#dek-toml)の `refs`）。それ以外の名前のデッキは固定できず、名前がどれにも合わないときに dek が挙げるデッキの一覧にも出さない。もう一度実行すると最新に固定し直す。`--json` は `rev`・`from`・`changed` を返す。リポジトリに LICENSE が無ければ警告する |
 | `dekc ref <file>.tgz` | pack を `file/<deck>` として固定し、`packs/<deck>.tgz` にコピーして、実体を展開する。同じデッキでファイルの違う pack なら固定を動かし、`--json` は上と同じく `from` と `changed` を返す。ファイルが同じなら何も変えない。`--json` はコミットするコピーの `pack` も返す。デッキが 2 つ以上ある tarball は受け付けない。読むのは 50 MB まで、展開して 100 MB まで。pack に LICENSE が無ければ警告する |
-| `dekc pack [deck] [--root-dist]` | `dist/<deck>.tgz` を書く。そのデッキだけを持つプロジェクトを、デッキ名のフォルダの下にまとめた gzip の tar。`script.md`・`theme.css`・`slides/`・`assets/` を入れ、`dist/`・`.cache/`・`voice/` と名前がドットで始まるファイルは入れない。`LICENSE` と、空の `dek.toml` を入れるので、プロジェクトの設定は外に出ない。`LICENSE` は `dek.toml` の `[pack] license` が指すライセンスの本文で、無ければプロジェクトの LICENSE ファイル。どちらも無ければ何も入れず、足し方を警告する（`--json` では `warnings`）。名前に空白か `@` を含むデッキ、50 MB を超えるデッキ、プロジェクトの外や存在しない先を指すシンボリックリンク、ref は受け付けない。`--json` は `outs` と `warnings` を返す |
+| `dekc pack [deck] [--root-dist]` | `dist/<deck>.tgz` を書く。そのデッキだけを持つプロジェクトを、デッキ名のフォルダの下にまとめた gzip の tar。`script.md`・`theme.css`・`slides/`・`assets/` を入れ、`dist/`・`.cache/`・`voice/` と名前がドットで始まるファイルは入れない。`LICENSE` と、空の `dek.toml` を入れるので、プロジェクトの設定は外に出ない。`LICENSE` は `dek.toml` の `[pack] license` が指すライセンスの本文で、無ければプロジェクトの LICENSE ファイル。どちらも無ければ何も入れず、足し方を警告する（`--json` では `warnings`）。ref が名前にできないデッキ（使えるのは文字・数字・ドット・ハイフン・アンダースコアの 64 文字までで、先頭はハイフン以外）、50 MB を超えるデッキ、プロジェクトの外や存在しない先を指すシンボリックリンク、ref は受け付けない。`--json` は `outs` と `warnings` を返す |
 | `dekc ref` | 固定した ref の一覧。rev、タイトル、枚数、取得していないもの |
 | `dekc ref rm <ref>` | 固定と実体を消す。pack なら `packs/` のコピーも消す |
 | `dekc new <name> --theme-from <ref>` | ref の `theme.css` のコピーで新しいデッキを始める。ref のレイアウトの上に組み立てるため。`dekc theme <ref> <layout>` が出すマークアップが、そのデッキでは lint を通る。実体が無い ref は先に取得するか、pack から展開する。コピーは新しいデッキのもので、ref はそのまま |

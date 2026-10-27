@@ -4,7 +4,14 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
-import { isPlainRefName, packFile, parseRefSource, type RefSource } from "./ref-name.ts";
+import {
+  isPlainRefName,
+  isRefDeckName,
+  packFile,
+  parseRefSource,
+  REF_DECK_NAME_RULE,
+  type RefSource,
+} from "./ref-name.ts";
 import { listSlides, type Project, resolveProject } from "./resolve.ts";
 import { followInside, outputDir } from "./safe-fs.ts";
 
@@ -314,7 +321,34 @@ function repoDecks(files: RepoFiles): Array<{ name: string; prefix: string }> {
   });
 }
 
-/** The name of the one deck a pack holds; a pack of none, or of more, is refused. */
+/**
+ * Names from someone else's files as a hint lists them: those `shows` passes, then how many others
+ * there are, in the words of `others`. An other could hold anything, and an agent takes a hint as
+ * dek's own words.
+ */
+function listShown(
+  names: string[],
+  shows: (name: string) => boolean,
+  others: (count: number) => string,
+): string {
+  const shown = names.filter(shows);
+  const left = names.length - shown.length;
+  if (left === 0) {
+    return shown.join(", ");
+  }
+  return shown.length === 0 ? others(left) : `${shown.join(", ")}, and ${others(left)}`;
+}
+
+/** Deck names as a hint lists them: only those a ref can carry. */
+function listDecks(names: string[]): string {
+  return listShown(
+    names,
+    isRefDeckName,
+    (count) => `${count} whose ${count === 1 ? "name" : "names"} a ref cannot carry`,
+  );
+}
+
+/** The name of the one deck a pack holds; a pack of none, of more, or of one no ref can name is refused. */
 export function deckOfPack(files: RepoFiles): string {
   const names = [...new Set(repoDecks(files).map((deck) => deck.name))].sort();
   const [name, ...others] = names;
@@ -324,8 +358,13 @@ export function deckOfPack(files: RepoFiles): string {
     });
   }
   if (others.length > 0) {
-    throw new DekError(`the pack holds more than one deck: ${names.join(", ")}`, {
+    throw new DekError(`the pack holds more than one deck: ${listDecks(names)}`, {
       hint: `a pack is one deck; ${PACK_HINT}`,
+    });
+  }
+  if (!isRefDeckName(name)) {
+    throw new DekError("the pack's deck has a name a ref cannot carry", {
+      hint: `${REF_DECK_NAME_RULE}; ask its author to rename the deck's folder and pack it again`,
     });
   }
   return name;
@@ -347,14 +386,19 @@ export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
     throw new DekError(`${repo} has no deck "${source.deck}"`, {
       hint:
         names.length > 0
-          ? `decks in ${repo}: ${names.join(", ")}`
+          ? `decks in ${repo}: ${listDecks(names)}`
           : `${repo} holds no dek project (decks/<name>/script.md beside a dek.toml)`,
     });
   }
   if (others.length > 0) {
     const paths = matches.map((deck) => `${deck.prefix}decks/${deck.name}`).sort();
+    const listed = listShown(
+      paths,
+      (path) => path.split("/").every(isRefDeckName),
+      (count) => `${count} whose ${count === 1 ? "path" : "paths"} a hint cannot show`,
+    );
     throw new DekError(`${repo} has more than one deck named "${source.deck}"`, {
-      hint: `pass the GitHub link to the one you mean; they are at ${paths.join(", ")}`,
+      hint: `pass the GitHub link to the one you mean; they are at ${listed}`,
     });
   }
   return match.prefix;

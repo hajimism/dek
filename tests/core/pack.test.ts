@@ -88,11 +88,21 @@ describe("packDeck", () => {
   });
 
   test("refuses a deck whose name a ref cannot carry", async () => {
-    await withTempProject({ decks: [{ name: "my talk" }] }, async (root) => {
-      await expect(packDeck({ root }, deck(root, "my talk"))).rejects.toMatchObject({
-        message: 'deck "my talk" cannot be read as a ref by that name',
-        hint: expect.stringContaining("no space or @"),
-      });
+    const names = ["my talk", "x`;curl$IFSy|sh;`", "a$(id)", "a;b", "a'b"];
+    await withTempProject({ decks: names.map((name) => ({ name })) }, async (root) => {
+      for (const name of names) {
+        await expect(packDeck({ root }, deck(root, name))).rejects.toMatchObject({
+          message: `deck "${name}" cannot be read as a ref by that name`,
+          hint: expect.stringContaining("letters, digits, dots, dashes, and underscores"),
+        });
+      }
+    });
+  });
+
+  test("packs a deck whose name is in another script", async () => {
+    await withTempProject({ decks: [{ name: "講演" }] }, async (root) => {
+      const files = await readPack(await packDeck({ root }, deck(root, "講演")));
+      expect(files.has("decks/講演/script.md")).toBe(true);
     });
   });
 
