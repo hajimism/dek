@@ -2,7 +2,7 @@
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
-import type { HiddenText } from "../core/foreign-text.ts";
+import { foreignLine, type HiddenText, TITLE_MAX } from "../core/foreign-text.ts";
 import { compareCodeUnits } from "../core/order.ts";
 import { unprinted } from "../core/prose.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
@@ -317,15 +317,17 @@ export function formatLs(data: LsListResult | LsDeckResult): string {
       ].join("\n");
     }
     case "deck": {
+      // A ref's frontmatter is someone else's: each value keeps to its line, as in AGENTS.md.
+      const line = (text: string) => (data.ref ? foreignLine(text, TITLE_MAX) : text);
       const meta: Array<[string, string]> = [];
       if (data.ref) {
         meta.push(["rev", data.ref.rev.slice(0, 7)]);
       }
       if (data.event) {
-        meta.push(["event", data.event]);
+        meta.push(["event", line(data.event)]);
       }
       if (data.date) {
-        meta.push(["date", data.date]);
+        meta.push(["date", line(data.date)]);
       }
       if (data.duration) {
         meta.push(["duration", data.duration]);
@@ -363,7 +365,7 @@ export function formatLs(data: LsListResult | LsDeckResult): string {
       ];
       const countLabel = formatSkipped(data.skipped) || diagnosticCount(data.diagnostics.length);
       return [
-        `${data.ref?.name ?? data.name}  ${data.title}`,
+        `${data.ref?.name ?? data.name}  ${line(data.title)}`,
         ...meta.map(([key, value]) => `${padEndWidth(key, keyWidth)}  ${value}`),
         "",
         formatTable(headers, rows, [...align]),
@@ -524,7 +526,7 @@ export function formatRef(data: RefCliResult): string {
         data.refs.map((ref) => [
           ref.name,
           short(ref.rev),
-          ref.fetched ? (ref.title ?? "") : notFetched(ref.name),
+          ref.fetched ? foreignLine(ref.title ?? "", TITLE_MAX) : notFetched(ref.name),
           ref.slides === undefined ? "" : String(ref.slides),
         ]),
         ["left", "left", "left", "right"],

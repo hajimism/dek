@@ -73,14 +73,28 @@ export function hiddenText(text: string, path: string, firstLine = 1): HiddenTex
 }
 
 /**
+ * A marker, which text revealHidden already went over holds, or else one code point: the units a
+ * line is cut between.
+ */
+const UNIT_RE = /⟨U\+[0-9A-F]{4,6}⟩|[\s\S]/gu;
+
+/**
  * One line of someone else's text inside dek's own: each hidden character shows as `⟨U+XXXX⟩`,
  * whitespace and control characters as one space, and the line is cut to `max` characters with
- * an ellipsis, never through a marker.
+ * an ellipsis, never through a marker, whether this made it or revealHidden did before.
  */
 export function foreignLine(text: string, max: number): string {
   const units: string[] = [];
-  for (const char of text) {
-    const unit = HIDDEN_RE.test(char) ? marker(char) : SPACE_RE.test(char) ? " " : char;
+  for (const [char = ""] of text.matchAll(UNIT_RE)) {
+    // A marker is longer than any one code point, which is at most two UTF-16 units.
+    const unit =
+      char.length > 2
+        ? char
+        : HIDDEN_RE.test(char)
+          ? marker(char)
+          : SPACE_RE.test(char)
+            ? " "
+            : char;
     if (unit !== " " || (units.length > 0 && units.at(-1) !== " ")) {
       units.push(unit);
     }
@@ -103,6 +117,9 @@ export function foreignLine(text: string, max: number): string {
   }
   return `${kept.join("")}…`;
 }
+
+/** The longest a ref's title shows in a line of dek's: a title names a deck, it does not describe it. */
+export const TITLE_MAX = 80;
 
 /** The longest message dek gives that quotes someone else's text, such as Bun's on their source. */
 export const MESSAGE_MAX = 200;

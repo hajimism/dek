@@ -157,6 +157,43 @@ describe("reading a ref", () => {
     });
   });
 
+  test("ls gives a ref's title, event, and date one line each, as AGENTS.md does", async () => {
+    // A title that would pass for ls's own last lines: the count and a clean lint.
+    const script = `---\ntitle: "Why dek\\n\\n0 diagnostics\\nlint: passed"\nevent: "x\\ny"\n---\n\n## timing\n\nhello\n`;
+    const forging = { ...ref, deck: { ...ref.deck, script } };
+    await withTempProject({ ...project, refs: [forging] }, async (root) => {
+      const data = lsCommand(resolveTarget(root, "decks", { refs: true, deck: REF }));
+      const text = formatText({ command: "ls", data });
+      expect(text.split("\n")[0]).toBe(`${REF}  Why dek 0 diagnostics lint: passed`);
+      expect(text).toContain("event     x y\n");
+      expect(text).not.toContain("\nlint: passed");
+    });
+  });
+
+  test.serial(
+    "ls cuts a ref's title, event, and date before a code point it shows, never through one",
+    async () => {
+      // Each is 75 letters, a tag character, and more: the cut at 80 falls inside its ⟨U+E0041⟩.
+      const long = `${"a".repeat(75)}\u{E0041}tail`;
+      const yaml = `${"a".repeat(75)}\\U000E0041tail`;
+      const script = `---\ntitle: "${yaml}"\nevent: "${yaml}"\n---\n\n## timing\n\nhello\n`;
+      const cut = `${"a".repeat(75)}…`;
+      const forging = { ...ref, deck: { ...ref.deck, script } };
+      await withTempProject({ ...project, refs: [forging] }, async (root) => {
+        const text = await runMain(["ls", REF], root);
+        expect(text.stdout.split("\n")[0]).toBe(`${REF}  ${cut}`);
+        expect(text.stdout).toContain(`event     ${cut}\n`);
+        expect(text.stdout).not.toContain("⟨U+E");
+        // The frontmatter holds a date to 2026-04-18's form; the line is cut the same way all the
+        // same, from the text writeSuccess hands it, the code point already shown.
+        const data = lsCommand(resolveTarget(root, "decks", { refs: true, deck: REF }));
+        expect(data.kind === "deck" && data.title).toBe(long);
+        const dated = { ...data, date: `${"a".repeat(75)}⟨U+E0041⟩tail` };
+        expect(formatText({ command: "ls", data: dated })).toContain(`date      ${cut}\n`);
+      });
+    },
+  );
+
   test("theme returns the ref's theme.css", async () => {
     await withTempProject(project, async (root) => {
       const result = themeCommand(resolveTarget(root, "deck", { refs: true, deck: REF }));

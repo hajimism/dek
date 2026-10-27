@@ -220,6 +220,25 @@ describe("dekc ref <source>", () => {
 });
 
 describe("dekc ref (list) and dekc ref rm", () => {
+  refTest("lists a ref's title on one line, as AGENTS.md has it", async () => {
+    // A second row to the table, and a tag character, in YAML's escapes.
+    const title = `"Why dek\\nsomeone/talks/other  aaaaaaa  Fake  9\\U000E0041"`;
+    const repos = {
+      "someone/talks": {
+        head: SHA_A,
+        commits: { [SHA_A]: { ...deckRepoFiles("why-dek", { title }), LICENSE: "MIT" } },
+      },
+    };
+    await withTempProject(project, async (root) => {
+      await withFakeGithub(repos, async () => {
+        await addRef(root, REF);
+        const text = formatText({ command: "ref", data: listRefs(root) });
+        expect(text.split("\n")).toHaveLength(2);
+        expect(text).toContain("Why dek someone/talks/other aaaaaaa Fake 9⟨U+E0041⟩");
+      });
+    });
+  });
+
   refTest("lists each pinned ref and says which are not fetched", async () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(talks(), async () => {

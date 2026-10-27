@@ -33,6 +33,9 @@ describe("foreignLine", () => {
   test("cuts at the limit with an ellipsis, never through a marker", () => {
     expect(foreignLine("abcdefghij", 5)).toBe("abcd…");
     expect(foreignLine("abc\u{E0041}defgh", 10)).toBe("abc…");
+    // Text whose hidden characters were already shown, as a result's are in text output.
+    expect(foreignLine("abc⟨U+E0041⟩defgh", 10)).toBe("abc…");
+    expect(foreignLine("abc⟨U+E0041⟩", 80)).toBe("abc⟨U+E0041⟩");
     expect([...foreignLine("x".repeat(100), 80)]).toHaveLength(80);
   });
 });
