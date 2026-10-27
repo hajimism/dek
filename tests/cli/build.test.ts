@@ -104,6 +104,33 @@ describe("buildCommand and a slide script that cannot run", () => {
       },
     );
   });
+
+  // Bun would run the macro in dek's own process while it read the script, before any refusal.
+  test("builds without a script whose macro import it refused, running none", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", theme: defaultTheme(), slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const mark = join(root, "macro-ran");
+        await Bun.write(
+          join(deckDir, "slides", "intro.ts"),
+          `import { writeFileSync } from "node:fs" with { type: "macro" };\nwriteFileSync(${JSON.stringify(mark)}, "ran");\nexport default {};\n`,
+        );
+        const result = await buildCommand(resolveDecks(deckDir));
+        expect(existsSync(mark)).toBe(false);
+        expect(result.diagnostics).toContainEqual(
+          expect.objectContaining({
+            id: "DEK016",
+            message: "imports are not supported; keep the slide script self-contained",
+            hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
+          }),
+        );
+        expect(await Bun.file(join(deckDir, "dist", "demo.html")).text()).not.toContain(
+          '{})["intro"] = (',
+        );
+      },
+    );
+  });
 });
 
 describe("buildCommand link preview", () => {

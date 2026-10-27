@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { seekProblems } from "../../src/core/lint/slide-script.ts";
 import { lintDeck, lintDeckAsync } from "../../src/core/lint.ts";
@@ -7,7 +7,13 @@ import { renameSection } from "../../src/core/mv.ts";
 import { renderPdfHtml } from "../../src/core/pdf.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { stillDrawScript } from "../../src/core/slide-draw.ts";
-import { readSlideScripts, slideScriptTags } from "../../src/core/slide-script.ts";
+import {
+  compileSlideScript,
+  readSlideScripts,
+  slideScriptTags,
+  staticProblems,
+  withoutImports,
+} from "../../src/core/slide-script.ts";
 import { evaluateSlideScripts, slideScriptsProblems } from "../../src/core/slide-script-eval.ts";
 import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -110,6 +116,18 @@ describe("slideScriptProblems with the slide's beats", () => {
     ]);
   });
 
+  test("still checks motion when the import carries an attribute", () => {
+    expect(
+      slideScriptProblems(
+        'import { x } from "x" with { type: "macro" };\nexport default { motion: { grwth: 900 } };',
+        steps,
+      ),
+    ).toEqual([
+      "imports are not supported; keep the slide script self-contained",
+      'motion key "grwth" is not a beat of this slide',
+    ]);
+  });
+
   test("does not blame the missing import's binding on the script", () => {
     expect(
       slideScriptProblems('import gsap from "gsap";\ngsap.init();\nexport default {};', steps),
@@ -159,6 +177,223 @@ export default { motion: { base: host.every((t) => t === "undefined") ? 1 : -1 }
     expect(slideScriptProblems("const el = document.body;\nexport default {};", steps)[0]).toMatch(
       /^top-level code threw: .*document.*; touch the slide only inside draw$/,
     );
+  });
+});
+
+const importsRefusal = {
+  message: "imports are not supported; keep the slide script self-contained",
+  hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
+};
+
+/** A script that would write `mark`, given a module whose top level writes it too. */
+type MacroForm = [string, (mark: string, module: string) => string];
+
+const write = (mark: string) => `writeFileSync(${JSON.stringify(mark)}, "ran");`;
+const fs = 'import { writeFileSync } from "node:fs"';
+const end = "\nexport default {};";
+
+/**
+ * Bun runs a macro, an import marked type "macro", in the process that scans or compiles the
+ * code. Each form would write `mark` there if Bun got to run it: through node:fs, or by loading
+ * `module`, whose top level writes it. Every read of a slide script refuses it as `refusal`.
+ */
+function refusedWithoutRunning(forms: MacroForm[], refusal: object): void {
+  for (const [name, source] of forms) {
+    test(`${name}: refused, and nothing runs`, async () => {
+      await withTempDir(async (dir) => {
+        const mark = join(dir, "ran");
+        const module = join(dir, "macro.ts");
+        await Bun.write(
+          module,
+          `import { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(mark)}, "loaded");\nexport function run() { return 1; }\nexport default run;\n`,
+        );
+        const code = source(mark, module);
+        expect(staticProblems(code)[0]).toMatchObject(refusal);
+        expect(compileSlideScript(code, "slide")).toMatchObject({ problem: refusal });
+        expect(slideScriptsProblems([{ code, steps: ["1"] }])[0]?.[0]).toMatchObject(refusal);
+        expect(existsSync(mark)).toBe(false);
+      });
+    });
+  }
+}
+
+/** The line terminators Bun ends a `#!` line at. */
+const TERMINATORS: Array<[string, string]> = [
+  ["\\n", "\n"],
+  ["\\r", "\r"],
+  ["U+2028", "\u2028"],
+  ["U+2029", "\u2029"],
+];
+
+describe("a slide script that imports is refused before Bun reads it", () => {
+  refusedWithoutRunning(
+    [
+      ['with { type: "macro" }', (m) => `${fs} with { type: "macro" };\n${write(m)}${end}`],
+      [
+        'the older assert { type: "macro" }',
+        (m) => `${fs} assert { type: "macro" };\n${write(m)}${end}`,
+      ],
+      [
+        "a default import",
+        (_, mod) => `import run from "${mod}" with { type: "macro" };\nrun();${end}`,
+      ],
+      [
+        "a namespace import",
+        (m) => `import * as fs from "node:fs" with { type: "macro" };\nfs.${write(m)}${end}`,
+      ],
+      ["an empty import", (_, mod) => `import {} from "${mod}" with { type: "macro" };${end}`],
+      ["a side-effect import", (_, mod) => `import "${mod}" with { type: "macro" };${end}`],
+      [
+        "comments and newlines inside the attribute",
+        (m) => `${fs} with /* a */ {\n  type /* b */ :\n  "macro" ,\n};\n${write(m)}${end}`,
+      ],
+      ["an uppercase TYPE", (m) => `${fs} with { TYPE: "macro" };\n${write(m)}${end}`],
+      ['an uppercase "MACRO"', (m) => `${fs} with { type: "MACRO" };\n${write(m)}${end}`],
+      ['a hex-escaped "macro"', (m) => `${fs} with { type: "\\x6dacro" };\n${write(m)}${end}`],
+      [
+        'a unicode-escaped "macro"',
+        (m) => `${fs} with { type: "\\u006dacro" };\n${write(m)}${end}`,
+      ],
+      ["a quoted key", (m) => `${fs} with { "type": "macro" };\n${write(m)}${end}`],
+      [
+        "an escaped specifier",
+        (m) =>
+          `import { writeFileSync } from "node\\x3afs" with { type: "macro" };\n${write(m)}${end}`,
+      ],
+      [
+        "a default and a named import together",
+        (m) =>
+          `import fs, { writeFileSync } from "node:fs" with { type: "macro" };\n${write(m)}${end}`,
+      ],
+      [
+        "a string import name",
+        (m) =>
+          `import { "writeFileSync" as w } from "node:fs" with { type: "macro" };\nw(${JSON.stringify(m)}, "ran");${end}`,
+      ],
+      [
+        "an import after other code",
+        (m) => `const a = 1;\n${fs} with { type: "macro" };\n${write(m)}${end}`,
+      ],
+      ["no semicolons", (m) => `${fs} with { type: "macro" }\n${write(m)}\nexport default {}`],
+      ["a byte order mark", (m) => `\uFEFF${fs} with { type: "macro" };\n${write(m)}${end}`],
+      ...TERMINATORS.map(
+        ([name, terminator]): MacroForm => [
+          `a #! line ending in ${name}`,
+          (m) => `#!/usr/bin/env bun${terminator}${fs} with { type: "macro" };\n${write(m)}${end}`,
+        ],
+      ),
+      [
+        "a call inside draw",
+        (m) => `${fs} with { type: "macro" };\nexport default { draw() { ${write(m)} } };`,
+      ],
+    ],
+    importsRefusal,
+  );
+
+  for (const [name, terminator] of TERMINATORS) {
+    test(`a #! line ending in ${name} still starts a script that does not import`, () => {
+      const code = `#!/usr/bin/env bun${terminator}const a = 1;\nexport default { motion: { 1: a } };`;
+      expect(staticProblems(code)).toEqual([]);
+      expect(slideScriptProblems(code, { steps: ["1"] })).toEqual([]);
+      const compiled = compileSlideScript(code, "intro");
+      expect("code" in compiled && run(compiled.code).intro?.motion).toEqual({ 1: 1 });
+    });
+  }
+
+  test("require.resolve is refused, as before, though scanImports does not report it", () => {
+    expect(staticProblems('const p = require.resolve("x");\nexport default {};')).toEqual([
+      importsRefusal,
+    ]);
+  });
+});
+
+// Bun's parser refuses these before it runs anything, so they were refused before too.
+describe("Bun itself refuses a macro in an export", () => {
+  refusedWithoutRunning(
+    [
+      ["export from", (_, mod) => `export { run } from "${mod}" with { type: "macro" };${end}`],
+      ["export * from", (_, mod) => `export * from "${mod}" with { type: "macro" };${end}`],
+    ],
+    {
+      message: expect.stringMatching(/^syntax error: /),
+      hint: "fix the syntax there; until the script parses, the slide shows without it",
+    },
+  );
+});
+
+// What dek said of these before it stopped Bun from reading a script that imports.
+describe("a slide script that imports is still checked for the rest", () => {
+  const steps = { steps: ["0", "base", "growth"] };
+  const cases: Array<[string, string, string[]]> = [
+    [
+      "an attribute whose string holds a brace",
+      'import x from "y" with { type: "}" };\nexport const b = 1;',
+      [
+        importsRefusal.message,
+        'only a default export is allowed; found "b"',
+        "missing export default",
+      ],
+    ],
+    [
+      "two imports on one line",
+      'import x from "y"; import z from "w";\nconst draw = 1;',
+      [importsRefusal.message, "missing export default"],
+    ],
+    [
+      "export from",
+      'export { a } from "y";\nexport const b = 1;',
+      [
+        importsRefusal.message,
+        'only a default export is allowed; found "a"',
+        'only a default export is allowed; found "b"',
+        "missing export default",
+      ],
+    ],
+    [
+      "an export of what an import gave",
+      'import x from "y";\nexport { x };\nexport default {};',
+      [importsRefusal.message, 'only a default export is allowed; found "x"'],
+    ],
+    [
+      "export * from, with motion",
+      'export * from "y";\nexport default { motion: { grwth: 900 } };',
+      [importsRefusal.message, 'motion key "grwth" is not a beat of this slide'],
+    ],
+    [
+      "a dynamic import, with motion",
+      'const p = import("y");\nexport default { motion: { grwth: 900 } };',
+      [importsRefusal.message, 'motion key "grwth" is not a beat of this slide'],
+    ],
+  ];
+  for (const [name, code, expected] of cases) {
+    test(name, () => {
+      expect(slideScriptProblems(`${code}\n// ${uniqueStatement()}`, steps)).toEqual(expected);
+    });
+  }
+  // Each run of spaces is read once; one read again from each of its spaces would take seconds.
+  test("a long run of spaces in an import costs no time to blank", () => {
+    const spaces = " ".repeat(64000);
+    const started = performance.now();
+    const blanked = withoutImports(
+      `import${spaces}x from "y";\nimport${spaces}\nimport z from "w";`,
+    );
+    const problems = staticProblems(`import${spaces}x from /*c*/ "y";\nexport default {};`);
+    expect(performance.now() - started).toBeLessThan(500);
+    // Both imports are blanked, the one after a bare `import` too.
+    expect(blanked.split("\n").map((line) => line.trim())).toEqual(["", "import", ""]);
+    expect(problems[0]?.message).toBe(importsRefusal.message);
+  });
+
+  // Bun words it otherwise than when it read the import with it; the line and the fix are the same.
+  test("an error of the script's own is reported alone, as before", () => {
+    const code = `import x from "y";\nconst a = 1;\na = 2;\nexport default {};\n// ${uniqueStatement()}`;
+    expect(slideScriptsProblems([{ code, ...steps }])[0]).toEqual([
+      {
+        message: expect.stringMatching(/^syntax error: .*"a".* constant$/),
+        line: 3,
+        hint: "fix the syntax there; until the script parses, the slide shows without it",
+      },
+    ]);
   });
 });
 

@@ -6,6 +6,7 @@ import {
   lineMatching,
   type SlideScriptProblem,
   staticProblems,
+  withoutImports,
 } from "./slide-script.ts";
 import { BUN_FLAGS } from "./spawn.ts";
 import { suggest } from "./suggest.ts";
@@ -77,13 +78,6 @@ type PendingScript = {
   withoutImports: boolean;
 };
 
-const IMPORT_RE = /^[ \t]*import\s+(?:type\s+)?(?:[\s\S]*?\sfrom\s*)?["'][^"'\n]+["'][ \t]*;?/gm;
-
-/** The code with its import declarations blanked out, lines kept in place. */
-function withoutImports(code: string): string {
-  return code.replace(IMPORT_RE, (match) => match.replace(/[^\n]/g, " "));
-}
-
 function prepareScripts(scripts: ScriptInput[]): {
   results: SlideScriptProblem[][];
   pending: PendingScript[];
@@ -97,7 +91,15 @@ function prepareScripts(scripts: ScriptInput[]): {
     const source = importsOnly ? withoutImports(script.code) : script.code;
     const compiled =
       problems.length > 0 && !importsOnly ? undefined : compileSlideScript(source, "slide");
-    if (compiled && "problem" in compiled) {
+    // The blanked code can fail for the blanking's sake: an import it left is refused again, and
+    // already reported, and a syntax error is its own, since the script as written parsed.
+    const blanking =
+      importsOnly &&
+      compiled &&
+      "problem" in compiled &&
+      (compiled.problem.message === IMPORTS_MESSAGE ||
+        compiled.problem.message.startsWith("syntax error: "));
+    if (compiled && "problem" in compiled && !blanking) {
       problems.push(compiled.problem);
     }
     results.push(problems);

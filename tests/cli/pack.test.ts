@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 import { addRef, listRefs, removeRef, restoreRef } from "../../src/cli/ref.ts";
@@ -11,6 +11,7 @@ import { loadConfig } from "../../src/core/config.ts";
 import { packDeck } from "../../src/core/pack.ts";
 import { readRefMeta, refDir } from "../../src/core/ref.ts";
 import { jsonStdout, type RunResult, runMain } from "../helpers/cli.ts";
+import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { type DeckSpec, withTempProject } from "../helpers/project.ts";
 
@@ -25,6 +26,7 @@ const talk: DeckSpec = {
 
 const sender = { decks: [talk] };
 const receiver = { toml: "# my talks\n", decks: [{ name: "mine" }] };
+const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.ts");
 
 /** The CLI in this process, its `--json` held to the contract as runDek holds it. */
 async function run(args: string[], cwd: string): Promise<RunResult> {
@@ -283,6 +285,30 @@ describe("a pack's ref after a clone", () => {
           showCommand(resolveTarget(root, "deck", { refs: true, deck: REF }), "intro"),
         ).toThrow(
           expect.objectContaining({ hint: expect.stringContaining("dekc ref packs/talk.tgz") }),
+        );
+      });
+    });
+  });
+});
+
+describe("a pack's slide script", () => {
+  // Bun would run the macro in the reader's dek while it read the script, before any refusal.
+  test.serial("is refused by dekc shot without its macro import running", async () => {
+    await withTempDir(async (inbox) => {
+      const mark = join(inbox, "macro-ran");
+      const script = `import { writeFileSync } from "node:fs" with { type: "macro" };\nwriteFileSync(${JSON.stringify(mark)}, "ran");\nexport default {};\n`;
+      const pack = await packOf(inbox, { ...talk, scripts: { intro: script } });
+      await withTempProject(receiver, async (root) => {
+        expect(await run(["ref", pack], root)).toMatchObject({ exitCode: 0 });
+        expect(existsSync(mark)).toBe(false);
+        await chmod(fakePlaywright, 0o755);
+        const result = await withEnv({ DEK_PLAYWRIGHT: fakePlaywright }, () =>
+          run(["shot", REF, "intro", "--json"], root),
+        );
+        expect(existsSync(mark)).toBe(false);
+        expect(result).toMatchObject({ exitCode: 1 });
+        expect(jsonStdout<{ error: { message: string } }>(result).error.message).toBe(
+          'invalid slide script "intro": imports are not supported; keep the slide script self-contained',
         );
       });
     });

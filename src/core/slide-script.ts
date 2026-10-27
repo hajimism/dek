@@ -4,8 +4,35 @@ import { escapeRegExp } from "./escape.ts";
 import { listSlideFiles } from "./resolve.ts";
 import { stillDrawScript } from "./slide-draw.ts";
 
-/** Slide scripts are `slides/<slug>.ts`; plain JavaScript is valid TypeScript. */
-const transpiler = new Bun.Transpiler({ loader: "ts" });
+/** Thrown in place of reading a script that imports; see `transpiler`. */
+class ImportsRefused extends Error {}
+
+/** A first `#!` line, a comment that `scanImports` rejects; Bun ends it at any line terminator. */
+const HASHBANG_RE = /^#![^\n\r\u2028\u2029]*/;
+
+/**
+ * Bun's transpiler, which nothing else in dek holds. Bun's own `scan` and `transformSync` run a
+ * macro, an import marked `type: "macro"`, in this process while they read the code, so a ref's
+ * slide script or a cloned project's would run inside dek. `scanImports` runs none: both methods
+ * here ask it first, and throw `ImportsRefused` for code that imports anything.
+ * Slide scripts are `slides/<slug>.ts`; plain JavaScript is valid TypeScript.
+ */
+const transpiler = (() => {
+  const bun = new Bun.Transpiler({ loader: "ts" });
+  /** The code to read, once it imports nothing; a syntax error throws as Bun reports it. */
+  function importFree(code: string): string {
+    const source = code.replace(HASHBANG_RE, "");
+    // A `require(…)` calls a function a page does not have, and Bun reads nothing for it.
+    if (bun.scanImports(source).some((found) => found.kind !== "require-call")) {
+      throw new ImportsRefused();
+    }
+    return source;
+  }
+  return {
+    scan: (code: string) => bun.scan(importFree(code)),
+    transformSync: (code: string) => bun.transformSync(importFree(code)),
+  };
+})();
 
 const DEFAULT_EXPORT_RE = /\bexport\s+default\b/;
 /** In transpiled output, comments are gone and each statement starts a line. */
@@ -35,30 +62,94 @@ function withLine(problem: SlideScriptProblem, line: number | undefined): SlideS
   return line === undefined ? problem : { ...problem, line };
 }
 
+function importsProblem(code: string): SlideScriptProblem {
+  return withLine(
+    {
+      message: IMPORTS_MESSAGE,
+      hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
+    },
+    lineMatching(code, /^\s*import\b/),
+  );
+}
+
+/** A string literal, which can hold a quote, a brace, or a semicolon. */
+const STRING = String.raw`"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'`;
+/**
+ * A name's character. Each part below takes only what it can hold, and none starts with a space
+ * where the part before it ends with any, so no text is read more than once from each place.
+ */
+const NAME = String.raw`[\p{ID_Continue}$]`;
+/** A specifier, then `with { … }` or the older `assert { … }`, to the end of the statement. */
+const SOURCE = String.raw`(?:${STRING})(?:\s*(?:with|assert)\s*\{(?:${NAME}|[\s,:]|${STRING})*\})?[ \t]*;?`;
+/** Where a statement can start: a line's start, or after a statement or a comment on its line. */
+const STATEMENT = String.raw`(?<=^|[;}]|\*\/)[ \t]*`;
+/** What an import declaration binds, up to its `from`, which no other import comes before. */
+const BINDINGS = String.raw`(?:(?!\bimport\b)(?:${NAME}|[\s,*{}])|${STRING})*?\bfrom\s*`;
+/** An `export { … }` clause, or the name of an `export * as`, captured. */
+const EXPORT_NAMES = String.raw`export\s*(?:\{((?:${NAME}|[\s,]|${STRING})*)\}|\*\s*as\s+(${NAME}+|${STRING}))`;
+
+/**
+ * What `scanImports` counts as an import, as the text shows it: an import declaration, an
+ * `export … from`, and the `import` of an `import(…)`.
+ */
+const IMPORT_RE = new RegExp(
+  String.raw`${STATEMENT}(?:import(?!${NAME})\s*(?:type\b\s*)?(?:(?=\S)${BINDINGS})?|(?:${EXPORT_NAMES}|export\s*\*)\s*from\s*)${SOURCE}|(?<!${NAME}|\.)import(?=\s*\()`,
+  "gmu",
+);
+const EXPORT_NAMES_RE = new RegExp(STATEMENT + EXPORT_NAMES, "gmu");
+
+/** The code with its imports blanked out, attributes included, lines kept in place. */
+export function withoutImports(code: string): string {
+  return code.replace(IMPORT_RE, (match) => match.replace(/[^\n]/g, " "));
+}
+
+/**
+ * The names `export { … }` and `export * as` give the module: what follows `as`, or the name
+ * itself. Bun leaves out of a scan one whose binding, or whose `from`, the blanking took.
+ */
+function exportedNames(code: string): string[] {
+  return [...code.matchAll(EXPORT_NAMES_RE)].flatMap(([, clause = "", star]) =>
+    (star === undefined ? clause.split(",") : [star])
+      .map((item) => item.trim())
+      .filter((item) => item !== "" && !/^type\s+(?!as\b)/.test(item))
+      .map((item) => (item.split(/\s+as\s+/).at(-1) ?? item).replace(/^(["'])(.*)\1$/, "$2")),
+  );
+}
+
 /**
  * What stops a script from being one self-contained module whose only export is the default
  * object, found without running it.
  */
 export function staticProblems(code: string): SlideScriptProblem[] {
-  let scan: ReturnType<Bun.Transpiler["scan"]>;
-  try {
-    scan = transpiler.scan(code);
-  } catch (error) {
-    return [syntaxProblem(error)];
-  }
   const problems: SlideScriptProblem[] = [];
-  if (scan.imports.length > 0) {
-    problems.push(
-      withLine(
-        {
-          message: IMPORTS_MESSAGE,
-          hint: "remove the import and write what it gave in this file; DekSlide is global, from .dek/slide.d.ts",
-        },
-        lineMatching(code, /^\s*import\b/),
-      ),
-    );
+  let exports: string[] | undefined;
+  try {
+    const scan = transpiler.scan(code);
+    // `require.resolve(…)` is the import scanImports does not report; nothing runs for it.
+    if (scan.imports.length > 0) {
+      problems.push(importsProblem(code));
+    }
+    exports = scan.exports;
+  } catch (error) {
+    if (!(error instanceof ImportsRefused)) {
+      return [syntaxProblem(error)];
+    }
+    // Imports alone do not stop the rest of the checks, which read the script without them.
+    problems.push(importsProblem(code));
+    const blanked = withoutImports(code);
+    try {
+      // In Bun's order, which sorts the names.
+      exports = [...new Set([...transpiler.scan(blanked).exports, ...exportedNames(code)])].sort();
+    } catch (blankedError) {
+      // An error on a line the blanking left alone is the script's own, and all Bun said before.
+      const own = blankedError instanceof ImportsRefused ? undefined : syntaxProblem(blankedError);
+      const at = own?.line === undefined ? undefined : own.line - 1;
+      if (own && at !== undefined && code.split("\n")[at] === blanked.split("\n")[at]) {
+        return [own];
+      }
+    }
   }
-  for (const name of scan.exports.filter((entry) => entry !== "default")) {
+  for (const name of (exports ?? []).filter((entry) => entry !== "default")) {
     problems.push(
       withLine(
         {
@@ -72,7 +163,8 @@ export function staticProblems(code: string): SlideScriptProblem[] {
       ),
     );
   }
-  if (!scan.exports.includes("default") || !DEFAULT_EXPORT_RE.test(code)) {
+  // Exports the blanking left unreadable leave the source to say whether one is the default.
+  if (!(exports?.includes("default") ?? true) || !DEFAULT_EXPORT_RE.test(code)) {
     problems.push({
       message: "missing export default",
       hint: "end the script with export default { draw(slide, { t }) {} } satisfies DekSlide",
@@ -116,7 +208,9 @@ export function compileSlideScript(
   try {
     js = transpiler.transformSync(code);
   } catch (error) {
-    return { problem: syntaxProblem(error) };
+    return {
+      problem: error instanceof ImportsRefused ? importsProblem(code) : syntaxProblem(error),
+    };
   }
   let firstError: unknown;
   for (const match of js.matchAll(EXPORT_DEFAULT_LINE_RE)) {
