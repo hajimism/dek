@@ -36,6 +36,16 @@ bash scripts/check-package.sh   # the tarball npm would ship, installed and run
 - If you change the shape of a command's `--json`, run `bun run schema` and commit the result.
 - If you add or change a command, a lint rule, or a docs page's `description`, run `bun run llms` and commit `docs/public/llms.txt`.
 
+## Tests with generated inputs
+
+Some tests check a property over inputs [fast-check](https://fast-check.dev) generates: stylesheets, attribute values, TOML documents, and sequences of what the dev server is asked to do ([ADR 29](./adr/0029-check-scanners-and-server-state-over-generated-inputs-with-fast-check.md)). Each run of `bun test` starts them from a new seed. One that fails prints the input it shrank the failure to, what that input failed on, and the line that replays it:
+
+```bash
+FC_SEED=1234 FC_PATH=0:1:2 bun test tests/core/css-scan.test.ts -t 'closes every block where it was closed'
+```
+
+`FC_SEED` alone runs every property from that seed, and `FC_NUM_RUNS=10000` runs each that many times, to search harder than the suite does; either lifts the five-second limit a synchronous property otherwise stops at. Fix the defect, add the shrunk input as a test of its own beside the property, and run again.
+
 ## Commits and releases
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, and so on, with `!` for a breaking change. They are the release notes: release-please reads them to keep a release PR open, and merging that PR tags the version, writes [CHANGELOG.md](./CHANGELOG.md), and publishes to npm.
