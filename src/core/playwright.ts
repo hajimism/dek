@@ -10,8 +10,9 @@ import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
 import type { PptxFill, PptxLayer, PptxTextBox } from "./pptx-package.ts";
 import type { PptxPageTheme } from "./pptx-theme.ts";
+import { chromiumFailure, launchFailure, runDrawingWorker, type SandboxMode } from "./sandbox.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
-import { exitWorker, readWorkerRequest, runJsonWorker, workerCommand } from "./spawn.ts";
+import { exitWorker, readWorkerRequest, workerCommand } from "./spawn.ts";
 import type { Position } from "./step.ts";
 
 /** One slide page to measure; a page that names a `screenshotPath` is shot there too. */
@@ -237,6 +238,11 @@ type SpawnTimeoutOptions = {
   timeoutMs?: number;
 };
 
+type RunnerOptions = SpawnTimeoutOptions & {
+  /** The pages hold a ref's deck: Chromium's sandbox only, unless the user accepted otherwise. */
+  ref?: boolean;
+};
+
 const requireFromDek = createRequire(import.meta.url);
 
 export function resolvePlaywrightModule(): string | undefined {
@@ -299,54 +305,98 @@ export async function importPlaywright(): Promise<typeof import("playwright")> {
   return import(pathToFileURL(spec).href) as Promise<typeof import("playwright")>;
 }
 
+/** Playwright's Chromium, or what stands in for it in tests. */
+type Chromium = typeof import("playwright").chromium;
+
 /**
  * A Playwright worker's whole life: load Playwright, read the request, launch Chromium, answer
  * with what `handle` returns, and close the browser. Any failure exits with its reason on stderr.
+ * Where Chromium's sandbox did not start, the answer says why in `unsandboxed`, and is only that
+ * when the request's `sandbox` required it, or with why Chromium did not start without it either
+ * in `failed`. `chromium` stands in for Playwright's in tests.
  */
 export async function runPlaywrightWorker<Request, Response>(
   handle: (browser: Browser, request: Request) => Promise<Response>,
+  chromium?: Chromium,
 ): Promise<void> {
-  let playwright: Awaited<ReturnType<typeof importPlaywright>>;
+  let launcher: Chromium;
   try {
-    playwright = await importPlaywright();
+    launcher = chromium ?? (await importPlaywright()).chromium;
   } catch {
     exitWorker(`playwright not found; ${PLAYWRIGHT_INSTALL}`);
   }
-  const request = await readWorkerRequest<Request>();
+  const request = await readWorkerRequest<Request & { sandbox?: unknown }>();
   try {
-    const browser = await launchChromium(playwright.chromium);
+    // Anything but "preferred", or nothing, requires the sandbox.
+    const sandbox = request.sandbox === "preferred" ? "preferred" : "required";
+    const launched = await launchChromium(launcher, sandbox);
+    if (!launched.browser) {
+      const { browser: _none, ...said } = launched;
+      process.stdout.write(`${JSON.stringify(said)}\n`);
+      return;
+    }
+    const { browser, unsandboxed } = launched;
     try {
       const response = await handle(browser, request);
-      process.stdout.write(`${JSON.stringify(response)}\n`);
+      const answer = unsandboxed === undefined ? response : { ...response, unsandboxed };
+      process.stdout.write(`${JSON.stringify(answer)}\n`);
     } finally {
       await browser.close();
     }
   } catch (error) {
-    exitWorker(error);
+    // The parent's hint keeps the start of stderr, and Playwright's opens with a command line.
+    exitWorker(chromiumFailure(error) ?? error);
   }
 }
 
 /**
- * Headless Chromium with its sandbox, which Playwright leaves off by default: slide scripts run in
- * it, a ref's included. Where the sandbox cannot start, as in a container running as root, it
- * runs without one rather than not at all.
+ * Chromium with its sandbox, or without it and why; or none: where the sandbox was required, or
+ * where Chromium did not start without it either.
  */
-async function launchChromium(chromium: typeof import("playwright").chromium): Promise<Browser> {
+type Launched =
+  | { browser: Browser; unsandboxed?: string }
+  | { browser?: never; unsandboxed: string; failed?: string };
+
+/**
+ * Headless Chromium with its sandbox, which Playwright leaves off by default: slide scripts run in
+ * it, a ref's included. When that launch fails, as in a container running as root, it launches
+ * again without one only when `sandbox` is "preferred", and says why in Chromium's words, whether
+ * or not they name the sandbox; when that fails too, it says both.
+ */
+export async function launchChromium(chromium: Chromium, sandbox: SandboxMode): Promise<Launched> {
+  let first: unknown;
   try {
-    return await chromium.launch({ headless: true, chromiumSandbox: true });
-  } catch {
-    return await chromium.launch({ headless: true });
+    return { browser: await chromium.launch({ headless: true, chromiumSandbox: true }) };
+  } catch (error) {
+    first = error;
+  }
+  const unsandboxed = launchFailure(first);
+  if (sandbox !== "preferred") {
+    return { unsandboxed };
+  }
+  try {
+    return { browser: await chromium.launch({ headless: true }), unsandboxed };
+  } catch (second) {
+    return { unsandboxed, failed: launchFailure(second) };
   }
 }
 
 export async function defaultPlaywrightRunner(
   request: VisualRequest,
-  options: SpawnTimeoutOptions = {},
+  options: RunnerOptions = {},
 ): Promise<VisualResponse | null> {
   if (!playwrightResolved()) {
     return null;
   }
   return spawnRunner(workerCommand(process.env.DEK_PLAYWRIGHT || workerPath()), request, options);
+}
+
+/**
+ * The default runner for a ref's pages: someone else's slide scripts, which Chromium runs only in
+ * its sandbox unless the user set DEK_ALLOW_UNSANDBOXED=1 (ADR 27).
+ */
+export function refPlaywrightRunner(request: VisualRequest): Promise<VisualResponse | null> {
+  return defaultPlaywrightRunner(request, { ref: true });
 }
 
 function workerPath(): string {
@@ -356,12 +406,13 @@ function workerPath(): string {
 function spawnRunner(
   cmd: string[],
   request: VisualRequest,
-  options: SpawnTimeoutOptions,
+  options: RunnerOptions,
 ): Promise<VisualResponse> {
-  return runJsonWorker(cmd, request, (text) => parseVisualResponse(text, request.kind), {
+  return runDrawingWorker(cmd, request, (text) => parseVisualResponse(text, request.kind), {
     label: "Playwright worker failed",
     hint: `${PLAYWRIGHT_INSTALL} or check DEK_PLAYWRIGHT`,
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+    ...(options.ref ? { ref: true } : {}),
   });
 }
 

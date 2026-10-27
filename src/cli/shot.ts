@@ -1,5 +1,6 @@
 import { DekError } from "../core/error.ts";
 import { shellQuote } from "../core/escape.ts";
+import { refPlaywrightRunner } from "../core/playwright.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
 import { type ShotFile, shotDeck, shotSheet } from "../core/shot/still.ts";
@@ -32,13 +33,15 @@ export type ShotMode =
   | { kind: "morph"; from: string; to: string; at: number };
 
 export async function shotCommand(
-  { project, deck }: ReadableDeck,
+  { project, deck, ref }: ReadableDeck,
   options: ShotCommandOptions,
 ): Promise<ShotCliResult> {
   const mode = parseShotMode(options);
+  // A ref's slide scripts are someone else's: Chromium runs them only in its sandbox (ADR 27).
+  const runner = ref ? { runner: refPlaywrightRunner } : {};
   switch (mode.kind) {
     case "sheet": {
-      const { sheets, shots } = await shotSheet({ project, deck });
+      const { sheets, shots } = await shotSheet({ project, deck }, runner);
       return { shots, sheets };
     }
     case "motion": {
@@ -48,6 +51,7 @@ export async function shotCommand(
           slug: mode.slug,
           ...(mode.step === undefined ? {} : { step: mode.step }),
           playerScript: await playerScript(),
+          ...runner,
         },
       );
       return { shots: [], sheets, motion: beats };
@@ -55,12 +59,21 @@ export async function shotCommand(
     case "morph": {
       const shots = await shotMorph(
         { project, deck },
-        { from: mode.from, to: mode.to, at: mode.at, playerScript: await playerScript() },
+        {
+          from: mode.from,
+          to: mode.to,
+          at: mode.at,
+          playerScript: await playerScript(),
+          ...runner,
+        },
       );
       return { shots };
     }
     case "still": {
-      const shots = await shotDeck({ project, deck }, { slug: mode.slug, step: mode.step });
+      const shots = await shotDeck(
+        { project, deck },
+        { slug: mode.slug, step: mode.step, ...runner },
+      );
       return { shots };
     }
   }

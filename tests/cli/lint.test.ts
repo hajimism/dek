@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { lintCommand } from "../../src/cli/lint.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
 import { mergeSarif, toSarif } from "../../src/core/sarif.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runDek, runMain } from "../helpers/cli.ts";
 import { withEnv } from "../helpers/env.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -339,6 +339,40 @@ more
       },
     );
   });
+
+  // Each deck is measured in a worker of its own, and each worker finds the sandbox will not start.
+  test.serial(
+    "says once that Chromium drew without its sandbox, however many decks it measured",
+    async () => {
+      await withTempProject(
+        {
+          decks: [
+            { name: "demo", slides: { intro: introHtml } },
+            { name: "other", slides: { intro: introHtml } },
+          ],
+        },
+        async (root) => {
+          const sandboxless = join(
+            import.meta.dir,
+            "..",
+            "helpers",
+            "fake-playwright-sandboxless.ts",
+          );
+          const result = await withEnv(
+            { DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: "" },
+            () => runMain(["lint", "--visual", "--json"], root),
+          );
+          expect(result).toMatchObject({ exitCode: 0 });
+          type Linted = { unsandboxed?: { reason: string; hint: string } };
+          expect(jsonStdout<Linted>(result).unsandboxed).toEqual({
+            reason: expect.any(String),
+            hint: expect.stringContaining("DEK_ALLOW_UNSANDBOXED=1"),
+          });
+          expect(result.stderr.split("warning: Chromium drew without its sandbox").length).toBe(2);
+        },
+      );
+    },
+  );
 
   test.serial("marks rumdl as skipped when the binary is missing without failing", async () => {
     await withTempProject(

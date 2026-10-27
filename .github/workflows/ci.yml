@@ -74,6 +74,8 @@ jobs:
       - run: bun run typecheck
       # Exports, files, and dependencies nothing uses.
       - run: bun run knip
+      # Lets Chromium's sandbox start on Ubuntu 24.04, whose AppArmor blocks user namespaces (ADR 27).
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: bun test --coverage
       - run: bun run docs:build
 

@@ -846,7 +846,7 @@ export const COMMANDS = {
       const { pptxCommand } = await import("./pptx.ts");
       return pptxCommand(target, { rootDist: flags["root-dist"], public: flags.public });
     },
-    output: { text: formatPptx, json: ({ outs }) => ({ outs }) },
+    output: { text: formatPptx, json: ({ lifted: _lifted, ...data }) => data },
   }),
   help: {
     kind: "help",

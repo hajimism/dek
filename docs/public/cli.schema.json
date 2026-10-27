@@ -744,6 +744,10 @@
                 "$ref": "#/$defs/SkippedCheck"
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "shot": {
               "type": "string"
             },
@@ -899,6 +903,10 @@
               "items": {
                 "$ref": "#/$defs/SkippedCheck"
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "shot": {
               "type": "string"
@@ -1143,6 +1151,10 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "ok": {
               "type": "boolean",
@@ -1783,6 +1795,10 @@
                 "$ref": "#/$defs/SkippedCheck"
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -1809,6 +1825,10 @@
               "items": {
                 "$ref": "#/$defs/SkippedCheck"
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "ok": {
               "type": "boolean",
@@ -2136,6 +2156,10 @@
                 "$ref": "#/$defs/SkippedCheck"
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2185,6 +2209,10 @@
             "credits": {
               "type": "string"
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2226,6 +2254,10 @@
                 "type": "string"
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2266,6 +2298,10 @@
               "items": {
                 "type": "string"
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "ok": {
               "type": "boolean",
@@ -2606,6 +2642,25 @@
       ],
       "additionalProperties": false,
       "description": "Set when the deck read is a ref."
+    },
+    "Unsandboxed": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "What Chromium said when it did not start with its sandbox."
+        },
+        "hint": {
+          "type": "string",
+          "description": "What lets the sandbox start, and, unless already set, DEK_ALLOW_UNSANDBOXED=1."
+        }
+      },
+      "required": [
+        "reason",
+        "hint"
+      ],
+      "additionalProperties": false,
+      "description": "Chromium drew without its sandbox, which did not start here, as in a container running as root. A ref is never drawn so unless DEK_ALLOW_UNSANDBOXED=1."
     },
     "Position": {
       "type": "object",

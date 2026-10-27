@@ -1,7 +1,8 @@
 import { DekError } from "../core/error.ts";
 import { moduleFilePath } from "../core/path.ts";
 import { playwrightResolved } from "../core/playwright.ts";
-import { runJsonWorker, workerCommand } from "../core/spawn.ts";
+import { runDrawingWorker } from "../core/sandbox.ts";
+import { workerCommand } from "../core/spawn.ts";
 import type { Position } from "../core/step.ts";
 import { playbackSchedule, type Timeline } from "../core/timeline.ts";
 
@@ -85,7 +86,7 @@ function spawnVideoRunner(
   request: VideoCaptureRequest,
   options: { timeoutMs?: number },
 ): Promise<VideoCaptureResponse> {
-  return runJsonWorker(workerCommand(bin), request, parseVideoResponse, {
+  return runDrawingWorker(workerCommand(bin), request, parseVideoResponse, {
     label: "video capture failed",
     hint: "install Playwright or set DEK_VIDEO",
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),

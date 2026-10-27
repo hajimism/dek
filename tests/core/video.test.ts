@@ -205,6 +205,7 @@ describe("video worker", () => {
         stdout: "pipe",
         stderr: "pipe",
       });
+      // As dek asks it, so a Chromium that cannot start its sandbox still reaches the failure.
       proc.stdin.write(
         JSON.stringify({
           html: "<html></html>",
@@ -212,6 +213,7 @@ describe("video worker", () => {
           fps: 10,
           viewport: { width: 1, height: 1 },
           outDir: join(file, "frames"),
+          sandbox: "preferred",
         }),
       );
       await proc.stdin.end();

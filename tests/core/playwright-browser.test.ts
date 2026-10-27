@@ -10,6 +10,7 @@ import { finishBeat } from "../../src/core/finish-beat.ts";
 import { holdStarted, seekStarted, startGoPaused } from "../../src/core/in-page-go.ts";
 import {
   importPlaywright,
+  launchChromium,
   type PageAction,
   playwrightResolved,
   requirePlaywright,
@@ -695,6 +696,66 @@ describe("playwright worker slide scripts", () => {
     });
     expect(response?.drawErrors).toEqual([]);
   });
+});
+
+/**
+ * The command line of each renderer `browser` runs, once a page is open: Chromium tells a renderer
+ * it starts without a sandbox `--no-sandbox`. The processes are Chromium's own answer, over CDP.
+ */
+async function rendererCommands(browser: Browser): Promise<string[]> {
+  const page = await browser.newPage();
+  await page.setContent("<p>hello</p>");
+  const session = await browser.newBrowserCDPSession();
+  const { processInfo } = (await session.send("SystemInfo.getProcessInfo")) as {
+    processInfo: Array<{ type: string; id: number }>;
+  };
+  // Read while the page is open: its renderer exits with it.
+  const commands = processInfo
+    .filter((entry) => entry.type === "renderer")
+    .map(({ id }) =>
+      Bun.spawnSync(["ps", "-ww", "-o", "command=", "-p", String(id)]).stdout.toString(),
+    );
+  await session.detach();
+  await page.close();
+  return commands;
+}
+
+// Slide scripts run in the renderer, a ref's included; only `ps` reads another process's arguments.
+describe("Chromium's sandbox", () => {
+  test.serial.skipIf(skip || process.platform === "win32")(
+    "is on in the renderers of the Chromium dek launches",
+    async () => {
+      const launched = await launchChromium((await importPlaywright()).chromium, "required");
+      if (!launched.browser) {
+        throw new Error(`Chromium did not start with its sandbox here: ${launched.unsandboxed}`);
+      }
+      try {
+        const commands = await rendererCommands(launched.browser);
+        expect(commands.length).toBeGreaterThan(0);
+        for (const command of commands) {
+          expect(command).toContain("--type=renderer");
+          expect(command).not.toContain("--no-sandbox");
+        }
+      } finally {
+        await launched.browser.close();
+      }
+    },
+  );
+
+  // The check above can tell: Playwright's own default is no sandbox, as these tests launch it.
+  test.serial.skipIf(skip || process.platform === "win32")(
+    "is off in the renderers of a Chromium launched as Playwright leaves it",
+    async () => {
+      if (!browser) {
+        throw new Error("no browser");
+      }
+      const commands = await rendererCommands(browser);
+      expect(commands.length).toBeGreaterThan(0);
+      for (const command of commands) {
+        expect(command).toContain("--no-sandbox");
+      }
+    },
+  );
 });
 
 // A draw must be a function of t that touches only its own slide: video and shots seek it, and the

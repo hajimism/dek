@@ -18,6 +18,7 @@ description: 'コマンド、フラグ、環境変数。'
 - **すべてのエラーが hint を持つ。** hint は次に叩くコマンドを示します。直し方が決まっている診断にも hint が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。
 - **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dek が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
 - **実行しなかったチェックは `"skipped"` に並びます。** 各要素は `check`、`reason`、実行する方法があれば `hint` を持ちます。Playwright がない `dekc check` は `visual` を、`voice/` のないデッキでの `dekc check --voice` は `voice` を、`dekc lint` は rumdl が入っていない、SARIF を出さない、30 秒を超える（そのときは止めて、後のデッキには走らせない）ときに `rumdl` を、URL か Playwright がない `dekc build` は `preview`（リンクプレビュー画像）を、ref に対する `dekc ls` は `lint` を飛ばします。テキストでは `<check>: skipped (<reason>)` と出て、hint が `help:` 行に続きます。`lint`、`check`、`build` はこれを標準エラーに出すので、標準出力には結果だけが残ります。すべて実行できたときはこのフィールド自体がありません。
+- **Chromium の sandbox なしで描いたページは、そう伝えます。** コンテナを root で動かしているときや Ubuntu 23.10 以降のように sandbox が起動しない環境でも、`check`、`lint --visual`、`shot`、`build`、`pdf`、`pptx`、`video` はプロジェクト自身のデッキを描き、1 回の実行につき 1 度だけ標準エラーに `warning: Chromium drew without its sandbox` と出し、`--json` に `unsandboxed`（Chromium が述べた `reason` と `hint`）を載せます。`dekc shot <ref>` はその環境では描かずに失敗します。`DEK_ALLOW_UNSANDBOXED=1` のときだけ描きます。[自分が書いていないプロジェクト](/ja/guide/architecture#自分が書いていないプロジェクト)を見てください。
 - **デッキごとにファイルを書くコマンドはリストを返す。** `build` と `pdf` は、1 デッキでも対象のデッキごとのパスを `outs` で返します。
 - **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`、pack なら `file/<deck>`）を受け取ります。`dekc new --theme-from` は ref のテーマを新しいデッキにコピーします。それ以外のコマンドは ref を受け取りません。開発サーバーを含め、どのコマンドも ref のスナップショットの中のディレクトリでは動きません。[ref](#ref) を参照してください。
 - **ヘルプはコマンドごとに出る。** `dekc help <command>`、`dekc <command> --help`、`-h` で、そのコマンドの使い方、やること、受け付けるフラグをすべて表示します。`dekc --version`（`-v`）はバージョンを表示します。コマンド名やデッキ名を打ち間違えると `did you mean …?` で候補を示します。
@@ -107,6 +108,7 @@ dek は `DEK_` で始まる変数を、起動したときの環境からだけ�
 
 | 変数 | 役割 |
 | --- | --- |
+| `DEK_ALLOW_UNSANDBOXED` | `1` にすると、コンテナを root で動かしているときのように sandbox が起動しない環境で、Chromium が sandbox なしで描くことを受け入れる。`dekc shot <ref>` は ref を描き（毎回警告する）、プロジェクト自身のデッキでは警告を出さない。`--json` にはそれでも `unsandboxed` が載る。どちらの場合も、dek はまず sandbox を求める |
 | `DEK_FFMPEG` | `dekc video` が mux に使う ffmpeg バイナリのパス。`PATH` の `ffmpeg` より優先 |
 | `DEK_GITHUB_API` | `dekc ref` が取得に使う GitHub API のベース URL。ここにはトークンを送らない |
 | `DEK_PLAYWRIGHT` | 代わりの Playwright ワーカースクリプトのパス |

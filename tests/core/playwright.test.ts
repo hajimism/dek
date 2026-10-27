@@ -1,20 +1,31 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { Browser } from "playwright";
 import { DekError } from "../../src/core/error.ts";
 import {
   defaultPlaywrightRunner,
+  launchChromium,
   type PagesRequest,
   PLAYWRIGHT_INSTALL,
   parseVisualResponse,
   playwrightMissingError,
   playwrightResolved,
+  refPlaywrightRunner,
   requirePlaywright,
   resolvePlaywrightModule,
   type VisualRequest,
 } from "../../src/core/playwright.ts";
+import { type SandboxMode, takeUnsandboxed } from "../../src/core/sandbox.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
+import {
+  CHROMIUM_MISSING,
+  SANDBOX_FAILED,
+  SANDBOX_REASON,
+  ZYGOTE_FAILED,
+  ZYGOTE_REASON,
+} from "../helpers/sandbox.ts";
 
 const fakePlaywright = join(import.meta.dir, "..", "helpers", "fake-playwright.ts");
 
@@ -316,6 +327,131 @@ describe("requirePlaywright", () => {
       name: "DekError",
       message: "Playwright is not installed",
       hint: PLAYWRIGHT_INSTALL,
+    });
+  });
+});
+
+describe("launchChromium", () => {
+  const browser = { close: async () => {} } as unknown as Browser;
+
+  /** A Chromium whose launches fail in turn with `failures`, and whose sandbox each one asked for. */
+  function chromiumFailing(...failures: Array<string | undefined>) {
+    const asked: Array<boolean | undefined> = [];
+    const chromium = {
+      launch: async (options?: { chromiumSandbox?: boolean }): Promise<Browser> => {
+        const failure = failures[asked.length];
+        asked.push(options?.chromiumSandbox);
+        if (failure !== undefined) {
+          throw new Error(failure);
+        }
+        return browser;
+      },
+    };
+    return { chromium, asked };
+  }
+
+  test("launches with the sandbox, once, where it starts", async () => {
+    const { chromium, asked } = chromiumFailing();
+    expect(await launchChromium(chromium, "required")).toEqual({ browser });
+    expect(asked).toEqual([true]);
+  });
+
+  test("where the sandbox cannot start, launches without it when preferred, and says why", async () => {
+    const { chromium, asked } = chromiumFailing(SANDBOX_FAILED);
+    expect(await launchChromium(chromium, "preferred")).toEqual({
+      browser,
+      unsandboxed: SANDBOX_REASON,
+    });
+    expect(asked).toEqual([true, undefined]);
+  });
+
+  test("launches nothing without the sandbox where it is required, and says why", async () => {
+    const { chromium, asked } = chromiumFailing(SANDBOX_FAILED);
+    expect(await launchChromium(chromium, "required")).toEqual({ unsandboxed: SANDBOX_REASON });
+    expect(asked).toEqual([true]);
+  });
+
+  test("launches without the sandbox after any failure when preferred, in Chromium's words", async () => {
+    const { chromium, asked } = chromiumFailing(ZYGOTE_FAILED);
+    expect(await launchChromium(chromium, "preferred")).toEqual({
+      browser,
+      unsandboxed: ZYGOTE_REASON,
+    });
+    expect(asked).toEqual([true, undefined]);
+  });
+
+  test("launches nothing more after any failure where the sandbox is required", async () => {
+    const { chromium, asked } = chromiumFailing(CHROMIUM_MISSING);
+    expect(await launchChromium(chromium, "required")).toEqual({ unsandboxed: CHROMIUM_MISSING });
+    expect(asked).toEqual([true]);
+  });
+
+  test("says both failures when the launch without the sandbox fails too", async () => {
+    const { chromium, asked } = chromiumFailing(SANDBOX_FAILED, CHROMIUM_MISSING);
+    expect(await launchChromium(chromium, "preferred")).toEqual({
+      unsandboxed: SANDBOX_REASON,
+      failed: CHROMIUM_MISSING,
+    });
+    expect(asked).toEqual([true, undefined]);
+  });
+
+  test("requires the sandbox when told anything but preferred", async () => {
+    const { chromium, asked } = chromiumFailing(SANDBOX_FAILED);
+    await launchChromium(chromium, "optional" as SandboxMode);
+    expect(asked).toEqual([true]);
+  });
+});
+
+// A worker gets the environment dek started in, so these change only what dek itself reads;
+// tests/cli/shot.test.ts sets the worker's own.
+describe("drawing where Chromium's sandbox cannot start", () => {
+  const sandboxless = join(import.meta.dir, "..", "helpers", "fake-playwright-sandboxless.ts");
+
+  // The spy holds stderr while the test runs.
+  test.serial("draws the user's own pages, warns once, and keeps why for --json", async () => {
+    takeUnsandboxed();
+    const warn = spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await withEnv({ DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: undefined }, async () => {
+        expect(await defaultPlaywrightRunner(request)).toMatchObject({ overflows: [] });
+        expect(await defaultPlaywrightRunner(request)).toMatchObject({ overflows: [] });
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain(
+        `warning: Chromium drew without its sandbox, which did not start here: ${SANDBOX_REASON}`,
+      );
+      expect(takeUnsandboxed()).toEqual({
+        unsandboxed: {
+          reason: SANDBOX_REASON,
+          hint: expect.stringContaining("DEK_ALLOW_UNSANDBOXED=1"),
+        },
+      });
+      expect(takeUnsandboxed()).toEqual({});
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test.serial("refuses a ref's pages, which it never drew", async () => {
+    takeUnsandboxed();
+    await withTempDir(async (dir) => {
+      const screenshotPath = join(dir, "intro.png");
+      await withEnv({ DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: undefined }, async () => {
+        await expect(
+          refPlaywrightRunner({
+            ...request,
+            pages: [{ html: "<html></html>", slug: "intro", step: "1", screenshotPath }],
+          }),
+        ).rejects.toMatchObject({
+          name: "DekError",
+          message: `Chromium did not start with its sandbox here, and a ref is drawn only inside it: ${SANDBOX_REASON}`,
+          hint: expect.stringContaining(
+            "if you accept running this ref's slide scripts without the sandbox, set DEK_ALLOW_UNSANDBOXED=1",
+          ),
+        });
+      });
+      expect(await Bun.file(screenshotPath).exists()).toBe(false);
+      expect(takeUnsandboxed()).toEqual({});
     });
   });
 });

@@ -50,6 +50,19 @@ const SkippedCheck = z
     description: "A check that did not run, so an empty list of findings is no pass for it.",
   });
 
+const Unsandboxed = z
+  .strictObject({
+    reason: z.string().describe("What Chromium said when it did not start with its sandbox."),
+    hint: z
+      .string()
+      .describe("What lets the sandbox start, and, unless already set, DEK_ALLOW_UNSANDBOXED=1."),
+  })
+  .meta({
+    id: "Unsandboxed",
+    description:
+      "Chromium drew without its sandbox, which did not start here, as in a container running as root. A ref is never drawn so unless DEK_ALLOW_UNSANDBOXED=1.",
+  });
+
 const Failure = z
   .strictObject({
     message: z.string(),
@@ -75,6 +88,9 @@ const Position = z
 const paths = z.array(z.string());
 const diagnostics = z.array(Diagnostic);
 const skipped = z.array(SkippedCheck).optional().describe("Absent when every check ran.");
+const unsandboxed = Unsandboxed.optional().describe(
+  "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+);
 
 const nav = z.strictObject({
   slug: z.string(),
@@ -230,6 +246,7 @@ export const RESULT_FIELDS = {
     slug: z.string(),
     diagnostics,
     skipped,
+    unsandboxed,
     shot: z.string().optional(),
     fill: z
       .strictObject({
@@ -289,6 +306,7 @@ export const RESULT_FIELDS = {
       )
       .optional()
       .describe("With --motion, each beat in order with its frames, the settled end last."),
+    unsandboxed,
   }),
   mv: z.strictObject({
     from: z.string(),
@@ -378,7 +396,7 @@ export const RESULT_FIELDS = {
     z.strictObject({ action: z.literal("clear"), cleared: z.number().int() }),
   ]),
   sync: z.strictObject({ created: paths, updated: paths, removed: paths, kept: paths }),
-  lint: z.strictObject({ diagnostics, skipped }),
+  lint: z.strictObject({ diagnostics, skipped, unsandboxed }),
   cues: z.strictObject({
     name: z.string(),
     cues: z.array(
@@ -417,15 +435,17 @@ export const RESULT_FIELDS = {
     images: paths.describe("dist/<deck>.png for each deck that got a link preview image."),
     diagnostics,
     skipped,
+    unsandboxed,
   }),
   video: z.strictObject({
     out: z.string(),
     vtt: z.string().optional(),
     chapters: z.string().optional(),
     credits: z.string().optional(),
+    unsandboxed,
   }),
-  pdf: z.strictObject({ outs: paths }),
-  pptx: z.strictObject({ outs: paths }),
+  pdf: z.strictObject({ outs: paths, unsandboxed }),
+  pptx: z.strictObject({ outs: paths, unsandboxed }),
   pack: z.strictObject({
     outs: paths,
     warnings: z.array(z.string()).describe("Once per project: the packs carry no license."),

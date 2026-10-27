@@ -28,6 +28,8 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.0
+      # Lets Chromium's sandbox start on Ubuntu 24.04, whose AppArmor blocks user namespaces (ADR 27).
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: bun install --frozen-lockfile
       # `dekc build` shoots each sample's first slide for its link preview image. As in CI, it
       # skips --with-deps, whose apt can stall on a slow Ubuntu mirror, and caches the download.

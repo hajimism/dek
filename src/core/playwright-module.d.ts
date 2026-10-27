@@ -51,9 +51,14 @@ declare module "playwright" {
       offline?: boolean;
       httpCredentials?: { username: string; password: string };
     }): Promise<BrowserContext>;
+    newBrowserCDPSession(): Promise<CDPSession>;
     close(): Promise<void>;
   };
   export const chromium: {
-    launch(options?: { headless?: boolean; chromiumSandbox?: boolean }): Promise<Browser>;
+    launch(options?: {
+      headless?: boolean;
+      chromiumSandbox?: boolean;
+      executablePath?: string;
+    }): Promise<Browser>;
   };
 }
