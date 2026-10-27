@@ -23,6 +23,16 @@ import { resolveProject } from "../../src/core/resolve.ts";
 import { deckRepoFiles, SHA_A, SHA_B } from "../helpers/fake-github.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { REF_SHA, withTempProject } from "../helpers/project.ts";
+import {
+  joinBytes,
+  paxRecords,
+  sparseEntry,
+  tarData,
+  tarFile,
+  tarHeader,
+  tarOf,
+  zeroBlocks,
+} from "../helpers/tar.ts";
 
 function githubSource(input: string): GithubRefSource {
   const source = parseRefSource(input);
@@ -279,6 +289,35 @@ describe("readTarball", () => {
     ).bytes();
     expect([...(await readTarball(bytes)).keys()]).toEqual(["decks/d/script.md"]);
   });
+
+  test("names what a tarball holds that dek does not read, and says to pin a pack instead", async () => {
+    const tar = joinBytes(
+      tarFile("o-r-abc/a", "a"),
+      sparseEntry("o-r-abc/big", 1024 * 1024),
+      zeroBlocks(2),
+    );
+    await expect(readTarball(Bun.gzipSync(tar))).rejects.toMatchObject({
+      name: "DekError",
+      message:
+        "the repository's tarball holds a sparse file (`o-r-abc/big`), which dek does not read",
+      hint: expect.stringMatching(/cannot read.*`dekc pack <deck>`.*`dekc ref <file>\.tgz`/),
+    });
+    await expect(readTarball(Bun.gzipSync(new Uint8Array(1024).fill(7)))).rejects.toMatchObject({
+      message: "GitHub's tarball of the repository is not a gzipped tar",
+    });
+  });
+
+  test("refuses a tarball that inflates past the limit, before taking it apart", async () => {
+    const bomb = await new Bun.Archive(
+      { "o-r-abc/big": new Uint8Array(1024 * 1024) },
+      { compress: "gzip" },
+    ).bytes();
+    await expect(readTarball(bomb, { maxTarBytes: 64 * 1024 })).rejects.toMatchObject({
+      name: "DekError",
+      message: expect.stringContaining("more than"),
+      hint: expect.stringMatching(/smaller repository.*`dekc pack <deck>`.*`dekc ref <file>\.tgz`/),
+    });
+  });
 });
 
 describe("readPack", () => {
@@ -288,6 +327,128 @@ describe("readPack", () => {
       message: expect.stringContaining("more than"),
       hint: expect.stringContaining("dekc pack"),
     });
+  });
+
+  test("refuses a gzip inside the gzip, which would inflate past the limit uncounted", async () => {
+    const tar = await new Bun.Archive({ "t/big": new Uint8Array(1024 * 1024) }).bytes();
+    const nested = Bun.gzipSync(Bun.gzipSync(tar));
+    await expect(readPack(nested, { maxTarBytes: 64 * 1024 })).rejects.toMatchObject({
+      message: expect.stringContaining("not a pack"),
+      hint: expect.stringContaining("dekc pack"),
+    });
+  });
+
+  // A kilobyte that declares 200 MB is short of what it declares, not larger than a pack may be.
+  test("says an entry that declares more than the tar stores is cut short", async () => {
+    const tar = tarOf([{ name: "t/big", type: "0", data: "x", size: 200 * 1024 * 1024 }]);
+    await expect(readPack(Bun.gzipSync(tar))).rejects.toMatchObject({
+      message: "the pack holds an entry cut short (`t/big`), which dek does not read",
+    });
+  });
+
+  test("refuses more entries than a pack may hold", async () => {
+    const tar = joinBytes(
+      ...["a", "b", "c", "d"].map((name) => tarFile(`t/${name}`, "")),
+      zeroBlocks(2),
+    );
+    await expect(readPack(Bun.gzipSync(tar), { maxEntries: 3 })).rejects.toMatchObject({
+      message: "the pack holds more than 3 entries, which dek does not read",
+      hint: expect.stringContaining("dekc pack"),
+    });
+  });
+
+  test("refuses a name longer than 4096 bytes, or one with a NUL in it", async () => {
+    const pax = (records: Record<string, string>) => {
+      const text = paxRecords(records);
+      return joinBytes(
+        tarHeader({ name: "t/PaxHeaders/a", type: "x", size: Buffer.byteLength(text) }),
+        tarData(text),
+      );
+    };
+    const long = `t/${"n".repeat(5000)}`;
+    const cases: Array<[Uint8Array<ArrayBuffer>, string]> = [
+      [
+        joinBytes(
+          tarHeader({ name: "././@LongLink", type: "L", size: long.length + 1 }),
+          tarData(`${long}\0`),
+        ),
+        "holds a name longer than 4096 bytes (`t/nnn",
+      ],
+      [pax({ path: long }), "holds a name longer than 4096 bytes (`t/nnn"],
+      [pax({ linkpath: long }), "holds a name longer than 4096 bytes (`t/nnn"],
+      [pax({ path: "t/a\0b.md" }), "holds a name with a NUL in it (`t/a\uFFFDb.md`)"],
+    ];
+    for (const [headers, message] of cases) {
+      const tar = joinBytes(headers, tarFile("t/h.md", "h"), zeroBlocks(2));
+      await expect(readPack(Bun.gzipSync(tar))).rejects.toMatchObject({
+        message: expect.stringContaining(message),
+      });
+    }
+  });
+
+  // Each is a tar of a few kilobytes that Bun.Archive read as a 1 MB file, or one that two
+  // readers could take apart differently; dek's reader refuses each before anything is unpacked.
+  // What dek says it found in each, so the sender knows what to change.
+  const found: Record<string, string> = {
+    "a GNU sparse file": "the pack holds a sparse file (`t/big`), which dek does not read",
+    "a pax sparse file": "holds a sparse file (`t/big`)",
+    "a second archive after the first one's end": "holds a second archive after the first",
+    "entries after a single block of zeros": "holds a second archive after the first",
+    "data after the end": "holds data after the end of the tar",
+    "a pax size before a GNU long name": "holds a sparse file (`t/big`)",
+    "a pax size, then a global header": "holds a pax global header between a header and its entry",
+    "two pax headers for one entry": "holds two pax or long-name headers before one entry",
+    "a tab in a size": "holds a header whose size does not read (`t/b`)",
+    "a size in base 256": "holds a header whose size does not read (`t/a`)",
+    'a pax record length written "+12"': "holds pax records that do not read",
+    'a pax record length written "0xc"': "holds pax records that do not read",
+    'a pax record length written " 12"': "holds pax records that do not read",
+    "a file named like a folder": "holds a file named like a folder (`t/d/`)",
+    "a header whose checksum does not add up":
+      "holds a header whose checksum does not add up (`t/b`)",
+    "a file that stores less than it declares": "holds an entry cut short (`t/a`)",
+    "a tar with no end": "holds a tar with no end",
+    "a link that declares data": "holds a link that declares data (`t/l`)",
+    "a folder that declares data": "holds a folder that declares data (`t/d/`)",
+    // Not a tar at all, rather than a tar dek does not read.
+    "a header without the ustar magic": "the file is not a pack: a pack is a gzipped tar",
+    "an entry of type 3": "holds a device (`t/a`)",
+    "an entry of type 4": "holds a device (`t/a`)",
+    "an entry of type 6": "holds a FIFO (`t/a`)",
+  };
+  for (const [what, tar] of unreadTars()) {
+    test(`refuses ${what}`, async () => {
+      await expect(readPack(Bun.gzipSync(tar), { maxTarBytes: 64 * 1024 })).rejects.toMatchObject({
+        name: "DekError",
+        message: expect.stringContaining(
+          found[what] ?? `holds an entry of type \`${what.at(-1)}\` (\`t/a\`)`,
+        ),
+        hint: expect.stringContaining("dekc pack"),
+      });
+    });
+  }
+
+  test("names what it found on one line and briefly, however the tar names it", async () => {
+    const name = `t/\u001b[31m\u202e${"x".repeat(200)}`;
+    const tar = joinBytes(sparseEntry(name.slice(0, 99), 1024 * 1024), zeroBlocks(2));
+    const error = await readPack(Bun.gzipSync(tar)).catch((caught: DekError) => caught);
+    const shown = /holds a sparse file \(`([^`]*)`\)/.exec((error as DekError).message)?.[1];
+    expect(shown).toStartWith("t/\uFFFD[31m\uFFFD");
+    expect([...(shown ?? "")].length).toBe(80);
+    expect(shown).toEndWith("…");
+  });
+
+  test("reads a tar written by hand with pax and GNU long-name headers", async () => {
+    const long = `t/decks/d/${"a".repeat(120)}.md`;
+    const tar = tarOf([
+      { name: "t/PaxHeaders/x", type: "x", data: paxRecords({ mtime: "1" }) },
+      { name: "t/decks/d/script.md", type: "0", data: "s" },
+      { name: "././@LongLink", type: "L", data: `${long}\0` },
+      { name: long.slice(0, 99), type: "0", data: "l" },
+    ]);
+    expect([...(await readPack(Bun.gzipSync(tar))).keys()].sort()).toEqual(
+      ["decks/d/script.md", long.slice(2)].sort(),
+    );
   });
 
   test("refuses a file larger than a pack may be, and one that is not a gzipped tar", async () => {
@@ -606,4 +767,158 @@ async function listFiles(dir: string): Promise<string[]> {
     .filter((entry) => entry.isFile())
     .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
     .sort();
+}
+
+/** Tars dek must not read, each with what is wrong with it. */
+function unreadTars(): Array<[string, Uint8Array<ArrayBuffer>]> {
+  const big = sparseEntry("t/big", 1024 * 1024);
+  const pax = (text: string, type = "x") =>
+    joinBytes(tarHeader({ name: "t/PaxHeaders/a", type, size: text.length }), tarData(text));
+  // A header whose size claims the next blocks, the sparse entry among them, for a reader that
+  // takes it for a header where another reader sees data.
+  const cover = tarHeader({ name: "t/cover", type: "0", size: 1024 });
+  const tars: Array<[string, Uint8Array<ArrayBuffer>]> = [
+    ["a GNU sparse file", joinBytes(big, zeroBlocks(2))],
+    [
+      "a pax sparse file",
+      tarOf([
+        {
+          name: "t/PaxHeaders/big",
+          type: "x",
+          data: paxRecords({
+            "GNU.sparse.major": "1",
+            "GNU.sparse.minor": "0",
+            "GNU.sparse.name": "t/big",
+            "GNU.sparse.realsize": String(1024 * 1024),
+          }),
+        },
+        // The map, one stored byte at the end of the file, then the byte.
+        {
+          name: "t/GNUSparseFile.0/big",
+          type: "0",
+          data: `${"1\n1048575\n1\n".padEnd(512, "\0")}x`,
+        },
+      ]),
+    ],
+    [
+      "a second archive after the first one's end",
+      joinBytes(tarFile("t/a", "a"), zeroBlocks(2), big, zeroBlocks(2)),
+    ],
+    [
+      "entries after a single block of zeros",
+      joinBytes(tarFile("t/a", "a"), zeroBlocks(1), tarFile("t/b", "b"), zeroBlocks(2)),
+    ],
+    ["data after the end", joinBytes(tarFile("t/a", "a"), zeroBlocks(2), tarData("A".repeat(512)))],
+    [
+      "a pax size before a GNU long name",
+      joinBytes(
+        pax(paxRecords({ size: "512" })),
+        tarHeader({ name: "././@LongLink", type: "L", size: 4 }),
+        tarData("t/a\0"),
+        tarHeader({ name: "t/a", type: "0", size: 0 }),
+        cover,
+        big,
+        zeroBlocks(2),
+      ),
+    ],
+    [
+      "a pax size, then a global header",
+      joinBytes(
+        pax(paxRecords({ size: "1536" })),
+        pax(paxRecords({ comment: "c" }), "g"),
+        tarHeader({ name: "t/a", type: "0", size: 0 }),
+        zeroBlocks(3),
+        big,
+        zeroBlocks(2),
+      ),
+    ],
+    [
+      "two pax headers for one entry",
+      joinBytes(
+        pax(paxRecords({ size: "1536" })),
+        pax(paxRecords({ mtime: "1" })),
+        tarHeader({ name: "t/a", type: "0", size: 0 }),
+        zeroBlocks(3),
+        big,
+        zeroBlocks(2),
+      ),
+    ],
+    [
+      "a tab in a size",
+      joinBytes(
+        tarFile("t/a", "a"),
+        tarHeader({ name: "t/b", type: "0", size: "\t0000001000\0" }),
+        cover,
+        big,
+        zeroBlocks(2),
+      ),
+    ],
+    [
+      "a size in base 256",
+      joinBytes(
+        tarHeader({
+          name: "t/a",
+          type: "0",
+          size: Uint8Array.of(0x80, ...new Array(10).fill(0), 5),
+        }),
+        tarData("hello"),
+        zeroBlocks(2),
+      ),
+    ],
+    ...["+12", "0xc", " 12"].map((length): [string, Uint8Array<ArrayBuffer>] => [
+      `a pax record length written ${JSON.stringify(length)}`,
+      joinBytes(
+        pax(`${length} mtime=1\n${paxRecords({ size: "1536" })}`),
+        tarHeader({ name: "t/a", type: "0", size: 0 }),
+        big,
+        tarHeader({ name: "t/pad", type: "0", size: 0 }),
+        zeroBlocks(2),
+      ),
+    ]),
+    [
+      "a file named like a folder",
+      joinBytes(tarHeader({ name: "t/d/", type: "0", size: 1024 }), big, zeroBlocks(2)),
+    ],
+    [
+      "a header whose checksum does not add up",
+      joinBytes(
+        tarFile("t/a", "a"),
+        tarHeader({ name: "t/b", type: "0", size: 5, badChecksum: true }),
+        tarData("hello"),
+        zeroBlocks(2),
+      ),
+    ],
+    [
+      "a file that stores less than it declares",
+      joinBytes(tarHeader({ name: "t/a", type: "0", size: 4096 }), tarData("x")),
+    ],
+    ["a tar with no end", tarFile("t/a", "a")],
+    [
+      "a link that declares data",
+      joinBytes(
+        tarHeader({ name: "t/l", type: "2", size: 1024, fields: [[157, "a"]] }),
+        big,
+        zeroBlocks(2),
+      ),
+    ],
+    [
+      "a folder that declares data",
+      joinBytes(tarHeader({ name: "t/d/", type: "5", size: 1024 }), big, zeroBlocks(2)),
+    ],
+    [
+      "a header without the ustar magic",
+      joinBytes(
+        tarHeader({ name: "t/a", type: "0", size: 1, fields: [[257, "\0\0\0\0\0\0\0\0"]] }),
+        tarData("a"),
+        zeroBlocks(2),
+      ),
+    ],
+  ];
+  for (const type of ["3", "4", "6", "A", "D", "M", "N", "V", "X", "8", "Z"]) {
+    tars.push([
+      `an entry of type ${type}`,
+      joinBytes(tarHeader({ name: "t/a", type, size: 5 }), tarData("hello"), zeroBlocks(2)),
+    ]);
+  }
+  return tars;
 }
