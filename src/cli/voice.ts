@@ -1,9 +1,9 @@
-import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import { deckProjectRoot } from "../core/path.ts";
 import { isCachedFile, requireInside, writeInside } from "../core/safe-fs.ts";
+import { runPiped } from "../core/spawn.ts";
 import { loadVoiceDict, loadVoiceSettings, voiceCacheFile, writeVoiceDict } from "../core/voice.ts";
 import {
   engineBaseUrl,
@@ -97,6 +97,9 @@ export function pinVoice({ deck }: DeckTarget): VoiceCliResult {
   return { action: "pin", timelinePath: pinTimeline, audioPath: pinAudio };
 }
 
+/** A clip of a sentence or two plays well inside this. */
+const PLAY_TIMEOUT_MS = 5 * 60 * 1000;
+
 async function playWav(path: string): Promise<void> {
   if (process.env.DEK_VOICE_PLAY === "0") {
     return;
@@ -106,9 +109,11 @@ async function playWav(path: string): Promise<void> {
   if (!bin) {
     return;
   }
-  await new Promise<void>((resolve) => {
-    const child = spawn(bin, [path], { stdio: "ignore" });
-    child.on("exit", () => resolve());
-    child.on("error", () => resolve());
-  });
+  // Playing is a courtesy: the clip is written either way, so a player that is missing, fails,
+  // or hangs is let go.
+  await runPiped([bin, path], {
+    label: `${bin} failed`,
+    hint: `play ${path} yourself`,
+    timeoutMs: PLAY_TIMEOUT_MS,
+  }).catch(() => {});
 }
