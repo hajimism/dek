@@ -93,6 +93,24 @@ describe("slide stylesheets in the page", () => {
     );
   });
 
+  // The newline is what ends the string; collapsed to a space, the string would run on over h2.
+  test.each([
+    ["LF", "\n"],
+    ["CR", "\r"],
+    ["CRLF", "\r\n"],
+    ["FF", "\f"],
+  ])("dekc build keeps the rules after a string cut short by %s", async (_, newline) => {
+    const css = ['.a { content: "x', "}", "h2 { color: red; }", ""].join(newline);
+    await withTempProject(deck({ styles: { usb: css } }), async (root) => {
+      const { playerScript } = await playerEmbed();
+      const result = await buildDeck(join(root, "decks", "demo"), { playerScript });
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).toContain(
+        '.slide:where([data-slug="usb"]) .a { content: "x\n} .slide:where([data-slug="usb"]) h2 { color: red; }',
+      );
+    });
+  });
+
   // Read as a comment, the /* would leave h2 unscoped, styling every slide, and the minified
   // single file would end at it.
   test("dekc build scopes and keeps the rules after a url() whose address holds /*", async () => {

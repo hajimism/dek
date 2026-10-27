@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Browser } from "playwright";
 import { parseCss } from "../../src/core/css.ts";
+import { minifyCss } from "../../src/core/css-transform.ts";
 import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
 
 // Where dek's stylesheet reader puts each rule, checked against the stylesheet Chromium reads.
@@ -48,8 +49,11 @@ function dekRules(css: string): RuleTree[] {
   return top;
 }
 
+/** What Chromium reads from a stylesheet: its rules as a tree, and each top-level rule's `cssText`. */
+type ChromiumRead = { rules: RuleTree[]; css: string[] };
+
 /** The rules Chromium's CSSStyleSheet reads from each stylesheet, nested as its CSSOM has them. */
-async function chromiumRules(sheets: string[]): Promise<RuleTree[][]> {
+async function chromiumRules(sheets: string[]): Promise<ChromiumRead[]> {
   if (!browser) {
     throw new Error("no browser");
   }
@@ -74,12 +78,15 @@ async function chromiumRules(sheets: string[]): Promise<RuleTree[][]> {
       return sources.map((source) => {
         const sheet = new CSSStyleSheet();
         sheet.replaceSync(source);
-        return walk(sheet.cssRules);
+        return {
+          rules: walk(sheet.cssRules),
+          css: [...sheet.cssRules].map((rule) => rule.cssText),
+        };
       });
     }, sheets);
     const tidy = (trees: RuleTree[]): RuleTree[] =>
       trees.map((tree) => ({ prelude: normalize(tree.prelude), rules: tidy(tree.rules) }));
-    return read.map(tidy);
+    return read.map(({ rules, css }) => ({ rules: tidy(rules), css }));
   } finally {
     await page.close();
   }
@@ -91,6 +98,7 @@ const theme = readFileSync(
 );
 
 const corpus: Record<string, string> = {
+  "a string cut short by LF": 'a{content:"x\n} b{color:red}',
   "a string cut short by CR": 'a{content:"x\r} b{color:red}',
   "a string cut short by FF": 'a{content:"x\f} b{color:red}',
   "a string cut short by CRLF": 'a{content:"x\r\n} b{color:red}',
@@ -113,6 +121,9 @@ const corpus: Record<string, string> = {
   "a vendor-prefixed url": "a{background:-webkit-url(x/*y)} b{} */ c{}",
   "a hash that reads url": "a{background:#url(x/*y)} b{} */ c{}",
   "a dimension whose unit is url": "a{background:10url(x/*y)} b{} */ c{}",
+  "a comment between a name and url(": "a{b:x/**/url(x/*y)} c{}",
+  "a comment inside a number": "a{width:1/**/.5px; margin:1/**/em} b{}",
+  "a comment between -- and >": "--/**/> b{} z{}",
   "a name that starts with NUL": "a{background:\u0000url(x/*y)} b{} */ c{}",
   "an unquoted url() holding a NUL": "a{background:url(x\u0000/*)} b{}",
   "rules on CRLF lines": "a {\r\n  color: red;\r\n}\r\nb {\r\n  color: blue;\r\n}\r\n",
@@ -137,7 +148,7 @@ c[title="}{"] { color: red; } d { content: "\\"}" }`,
 describe("dek reads a stylesheet's rules where Chromium does", () => {
   browserTest("for every stylesheet in the corpus", async () => {
     const names = Object.keys(corpus);
-    const chromium = await chromiumRules(Object.values(corpus));
+    const chromium = (await chromiumRules(Object.values(corpus))).map((read) => read.rules);
     const dek = Object.values(corpus).map(dekRules);
     const differ = names.filter((_, i) => !Bun.deepEquals(dek[i], chromium[i]));
     expect(
@@ -145,6 +156,32 @@ describe("dek reads a stylesheet's rules where Chromium does", () => {
         name,
         dek: dek[names.indexOf(name)],
         chromium: chromium[names.indexOf(name)],
+      })),
+    ).toEqual([]);
+  });
+});
+
+/** Stylesheets whose rules Chromium drops, so dek reads them otherwise, which minifying must keep. */
+const dropped: Record<string, string> = {
+  "two type selectors parted by a comment": "div/**/p { color: red; } a { color: blue; }",
+  "a comment between < and !--": "</**/!-- b{} z{}",
+  "a comment between <! and --": "<!/**/-- b{} z{}",
+};
+
+describe("the minified stylesheet reads as its source does", () => {
+  browserTest("for every stylesheet in the corpus", async () => {
+    const sheets = { ...corpus, ...dropped };
+    const names = Object.keys(sheets);
+    // The declarations too, so a value the minifier changes shows, as `1/**/.5px` made `1.5px`.
+    const source = await chromiumRules(Object.values(sheets));
+    const minified = await chromiumRules(Object.values(sheets).map(minifyCss));
+    const differ = names.filter((_, i) => !Bun.deepEquals(minified[i], source[i]));
+    expect(
+      differ.map((name) => ({
+        name,
+        minified: minifyCss(sheets[name] ?? ""),
+        source: source[names.indexOf(name)],
+        read: minified[names.indexOf(name)],
       })),
     ).toEqual([]);
   });

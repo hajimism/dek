@@ -108,32 +108,63 @@ export function replaceUrls(replace: (value: string) => string | undefined): Css
 
 /** Whitespace as CSS defines it. U+3000 and NBSP are content, not whitespace. */
 const CSS_WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
+const CSS_NEWLINES = new Set(["\n", "\r", "\f"]);
+
+/** A token that runs on into the next with nothing between: a name, a number, or `#@.+/`. */
+const RUNS_ON_RE = /^[-\w\u0080-\uffff\0\\#@.+/]/;
+/** What such a token runs on into: a name, a number, `(`, `%`, or the `*` that opens a comment. */
+const RUNS_INTO_RE = /^[-\w\u0080-\uffff\0\\.+(%*]/;
+
+/**
+ * Whether the token `last` and the one that starts with `next` would read as one with nothing
+ * between them: `x` and `url(` as `xurl(`, `/` and `*` as a comment, or `--` and `>`, `<` and
+ * `!`, `!` and `--` as the `-->` and `<!--` a stylesheet skips.
+ */
+function runTogether(last: string, next: string): boolean {
+  return (
+    (RUNS_ON_RE.test(last) && RUNS_INTO_RE.test(next)) ||
+    (last.endsWith("--") && next === ">") ||
+    (last === "<" && next === "!") ||
+    (last === "!" && next === "-")
+  );
+}
 
 /**
  * Drops comments and collapses whitespace to one space, leaving strings and `url()`s byte for
- * byte, so `content: "a　b"` or `"  "` renders in the build as it does on the dev server.
+ * byte, so `content: "a　b"` or `"  "` renders in the build as it does on the dev server. The
+ * result reads as the source does: a newline after a string stays one, since it is what ends a
+ * string cut short, and a comment between two tokens that would run into one, as `x` and `url(`
+ * into `xurl(`, stays as an empty one, since a space would make `div` and `p` two selectors.
  */
 export function minifyCss(css: string): string {
   let out = "";
-  let space = false;
+  let last = "";
+  // What parts the last token written from the next: nothing, comments, a space, or a newline.
+  let gap: "" | "comment" | " " | "\n" = "";
   let i = 0;
   while (i < css.length) {
     const ch = css[i] ?? "";
     if (ch === "/" && css[i + 1] === "*") {
       i = consumeComment(css, i);
+      gap ||= "comment";
       continue;
     }
     if (CSS_WHITESPACE.has(ch)) {
-      space = true;
+      if (gap !== "\n") {
+        const cut: boolean =
+          gap === "" && CSS_NEWLINES.has(ch) && (last[0] === '"' || last[0] === "'");
+        gap = cut ? "\n" : " ";
+      }
       i++;
       continue;
     }
-    if (space && out !== "") {
-      out += " ";
+    if (out !== "") {
+      out += gap !== "comment" ? gap : runTogether(last, ch) ? "/**/" : "";
     }
-    space = false;
+    gap = "";
     const end = consumeToken(css, i);
-    out += css.slice(i, end);
+    last = css.slice(i, end);
+    out += last;
     i = end;
   }
   return out;

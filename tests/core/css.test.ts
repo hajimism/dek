@@ -44,6 +44,16 @@ describe("minifyCss", () => {
     expect(minifyCss(css)).toBe(css);
   });
 
+  test("keeps an empty comment where two tokens would run into one without it", () => {
+    expect(minifyCss("a{b:x/* c */url(x/*y)} c{}")).toBe("a{b:x/**/url(x/*y)} c{}");
+    expect(minifyCss("div/* c */p { color: red/* d */; }")).toBe("div/**/p { color: red; }");
+    expect(minifyCss("a{b:1/**/%;c:x/**/(d)}")).toBe("a{b:1/**/%;c:x/**/(d)}");
+    // Joined, they would be the <!-- and --> a stylesheet skips.
+    for (const css of ["--/* c */> b{}", "</* c */!-- b{}", "<!/* c */-- b{}"]) {
+      expect(minifyCss(css)).toBe(css.replace("/* c */", "/**/"));
+    }
+  });
+
   test("treats U+3000 and NBSP outside strings as content, not whitespace", () => {
     expect(minifyCss(".a { --gap: \u3000; --nb:\u00a0; }")).toBe(
       ".a { --gap: \u3000; --nb:\u00a0; }",
@@ -576,8 +586,12 @@ describe("scopeSlideCss keyframes", () => {
 });
 
 describe("minifyCss and the scanner agree on strings", () => {
-  test("an unclosed string ends at the newline, as CSS reads it", () => {
-    expect(minifyCss('.a { content: "x\n; color: red; }')).toBe('.a { content: "x ; color: red; }');
+  test("an unclosed string ends at the newline, as CSS reads it, so the newline stays", () => {
+    for (const newline of ["\n", "\r", "\r\n", "\f"]) {
+      expect(minifyCss(`.a { content: "x${newline}; color: red; }`)).toBe(
+        '.a { content: "x\n; color: red; }',
+      );
+    }
   });
 });
 
