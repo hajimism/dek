@@ -6,6 +6,8 @@ import { lintCommand } from "../../src/cli/lint.ts";
 import { addressResult } from "../../src/cli/result.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { REF_MARKER } from "../../src/core/ref.ts";
+import { runMain } from "../helpers/cli.ts";
+import { withEnv } from "../helpers/env.ts";
 import { REF_SHA, withTempProject } from "../helpers/project.ts";
 import { AWKWARD_NAMES, hintCommands, UNWRITABLE_NAMES } from "../helpers/shell.ts";
 
@@ -108,6 +110,51 @@ describe("addressHint", () => {
   test("leaves every hint alone when there is no deck to name", () => {
     expect(addressHint("run `dekc theme`", undefined, root)).toBe("run `dekc theme`");
   });
+
+  test("names each deck file as a path from where the command ran, as diagnostic paths are", () => {
+    const hints = [
+      "cut it, or give it a smaller size in slides/intro.css",
+      "theme.css alone draws it below 4.5:1: fix the pair in theme.css",
+      "add a section for it to script.md, like `## Intro {#intro}`, or remove slides/intro.html",
+      "run `mv slides/intro.js slides/intro.ts`; plain JavaScript is valid TypeScript",
+      "create voice/voice.toml in the deck with a speaker",
+      "the project has it: copy ../../assets/logo.svg into the deck's assets/",
+    ];
+    expect(hints.map((hint) => addressHint(hint, demo, root))).toEqual([
+      "cut it, or give it a smaller size in decks/demo/slides/intro.css",
+      "decks/demo/theme.css alone draws it below 4.5:1: fix the pair in decks/demo/theme.css",
+      "add a section for it to decks/demo/script.md, like `## Intro {#intro}`, or remove decks/demo/slides/intro.html",
+      "run `mv decks/demo/slides/intro.js decks/demo/slides/intro.ts`; plain JavaScript is valid TypeScript",
+      "create decks/demo/voice/voice.toml in the deck with a speaker",
+      "the project has it: copy assets/logo.svg into the deck's assets/",
+    ]);
+    expect(addressHint(hints[0] ?? "", demo, "/p/decks/demo/slides")).toBe(
+      "cut it, or give it a smaller size in intro.css",
+    );
+    expect(addressHint(hints[1] ?? "", demo, "/p/decks/other")).toBe(
+      "../demo/theme.css alone draws it below 4.5:1: fix the pair in ../demo/theme.css",
+    );
+    for (const hint of hints) {
+      expect(addressHint(hint, demo, demo.dir)).toBe(hint);
+    }
+  });
+
+  test("leaves a deck file as written when the path from where the command ran is no plain word", () => {
+    const odd = { name: "odd", dir: "/p/decks/a`b" };
+    const hint = "cut it, or give it a smaller size in slides/intro.css";
+    expect(addressHint(hint, odd, root)).toBe(hint);
+  });
+
+  test("leaves what only looks like a deck file", () => {
+    for (const hint of [
+      "copy decks/demo/theme.css into the new deck",
+      "see https://hajimism.github.io/dek/guide/voice.html#setup",
+      "a rule in slides/<id>.css weighs as if it were in a theme.css-like file",
+      "download it into assets/ and use assets/logo.svg",
+    ]) {
+      expect(addressHint(hint, demo, root)).toBe(hint);
+    }
+  });
 });
 
 describe("deckAround", () => {
@@ -181,4 +228,65 @@ describe("addressResult", () => {
       },
     );
   });
+
+  test.serial(
+    "a visual lint at the project root names the files to fix from the root",
+    async () => {
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              slides: {
+                intro:
+                  '<section class="slide" data-layout="default"><h2 class="slide-title">Demo</h2><p>small print</p></section>\n',
+              },
+            },
+          ],
+        },
+        async (root) => {
+          // A worker that answers with one overflow and one contrast finding, as Playwright would.
+          const found = {
+            overflows: [
+              { slug: "intro", step: "0", box: "p", text: "small print", by: { bottom: 30 } },
+            ],
+            contrasts: [
+              {
+                slug: "intro",
+                step: "0",
+                box: "p",
+                text: "small print",
+                ratio: 1.3,
+                fg: "rgb(39, 39, 39)",
+                bg: "rgb(17, 17, 17)",
+                fontSize: 16,
+                fontWeight: 400,
+                origin: "slide",
+              },
+            ],
+          };
+          const worker = join(root, "worker.ts");
+          await writeFile(
+            worker,
+            `await Bun.stdin.text();\nprocess.stdout.write(${JSON.stringify(`${JSON.stringify(found)}\n`)});\n`,
+          );
+          const printed = await withEnv({ DEK_PLAYWRIGHT: worker }, () =>
+            runMain(["lint", "--visual", "--json"], root),
+          );
+          const { diagnostics } = JSON.parse(printed.stdout) as {
+            diagnostics: Array<{ id: string; path: string; hint: string }>;
+          };
+          const css = "decks/demo/slides/intro.css";
+          expect(diagnostics.find((d) => d.id === "DEK030")).toMatchObject({
+            path: "decks/demo/slides/intro.html",
+            hint: `cut it, split it across beats or slides, or give it a smaller size in ${css}`,
+          });
+          expect(diagnostics.find((d) => d.id === "DEK031")).toMatchObject({
+            path: css,
+            hint: `${css} brings it below 4.5:1, which decks/demo/theme.css alone does not: raise its contrast in ${css}`,
+          });
+        },
+      );
+    },
+  );
 });

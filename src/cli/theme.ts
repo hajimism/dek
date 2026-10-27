@@ -36,7 +36,7 @@ export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeR
   if (!existsSync(path)) {
     throw new DekError("theme.css not found", {
       path,
-      hint: "copy the project theme.css into the deck, or run `dekc new <name>` for a fresh deck",
+      hint: "copy the project's template, ../../theme.css, into the deck, or run `dekc new <name>` for a fresh deck",
     });
   }
   const css = readDeckFile(deck.dir, path) ?? "";

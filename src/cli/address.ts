@@ -1,30 +1,49 @@
 import { existsSync, statSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import { shellName } from "../core/escape.ts";
+import { basename, dirname, join, relative } from "node:path";
+import { isPlainWord, shellName } from "../core/escape.ts";
 import { isInside } from "../core/path.ts";
 import { snapshotName } from "../core/ref.ts";
+import { isRefName } from "../core/ref-name.ts";
 import { type AnySpec, COMMANDS, subcommandsOf } from "./commands.ts";
 
 /** A deck a hint is about: the name a command takes, and the directory that makes it implicit. */
 export type HintDeck = { name: string; dir: string };
 
 /**
- * A hint's commands as they run from `cwd`. Hints are written as if run inside the deck they are
- * about, where a command finds its deck by itself. Run anywhere else, a command that takes a deck
- * needs its name: as the first word outside every deck, and as `--deck` inside another deck,
- * where a first word names something in that deck instead, or where the name would read as a
- * subcommand or a flag. The name is one shell word, however it is spelled, or `<deck>` when no
- * word holds it alike in every shell, with where to find it unless `note` is false, for a hint
- * that joins several and says it once. A command that already names a deck, or takes none, is
- * left as written.
+ * A hint as it reads from `cwd`. Hints are written as if read inside the deck they are about:
+ * its commands are addressed as `addressCommands` says, and the deck files it names become paths
+ * from `cwd`, as the path of the diagnostic beside it is, except in a ref.
  */
 export function addressHint(
   hint: string,
   deck: HintDeck | undefined,
   cwd: string,
+  options: { note?: boolean } = {},
+): string {
+  if (deck === undefined) {
+    return hint;
+  }
+  const addressed = addressCommands(hint, deck, cwd, options);
+  // A ref's files are its author's to fix, so a hint about one names them as the ref does.
+  return isRefName(deck.name) ? addressed : addressFiles(addressed, deck.dir, cwd);
+}
+
+/**
+ * A hint's commands as they run from `cwd`. Inside the deck they are about, a command finds its
+ * deck by itself. Run anywhere else, a command that takes a deck needs its name: as the first
+ * word outside every deck, and as `--deck` inside another deck, where a first word names
+ * something in that deck instead, or where the name would read as a subcommand or a flag. The
+ * name is one shell word, however it is spelled, or `<deck>` when no word holds it alike in every
+ * shell, with where to find it unless `note` is false, for a hint that joins several and says it
+ * once. A command that already names a deck, or takes none, is left as written.
+ */
+export function addressCommands(
+  hint: string,
+  deck: HintDeck,
+  cwd: string,
   { note: noted = true }: { note?: boolean } = {},
 ): string {
-  if (deck === undefined || isInside(cwd, deck.dir)) {
+  if (isInside(cwd, deck.dir)) {
     return hint;
   }
   const word = shellName(deck.name) ?? DECK_PLACEHOLDER;
@@ -78,6 +97,24 @@ export function deckWord(name: string): string {
 export function deckFlag(name: string): string {
   const word = shellName(name) ?? DECK_PLACEHOLDER;
   return name.startsWith("-") ? `--deck=${word}` : `--deck ${word}`;
+}
+
+/**
+ * A deck file as a hint names it from the deck: a slide's own file, a voice file, theme.css, or
+ * script.md, or a project file reached with `../../`. Not part of a longer path or word. A path
+ * from `cwd` that is no plain word, through a folder a hint may not name, is left as written.
+ */
+const DECK_FILE_RE =
+  /(?<![\w./-])(\.\.\/\.\.\/[\w./-]*[\w-]|(?:slides|voice)\/[\w.-]*[\w-]|theme\.css|script\.md)(?![\w/-])/g;
+
+function addressFiles(hint: string, dir: string, cwd: string): string {
+  if (cwd === dir) {
+    return hint;
+  }
+  return hint.replace(DECK_FILE_RE, (file) => {
+    const path = relative(cwd, join(dir, file)) || ".";
+    return isPlainWord(path) ? path : file;
+  });
 }
 
 /** A backquoted command: `dekc`, a command word, and what follows it up to the closing quote. */

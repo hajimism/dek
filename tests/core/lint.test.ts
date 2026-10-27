@@ -420,7 +420,7 @@ describe("lintDeck", () => {
             severity: "error",
             message: "theme.css not found",
             path: join(root, "decks", "demo", "theme.css"),
-            hint: expect.stringContaining("copy theme.css"),
+            hint: expect.stringContaining("copy the project's template, ../../theme.css"),
           },
         ]);
       },

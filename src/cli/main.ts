@@ -7,7 +7,7 @@ import { isRefName } from "../core/ref-name.ts";
 import { type ProjectDeck, readDeckFile, resolveProject } from "../core/resolve.ts";
 import { takeUnsandboxed } from "../core/sandbox.ts";
 import { themeFacts } from "../core/theme-facts.ts";
-import { addressHint, deckWord, type HintDeck, withPlaceholderNote } from "./address.ts";
+import { addressCommands, deckWord, type HintDeck, withPlaceholderNote } from "./address.ts";
 import {
   type AnySpec,
   type CliResult,
@@ -207,7 +207,7 @@ function retypedWithDeck<T>(line: CommandLine, cwd: string, call: Call, resolve:
     const decks = error.decks.filter((deck) => runsIn(call, deck));
     const [first] = decks;
     // Each command is retyped for one deck; where to find a name left as <deck> is said once.
-    const retyped = (deck: HintDeck) => addressHint(typed, deck, cwd, { note: false });
+    const retyped = (deck: HintDeck) => addressCommands(typed, deck, cwd, { note: false });
     const hint =
       error.decks.length === 0
         ? "run `dekc new <name>` to make a deck"
