@@ -1,5 +1,6 @@
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { holdsHidden } from "./foreign-text.ts";
 
 export function moduleFilePath(url: string | URL): string {
   return fileURLToPath(url);
@@ -16,8 +17,12 @@ export function deckProjectRoot(deckDir: string): string {
 }
 
 export const DECK_NAME_HINT =
-  'use a plain name like 2026-10-talk: no "/" or "\\", no control characters, no leading "-"';
+  'use a plain name like 2026-10-talk: no "/" or "\\", no control character or one a person cannot see, no leading "-"';
 
+/**
+ * A name `dekc new` and `dekc init` may give a deck. A pack's ref takes its deck's name, so, as
+ * `dekc pack` does, these refuse a control character and one a person cannot see.
+ */
 export function isDeckName(name: string): boolean {
   return (
     name.length > 0 &&
@@ -28,7 +33,8 @@ export function isDeckName(name: string): boolean {
     // A leading "-" reads as a flag to every tool the name is passed to.
     !name.startsWith("-") &&
     // biome-ignore lint/suspicious/noControlCharactersInRegex: a control in a name is the problem.
-    !/[\x00-\x1f\x7f]/.test(name)
+    !/[\x00-\x1f\x7f-\x9f]/.test(name) &&
+    !holdsHidden(name)
   );
 }
 

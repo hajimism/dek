@@ -18,7 +18,7 @@ import {
   snapshotDigest,
   writeSnapshot,
 } from "../../src/core/ref.ts";
-import type { GithubRefSource } from "../../src/core/ref-name.ts";
+import { type GithubRefSource, REF_DECK_NAME_RULE } from "../../src/core/ref-name.ts";
 import { resolveProject } from "../../src/core/resolve.ts";
 import { deckRepoFiles, SHA_A, SHA_B } from "../helpers/fake-github.ts";
 import { withTempDir } from "../helpers/fs.ts";
@@ -523,6 +523,29 @@ describe("deckOfPack", () => {
     expect(error.hint).toBe(
       "a pack is one deck; ask for a pack its author made with `dekc pack <deck>`",
     );
+  });
+});
+
+describe("a pack's deck name", () => {
+  test("is refused when it holds a control character or one a person cannot see", () => {
+    // The name becomes the ref's, file/<deck>, in AGENTS.md and in every hint about the ref.
+    // The name is not repeated: what dek cannot show as the author wrote it, it does not show.
+    for (const name of [
+      "talk\u{E0041}\u{E0042}",
+      "talk\u{202E}",
+      "talk\x1b[8m",
+      "\u{3164}",
+      "a\u{3164}b",
+    ]) {
+      const error = errorOf(() => deckOfPack(repoFiles(deckRepoFiles(name))));
+      expect(error.message).toBe("the pack's deck has a name a ref cannot carry");
+      expect(error.hint).toBe(
+        `${REF_DECK_NAME_RULE}; ask its author to rename the deck's folder and pack it again`,
+      );
+    }
+    expect(() => parseRefSource("file/talk\u{200B}")).toThrow("is not a ref name");
+    expect(() => parseRefSource("file/a\u{3164}b")).toThrow("is not a ref name");
+    expect(() => parseRefSource("o/r/talk\x07")).toThrow("is not a ref name");
   });
 });
 

@@ -117,6 +117,9 @@ describe("initCommand", () => {
       expect(() => initCommand({ cwd: dir, dir: target, deck: "bad/name" })).toThrow(
         "invalid deck name",
       );
+      expect(() => initCommand({ cwd: dir, dir: target, deck: "talk\u{E0041}" })).toThrow(
+        "invalid deck name",
+      );
       expect(existsSync(target)).toBe(false);
     });
   });

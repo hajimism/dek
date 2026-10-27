@@ -20,6 +20,11 @@ const HIDDEN_RE =
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
 const SPACE_RE = /[\s\x00-\x1f\x7f-\x9f]/u;
 
+/** True when `text` holds a character that shows as nothing or moves the text around it. */
+export function holdsHidden(text: string): boolean {
+  return HIDDEN_RE.test(text);
+}
+
 /** `U+202E`, as a code point is written. */
 function codePoint(char: string): string {
   return `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;

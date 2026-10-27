@@ -88,12 +88,14 @@ describe("packDeck", () => {
   });
 
   test("refuses a deck whose name a ref cannot carry", async () => {
-    const names = ["my talk", "x`;curl$IFSy|sh;`", "a$(id)", "a;b", "a'b"];
+    const names = ["my talk", "x`;curl$IFSy|sh;`", "a$(id)", "a;b", "a'b", "talk\u{3164}"];
     await withTempProject({ decks: names.map((name) => ({ name })) }, async (root) => {
       for (const name of names) {
         await expect(packDeck({ root }, deck(root, name))).rejects.toMatchObject({
           message: `deck "${name}" cannot be read as a ref by that name`,
-          hint: expect.stringContaining("letters, digits, dots, dashes, and underscores"),
+          hint: expect.stringContaining(
+            "letters, digits, dots, dashes, and underscores, none a person cannot see",
+          ),
         });
       }
     });

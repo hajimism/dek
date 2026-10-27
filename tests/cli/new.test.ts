@@ -197,6 +197,28 @@ describe("newCommand", () => {
     },
   );
 
+  // A deck dek can make is one it can pack: a pack's ref takes the deck's name, as AGENTS.md and
+  // every hint about the ref show it, so it holds nothing a person cannot see.
+  // U+3164, a Hangul filler, shows blank: a deck named only one would print as no name at all.
+  test.each([
+    "talk\u{E0041}",
+    "talk\u{200B}",
+    "talk\u{202E}",
+    "talk\x9b",
+    "\u{3164}",
+    "talk\u{AD}",
+  ])("fails on %j, which holds a character a person cannot see or a control", async (name) => {
+    await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
+      expect(() => newCommand({ cwd: root, name })).toThrow(
+        expect.objectContaining({
+          message: expect.stringContaining("invalid deck name"),
+          hint: expect.stringContaining("no control character or one a person cannot see"),
+        }),
+      );
+      expect(existsSync(join(root, "decks", name))).toBe(false);
+    });
+  });
+
   test("names next commands that paste as printed, from wherever new ran", async () => {
     await withTempProject({ theme: defaultTheme(), decks: [{ name: "demo" }] }, async (root) => {
       const inDeck = join(root, "decks", "demo");
