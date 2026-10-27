@@ -294,7 +294,9 @@ function jsonNotFound(deckName: string): Response {
 function safeDeckAsset(deckDir: string, relative: string): string | undefined {
   const root = join(deckDir, "assets");
   const found = fileInside(join(root, relative), root);
-  return found.kind === "file" ? found.path : undefined;
+  // assets/ may itself be a link, and then everything under what it points to is "inside" it:
+  // what is served must also be in the project, as every file dek reads is.
+  return found.kind === "file" ? followInside(found.path, deckProjectRoot(deckDir)) : undefined;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {

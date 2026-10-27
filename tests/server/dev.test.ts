@@ -1791,6 +1791,45 @@ describe("startDevServer --remote exposure", () => {
     );
   });
 
+  test("serves no asset behind an assets folder that links out of the project", async () => {
+    await withTempDir(async (outside) => {
+      await writeFile(join(outside, "notes.txt"), "not the deck's\n");
+      await mkdir(join(outside, ".ssh"));
+      await writeFile(join(outside, ".ssh", "id_ed25519"), "not the deck's either\n");
+      await withTempProject(
+        {
+          decks: [{ name: "demo", slides: { intro: introHtml } }],
+          assets: { "logo.txt": "ours\n" },
+        },
+        async (root) => {
+          const deckDir = join(root, "decks", "demo");
+          await rm(join(deckDir, "assets"), { recursive: true });
+          await symlink(outside, join(deckDir, "assets"));
+          // The audience, with no password, from the project root and from inside the deck.
+          for (const [cwd, prefix] of [
+            [root, "/decks/demo/assets"],
+            [deckDir, "/assets"],
+          ] as const) {
+            await withDevServer({ cwd, remote: true, password: "secret" }, async (server) => {
+              for (const name of ["notes.txt", ".ssh/id_ed25519"]) {
+                const response = await fetch(new URL(`${prefix}/${name}`, server.url));
+                expect({ name, status: response.status }).toEqual({ name, status: 404 });
+              }
+            });
+          }
+          // An assets folder that links elsewhere in the project still serves.
+          await rm(join(deckDir, "assets"));
+          await symlink(join(root, "assets"), join(deckDir, "assets"));
+          await withDevServer({ cwd: root, remote: true, password: "secret" }, async (server) => {
+            const response = await fetch(new URL("/decks/demo/assets/logo.txt", server.url));
+            expect(response.status).toBe(200);
+            expect(await response.text()).toBe("ours\n");
+          });
+        },
+      );
+    });
+  });
+
   test("serves no voice file that links out of the project", async () => {
     await withTempDir(async (outside) => {
       await writeFile(join(outside, "timeline.json"), '{"audio":"audio.wav","beats":[]}\n');
