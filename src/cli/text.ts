@@ -1,7 +1,8 @@
 // How each command's result reads as text; commands.ts says which command prints which.
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
-import { shellQuote } from "../core/escape.ts";
+import { isPlainWord, shellQuote } from "../core/escape.ts";
+import { unprinted } from "../core/prose.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
 import { formatClock } from "../core/timing.ts";
 import type { AnnotationsCliResult } from "./annotations.ts";
@@ -362,13 +363,17 @@ export function formatTheme(data: ThemeResult): string {
     return data.layout.example;
   }
   const width = Math.max(0, ...data.tokens.map((token) => token.name.length));
+  // A layout's name is the theme's text, maybe a pack's: one that is no plain word is counted.
+  const layouts = data.layouts.filter((layout) => isPlainWord(layout.name));
+  const left = data.layouts.length - layouts.length;
   return [
     data.path,
     "",
     "LAYOUTS",
-    ...data.layouts.map(
+    ...layouts.map(
       (layout) => `  ${layout.name}${layout.example === undefined ? "  (no example)" : ""}`,
     ),
+    ...(left > 0 ? [`  and ${unprinted(left)}`] : []),
     "",
     "CLASSES",
     `  ${data.classes.join(" ")}`,
@@ -383,7 +388,7 @@ export function formatTheme(data: ThemeResult): string {
     "TOKENS",
     ...data.tokens.map((token) => `  ${token.name.padEnd(width)}  ${token.value}`),
     "",
-    "Markup for a layout: dekc theme <layout>",
+    `Markup for a layout: dekc theme ${data.ref ? `${shellQuote(data.ref.name)} ` : ""}<layout>`,
   ].join("\n");
 }
 

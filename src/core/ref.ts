@@ -5,6 +5,7 @@ import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
 import { shellQuote } from "./escape.ts";
+import { listShown } from "./prose.ts";
 import {
   isPlainRefName,
   isRefDeckName,
@@ -321,24 +322,6 @@ function repoDecks(files: RepoFiles): Array<{ name: string; prefix: string }> {
     const prefix = match?.[1] ? `${match[1]}/` : "";
     return match?.[2] && files.has(`${prefix}dek.toml`) ? [{ name: match[2], prefix }] : [];
   });
-}
-
-/**
- * Names from someone else's files as a hint lists them: those `shows` passes, then how many others
- * there are, in the words of `others`. An other could hold anything, and an agent takes a hint as
- * dek's own words.
- */
-function listShown(
-  names: string[],
-  shows: (name: string) => boolean,
-  others: (count: number) => string,
-): string {
-  const shown = names.filter(shows);
-  const left = names.length - shown.length;
-  if (left === 0) {
-    return shown.join(", ");
-  }
-  return shown.length === 0 ? others(left) : `${shown.join(", ")}, and ${others(left)}`;
 }
 
 /** Deck names as a hint lists them: only those a ref can carry. */

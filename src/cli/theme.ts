@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { type CssToken, parseCss } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
+import { isPlainWord } from "../core/escape.ts";
+import { listShown, unprinted } from "../core/prose.ts";
 import { readDeckFile } from "../core/resolve.ts";
 import { type ThemeLayout, themeFacts } from "../core/theme-facts.ts";
 import type { ReadableDeck, RefInfo } from "./scope.ts";
@@ -49,7 +51,13 @@ export function themeCommand({ deck, ref }: ReadableDeck, name?: string): ThemeR
   if (!layout) {
     throw new DekError(`layout "${name}" is not defined in theme.css`, {
       path,
-      hint: `use one of: ${layouts.map((entry) => entry.name).join(", ") || "(none)"}`,
+      hint: `use one of: ${
+        listShown(
+          layouts.map((entry) => entry.name),
+          isPlainWord,
+          unprinted,
+        ) || "(none)"
+      }`,
     });
   }
   if (layout.example === undefined) {

