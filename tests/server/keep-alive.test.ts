@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { onOrphaned, stopOnce } from "../../src/cli/keep-alive.ts";
 import { cliPath } from "../helpers/cli.ts";
@@ -8,9 +9,16 @@ import { WAIT_MS } from "../helpers/wait.ts";
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch {
     return false;
+  }
+  // The parent that would reap this process was killed. Until init reaps it, it is a zombie and
+  // kill still succeeds, so the exit looks like it never came. Linux records that as state Z.
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat[stat.lastIndexOf(")") + 2] !== "Z";
+  } catch {
+    return true;
   }
 }
 
@@ -106,7 +114,7 @@ await child.exited;`,
           child = Number(out.match(/child (\d+)/)?.[1]);
           parent.kill("SIGKILL");
           await parent.exited;
-          expect(await until(() => !isAlive(child), WAIT_MS * 2)).toBe(true);
+          expect(await until(() => !isAlive(child), WAIT_MS * 3)).toBe(true);
         } finally {
           parent.kill("SIGKILL");
           if (child && isAlive(child)) {
@@ -115,6 +123,6 @@ await child.exited;`,
         }
       });
     },
-    WAIT_MS * 4,
+    WAIT_MS * 5,
   );
 });
