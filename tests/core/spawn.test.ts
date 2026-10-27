@@ -209,6 +209,24 @@ describe("runPiped", () => {
     { timeout: 40_000 },
   );
 
+  // Bun hands a child the environment the process started with unless told otherwise, and dek
+  // starts with what a `.env` set, which it then takes out of process.env.
+  test("runs the command with the environment as it is now, not as dek started", async () => {
+    const spawnModule = join(import.meta.dir, "..", "..", "src", "core", "spawn.ts");
+    const dek = `
+      import { runPiped } from ${JSON.stringify(spawnModule)};
+      delete process.env.DEK_PROBE;
+      process.env.DEK_ADDED = "added";
+      const show = "echo \${DEK_PROBE:-unset} \${DEK_ADDED:-unset}";
+      const { stdout } = await runPiped(["sh", "-c", show], { label: "x", hint: "", timeoutMs: 10_000 });
+      process.stdout.write(stdout);
+    `;
+    const child = Bun.spawnSync([process.execPath, "-e", dek], {
+      env: { ...process.env, DEK_PROBE: "from a .env" },
+    });
+    expect(child.stdout.toString()).toBe("unset added\n");
+  });
+
   test("a command that cannot start fails with the hint", async () => {
     await expect(
       runPiped(["/no/such/command"], {

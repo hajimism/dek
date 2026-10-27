@@ -10,7 +10,13 @@ export function ffmpegResolved(): boolean {
     return true;
   }
   try {
-    const result = Bun.spawnSync(["ffmpeg", "-version"], { stdout: "pipe", stderr: "pipe" });
+    // The environment as it is now, as runPiped passes it: left out, Bun passes the one dek
+    // started with.
+    const result = Bun.spawnSync(["ffmpeg", "-version"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: process.env,
+    });
     return result.exitCode === 0;
   } catch {
     return false;

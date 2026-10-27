@@ -41,10 +41,8 @@ export async function defaultRumdlRunner(
     const { stdout, exitCode, cutShort } = await runPiped(workerCommand(bin, args), {
       label: "rumdl failed",
       hint: "",
+      // runPiped passes the environment as it is now, like the PATH rumdl was found on.
       cwd: dirname(scriptPath),
-      // The environment as it is now, like the PATH rumdl was found on; left out, Bun passes
-      // the one the process started with.
-      env: process.env,
       timeoutMs,
     });
     if (exitCode === 2) {

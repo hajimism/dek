@@ -35,8 +35,6 @@ type PipedOptions = {
   timeoutMs: number;
   /** Where the command runs; dek's working directory when left out. */
   cwd?: string;
-  /** The command's environment; left out, Bun passes the one dek started with. */
-  env?: Record<string, string | undefined>;
 };
 
 type Piped = {
@@ -59,7 +57,9 @@ export async function runPiped(cmd: string[], options: PipedOptions): Promise<Pi
   try {
     proc = Bun.spawn(cmd, {
       ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
-      ...(options.env !== undefined ? { env: options.env } : {}),
+      // The environment as it is now: left out, Bun passes the one dek started with, which holds
+      // what a `.env` set before dek took it out (see dropEnvFileVariables).
+      env: process.env,
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
