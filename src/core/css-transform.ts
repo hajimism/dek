@@ -129,18 +129,24 @@ function runTogether(last: string, next: string): boolean {
   );
 }
 
+/** A hex escape at the end of a token, which takes one whitespace after it as its own. */
+const HEX_ESCAPE_END_RE = /\\[0-9a-fA-F]{1,6}$/;
+
 /**
  * Drops comments and collapses whitespace to one space, leaving strings and `url()`s byte for
  * byte, so `content: "a　b"` or `"  "` renders in the build as it does on the dev server. The
  * result reads as the source does: a newline after a string stays one, since it is what ends a
  * string cut short, and a comment between two tokens that would run into one, as `x` and `url(`
- * into `xurl(`, stays as an empty one, since a space would make `div` and `p` two selectors.
+ * into `xurl(`, stays as an empty one, since a space would make `div` and `p` two selectors. A
+ * hex escape that a comment ends, such as `\41` before a comment and ` x`, is followed by two
+ * spaces, since it takes one as its own.
  */
 export function minifyCss(css: string): string {
   let out = "";
   let last = "";
-  // What parts the last token written from the next: nothing, comments, a space, or a newline.
-  let gap: "" | "comment" | " " | "\n" = "";
+  // What parts the last token written from the next: "", "comment", a space, or the newline that
+  // ends a string.
+  let gap = "";
   let i = 0;
   while (i < css.length) {
     const ch = css[i] ?? "";
@@ -150,16 +156,25 @@ export function minifyCss(css: string): string {
       continue;
     }
     if (CSS_WHITESPACE.has(ch)) {
-      if (gap !== "\n") {
-        const cut: boolean =
-          gap === "" && CSS_NEWLINES.has(ch) && (last[0] === '"' || last[0] === "'");
-        gap = cut ? "\n" : " ";
+      const whitespace = ch === "\r" && css[i + 1] === "\n" ? "\r\n" : ch;
+      if (gap === "" && CSS_NEWLINES.has(ch) && (last[0] === '"' || last[0] === "'")) {
+        // One LF, unless the string ends on a CR it escapes, which an LF would join into a CRLF.
+        gap = last.endsWith("\r") ? whitespace : "\n";
+      } else if (gap === "" || gap === "comment") {
+        gap = " ";
       }
-      i++;
+      i += whitespace.length;
       continue;
     }
     if (out !== "") {
-      out += gap !== "comment" ? gap : runTogether(last, ch) ? "/**/" : "";
+      out +=
+        gap === "comment"
+          ? runTogether(last, ch)
+            ? "/**/"
+            : ""
+          : gap === " " && HEX_ESCAPE_END_RE.test(last)
+            ? "  "
+            : gap;
     }
     gap = "";
     const end = consumeToken(css, i);

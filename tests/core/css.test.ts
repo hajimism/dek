@@ -54,6 +54,11 @@ describe("minifyCss", () => {
     }
   });
 
+  test("keeps a hex escape a comment cuts off apart from the name after it", () => {
+    // The escape takes one space after it, so a second keeps `\41` and `x` two names.
+    expect(minifyCss(".a { b: \\41/* c */ x; }")).toBe(".a { b: \\41  x; }");
+  });
+
   test("treats U+3000 and NBSP outside strings as content, not whitespace", () => {
     expect(minifyCss(".a { --gap: \u3000; --nb:\u00a0; }")).toBe(
       ".a { --gap: \u3000; --nb:\u00a0; }",
@@ -599,6 +604,13 @@ describe("minifyCss and the scanner agree on strings", () => {
       expect(minifyCss(`.a { content: "x${newline}; color: red; }`)).toBe(
         '.a { content: "x\n; color: red; }',
       );
+    }
+  });
+
+  test("the newline after a CR the string escapes stays as written, never joined into a CRLF", () => {
+    for (const newline of ["\r", "\r\n", "\f"]) {
+      const css = `.a { content: "x\\\r${newline}; color: red; }`;
+      expect(minifyCss(css)).toBe(css);
     }
   });
 });
