@@ -8,7 +8,7 @@ Accepted
 
 Amended by [16. Hand a pack over under CC0 unless dek.toml says otherwise](0016-hand-a-pack-over-under-cc0-unless-dek-toml-says-otherwise.md)
 
-Amended by [31. Read a pack's or a repository's tar with dek's own reader, so nothing unpacks beyond what was counted](0031-read-a-pack-s-or-a-repository-s-tar-with-dek-s-own-reader-so-nothing-unpacks-beyond-what-was-counted.md)
+Amended by [27. Read a pack's or a repository's tar with dek's own reader, so nothing unpacks beyond what was counted](0027-read-a-pack-s-or-a-repository-s-tar-with-dek-s-own-reader-so-nothing-unpacks-beyond-what-was-counted.md)
 
 ## Context
 

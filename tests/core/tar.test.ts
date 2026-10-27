@@ -188,22 +188,29 @@ describe("readTar names", () => {
       "a GNU long name, then a pax path",
       joinBytes(longName("t/l.md"), pax({ path: "t/x.md" }), tarFile("t/h.md", "a")),
     ],
-    // macOS's tar writes a file's extended attributes as `._<name>`, just before the file.
-    [
-      "macOS's AppleDouble files",
-      joinBytes(
-        tarFile("t/slides/._intro.html", "attrs"),
-        tarFile("t/slides/intro.html", "<section>"),
-        tarFile("t/._d/kept.md", "kept"),
-        tarFile("._top", "attrs"),
-      ),
-    ],
   ];
   for (const [what, entries] of named) {
     test(`names the files of ${what} as Bun.Archive does`, async () => {
       await expectAsBunReads(joinBytes(entries, zeroBlocks(2)));
     });
   }
+
+  // macOS's tar writes a file's extended attributes as `._<name>`, just before the file.
+  // `Bun.Archive` keeps those files; dek leaves out a last segment that starts with `._`.
+  test("leaves out an AppleDouble file, and keeps a directory whose name starts with ._", () => {
+    const tar = joinBytes(
+      tarFile("t/slides/._intro.html", "attrs"),
+      tarFile("t/slides/intro.html", "<section>"),
+      tarFile("t/._d/kept.md", "kept"),
+      tarFile("._top", "attrs"),
+      zeroBlocks(2),
+    );
+    const ours = readTar(tar, unlimited);
+    if (!(ours instanceof Map)) {
+      throw new Error(`readTar refused it: ${JSON.stringify(ours)}`);
+    }
+    expect([...ours.keys()].sort()).toEqual(["t/._d/kept.md", "t/slides/intro.html"]);
+  });
 
   test.skipIf(!Bun.which("xattr") || !tarFormats().includes("gnutar"))(
     "leaves out the AppleDouble file bsdtar writes for a file's extended attributes",
@@ -218,8 +225,11 @@ describe("readTar names", () => {
         Bun.spawnSync(["tar", "-c", "-f", out, "--format=pax", "t"], { cwd: dir, env: macEnv });
         const tar = new Uint8Array(await readFile(out));
         expect(new TextDecoder().decode(tar)).toContain("t/slides/._intro.html");
-        const files = await expectAsBunReads(tar);
-        expect([...files.keys()]).toEqual(["t/slides/intro.html"]);
+        const ours = readTar(tar, unlimited);
+        if (!(ours instanceof Map)) {
+          throw new Error(`readTar refused it: ${JSON.stringify(ours)}`);
+        }
+        expect([...ours.keys()]).toEqual(["t/slides/intro.html"]);
       });
     },
   );

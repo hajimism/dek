@@ -1,4 +1,4 @@
-# 31. Read a pack's or a repository's tar with dek's own reader, so nothing unpacks beyond what was counted
+# 27. Read a pack's or a repository's tar with dek's own reader, so nothing unpacks beyond what was counted
 
 Date: 2026-10-27
 
@@ -37,7 +37,7 @@ At the default limits, the first of these took a 129-byte pack to a 300 MB file 
 - Headers are ustar, in POSIX form (`ustar\0` `00`, its prefix placed before its name) or GNU form (`ustar  \0`), with a checksum that adds up, summed as unsigned or as signed bytes.
 - A pax `x` header's `path` and `size` belong to the entry after it and to no other; a GNU `L` long name likewise, and a GNU `K` long link name is read and left aside. With both a pax `path` and an `L` name, the later one names the entry, and an empty one leaves the header's name, as `Bun.Archive` named it; a name keeps a byte order mark at its start. A pax `g` header is read and left aside, and may come only between entries.
 - Regular files (`0`, `\0`, `7`) are read. Folders (`5`) and hard and symbolic links (`1`, `2`) are skipped, as `Bun.Archive` skipped links, and must declare no data.
-- A file whose name's last segment starts with `._` is left out, as `Bun.Archive` left it out: macOS's tar writes a file's extended attributes as an AppleDouble file of that name just before it, so a pack made with `tar czf` on a Mac holds one beside every file that has them, and dek would otherwise read `slides/._intro.html` as a slide.
+- A file whose name's last segment starts with `._` is left out: macOS's tar writes a file's extended attributes as an AppleDouble file of that name just before it, so a pack made with `tar czf` on a Mac holds one beside every file that has them, and dek would otherwise read `slides/._intro.html` as a slide. `Bun.Archive` keeps that file.
 - Each entry must store all it declares, and the sizes all entries declare may add up to the unpacked limit at most; an entry that declares more than the tar holds is refused as cut short, not as too large. A pack may hold 10,000 headers, a repository's tarball 200,000.
 - The tar ends at a block of zeros, and only zeros may follow it.
 

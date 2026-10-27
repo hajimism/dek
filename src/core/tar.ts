@@ -1,5 +1,5 @@
 /**
- * dek's reader for a tar from someone else, a pack or GitHub's tarball of a repository (ADR 31).
+ * dek's reader for a tar from someone else, a pack or GitHub's tarball of a repository (ADR 27).
  * It reads the tar where it lies in memory, and each file is a copy of the bytes the tar stores
  * for it, so nothing comes out larger than the tar that was counted on the way in. It reads what
  * git, GNU tar, bsdtar, and Bun write: ustar headers, POSIX or GNU, with pax `x` and `g` headers
@@ -42,8 +42,8 @@ export type TarRefusal =
  * `maxEntries` headers at most, and its entries may declare `maxBytes` in all. The tar must end
  * with a block of zeros, and only zeros may follow it, so a second archive after the first is
  * refused rather than half read. A file whose name's last segment starts with `._`, the
- * AppleDouble file in which macOS's tar keeps another file's extended attributes, is left out, as
- * Bun.Archive left it out.
+ * AppleDouble file in which macOS's tar keeps another file's extended attributes, is left out,
+ * so dek does not read `slides/._intro.html` as a slide.
  */
 export function readTar(
   tar: Uint8Array<ArrayBuffer>,
