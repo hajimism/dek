@@ -132,7 +132,7 @@ function refAround(dir: string): { dir: string; name: string } | undefined {
  * The ref `dir` holds, when it is a snapshot as dek writes one: a dek.toml beside a marker that
  * names a ref, at that ref's own place under a project's refs/.
  */
-function snapshotName(dir: string): string | undefined {
+export function snapshotName(dir: string): string | undefined {
   if (!isThere(join(dir, "dek.toml"))) {
     return undefined;
   }

@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { shellName } from "../core/escape.ts";
 import { isInside } from "../core/path.ts";
+import { snapshotName } from "../core/ref.ts";
 import { type AnySpec, COMMANDS, subcommandsOf } from "./commands.ts";
 
 /** A deck a hint is about: the name a command takes, and the directory that makes it implicit. */
@@ -111,14 +112,17 @@ function namesDeck(rest: string, word: string | undefined): boolean {
 /**
  * The deck `path` lies in: the directory under a project's `decks/`, found from the path alone.
  * A source path dek reports is absolute, so no project needs to be resolved to address it. A
- * deck that is not there, such as the one a `deck "nope" not found` points at, is none.
+ * deck that is not there, such as the one a `deck "nope" not found` points at, is none, and a
+ * ref's deck, in a snapshot as dek writes one, is named by the ref, as every command that reads
+ * one takes it.
  */
 export function deckAround(path: string): HintDeck | undefined {
   for (let dir = path; dirname(dir) !== dir; dir = dirname(dir)) {
     const parent = dirname(dir);
-    if (basename(parent) === "decks" && existsSync(join(dirname(parent), "dek.toml"))) {
+    const root = dirname(parent);
+    if (basename(parent) === "decks" && existsSync(join(root, "dek.toml"))) {
       return statSync(dir, { throwIfNoEntry: false })?.isDirectory()
-        ? { name: basename(dir), dir }
+        ? { name: snapshotName(root) ?? basename(dir), dir }
         : undefined;
     }
   }
