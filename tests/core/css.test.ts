@@ -449,6 +449,14 @@ describe("themeExcerpt", () => {
     expect(own).toContain("--bg: #fff;");
     expect(own).toContain("@keyframes spin {");
   });
+
+  test("keeps the name of keyframes written as a string", () => {
+    const quoted = themeExcerpt(
+      parseCss('@keyframes "pop" { to { opacity: 1; } }\n.slide .card { animation: pop 1s; }'),
+      { classes: ["card"] },
+    );
+    expect(quoted).toContain('@keyframes "pop" {\n  to {\n    opacity: 1;\n  }\n}');
+  });
 });
 
 describe("scanners share the string-aware rule walker", () => {

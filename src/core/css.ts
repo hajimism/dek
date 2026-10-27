@@ -177,13 +177,23 @@ class SheetReader {
     return i;
   }
 
-  /** A prelude's span with its trailing spaces trimmed off. */
+  /**
+   * A prelude's span with the spaces and comments at its end trimmed off; a string it ends on,
+   * such as the name of `@keyframes "pop"`, stays.
+   */
   trimEnd(start: number, end: number): number {
     let j = end;
-    while (j > start && WHITESPACE_RE.test(this.blank[j - 1] ?? "")) {
-      j--;
+    while (j > start) {
+      const comment = this.comments.find(([, close]) => close === j);
+      if (comment) {
+        j = comment[0];
+      } else if (WHITESPACE_RE.test(this.source[j - 1] ?? "")) {
+        j--;
+      } else {
+        break;
+      }
     }
-    return j;
+    return Math.max(j, start);
   }
 
   atRule(start: number, end: number, scope: Scope): number {
