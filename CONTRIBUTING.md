@@ -59,6 +59,10 @@ Tests may use any of them.
 
 Code outside a guard that needs one anyway says why on the line before, in a `// biome-ignore lint/style/noRestrictedImports: <why>` naming what the import brings in, as `src/core/mv.ts` does. `git grep -n 'biome-ignore lint/.*Restricted' src` lists every such exception with its reason; only the guards are overrides in `biome.json`. `tests/core/raw-apis.test.ts` checks that each rule fires outside its guard, that each override is needed, and that no such `biome-ignore` is left with nothing to suppress. The rules read the code as written, so some ways around them slip past: `Bun.file(path).write()`, `.writer()`, or `.delete()`; `import * as bun from "bun"`; `globalThis.Bun.spawn`; and a request through `node:http`, `node:https`, or `node:net`. `scripts/` is not linted at all.
 
+## Nightly checks
+
+A nightly workflow runs the suite in random order, on the pinned Bun and the latest, and in its usual order on macOS, which is the only run of the QR reader tests. A random-order run prints its seed before the tests start, and its summary gives the command that runs the tests in that order again; so does running the workflow by hand with that seed. A few files in `tests/runtime/` are each one scenario, tests that drive one player in the order they are written; the workflow names them in `IN_ORDER` and runs them after, in their order. Write new tests so that any order passes, and take a file off the list once its tests do. A failed run is the alarm: nothing opens an issue.
+
 ## Commits and releases
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, and so on, with `!` for a breaking change. They are the release notes: release-please reads them to keep a release PR open, and merging that PR tags the version, writes [CHANGELOG.md](./CHANGELOG.md), and publishes to npm.
