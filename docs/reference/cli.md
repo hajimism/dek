@@ -42,7 +42,7 @@ Create a project with `bunx @hajimism/dek init`, then install dek into it with `
 
 ## Refs
 
-A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. Its snapshot under `refs/` is gitignored; whenever it is missing or at another commit, the next read fetches the pinned commit again. dek follows no symlink under `refs/`: it refuses to write or remove a snapshot through one, and names the link to remove. Public repositories need no token. For a private one, set `GITHUB_TOKEN` (or `GH_TOKEN`) to a token that can read it, such as `GITHUB_TOKEN=$(gh auth token) dekc ref …`. dek sends it only to `api.github.com`, and never asks `gh` for one itself.
+A ref is someone else's deck, pinned in `dek.toml` `[refs]` to read as a model. Its snapshot under `refs/` is gitignored; whenever it is missing or at another commit, the next read fetches the pinned commit again. dek follows no symlink under `refs/`: it refuses to write or remove a snapshot through one, and names the link to remove. The same holds for `packs/`: a pack's copy there is written and removed only as a plain file. Public repositories need no token. For a private one, set `GITHUB_TOKEN` (or `GH_TOKEN`) to a token that can read it, such as `GITHUB_TOKEN=$(gh auth token) dekc ref …`. dek sends it only to `api.github.com`, and never asks `gh` for one itself.
 
 A deck the reader cannot reach on GitHub travels as a pack: `dekc pack` writes it as a file, and `dekc ref <file>.tgz` pins it as `file/<deck>` to a sha256 of its files. The pack is kept as `packs/<deck>.tgz`, which is not ignored: commit it, and a clone, or a deleted `refs/`, unpacks the ref from it on the next read. `file` is kept for packs, so a GitHub owner of that name cannot be pinned.
 
