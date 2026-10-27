@@ -8,6 +8,8 @@ Accepted
 
 Amended by [29. Say whenever Chromium draws without its sandbox, and draw a ref so only with DEK_ALLOW_UNSANDBOXED](0029-say-whenever-chromium-draws-without-its-sandbox-and-draw-a-ref-so-only-with-dek-allow-unsandboxed.md)
 
+Amended by [28. Keep a ref's words out of dek's hints, and mark what a ref wrote wherever dek prints it](0028-keep-a-ref-s-words-out-of-dek-s-hints-and-mark-what-a-ref-wrote-wherever-dek-prints-it.md)
+
 ## Context
 
 dek has made its security decisions one at a time, each where a report or a review found a hole: reads and writes kept inside the project (242f218); `DEK_` variables and the GitHub token taken only from what the user sets (7f4629b, 62c896b, da02b7c, [ADR 12](0012-take-github-tokens-and-dek-variables-only-from-what-the-user-sets.md)); no `bunfig.toml` or `tsconfig.json` of the project's reaching dek's own process (0418909, 3eed8f0); Chromium's sandbox and no network for the pages dek draws (550cc3a); refs and packs read as someone else's decks ([ADR 15](0015-hand-a-deck-over-as-a-pack-and-read-it-as-a-ref.md), [ADR 17](0017-start-a-deck-from-a-ref-s-theme.md)); the dev server's Host and Origin checks and its presenter password; and dependency code kept away from the tokens that publish ([ADR 19](0019-keep-dependency-code-away-from-the-tokens-that-publish.md)).
