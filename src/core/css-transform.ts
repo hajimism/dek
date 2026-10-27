@@ -1,5 +1,5 @@
 import { outermostStyleRules, type Stylesheet, splitSelectorList, startsAtSlide } from "./css.ts";
-import { consumeComment, consumeString, cssIdents } from "./css-scan.ts";
+import { consumeComment, consumeToken, cssIdents } from "./css-scan.ts";
 
 /** Text to put in place of `[start, end)` of the stylesheet as it was read. */
 type CssEdit = { start: number; end: number; text: string };
@@ -110,8 +110,8 @@ export function replaceUrls(replace: (value: string) => string | undefined): Css
 const CSS_WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
 
 /**
- * Drops comments and collapses whitespace to one space, leaving strings byte for byte, so
- * `content: "a　b"` or `"  "` renders in the build as it does on the dev server.
+ * Drops comments and collapses whitespace to one space, leaving strings and `url()`s byte for
+ * byte, so `content: "a　b"` or `"  "` renders in the build as it does on the dev server.
  */
 export function minifyCss(css: string): string {
   let out = "";
@@ -132,7 +132,7 @@ export function minifyCss(css: string): string {
       out += " ";
     }
     space = false;
-    const end = ch === '"' || ch === "'" ? consumeString(css, i) : ch === "\\" ? i + 2 : i + 1;
+    const end = consumeToken(css, i);
     out += css.slice(i, end);
     i = end;
   }

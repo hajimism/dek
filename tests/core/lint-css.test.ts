@@ -72,6 +72,22 @@ describe("theme.css is read as CSS reads it", () => {
     ]);
   });
 
+  test("DEK012 sees a page rule after a url() whose address holds a quote or /*", async () => {
+    const found = await lintWith({
+      theme: `.slide .a { background: url(assets/o'brien.png); }
+body { color: var(--fg); }
+.slide .b { background: url(https://cdn.example/*.png); }
+html { color: var(--fg); }
+`,
+    });
+    expect(
+      found.filter((d) => d.id === "DEK012").map(({ line, data }) => ({ line, data })),
+    ).toEqual([
+      { line: 10, data: { selector: "body" } },
+      { line: 12, data: { selector: "html" } },
+    ]);
+  });
+
   test("DEK012 leaves a rule nested under .slide alone", async () => {
     const found = await lintWith({ theme: ".slide { .slide-title { color: var(--fg); } }\n" });
     expect(ids(found)).not.toContain("DEK012");

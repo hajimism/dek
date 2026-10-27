@@ -2,6 +2,7 @@ import {
   blankStringsAndComments,
   consumeComment,
   consumeString,
+  consumeToken,
   matchBrace,
   scanTopLevel,
   splitTopLevel,
@@ -131,16 +132,11 @@ class SheetReader {
     const { source } = this;
     let i = 0;
     while (i < source.length) {
-      const ch = source[i];
-      if (ch === '"' || ch === "'") {
-        i = consumeString(source, i);
-      } else if (ch === "/" && source[i + 1] === "*") {
-        const close = consumeComment(source, i);
-        this.comments.push([i, close]);
-        i = close;
-      } else {
-        i += ch === "\\" ? 2 : 1;
+      const next = consumeToken(source, i);
+      if (source[i] === "/" && source[i + 1] === "*") {
+        this.comments.push([i, next]);
       }
+      i = next;
     }
     const locate = lineLocator(sheet.source);
     this.lineOf = (offset) => locate(offset).line;

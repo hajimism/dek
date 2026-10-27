@@ -92,6 +92,26 @@ describe("slide stylesheets in the page", () => {
       },
     );
   });
+
+  // Read as a comment, the /* would leave h2 unscoped, styling every slide, and the minified
+  // single file would end at it.
+  test("dekc build scopes and keeps the rules after a url() whose address holds /*", async () => {
+    await withTempProject(
+      deck({
+        styles: {
+          usb: ".usb-mark { background: url(https://cdn.example/*.png); }\nh2 { color: red; }\n",
+        },
+      }),
+      async (root) => {
+        const { playerScript } = await playerEmbed();
+        const result = await buildDeck(join(root, "decks", "demo"), { playerScript });
+        const html = await readFile(result.outPath, "utf8");
+        expect(html).toContain(
+          '.slide:where([data-slug="usb"]) .usb-mark { background: url(https://cdn.example/*.png); } .slide:where([data-slug="usb"]) h2 { color: red; }',
+        );
+      },
+    );
+  });
 });
 
 describe("slide stylesheet lint", () => {
