@@ -21,6 +21,11 @@ export function escapeRegExp(text: string): string {
  */
 const PLAIN_WORD = /^[\p{L}\p{M}\p{N}@%+:,./_-][\p{L}\p{M}\p{N}@%+=:,./_-]*$/u;
 
+/** Whether `word` is plain: dek prints it as it is, in a command or in prose. */
+export function isPlainWord(word: string): boolean {
+  return PLAIN_WORD.test(word);
+}
+
 /** A backtick, as a shell word that holds none: `printf` writes it from its octal code. */
 const BACKTICK_WORD = `"$(printf '\\140')"`;
 
@@ -32,7 +37,7 @@ const BACKTICK_WORD = `"$(printf '\\140')"`;
  * cmd quote otherwise. A name from a file goes through `shellName` instead.
  */
 export function shellQuote(word: string): string {
-  if (PLAIN_WORD.test(word)) {
+  if (isPlainWord(word)) {
     return word;
   }
   const quoted = word

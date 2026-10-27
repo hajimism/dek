@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { DekError } from "./error.ts";
+import { isPlainWord } from "./escape.ts";
 
 const REFERENCE = "https://hajimism.github.io/dek/reference/config.html";
 
@@ -21,10 +22,17 @@ export function parseFailure(error: unknown): string {
   );
 }
 
+/**
+ * Each issue as `path: message`. A key in the path is the file's text, which a cloned project or
+ * a pack brings along, so one that is no plain word shows as `<key>`: repeated, it could close a
+ * code span or start a line of its own.
+ */
 export function formatZodIssues(error: z.ZodError): string {
   return error.issues
     .map((issue) => {
-      const path = issue.path.join(".");
+      const path = issue.path
+        .map((key) => (isPlainWord(String(key)) ? String(key) : "<key>"))
+        .join(".");
       // "expected string, received undefined" says less than "required".
       const message =
         issue.code === "invalid_type" && /received undefined$/.test(issue.message)
