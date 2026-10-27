@@ -28,6 +28,7 @@ export function slideScriptsProblems(scripts: ScriptInput[]): SlideScriptProblem
   const { results, pending } = prepareScripts(scripts);
   const codes = uncached(pending);
   if (codes.length > 0) {
+    // biome-ignore lint/nursery/noJsRestrictedProperties: lint's path is synchronous, the scripts get an empty environment, and a killed worker's lines still count; runPiped does none of these.
     const stdout = Bun.spawnSync(evaluatorCommand(), {
       ...EVALUATOR_OPTIONS,
       stdin: Buffer.from(JSON.stringify(codes)),
@@ -48,6 +49,7 @@ export async function evaluateSlideScripts(
   const { results, pending } = prepareScripts(scripts);
   const codes = uncached(pending);
   if (codes.length > 0) {
+    // biome-ignore lint/nursery/noJsRestrictedProperties: as for spawnSync above; SIGTERM ends the worker, as no host object reaches its scripts.
     const child = Bun.spawn(evaluatorCommand(), {
       ...EVALUATOR_OPTIONS,
       stdin: Buffer.from(JSON.stringify(codes)),

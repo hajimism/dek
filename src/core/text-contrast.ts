@@ -255,6 +255,7 @@ async function sampleTextContrasts({
   texts,
 }: SamplerInput): Promise<Array<TextContrast | null>> {
   const decode = async (base64: string): Promise<Pixels> => {
+    // biome-ignore lint/style/noRestrictedGlobals: it runs in the page and decodes a data: URL, which reaches no network.
     const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
     const bitmap = await createImageBitmap(blob);
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -419,6 +420,7 @@ ${
   }, GLYPHS_MARK);
   const found = await page.evaluate(async (input) => {
     const decode = async (base64: string) => {
+      // biome-ignore lint/style/noRestrictedGlobals: it runs in the page and decodes a data: URL, which reaches no network.
       const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
       const bitmap = await createImageBitmap(blob);
       const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);

@@ -1,4 +1,5 @@
 import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
+// biome-ignore lint/style/noRestrictedImports: mkdir, writeFile, rename, and rm, which write a snapshot into a fresh folder in refs/, which outputDir checked, and swap it in whole.
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";

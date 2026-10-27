@@ -74,6 +74,7 @@ async function requestDevServer(
         })
       : error;
   };
+  // biome-ignore lint/style/noRestrictedGlobals: signal, an AbortSignal.timeout, bounds the request and the read of its answer.
   const response = await fetch(url, {
     method: request.method,
     headers: Object.keys(headers).length > 0 ? headers : undefined,

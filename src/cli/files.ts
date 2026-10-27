@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: mkdirSync and writeFileSync, for init and new, which create a file only where none is (wx); safe-fs replaces one.
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { bundledTheme } from "../core/bundled-theme.ts";

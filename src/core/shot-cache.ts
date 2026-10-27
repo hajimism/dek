@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+// biome-ignore lint/style/noRestrictedImports: rmSync, which prunes old entries by name in the folder outputDir returned, and takes a link, not its target.
 import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { escapeRegExp } from "./escape.ts";

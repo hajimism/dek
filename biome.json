@@ -37,7 +37,102 @@
   "overrides": [
     {
       "includes": ["src/theme/**/*.css"],
-      "linter": { "rules": { "correctness": { "noUnknownTypeSelector": "off" } } }
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnknownTypeSelector": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "node:fs": {
+                    "allowImportNames": [
+                      "existsSync",
+                      "lstatSync",
+                      "readdirSync",
+                      "readFileSync",
+                      "realpathSync",
+                      "statSync",
+                      "watch"
+                    ],
+                    "message": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  "fs": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md.",
+                  "node:fs/promises": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md.",
+                  "fs/promises": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md.",
+                  "node:child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
+                  "child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
+                  "bun": {
+                    "importNames": ["$", "Archive", "fetch", "spawn", "spawnSync", "write"],
+                    "message": "start programs with src/core/spawn.ts, write files with src/core/safe-fs.ts, read tars with src/core/tar.ts, and give a fetch a deadline; see Raw APIs in CONTRIBUTING.md."
+                  }
+                }
+              }
+            },
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "fetch": "give the fetch a deadline and say so in a biome-ignore on the call, as src/core/github.ts does; see Raw APIs in CONTRIBUTING.md."
+                }
+              }
+            }
+          },
+          "nursery": {
+            "noJsRestrictedProperties": {
+              "level": "error",
+              "options": {
+                "entries": [
+                  {
+                    "object": "Bun",
+                    "property": "spawn",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "spawnSync",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "$",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "write",
+                    "message": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "Archive",
+                    "message": "read a tar with readTar from src/core/tar.ts; only src/core/pack.ts writes one with Bun.Archive; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "fetch",
+                    "message": "give the fetch a deadline and say so in a biome-ignore on the call, as src/core/github.ts does; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "globalThis",
+                    "property": "fetch",
+                    "message": "give the fetch a deadline and say so in a biome-ignore on the call, as src/core/github.ts does; see Raw APIs in CONTRIBUTING.md."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     },
     {
       "includes": ["src/core/**"],
@@ -47,6 +142,29 @@
             "noRestrictedImports": {
               "level": "error",
               "options": {
+                "paths": {
+                  "node:fs": {
+                    "allowImportNames": [
+                      "existsSync",
+                      "lstatSync",
+                      "readdirSync",
+                      "readFileSync",
+                      "realpathSync",
+                      "statSync",
+                      "watch"
+                    ],
+                    "message": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  "fs": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md.",
+                  "node:fs/promises": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md.",
+                  "fs/promises": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md.",
+                  "node:child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
+                  "child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
+                  "bun": {
+                    "importNames": ["$", "Archive", "fetch", "spawn", "spawnSync", "write"],
+                    "message": "start programs with src/core/spawn.ts, write files with src/core/safe-fs.ts, read tars with src/core/tar.ts, and give a fetch a deadline; see Raw APIs in CONTRIBUTING.md."
+                  }
+                },
                 "patterns": [
                   {
                     "group": [
@@ -62,6 +180,143 @@
                 ]
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/core/safe-fs.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "node:child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
+                  "child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
+                  "bun": {
+                    "importNames": ["$", "Archive", "fetch", "spawn", "spawnSync", "write"],
+                    "message": "start programs with src/core/spawn.ts, write files with src/core/safe-fs.ts, read tars with src/core/tar.ts, and give a fetch a deadline; see Raw APIs in CONTRIBUTING.md."
+                  }
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "**/runtime/**",
+                      "**/video/**",
+                      "**/voice/**",
+                      "**/cli/**",
+                      "**/server/**",
+                      "**/cli.ts"
+                    ],
+                    "message": "core must not depend on adapters or entry points."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/core/spawn.ts"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noJsRestrictedProperties": {
+              "level": "error",
+              "options": {
+                "entries": [
+                  {
+                    "object": "Bun",
+                    "property": "spawnSync",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "$",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "write",
+                    "message": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "Archive",
+                    "message": "read a tar with readTar from src/core/tar.ts; only src/core/pack.ts writes one with Bun.Archive; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "fetch",
+                    "message": "give the fetch a deadline and say so in a biome-ignore on the call, as src/core/github.ts does; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "globalThis",
+                    "property": "fetch",
+                    "message": "give the fetch a deadline and say so in a biome-ignore on the call, as src/core/github.ts does; see Raw APIs in CONTRIBUTING.md."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/core/pack.ts"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noJsRestrictedProperties": {
+              "level": "error",
+              "options": {
+                "entries": [
+                  {
+                    "object": "Bun",
+                    "property": "spawn",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "spawnSync",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "$",
+                    "message": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "write",
+                    "message": "write, move, and remove files with src/core/safe-fs.ts, and import only reads from node:fs; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "Bun",
+                    "property": "fetch",
+                    "message": "give the fetch a deadline and say so in a biome-ignore on the call, as src/core/github.ts does; see Raw APIs in CONTRIBUTING.md."
+                  },
+                  {
+                    "object": "globalThis",
+                    "property": "fetch",
+                    "message": "give the fetch a deadline and say so in a biome-ignore on the call, as src/core/github.ts does; see Raw APIs in CONTRIBUTING.md."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/runtime/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": "off"
           }
         }
       }

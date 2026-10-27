@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: renameSync and unlinkSync, for mv's steps, each undone on failure; safe-fs does not rename.
 import { existsSync, renameSync, unlinkSync } from "node:fs";
 import { basename } from "node:path";
 import { deckPaths } from "./deck-paths.ts";

@@ -6,6 +6,7 @@
  * that never ends is cut off; the parent's timeout covers anything that
  * escapes into the microtask queue.
  */
+// biome-ignore lint/style/noRestrictedImports: writeSync, to stdout (fd 1), so each answer is out before the worker is killed or exits.
 import { readFileSync, writeSync } from "node:fs";
 import vm from "node:vm";
 

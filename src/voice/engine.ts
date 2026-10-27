@@ -216,6 +216,7 @@ async function engineFetch<T>(
     });
   let res: Response;
   try {
+    // biome-ignore lint/style/noRestrictedGlobals: signal, an AbortSignal.timeout, bounds the request and read(res).
     res = await fetch(`${baseUrl}${path}`, { ...init, signal });
   } catch {
     if (signal.aborted) {

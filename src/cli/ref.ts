@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: rmdirSync, which takes packs/ and refs/ folders only while empty; removeInside would take what is in them.
 import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { loadConfig } from "../core/config.ts";

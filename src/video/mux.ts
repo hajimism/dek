@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: mkdtempSync, rmSync, and writeFileSync, for ffmpeg's frame list in a folder of its own in the system's temp folder.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +13,7 @@ export function ffmpegResolved(): boolean {
   try {
     // The environment as it is now, as runPiped passes it: left out, Bun passes the one dek
     // started with.
+    // biome-ignore lint/nursery/noJsRestrictedProperties: ffmpegResolved is synchronous, for tests too, and ffmpeg -version exits at once; the encode runs through runPiped.
     const result = Bun.spawnSync(["ffmpeg", "-version"], {
       stdout: "pipe",
       stderr: "pipe",

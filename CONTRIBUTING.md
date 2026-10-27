@@ -46,6 +46,19 @@ FC_SEED=1234 FC_PATH=0:1:2 bun test tests/core/css-scan.test.ts -t 'closes every
 
 `FC_SEED` alone runs every property from that seed, and `FC_NUM_RUNS=10000` runs each that many times, to search harder than the suite does; either lifts the five-second limit a synchronous property otherwise stops at. Fix the defect, add the shrunk input as a test of its own beside the property, and run again.
 
+## Raw APIs
+
+A few APIs are easy to call and hard to call safely, so each one stays in the module that guards it, and `bunx biome ci .` fails any other file in `src/` that uses it:
+
+- **Writing, moving, or removing a file** (`node:fs` beyond the reads `biome.json` lists in `allowImportNames`, `node:fs/promises`, `Bun.write`): `src/core/safe-fs.ts`. It refuses a link out of the project, renames a fresh file into place, and keeps the mode of the file it replaces.
+- **Starting a program** (`Bun.spawn`, `Bun.spawnSync`, `Bun.$`, `node:child_process`): `runPiped` and `runJsonWorker` in `src/core/spawn.ts`. They stop the program at its timeout, SIGTERM then SIGKILL, and pass it the environment as it is now.
+- **Reading a tar** (`Bun.Archive`): `readTar` in `src/core/tar.ts`, which unpacks no more than was counted. Only `src/core/pack.ts` uses `Bun.Archive`, to write a pack.
+- **Fetching** (`fetch`): no one module. Each call has a deadline, an `AbortSignal.timeout` and an error that says what did not answer, as in `src/core/github.ts`. `src/runtime/` runs in the browser and fetches freely.
+
+Tests may use any of them.
+
+Code outside a guard that needs one anyway says why on the line before, in a `// biome-ignore lint/style/noRestrictedImports: <why>` naming what the import brings in, as `src/core/mv.ts` does. `git grep -n 'biome-ignore lint/.*Restricted' src` lists every such exception with its reason; only the guards are overrides in `biome.json`. `tests/core/raw-apis.test.ts` checks that each rule fires outside its guard, that each override is needed, and that no such `biome-ignore` is left with nothing to suppress. The rules read the code as written, so some ways around them slip past: `Bun.file(path).write()`, `.writer()`, or `.delete()`; `import * as bun from "bun"`; `globalThis.Bun.spawn`; and a request through `node:http`, `node:https`, or `node:net`. `scripts/` is not linted at all.
+
 ## Commits and releases
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, and so on, with `!` for a breaking change. They are the release notes: release-please reads them to keep a release PR open, and merging that PR tags the version, writes [CHANGELOG.md](./CHANGELOG.md), and publishes to npm.
