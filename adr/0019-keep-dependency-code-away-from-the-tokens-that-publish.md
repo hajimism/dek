@@ -20,7 +20,7 @@ dek's workflows already pin every action to a commit, give each token the least 
 
 ## Decision
 
-**Releasing is two jobs.** `pack` checks out the tag, installs from the lockfile, runs `scripts/check-package.sh package`, and uploads the tarball it checked as an artifact. It has no `id-token`. `publish` holds `id-token: write` in the `npm` environment, as before, but checks out nothing and installs nothing: it sets up Node, downloads the artifact, whose digest `actions/download-artifact` checks, and runs `npm publish package/*.tgz --ignore-scripts`. The tarball npm receives is the one that was checked, byte for byte.
+**Releasing is two jobs.** `pack` checks out the tag, installs from the lockfile, runs `scripts/check-package.sh package`, and uploads the tarball it checked as an artifact. It has no `id-token`. `publish` holds `id-token: write` in the `npm` environment, as before, but checks out nothing and installs nothing: it sets up Node, downloads the artifact, whose digest `actions/download-artifact` checks, and runs `npm publish ./package/*.tgz --ignore-scripts`. The `./` is required: npm 11 reads a path without it as a GitHub repository. The tarball npm receives is the one that was checked, byte for byte.
 
 **publint comes from the lockfile.** It is a devDependency at an exact version, and `check-package.sh` runs it from `node_modules`. knip is told it is used, since only the shell script uses it. Given a directory, the script leaves the tarball it checked there.
 
