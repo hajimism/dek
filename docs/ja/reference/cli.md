@@ -17,7 +17,7 @@ description: 'コマンド、フラグ、環境変数。'
 - **`init` と `sync` はあなたの作業を上書きしない。** 足りないものを作り、余ったものを警告します。sync が書き直したり消したりするスライドは、誰も手を入れていない骨格だけです。元になった台本が変われば書き直し、セクションがなくなって横にスタイルシートもスクリプトもなければ消します。`AGENTS.md` で dek が持つのは `<!-- dek:begin … -->` から `<!-- dek:end -->` までのブロックだけです。リネームもしません。
 - **すべてのエラーが hint を持つ。** hint は次に叩くコマンドを示します。直し方が決まっている診断にも hint が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。
 - **ソースツリー内のパスは、テキストでも `--json` でも実行場所からの相対パス。** 診断、エラー、`init`・`new`・`sync` が作ったファイルが対象です。スクリーンショットやビルドのように dek が書き出す成果物は絶対パスのまま。SARIF は絶対 URI のままです。
-- **実行しなかったチェックは `"skipped"` に並びます。** 各要素は `check`、`reason`、実行する方法があれば `hint` を持ちます。Playwright がない `dekc check` は `visual` を、`voice/` のないデッキでの `dekc check --voice` は `voice` を、rumdl がない `dekc lint` は `rumdl` を、URL か Playwright がない `dekc build` は `preview`（リンクプレビュー画像）を、ref に対する `dekc ls` は `lint` を飛ばします。テキストでは `<check>: skipped (<reason>)` と出て、hint が `help:` 行に続きます。`lint`、`check`、`build` はこれを標準エラーに出すので、標準出力には結果だけが残ります。すべて実行できたときはこのフィールド自体がありません。
+- **実行しなかったチェックは `"skipped"` に並びます。** 各要素は `check`、`reason`、実行する方法があれば `hint` を持ちます。Playwright がない `dekc check` は `visual` を、`voice/` のないデッキでの `dekc check --voice` は `voice` を、`dekc lint` は rumdl が入っていない、SARIF を出さない、30 秒を超える（そのときは止めて、後のデッキには走らせない）ときに `rumdl` を、URL か Playwright がない `dekc build` は `preview`（リンクプレビュー画像）を、ref に対する `dekc ls` は `lint` を飛ばします。テキストでは `<check>: skipped (<reason>)` と出て、hint が `help:` 行に続きます。`lint`、`check`、`build` はこれを標準エラーに出すので、標準出力には結果だけが残ります。すべて実行できたときはこのフィールド自体がありません。
 - **デッキごとにファイルを書くコマンドはリストを返す。** `build` と `pdf` は、1 デッキでも対象のデッキごとのパスを `outs` で返します。
 - **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`、pack なら `file/<deck>`）を受け取ります。`dekc new --theme-from` は ref のテーマを新しいデッキにコピーします。それ以外のコマンドは ref を受け取りません。開発サーバーを含め、どのコマンドも ref のスナップショットの中のディレクトリでは動きません。[ref](#ref) を参照してください。
 - **ヘルプはコマンドごとに出る。** `dekc help <command>`、`dekc <command> --help`、`-h` で、そのコマンドの使い方、やること、受け付けるフラグをすべて表示します。`dekc --version`（`-v`）はバージョンを表示します。コマンド名やデッキ名を打ち間違えると `did you mean …?` で候補を示します。
@@ -48,8 +48,8 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc ref <owner/repo/deck>[@rev]` | ref を既定のブランチ、または `@` の後の tag・branch・sha に固定して、実体を取得する。デッキのフォルダを指す GitHub のリンクも渡せる。ref のデッキ名に使えるのは、どの文字体系の文字と数字、ドット、ハイフン、アンダースコアで、64 文字まで。先頭はハイフンにできない（規則の全体は[設定](/ja/reference/config#dek-toml)の `refs`）。それ以外の名前のデッキは固定できず、名前がどれにも合わないときに dek が挙げるデッキの一覧にも出さない。もう一度実行すると最新に固定し直す。`--json` は `rev`・`from`・`changed` を返す。リポジトリに LICENSE が無ければ警告する |
-| `dekc ref <file>.tgz` | pack を `file/<deck>` として固定し、`packs/<deck>.tgz` にコピーして、実体を展開する。同じデッキでファイルの違う pack なら固定を動かし、`--json` は上と同じく `from` と `changed` を返す。ファイルが同じなら何も変えない。`--json` はコミットするコピーの `pack` も返す。デッキが 2 つ以上ある tarball は受け付けない。読むのは 50 MB まで、展開して 100 MB まで。pack に LICENSE が無ければ警告する |
+| `dekc ref <owner/repo/deck>[@rev]` | ref を既定のブランチ、または `@` の後の tag・branch・sha に固定して、実体を取得する。デッキのフォルダを指す GitHub のリンクも渡せる。ref のデッキ名に使えるのは、どの文字体系の文字と数字、ドット、ハイフン、アンダースコアで、64 文字まで。先頭はハイフンにできない（規則の全体は[設定](/ja/reference/config#dek-toml)の `refs`）。それ以外の名前のデッキは固定できず、名前がどれにも合わないときに dek が挙げるデッキの一覧にも出さない。もう一度実行すると最新に固定し直す。`--json` は `rev`・`from`・`changed` を返す。リポジトリはダウンロードして 200 MB まで、展開して 1 GB まで。リポジトリに LICENSE が無ければ警告する |
+| `dekc ref <file>.tgz` | pack を `file/<deck>` として固定し、`packs/<deck>.tgz` にコピーして、実体を展開する。同じデッキでファイルの違う pack なら固定を動かし、`--json` は上と同じく `from` と `changed` を返す。ファイルが同じなら何も変えない。`--json` はコミットするコピーの `pack` も返す。デッキが 2 つ以上ある tarball は受け付けない。読むのは 50 MB まで、展開して 100 MB まで。読むのは `dekc pack`、git、tar が書く形の、ファイルとフォルダとリンクだけの tar で、スパースファイルやデバイス、後ろに続く別のアーカイブを含む tar は受け付けない。pack に LICENSE が無ければ警告する |
 | `dekc pack [deck] [--root-dist]` | `dist/<deck>.tgz` を書く。そのデッキだけを持つプロジェクトを、デッキ名のフォルダの下にまとめた gzip の tar。`script.md`・`theme.css`・`slides/`・`assets/` を入れ、`dist/`・`.cache/`・`voice/` と名前がドットで始まるファイルは入れない。`LICENSE` と、空の `dek.toml` を入れるので、プロジェクトの設定は外に出ない。`LICENSE` は `dek.toml` の `[pack] license` が指すライセンスの本文で、無ければプロジェクトの LICENSE ファイル。どちらも無ければ何も入れず、足し方を警告する（`--json` では `warnings`）。ref が名前にできないデッキ（使えるのは文字・数字・ドット・ハイフン・アンダースコアの 64 文字までで、先頭はハイフン以外）、50 MB を超えるデッキ、プロジェクトの外や存在しない先を指すシンボリックリンク、ref は受け付けない。`--json` は `outs` と `warnings` を返す |
 | `dekc ref` | 固定した ref の一覧。rev、タイトル、枚数、取得していないもの |
 | `dekc ref rm <ref>` | 固定と実体を消す。pack なら `packs/` のコピーも消す |
@@ -71,8 +71,8 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 | `dekc shot [deck] <a> --to <b> [--at 0..1]` | `a` の最終ビートから `b` へ移る View Transition を、遷移の長さに対する `--at`（既定 0.5）で止めた 1 フレーム。`b` の入りのアニメーションは `--at 1` でもまだ動いていることがあり、それは `--motion` で見る。`.cache/shots/<a>~<b>~<at>.<hash>.png` に書く。`--step` とは併用できない |
 | `dekc mv [deck] <old> <new>` | セクション id、HTML ファイルと `data-slug`、あれば `.css` と `.ts`、`voice/voice.toml` のキーを改名。見出しの文言は触らない。宛先がひとつでも既にあれば拒否し、すべて変わるかどれも変わらないかのどちらか |
 | `dekc mv [deck] <slug> --before\|--after <slug>` | `script.md` の中でセクションを並べ替える |
-| `dekc goto [deck] <slug>` | 開いているブラウザを飛ばす。開発サーバが必要。`--json` の `viewers` はそのデッキを表示しているページの数。0 のときは、次に開いたページがその位置に着き、そのことを標準エラーで伝える |
-| `dekc current [deck]` | いま表示中の枚を出力。開発サーバが必要。`viewers` は表示しているページの数。0 のときは何も表示されておらず、出力した枚は次に開くページが着く位置で、そのことを標準エラーで伝える |
+| `dekc goto [deck] <slug>` | 開いているブラウザを飛ばす。開発サーバが必要で、10 秒以内に応えなければ諦める。`--json` の `viewers` はそのデッキを表示しているページの数。0 のときは、次に開いたページがその位置に着き、そのことを標準エラーで伝える |
+| `dekc current [deck]` | いま表示中の枚を出力。開発サーバが必要で、10 秒以内に応えなければ諦める。`viewers` は表示しているページの数。0 のときは何も表示されておらず、出力した枚は次に開くページが着く位置で、そのことを標準エラーで伝える |
 | `dekc marks [deck]` | リハーサル中に直したいと印を付けたビートを一覧する。発表者ビューで `m` を押すか、バーの印ボタンで、言いよどんだビートに印を付ける。印ごとに、`script.md` での見出しの `line`、`was`（印を付けたときのビートの文面）、`text`（いまの文面）、`status` を返す。`status` は `open`、文面が変わると `edited`、その名前のビートがなくなると `gone`。印はビートの id か、なければタイトルで追いかけるので、前にビートを足しても動かない。印は `.dek/marks.json` に保存される。印を付けるには開発サーバが必要。 |
 | `dekc marks [deck] clear` | デッキの印を消す。`--json` の `cleared` は消した数。 |
 | `dekc annotations [deck]` | 注釈モードでスライドの要素に書いたノートを一覧する。開発サーバのページで `a` を押すか、発表者バーの注釈ボタンを押して、直したいものをクリックして書く。ノートごとに、ページのマーカーと同じ `number`、書いたときの `step`、人が書いた `text`、そのビートを撮る `shot` コマンド、`targets` を返す。`targets` は要素ごとに、いまのファイルでの開始タグの `path`・`line`・`column`、`name`（そこに書かれたとおりのタグとクラス）、`was`（ノートを書いたときの文字）、`text`（いまの文字）、書いたときのスライド上の `box`、見つかったかどうかの `found`。`status` は、スライド自身の `slides/<id>.html`・`.css`・`.ts` が書いたときのままなら `open`、どれかが変わると `edited`（`changed` がどれかを示す）、ノートの要素が 1 つもスライドになくなるか、スライドが台本からなくなると `gone`。`edited` はスライドが変わったことを示すだけで、ノートが片付いたことは示さない。`shot` をノートと見比べること。要素は、いまのファイルに対して照合し直す。同じ位置で同じ名前と文字のもの、なければその名前と文字を持つ唯一の要素、なければ同じ位置で同じ名前のもの、なければ同じ位置で同じタグのもの（クラスが変わった場合）。見つけた位置は書き戻すので、ノートは編集をまたいで要素を追いかける。ノートは `.dek/annotations.json` に保存される。読むのに開発サーバは要らない。書くにはページが要る。 |
@@ -85,7 +85,7 @@ GitHub で届かないデッキは pack として渡します。`dekc pack` が�
 | --- | --- |
 | `dekc lint [deck] [--fix] [--visual] [--format sarif]` | lint。`--fix` は先に `dekc sync` を実行する。`--visual` ははみ出し、コントラスト、改行、揃えを足す |
 | `dekc cues [deck]` | 喋りの Cue を `Cue[]` で出力。段落だけ。エンジン不要 |
-| `dekc voice [deck]` | 変わった文を `.cache/voice/` に合成。保存時にも走る |
+| `dekc voice [deck]` | 変わった文を `.cache/voice/` に合成。保存時にも走る。話者の一覧やバージョンに 10 秒、文の読みに 60 秒、読み上げに 5 分を超えるエンジンは諦める |
 | `dekc voice [deck] speakers` | エンジンの話者一覧 |
 | `dekc voice [deck] say <text>` | 1 文を再生 |
 | `dekc voice [deck] dict add <word> <kana> [--accent N]` | `voice/dict.toml` に読みを追加。`--accent` でアクセント位置も指定する |
