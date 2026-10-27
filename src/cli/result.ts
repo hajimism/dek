@@ -5,7 +5,7 @@ import { addressHint, deckAround, type HintDeck } from "./address.ts";
 import { type CliResult, outputOf } from "./commands.ts";
 import type { FlagValues } from "./flags.ts";
 import { displayPath, formatError, formatErrorText } from "./format.ts";
-import { shouldColor, terminalSafe } from "./tty.ts";
+import { plainText, shouldColor, terminalSafe } from "./tty.ts";
 
 export type { CliResult, SkippedCheck };
 
@@ -101,9 +101,10 @@ export function writeSuccess(original: CliResult, options: WriteSuccessOptions):
     const data = output.json ? output.json(result.data) : (result.data as object);
     process.stdout.write(`${JSON.stringify({ ...envelope, ...data })}\n`);
   } else {
-    const text = formatText(result, shouldColor(process.stdout));
+    const plain = { ...result, data: plainStrings(result.data) } as CliResult;
+    const text = formatText(plain, shouldColor(process.stdout));
     process.stdout.write(`${terminalSafe(text)}\n`);
-    const notes = output.notes?.(result.data, shouldColor(process.stderr));
+    const notes = output.notes?.(plain.data, shouldColor(process.stderr));
     if (notes) {
       process.stderr.write(`${terminalSafe(notes)}\n`);
     }
@@ -127,6 +128,29 @@ export function displayPaths(result: CliResult, cwd: string): CliResult {
     return result;
   }
   return { ...result, data: paths(result.data, (path) => displayPath(path, cwd)) } as CliResult;
+}
+
+/**
+ * Every string in a result as plainText, so the text a deck or a ref wrote reaches the terminal
+ * with no escape of its own; the text formatters paint dek's colors after.
+ */
+function plainStrings<T>(value: T): T {
+  if (typeof value === "string") {
+    return plainText(value) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map(plainStrings) as T;
+  }
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    Object.getPrototypeOf(value) === Object.prototype
+  ) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, plainStrings(entry)]),
+    ) as T;
+  }
+  return value;
 }
 
 /** A result as text, without what did not run; see writeSuccess. */

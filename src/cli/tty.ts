@@ -10,15 +10,29 @@ const codes = {
   bold: "\x1b[1m",
 } as const;
 
+/** The codes dek's own palette writes, which are all terminalSafe lets through. */
+const PALETTE = new Set<string>([reset, ...Object.values(codes)]);
+
+/**
+ * Text with no control character but a newline and a tab: each other shows as U+FFFD, the escape
+ * that starts a color code included. A result's and an error's text go through it before dek
+ * paints them, so what a deck or a ref wrote carries no color, conceal, or cursor move of its own.
+ */
+export function plainText(text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+  return text.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, "\uFFFD");
+}
+
 /**
  * Text for a terminal: dek's own colors, newlines, and tabs pass, and every other control
  * character shows as U+FFFD. A deck title, a file name, or a ref's title fetched from GitHub
- * could otherwise set the window title, draw a fake link (OSC 8), or clear the screen.
+ * could otherwise set the window title, draw a fake link (OSC 8), clear the screen, or hide
+ * itself from a person while an agent reading the bytes sees it, as conceal (SGR 8) does.
  */
 export function terminalSafe(text: string): string {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
   return text.replace(/\x1b\[[0-9;]*m|[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, (match) =>
-    match.length > 1 ? match : "\uFFFD",
+    PALETTE.has(match) ? match : plainText(match),
   );
 }
 

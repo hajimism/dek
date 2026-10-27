@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { ansi, displayWidth, padEndWidth, shouldColor, terminalSafe } from "../../src/cli/tty.ts";
+import {
+  ansi,
+  displayWidth,
+  padEndWidth,
+  plainText,
+  shouldColor,
+  terminalSafe,
+} from "../../src/cli/tty.ts";
 import { withEnv } from "../helpers/env.ts";
 
 /** The color variables unset, then `env` on top: each case starts from a clean slate. */
@@ -58,6 +65,14 @@ describe("ansi", () => {
   });
 });
 
+describe("plainText", () => {
+  test("keeps newlines and tabs and shows every other control, color codes included", () => {
+    expect(plainText("a\tb\nc\x1b[31md\x1b[0m\r\x07")).toBe(
+      "a\tb\nc\uFFFD[31md\uFFFD[0m\uFFFD\uFFFD",
+    );
+  });
+});
+
 describe("terminalSafe", () => {
   test("keeps dek's colors, newlines, and tabs", () => {
     const text = "\x1b[31merror\x1b[0m\tscript.md\n  \x1b[2mhint\x1b[0m";
@@ -72,5 +87,11 @@ describe("terminalSafe", () => {
     expect(terminalSafe(hostile)).toBe(
       "\uFFFD]8;;https://attacker.example\uFFFDclick\uFFFD]8;;\uFFFD \uFFFD]0;pwned\uFFFD\uFFFD[2J\uFFFDok\uFFFD",
     );
+  });
+
+  test("passes only the color codes dek paints with, not one that hides text", () => {
+    // Conceal, black on black, and a 24-bit color: each would hide text from a person.
+    const hiding = "\x1b[8mx\x1b[30;40my\x1b[38;2;0;0;0mz\x1b[1;31mw";
+    expect(terminalSafe(hiding)).toBe("\uFFFD[8mx\uFFFD[30;40my\uFFFD[38;2;0;0;0mz\uFFFD[1;31mw");
   });
 });

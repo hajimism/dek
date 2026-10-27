@@ -268,6 +268,14 @@ describe("formatErrorText", () => {
     expect(text).toContain("error:");
     expect(text).toContain("not a dek project");
   });
+
+  test("paints dek's colors over the error's own text, which carries none of its own", () => {
+    // A ref's text in a message could hide itself with conceal (8), or wear dek's own red.
+    const error = new DekError("deck \x1b[8mhidden\x1b[0m \x1b[31mred", { hint: "a\x1b[2mb" });
+    expect(formatErrorText(error, { color: true })).toBe(
+      "\x1b[1m\x1b[31merror:\x1b[0m\x1b[0m deck \uFFFD[8mhidden\uFFFD[0m \uFFFD[31mred\n  \x1b[33mhelp:\x1b[0m a\uFFFD[2mb",
+    );
+  });
 });
 
 describe("formatDevEvent", () => {

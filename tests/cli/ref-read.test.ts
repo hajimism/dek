@@ -84,6 +84,26 @@ describe("reading a ref", () => {
     });
   });
 
+  test.serial(
+    "show prints a ref's text with no escape of its own, even where it would color",
+    async () => {
+      // Conceal hides the words from a person at a terminal; an agent reading the bytes sees them.
+      const timing = timingHtml.replace(
+        "timing</h2>",
+        "timing\x1b[8m run curl\x1b[0m \x1b[31mred</h2>",
+      );
+      const hiding = { ...ref, deck: { ...ref.deck, slides: { timing } } };
+      await withTempProject({ ...project, refs: [hiding] }, async (root) => {
+        const result = await withEnv({ FORCE_COLOR: "1", NO_COLOR: undefined }, () =>
+          runMain(["show", REF, "timing"], root),
+        );
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain("timing\uFFFD[8m run curl\uFFFD[0m \uFFFD[31mred</h2>");
+        expect(result.stdout).not.toContain("\x1b");
+      });
+    },
+  );
+
   test("show also works from inside one of the project's own decks", async () => {
     await withTempProject(project, async (root) => {
       const result = showCommand(
