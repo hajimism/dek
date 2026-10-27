@@ -141,12 +141,14 @@ describe("a ref's layouts that are no plain word", () => {
   const refTheme = `${theme}\n.slide[data-layout="${bad}"] { color: red; }\n.slide[data-layout="a$(id)"] {}\n`;
   const ref = { name: "someone/talks/talk", deck: { theme: refTheme } };
 
-  test("are left out of the hint and the list, with a count, and the list names the ref", async () => {
+  test("are left out of the error and the list, with a count, and the list names the ref", async () => {
     await withTempProject({ decks: [{ name: "mine" }], refs: [ref] }, async (root) => {
       const target = resolveTarget(root, "deck", { deck: "someone/talks/talk", refs: true });
       expect(() => themeCommand(target, "nope")).toThrow(
         expect.objectContaining({
-          hint: "use one of: bare, split, and 2 whose names dek does not print",
+          message:
+            'layout "nope" is not defined in theme.css, which defines bare, split, and 2 whose names dek does not print',
+          hint: "pass one of them: `dekc theme someone/talks/talk <layout>`",
         }),
       );
       const text = formatText({ command: "theme", data: themeCommand(target) });

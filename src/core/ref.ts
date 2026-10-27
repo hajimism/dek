@@ -6,7 +6,7 @@ import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { DekError } from "./error.ts";
 import { shellQuote } from "./escape.ts";
-import { listShown } from "./prose.ts";
+import { foreignList } from "./foreign-text.ts";
 import {
   isPlainRefName,
   isRefDeckName,
@@ -387,16 +387,37 @@ function repoDecks(files: RepoFiles): Array<{ name: string; prefix: string }> {
   });
 }
 
-/** Deck names as a hint lists them: only those a ref can carry. */
+/**
+ * Names from someone else's repository or pack as a message lists them: those `shows` passes,
+ * as foreignList shows them, then how many others there are, in the words of `others`.
+ */
+function listCarried(
+  names: string[],
+  shows: (name: string) => boolean,
+  others: (count: number) => string,
+): string {
+  const shown = names.filter(shows);
+  const left = names.length - shown.length;
+  if (left === 0) {
+    return foreignList(shown);
+  }
+  return shown.length === 0 ? others(left) : `${foreignList(shown)}, and ${others(left)}`;
+}
+
+/** Deck names as a message lists them: only those a ref can carry. */
 function listDecks(names: string[]): string {
-  return listShown(
+  return listCarried(
     names,
     isRefDeckName,
     (count) => `${count} whose ${count === 1 ? "name" : "names"} a ref cannot carry`,
   );
 }
 
-/** The name of the one deck a pack holds; a pack of none, of more, or of one no ref can name is refused. */
+/**
+ * The name of the one deck a pack holds; a pack of none, of more, or of one no ref can name is
+ * refused. The names are the pack author's, so the message lists them as listDecks does, and the
+ * hint is dek's.
+ */
 export function deckOfPack(files: RepoFiles): string {
   const names = [...new Set(repoDecks(files).map((deck) => deck.name))].sort();
   const [name, ...others] = names;
@@ -418,7 +439,11 @@ export function deckOfPack(files: RepoFiles): string {
   return name;
 }
 
-/** The directory of the project that holds the deck, as a prefix: "" or "sample/". */
+/**
+ * The directory of the project that holds the deck, as a prefix: "" or "sample/". The folder
+ * names the source holds are its author's: an error lists them in its message, as foreignList
+ * does, and its hint is dek's words alone.
+ */
 export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
   const repo = source.kind === "file" ? "the pack" : `${source.owner}/${source.repo}`;
   const path = source.kind === "github" ? source.path : undefined;
@@ -431,22 +456,32 @@ export function findDeckInRepo(files: RepoFiles, source: RefSource): string {
   const [match, ...others] = matches;
   if (!match) {
     const names = [...new Set(decks.map((deck) => deck.name))].sort();
-    throw new DekError(`${repo} has no deck "${source.deck}"`, {
+    if (names.length === 0) {
+      throw new DekError(`${repo} has no deck "${source.deck}"`, {
+        hint: `${repo} holds no dek project (decks/<name>/script.md beside a dek.toml)`,
+      });
+    }
+    throw new DekError(`${repo} has no deck "${source.deck}", only ${listDecks(names)}`, {
       hint:
-        names.length > 0
-          ? `decks in ${repo}: ${listDecks(names)}`
-          : `${repo} holds no dek project (decks/<name>/script.md beside a dek.toml)`,
+        source.kind === "file"
+          ? `add the pack you were sent with \`dekc ref <file>.tgz\`, which pins the deck it holds`
+          : names.some(isRefDeckName)
+            ? `pin one of them: \`dekc ref ${repo}/<deck>\``
+            : `${REF_DECK_NAME_RULE}; ask its author to rename the deck's folder`,
     });
   }
   if (others.length > 0) {
     const paths = matches.map((deck) => `${deck.prefix}decks/${deck.name}`).sort();
-    const listed = listShown(
+    const listed = listCarried(
       paths,
       (path) => path.split("/").every(isRefDeckName),
-      (count) => `${count} whose ${count === 1 ? "path" : "paths"} a hint cannot show`,
+      (count) => `${count} whose ${count === 1 ? "path" : "paths"} dek does not print`,
     );
-    throw new DekError(`${repo} has more than one deck named "${source.deck}"`, {
-      hint: `pass the GitHub link to the one you mean; they are at ${listed}`,
+    throw new DekError(`${repo} has more than one deck named "${source.deck}", at ${listed}`, {
+      hint:
+        source.kind === "file"
+          ? `a pack is one deck; ${PACK_HINT}`
+          : `pass the GitHub link to the folder of the one you mean, https://github.com/${repo}/tree/<rev>/<path>`,
     });
   }
   return match.prefix;

@@ -123,6 +123,28 @@ describe("reading a ref", () => {
     });
   });
 
+  test("theme names a ref's layouts in the message and keeps its hint to dek's words", async () => {
+    const layout = "x\u{202E}\u{E0041}"; // a layout name its author chose: a bidi control and a tag
+    const theme = `.slide { color: red; }\n.slide[data-layout="split"] { gap: 0; }\n.slide[data-layout="${layout}"] { gap: 0; }\n`;
+    const hostile = { ...ref, deck: { ...ref.deck, theme } };
+    await withTempProject({ ...project, refs: [hostile] }, async (root) => {
+      const target = () => resolveTarget(root, "deck", { refs: true, deck: REF });
+      expect(() => themeCommand(target(), "nope")).toThrow(
+        expect.objectContaining({
+          message:
+            'layout "nope" is not defined in theme.css, which defines split, and 1 whose name dek does not print',
+          hint: `pass one of them: \`dekc theme ${REF} <layout>\``,
+        }),
+      );
+      // A ref is read-only: the fix for a layout with no example is not to write one into it.
+      expect(() => themeCommand(target(), layout)).toThrow(
+        expect.objectContaining({
+          hint: `a ref is read-only; read the markup of a slide that uses it with \`dekc show ${REF} <slug>\``,
+        }),
+      );
+    });
+  });
+
   test.serial("shot renders a ref's slide", async () => {
     await withTempProject(project, async (root) => {
       await chmod(fakePlaywright, 0o755);

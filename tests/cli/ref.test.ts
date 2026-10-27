@@ -147,8 +147,9 @@ describe("dekc ref <source>", () => {
     await withTempProject(project, async (root) => {
       await withFakeGithub(repos, async () => {
         await expect(addRef(root, "someone/talks/why")).rejects.toMatchObject({
-          message: 'someone/talks has no deck "why"',
-          hint: "decks in someone/talks: why-dek, and 1 whose name a ref cannot carry",
+          message:
+            'someone/talks has no deck "why", only why-dek, and 1 whose name a ref cannot carry',
+          hint: "pin one of them: `dekc ref someone/talks/<deck>`",
         });
       });
     });
@@ -194,6 +195,25 @@ describe("dekc ref <source>", () => {
         expect(line).toEndWith("!…");
         expect([...(line ?? "")].length).toBe(`- \`${REF}\`: `.length + 80);
         expect(agents).not.toContain("\n## Setup");
+      });
+    });
+  });
+
+  refTest("shows the characters a person cannot see in a ref's title, in AGENTS.md", async () => {
+    // Tag characters spell "hi" to a model and show as nothing; U+202E reverses what follows.
+    const title = '"Why dek\u{E0068}\u{E0069} \u{202E}kcatta"';
+    const repos = {
+      "someone/talks": {
+        head: SHA_A,
+        commits: { [SHA_A]: { ...deckRepoFiles("why-dek", { title }), LICENSE: "MIT" } },
+      },
+    };
+    await withTempProject(project, async (root) => {
+      await withFakeGithub(repos, async () => {
+        await addRef(root, REF);
+        const agents = await readFile(join(root, "AGENTS.md"), "utf8");
+        expect(agents).toContain(`- \`${REF}\`: Why dek⟨U+E0068⟩⟨U+E0069⟩ ⟨U+202E⟩kcatta\n`);
+        expect(agents).not.toMatch(/[\u{202E}\u{E0000}-\u{E007F}]/u);
       });
     });
   });
