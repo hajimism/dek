@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { VoiceDict } from "./cue.ts";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
+import { compareCodeUnits } from "./order.ts";
 import { cacheDir, deckProjectRoot } from "./path.ts";
 import { readDeckFile } from "./resolve.ts";
 import { writeInside } from "./safe-fs.ts";
@@ -184,7 +185,7 @@ export function loadVoiceDict(deckDir: string): VoiceDict {
 export function writeVoiceDict(deckDir: string, dict: VoiceDict): string {
   const path = deckPaths(deckDir).voiceDict;
   const body = Object.entries(dict)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => compareCodeUnits(a, b))
     .map(([key, entry]) => {
       const accent = entry.accent !== undefined ? `\naccent = ${entry.accent}` : "";
       return `[${escapeTomlKey(key)}]\nkana = ${JSON.stringify(entry.kana)}${accent}\n`;

@@ -215,6 +215,14 @@ describe("formatReport", () => {
     expect(report.split("\n")).toHaveLength(5);
   });
 
+  test("names rules with as many findings by character code, the same on every machine", () => {
+    expect(
+      formatReport([found("b"), found("B"), found("a")])
+        .split("\n")
+        .at(-1),
+    ).toBe("3 errors: B ×1, a ×1, b ×1");
+  });
+
   test("counts one in the singular, and names no errors when there are none", () => {
     expect(
       formatReport([found("DEK040", "warning")])

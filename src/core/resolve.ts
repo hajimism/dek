@@ -3,6 +3,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { walkUp } from "./optional.ts";
+import { compareCodeUnits } from "./order.ts";
 import { parseScript } from "./parse.ts";
 import { deckProjectRoot, isInside } from "./path.ts";
 import { readSourceIfExists, requireInside } from "./safe-fs.ts";
@@ -115,7 +116,7 @@ export function listSlideFiles(
     readdirSync(dir)
       // A declaration file carries types for the editor, not a slide.
       .filter((name) => name.endsWith(ext) && !name.endsWith(".d.ts"))
-      .sort((a, b) => a.localeCompare(b))
+      .sort(compareCodeUnits)
       .flatMap((name) => {
         const path = join(dir, name);
         if (!statSync(requireInside(path, root)).isFile()) {
@@ -170,7 +171,7 @@ function loadDecks(root: string): {
 
   for (const entry of readdirSync(realDecks, { withFileTypes: true })
     .filter((item) => item.isDirectory())
-    .sort((a, b) => a.name.localeCompare(b.name))) {
+    .sort((a, b) => compareCodeUnits(a.name, b.name))) {
     const loaded = readDeck(root, entry.name);
     if (loaded.ok) {
       decks.push(loaded.deck);

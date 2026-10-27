@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
@@ -14,6 +14,7 @@ import {
   resolveTimelineAudio,
   VOICE_SETUP_HINT,
   voiceCacheFile,
+  writeVoiceDict,
 } from "../../src/core/voice.ts";
 import { silentWav } from "../../src/voice/wav.ts";
 import { withEnv } from "../helpers/env.ts";
@@ -389,6 +390,54 @@ describe("synthDeck timeline audio", () => {
         message: "invalid timeline.json",
       });
       expect(existsSync(voiceCacheFile(deckDir, "timeline.json"))).toBe(false);
+    });
+  });
+});
+
+/** `fn` run as on a machine whose locale is `locale`, which `localeCompare` takes when given none. */
+function onMachineIn<T>(locale: string, fn: () => T): T {
+  const original = String.prototype.localeCompare;
+  String.prototype.localeCompare = function (
+    this: string,
+    that: string,
+    locales?: Intl.LocalesArgument,
+    options?: Intl.CollatorOptions,
+  ) {
+    return original.call(this, that, locales ?? locale, options);
+  };
+  try {
+    return fn();
+  } finally {
+    String.prototype.localeCompare = original;
+  }
+}
+
+describe("writeVoiceDict", () => {
+  // Teammates on machines set to other languages would otherwise rewrite each other's dict.toml.
+  test("writes the entries in the same order on every machine, by character code", async () => {
+    await withTempProject({ decks: [{ name: "demo", script }] }, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      const dict = Object.fromEntries(
+        ["a", "B", "ä", "z", "i", "I", "日本", "にほん", "ニホン"].map((word) => [
+          word,
+          { kana: "ア" },
+        ]),
+      );
+      const written = ["en", "sv", "tr", "ja"].map((locale) =>
+        onMachineIn(locale, () => readFileSync(writeVoiceDict(deckDir, dict), "utf8")),
+      );
+      expect(new Set(written).size).toBe(1);
+      expect([...(written[0] ?? "").matchAll(/^\[(.*)\]$/gm)].map((match) => match[1])).toEqual([
+        "B",
+        "I",
+        "a",
+        "i",
+        "z",
+        '"ä"',
+        '"にほん"',
+        '"ニホン"',
+        '"日本"',
+      ]);
     });
   });
 });

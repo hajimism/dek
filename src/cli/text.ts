@@ -2,6 +2,7 @@
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
+import { compareCodeUnits } from "../core/order.ts";
 import { unprinted } from "../core/prose.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
 import { formatClock } from "../core/timing.ts";
@@ -53,7 +54,7 @@ export function formatReport(diagnostics: Diagnostic[], opts?: { color?: boolean
     byRule.set(id, (byRule.get(id) ?? 0) + 1);
   }
   const rules = [...byRule]
-    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+    .sort(([a, x], [b, y]) => y - x || compareCodeUnits(a, b))
     .map(([id, n]) => `${id} ×${n}`);
   return `${list}\n${countSummary(diagnostics)}: ${rules.join(", ")}`;
 }

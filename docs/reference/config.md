@@ -154,7 +154,7 @@ kana = "デック"
 kana = "スクリプトエムディー"
 ```
 
-`dekc voice dict add <word> <kana>` appends an entry. A word not in the dictionary is `DEK040`.
+`dekc voice dict add <word> <kana>` adds an entry and writes the file sorted by key, by character code rather than any language's alphabet, so it comes out the same on every machine. A word not in the dictionary is `DEK040`.
 
 ## Theme tokens
 
