@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
+import { isDeckName } from "../core/path.ts";
 import { readSourceIfExists, removeInside, writeInside } from "../core/safe-fs.ts";
 
 export type DevServerLock = {
@@ -88,20 +89,49 @@ export function readDevServerLock(root: string): DevServerLock | undefined {
   return undefined;
 }
 
-/** The URL of each root a server in this process holds, which two racing servers both see. */
-const claimedRoots = new Map<string, string>();
+/** The server each root a server in this process holds, which two racing servers both see. */
+const claimedRoots = new Map<string, Omit<DevServerLock, "password">>();
 
-/** Throw when a live server, in this process or another, already holds `root`. */
-export function assertNoDevServer(root: string): void {
+/**
+ * Throw when a live server, in this process or another, already holds `root`. `deck` is the one
+ * deck the server about to start would serve, none for the whole project.
+ */
+export function assertNoDevServer(root: string, deck?: string): void {
   const existing = readDevServerLock(root);
   const running =
-    claimedRoots.get(root) ?? (existing && isPidAlive(existing.pid) ? existing.url : undefined);
+    claimedRoots.get(root) ?? (existing && isPidAlive(existing.pid) ? existing : undefined);
   if (running !== undefined) {
-    throw new DekError(`dev server already running at ${running}`, {
+    throw new DekError(`dev server already running at ${running.url}`, {
       path: serverLockPath(root),
-      hint: `open ${running}`,
+      hint: runningServerHint(root, running, deck),
     });
   }
+}
+
+/**
+ * Where the running server shows what was asked for, or, when it serves one other deck only, how
+ * to get one that serves both: `dekc` started inside a deck's folder serves that deck alone.
+ */
+function runningServerHint(
+  root: string,
+  running: Omit<DevServerLock, "password">,
+  deck: string | undefined,
+): string {
+  if (running.deck === deck) {
+    return `open ${running.url}`;
+  }
+  if (running.deck === undefined && deck !== undefined) {
+    return `open ${running.url}decks/${encodeURIComponent(deck)}/`;
+  }
+  // The lock is a file a repository could bring along: name only a deck this project has.
+  const named =
+    running.deck !== undefined &&
+    isDeckName(running.deck) &&
+    existsSync(join(root, "decks", running.deck, "script.md"))
+      ? `decks/${running.deck}`
+      : "one deck";
+  const wanted = deck === undefined ? "the whole project" : `decks/${deck}`;
+  return `it serves only ${named}; to serve ${wanted}, stop it (pid ${running.pid}) and run \`dekc\` at the project root, which serves every deck`;
 }
 
 export function writeDevServerLock(
@@ -110,8 +140,8 @@ export function writeDevServerLock(
   password?: string,
   deck?: string,
 ): void {
-  assertNoDevServer(root);
-  claimedRoots.set(root, url);
+  assertNoDevServer(root, deck);
+  claimedRoots.set(root, { url, pid: process.pid, ...(deck ? { deck } : {}) });
   try {
     // A fresh file renamed into place, so it may hold the --remote password: its owner's only.
     writeInside(
