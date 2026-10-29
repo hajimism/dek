@@ -76,9 +76,9 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   if (options.deck !== undefined && isRefName(options.deck)) {
     throw refReadOnlyError(options.deck);
   }
-  // Before the port and the watchers; writing the lock checks again, for a server that raced us.
-  assertNoDevServer(project.root);
   const { scopedDeckName, deckDir } = serverScope(project, options);
+  // Before the port and the watchers; writing the lock checks again, for a server that raced us.
+  assertNoDevServer(project.root, scopedDeckName);
   const access = accessFor(options);
   const embed = {
     playerScript: await livePlayerScript(),
