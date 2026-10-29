@@ -130,7 +130,10 @@ describe("readTar", () => {
         await writeTree(dir);
         const files = await expectAsBunReads(await tarArchive(dir, format));
         expect([...files.keys()]).toContain("top/ü日本.md");
-        expect(files.get("top/big.bin")?.size).toBe(3000);
+        // tar writes the first of two hard links it meets as the file and the other as a link,
+        // which is left out; which comes first is the order the file system lists them in.
+        const pair = ["top/big.bin", "top/hard.bin"].flatMap((path) => files.get(path)?.size ?? []);
+        expect(pair).toEqual([3000]);
       });
     });
   }
