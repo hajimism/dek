@@ -46,7 +46,7 @@ const CHROMIUM_SAYS = /\[err\]|FATAL/;
 const REASON_CHARS = 280;
 
 /** A sentence: up to a `.`, `!`, or `?` that ends a word, outside parentheses, as `(0 vs. 1)` is. */
-const SENTENCE = /(?:\([^)]*\)|\((?!\)|$)|[^()!?\.]|[.!?](?!\s|$))+(?:[.!?]+|$)/g;
+const SENTENCE = /(?:\([^)]*\)|\((?!\)|$)|[^()!?.]|[.!?](?!\s|$))+(?:[.!?]+|$)/g;
 
 /**
  * What Chromium said when it failed: its words for a sandbox that cannot start, else its first

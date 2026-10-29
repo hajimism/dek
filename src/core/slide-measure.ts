@@ -251,6 +251,7 @@ export function measureSlideInPage(): SlideMeasure {
     const own = squash(textNodes.map((node) => node.textContent ?? "").join(" "));
     // innerText separates block children; textContent would run "item 0item 1" together.
     // SVG and MathML have no innerText, so they fall back to textContent.
+    // biome-ignore lint/performance/useDomNodeTextContent: the rendered line breaks are the point here.
     const whole = el instanceof HTMLElement ? el.innerText : el.textContent;
     const text = own || squash(whole ?? "");
     const parentEl = el.parentElement;
