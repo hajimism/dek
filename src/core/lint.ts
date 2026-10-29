@@ -18,6 +18,7 @@ import { timingDiagnostics } from "./lint/timing.ts";
 import { voiceDiagnostics } from "./lint/voice.ts";
 import { asResolvedDeck, type Project, type ProjectDeck } from "./resolve.ts";
 import type { Section } from "./schema.ts";
+import type { SlideScriptProblem } from "./slide-script.ts";
 import { evaluateSlideScripts, slideScriptsProblems } from "./slide-script-eval.ts";
 import { RUNTIME_CLASSES } from "./theme-facts.ts";
 
@@ -53,7 +54,7 @@ export function lintDeck(
 export function lintDeck(input: DeckInput, options?: LintDeckOptions): Diagnostic[] {
   const { files, scripted } = readLintInput(input);
   const problems = slideScriptsProblems(scripted.map((entry) => entry.input));
-  return runRules({ ...files, scripts: slideScriptDiagnostics(scripted, problems) }, options);
+  return runRules(lintContext(files, scripted, problems), options);
 }
 
 /**
@@ -66,7 +67,19 @@ export async function lintDeckAsync(
 ): Promise<Diagnostic[]> {
   const { files, scripted } = readLintInput(input);
   const problems = await evaluateSlideScripts(scripted.map((entry) => entry.input));
-  return runRules({ ...files, scripts: slideScriptDiagnostics(scripted, problems) }, options);
+  return runRules(lintContext(files, scripted, problems), options);
+}
+
+function lintContext(
+  files: DeckFiles,
+  scripted: LintedScript[],
+  problems: SlideScriptProblem[][],
+): LintContext {
+  return {
+    ...files,
+    scripts: slideScriptDiagnostics(scripted, problems),
+    scriptCode: new Map(scripted.map(({ section, input }) => [section.slug, input.code])),
+  };
 }
 
 function readLintInput(input: DeckInput): { files: DeckFiles; scripted: LintedScript[] } {

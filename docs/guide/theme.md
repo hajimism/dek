@@ -86,7 +86,7 @@ A line ends wherever the browser runs out of room, which neither the script nor 
 
 `word-break: auto-phrase` breaks Japanese between phrases instead of between any two characters. It works when the deck's `lang` is `ja`, which dek reads from the script when the frontmatter leaves it out. `text-wrap: pretty` keeps a paragraph from ending on a word left alone, and `text-wrap: balance` evens out a heading's lines. The player, the shots, the PDF, and the video are all drawn in Chromium, so they all break the same way.
 
-A deck owns its copy of the theme, so a deck made before these lines keeps breaking as it did until you copy them into its `theme.css`; `dekc lint --visual` points it out as [`DEK035`](/reference/lint#dek035), a line that ends inside a phrase or a paragraph that ends on a remnant. Where you want a break the browser would not choose, write `<br>` in the slide.
+A deck owns its copy of the theme, so a deck made before these lines keeps breaking as it did until you copy them into its `theme.css`; `dekc lint --visual` points it out as [`DEK035`](/reference/lint#dek035), a line that ends inside a phrase or a paragraph that ends on a remnant. Once the lines are in, `DEK035` reports no line that ends inside a phrase: it finds one by comparing the text with the same text broken by phrase, and the two are now the same. A break that still reads wrong, such as a line that starts with a particle, is where Chromium's own phrases put it, or inside a phrase too long for its line, so look for it in `dekc shot`. Where you want a break the browser would not choose, write `<br>` in the slide.
 
 ## Copy, then freeze
 

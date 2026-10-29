@@ -8,9 +8,9 @@ import { withTempProject } from "../helpers/project.ts";
 
 const SLUGS = ["a", "b", "c", "d"];
 
-const script = `---
+const script = (frontmatter = "") => `---
 title: Demo
----
+${frontmatter}---
 
 ${SLUGS.map((slug) => `## ${slug}\n\nsaid on ${slug}\n`).join("\n")}`;
 
@@ -22,14 +22,16 @@ const slide = (slug: string) =>
 
 async function lintStyles(
   styles: Record<string, string>,
-  options: { slug?: string } = {},
+  options: { slug?: string; maxClasses?: number } = {},
 ): Promise<Diagnostic[]> {
   return withTempProject(
     {
       decks: [
         {
           name: "demo",
-          script,
+          script: script(
+            options.maxClasses === undefined ? "" : `max_classes: ${options.maxClasses}\n`,
+          ),
           slides: Object.fromEntries(SLUGS.map((slug) => [slug, slide(slug)])),
           theme: `.slide .card { color: var(--fg); }\n.slide .note { color: var(--muted); }\n`,
           styles,
@@ -38,7 +40,9 @@ async function lintStyles(
     },
     async (root) => {
       const resolved = resolveDeck(join(root, "decks", "demo"));
-      return lintDeck(resolved, options).filter((d) => d.id === "DEK026");
+      return lintDeck(resolved, options.slug === undefined ? {} : { slug: options.slug }).filter(
+        (d) => d.id === "DEK026",
+      );
     },
   );
 }
@@ -152,5 +156,26 @@ describe("DEK026 repeated slide styles", () => {
   test("shows up in one slide's check", async () => {
     const found = await lintStyles({ a: DARK_CARD, b: DARK_CARD, c: DARK_CARD }, { slug: "b" });
     expect(found.map((d) => d.slug)).toEqual(["b"]);
+  });
+
+  // The theme already holds .slide, .card, and .note; .tag is each slide's own.
+  const TAG = ".tag {\n  color: var(--accent);\n}\n";
+
+  // Moving the rule must not trade this warning for DEK013's error on theme.css.
+  test("says so when moving the rule would take the theme past max_classes", async () => {
+    const found = await lintStyles({ a: TAG, b: TAG, c: TAG }, { maxClasses: 3 });
+    expect(found[0]?.hint).toBe(
+      "write .slide .tag { color: var(--accent) } once in theme.css and delete it from slides/a.css, slides/b.css, and slides/c.css; theme.css would then define 4 classes, past max_classes 3, so set `max_classes: 4` in the frontmatter too, or leave the rule in the slides",
+    );
+    expect(found[0]?.data).toMatchObject({ themeClasses: 4, limit: 3 });
+  });
+
+  test("says nothing of the budget when the move stays within it", async () => {
+    const tag = await lintStyles({ a: TAG, b: TAG, c: TAG }, { maxClasses: 4 });
+    expect(tag[0]?.hint).not.toContain("max_classes");
+    expect(tag[0]?.data?.themeClasses).toBeUndefined();
+    // A class the theme already defines adds nothing to it, however tight the budget.
+    const card = await lintStyles({ a: DARK_CARD, b: DARK_CARD, c: DARK_CARD }, { maxClasses: 3 });
+    expect(card[0]?.hint).not.toContain("max_classes");
   });
 });

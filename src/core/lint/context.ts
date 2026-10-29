@@ -26,6 +26,8 @@ type SlideSource = { html: string; scan: HtmlScan; skeleton: boolean };
 export type LintContext = DeckFiles & {
   /** DEK016 and DEK017 of each slide script, by slug: evaluated before the rules run. */
   scripts: Map<string, Diagnostic[]>;
+  /** The source of each slide script lint evaluated, by slug. */
+  scriptCode: Map<string, string>;
 };
 
 /** The deck as read from disk, each file once. */
