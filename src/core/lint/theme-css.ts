@@ -12,6 +12,7 @@ import {
 } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { escapeRegExp } from "../escape.ts";
 import { listed } from "../prose.ts";
 import { assetRefDiagnostics } from "./asset-refs.ts";
 import type { LintContext } from "./context.ts";
@@ -315,8 +316,9 @@ function classBudgetHint(classCount: number, usedBy: Map<string, string[]> | und
 }
 
 /**
- * Each class the theme defines but `.slide`, which every slide is, to the slides whose markup uses
- * it, in script order. None while a section has no HTML yet: what it will use is unknown.
+ * Each class the theme defines but `.slide`, which every slide is, to the slides that use it, in
+ * script order: in their markup, or anywhere in their script, which may set it with `classList`.
+ * None while a section has no HTML yet or only its skeleton: what it will use is unknown.
  */
 function slidesUsing(ctx: LintContext, classes: Set<string>): Map<string, string[]> | undefined {
   const usedBy = new Map(
@@ -324,14 +326,22 @@ function slidesUsing(ctx: LintContext, classes: Set<string>): Map<string, string
   );
   for (const slug of ctx.sectionsBySlug.keys()) {
     const source = ctx.slideSource(slug);
-    if (source === undefined) {
+    if (source === undefined || source.skeleton) {
       return undefined;
     }
-    for (const name of new Set(source.scan.classes)) {
-      usedBy.get(name)?.push(slug);
+    const code = ctx.scriptCode.get(slug);
+    for (const [name, slugs] of usedBy) {
+      if (source.scan.classes.includes(name) || (code !== undefined && namesClass(code, name))) {
+        slugs.push(slug);
+      }
     }
   }
   return usedBy;
+}
+
+/** Whether `code` holds `name` as a class token: a word of its own, wherever it stands. */
+function namesClass(code: string, name: string): boolean {
+  return new RegExp(`(^|[^\\w-])${escapeRegExp(name)}($|[^\\w-])`).test(code);
 }
 
 /** The theme's own findings, or DEK018 when there is no theme. */
