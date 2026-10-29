@@ -26,7 +26,7 @@ function missingThemeDiagnostic(ctx: LintContext): Diagnostic {
   return diag("DEK018", {
     message: "theme.css not found",
     path: deckPaths(ctx.deck.dir).theme,
-    hint: "copy theme.css from the project root or another deck into the deck directory",
+    hint: "copy the project's template, ../../theme.css, or another deck's theme into the deck directory",
   });
 }
 
