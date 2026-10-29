@@ -76,8 +76,9 @@ jobs:
       - run: bun run knip
       # Lets Chromium's sandbox start on Ubuntu 24.04, whose AppArmor blocks user namespaces (ADR 27).
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      # tests/setup.ts sets this default, WAIT_MS * 2, but only for the first test file.
-      - run: bun test --coverage --timeout=20000
+      # tests/setup.ts sets this default, WAIT_MS * 2, but only for the first test file. The
+      # runner has four cores, as package.json's test script assumes; the files run four at a time.
+      - run: bun test --coverage --timeout=20000 --parallel=4
       - run: bun run docs:build
 
   # The tarball npm would ship, installed and run the way the docs say.
