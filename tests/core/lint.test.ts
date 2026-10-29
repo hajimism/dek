@@ -1097,6 +1097,51 @@ ${body}
     );
   });
 
+  // The hint frees what costs no slide anything before it raises the budget.
+  test("DEK013: the hint names the classes to free, then the budget to raise", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\nmax_classes: 3\n---\n\n## a\n\nhello\n\n## b\n\nagain\n",
+            theme: ".slide {}\n.slide .spare {}\n.slide .lead {}\n.slide .card {}\n",
+            slides: {
+              a: slideDocument('<section class="slide"><p class="lead card">a</p></section>'),
+              b: slideDocument('<section class="slide"><p class="card">b</p></section>'),
+            },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK013");
+        expect(found?.hint).toBe(
+          "delete .spare, which no slide uses; or move each class only one slide uses into that slide's stylesheet: .lead into slides/a.css; or set `max_classes: 4` in the frontmatter",
+        );
+      },
+    );
+  });
+
+  // Until every section has HTML, a class no slide uses yet may be one a slide is about to.
+  test("DEK013: the hint frees no class while a slide has no HTML", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: "---\ntitle: Demo\nmax_classes: 2\n---\n\n## a\n\nhello\n\n## b\n\nagain\n",
+            theme: ".slide {}\n.slide .spare {}\n.slide .lead {}\n",
+            slides: { a: slideDocument('<section class="slide"><p>a</p></section>') },
+          },
+        ],
+      },
+      async (root) => {
+        const found = lintDeck(join(root, "decks", "demo")).find((d) => d.id === "DEK013");
+        expect(found?.hint).toBe("set `max_classes: 3` in the frontmatter");
+      },
+    );
+  });
+
   // A deck owns its limit: changing dek.toml later must not pass or fail a finished deck.
   test("DEK013: max_classes in dek.toml leaves a deck's limit alone", async () => {
     const classes = Array.from({ length: 41 }, (_, i) => `.slide .c${i} {}`).join("\n");

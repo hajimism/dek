@@ -12,6 +12,7 @@ import {
 } from "../css.ts";
 import { deckPaths } from "../deck-paths.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
+import { listed } from "../prose.ts";
 import { assetRefDiagnostics } from "./asset-refs.ts";
 import type { LintContext } from "./context.ts";
 import { isRawThemeValue, isRawTokenValue, REQUIRED_TOKENS, tokenSuggestion } from "./tokens.ts";
@@ -31,7 +32,11 @@ function missingThemeDiagnostic(ctx: LintContext): Diagnostic {
 /** DEK012, DEK013, DEK015, DEK014, and what its `url()`s load (DEK020 to DEK023) for theme.css. */
 function lintTheme(
   { path, sheet, classes, tokens }: NonNullable<LintContext["theme"]>,
-  { maxClasses, deckDir }: { maxClasses: number; deckDir: string },
+  {
+    maxClasses,
+    deckDir,
+    usedBy,
+  }: { maxClasses: number; deckDir: string; usedBy: Map<string, string[]> | undefined },
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   // A rule inside `@media` reaches the page as surely as one outside it.
@@ -56,6 +61,7 @@ function lintTheme(
       diag("DEK013", {
         message: `theme.css has ${classCount} classes; limit is ${maxClasses}`,
         path,
+        hint: classBudgetHint(classCount, usedBy),
         data: { classes: classCount, limit: maxClasses },
       }),
     );
@@ -287,9 +293,54 @@ function themeScopeHint(selector: string): string {
   return `write it as ${scoped.join(", ")}`;
 }
 
+/**
+ * How to bring the theme back within its class budget: first what frees a class without changing
+ * a slide, a class no slide uses and one only one slide uses, then raising the budget itself.
+ */
+function classBudgetHint(classCount: number, usedBy: Map<string, string[]> | undefined): string {
+  if (usedBy === undefined) {
+    return `set \`max_classes: ${classCount}\` in the frontmatter`;
+  }
+  const unused = [...usedBy].filter(([, slugs]) => slugs.length === 0).map(([name]) => `.${name}`);
+  const single = [...usedBy].flatMap(([name, slugs]) =>
+    slugs.length === 1 ? [`.${name} into slides/${slugs[0]}.css`] : [],
+  );
+  return [
+    ...(unused.length > 0 ? [`delete ${listed(unused)}, which no slide uses`] : []),
+    ...(single.length > 0
+      ? [`move each class only one slide uses into that slide's stylesheet: ${listed(single)}`]
+      : []),
+    `set \`max_classes: ${classCount}\` in the frontmatter`,
+  ].join("; or ");
+}
+
+/**
+ * Each class the theme defines but `.slide`, which every slide is, to the slides whose markup uses
+ * it, in script order. None while a section has no HTML yet: what it will use is unknown.
+ */
+function slidesUsing(ctx: LintContext, classes: Set<string>): Map<string, string[]> | undefined {
+  const usedBy = new Map(
+    [...classes].filter((name) => name !== "slide").map((name) => [name, [] as string[]]),
+  );
+  for (const slug of ctx.sectionsBySlug.keys()) {
+    const source = ctx.slideSource(slug);
+    if (source === undefined) {
+      return undefined;
+    }
+    for (const name of new Set(source.scan.classes)) {
+      usedBy.get(name)?.push(slug);
+    }
+  }
+  return usedBy;
+}
+
 /** The theme's own findings, or DEK018 when there is no theme. */
 export function themeDiagnostics(ctx: LintContext): Diagnostic[] {
   return ctx.theme
-    ? lintTheme(ctx.theme, { maxClasses: ctx.deck.deck.max_classes, deckDir: ctx.deck.dir })
+    ? lintTheme(ctx.theme, {
+        maxClasses: ctx.deck.deck.max_classes,
+        deckDir: ctx.deck.dir,
+        usedBy: slidesUsing(ctx, ctx.theme.classes),
+      })
     : [missingThemeDiagnostic(ctx)];
 }

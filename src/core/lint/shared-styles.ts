@@ -2,6 +2,7 @@ import { isKeyframesPrelude, selectorClasses, splitSelectorList, startsAtSlide }
 import { deckPaths } from "../deck-paths.ts";
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import { listed } from "../prose.ts";
+import { RUNTIME_CLASSES } from "../theme-facts.ts";
 import type { LintContext } from "./context.ts";
 
 /** How many slides may style something alike before it belongs in the theme: the third copy. */
@@ -54,6 +55,21 @@ function alsoReaches(ctx: LintContext, selector: string, setters: string[]): str
     const used = source && new Set(source.scan.classes);
     return used !== undefined && classes.every((name) => used.has(name));
   });
+}
+
+/**
+ * How many classes theme.css would define with a rule under `selector` moved into it, when that
+ * is more than the deck's `max_classes` (DEK013); nothing while the move stays within it.
+ */
+function overBudget(ctx: LintContext, selector: string): number | undefined {
+  const defined = ctx.theme?.classes ?? new Set<string>();
+  const added = new Set(
+    selectorClasses(themeSelector(selector)).filter(
+      (name) => !defined.has(name) && !RUNTIME_CLASSES.has(name),
+    ),
+  );
+  const after = defined.size + added.size;
+  return added.size > 0 && after > ctx.deck.deck.max_classes ? after : undefined;
 }
 
 /**
@@ -146,18 +162,27 @@ export function sharedStyleDiagnostics(ctx: LintContext): Diagnostic[] {
                 .join(
                   "",
                 )} without it, so check ${reaches.length === 1 ? "that slide" : "those slides"} after the move`;
+        // Following the hint must not trade this warning for DEK013's error.
+        const themeClasses = overBudget(ctx, selector);
+        const budget =
+          themeClasses === undefined
+            ? ""
+            : `; theme.css would then define ${themeClasses} classes, past max_classes ${ctx.deck.deck.max_classes}, so set \`max_classes: ${themeClasses}\` in the frontmatter too, or leave the rule in the slides`;
         return diag("DEK026", {
           message: `${rule} is also in ${listed(others)}`,
           path: paths.slide(slug, ".css"),
           line,
           slug,
-          hint: `write ${themeRule} once in theme.css and delete it from ${listed(slugs.map(cssOf))}${affected}`,
+          hint: `write ${themeRule} once in theme.css and delete it from ${listed(slugs.map(cssOf))}${affected}${budget}`,
           data: {
             selector,
             declarations,
             slides: slugs,
             ...(atPath.length > 0 ? { atRules: atPath } : {}),
             ...(reaches.length > 0 ? { alsoReaches: reaches } : {}),
+            ...(themeClasses !== undefined
+              ? { themeClasses, limit: ctx.deck.deck.max_classes }
+              : {}),
           },
         });
       }),
