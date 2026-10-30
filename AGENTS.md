@@ -12,6 +12,7 @@ A build system for talks, written in TypeScript on Bun. This file is for working
 
 ## Rules
 
+- **Survey code through a subagent.** Before you implement, hand reading and searching the code to a subagent (Explore in Claude Code) and bring back only its conclusion; what you read yourself is read again on every turn after.
 - **Agents are users.** Read the [Agent Usability Criteria](docs/guide/agent-criteria.md) before changing a command, a diagnostic, or a convention.
 - **The command is `dekc`.** Write the product, the package, and its files as dek; write anything typed to run it as `dekc` ([ADR 2](adr/0002-keep-the-name-dek-and-run-it-as-dekc.md)).
 - **Docs come in two languages.** A change to `docs/` or a README lands in both English and Japanese.
