@@ -2,6 +2,25 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.5.1](https://github.com/hajimism/dek/compare/v0.5.0...v0.5.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **cli:** stop a dev server whose parent died before the server was up ([80b533f](https://github.com/hajimism/dek/commit/80b533fc691cfc104b6c83f7d99be4d73fc75c8d))
+* **dev:** say when the running server serves another deck only ([333ae06](https://github.com/hajimism/dek/commit/333ae06818fa8ad09f5ed492ae33148cce9254fd))
+* judge a command that skips its stdin by how it exits, not as one that cannot start ([103152c](https://github.com/hajimism/dek/commit/103152cd2132ba9c430ede4d7020844f7a8dcf9a))
+* **lint:** free no DEK013 class a skeleton or a slide script may use ([e32638b](https://github.com/hajimism/dek/commit/e32638b12220055d8a5a329b9e93f9eda47371e8))
+* **lint:** name the files a hint sends you to as paths from where the command ran ([5943dbe](https://github.com/hajimism/dek/commit/5943dbe1b11ac4529faae9cc1b98f22b4c63d214))
+* **lint:** name the files a hint sends you to as paths from where the command ran ([c5fcce3](https://github.com/hajimism/dek/commit/c5fcce3101061a6eaad55b27d94019f5b028e762))
+* **lint:** say how to stay within max_classes in DEK013 and DEK026 ([9c3078b](https://github.com/hajimism/dek/commit/9c3078bad4d93e5f381c99f5b6e0dd2c059f32dc))
+
+
+### Documentation
+
+* say that DEK035 leaves a deck that breaks by phrase to Chromium ([c21b428](https://github.com/hajimism/dek/commit/c21b4284db4a46a231778a4fa8d42aac38c46b0d))
+* say that DEK035 leaves a deck that breaks by phrase to Chromium ([dfef085](https://github.com/hajimism/dek/commit/dfef085bedf2d120c62a0f7418fd3d69f0a77001))
+
 ## [0.5.0](https://github.com/hajimism/dek/compare/v0.4.0...v0.5.0) (2026-10-27)
 
 
