@@ -5,6 +5,7 @@ import {
   mkdir,
   readdir,
   readFile,
+  rename,
   rm,
   symlink,
   unlink,
@@ -16,7 +17,7 @@ import { livePlayerScript } from "../../src/runtime/player.ts";
 import { startDevServer } from "../../src/server/dev.ts";
 import { POLL_INTERVAL_MS } from "../../src/server/watch.ts";
 import { spawnDekServer } from "../helpers/cli.ts";
-import { withTempDir } from "../helpers/fs.ts";
+import { withTempDir, writeEdit } from "../helpers/fs.ts";
 import { slideDocument, slidePlaces } from "../helpers/html.ts";
 import { assetFixturesDir } from "../helpers/paths.ts";
 import { defaultScript, withTempProject } from "../helpers/project.ts";
@@ -353,12 +354,22 @@ more
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
         await withDevServer({ cwd: root }, async (server) => {
+          // The deck arrives whole, as a copy or a checkout brings it. One made a file at a time
+          // can be watched before its script is there, and the scan that syncs the script then
+          // takes in the slide edit below with it, as part of the sync and not as an edit.
+          const staged = join(root, "staged");
+          await mkdir(join(staged, "slides"), { recursive: true });
+          await writeFile(join(staged, "script.md"), defaultScript("New"));
+          await writeFile(join(staged, "slides", "intro.html"), introHtml);
           const created = join(root, "decks", "newone");
-          await mkdir(join(created, "slides"), { recursive: true });
-          await writeFile(join(created, "script.md"), defaultScript("New"));
+          await rename(staged, created);
+          // The server lists a deck and starts watching it in one step, so served is watched.
           await waitForOk(new URL("/decks/newone/", server.url).href);
-          const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
-          await writeFile(join(created, "slides", "intro.html"), introHtml);
+          const pending = waitForEvent(
+            server.events,
+            (event) => event.deck === "newone" && event.type === "reload-slide",
+          );
+          await writeEdit(join(created, "slides", "intro.html"), `${introHtml}\n`);
           expect(await pending).toMatchObject({ type: "reload-slide", slug: "intro" });
         });
       },
@@ -392,7 +403,7 @@ more
         expect(page).not.toContain('class="dek-diagnostics"');
 
         const pending = waitForEvent(server.events, (event) => event.type === "reload-slide");
-        await writeFile(join(deckDir, "slides", "intro.html"), introHtml);
+        await writeEdit(join(deckDir, "slides", "intro.html"), introHtml);
         expect(await pending).toMatchObject({ type: "reload-slide", slug: "intro" });
       });
     });

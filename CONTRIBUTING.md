@@ -87,6 +87,12 @@ The report is `report.md` and `report.json` under `.cache/agent-eval/<time>/` (o
 
 A run costs model usage and takes minutes, so it is never run in CI; one run is an anecdote, so compare a few before and after. To add a scenario, give it a known solution as well: `AGENT_EVAL_TESTS=1 bun test --timeout=20000 tests/scripts/agent-eval.test.ts` checks that every scenario fails as set up and passes once solved, with no model. Without the variable, `bun test --timeout=20000` runs only the report's unit tests and skips these, which take a minute and a browser.
 
+## Working on dek with Claude Code
+
+`.claude/settings.json` gives Claude Code a Stop hook, in `scripts/agent-hooks.ts`. When a turn ends with `.ts` files under `src/` or `tests/` changed, the changed test files and those that import a changed file themselves run. A failure stops the agent once with the tests that failed and the command that runs them again, and not again until the files change. More than 40 such test files are left to `bun run test`; a module reached only through another is left to CI, which runs the full suite.
+
+Its state is under `.cache/agent-hooks/`. `"disableAllHooks": true` in `.claude/settings.local.json` turns off every hook in your checkout, this one included.
+
 ## Commits and releases
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, and so on, with `!` for a breaking change. They are the release notes: release-please reads them to keep a release PR open, and merging that PR tags the version, writes [CHANGELOG.md](./CHANGELOG.md), and publishes to npm.

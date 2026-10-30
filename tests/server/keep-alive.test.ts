@@ -37,7 +37,7 @@ describe("onOrphaned", () => {
   test("fires once the parent process id changes, and not before", async () => {
     let ppid = 4242;
     let fired = 0;
-    const stop = onOrphaned(() => fired++, { ppid: () => ppid, intervalMs: 5 });
+    const stop = onOrphaned(() => fired++, { parent: 4242, ppid: () => ppid, intervalMs: 5 });
     try {
       await Bun.sleep(30);
       expect(fired).toBe(0);
@@ -45,6 +45,16 @@ describe("onOrphaned", () => {
       expect(await until(() => fired === 1, WAIT_MS)).toBe(true);
       await Bun.sleep(30);
       expect(fired).toBe(1);
+    } finally {
+      stop();
+    }
+  });
+
+  test("fires for a parent that died before the watch began", async () => {
+    let fired = 0;
+    const stop = onOrphaned(() => fired++, { parent: 4242, ppid: () => 1, intervalMs: 5 });
+    try {
+      expect(await until(() => fired === 1, WAIT_MS)).toBe(true);
     } finally {
       stop();
     }
@@ -114,7 +124,7 @@ await child.exited;`,
           child = Number(out.match(/child (\d+)/)?.[1]);
           parent.kill("SIGKILL");
           await parent.exited;
-          expect(await until(() => !isAlive(child), WAIT_MS * 3)).toBe(true);
+          expect(await until(() => !isAlive(child), WAIT_MS)).toBe(true);
         } finally {
           parent.kill("SIGKILL");
           if (child && isAlive(child)) {
@@ -123,6 +133,6 @@ await child.exited;`,
         }
       });
     },
-    WAIT_MS * 5,
+    WAIT_MS * 3,
   );
 });

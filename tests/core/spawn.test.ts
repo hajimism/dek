@@ -102,6 +102,17 @@ describe("runJsonWorker", () => {
 });
 
 describe("runPiped", () => {
+  test("a command that exits without reading all its stdin is judged by its exit and output", async () => {
+    // More than a pipe holds, so the write is still going when the command exits.
+    const result = await runPiped(["sh", "-c", "printf ok"], {
+      label: "sh failed",
+      hint: "install sh",
+      stdin: "x".repeat(1 << 20),
+      timeoutMs: WAIT_MS,
+    });
+    expect(result).toMatchObject({ stdout: "ok", exitCode: 0 });
+  });
+
   test("writes stdin, closes it, and returns the output and the exit code", async () => {
     const piped = await runPiped(
       [

@@ -8,7 +8,7 @@ import { syncDeck } from "../../src/core/sync.ts";
 import { createEventHub, type EventHub } from "../../src/server/hub.ts";
 import { voiceFailureLine, watchDeck, watchErrorDiagnostic } from "../../src/server/watch.ts";
 import { withEnv } from "../helpers/env.ts";
-import { withTempDir } from "../helpers/fs.ts";
+import { withTempDir, writeEdit } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
 import { waitForEvent } from "../helpers/server.ts";
@@ -256,9 +256,7 @@ describe("watchDeck", () => {
           await first;
           const pending = waitForEvent(hub, (event) => event.type === "diagnostics");
           const scriptPath = join(dir, "script.md");
-          await writeFile(scriptPath, "not a deck\n");
-          const later = new Date(Date.now() + 10_000);
-          await utimes(scriptPath, later, later);
+          await writeEdit(scriptPath, "not a deck\n");
           const event = await pending;
           expect(event.type).toBe("diagnostics");
           if (event.type !== "diagnostics") {
@@ -303,9 +301,7 @@ describe("watchDeck", () => {
           );
           const pending = waitForEvent(hub, (event) => event.type === "diagnostics");
           const slidePath = join(dir, "slides", "intro.html");
-          await writeFile(slidePath, `${introHtml}\n`);
-          const later = new Date(Date.now() + 10_000);
-          await utimes(slidePath, later, later);
+          await writeEdit(slidePath, `${introHtml}\n`);
           await pending;
           expect(calls).toBe(2);
         } finally {
