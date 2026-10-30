@@ -8,6 +8,13 @@ const PARENT_POLL_MS = 1_000;
 const SHUTDOWN_GRACE_MS = 2_000;
 
 /**
+ * The process that started this one, read as the CLI loads. A parent read once the server is up
+ * would come too late: whoever waits for the URL can be killed before the next line runs, and the
+ * parent read then is already init, which never goes away.
+ */
+const startedBy = process.ppid;
+
+/**
  * Serve until told to stop: Ctrl-C, a kill, a closed terminal, or the process that started the
  * server going away, so a test run or an editor that dies without cleaning up leaves no server
  * holding a port.
@@ -51,16 +58,15 @@ export function stopOnce(
 }
 
 /**
- * Call `fn` once this process is reparented, which is how Unix says the parent died: a SIGKILL
- * leaves it no chance to stop its children. A process started with no parent of its own to lose
- * (already under init) is never orphaned.
+ * Call `fn` once this process is no longer under `parent`, the one that started it, which is how
+ * Unix says the parent died: a SIGKILL leaves it no chance to stop its children. A process started
+ * with no parent of its own to lose (already under init) is never orphaned.
  */
 export function onOrphaned(
   fn: () => void,
-  options: { ppid?: () => number; intervalMs?: number } = {},
+  options: { parent?: number; ppid?: () => number; intervalMs?: number } = {},
 ): () => void {
-  const ppid = options.ppid ?? (() => process.ppid);
-  const parent = ppid();
+  const { parent = startedBy, ppid = () => process.ppid } = options;
   const timer = setInterval(() => {
     if (ppid() !== parent) {
       clearInterval(timer);
