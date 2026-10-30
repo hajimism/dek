@@ -75,10 +75,16 @@ export async function runPiped(cmd: string[], options: PipedOptions): Promise<Pi
       hint: `it did not finish within ${Math.round(options.timeoutMs / 1000)}s and was stopped`,
     });
   try {
-    if (options.stdin !== undefined) {
-      proc.stdin.write(options.stdin);
+    try {
+      if (options.stdin !== undefined) {
+        // A write the pipe cannot take at once returns a promise, which can reject with the pipe.
+        await proc.stdin.write(options.stdin);
+      }
+      await proc.stdin.end();
+    } catch {
+      // The pipe broke: the command exited without reading all of its stdin, as `head` does, or
+      // was killed at its timeout while a write waited on it. Its exit says which, and how it went.
     }
-    await proc.stdin.end();
     const exitCode = await proc.exited;
     // It finished in time, however long what it left behind keeps the pipes open.
     stop.clear();
@@ -90,10 +96,6 @@ export async function runPiped(cmd: string[], options: PipedOptions): Promise<Pi
   } catch (error) {
     if (error instanceof DekError) {
       throw error;
-    }
-    // Killing the command breaks the pipe a write to its stdin was waiting on.
-    if (stop.fired()) {
-      throw overrun();
     }
     throw new DekError(options.label, { hint: options.hint, cause: error });
   } finally {
