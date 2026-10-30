@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR/scripts/agent-hooks.ts\" stop",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}
