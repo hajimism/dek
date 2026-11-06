@@ -69,7 +69,7 @@ AGENTS.md には、プラグインごとに版、ルール id、データファ�
 
 ### lock
 
-`plugins/<name>/plugin.json` には、プロジェクトが受け入れた申告を書きます。中身は、プラグインの版、ルールとその重大度、データファイルです。`dekc lint` は、インストールされたプラグインの申告が lock とまったく同じときだけ、そのプラグインを走らせます。そのため、別の版を入れたチームの仲間や CI では、違う検査が走るのではなく、検査が走らず、走らなかったと報告されます。
+`plugins/<name>/plugin.json` には、プロジェクトが受け入れた申告を書きます。中身は、プラグインの版、ルールとその重大度、データファイルです。同じフォルダには、すべてのデッキの検査に使うリストのように、プラグインがプロジェクト全体のために持つデータも置きます。lock と一緒にコミットします。`dekc lint` は、インストールされたプラグインの申告が lock とまったく同じときだけ、そのプラグインを走らせます。そのため、別の版を入れたチームの仲間や CI では、違う検査が走るのではなく、検査が走らず、走らなかったと報告されます。
 
 更新などで、インストールされたプラグインの申告が変わると、`dekc sync` は何が変わったかを挙げます。`version 0.1.0 → 0.2.0` や `GLOSSARY003 added (error)` のような形です。lock は書き換えません。変わったところを読んでから、受け入れます。
 
@@ -141,7 +141,7 @@ import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plug
 | `check.rules` | 検査が報告しうるルール id のすべて。id は、名前を大文字にし、`-` を `_` にして、数字三桁を続けたもの。`glossary` なら `GLOSSARY001`、`acme-talks` なら `ACME_TALKS001` |
 | `…severity` | `error` か `warning`。dek は結果の SARIF の `level` ではなく、これを使う。lint を失敗させるのは error だけ |
 | `…summary` | 一行、120 文字以内。dek は SARIF のルール一覧にだけ出す |
-| `data` | 省略できる。プラグインが読む、デッキの中のファイル。デッキのフォルダからの相対パス。隠しファイルでも、デッキの外でも、dek 自身のもの（`script.md`、`theme.css`、`slides/`、`assets/`、`voice/`、`dist/`）でもないこと。AGENTS.md に名前が載る |
+| `data` | 省略できる。プラグインが読むファイル。AGENTS.md に名前が載る。`{ "path": "glossary.yaml" }` はデッキの中のファイルで、デッキのフォルダからの相対パス。隠しファイルでも、デッキの外でも、dek 自身のもの（`script.md`、`theme.css`、`slides/`、`assets/`、`voice/`、`dist/`）でもないこと。`{ "path": "terms.yaml", "in": "project" }` はプロジェクトの `plugins/<name>/` の中のファイルで、すべてのデッキが共有するデータに使う。隠しファイルでも、そのフォルダの外でも、`plugin.json` でもないこと。ページに渡るのはデッキのファイルだけ（[ADR 35](https://github.com/hajimism/dek/blob/main/adr/0035-let-a-plugin-keep-data-for-the-whole-project-in-plugins-name.md)） |
 
 知らない欄は無視します。申告には、案内の文章を書く欄はありません。エージェントがプラグインについて読む文は、dek がこれらの事実から書きます。毎回同じ申告を出してください。制限時間は 10 秒です。
 
@@ -159,11 +159,12 @@ dek は、デッキごとに一回、デッキのフォルダで、デッキを 
     "slides": [
       { "slug": "planning-fallacy", "title": "計画錯誤", "html": "slides/planning-fallacy.html", "css": null, "ts": null }
     ]
-  }
+  },
+  "pluginDir": "/home/me/talks/plugins/glossary"
 }
 ```
 
-パスはデッキのフォルダからの相対パスで、ファイルがなければ `null` です。ファイルはプラグインが自分で読みます。
+スライドのパスはデッキのフォルダからの相対パスで、ファイルがなければ `null` です。`pluginDir` はプロジェクトの `plugins/<name>/` の絶対パスで、`"in": "project"` の `data` はここにあります。フォルダがなくても渡します。このフィールドより古い dek は渡さないので、そのときはプロジェクトのデータがないものとして扱います。ファイルはプラグインが自分で読みます。
 
 SARIF 2.1.0 を stdout に出し、指摘があってもなくても 0 で終わります。0 以外の終了は、検査そのものの失敗を意味します。dek は各結果から次を読みます。
 
@@ -171,11 +172,11 @@ SARIF 2.1.0 を stdout に出し、指摘があってもなくても 0 で終わ
 | --- | --- |
 | `ruleId` | `id`。`check.rules` にあること |
 | `message.text` | `message`。必須 |
-| `locations[0].physicalLocation.artifactLocation.uri` | `path`。デッキのフォルダからの相対パスか、デッキの中を指す `file:` URL。それ以外の場所は捨てる。`slides/<slug>.html`、`.css`、`.ts` なら `slug` も付く |
+| `locations[0].physicalLocation.artifactLocation.uri` | `path`。デッキのフォルダからの相対パスか、デッキの中か `pluginDir` の中を指す `file:` URL。それ以外の場所は捨てる。`slides/<slug>.html`、`.css`、`.ts` なら `slug` も付く |
 | `…region.startLine`、`…region.startColumn` | `line`、`column` |
 | `properties.hint` | `hint`。次にすること |
 
-dek は、メッセージとヒントを、それぞれ 300 文字以内の一行にします。重大度は申告から決まります。
+dek は、メッセージとヒントを、それぞれ 300 文字以内の一行にします。重大度は申告から決まります。プロジェクトのデータファイルの誤りのように、`pluginDir` の中への指摘をどのデッキの検査も同じ形で返すときは、一度だけ報告します。
 
 検査は、同じ入力には同じ出力を返し、ファイルを書かず、ネットワークを使わないと約束します。制限時間はデッキごとに 30 秒です。過ぎれば SIGTERM で止め、のちに SIGKILL を送ります。一度止まらなかった検査は、その後のデッキでは走らせません。
 

@@ -4,7 +4,7 @@ import type { Diagnostic } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
 import { lintDeck, lintProject, unreadableScriptDiagnostics } from "../core/lint.ts";
 import { playwrightMissingError } from "../core/playwright.ts";
-import { checkDeck, pluginChecks } from "../core/plugin-host.ts";
+import { checkDeck, onProjectData, pluginChecks } from "../core/plugin-host.ts";
 import { type RumdlRunner, type RumdlSkip, resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
 import { mergeSarif, pluginSarif, type SarifLog } from "../core/sarif.ts";
 import { syncDeck } from "../core/sync.ts";
@@ -43,6 +43,7 @@ export async function lintCommand(
     diagnostics: [] as Diagnostic[],
     hungOn: undefined as string | undefined,
     skippedDecks: 0,
+    seen: new Set<string>(),
   }));
 
   for (const deck of decks) {
@@ -68,8 +69,21 @@ export async function lintCommand(
         continue;
       }
       const outcome = await checkDeck(plugin, project, deck);
-      diagnostics.push(...outcome.diagnostics);
-      plugin.diagnostics.push(...outcome.diagnostics.filter(({ id }) => id !== "DEK046"));
+      // A finding on the project's data comes back from each deck; it is reported once (ADR 35).
+      const fresh = outcome.diagnostics.filter((finding) => {
+        if (!onProjectData(finding, project.root, plugin.name)) {
+          return true;
+        }
+        const { id, path, line, column, message } = finding;
+        const key = JSON.stringify([id, path, line, column, message]);
+        if (plugin.seen.has(key)) {
+          return false;
+        }
+        plugin.seen.add(key);
+        return true;
+      });
+      diagnostics.push(...fresh);
+      plugin.diagnostics.push(...fresh.filter(({ id }) => id !== "DEK046"));
       if (outcome.hung) {
         plugin.hungOn = deck.name;
       }

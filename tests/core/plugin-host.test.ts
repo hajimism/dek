@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { lockText, readManifest } from "../../src/core/plugin.ts";
 import {
   checkDeck,
@@ -191,7 +192,7 @@ describe("checkDeck", () => {
 
   test.serial("hands the plugin the deck on stdin, in the deck's folder", async () => {
     await withPluginProject(QUIZ, async (root, binDir) => {
-      const { plugin, deck } = await check(binDir, root, {});
+      const { plugin, deck, project } = await check(binDir, root, {});
       const [call] = plugin.calls();
       expect(call?.args).toEqual(["check", "--protocol", "1"]);
       expect(call?.cwd).toBe(deck.dir);
@@ -212,6 +213,7 @@ describe("checkDeck", () => {
             { slug: "second", title: "second", html: null, css: null, ts: null },
           ],
         },
+        pluginDir: join(project.root, "plugins", "quiz"),
       });
     });
   });
@@ -289,6 +291,37 @@ describe("checkDeck", () => {
       expect(finding?.message.length).toBeLessThanOrEqual(300);
       expect(finding?.hint).toBe("a ## heading");
       expect(finding?.path).toBeUndefined();
+    });
+  });
+
+  test.serial("keeps a location in the plugin's own plugins/<name>/, and no other's", async () => {
+    await withPluginProject(QUIZ, async (root, binDir) => {
+      const at = (path: string) => ({
+        ruleId: "QUIZ001",
+        message: { text: "the list does not read" },
+        locations: [
+          {
+            physicalLocation: {
+              artifactLocation: { uri: pathToFileURL(join(root, path)).href },
+              region: { startLine: 2, startColumn: 3 },
+            },
+          },
+        ],
+      });
+      const { outcome, project } = await check(binDir, root, {
+        sarif: sarif([
+          at("plugins/quiz/quiz.yaml"),
+          at("plugins/study/study.yaml"),
+          at("dek.toml"),
+        ]),
+      });
+      expect(outcome.diagnostics.map(({ path, line, column }) => ({ path, line, column }))).toEqual(
+        [
+          { path: join(project.root, "plugins", "quiz", "quiz.yaml"), line: 2, column: 3 },
+          { path: undefined, line: undefined, column: undefined },
+          { path: undefined, line: undefined, column: undefined },
+        ],
+      );
     });
   });
 

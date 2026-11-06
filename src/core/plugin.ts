@@ -62,7 +62,11 @@ const Check = z.object({
   rules: z.record(z.string(), Rule),
 });
 
-const Data = z.object({ path: z.string() });
+/**
+ * A data file: a path in the deck, or, with `in: "project"`, in the plugin's own `plugins/<name>/`
+ * in the project (ADR 35).
+ */
+const Data = z.object({ path: z.string(), in: z.literal("project").optional() });
 
 /** A page in the player and the build. Its script is the plugin's to ship; this dek reads only these. */
 const Page = z.object({
@@ -165,36 +169,50 @@ function ruleProblem(manifest: PluginManifest, name: string): string | undefined
 
 function dataProblem(manifest: PluginManifest): string | undefined {
   const seen = new Set<string>();
-  for (const { path } of manifest.data ?? []) {
-    const problem = dataPathProblem(path);
+  for (const entry of manifest.data ?? []) {
+    const shown = dataPath(manifest.name, entry);
+    const problem = dataPathProblem(entry);
     if (problem) {
-      return `data: \`${path}\` ${problem}`;
+      return `data: \`${entry.path}\` ${problem}`;
     }
-    if (seen.has(path)) {
-      return `data: \`${path}\` is named twice`;
+    if (seen.has(shown)) {
+      return `data: \`${shown}\` is named twice`;
     }
-    seen.add(path);
+    seen.add(shown);
   }
   return undefined;
 }
 
+type DataEntry = NonNullable<PluginManifest["data"]>[number];
+
+/** A data file as an agent finds it: in the deck, or in the project when it is the project's. */
+function dataPath(name: string, entry: DataEntry): string {
+  return entry.in === "project" ? `plugins/${name}/${entry.path}` : entry.path;
+}
+
 /**
- * A data file is a path inside the deck, `/`-separated, through no hidden folder, and none of the
- * files and folders dek reads or writes there.
+ * A data file is a path inside its folder, `/`-separated, through no hidden folder. In a deck it
+ * is none of the files and folders dek reads or writes there; in `plugins/<name>/` it is not the
+ * lock.
  */
-function dataPathProblem(path: string): string | undefined {
+function dataPathProblem({ path, in: level }: DataEntry): string | undefined {
+  const folder = level === "project" ? "plugins/<name>/" : "the deck";
   if (path === "" || path.startsWith("/") || path.includes("\\")) {
-    return "is not a path relative to the deck";
+    return `is not a path relative to ${folder}`;
   }
   const segments = path.split("/");
   if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
-    return "is not a path inside the deck";
+    return `is not a path inside ${folder}`;
   }
   if (segments.some((segment) => segment.startsWith("."))) {
-    return "is hidden, and dek reads no hidden file of a deck";
+    return "is hidden, and dek reads no hidden file of a plugin's";
   }
   // A Mac's disk and Windows' take `Slides` for `slides`.
-  if (DEK_DECK_ENTRIES.has((segments[0] ?? "").normalize("NFC").toLowerCase())) {
+  const first = (segments[0] ?? "").normalize("NFC").toLowerCase();
+  if (level === "project") {
+    return segments.length === 1 && first === "plugin.json" ? "is the plugin's lock" : undefined;
+  }
+  if (DEK_DECK_ENTRIES.has(first)) {
     return "is dek's";
   }
   return undefined;
@@ -225,7 +243,13 @@ function canonical(manifest: PluginManifest): PluginManifest {
     ...(manifest.page
       ? { page: { api: manifest.page.api, keys: [...(manifest.page.keys ?? [])].sort() } }
       : {}),
-    ...(manifest.data ? { data: manifest.data.map(({ path }) => ({ path })) } : {}),
+    ...(manifest.data
+      ? {
+          data: manifest.data.map((entry) =>
+            entry.in === "project" ? { path: entry.path, in: entry.in } : { path: entry.path },
+          ),
+        }
+      : {}),
   };
 }
 
@@ -263,8 +287,10 @@ export function manifestChanges(accepted: PluginManifest, installed: PluginManif
   }
   changes.push(...checkChanges(accepted.check, installed.check));
   changes.push(...pageChanges(accepted.page, installed.page));
-  const before = new Set((accepted.data ?? []).map(({ path }) => path));
-  const after = new Set((installed.data ?? []).map(({ path }) => path));
+  const paths = (manifest: PluginManifest) =>
+    new Set((manifest.data ?? []).map((entry) => dataPath(manifest.name, entry)));
+  const before = paths(accepted);
+  const after = paths(installed);
   for (const path of before) {
     if (!after.has(path)) {
       changes.push(`data ${path} removed`);
@@ -354,7 +380,11 @@ export function pluginsSection(plugins: PinnedPlugin[]): string {
         ? [`\`dekc lint\` checks ${ruleList(Object.keys(manifest.check.rules))}.`]
         : []),
       ...(manifest.data && manifest.data.length > 0
-        ? [`Its data: ${manifest.data.map(({ path }) => `\`${path}\``).join(", ")}.`]
+        ? [
+            `Its data: ${projectFirst(manifest.data)
+              .map((entry) => `\`${dataPath(name, entry)}\``)
+              .join(", ")}.`,
+          ]
         : []),
       ...(manifest.page?.keys && manifest.page.keys.length > 0
         ? [
@@ -371,6 +401,11 @@ Checks installed beside dek, named in \`dek.toml\` \`[plugins]\` and pinned in \
 
 ${lines.join("\n")}
 `;
+}
+
+/** The project's data files, then the deck's, each in the order the manifest gave them. */
+function projectFirst(data: DataEntry[]): DataEntry[] {
+  return [...data.filter((entry) => entry.in === "project"), ...data.filter((e) => !e.in)];
 }
 
 function ruleList(ids: string[]): string {

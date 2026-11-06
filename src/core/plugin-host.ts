@@ -202,8 +202,32 @@ function stderrLine(stderr: string): string {
   return line === undefined ? "" : `: ${foreignLine(line, PLUGIN_TEXT_MAX)}`;
 }
 
+/** The data files a manifest declares in the deck, leaving out the project's (ADR 35). */
+export function deckData(manifest: PluginManifest): Array<{ path: string }> {
+  return (manifest.data ?? []).filter((entry) => entry.in === undefined);
+}
+
+/** `plugins/<name>/` in the project: the lock, and the data the plugin keeps for the whole project. */
+function pluginDir(root: string, name: string): string {
+  return join(root, "plugins", name);
+}
+
+/**
+ * Whether a finding is on a file in the plugin's own `plugins/<name>/`, which every deck's check
+ * reads alike, so lint reports it once (ADR 35). A finding on a deck, or on none, is each deck's.
+ */
+export function onProjectData(finding: Diagnostic, root: string, name: string): boolean {
+  return finding.path !== undefined && inside(pluginDir(root, name), finding.path) !== undefined;
+}
+
+/** `path` relative to `dir` when it is inside it, as `location` reads a finding's place. */
+function inside(dir: string, path: string): string | undefined {
+  const within = relative(dir, path);
+  return within === "" || within.startsWith("..") || isAbsolute(within) ? undefined : within;
+}
+
 /** What the plugin reads on stdin: the deck, as the published schema says, not dek's own types. */
-function checkInput(deck: ProjectDeck): string {
+function checkInput(deck: ProjectDeck, dir: string): string {
   const relativeIfThere = (path: string) =>
     existsSync(path) ? relative(deck.dir, path).split(sep).join("/") : null;
   // Typed as published, so the shape a plugin reads cannot drift from @hajimism/dek/plugin.
@@ -221,6 +245,8 @@ function checkInput(deck: ProjectDeck): string {
         ts: relativeIfThere(join(deck.dir, "slides", `${section.slug}.ts`)),
       })),
     },
+    // Absolute: a deck reached through a link would lead a relative path elsewhere (ADR 35).
+    pluginDir: dir,
   };
   return JSON.stringify(input);
 }
@@ -254,7 +280,7 @@ export async function checkDeck(
       {
         label: `${binName(plugin.name)} check failed`,
         hint: "",
-        stdin: checkInput(deck),
+        stdin: checkInput(deck, pluginDir(project.root, plugin.name)),
         cwd: deck.dir,
         timeoutMs,
       },
@@ -272,7 +298,7 @@ export async function checkDeck(
     }
     return { diagnostics: [failed("could not start")] };
   }
-  const read = readSarif(stdout, plugin, deck.dir);
+  const read = readSarif(stdout, plugin, [deck.dir, pluginDir(project.root, plugin.name)]);
   return typeof read === "string" ? { diagnostics: [failed(read)] } : { diagnostics: read };
 }
 
@@ -307,8 +333,15 @@ type SarifResult = {
   properties?: { hint?: unknown };
 };
 
-/** The findings in a check's SARIF, or what is wrong with it, as the end of a DEK046 message. */
-function readSarif(stdout: string, plugin: ReadyPlugin, deckDir: string): Diagnostic[] | string {
+/**
+ * The findings in a check's SARIF, or what is wrong with it, as the end of a DEK046 message.
+ * `dirs` are the deck's folder, which a relative location is read against, then the plugin's own.
+ */
+function readSarif(
+  stdout: string,
+  plugin: ReadyPlugin,
+  dirs: [deck: string, plugin: string],
+): Diagnostic[] | string {
   let log: unknown;
   try {
     log = JSON.parse(stdout);
@@ -342,7 +375,7 @@ function readSarif(stdout: string, plugin: ReadyPlugin, deckDir: string): Diagno
         id,
         severity: rule.severity,
         message: foreignLine(text, PLUGIN_TEXT_MAX),
-        ...location(result, deckDir),
+        ...location(result, dirs),
         ...(typeof hint === "string" && hint.trim() !== ""
           ? { hint: foreignLine(hint, PLUGIN_TEXT_MAX) }
           : {}),
@@ -353,12 +386,13 @@ function readSarif(stdout: string, plugin: ReadyPlugin, deckDir: string): Diagno
 }
 
 /**
- * Where a finding is, from its first location: a path relative to the deck, or a file URL, either
- * inside the deck. A location anywhere else is dropped, never shown as a file to change.
+ * Where a finding is, from its first location: a path relative to the deck, or a file URL, inside
+ * the deck or the plugin's own `plugins/<name>/` (ADR 35). A location anywhere else is dropped,
+ * never shown as a file to change.
  */
 function location(
   result: SarifResult,
-  deckDir: string,
+  [deckDir, ownDir]: [string, string],
 ): Pick<Diagnostic, "path" | "line" | "column" | "slug"> {
   const physical = result.locations?.[0]?.physicalLocation;
   const uri = physical?.artifactLocation?.uri;
@@ -371,14 +405,14 @@ function location(
   } catch {
     return {};
   }
-  const inDeck = relative(deckDir, path);
-  if (inDeck === "" || inDeck.startsWith("..") || isAbsolute(inDeck)) {
+  const inDeck = inside(deckDir, path);
+  if (inDeck === undefined && inside(ownDir, path) === undefined) {
     return {};
   }
   const line = positive(physical?.region?.startLine);
   const column = line === undefined ? undefined : positive(physical?.region?.startColumn);
   const slug = inDeck
-    .split(sep)
+    ?.split(sep)
     .join("/")
     .match(/^slides\/([^/]+)\.(?:html|css|ts)$/)?.[1];
   return {
@@ -609,7 +643,8 @@ export function pluginPages(
       return [];
     }
     const data: PluginPage["data"] = {};
-    for (const { path } of manifest.data ?? []) {
+    // A page gets the deck's data alone; the project's is the check's (ADR 35).
+    for (const { path } of deckData(manifest)) {
       let text: string | undefined;
       try {
         text = readSourceIfExists(join(deckDir, path), root);

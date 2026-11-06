@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 import type { Diagnostic, SkippedCheck } from "../../src/core/diagnostic.ts";
 import type { SarifLog } from "../../src/core/sarif.ts";
@@ -121,6 +122,57 @@ describe("dekc sync and lint with a plugin", () => {
       const dek = log.runs.find((entry) => entry.tool.driver.name === "dek");
       expect(dek?.results.some((result) => result.ruleId === "QUIZ002")).toBe(false);
     });
+  });
+
+  test.serial("reports a finding on the project's data once, not once for each deck", async () => {
+    await withTempDir((outside) =>
+      withTempProject(
+        { toml: "[plugins.quiz]\n", decks: [deck, { ...deck, name: "outro" }] },
+        async (root) => {
+          const binDir = join(outside, "bin");
+          mkdirSync(binDir);
+          const list = pathToFileURL(join(root, "plugins", "quiz", "quiz.yaml")).href;
+          const onList = {
+            ruleId: "QUIZ001",
+            message: { text: "quiz.yaml does not read" },
+            locations: [
+              { physicalLocation: { artifactLocation: { uri: list }, region: { startLine: 3 } } },
+            ],
+          };
+          // Said of each deck with no place: one finding per deck, not one for the project.
+          const onDeck = { ruleId: "QUIZ002", message: { text: "the deck has no closing slide" } };
+          installPlugin(binDir, "quiz", {
+            manifest: quizManifest(),
+            sarif: {
+              version: "2.1.0",
+              runs: [{ results: [onList, ...(finding.runs[0]?.results ?? []), onDeck] }],
+            },
+          });
+          const env = { PATH: [binDir, dirname(process.execPath)].join(delimiter) };
+          await withEnv(env, async () => {
+            await runMain(["sync"], root);
+            const linted = jsonStdout<LintJson>(await dek(["lint", "--json"], root));
+            const ids = linted.diagnostics.map(({ id, path }) => `${id} ${path}`);
+            expect(ids).toEqual([
+              `QUIZ001 ${join("plugins", "quiz", "quiz.yaml")}`,
+              `QUIZ002 ${join("decks", "intro", "slides", "first.html")}`,
+              "QUIZ002 undefined",
+              `QUIZ002 ${join("decks", "outro", "slides", "first.html")}`,
+              "QUIZ002 undefined",
+            ]);
+            const sarif = JSON.parse((await runMain(["lint", "--format", "sarif"], root)).stdout);
+            const run = (sarif as SarifLog).runs.find((r) => r.tool.driver.name === "dek-quiz");
+            expect(run?.results.map((result) => result.ruleId)).toEqual([
+              "QUIZ001",
+              "QUIZ002",
+              "QUIZ002",
+              "QUIZ002",
+              "QUIZ002",
+            ]);
+          });
+        },
+      ),
+    );
   });
 
   test.serial("skips a plugin that changed until the change is accepted", async () => {

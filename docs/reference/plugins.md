@@ -69,7 +69,7 @@ AGENTS.md lists each plugin, with its version, its rule ids, and its data files,
 
 ### The lock
 
-`plugins/<name>/plugin.json` holds the manifest the project accepted: the plugin's version, its rules and their severities, and its data files. `dekc lint` runs a plugin only while the installed one promises exactly what the lock says. So a teammate or CI with another version runs no check rather than another one, and says so.
+`plugins/<name>/plugin.json` holds the manifest the project accepted: the plugin's version, its rules and their severities, and its data files. The same folder holds the data a plugin keeps for the whole project, such as a list every deck is checked against; commit it with the lock. `dekc lint` runs a plugin only while the installed one promises exactly what the lock says. So a teammate or CI with another version runs no check rather than another one, and says so.
 
 When the installed plugin's manifest changes, for example after an update, `dekc sync` lists what changed, such as `version 0.1.0 → 0.2.0` or `GLOSSARY003 added (error)`, and leaves the lock alone. Read the changes, then accept them:
 
@@ -141,7 +141,7 @@ Prints the manifest as JSON on stdout and exits 0:
 | `check.rules` | Every rule id the check can report. An id is the name in capitals, with `_` for `-`, then three digits: `glossary` → `GLOSSARY001`, `acme-talks` → `ACME_TALKS001` |
 | `…severity` | `error` or `warning`. dek uses this, not a result's SARIF `level`; only an error fails lint |
 | `…summary` | One line, at most 120 characters. dek shows it only in SARIF's rule list |
-| `data` | Optional. Files in the deck the plugin reads, relative to the deck's folder. Not hidden, not outside the deck, and none of dek's own (`script.md`, `theme.css`, `slides/`, `assets/`, `voice/`, `dist/`). AGENTS.md names them |
+| `data` | Optional. Files the plugin reads, which AGENTS.md names. `{ "path": "glossary.yaml" }` is in the deck, relative to its folder: not hidden, not outside the deck, and none of dek's own (`script.md`, `theme.css`, `slides/`, `assets/`, `voice/`, `dist/`). `{ "path": "terms.yaml", "in": "project" }` is in `plugins/<name>/` in the project, for data every deck shares: not hidden, not outside that folder, and not `plugin.json`. Only the deck's files reach a page ([ADR 35](https://github.com/hajimism/dek/blob/main/adr/0035-let-a-plugin-keep-data-for-the-whole-project-in-plugins-name.md)) |
 
 dek ignores a field it does not know. The manifest has no field for guidance: what agents read about a plugin, dek writes from these facts. Print the same manifest every time; dek gives it 10 seconds.
 
@@ -159,11 +159,12 @@ dek runs it once per deck, in the deck's folder, with the deck as JSON on stdin:
     "slides": [
       { "slug": "planning-fallacy", "title": "計画錯誤", "html": "slides/planning-fallacy.html", "css": null, "ts": null }
     ]
-  }
+  },
+  "pluginDir": "/home/me/talks/plugins/glossary"
 }
 ```
 
-Each path is relative to the deck's folder, or `null` when the file is not there. Read the files yourself.
+Each slide's path is relative to the deck's folder, or `null` when the file is not there. `pluginDir` is the absolute path of `plugins/<name>/` in the project, where a `data` file with `"in": "project"` is, whether or not the folder exists; a dek older than this field does not send it, which means no project data. Read the files yourself.
 
 Print SARIF 2.1.0 on stdout and exit 0, with or without findings. A non-zero exit means the check itself failed. dek reads, from each result:
 
@@ -171,11 +172,11 @@ Print SARIF 2.1.0 on stdout and exit 0, with or without findings. A non-zero exi
 | --- | --- |
 | `ruleId` | `id`; it must be in `check.rules` |
 | `message.text` | `message`; required |
-| `locations[0].physicalLocation.artifactLocation.uri` | `path`: relative to the deck's folder, or a `file:` URL inside it. A location elsewhere is dropped. `slides/<slug>.html`, `.css`, or `.ts` also sets `slug` |
+| `locations[0].physicalLocation.artifactLocation.uri` | `path`: relative to the deck's folder, or a `file:` URL inside it or inside `pluginDir`. A location elsewhere is dropped. `slides/<slug>.html`, `.css`, or `.ts` also sets `slug` |
 | `…region.startLine`, `…region.startColumn` | `line`, `column` |
 | `properties.hint` | `hint`: what to do next |
 
-dek makes each message and hint one line of at most 300 characters. The severity comes from the manifest.
+dek makes each message and hint one line of at most 300 characters. The severity comes from the manifest. A finding in `pluginDir` that each deck's check reports the same way, such as a mistake in a project's data file, is reported once.
 
 A check promises to print the same output for the same input, to write no file, and to use no network. dek gives it 30 seconds per deck, then stops it with SIGTERM and later SIGKILL, and runs it on no deck after one it hung on.
 
