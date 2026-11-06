@@ -100,7 +100,7 @@ more
         ],
       },
       async (root) => {
-        const result = syncCommand(resolveDecks(root));
+        const result = await syncCommand(resolveDecks(root));
         expect(result.created.some((path) => path.endsWith("decks/alpha/slides/extra.html"))).toBe(
           true,
         );
@@ -113,9 +113,9 @@ more
 
   test("lists dek's own files it updated, once however many decks it syncs", async () => {
     await withTempProject({ decks: [{ name: "alpha" }, { name: "beta" }] }, async (root) => {
-      syncCommand(resolveDecks(root));
+      await syncCommand(resolveDecks(root));
       await writeFile(join(root, ".dek", "slide.d.ts"), "// an older dek's types\n");
-      const result = syncCommand(resolveDecks(root));
+      const result = await syncCommand(resolveDecks(root));
       expect(result.updated).toEqual([join(root, ".dek", "slide.d.ts")]);
     });
   });
@@ -126,7 +126,7 @@ more
       const deckDir = join(dir, "decks", "demo");
       await writeFile(join(deckDir, "script.md"), "---\ntitle: Mine\n---\n\n## hello\n");
 
-      const result = syncCommand(resolveDecks(deckDir));
+      const result = await syncCommand(resolveDecks(deckDir));
       expect(result.created).toEqual([join(deckDir, "slides", "hello.html")]);
       expect(result.removed.length).toBeGreaterThan(0);
       expect(listSlides(deckDir).map((slide) => slide.slug)).toEqual(["hello"]);
@@ -151,7 +151,7 @@ describe("dekc sync and slides the script no longer names", () => {
       },
       async (root) => {
         const deckDir = join(root, "decks", "demo");
-        const result = syncCommand(resolveDecks(deckDir));
+        const result = await syncCommand(resolveDecks(deckDir));
         expect(result.kept).toEqual([join(deckDir, "slides", "old.html")]);
         expect(outputOf("sync").notes?.(result, false)).toBe(
           `kept ${join(deckDir, "slides", "old.html")}: its section is gone from script.md, and the file is yours\n  help: run \`dekc lint\`, which names the \`dekc mv\` if its section was renamed, or what else to do with it`,
@@ -166,12 +166,12 @@ describe("syncCommand and .gitignore", () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const path = join(root, ".gitignore");
       await writeFile(path, "# mine\ndist/\n.dek/server.json");
-      const first = syncCommand(resolveDecks(root));
+      const first = await syncCommand(resolveDecks(root));
       expect(first.updated).toContain(path);
       expect(await readFile(path, "utf8")).toBe(
         "# mine\ndist/\n.dek/server.json\n.dek/marks.json\n.dek/annotations.json\n",
       );
-      const second = syncCommand(resolveDecks(root));
+      const second = await syncCommand(resolveDecks(root));
       expect(second.updated).not.toContain(path);
     });
   });
@@ -180,14 +180,14 @@ describe("syncCommand and .gitignore", () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
       const path = join(root, ".gitignore");
       await writeFile(path, "/.dek/\n");
-      expect(syncCommand(resolveDecks(root)).updated).not.toContain(path);
+      expect((await syncCommand(resolveDecks(root))).updated).not.toContain(path);
       expect(await readFile(path, "utf8")).toBe("/.dek/\n");
     });
   });
 
   test("writes no .gitignore where the project has none", async () => {
     await withTempProject({ decks: [{ name: "demo" }] }, async (root) => {
-      syncCommand(resolveDecks(root));
+      await syncCommand(resolveDecks(root));
       expect(existsSync(join(root, ".gitignore"))).toBe(false);
     });
   });
@@ -197,7 +197,7 @@ describe("syncCommand and .gitignore", () => {
       initCommand({ cwd: dir, deck: "demo" });
       const path = join(dir, ".gitignore");
       const before = await readFile(path, "utf8");
-      expect(syncCommand(resolveDecks(dir)).updated).not.toContain(path);
+      expect((await syncCommand(resolveDecks(dir))).updated).not.toContain(path);
       expect(await readFile(path, "utf8")).toBe(before);
     });
   });

@@ -4,6 +4,7 @@ import { DekError } from "./error.ts";
 import { shellQuote } from "./escape.ts";
 import { isPackLicense, PACK_LICENSES, type PackLicense } from "./licenses.ts";
 import { parsePublicUrl } from "./ogp.ts";
+import { pluginNameProblem } from "./plugin.ts";
 import {
   isPinFor,
   isPlainRefName,
@@ -30,6 +31,12 @@ export const Pack = z.object({
     })
     .optional(),
 });
+
+/**
+ * A plugin's table in `[plugins]`. It takes no key yet: a project chooses which of the plugins the
+ * user installed it uses, and never names a path, an argument, or a program for dek to run.
+ */
+export const PluginTable = z.object({});
 
 export const DekToml = z.object({
   url: z
@@ -71,6 +78,18 @@ export const DekToml = z.object({
     })
     .transform((refs) => refs as Record<string, string>)
     .optional(),
+  // A name that is no plugin's is refused without being repeated, as a ref's is.
+  plugins: z
+    .record(z.string(), PluginTable)
+    .superRefine((plugins, ctx) => {
+      for (const name of Object.keys(plugins)) {
+        const problem = pluginNameProblem(name);
+        if (problem) {
+          ctx.addIssue({ code: "custom", path: [], message: problem });
+        }
+      }
+    })
+    .optional(),
 });
 
 const REFUSED_REF_KEY = "a key in [refs] names no ref";
@@ -107,6 +126,37 @@ function refusedRefKey(source: string): { line?: number } | undefined {
   return entry === undefined ? {} : { line: entry.line };
 }
 
+/**
+ * The first name in [plugins] that is no plugin's, with what is wrong and its line. Like a ref's,
+ * the name may be someone else's text, so the error points at it and never repeats it.
+ */
+function refusedPluginKey(source: string): { problem: string; line?: number } | undefined {
+  let parsed: unknown;
+  try {
+    parsed = Bun.TOML.parse(source);
+  } catch {
+    return undefined;
+  }
+  const plugins = (parsed as { plugins?: unknown } | null)?.plugins;
+  if (plugins === null || typeof plugins !== "object") {
+    return undefined;
+  }
+  for (const name of Object.keys(plugins)) {
+    const problem = pluginNameProblem(name);
+    if (problem === undefined) {
+      continue;
+    }
+    const written = scanTomlKeys(source).filter(
+      (entry) => entry.path[0] === "plugins" && entry.path.length === 2,
+    );
+    const entry =
+      written.find((key) => key.path[1] === name) ??
+      written.find((key) => pluginNameProblem(key.path[1] ?? "") !== undefined);
+    return entry === undefined ? { problem } : { problem, line: entry.line };
+  }
+  return undefined;
+}
+
 type VoiceDefaults = {
   engine: string;
   speaker: string;
@@ -126,12 +176,22 @@ export type DekConfig = {
   pack?: { license?: PackLicense };
   /** `[refs]`: each ref name and what it is pinned to: a commit, or a pack's digest. */
   refs?: Record<string, string>;
+  /** `[plugins]`: the name of each plugin the project uses, sorted, as dek runs them. */
+  plugins?: string[];
 };
 
 export function parseDekToml(source: string, path?: string): DekConfig {
   const refused = refusedRefKey(source);
   if (refused) {
     throw new DekError(REFUSED_REF_KEY, { path, ...refused, hint: REFUSED_REF_HINT });
+  }
+  const plugin = refusedPluginKey(source);
+  if (plugin) {
+    throw new DekError(`a name in [plugins] is no plugin's: ${plugin.problem}`, {
+      path,
+      ...(plugin.line === undefined ? {} : { line: plugin.line }),
+      hint: "rename the table to the <name> of the dek-<name> you installed, or delete it",
+    });
   }
   const data = parseTomlWith(DekToml, source, {
     label: "dek.toml",
@@ -155,6 +215,9 @@ export function parseDekToml(source: string, path?: string): DekConfig {
       ? { pack: data.pack.license ? { license: data.pack.license as PackLicense } : {} }
       : {}),
     ...(data.refs && Object.keys(data.refs).length > 0 ? { refs: data.refs } : {}),
+    ...(data.plugins && Object.keys(data.plugins).length > 0
+      ? { plugins: Object.keys(data.plugins).sort() }
+      : {}),
   };
 }
 

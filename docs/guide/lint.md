@@ -32,6 +32,7 @@ dek delegates general Markdown hygiene to [rumdl](https://github.com/rvben/rumdl
 | Rendering | Overflow, contrast, line breaks, and alignment, measured in a browser |
 | Narration | Only for decks with `voice/` |
 | Length | Only for decks with a `duration` |
+| Plugins | Conventions dek does not know, checked by each `dek-<name>` the project pins; see [Plugins](/reference/plugins) |
 
 ## `--visual`
 
@@ -61,7 +62,7 @@ Without `--visual`, `dekc lint` says so: `visual` is in `"skipped"`, and the tex
 
 ## Output
 
-Diagnostics are SARIF 2.1.0 so that VS Code, CI, and agents all read the same format. rumdl's results are merged in as a second run. Humans get ESLint-style text by default.
+Diagnostics are SARIF 2.1.0 so that VS Code, CI, and agents all read the same format. rumdl's results are merged in as a second run, and each plugin's as a run of its own. Humans get ESLint-style text by default.
 
 Wherever the fix is known, a diagnostic carries a `hint`: the beat ids a `data-step` may use, the classes a slide may use, the `assets/` path for a remote image. Text output prints it as a `help:` line, `--json` as a `hint` field, and SARIF as `properties.hint`, next to `slug` and `data`.
 

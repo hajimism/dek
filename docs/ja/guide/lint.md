@@ -32,6 +32,7 @@ dekc check architecture --shot
 | 描画 | はみ出し、コントラスト、改行、揃え。ブラウザで測る |
 | ナレーション | `voice/` のあるデッキだけ |
 | 尺 | `duration` のあるデッキだけ |
+| プラグイン | dek の知らない規約。プロジェクトが固定した `dek-<name>` がそれぞれ検査する。[プラグイン](/ja/reference/plugins)を参照 |
 
 ## `--visual`
 
@@ -61,7 +62,7 @@ slides/objection.html: DEK031 p.note "補足" has contrast 1.5 (#333333 on #1111
 
 ## 出力
 
-診断は SARIF 2.1.0 で統一しています。VS Code も CI もエージェントも同じ形式を読めるようにするためで、rumdl の結果は 2 つ目の run として加わります。人間向けの既定は ESLint 風のテキストです。
+診断は SARIF 2.1.0 で統一しています。VS Code も CI もエージェントも同じ形式を読めるようにするためで、rumdl の結果は 2 つ目の run として、プラグインの結果はプラグインごとの run として加わります。人間向けの既定は ESLint 風のテキストです。
 
 直し方が決まっている診断には `hint` が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。テキストでは `help:` 行、`--json` では `hint` フィールド、SARIF では `slug` や `data` と並んで `properties.hint` に入ります。
 

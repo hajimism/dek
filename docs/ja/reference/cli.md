@@ -81,13 +81,13 @@ ref の文章は他人のものなので、dek は自分の言葉と分けて扱
 | `dekc marks [deck] clear` | デッキの印を消す。`--json` の `cleared` は消した数。 |
 | `dekc annotations [deck]` | 注釈モードでスライドの要素に書いたノートを一覧する。開発サーバのページで `a` を押すか、発表者バーの注釈ボタンを押して、直したいものをクリックして書く。ノートごとに、ページのマーカーと同じ `number`、書いたときの `step`、人が書いた `text`、そのビートを撮る `shot` コマンド、`targets` を返す。`targets` は要素ごとに、いまのファイルでの開始タグの `path`・`line`・`column`、`name`（そこに書かれたとおりのタグとクラス）、`was`（ノートを書いたときの文字）、`text`（いまの文字）、書いたときのスライド上の `box`、見つかったかどうかの `found`。`status` は、スライド自身の `slides/<id>.html`・`.css`・`.ts` が書いたときのままなら `open`、どれかが変わると `edited`（`changed` がどれかを示す）、ノートの要素が 1 つもスライドになくなるか、スライドが台本からなくなると `gone`。`edited` はスライドが変わったことを示すだけで、ノートが片付いたことは示さない。`shot` をノートと見比べること。要素は、いまのファイルに対して照合し直す。同じ位置で同じ名前と文字のもの、なければその名前と文字を持つ唯一の要素、なければ同じ位置で同じ名前のもの、なければ同じ位置で同じタグのもの（クラスが変わった場合）。見つけた位置は書き戻すので、ノートは編集をまたいで要素を追いかける。ノートは `.dek/annotations.json` に保存される。読むのに開発サーバは要らない。書くにはページが要る。 |
 | `dekc annotations [deck] clear` | デッキの注釈を消す。片付いたことを人が確かめてから。`--json` の `cleared` は消した数。 |
-| `dekc sync [deck]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、dek 自身のファイル（`AGENTS.md` の dek のブロック、`.dek/schema.json`、`.dek/slide.d.ts`）を更新する。これらはデッキではなく、入っている dek とプロジェクトの ref に従うので、どちらかが変わった後にだけ変わる。そのとき最初に走ったコマンドが、どれであれ更新したと表示する。`.gitignore` が dek 自身のためのファイル（`.dek/server.json`、`.dek/marks.json`、`.dek/annotations.json`）を無視していなければ末尾に書き足し、更新したと表示する。`.gitignore` のないプロジェクトには作らない。手を入れたスライド、`AGENTS.md` の dek のブロックの外に書いたこと、`tsconfig.json` には触れない。セクションがなくなっても手が入っているスライドは残し、どうすればよいかと一緒に標準エラーに名前を出す。lint はそれを `DEK002` として報告する。`--json` は `created`、`updated`、`removed`、`kept` を返す |
+| `dekc sync [deck] [--accept <plugin>]` | 足りない骨格スライドを作り、その後誰も手を入れていない骨格を書き直し、セクションがなくなった手付かずの骨格を消し（横に `slides/<id>.css` か `.ts` があれば残す）、dek 自身のファイル（`AGENTS.md` の dek のブロック、`.dek/schema.json`、`.dek/slide.d.ts`）を更新する。これらはデッキではなく、入っている dek とプロジェクトの ref に従うので、どちらかが変わった後にだけ変わる。そのとき最初に走ったコマンドが、どれであれ更新したと表示する。`.gitignore` が dek 自身のためのファイル（`.dek/server.json`、`.dek/marks.json`、`.dek/annotations.json`）を無視していなければ末尾に書き足し、更新したと表示する。`.gitignore` のないプロジェクトには作らない。手を入れたスライド、`AGENTS.md` の dek のブロックの外に書いたこと、`tsconfig.json` には触れない。セクションがなくなっても手が入っているスライドは残し、どうすればよいかと一緒に標準エラーに名前を出す。lint はそれを `DEK002` として報告する。`dek.toml` が挙げる[プラグイン](/ja/reference/plugins)ごとに、先に `dek-<name>` に申告を出させ、`plugins/<name>/plugin.json` に固定する。その lock と違う申告は、何が変わったかを標準エラーに挙げ、`--accept <plugin>` を付けたときだけ固定する。見つからない、読めないプラグインは、理由と一緒に名前を出す。プラグインを走らせるのはこのコマンドだけで、開発サーバーの sync は走らせない。`--json` は `created`、`updated`、`removed`、`kept` を返し、`dek.toml` がプラグインを挙げていれば、それぞれの `status` を持つ `plugins` も返す |
 
 ## 成果物
 
 | コマンド | 役割 |
 | --- | --- |
-| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | lint。`--fix` は先に `dekc sync` を実行する。`--visual` ははみ出し、コントラスト、改行、揃えを足す |
+| `dekc lint [deck] [--fix] [--visual] [--format sarif]` | lint。`--fix` は先に `dekc sync` を実行する。`--visual` ははみ出し、コントラスト、改行、揃えを足す。プロジェクトが固定した[プラグイン](/ja/reference/plugins)も、それぞれのルール id で各デッキを検査する。走れないものは飛ばしたと報告する |
 | `dekc cues [deck]` | 喋りの Cue を `Cue[]` で出力。段落だけ。エンジン不要 |
 | `dekc voice [deck]` | 変わった文を `.cache/voice/` に合成。保存時にも走る。話者の一覧やバージョンに 10 秒、文の読みに 60 秒、読み上げに 5 分を超えるエンジンは諦める |
 | `dekc voice [deck] speakers` | エンジンの話者一覧 |

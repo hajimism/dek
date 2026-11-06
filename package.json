@@ -8,6 +8,13 @@
   "bin": {
     "dekc": "src/cli.ts"
   },
+  "exports": {
+    "./plugin": {
+      "types": "./src/plugin-api.ts",
+      "default": "./src/plugin-api.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "src",
     "skills",

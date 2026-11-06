@@ -1,4 +1,4 @@
-import { hasErrors } from "../core/diagnostic.ts";
+import { hasErrors, RULES } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
 import type { HiddenText } from "../core/foreign-text.ts";
 import { isRefName } from "../core/ref-name.ts";
@@ -27,6 +27,7 @@ import {
   formatNew,
   formatPack,
   formatPdf,
+  formatPluginNotes,
   formatPptx,
   formatRef,
   formatReport,
@@ -658,23 +659,31 @@ export const COMMANDS = {
   sync: result({
     scope: "decks",
     args: [],
-    flags: [],
-    usage: ["dekc sync [deck]"],
+    flags: ["accept"],
+    usage: ["dekc sync [deck] [--accept <plugin>]"],
     summary:
       "Create a skeleton for each section without slide HTML, refresh the skeletons\nnobody has edited since, and remove the ones whose section is gone.",
     group: "Slide",
-    overview: [["dekc sync", "create missing skeletons; refresh or drop the ones nobody edited"]],
+    overview: [
+      ["dekc sync", "create missing skeletons; refresh or drop the ones nobody edited"],
+      ["dekc sync --accept <plugin>", "pin a plugin whose manifest changed since its lock"],
+    ],
     agent: [
       "dekc sync            create missing skeletons; refresh or drop untouched ones; never edits your slides",
+      "dekc sync --accept <plugin>  pin a plugin's changed manifest, once the user has read the change",
     ],
-    run: async ({ target }) => {
+    run: async ({ target, flags }) => {
       const { syncCommand } = await import("./sync.ts");
-      return syncCommand(target);
+      return syncCommand(target, { accept: flags.accept });
     },
     output: {
       text: (data) => formatCreated(data.created, data.updated, data.removed),
-      notes: (data, color) => formatKept(data.kept, color) || undefined,
+      notes: (data, color) =>
+        [formatKept(data.kept, color), formatPluginNotes(data.plugins, color)]
+          .filter(Boolean)
+          .join("\n") || undefined,
       paths: (data, display) => ({
+        ...data,
         created: data.created.map(display),
         updated: data.updated.map(display),
         removed: data.removed.map(display),
@@ -703,14 +712,19 @@ export const COMMANDS = {
     output: {
       text: (data, color) => formatReport(data.diagnostics, { color }),
       notes: (data, color) => formatSkipped(data.skipped, color) || undefined,
-      json: ({ rumdlSarif: _rumdlSarif, ...data }) => data,
+      json: ({ rumdlSarif: _rumdlSarif, pluginSarif: _pluginSarif, ...data }) => data,
       paths: withDisplayDiagnostics,
       // The rerun measures what this run did: without --visual, the errors it found may not show.
       failure: (data, flags) =>
         diagnosticFailure("lint", data, flags.visual ? "dekc lint --visual" : "dekc lint"),
+      // dek's run holds its own rules; rumdl and each plugin have runs of their own.
       sarif: (data) => {
-        const dek = data.diagnostics.filter((diagnostic) => diagnostic.id.startsWith("DEK"));
-        return mergeSarif(toSarif(dek, { skipped: data.skipped ?? [] }), data.rumdlSarif);
+        const dek = data.diagnostics.filter((diagnostic) => Object.hasOwn(RULES, diagnostic.id));
+        return mergeSarif(
+          toSarif(dek, { skipped: data.skipped ?? [] }),
+          data.rumdlSarif,
+          data.pluginSarif,
+        );
       },
     },
   }),

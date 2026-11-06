@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { loadConfig } from "./config.ts";
 import { type DeckPaths, deckPaths } from "./deck-paths.ts";
 import { foreignLine, TITLE_MAX } from "./foreign-text.ts";
+import { pluginsSection } from "./plugin.ts";
+import { pinnedPlugins } from "./plugin-host.ts";
 import { parseRefSource, refDir, refTitle } from "./ref.ts";
 import { asResolvedDeck, listSlides, type ResolvedDeck, SLIDE_SIDECARS } from "./resolve.ts";
 import { outputDir, readSourceIfExists, removeInside, writeInside } from "./safe-fs.ts";
@@ -289,7 +291,7 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - \`dekc lint --visual\` passes.
 - You have read \`dekc shot --sheet\` and judged the deck's balance.
 - Say what you could not judge, such as the argument and the timing, and leave it to the author.
-${referencesSection(root)}
+${referencesSection(root)}${pluginsSection(pinnedPlugins(root))}
 For commands, run \`dekc help --agent\`.
 `;
 }

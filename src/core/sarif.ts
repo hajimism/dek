@@ -1,6 +1,13 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { type Diagnostic, type DiagnosticValue, RULES, type SkippedCheck } from "./diagnostic.ts";
+import {
+  type Diagnostic,
+  type DiagnosticValue,
+  RULES,
+  type SkippedCheck,
+  skippedLabel,
+} from "./diagnostic.ts";
+import type { PluginManifest } from "./plugin.ts";
 
 type SarifLevel = "error" | "warning" | "note" | "none";
 
@@ -11,8 +18,14 @@ export type SarifLog = {
     tool: {
       driver: {
         name: string;
+        version?: string;
         informationUri?: string;
-        rules?: Array<{ id: string; defaultConfiguration: { level: SarifLevel }; helpUri: string }>;
+        rules?: Array<{
+          id: string;
+          shortDescription?: { text: string };
+          defaultConfiguration: { level: SarifLevel };
+          helpUri?: string;
+        }>;
       };
     };
     invocations?: Array<{
@@ -74,10 +87,11 @@ export function toSarif(
                   executionSuccessful: true,
                   toolExecutionNotifications: skipped.map((entry) => ({
                     level: "warning" as const,
-                    message: { text: `${entry.check}: skipped (${entry.reason})` },
+                    message: { text: `${skippedLabel(entry)}: skipped (${entry.reason})` },
                     descriptor: { id: `skipped/${entry.check}` },
                     properties: {
                       check: entry.check,
+                      ...(entry.plugin === undefined ? {} : { plugin: entry.plugin }),
                       ...(entry.hint === undefined ? {} : { hint: entry.hint }),
                     },
                   })),
@@ -88,6 +102,33 @@ export function toSarif(
         results: diagnostics.map(sarifResult),
       },
     ],
+  };
+}
+
+/**
+ * Each plugin's findings as a run of its own, under the plugin's name and version, with the rules
+ * its accepted manifest declares. A plugin that found nothing still has its run: it ran.
+ */
+export function pluginSarif(
+  plugins: Array<{ name: string; manifest: PluginManifest; diagnostics: Diagnostic[] }>,
+): SarifLog {
+  return {
+    version: "2.1.0",
+    $schema: "https://json.schemastore.org/sarif-2.1.0.json",
+    runs: plugins.map(({ name, manifest, diagnostics }) => ({
+      tool: {
+        driver: {
+          name: `dek-${name}`,
+          version: manifest.version,
+          rules: Object.entries(manifest.check?.rules ?? {}).map(([id, rule]) => ({
+            id,
+            shortDescription: { text: rule.summary },
+            defaultConfiguration: { level: rule.severity },
+          })),
+        },
+      },
+      results: diagnostics.map(sarifResult),
+    })),
   };
 }
 
@@ -126,10 +167,11 @@ function sarifResult(diagnostic: Diagnostic): SarifLog["runs"][number]["results"
   };
 }
 
-export function mergeSarif(dek: SarifLog, rumdl?: SarifLog): SarifLog {
+/** One log of every run in `dek` and the logs after it, such as rumdl's and the plugins'. */
+export function mergeSarif(dek: SarifLog, ...others: Array<SarifLog | undefined>): SarifLog {
   return {
     version: "2.1.0",
     $schema: dek.$schema,
-    runs: [...dek.runs, ...(rumdl?.runs ?? [])],
+    runs: [...dek.runs, ...others.flatMap((log) => log?.runs ?? [])],
   };
 }

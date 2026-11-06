@@ -41,7 +41,8 @@ const Diagnostic = z
 
 const SkippedCheck = z
   .strictObject({
-    check: z.enum(["lint", "preview", "rumdl", "visual", "voice"]),
+    check: z.enum(["lint", "plugin", "preview", "rumdl", "visual", "voice"]),
+    plugin: z.string().optional().describe("For a plugin's check, its name in dek.toml [plugins]."),
     reason: z.string(),
     hint: z.string().optional().describe("What to do so that the check runs."),
   })
@@ -421,7 +422,32 @@ export const RESULT_FIELDS = {
     }),
     z.strictObject({ action: z.literal("clear"), cleared: z.number().int() }),
   ]),
-  sync: z.strictObject({ created: paths, updated: paths, removed: paths, kept: paths }),
+  sync: z.strictObject({
+    created: paths,
+    updated: paths,
+    removed: paths,
+    kept: paths,
+    plugins: z
+      .array(
+        z.strictObject({
+          name: z.string().describe("The plugin's name in dek.toml [plugins]."),
+          status: z
+            .enum(["accepted", "current", "changed", "missing", "invalid", "unsupported"])
+            .describe(
+              "accepted: pinned now; current: as pinned; changed: differs from its lock, which was left as it was; missing: not installed; invalid: printed no manifest dek can use; unsupported: needs a newer dek.",
+            ),
+          version: z.string().optional().describe("The installed plugin's version."),
+          changes: z
+            .array(z.string())
+            .optional()
+            .describe("For changed: what differs from the lock, one change each."),
+          reason: z.string().optional(),
+          hint: z.string().optional(),
+        }),
+      )
+      .optional()
+      .describe("Each plugin dek.toml names, in name order; absent when it names none."),
+  }),
   lint: z.strictObject({ diagnostics, skipped, unsandboxed }),
   cues: z.strictObject({
     name: z.string(),

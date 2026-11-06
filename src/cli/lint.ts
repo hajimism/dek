@@ -4,8 +4,9 @@ import type { Diagnostic } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
 import { lintDeck, lintProject, unreadableScriptDiagnostics } from "../core/lint.ts";
 import { playwrightMissingError } from "../core/playwright.ts";
+import { checkDeck, pluginChecks } from "../core/plugin-host.ts";
 import { type RumdlRunner, type RumdlSkip, resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
-import { mergeSarif, type SarifLog } from "../core/sarif.ts";
+import { mergeSarif, pluginSarif, type SarifLog } from "../core/sarif.ts";
 import { syncDeck } from "../core/sync.ts";
 import { lintVisualDeck } from "../core/visual.ts";
 import { RENDERED_RULES, type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
@@ -16,6 +17,8 @@ export type LintCliResult = {
   /** Checks that did not run, each with why and how to run it, so an empty list is not a pass. */
   skipped?: SkippedCheck[];
   rumdlSarif?: SarifLog;
+  /** A run per plugin that ran, for `--format sarif`. */
+  pluginSarif?: SarifLog;
 };
 
 /** `cwd` is where a skipped rumdl's hint says to run it from; `rumdl` runs it, dek's by default. */
@@ -32,6 +35,15 @@ export async function lintCommand(
   let rumdlSarif: SarifLog | undefined;
   // A rumdl that hung on one deck would hang on each, half a minute apiece.
   let rumdlHung = false;
+  // The plugins as the project accepted them; one that hung is run on no deck after, as rumdl.
+  const plugins = await pluginChecks(project);
+  diagnostics.push(...plugins.diagnostics);
+  const pluginRuns = plugins.ready.map((plugin) => ({
+    ...plugin,
+    diagnostics: [] as Diagnostic[],
+    hungOn: undefined as string | undefined,
+    skippedDecks: 0,
+  }));
 
   for (const deck of decks) {
     if (options.fix) {
@@ -50,6 +62,18 @@ export async function lintCommand(
         rumdlSarif = rumdlSarif ? mergeSarif(rumdlSarif, markdown.sarif) : markdown.sarif;
       }
     }
+    for (const plugin of pluginRuns) {
+      if (plugin.hungOn !== undefined) {
+        plugin.skippedDecks += 1;
+        continue;
+      }
+      const outcome = await checkDeck(plugin, project, deck);
+      diagnostics.push(...outcome.diagnostics);
+      plugin.diagnostics.push(...outcome.diagnostics.filter(({ id }) => id !== "DEK046"));
+      if (outcome.hung) {
+        plugin.hungOn = deck.name;
+      }
+    }
     if (options.visual) {
       const visual = await lintVisualDeck({ project, deck });
       if (visual === null) {
@@ -63,6 +87,19 @@ export async function lintCommand(
     diagnostics,
     ...skippedChecks([
       ...(rumdlSkip ? [rumdlSkip] : []),
+      ...plugins.skipped,
+      ...pluginRuns.flatMap((plugin): SkippedCheck[] =>
+        plugin.skippedDecks > 0
+          ? [
+              {
+                check: "plugin",
+                plugin: plugin.name,
+                reason: `dek-${plugin.name} hung on ${plugin.hungOn}, so it ran on no deck after`,
+                hint: `tell the user: dek-${plugin.name} hangs, and its author can fix it`,
+              },
+            ]
+          : [],
+      ),
       ...(options.visual
         ? []
         : [
@@ -72,6 +109,7 @@ export async function lintCommand(
           ]),
     ]),
     ...(rumdlSarif ? { rumdlSarif } : {}),
+    ...(pluginRuns.length > 0 ? { pluginSarif: pluginSarif(pluginRuns) } : {}),
   };
 }
 

@@ -1,9 +1,10 @@
 // How each command's result reads as text; commands.ts says which command prints which.
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
-import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
+import { type Diagnostic, type SkippedCheck, skippedLabel } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
 import { foreignLine, type HiddenText, TITLE_MAX } from "../core/foreign-text.ts";
 import { compareCodeUnits } from "../core/order.ts";
+import type { PluginSync } from "../core/plugin-host.ts";
 import { unprinted } from "../core/prose.ts";
 import { packFile, parseRefSource } from "../core/ref-name.ts";
 import { formatClock } from "../core/timing.ts";
@@ -65,7 +66,7 @@ export function formatSkipped(skipped: SkippedCheck[] | undefined, color = false
   const c = ansi(color);
   return (skipped ?? [])
     .flatMap((entry) => [
-      `${entry.check}: skipped (${entry.reason})`,
+      `${skippedLabel(entry)}: skipped (${entry.reason})`,
       ...(entry.hint ? [`  ${c.yellow("help:")} ${entry.hint}`] : []),
     ])
     .join("\n");
@@ -114,6 +115,23 @@ export function formatKept(kept: string[], color = false): string {
     .flatMap((path) => [
       `kept ${path}: its section is gone from script.md, and the file is yours`,
       `  ${c.yellow("help:")} ${ORPHAN_HINT}`,
+    ])
+    .join("\n");
+}
+
+/**
+ * The plugins sync could not pin as they are, for stderr: one whose manifest changed, with what
+ * changed, and one dek could not find or read, with why; a plugin pinned or current says nothing.
+ */
+export function formatPluginNotes(plugins: PluginSync[] | undefined, color = false): string {
+  const c = ansi(color);
+  return (plugins ?? [])
+    .filter(({ status }) => status !== "accepted" && status !== "current")
+    .flatMap((plugin) => [
+      plugin.status === "changed"
+        ? `plugin ${plugin.name} changed: ${(plugin.changes ?? [plugin.reason ?? ""]).join("; ")}`
+        : `plugin ${plugin.name}: ${plugin.reason ?? plugin.status}`,
+      ...(plugin.hint ? [`  ${c.yellow("help:")} ${plugin.hint}`] : []),
     ])
     .join("\n");
 }

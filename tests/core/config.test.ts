@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadConfig, parseDekToml } from "../../src/core/config.ts";
-import { unknownFrontmatterKeys } from "../../src/core/config-keys.ts";
+import { unknownFrontmatterKeys, unknownTomlKeys } from "../../src/core/config-keys.ts";
 import { DekError } from "../../src/core/error.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -120,6 +120,46 @@ describe("[pack]", () => {
     expect(() => parseDekToml('[pack]\nlicense = "MIT"\n')).toThrow(
       /CC0-1\.0.*CC-BY-4\.0.*LICENSE/,
     );
+  });
+});
+
+describe("[plugins]", () => {
+  test("reads the name of each plugin, in order", () => {
+    expect(parseDekToml("[plugins.study]\n[plugins.acme-talks]\n").plugins).toEqual([
+      "acme-talks",
+      "study",
+    ]);
+    expect(parseDekToml("# no plugins\n").plugins).toBeUndefined();
+  });
+
+  test("refuses a name that is no plugin's by its line, never repeating it", () => {
+    const source = '# plugins\n[plugins.study]\n[plugins."Study Notes"]\n';
+    expect(() => parseDekToml(source)).toThrow(/lowercase letter/);
+    expect(() => parseDekToml(source)).not.toThrow(/Study Notes/);
+    try {
+      parseDekToml(source, "dek.toml");
+    } catch (error) {
+      expect(error).toBeInstanceOf(DekError);
+      expect((error as DekError).line).toBe(3);
+      expect((error as DekError).hint).not.toContain("Study Notes");
+    }
+  });
+
+  test("refuses dek's own prefix and rumdl's as a name", () => {
+    expect(() => parseDekToml("[plugins.dek]\n")).toThrow(/DEK/);
+    expect(() => parseDekToml("[plugins.md]\n")).toThrow(/MD/);
+  });
+
+  test("is a table of tables", () => {
+    expect(() => parseDekToml("[plugins]\nstudy = true\n")).toThrow(DekError);
+  });
+
+  test("takes no key inside a plugin's table yet: one there is DEK008's to report", () => {
+    expect(parseDekToml('[plugins.study]\npath = "/bin/x"\n').plugins).toEqual(["study"]);
+    expect(unknownTomlKeys('[plugins.study]\npath = "/bin/x"\n')).toEqual([
+      { key: "plugins.study.path", line: 2 },
+    ]);
+    expect(unknownTomlKeys("[plugins.study]\n[plugins.acme]\n")).toEqual([]);
   });
 });
 

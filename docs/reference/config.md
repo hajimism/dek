@@ -70,6 +70,8 @@ license = "CC0-1.0"
 
 [refs]
 "hajimism/dek/why-dek" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
+
+[plugins.study]
 ```
 
 | Key | Default | Purpose |
@@ -83,6 +85,7 @@ license = "CC0-1.0"
 | `voice.speed` | `1.0` | Speaking speed |
 | `pack.license` | none; `dekc init` writes `"CC0-1.0"` | The license `dekc pack` hands a deck over under: `"CC0-1.0"`, which lets the reader reuse the deck freely, with no credit owed, as a template is meant to be used, or `"CC-BY-4.0"`, which asks for credit. The pack carries its legal code as `LICENSE`, in place of the project's own LICENSE file. Without it, the pack carries the project's LICENSE file, or none, and `dekc pack` warns. Nothing else reads it: a ref on GitHub reads the repository's LICENSE file |
 | `refs` | none | Each ref and what it is pinned to: `owner/repo/deck` to a 40-character commit sha, a pack's `file/<deck>` to the 64-character sha256 of its files. A ref's deck name is up to 64 letters, digits, dots, dashes, and underscores of any script, and 200 bytes at most; it does not start with a dash, holds no character a person cannot see, and writes each accented letter as one character (NFC). A key that is no such name stops dek.toml from loading, with an error that gives its line and never repeats it: delete the line, and for a pack its `packs/<deck>.tgz` and `refs/file/<deck>`, then pin the deck again. `dekc ref` writes it; see [Refs](/reference/cli#refs) |
+| `plugins` | none | A table per [plugin](/reference/plugins) the project uses, `[plugins.<name>]`, for the `dek-<name>` the user installed. The name is a lowercase letter, then lowercase letters, digits, and hyphens, at most 40; `dek` and `md` are taken. A table takes no key yet, and one there is `DEK008`: a project chooses a plugin, never a path or a program to run. `dekc sync` pins each in `plugins/<name>/plugin.json` |
 
 dek ignores keys it does not know, and lint names each one as `DEK008`, with the key it most likely meant.
 

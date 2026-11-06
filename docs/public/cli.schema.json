@@ -1779,6 +1779,53 @@
                 "type": "string"
               }
             },
+            "plugins": {
+              "description": "Each plugin dek.toml names, in name order; absent when it names none.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The plugin's name in dek.toml [plugins]."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "accepted",
+                      "current",
+                      "changed",
+                      "missing",
+                      "invalid",
+                      "unsupported"
+                    ],
+                    "description": "accepted: pinned now; current: as pinned; changed: differs from its lock, which was left as it was; missing: not installed; invalid: printed no manifest dek can use; unsupported: needs a newer dek."
+                  },
+                  "version": {
+                    "description": "The installed plugin's version.",
+                    "type": "string"
+                  },
+                  "changes": {
+                    "description": "For changed: what differs from the lock, one change each.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "hint": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2661,11 +2708,16 @@
           "type": "string",
           "enum": [
             "lint",
+            "plugin",
             "preview",
             "rumdl",
             "visual",
             "voice"
           ]
+        },
+        "plugin": {
+          "description": "For a plugin's check, its name in dek.toml [plugins].",
+          "type": "string"
         },
         "reason": {
           "type": "string"
