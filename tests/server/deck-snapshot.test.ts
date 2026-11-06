@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { type DeckSnapshot, diffSnapshot, mergeScope } from "../../src/server/deck-snapshot.ts";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { lockText } from "../../src/core/plugin.ts";
+import {
+  type DeckSnapshot,
+  diffSnapshot,
+  mergeScope,
+  takeSnapshot,
+} from "../../src/server/deck-snapshot.ts";
+import { withTempProject } from "../helpers/project.ts";
 
 const base: DeckSnapshot = {
   script: 1,
@@ -9,11 +18,26 @@ const base: DeckSnapshot = {
   scripts: { intro: 1 },
   javascript: {},
   voice: {},
+  plugins: { "plugins/study/plugin.json": 1, "decks/demo/study.yaml": 1 },
 };
 
 const edit = (change: Partial<DeckSnapshot>): DeckSnapshot => ({ ...base, ...change });
 
 describe("diffSnapshot", () => {
+  test("reloads the page when a plugin's lock or data file changes, and lints nothing", () => {
+    const changed: Array<Record<string, number>> = [
+      { "plugins/study/plugin.json": 2, "decks/demo/study.yaml": 1 },
+      { "plugins/study/plugin.json": 1 },
+    ];
+    for (const plugins of changed) {
+      expect(diffSnapshot(base, edit({ plugins }))).toEqual({
+        sync: false,
+        events: [{ type: "reload-script", slugs: [] }],
+        synth: false,
+      });
+    }
+  });
+
   test("nothing changed: no events and no work", () => {
     expect(diffSnapshot(base, base)).toEqual({ sync: false, events: [], synth: false });
   });
@@ -103,5 +127,36 @@ describe("mergeScope", () => {
     expect(mergeScope({ slug: "a" }, { slug: "b" })).toEqual({});
     expect(mergeScope({}, { slug: "a" })).toEqual({});
     expect(mergeScope(undefined, { slug: "a" })).toEqual({ slug: "a" });
+  });
+});
+
+describe("takeSnapshot", () => {
+  test("watches each pinned plugin's lock, and the data files it declares in this deck", async () => {
+    await withTempProject(
+      {
+        toml: "[plugins.study]\n",
+        decks: [{ name: "demo", slides: { intro: '<section class="slide"></section>' } }],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        expect(takeSnapshot(deckDir).plugins).toEqual({});
+        mkdirSync(join(root, "plugins", "study"), { recursive: true });
+        writeFileSync(
+          join(root, "plugins", "study", "plugin.json"),
+          lockText({
+            schema: 1,
+            name: "study",
+            version: "0.1.0",
+            page: { api: 1, keys: ["r"] },
+            data: [{ path: "study.yaml" }],
+          }),
+        );
+        writeFileSync(join(deckDir, "study.yaml"), "version: 1\n");
+        expect(Object.keys(takeSnapshot(deckDir).plugins).sort()).toEqual([
+          "decks/demo/study.yaml",
+          "plugins/study/plugin.json",
+        ]);
+      },
+    );
   });
 });

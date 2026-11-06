@@ -1,7 +1,9 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { deckPaths } from "../core/deck-paths.ts";
 import type { LiveEvent } from "../core/live-protocol.ts";
+import { deckProjectRoot } from "../core/path.ts";
+import { pinnedPlugins } from "../core/plugin-host.ts";
 import { listSlideFiles, type SlideSidecar } from "../core/resolve.ts";
 
 /** Modification times by name; a file that is gone is left out. */
@@ -19,6 +21,11 @@ export type DeckSnapshot = {
   javascript: Mtimes;
   /** `voice/voice.toml`, `voice/dict.toml`, and `voice/pin/*`. */
   voice: Mtimes;
+  /**
+   * Each pinned plugin's lock, and each data file it declares in this deck, keyed by the path
+   * from the project's root: what the page's plugin layer is made from (ADR 33).
+   */
+  plugins: Mtimes;
 };
 
 /** Which slides to lint: one slug, or the whole deck when it is left out. */
@@ -43,7 +50,27 @@ export function takeSnapshot(deckDir: string): DeckSnapshot {
     scripts: slideMtimes(deckDir, ".ts"),
     javascript: slideMtimes(deckDir, ".js"),
     voice: voiceMtimes(paths.voice),
+    plugins: pluginMtimes(deckDir),
   };
+}
+
+function pluginMtimes(deckDir: string): Mtimes {
+  const root = deckProjectRoot(deckDir);
+  const times: Mtimes = {};
+  const note = (path: string) => {
+    const time = mtime(path);
+    if (time !== 0) {
+      times[relative(root, path).split(sep).join("/")] = time;
+    }
+  };
+  // A dek.toml mid-edit names no plugin; the next scan sees them again.
+  for (const { name, manifest } of pinnedPlugins(root)) {
+    note(join(root, "plugins", name, "plugin.json"));
+    for (const { path } of manifest?.data ?? []) {
+      note(join(deckDir, path));
+    }
+  }
+  return times;
 }
 
 /**
@@ -87,6 +114,10 @@ export function diffSnapshot(prev: DeckSnapshot, next: DeckSnapshot): DeckChange
         lint({ slug });
       }
     }
+  }
+  // A plugin's page reads its data once, as the page loads, so a change reloads the page.
+  if (!sync && changedKeys(prev.plugins, next.plugins).length > 0) {
+    events.push({ type: "reload-script", slugs: [] });
   }
   const synth = sync || changedKeys(prev.voice, next.voice).length > 0;
   return { sync, events, ...(diagnose ? { diagnose } : {}), synth };

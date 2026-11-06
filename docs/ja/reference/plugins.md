@@ -89,6 +89,7 @@ import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plug
 | `name` | `dek-<name>` の `<name>` |
 | `version` | 英数字と `.`、`+`、`-` からなる一語。64 文字以内 |
 | `check` | 省略できる。ないとき、dek は検査を走らせない |
+| `page` | 省略できる。`{ "api": 1, "keys": ["r"] }`。プレーヤーとビルドに入る、ページ API 1 を呼ぶページと、それが使うキー。キーは dek のもの（`a f l m p s`）以外の英小文字一字。デッキに届くのは、dek が運ぶスクリプトを持つページだけ（[ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)） |
 | `check.protocol` | 下のやりとりの版。`1` |
 | `check.rules` | 検査が報告しうるルール id のすべて。id は、名前を大文字にし、`-` を `_` にして、数字三桁を続けたもの。`study` なら `STUDY001`、`acme-talks` なら `ACME_TALKS001` |
 | `…severity` | `error` か `warning`。dek は結果の SARIF の `level` ではなく、これを使う。lint を失敗させるのは error だけ |
@@ -130,3 +131,28 @@ SARIF 2.1.0 を stdout に出し、指摘があってもなくても 0 で終わ
 dek は、メッセージとヒントを、それぞれ 300 文字以内の一行にします。重大度は申告から決まります。
 
 検査は、同じ入力には同じ出力を返し、ファイルを書かず、ネットワークを使わないと約束します。制限時間はデッキごとに 30 秒です。過ぎれば SIGTERM で止め、のちに SIGKILL を送ります。一度止まらなかった検査は、その後のデッキでは走らせません。
+
+### ページ API 1
+
+ページは、開発サーバーのプレーヤーと `dekc build` のファイルで、dek のプレーヤーの後に動き、グローバルには一つだけ触れます。
+
+```ts
+import type { DekPage } from "@hajimism/dek/plugin";
+declare const dek: DekPage;
+
+dek.plugin("study", { api: 1 }, (api) => {
+  api.deck;                 // { name }
+  api.slides;               // [{ slug, title }]
+  api.current();            // { slug, index, beat }。beat 0 はスライドに来たところ
+  api.on("change", (position) => {});            // 初めに一度、その後デッキが落ち着くたびに
+  api.on("mount", ({ slug, root, layer, view }) => {});
+  api.shown(element);       // まだ来ていないビートに隠されていないか
+  api.data("study.yaml");   // { text, version } | null。申告したファイルだけ
+  api.key("r", () => {});   // 申告していないキーなら false
+});
+```
+
+- `mount` は、ステージのすべてのスライドで呼びます（`view` は `"stage"`）。ライブリロードで差し替わったスライドでも、もう一度呼びます。`root` はそのスライドで、読むだけにし、変えてはいけません。lint はそのままの形を検査したからです。`layer` はスライドの上に重なる ShadowRoot で、座標はスライドのピクセル、そのプラグインだけのものです。表示されるのは今のスライドの層だけで、層の土台はポインタを受けません。ポインタが要る要素には `pointer-events: auto` を付けます。
+- 今のスライドでない層は大きさが 0 なので、測るのは `change` のときにします。
+- ページは、プレゼンター画面、動画、dek がスクリーンショット・PDF・pptx・見た目の lint のために描くページには入りません。
+- ページが投げた例外は受け止め、コンソールに名前を出します。プレーヤーは止まりません。

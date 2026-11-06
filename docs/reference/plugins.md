@@ -89,6 +89,7 @@ Prints the manifest as JSON on stdout and exits 0:
 | `name` | The `<name>` of `dek-<name>` |
 | `version` | One token of letters, digits, `.`, `+`, and `-`, at most 64 characters |
 | `check` | Optional. Without it, dek runs no check |
+| `page` | Optional: `{ "api": 1, "keys": ["r"] }`, a page in the player and the build that calls page API 1, and the letters it binds, none of dek's own (`a f l m p s`). A page reaches a deck only once dek has a script to carry for it ([ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)) |
 | `check.protocol` | The version of the exchange below: `1` |
 | `check.rules` | Every rule id the check can report. An id is the name in capitals, with `_` for `-`, then three digits: `study` → `STUDY001`, `acme-talks` → `ACME_TALKS001` |
 | `…severity` | `error` or `warning`. dek uses this, not a result's SARIF `level`; only an error fails lint |
@@ -130,3 +131,28 @@ Print SARIF 2.1.0 on stdout and exit 0, with or without findings. A non-zero exi
 dek makes each message and hint one line of at most 300 characters. The severity comes from the manifest.
 
 A check promises to print the same output for the same input, to write no file, and to use no network. dek gives it 30 seconds per deck, then stops it with SIGTERM and later SIGKILL, and runs it on no deck after one it hung on.
+
+### Page API 1
+
+A page runs after dek's player, in the dev server's player and in `dekc build`'s file, and touches one global:
+
+```ts
+import type { DekPage } from "@hajimism/dek/plugin";
+declare const dek: DekPage;
+
+dek.plugin("study", { api: 1 }, (api) => {
+  api.deck;                 // { name }
+  api.slides;               // [{ slug, title }]
+  api.current();            // { slug, index, beat }, beat 0 being the slide's arrival
+  api.on("change", (position) => {});            // at setup, then each time the deck settles
+  api.on("mount", ({ slug, root, layer, view }) => {});
+  api.shown(element);       // whether no beat still to come hides it
+  api.data("study.yaml");   // { text, version } | null, for a file the manifest declares
+  api.key("r", () => {});   // false for a key the manifest does not declare
+});
+```
+
+- `mount` runs for every slide on the stage (`view` is `"stage"`), and again for a slide a live reload replaced. `root` is the slide: read it, never change it, since lint checked it as it is. `layer` is a ShadowRoot over the slide, in the slide's own pixels, that is the plugin's alone; only the current slide's shows, and its host takes no pointer, so give what you draw `pointer-events: auto` where it needs one.
+- A layer measured on a slide that is not current is zero in size: measure on `change`.
+- A page never reaches the presenter view, a video, or any page dek draws for a screenshot, PDF, pptx, or the visual lint.
+- What a page throws is caught and named in the console, and the player goes on.

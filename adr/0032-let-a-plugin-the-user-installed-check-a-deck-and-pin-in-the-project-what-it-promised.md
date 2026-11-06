@@ -8,6 +8,8 @@ Accepted
 
 Amends [28. Let a project's code run only as a page, a ref's only in an offline sandbox, and the dev server act only for its own pages](0028-let-a-project-s-code-run-only-as-a-page-a-ref-s-only-in-an-offline-sandbox-and-the-dev-server-act-only-for-its-own-pages.md)
 
+Amended by [33. Show a plugin's page in the player and builds behind page API 1](0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)
+
 ## Context
 
 dek is useful to an agent because lint lets the agent converge and then stop ([Agent Usability Criteria](../docs/guide/agent-criteria.md), 2 and 6). Some conventions are not dek's to know. An event can ask for a title slide and a closing slide, or a team can ban words. A study tool built on dek, dekstudy, puts stickers over a slide's words, and needs every sticker to still find its word after the slide is edited. Today such a convention lives in a skill's prose, which an agent can misread and nothing checks. The way out has been to wrap dek in another command, which an agent has to know about and remember to run. A convention only that command checks is a false pass for an agent that runs `dekc lint` (S1).
@@ -113,4 +115,4 @@ A plugin named but not pinned is listed as "not pinned yet; `dekc sync` pins it.
 - **An agent can accept a change,** since `dekc sync --accept` is a command like any other. The hint says the user accepts it, the change shows in the lock's diff, and an agent that runs it has done what it was asked not to, visibly.
 - **A plugin author imports types, not a library.** `import type { CheckOutput } from "@hajimism/dek/plugin"` is all a TypeScript plugin needs from dek; a plugin in any other language reads the reference page. A deep import into dek's files, which nothing promised, no longer resolves.
 - **dek's rules range grows to `DEK046`.** It is documented in [the lint reference](../docs/reference/lint.md), and plugin authors get a reference page that states the manifest, the exchange, and the lock.
-- **Later records decide the rest of plugins:** a plugin's layer in the player and the build, behind a versioned page API, and the dev server writing a plugin's data. Each adds to the manifest, as its schema allows, and none changes what this record decides.
+- **Later records decide the rest of plugins:** a plugin's layer in the player and the build, behind a versioned page API ([ADR 33](0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)), and the dev server writing a plugin's data. Each adds to the manifest, as its schema allows, and none changes what this record decides.

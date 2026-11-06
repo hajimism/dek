@@ -4,6 +4,7 @@ import { loadConfig } from "./config.ts";
 import { renderDeckDocument } from "./document.ts";
 import { type DistOptions, distFile } from "./path.ts";
 import type { PlaywrightRunner } from "./playwright.ts";
+import { pluginPages } from "./plugin-host.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { removeInside, writeInside } from "./safe-fs.ts";
 import { coverShot } from "./shot/still.ts";
@@ -22,6 +23,8 @@ export type BuildResult = { outPath: string } & (
 
 export type BuildOptions = DistOptions & {
   playerScript: string;
+  /** The pages of the plugins dek ships, compiled, by name; a pinned one's goes into the page. */
+  pluginScripts?: Record<string, string>;
   /** Where dist/ is served from, ending in a slash; overrides `url` in dek.toml. */
   url?: string;
   /** For anyone with the link: the presenter view carries only what is said aloud. */
@@ -50,6 +53,7 @@ export async function buildDeck(
   }
   const html = renderDeckDocument(deck, {
     playerScript: options.playerScript,
+    plugins: pluginPages(project.root, deck.dir, options.pluginScripts ?? {}),
     target: {
       kind: "build",
       ...(options.public ? { public: true } : {}),
