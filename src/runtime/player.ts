@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
+import { bundledPageEntries } from "../core/plugin-host.ts";
 
 export { liveReloadScript } from "./live-reload.ts";
 
@@ -27,9 +28,24 @@ export function annotateScript(): Promise<string> {
   return annotate;
 }
 
+let pluginPages: Promise<Record<string, string>> | undefined;
+
+/**
+ * The page of each plugin dek ships, compiled for the browser, by name: what the player and the
+ * build carry for a project that pinned the plugin (ADR 34).
+ */
+export function pluginPageScripts(): Promise<Record<string, string>> {
+  pluginPages ??= Promise.all(
+    Object.entries(bundledPageEntries()).map(
+      async ([name, entry]) => [name, await compile(entry, `the ${name} plugin's page`)] as const,
+    ),
+  ).then(Object.fromEntries);
+  return pluginPages;
+}
+
 async function compile(entry: string, what: string): Promise<string> {
   const result = await Bun.build({
-    entrypoints: [join(import.meta.dir, entry)],
+    entrypoints: [isAbsolute(entry) ? entry : join(import.meta.dir, entry)],
     target: "browser",
     format: "iife",
     minify: true,

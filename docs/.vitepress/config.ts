@@ -51,6 +51,7 @@ function reference(p: string, t: Record<string, string>): DefaultTheme.SidebarIt
         { text: t.cli, link: `${p}/reference/cli` },
         { text: t.lintRules, link: `${p}/reference/lint` },
         { text: t.config, link: `${p}/reference/config` },
+        { text: t.plugins, link: `${p}/reference/plugins` },
       ],
     },
   ];
@@ -80,6 +81,7 @@ const en = {
   cli: "CLI",
   lintRules: "Lint Rules",
   config: "Configuration",
+  plugins: "Plugins",
 };
 
 const ja = {
@@ -106,6 +108,7 @@ const ja = {
   cli: "CLI",
   lintRules: "Lint ルール",
   config: "設定",
+  plugins: "プラグイン",
 };
 
 export default defineConfig({

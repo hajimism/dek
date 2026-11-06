@@ -34,12 +34,12 @@ async function lint(deck: string): Promise<{ ok: boolean; diagnostics: Diagnosti
 }
 
 /** Runs the `dekc mv` or `dekc sync` a hint names, the way the CLI would. */
-function run(argv: string[], cwd: string): void {
+async function run(argv: string[], cwd: string): Promise<void> {
   const [command, ...args] = argv;
   if (command === "mv") {
     mvCommand(requireDeckFromCwd(cwd), { slug: args[0] ?? "", to: args[1] });
   } else if (command === "sync") {
-    syncCommand(resolveDecks(cwd));
+    await syncCommand(resolveDecks(cwd));
   } else {
     throw new Error(`unexpected command: ${argv.join(" ")}`);
   }
@@ -80,7 +80,7 @@ describe("renaming after editing script.md first", () => {
             "run `dekc mv before after` to move the files to the script's id, or `dekc mv after before` to give the section the files' id",
           );
 
-          run(commandOf(orphan?.hint), deck);
+          await run(commandOf(orphan?.hint), deck);
 
           expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
           expect(existsSync(join(deck, "slides", "after.css"))).toBe(true);
@@ -101,7 +101,7 @@ describe("renaming after editing script.md first", () => {
       );
       const lintResult = await lint(deck);
       expect(lintResult.diagnostics.find((d) => d.id === "DEK002")?.hint).not.toContain("dekc mv");
-      expect(() => run(["mv", "before", "after"], deck)).toThrow(
+      await expect(run(["mv", "before", "after"], deck)).rejects.toThrow(
         "slides/before.html and slides/after.html both hold a slide you wrote",
       );
       expect(existsSync(join(deck, "slides", "before.html"))).toBe(true);
@@ -136,7 +136,7 @@ describe("renaming after moving the files first", () => {
     test(`dekc mv gives the section the files' id when ${state}`, async () => {
       await withFilesRenamed(
         async (deck) => {
-          run(["mv", "before", "after"], deck);
+          await run(["mv", "before", "after"], deck);
 
           expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
           expect(existsSync(join(deck, "slides", "after.css"))).toBe(true);
@@ -157,7 +157,7 @@ describe("renaming after moving the files first", () => {
           );
           expect(second).toEqual(["mv", "before", "after"]);
 
-          run(second ?? [], deck);
+          await run(second ?? [], deck);
 
           expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
           expect((await lint(deck)).diagnostics).toEqual([]);
@@ -173,7 +173,7 @@ describe("renaming after moving the files first", () => {
       await writeFile(join(deck, "slides", "before.html"), other);
       let error: unknown;
       try {
-        run(["mv", "before", "after"], deck);
+        await run(["mv", "before", "after"], deck);
       } catch (caught) {
         error = caught;
       }
@@ -206,7 +206,7 @@ describe("rename hints", () => {
       );
       expect(orphan?.data).toMatchObject({ renames: ["after", "qa"] });
 
-      run(commandsOf(orphan?.hint)[0] ?? [], deck);
+      await run(commandsOf(orphan?.hint)[0] ?? [], deck);
 
       expect(await readFile(join(deck, "slides", "after.html"), "utf8")).toBe(written);
       expect(existsSync(join(deck, "slides", "qa.html"))).toBe(true);
@@ -273,7 +273,7 @@ describe("DEK001 hints", () => {
       const deck = join(root, "decks", "demo");
       const dek001 = (await lint(deck)).diagnostics.find((d) => d.id === "DEK001");
       expect(dek001?.hint).toBe("run `dekc sync` to create the skeleton");
-      run(commandOf(dek001?.hint), deck);
+      await run(commandOf(dek001?.hint), deck);
       expect((await lint(deck)).diagnostics).toEqual([]);
     });
   });

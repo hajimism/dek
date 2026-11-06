@@ -52,6 +52,11 @@ export const FLAGS = {
     note: "for JSON, pass --json",
     text: "print diagnostics as SARIF",
   },
+  accept: {
+    type: "string",
+    value: "PLUGIN",
+    text: "pin the installed plugin's manifest though it changed from plugins/<name>/plugin.json",
+  },
   before: { type: "string", value: "SLUG", text: "move the section before this one" },
   after: { type: "string", value: "SLUG", text: "move the section after this one" },
   step: { type: "string", value: "ID|N", text: "the beat to capture (default: the last)" },

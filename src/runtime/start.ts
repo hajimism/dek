@@ -9,6 +9,7 @@ import type { CreateDevLine } from "./dev-line.ts";
 import { bindInput } from "./input.ts";
 import { createLaserView, type LaserView } from "./laser-view.ts";
 import { createNavigator } from "./navigator.ts";
+import { createPluginHost } from "./plugins.ts";
 import { createPresenterView } from "./presenter-view.ts";
 import { createRailView } from "./rail-view.ts";
 import { deckChannelName } from "./routes.ts";
@@ -41,6 +42,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     presenter.render(pos);
     rail.markCurrent(pos.slideIndex);
     marks?.render(pos);
+    plugins.render(pos);
   }
 
   /**
@@ -92,12 +94,25 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
         stage.showMove(from, to);
       }
     },
-    afterMove: presenter.startClock,
+    afterMove: () => {
+      presenter.startClock();
+      // A move that another is queued behind has not settled; the last one says where it stands.
+      if (positionsEqual(nav.target(), nav.position())) {
+        plugins.settled(nav.position());
+      }
+    },
     route: (next) => control.request(next, "remote"),
     ...(laser ? { onPointer: laser.receive } : {}),
   });
 
   const marks = dev?.marks;
+
+  // Plugins' pages run after the player and call window.dek.plugin, which this defines.
+  const plugins = createPluginHost({
+    deck: page.deck,
+    slides,
+    position: () => nav.position(),
+  });
 
   const rail = createRailView({
     slides,

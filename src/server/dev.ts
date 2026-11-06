@@ -3,7 +3,12 @@ import { DekError } from "../core/error.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { isRefName, refReadOnlyError, requireProject } from "../core/ref.ts";
 import { locateDeck, type Project } from "../core/resolve.ts";
-import { annotateScript, livePlayerScript, liveReloadScript } from "../runtime/player.ts";
+import {
+  annotateScript,
+  livePlayerScript,
+  liveReloadScript,
+  pluginPageScripts,
+} from "../runtime/player.ts";
 import {
   clearance,
   keepToOwnOrigin,
@@ -84,6 +89,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     playerScript: await livePlayerScript(),
     liveReloadScript: liveReloadScript(),
     annotateScript: await annotateScript(),
+    pluginScripts: await pluginPageScripts(),
   };
 
   const pages = createDevPages({

@@ -14,7 +14,7 @@ Each finding is about one of three things, and the command that reports it follo
 - **`deck`**: a file every slide of the deck shares: `theme.css`, the frontmatter, `voice/voice.toml`, or `script.md` as a whole (its length, a heading above the first slide). It carries no `slug`.
 - **`project`**: `dek.toml`. Found once per project, however many decks a command covers.
 
-`dekc lint` reports all three. A rule that reads both a shared file and a slide's own has two scopes: `DEK014` in `theme.css` is a deck finding, in `slides/<id>.css` a slide finding. `dekc build` and `dekc ls` count the same findings as `dekc lint` without rumdl, whose Markdown style checks run only in `dekc lint`; `dekc ls` lists a project finding on its own `project` line, not on each deck's row.
+`dekc lint` reports all three. A rule that reads both a shared file and a slide's own has two scopes: `DEK014` in `theme.css` is a deck finding, in `slides/<id>.css` a slide finding. `dekc build` and `dekc ls` count the same findings as `dekc lint` without rumdl's and the [plugins'](/reference/plugins), which run only in `dekc lint`; `dekc ls` lists a project finding on its own `project` line, not on each deck's row.
 
 ## Rules
 
@@ -62,6 +62,7 @@ Each finding is about one of three things, and the command that reports it follo
 | `DEK043` | `deck` | A `[beats]` key in `voice.toml` that matches no slide or beat. Warning | — |
 | `DEK044` | `deck`, `slide` | A `#` or `####` heading in `script.md`. Only `##` (slide) and `###` (beat) mean anything, so any other level is read out as script. Warning | — |
 | `DEK045` | `deck` | `voice/voice.toml` or `voice/dict.toml` cannot be read. The checks that need it are skipped, the rest of lint runs. Warning | — |
+| `DEK046` | `deck` | A [plugin](/reference/plugins) the project pinned failed: its manifest or check exited non-zero, ran past its time, printed no SARIF, or reported a rule its lock does not declare | — |
 
 ## Conditions
 
@@ -206,3 +207,7 @@ Of two items that miss each other, the one fewer others line up with is named as
 ### DEK042
 
 Only paragraphs are spoken. A beat that shows a list, code, or a table without a paragraph passes in `pause.beat` milliseconds when narrated. Empty beats and blockquote-only beats are treated as deliberate pauses and are not flagged.
+
+### DEK046
+
+A plugin's own findings carry its rule ids, such as `STUDY001`, and the severity its manifest gives them; see [Plugins](/reference/plugins). `DEK046` is the plugin failing, not the deck: its message names the plugin and the version the project pinned, its path is `dek.toml`, where the plugin is named, and `data` carries `plugin` and `version`. A plugin that did not run, because it is not installed, has no lock yet, differs from its lock, or needs a newer dek, is not `DEK046` but a skipped check.

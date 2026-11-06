@@ -4,6 +4,7 @@ import { escapeAttr, escapeHtml } from "./escape.ts";
 import { collectSlidesHtml, htmlShell } from "./html.ts";
 import { type OgpImage, ogpHead } from "./ogp.ts";
 import { PAGE_ID, type PageMode, pageConfigAttrs } from "./page.ts";
+import type { PluginPage } from "./plugin.ts";
 import {
   nextPresenterTitle,
   presenterSlides,
@@ -49,14 +50,19 @@ export type PageTarget =
 /** The deck at `dir`, rendered for `target`. */
 export function renderDeckHtml(
   dir: string,
-  options: { playerScript: string; target: PageTarget },
+  options: { playerScript: string; target: PageTarget; plugins?: PluginPage[] },
 ): string {
   return renderDeckDocument(resolveDeck(dir).deck, options);
 }
 
 export function renderDeckDocument(
   deck: ProjectDeck,
-  options: { playerScript: string; target: PageTarget },
+  options: {
+    playerScript: string;
+    target: PageTarget;
+    /** Each plugin's page; only the player and the build carry them (ADR 33). */
+    plugins?: PluginPage[];
+  },
 ): string {
   const { target } = options;
   const mode: PageMode =
@@ -160,7 +166,8 @@ export function renderDeckDocument(
   ${slideScriptTags(slideScripts)}
   <script>${options.playerScript}</script>
   ${target.kind === "dev" ? `<script>${target.liveReloadScript}</script>` : ""}
-  ${target.kind === "dev" && includeNotes ? `<script>${target.annotateScript}</script>` : ""}`,
+  ${target.kind === "dev" && includeNotes ? `<script>${target.annotateScript}</script>` : ""}
+  ${pluginPagesHtml(target, options.plugins ?? [])}`,
   });
 }
 
@@ -223,6 +230,24 @@ function laserLabel(lang: string): string {
 function renderKeyHintHtml(lang: string): string {
   const labels = lang.toLowerCase().startsWith("ja") ? KEY_HINT_LABELS.ja : KEY_HINT_LABELS.en;
   return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span><span><kbd>p</kbd>${labels.presenter}</span></div>`;
+}
+
+/**
+ * The plugins' pages, after the player, which gives them `dek.plugin`: their keys and data as one
+ * JSON block, then each script in name order. Only the player and the build carry them; the
+ * presenter view and a video, like every still page, never do.
+ */
+function pluginPagesHtml(target: PageTarget, plugins: PluginPage[]): string {
+  const carried = target.kind === "build" || (target.kind === "dev" && target.mode === "player");
+  if (!carried || plugins.length === 0) {
+    return "";
+  }
+  const ordered = plugins.toSorted((a, b) => a.name.localeCompare(b.name));
+  const config = Object.fromEntries(ordered.map(({ name, keys, data }) => [name, { keys, data }]));
+  return [
+    `<script type="application/json" id="${PAGE_ID.plugins}">${jsonForScript(config)}</script>`,
+    ...ordered.map(({ script }) => `<script>${script.replace(/<\/(script)/gi, "<\\/$1")}</script>`),
+  ].join("\n  ");
 }
 
 function jsonForScript(value: unknown): string {

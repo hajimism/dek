@@ -1,4 +1,5 @@
-import { DekToml, Pack, Voice } from "./config.ts";
+import { z } from "zod";
+import { DekToml, Pack, PluginTable, Voice } from "./config.ts";
 import { splitLines } from "./lines.ts";
 import { readFrontmatterYaml } from "./parse.ts";
 import { Frontmatter } from "./schema.ts";
@@ -9,10 +10,14 @@ import { unrecognizedKeys } from "./zod.ts";
 /** A key dek does not read, where it is, and the known key it most likely meant. */
 export type UnknownKey = { key: string; line: number; suggestion?: string };
 
-/** dek.toml's schema, but a key it does not read is an issue; `refs` still takes any key. */
+/**
+ * dek.toml's schema, but a key it does not read is an issue; `refs` and `plugins` still take any
+ * name, and a plugin's table, none of its own.
+ */
 const StrictDekToml = DekToml.extend({
   voice: Voice.strict().optional(),
   pack: Pack.strict().optional(),
+  plugins: z.record(z.string(), PluginTable.strict()).optional(),
 }).strict();
 
 /** Every key dek.toml may hold, as dotted paths. */

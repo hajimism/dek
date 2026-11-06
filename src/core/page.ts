@@ -7,6 +7,7 @@ import { escapeAttr } from "./escape.ts";
 export const PAGE_ID = {
   deck: "deck",
   data: "dek-data",
+  plugins: "dek-plugins",
   shell: "dek-shell",
   rail: "dek-rail",
   railResize: "dek-rail-resize",

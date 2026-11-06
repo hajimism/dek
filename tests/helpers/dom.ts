@@ -1,5 +1,6 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { renderDeckHtml } from "../../src/core/document.ts";
+import type { PluginPage } from "../../src/core/plugin.ts";
 import { annotateScript, livePlayerScript, playerScript } from "../../src/runtime/player.ts";
 import { deckChannelName } from "../../src/runtime/routes.ts";
 
@@ -26,6 +27,8 @@ export async function mountPlayer(
     live?: boolean;
     /** Runs after the page exists and before the player starts, e.g. to block storage. */
     beforeStart?: () => void;
+    /** Plugins' pages, run after the player as the page runs them. */
+    plugins?: PluginPage[];
   } = {},
 ): Promise<void> {
   const html = renderDeckHtml(deckDir, {
@@ -39,6 +42,7 @@ export async function mountPlayer(
           annotateScript: "",
         }
       : { kind: options.mode === "video" ? "video" : "build" },
+    ...(options.plugins ? { plugins: options.plugins } : {}),
   });
   GlobalRegistrator.register({ url: options.url ?? "file:///deck.html", width: 1280, height: 720 });
   document.documentElement.innerHTML = html
@@ -69,13 +73,18 @@ export async function mountPlayer(
       // biome-ignore lint/complexity/noCommaOperator: indirect eval
       (0, eval)(await annotateScript());
     }
+    for (const plugin of options.plugins ?? []) {
+      // biome-ignore lint/security/noGlobalEval: a plugin's page must see happy-dom globals
+      // biome-ignore lint/complexity/noCommaOperator: indirect eval
+      (0, eval)(plugin.script);
+    }
   } finally {
     globalThis.BroadcastChannel = Channel;
   }
 }
 
 /** What the player sets on `window`, which happy-dom makes the test process's globalThis. */
-const PLAYER_HOOKS = ["dekGo", "dekMotion", "dekLive"] as const;
+const PLAYER_HOOKS = ["dekGo", "dekMotion", "dekLive", "dek"] as const;
 
 export async function unmountPlayer(): Promise<void> {
   for (const channel of openChannels.splice(0)) {

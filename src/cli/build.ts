@@ -4,7 +4,7 @@ import { DekError } from "../core/error.ts";
 import { lintDeck, lintProject } from "../core/lint.ts";
 import { parsePublicUrl } from "../core/ogp.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "../core/playwright.ts";
-import { playerScript } from "../runtime/player.ts";
+import { playerScript, pluginPageScripts } from "../runtime/player.ts";
 import { RENDERED_RULES, type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
 import type { DecksTarget } from "./scope.ts";
 
@@ -47,12 +47,14 @@ export async function buildCommand(
     });
   }
   const script = await playerScript();
+  const pluginScripts = await pluginPageScripts();
   const results = await Promise.all(
     decks.map((entry) =>
       buildDeck(
         { project, deck: entry },
         {
           playerScript: script,
+          pluginScripts,
           rootDist: options.rootDist,
           ...(url ? { url } : {}),
           ...(options.public ? { public: true } : {}),

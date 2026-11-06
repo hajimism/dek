@@ -1,4 +1,5 @@
 import type { Position } from "../core/step.ts";
+import type { DekPage } from "../plugin-api.ts";
 
 /** How capture tools seek the current slide's script, the way they seek Web Animations. */
 export type DekMotionHandle = {
@@ -17,6 +18,8 @@ declare global {
     dekGo?: (next: Position | null | undefined) => Promise<void>;
     dekMotion?: DekMotionHandle;
     dekLive?: (raw: unknown) => Promise<void>;
+    /** Page API 1, for plugins' pages (ADR 33). */
+    dek?: DekPage;
     /** The go the video recorder started and has not awaited yet. */
     __dekPendingGo?: Promise<void>;
     /** The animations that go started, so capture tools seek those and nothing older. */

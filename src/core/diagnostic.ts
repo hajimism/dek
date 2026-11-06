@@ -64,6 +64,7 @@ export const RULES = {
   DEK043: { severity: "warning", scopes: ["deck"] },
   DEK044: { severity: "warning", scopes: ["deck", "slide"] },
   DEK045: { severity: "warning", scopes: ["deck"] },
+  DEK046: { severity: "error", scopes: ["deck"] },
 } as const satisfies Record<string, { severity: Severity; scopes: readonly Scope[] }>;
 
 export type RuleId = keyof typeof RULES;
@@ -113,7 +114,14 @@ export function hasErrors(diagnostics: Diagnostic[]): boolean {
  */
 export type SkippedCheck = {
   /** `preview` is a build's link preview image, which needs a URL and Playwright. */
-  check: "lint" | "preview" | "rumdl" | "visual" | "voice";
+  check: "lint" | "plugin" | "preview" | "rumdl" | "visual" | "voice";
+  /** The plugin, for a `plugin` check: its name in dek.toml `[plugins]`. */
+  plugin?: string;
   reason: string;
   hint?: string;
 };
+
+/** A skipped check as text names it: the check, or the plugin for a plugin's. */
+export function skippedLabel(entry: SkippedCheck): string {
+  return entry.plugin === undefined ? entry.check : `plugin ${entry.plugin}`;
+}

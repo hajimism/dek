@@ -70,6 +70,8 @@ license = "CC0-1.0"
 
 [refs]
 "hajimism/dek/why-dek" = "89fbd5a0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
+
+[plugins.study]
 ```
 
 | キー | 既定 | 役割 |
@@ -83,6 +85,7 @@ license = "CC0-1.0"
 | `voice.speed` | `1.0` | 話速 |
 | `pack.license` | なし。`dekc init` は `"CC0-1.0"` を書く | `dekc pack` でデッキを渡すときのライセンス。`"CC0-1.0"` は、テンプレートとして使われるとおり、受け手が出典表示なしに自由に再利用できる。`"CC-BY-4.0"` は出典表示を求める。pack にはその本文を `LICENSE` として、プロジェクトの LICENSE ファイルの代わりに入れる。無ければ、プロジェクトの LICENSE ファイルを入れるか何も入れず、`dekc pack` が警告する。ほかに読むものはない。GitHub の ref はリポジトリの LICENSE ファイルを読む |
 | `refs` | なし | ref ごとに、固定した先。`owner/repo/deck` はコミットの40桁の sha、pack の `file/<deck>` は中のファイルの64桁の sha256。ref のデッキ名に使えるのは、どの文字体系の文字と数字、ドット、ハイフン、アンダースコアで、64 文字・200 バイトまで。先頭はハイフンにできず、人には見えない文字は使えず、アクセント付きの文字は 1 文字で書く（NFC）。そうでないキーがあると dek.toml を読めず、エラーはそのキーを繰り返さずに行を示す。その行を消し、pack なら `packs/<deck>.tgz` と `refs/file/<deck>` も消してから、デッキを固定し直す。`dekc ref` が書く。[ref](/ja/reference/cli#ref) を参照 |
+| `plugins` | なし | プロジェクトが使う[プラグイン](/ja/reference/plugins)ごとの表 `[plugins.<name>]`。ユーザーがインストールした `dek-<name>` を指す。名前は小文字の英字で始まり、小文字の英字、数字、ハイフンが続く 40 文字以内。`dek` と `md` は使えない。表にはまだキーを書けず、書けば `DEK008` になる。プロジェクトが選ぶのはプラグインで、実行するパスやプログラムではない。`dekc sync` が `plugins/<name>/plugin.json` に固定する |
 
 dek は知らないキーを無視し、lint がそれぞれを `DEK008` として、おそらく意図したキーと一緒に示します。
 

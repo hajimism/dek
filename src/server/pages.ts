@@ -1,4 +1,5 @@
 import { renderDeckHtml } from "../core/document.ts";
+import { pluginPages } from "../core/plugin-host.ts";
 import type { Project } from "../core/resolve.ts";
 import { errorPage, htmlResponse, renderIndexHtml } from "./routes.ts";
 
@@ -13,7 +14,13 @@ export type DevPages = {
 
 /** The pages a dev server renders, each kept until `clear`. */
 export function createDevPages(options: {
-  embed: { playerScript: string; liveReloadScript: string; annotateScript: string };
+  embed: {
+    playerScript: string;
+    liveReloadScript: string;
+    annotateScript: string;
+    /** The pages of the plugins dek ships, compiled, by name. */
+    pluginScripts?: Record<string, string>;
+  };
   remote: boolean;
   /** Embedded on the presenter page, so its stream and moves are let through. */
   password: string | undefined;
@@ -39,6 +46,7 @@ export function createDevPages(options: {
           cached(`${dir}:${mode}`, () =>
             renderDeckHtml(dir, {
               playerScript: embed.playerScript,
+              plugins: pluginPages(options.project().root, dir, embed.pluginScripts ?? {}),
               target: {
                 kind: "dev",
                 mode,
