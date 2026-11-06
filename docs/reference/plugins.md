@@ -12,7 +12,7 @@ dek ships one plugin, dek-study, in its own package. Using it takes no install: 
 
 ### dek-study
 
-Stickers over the words a reader of a study deck should be able to recall. The checks keep each sticker on its words as the slides change.
+Stickers over the words a reader of a study deck should be able to recall. In the dev server and in a built file, a sheet lays the stickers over the slides; the checks keep each sticker on its words as the slides change.
 
 ```toml
 [plugins.study]
@@ -38,6 +38,18 @@ A slide's words are the text a reader sees in its HTML: not inside `script`, `st
 | `STUDY003` | error | `study.yaml` does not read: not YAML, a `version` other than 1, a sticker without `id`, `slide`, or `quote`, a sticker's words YAML reads as a number or as true or false, or two stickers with one id. The other stickers are still checked |
 
 Every finding points at the sticker's line in `study.yaml`. A deck without `study.yaml` has nothing to check.
+
+#### The sheet
+
+Once `dekc sync` has pinned dek-study, every slide in the dev server and in `dekc build`'s file carries the sheet:
+
+- **`r`** lays the sheet on, or takes it off. It starts off, and each browser remembers it for the deck. A notice in the corner, SHEET ON or SHEET OFF, says which.
+- **A sticker** is a slip of pale yellow paper with square corners, like a sticky note.
+- **Point at a sticker,** and it fades away at once, leaving a yellow rule under the words, until the pointer leaves.
+- A sticker over a beat still to come waits for the beat, so it does not give away what the beat will show.
+- In the dev server, an edit to `study.yaml` reloads the page.
+
+The sheet is never in the presenter view, a screenshot, a PDF, pptx, or video, nor in the visual lint. The rail's thumbnails do not carry it yet, so the words show there.
 
 ## Using a plugin
 

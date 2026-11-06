@@ -27,5 +27,6 @@ export const MANIFEST = {
   name: "study",
   version: VERSION,
   check: { protocol: 1, rules: RULES },
+  page: { api: 1, keys: ["r"] },
   data: [{ path: STUDY_FILE }],
 } as const satisfies PluginManifest<"STUDY">;

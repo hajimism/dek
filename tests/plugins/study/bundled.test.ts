@@ -68,7 +68,7 @@ describe("dek-study, the plugin dek ships", () => {
             { name: "study", status: "accepted", version: MANIFEST.version },
           ]);
           expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain(
-            `- \`study\` ${MANIFEST.version}: \`dekc lint\` checks STUDY001 to STUDY003. Its data: \`study.yaml\`.`,
+            `- \`study\` ${MANIFEST.version}: \`dekc lint\` checks STUDY001 to STUDY003. Its data: \`study.yaml\`. Its page takes the key \`r\`.`,
           );
           const lint = jsonStdout<{ diagnostics: Array<{ id: string; line?: number }> }>(
             await runMain(["lint", "--json"], root),

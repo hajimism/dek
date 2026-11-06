@@ -7,6 +7,7 @@
     "src/core/*-worker.ts",
     "src/video/worker.ts",
     "src/plugins/*/main.ts",
+    "src/plugins/*/page.ts",
     "tests/helpers/fake-*.ts",
     "scripts/*.ts",
     "evals/agent/shim.ts"

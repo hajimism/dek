@@ -19,6 +19,7 @@ test("what dek-study promises changes only with its version", () => {
         STUDY003: { severity: "error", summary: "study.yaml cannot be read" },
       },
     },
+    page: { api: 1, keys: ["r"] },
     data: [{ path: "study.yaml" }],
   });
 });

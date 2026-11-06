@@ -57,6 +57,13 @@ const BUNDLED: Record<string, string> = {
   study: join(import.meta.dir, "..", "plugins", "study", "main.ts"),
 };
 
+/** The page of each plugin dek ships, as a file to compile for the browser (ADR 34). */
+export function bundledPageEntries(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(BUNDLED).map(([name, main]) => [name, join(dirname(main), "page.ts")]),
+  );
+}
+
 /**
  * A plugin dek ships, from dek's own files; otherwise
  * `dek-<name>` on the user's PATH, as an absolute path to start it by. A PATH entry that is
@@ -588,7 +595,8 @@ export function pinnedPlugins(root: string): PinnedPlugin[] {
 /**
  * The page of each plugin the project pinned with one, for the player and the build: its compiled
  * `script`, the keys its lock declares, and each declared data file the deck has. Only a plugin
- * `scripts` has a page for gets one, so a page dek was not given never reaches a deck (ADR 33).
+ * `scripts` has a page for gets one, so a page dek was not given never reaches a deck (ADR 33). The
+ * scripts are those of the plugins dek ships (ADR 34).
  */
 export function pluginPages(
   root: string,
