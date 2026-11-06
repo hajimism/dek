@@ -53,14 +53,20 @@ function binName(name: string): string {
  * any plugin does, and never from PATH: its code is the dek the project installed, which the
  * project's lockfile pins.
  */
-const BUNDLED: Record<string, string> = {
-  study: join(import.meta.dir, "..", "plugins", "study", "main.ts"),
+const BUNDLED: Record<string, { main: string; page?: string }> = {
+  study: bundled("study", { page: true }),
+  words: bundled("words", { page: false }),
 };
 
-/** The page of each plugin dek ships, as a file to compile for the browser (ADR 34). */
+function bundled(name: string, { page }: { page: boolean }): { main: string; page?: string } {
+  const dir = join(import.meta.dir, "..", "plugins", name);
+  return { main: join(dir, "main.ts"), ...(page ? { page: join(dir, "page.ts") } : {}) };
+}
+
+/** The page of each plugin dek ships with one, as a file to compile for the browser (ADR 34). */
 export function bundledPageEntries(): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(BUNDLED).map(([name, main]) => [name, join(dirname(main), "page.ts")]),
+    Object.entries(BUNDLED).flatMap(([name, { page }]) => (page ? [[name, page]] : [])),
   );
 }
 
@@ -72,9 +78,9 @@ export function bundledPageEntries(): Record<string, string> {
  * never add one. On Windows only an `.exe` is taken, so no script runs through a shell.
  */
 export function resolvePluginBin(name: string, root: string): string | undefined {
-  const bundled = BUNDLED[name];
-  if (bundled !== undefined) {
-    return bundled;
+  const own = BUNDLED[name];
+  if (own !== undefined) {
+    return own.main;
   }
   const project = realOrUndefined(root) ?? resolve(root);
   const entries = pathEntries().filter((entry) => !passedOver(entry, project));
