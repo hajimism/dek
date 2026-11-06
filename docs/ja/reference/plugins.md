@@ -6,17 +6,52 @@ description: 'プラグインは dekc lint でデッキを検査する実行フ�
 
 プラグインは、dek の知らない検査を、エージェントがもともと走らせる `dekc lint` に足します。イベントのスライドの決まりや、学習用ツールのシールの検査がその例です。プラグインは、ユーザーがインストールする実行ファイル `dek-<name>` 一つです。別のプロセスで動き、dek とは JSON と SARIF で話します。この決定とその理由は [ADR 32](https://github.com/hajimism/dek/blob/main/adr/0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md) にあります。
 
+## 公式プラグイン
+
+dek は、自分のパッケージに一つのプラグイン dek-study を同梱しています。インストールは要りません。`dek.toml` で名前を挙げれば、dek は自分のファイルから走らせます。`PATH` 上の `dek-study` は使いません（[ADR 34](https://github.com/hajimism/dek/blob/main/adr/0034-ship-dek-study-inside-dek-as-its-first-official-plugin.md)）。
+
+### dek-study
+
+学習用のデッキで、思い出せるようになりたい言葉にシールを貼ります。検査は、スライドが変わってもシールがその言葉の上に残るようにします。
+
+```toml
+[plugins.study]
+```
+
+シールは、デッキのフォルダの `study.yaml` に書きます。
+
+```yaml
+version: 1
+stickers:
+  - id: s_8k2f                   # デッキの中で一意
+    slide: planning-fallacy      # スライドの slug
+    quote: 外部視点               # シールが隠す言葉
+    prefix: 楽観的に見積もる傾向に、  # 省略可。直前の言葉で、二か所を見分ける
+```
+
+スライドの言葉は、HTML のうち読む人に見える文字です。`script`、`style`、`template`、`noscript` の中とコメントは含みません。連続する空白は一つの空白として読みます。単語を空白で区切る言語では、quote は単語単位で探すので、`is` は "This" の中には見つかりません。日本語、中国語、韓国語、タイ語では、文字の並びとして探します。`prefix` のあるシールは、その直後に言葉が来る最初の場所を覆い、ないシールは残った最初の場所を覆います。`1868` のように YAML が数や true・false として読む値は、引用符で囲んでください。
+
+| ID | 重大度 | 条件 |
+| --- | --- | --- |
+| `STUDY001` | error | シールの言葉がそのスライドにない、またはスライドがデッキにない。言葉がそのスライドから消えてほかの一枚にだけあれば、ヒントがそのスライドを示す。まだそのスライドにあれば、prefix が合わなくなったのか、どの場所もほかのシールが覆っているのかをメッセージが示す |
+| `STUDY002` | warning | シールの言葉が、同じスライドのシールのない場所にも出ている |
+| `STUDY003` | error | `study.yaml` を読めない。YAML でない、`version` が 1 でない、`id`・`slide`・`quote` のないシールがある、シールの言葉を YAML が数や true・false として読む、二つのシールが同じ id を持つ。ほかのシールは検査する |
+
+指摘はどれも、`study.yaml` のそのシールの行を指します。`study.yaml` のないデッキには、検査するものがありません。
+
 ## プラグインを使う
+
+次の手順は、ほかの人が書いたプラグインのためのものです。公式プラグインは最初の手順が要りません。
 
 1. `dek-<name>` を、`PATH` の通った、プロジェクトの外の場所にインストールします。
 2. `dek.toml` で名前を挙げます。
 
    ```toml
-   [plugins.study]
+   [plugins.glossary]
    ```
 
-3. `dekc sync` を実行します。プラグインに申告（マニフェスト）を出させ、lock である `plugins/study/plugin.json` に書きます。lock はコミットします。
-4. `dekc lint` を実行します。プラグインの指摘が、プラグインのルール id（`STUDY001` など）で、dek の指摘と並んで出ます。
+3. `dekc sync` を実行します。プラグインに申告（マニフェスト）を出させ、lock である `plugins/glossary/plugin.json` に書きます。lock はコミットします。
+4. `dekc lint` を実行します。プラグインの指摘が、プラグインのルール id（`GLOSSARY001` など）で、dek の指摘と並んで出ます。
 
 AGENTS.md には、プラグインごとに版、ルール id、データファイルを載せます。エージェントは、lint が何を検査するかをそこで知ります。
 
@@ -24,10 +59,10 @@ AGENTS.md には、プラグインごとに版、ルール id、データファ�
 
 `plugins/<name>/plugin.json` には、プロジェクトが受け入れた申告を書きます。中身は、プラグインの版、ルールとその重大度、データファイルです。`dekc lint` は、インストールされたプラグインの申告が lock とまったく同じときだけ、そのプラグインを走らせます。そのため、別の版を入れたチームの仲間や CI では、違う検査が走るのではなく、検査が走らず、走らなかったと報告されます。
 
-更新などで、インストールされたプラグインの申告が変わると、`dekc sync` は何が変わったかを挙げます。`version 0.1.0 → 0.2.0` や `STUDY003 added (error)` のような形です。lock は書き換えません。変わったところを読んでから、受け入れます。
+更新などで、インストールされたプラグインの申告が変わると、`dekc sync` は何が変わったかを挙げます。`version 0.1.0 → 0.2.0` や `GLOSSARY003 added (error)` のような形です。lock は書き換えません。変わったところを読んでから、受け入れます。
 
 ```bash
-dekc sync --accept study
+dekc sync --accept glossary
 ```
 
 lock が固定するのは、プラグインのバイナリではなく、プラグインの約束です。そのため、macOS で書いた lock が Linux の CI でも通ります。
@@ -61,7 +96,7 @@ TypeScript で書くプラグインは、下の形を、コードなしの型と
 import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plugin";
 ```
 
-`PluginManifest<"STUDY">` はルール id の接頭辞を検査し、`CheckOutput<"STUDY001" | "STUDY002">` は申告していない id の指摘を型の段階で拒みます。
+`PluginManifest<"GLOSSARY">` はルール id の接頭辞を検査し、`CheckOutput<"GLOSSARY001" | "GLOSSARY002">` は申告していない id の指摘を型の段階で拒みます。
 
 ### `dek-<name> manifest`
 
@@ -70,16 +105,16 @@ import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plug
 ```json
 {
   "schema": 1,
-  "name": "study",
+  "name": "glossary",
   "version": "0.1.0",
   "check": {
     "protocol": 1,
     "rules": {
-      "STUDY001": { "severity": "error", "summary": "a sticker's text is not on its slide" },
-      "STUDY002": { "severity": "warning", "summary": "a hidden word shows elsewhere on the slide" }
+      "GLOSSARY001": { "severity": "error", "summary": "a term is used before it is defined" },
+      "GLOSSARY002": { "severity": "warning", "summary": "a term is spelled two ways" }
     }
   },
-  "data": [{ "path": "study.yaml" }]
+  "data": [{ "path": "glossary.yaml" }]
 }
 ```
 
@@ -89,9 +124,9 @@ import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plug
 | `name` | `dek-<name>` の `<name>` |
 | `version` | 英数字と `.`、`+`、`-` からなる一語。64 文字以内 |
 | `check` | 省略できる。ないとき、dek は検査を走らせない |
-| `page` | 省略できる。`{ "api": 1, "keys": ["r"] }`。プレーヤーとビルドに入る、ページ API 1 を呼ぶページと、それが使うキー。キーは dek のもの（`a f l m p s`）以外の英小文字一字。デッキに届くのは、dek が運ぶスクリプトを持つページだけ（[ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)） |
+| `page` | 省略できる。`{ "api": 1, "keys": ["r"] }`。プレーヤーとビルドに入る、ページ API 1 を呼ぶページと、それが使うキー。キーは dek のもの（`a f l m p s`）以外の英小文字一字。今のところ、デッキに届くのは公式プラグインのページだけ（[ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)） |
 | `check.protocol` | 下のやりとりの版。`1` |
-| `check.rules` | 検査が報告しうるルール id のすべて。id は、名前を大文字にし、`-` を `_` にして、数字三桁を続けたもの。`study` なら `STUDY001`、`acme-talks` なら `ACME_TALKS001` |
+| `check.rules` | 検査が報告しうるルール id のすべて。id は、名前を大文字にし、`-` を `_` にして、数字三桁を続けたもの。`glossary` なら `GLOSSARY001`、`acme-talks` なら `ACME_TALKS001` |
 | `…severity` | `error` か `warning`。dek は結果の SARIF の `level` ではなく、これを使う。lint を失敗させるのは error だけ |
 | `…summary` | 一行、120 文字以内。dek は SARIF のルール一覧にだけ出す |
 | `data` | 省略できる。プラグインが読む、デッキの中のファイル。デッキのフォルダからの相対パス。隠しファイルでも、デッキの外でも、dek 自身のもの（`script.md`、`theme.css`、`slides/`、`assets/`、`voice/`、`dist/`）でもないこと。AGENTS.md に名前が載る |
@@ -140,14 +175,14 @@ dek は、メッセージとヒントを、それぞれ 300 文字以内の一�
 import type { DekPage } from "@hajimism/dek/plugin";
 declare const dek: DekPage;
 
-dek.plugin("study", { api: 1 }, (api) => {
+dek.plugin("glossary", { api: 1 }, (api) => {
   api.deck;                 // { name }
   api.slides;               // [{ slug, title }]
   api.current();            // { slug, index, beat }。beat 0 はスライドに来たところ
   api.on("change", (position) => {});            // 初めに一度、その後デッキが落ち着くたびに
   api.on("mount", ({ slug, root, layer, view }) => {});
   api.shown(element);       // まだ来ていないビートに隠されていないか
-  api.data("study.yaml");   // { text, version } | null。申告したファイルだけ
+  api.data("glossary.yaml");   // { text, version } | null。申告したファイルだけ
   api.key("r", () => {});   // 申告していないキーなら false
 });
 ```

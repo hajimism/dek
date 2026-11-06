@@ -6,6 +6,7 @@
     "src/runtime/annotate.ts",
     "src/core/*-worker.ts",
     "src/video/worker.ts",
+    "src/plugins/*/main.ts",
     "tests/helpers/fake-*.ts",
     "scripts/*.ts",
     "evals/agent/shim.ts"

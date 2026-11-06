@@ -38,6 +38,10 @@ bun add -d "$tarball" > /dev/null
 # The skill ships with the version it describes, wherever the install put the package.
 installed="$(bun -e 'console.log(require.resolve("@hajimism/dek/package.json"))')"
 for skill in dek dek-design; do test -f "$(dirname "$installed")/skills/$skill/SKILL.md"; done
+# The plugin dek ships runs from the installed package, with nothing on PATH for it (ADR 33).
+printf '\n[plugins.study]\n' >> dek.toml
+bunx dekc sync > /dev/null 2>&1
+test -f plugins/study/plugin.json
 cd decks/demo
 bunx dekc --version
 bunx dekc ls > /dev/null 2>&1

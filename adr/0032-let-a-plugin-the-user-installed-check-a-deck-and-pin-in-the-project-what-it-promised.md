@@ -10,6 +10,8 @@ Amends [28. Let a project's code run only as a page, a ref's only in an offline 
 
 Amended by [33. Show a plugin's page in the player and builds behind page API 1](0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)
 
+Amended by [34. Ship dek-study inside dek as its first official plugin](0034-ship-dek-study-inside-dek-as-its-first-official-plugin.md)
+
 ## Context
 
 dek is useful to an agent because lint lets the agent converge and then stop ([Agent Usability Criteria](../docs/guide/agent-criteria.md), 2 and 6). Some conventions are not dek's to know. An event can ask for a title slide and a closing slide, or a team can ban words. A study tool built on dek, dekstudy, puts stickers over a slide's words, and needs every sticker to still find its word after the slide is edited. Today such a convention lives in a skill's prose, which an agent can misread and nothing checks. The way out has been to wrap dek in another command, which an agent has to know about and remember to run. A convention only that command checks is a false pass for an agent that runs `dekc lint` (S1).

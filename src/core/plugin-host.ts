@@ -20,7 +20,7 @@ import {
 } from "./plugin.ts";
 import type { Project, ProjectDeck } from "./resolve.ts";
 import { readSourceIfExists, writeInside } from "./safe-fs.ts";
-import { OverrunError, runPiped } from "./spawn.ts";
+import { OverrunError, runPiped, workerCommand } from "./spawn.ts";
 
 /**
  * Running the plugins a project names: finding each `dek-<name>`, asking it for its manifest,
@@ -49,12 +49,26 @@ function binName(name: string): string {
 }
 
 /**
+ * The plugins dek ships, by name (ADR 34). Each runs from dek's own files, in a bun of its own as
+ * any plugin does, and never from PATH: its code is the dek the project installed, which the
+ * project's lockfile pins.
+ */
+const BUNDLED: Record<string, string> = {
+  study: join(import.meta.dir, "..", "plugins", "study", "main.ts"),
+};
+
+/**
+ * A plugin dek ships, from dek's own files; otherwise
  * `dek-<name>` on the user's PATH, as an absolute path to start it by. A PATH entry that is
  * relative, or whose real path is in the project, is passed over: bunx, direnv, and mise put a
  * project's own folders there, and a project may choose among the plugins the user installed but
  * never add one. On Windows only an `.exe` is taken, so no script runs through a shell.
  */
 export function resolvePluginBin(name: string, root: string): string | undefined {
+  const bundled = BUNDLED[name];
+  if (bundled !== undefined) {
+    return bundled;
+  }
   const project = realOrUndefined(root) ?? resolve(root);
   const entries = pathEntries().filter((entry) => !passedOver(entry, project));
   const found = Bun.which(binName(name), { PATH: entries.join(delimiter) }) ?? undefined;
@@ -146,7 +160,7 @@ export async function installedManifest(
   const timeoutMs = options.timeoutMs ?? MANIFEST_TIMEOUT_MS;
   let printed: string;
   try {
-    const run = await runPiped([bin, "manifest"], {
+    const run = await runPiped(workerCommand(bin, ["manifest"]), {
       label: `${binName(name)} manifest failed`,
       hint: "",
       cwd: root,
@@ -228,13 +242,16 @@ export async function checkDeck(
   const timeoutMs = options.timeoutMs ?? CHECK_TIMEOUT_MS;
   let stdout: string;
   try {
-    const run = await runPiped([plugin.bin, "check", "--protocol", String(CHECK_PROTOCOL)], {
-      label: `${binName(plugin.name)} check failed`,
-      hint: "",
-      stdin: checkInput(deck),
-      cwd: deck.dir,
-      timeoutMs,
-    });
+    const run = await runPiped(
+      workerCommand(plugin.bin, ["check", "--protocol", String(CHECK_PROTOCOL)]),
+      {
+        label: `${binName(plugin.name)} check failed`,
+        hint: "",
+        stdin: checkInput(deck),
+        cwd: deck.dir,
+        timeoutMs,
+      },
+    );
     if (run.exitCode !== 0) {
       return { diagnostics: [failed(`exited ${run.exitCode}${stderrLine(run.stderr)}`)] };
     }

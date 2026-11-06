@@ -6,17 +6,52 @@ description: 'A plugin is a dek-<name> executable that checks decks in dekc lint
 
 A plugin adds checks that dek does not know, such as an event's slide rules or a study tool's stickers, to the `dekc lint` an agent already runs. A plugin is one executable, `dek-<name>`, that the user installs. It runs in a process of its own and talks to dek in JSON and SARIF. The decision and its reasons are in [ADR 32](https://github.com/hajimism/dek/blob/main/adr/0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md).
 
+## Official plugins
+
+dek ships one plugin, dek-study, in its own package. Using it takes no install: name it in `dek.toml`, and dek runs it from its own files, never a `dek-study` on `PATH` ([ADR 34](https://github.com/hajimism/dek/blob/main/adr/0034-ship-dek-study-inside-dek-as-its-first-official-plugin.md)).
+
+### dek-study
+
+Stickers over the words a reader of a study deck should be able to recall. The checks keep each sticker on its words as the slides change.
+
+```toml
+[plugins.study]
+```
+
+The stickers live in `study.yaml`, in the deck's folder:
+
+```yaml
+version: 1
+stickers:
+  - id: s_8k2f                   # unique in the deck
+    slide: planning-fallacy      # the slide's slug
+    quote: 外部視点               # the words the sticker hides
+    prefix: 楽観的に見積もる傾向に、  # optional: the words right before, to tell two places apart
+```
+
+A slide's words are the text a reader sees in its HTML: not inside `script`, `style`, `template`, or `noscript`, nor in comments, with each run of whitespace read as one space. In a language written with spaces between words, a quote is whole words: `is` is not found in "This". In Japanese, Chinese, Korean, or Thai it is any run of the words. A sticker with a `prefix` covers the first place its quote follows that prefix; one without covers the first place left. Write a value YAML would read as a number or as true or false, such as `1868`, in quotes.
+
+| ID | Severity | Condition |
+| --- | --- | --- |
+| `STUDY001` | error | A sticker's words are not on its slide, or its slide is not in the deck. When they are gone from it and on exactly one other slide, the hint names it; when they are still on it, the message says whether the prefix no longer matches or another sticker took each place |
+| `STUDY002` | warning | A sticker's words show again on its slide where no sticker covers them |
+| `STUDY003` | error | `study.yaml` does not read: not YAML, a `version` other than 1, a sticker without `id`, `slide`, or `quote`, a sticker's words YAML reads as a number or as true or false, or two stickers with one id. The other stickers are still checked |
+
+Every finding points at the sticker's line in `study.yaml`. A deck without `study.yaml` has nothing to check.
+
 ## Using a plugin
+
+These steps are for a plugin someone else wrote; an official one skips the first.
 
 1. Install `dek-<name>` somewhere on your `PATH` outside the project.
 2. Name it in `dek.toml`:
 
    ```toml
-   [plugins.study]
+   [plugins.glossary]
    ```
 
-3. Run `dekc sync`. It asks the plugin for its manifest and writes it to `plugins/study/plugin.json`, the lock. Commit the lock.
-4. Run `dekc lint`. The plugin's findings appear with dek's, under the plugin's rule ids (`STUDY001`, …).
+3. Run `dekc sync`. It asks the plugin for its manifest and writes it to `plugins/glossary/plugin.json`, the lock. Commit the lock.
+4. Run `dekc lint`. The plugin's findings appear with dek's, under the plugin's rule ids (`GLOSSARY001`, …).
 
 AGENTS.md lists each plugin, with its version, its rule ids, and its data files, so an agent knows what lint checks.
 
@@ -24,10 +59,10 @@ AGENTS.md lists each plugin, with its version, its rule ids, and its data files,
 
 `plugins/<name>/plugin.json` holds the manifest the project accepted: the plugin's version, its rules and their severities, and its data files. `dekc lint` runs a plugin only while the installed one promises exactly what the lock says. So a teammate or CI with another version runs no check rather than another one, and says so.
 
-When the installed plugin's manifest changes, for example after an update, `dekc sync` lists what changed, such as `version 0.1.0 → 0.2.0` or `STUDY003 added (error)`, and leaves the lock alone. Read the changes, then accept them:
+When the installed plugin's manifest changes, for example after an update, `dekc sync` lists what changed, such as `version 0.1.0 → 0.2.0` or `GLOSSARY003 added (error)`, and leaves the lock alone. Read the changes, then accept them:
 
 ```bash
-dekc sync --accept study
+dekc sync --accept glossary
 ```
 
 The lock pins what the plugin promises, not its binary, so a lock written on macOS holds on Linux CI.
@@ -61,7 +96,7 @@ A plugin in TypeScript gets the shapes below as types from dek, with no code:
 import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plugin";
 ```
 
-`PluginManifest<"STUDY">` checks the rule ids' prefix, and `CheckOutput<"STUDY001" | "STUDY002">` refuses a finding under an id the manifest does not declare.
+`PluginManifest<"GLOSSARY">` checks the rule ids' prefix, and `CheckOutput<"GLOSSARY001" | "GLOSSARY002">` refuses a finding under an id the manifest does not declare.
 
 ### `dek-<name> manifest`
 
@@ -70,16 +105,16 @@ Prints the manifest as JSON on stdout and exits 0:
 ```json
 {
   "schema": 1,
-  "name": "study",
+  "name": "glossary",
   "version": "0.1.0",
   "check": {
     "protocol": 1,
     "rules": {
-      "STUDY001": { "severity": "error", "summary": "a sticker's text is not on its slide" },
-      "STUDY002": { "severity": "warning", "summary": "a hidden word shows elsewhere on the slide" }
+      "GLOSSARY001": { "severity": "error", "summary": "a term is used before it is defined" },
+      "GLOSSARY002": { "severity": "warning", "summary": "a term is spelled two ways" }
     }
   },
-  "data": [{ "path": "study.yaml" }]
+  "data": [{ "path": "glossary.yaml" }]
 }
 ```
 
@@ -89,9 +124,9 @@ Prints the manifest as JSON on stdout and exits 0:
 | `name` | The `<name>` of `dek-<name>` |
 | `version` | One token of letters, digits, `.`, `+`, and `-`, at most 64 characters |
 | `check` | Optional. Without it, dek runs no check |
-| `page` | Optional: `{ "api": 1, "keys": ["r"] }`, a page in the player and the build that calls page API 1, and the letters it binds, none of dek's own (`a f l m p s`). A page reaches a deck only once dek has a script to carry for it ([ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)) |
+| `page` | Optional: `{ "api": 1, "keys": ["r"] }`, a page in the player and the build that calls page API 1, and the letters it binds, none of dek's own (`a f l m p s`). For now only an official plugin's page reaches a deck ([ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)) |
 | `check.protocol` | The version of the exchange below: `1` |
-| `check.rules` | Every rule id the check can report. An id is the name in capitals, with `_` for `-`, then three digits: `study` → `STUDY001`, `acme-talks` → `ACME_TALKS001` |
+| `check.rules` | Every rule id the check can report. An id is the name in capitals, with `_` for `-`, then three digits: `glossary` → `GLOSSARY001`, `acme-talks` → `ACME_TALKS001` |
 | `…severity` | `error` or `warning`. dek uses this, not a result's SARIF `level`; only an error fails lint |
 | `…summary` | One line, at most 120 characters. dek shows it only in SARIF's rule list |
 | `data` | Optional. Files in the deck the plugin reads, relative to the deck's folder. Not hidden, not outside the deck, and none of dek's own (`script.md`, `theme.css`, `slides/`, `assets/`, `voice/`, `dist/`). AGENTS.md names them |
@@ -140,14 +175,14 @@ A page runs after dek's player, in the dev server's player and in `dekc build`'s
 import type { DekPage } from "@hajimism/dek/plugin";
 declare const dek: DekPage;
 
-dek.plugin("study", { api: 1 }, (api) => {
+dek.plugin("glossary", { api: 1 }, (api) => {
   api.deck;                 // { name }
   api.slides;               // [{ slug, title }]
   api.current();            // { slug, index, beat }, beat 0 being the slide's arrival
   api.on("change", (position) => {});            // at setup, then each time the deck settles
   api.on("mount", ({ slug, root, layer, view }) => {});
   api.shown(element);       // whether no beat still to come hides it
-  api.data("study.yaml");   // { text, version } | null, for a file the manifest declares
+  api.data("glossary.yaml");   // { text, version } | null, for a file the manifest declares
   api.key("r", () => {});   // false for a key the manifest does not declare
 });
 ```
