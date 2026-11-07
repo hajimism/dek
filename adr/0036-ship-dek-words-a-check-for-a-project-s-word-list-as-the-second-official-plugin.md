@@ -6,6 +6,8 @@ Date: 2026-11-07
 
 Accepted
 
+Amended by [37. Run a project's plugins in dekc check, for the slide it checks](0037-run-a-project-s-plugins-in-dekc-check-for-the-slide-it-checks.md)
+
 ## Context
 
 An agent that writes a talk in Japanese leans on the same words: metaphor verbs (効く, 刺さる), role metaphors (入口, 土台), words that sound concrete and are not (解像度, 腹落ち), calques (〜した瞬間), and stiff forms (活用する, 〜を実施する). A team that cares writes them down. The project that asked for this keeps such a list in an agent skill and has the agent review a whole deck against it at the end. The review is slow, costs a pass of the model each time, and misses words the agent wrote again after it. A word on a list is a fact a check can find, so it belongs where the agent already stops: `dekc lint` ([Agent Usability Criteria](../docs/guide/agent-criteria.md), 2). [ADR 32](0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md) named "a team can ban words" among the conventions a plugin is for.

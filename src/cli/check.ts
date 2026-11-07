@@ -4,6 +4,7 @@ import { shellQuote } from "../core/escape.ts";
 import type { Fill } from "../core/fill.ts";
 import { lintDeck } from "../core/lint.ts";
 import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
+import { checkSlide } from "../core/plugin-host.ts";
 import { runVisualDeck } from "../core/visual.ts";
 import { hasVoice, loadCachedTimeline, VOICE_SETUP_HINT } from "../core/voice.ts";
 import { type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
@@ -35,26 +36,34 @@ export async function checkCommand(
   requireSection(deck, slug);
 
   const diagnostics = lintDeck({ project, deck }, { slug });
-  const visual = await runVisualDeck(
-    { project, deck },
-    {
-      slug,
-      screenshot: options.shot === true,
-      ...(options.runner ? { runner: options.runner } : {}),
-    },
-  );
+  // The plugins run in processes of their own while the browser measures the slide.
+  const [visual, plugins] = await Promise.all([
+    runVisualDeck(
+      { project, deck },
+      {
+        slug,
+        screenshot: options.shot === true,
+        ...(options.runner ? { runner: options.runner } : {}),
+      },
+    ),
+    checkSlide(project, deck, slug),
+  ]);
   if (visual) {
     diagnostics.push(...visual.diagnostics);
   } else if (options.shot) {
     throw playwrightMissingError();
   }
+  diagnostics.push(...plugins.diagnostics);
 
   const shot = visual?.screenshotPath;
   const { slug: _slide, ...fill } = visual?.fills.find((found) => found.slug === slug) ?? {};
 
-  const skipped: SkippedCheck[] = visual
-    ? []
-    : [visualSkipped(`dekc check ${shellQuote(slug)}`, { reason: "Playwright is not installed" })];
+  const skipped: SkippedCheck[] = [...plugins.skipped];
+  if (!visual) {
+    skipped.push(
+      visualSkipped(`dekc check ${shellQuote(slug)}`, { reason: "Playwright is not installed" }),
+    );
+  }
 
   // A live-only deck is done without voice, so asking for it skips the check rather than failing,
   // the way a missing Playwright skips visual.

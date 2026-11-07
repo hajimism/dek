@@ -269,7 +269,7 @@ describe("pluginsSection", () => {
       { name: "glossary", manifest: undefined },
     ]);
     expect(section).toContain(
-      "- `study` 0.1.0: `dekc lint` checks STUDY001 and STUDY002. Its data: `study.yaml`.",
+      "- `study` 0.1.0: It checks STUDY001 and STUDY002. Its data: `study.yaml`.",
     );
     expect(section).toContain("- `glossary`: not pinned yet; `dekc sync` pins it.");
     expect(section).not.toContain("sticker");
@@ -285,7 +285,7 @@ describe("pluginsSection", () => {
         manifest: { schema: 1, name: "study", version: "1.0.0", check: { protocol: 1, rules } },
       },
     ]);
-    expect(section).toContain("`dekc lint` checks STUDY001 to STUDY003.");
+    expect(section).toContain("It checks STUDY001 to STUDY003.");
   });
 
   test("is empty when dek.toml names no plugin", () => {

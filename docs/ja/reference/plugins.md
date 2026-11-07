@@ -1,10 +1,10 @@
 ---
-description: 'プラグインは dekc lint でデッキを検査する実行ファイル dek-<name> である。プロジェクトでの使い方と、作者が従う申告・検査・lock の形。'
+description: 'プラグインは dekc lint と dekc check でデッキを検査する実行ファイル dek-<name> である。プロジェクトでの使い方と、作者が従う申告・検査・lock の形。'
 ---
 
 # プラグイン
 
-プラグインは、dek の知らない検査を、エージェントがもともと走らせる `dekc lint` に足します。イベントのスライドの決まりや、学習用ツールのシールの検査がその例です。プラグインは、ユーザーがインストールする実行ファイル `dek-<name>` 一つです。別のプロセスで動き、dek とは JSON と SARIF で話します。この決定とその理由は [ADR 32](https://github.com/hajimism/dek/blob/main/adr/0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md) にあります。
+プラグインは、dek の知らない検査を、エージェントがもともと走らせる `dekc check` と `dekc lint` に足します。イベントのスライドの決まりや、学習用ツールのシールの検査がその例です。プラグインは、ユーザーがインストールする実行ファイル `dek-<name>` 一つです。別のプロセスで動き、dek とは JSON と SARIF で話します。この決定とその理由は [ADR 32](https://github.com/hajimism/dek/blob/main/adr/0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md) にあります。
 
 ## 公式プラグイン
 
@@ -140,7 +140,7 @@ lock が固定するのは、プラグインのバイナリではなく、プラ
 
 ### プラグインが走らないとき
 
-`dekc lint` は、走らなかったプラグインを pass と数えません。`--json` の `skipped` に `{ "check": "plugin", "plugin": "<name>", "reason", "hint" }` として挙げます。次のときです。
+`dekc lint` と `dekc check` は、走らなかったプラグインを pass と数えません。`--json` の `skipped` に `{ "check": "plugin", "plugin": "<name>", "reason", "hint" }` として挙げます。次のときです。
 
 - インストールされていない
 - プロジェクトにまだ lock がない（`dekc sync` が書く）
@@ -149,7 +149,7 @@ lock が固定するのは、プラグインのバイナリではなく、プラ
 
 プラグインが失敗したときは、エラーの [`DEK046`](/ja/reference/lint#ルール) になります。申告や検査が 0 以外で終わった、時間内に終わらなかった、SARIF を出さなかった、lock にないルールを報告した、などの場合です。デッキの問題ではないので、ヒントは「ユーザーに伝える」です。
 
-プラグインが走るのは、rumdl と同じく `dekc lint` だけです。`dekc check`、`dekc build`、開発サーバーでは走りません。
+`dekc lint` は、各プラグインを各デッキで走らせます。`dekc check <slug>` は、そのスライドのデッキで走らせ、そのスライドについての指摘と、どのスライドにもない error を残します。スライドについての指摘とは、スライドの HTML、CSS、TypeScript か、`script.md` のそのセクションにある指摘です。どのスライドにもない error とは、読めないデータファイルや `DEK046` などです。`dekc build` と開発サーバーはプラグインを走らせません。`dekc check` は rumdl も走らせません。
 
 ## プラグインを書く
 

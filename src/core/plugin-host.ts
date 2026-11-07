@@ -20,6 +20,7 @@ import {
 } from "./plugin.ts";
 import type { Project, ProjectDeck } from "./resolve.ts";
 import { readSourceIfExists, writeInside } from "./safe-fs.ts";
+import { slugAtLine } from "./script-lines.ts";
 import { OverrunError, runPiped, workerCommand } from "./spawn.ts";
 
 /**
@@ -304,7 +305,7 @@ export async function checkDeck(
     }
     return { diagnostics: [failed("could not start")] };
   }
-  const read = readSarif(stdout, plugin, [deck.dir, pluginDir(project.root, plugin.name)]);
+  const read = readSarif(stdout, plugin, deck, pluginDir(project.root, plugin.name));
   return typeof read === "string" ? { diagnostics: [failed(read)] } : { diagnostics: read };
 }
 
@@ -340,13 +341,14 @@ type SarifResult = {
 };
 
 /**
- * The findings in a check's SARIF, or what is wrong with it, as the end of a DEK046 message.
- * `dirs` are the deck's folder, which a relative location is read against, then the plugin's own.
+ * The findings in a check's SARIF, or what is wrong with it, as the end of a DEK046 message. A
+ * relative location is read against the deck's folder; `ownDir` is the plugin's own.
  */
 function readSarif(
   stdout: string,
   plugin: ReadyPlugin,
-  dirs: [deck: string, plugin: string],
+  deck: ProjectDeck,
+  ownDir: string,
 ): Diagnostic[] | string {
   let log: unknown;
   try {
@@ -381,7 +383,7 @@ function readSarif(
         id,
         severity: rule.severity,
         message: foreignLine(text, PLUGIN_TEXT_MAX),
-        ...location(result, dirs),
+        ...location(result, deck, ownDir),
         ...(typeof hint === "string" && hint.trim() !== ""
           ? { hint: foreignLine(hint, PLUGIN_TEXT_MAX) }
           : {}),
@@ -394,11 +396,13 @@ function readSarif(
 /**
  * Where a finding is, from its first location: a path relative to the deck, or a file URL, inside
  * the deck or the plugin's own `plugins/<name>/` (ADR 35). A location anywhere else is dropped,
- * never shown as a file to change.
+ * never shown as a file to change. A finding in a slide's files, or in its section of script.md,
+ * is on that slide, as dek's own are.
  */
 function location(
   result: SarifResult,
-  [deckDir, ownDir]: [string, string],
+  deck: ProjectDeck,
+  ownDir: string,
 ): Pick<Diagnostic, "path" | "line" | "column" | "slug"> {
   const physical = result.locations?.[0]?.physicalLocation;
   const uri = physical?.artifactLocation?.uri;
@@ -407,20 +411,20 @@ function location(
   }
   let path: string;
   try {
-    path = uri.startsWith("file:") ? fileURLToPath(uri) : resolve(deckDir, decodeURI(uri));
+    path = uri.startsWith("file:") ? fileURLToPath(uri) : resolve(deck.dir, decodeURI(uri));
   } catch {
     return {};
   }
-  const inDeck = inside(deckDir, path);
+  const inDeck = inside(deck.dir, path)?.split(sep).join("/");
   if (inDeck === undefined && inside(ownDir, path) === undefined) {
     return {};
   }
   const line = positive(physical?.region?.startLine);
   const column = line === undefined ? undefined : positive(physical?.region?.startColumn);
-  const slug = inDeck
-    ?.split(sep)
-    .join("/")
-    .match(/^slides\/([^/]+)\.(?:html|css|ts)$/)?.[1];
+  const slug =
+    inDeck === "script.md" && line !== undefined
+      ? slugAtLine(deck.deck.sections, line)
+      : inDeck?.match(/^slides\/([^/]+)\.(?:html|css|ts)$/)?.[1];
   return {
     path,
     ...(line === undefined ? {} : { line }),
@@ -528,6 +532,30 @@ export async function pluginChecks(
     ready.push({ name, bin: installed.bin, manifest: pinned });
   }
   return { ready, skipped, diagnostics };
+}
+
+/**
+ * The plugins' findings for `dekc check` on one slide, and the plugins that did not run. Each
+ * pinned plugin checks the deck, as lint has it, and the slide keeps what is on it. It also keeps
+ * an error on no slide, such as data that does not read or a plugin that failed: the slide's
+ * check may rest on it, and leaving it out would pass a slide no plugin checked.
+ */
+export async function checkSlide(
+  project: Project,
+  deck: ProjectDeck,
+  slug: string,
+): Promise<{ diagnostics: Diagnostic[]; skipped: SkippedCheck[] }> {
+  const plugins = await pluginChecks(project);
+  const outcomes = await Promise.all(
+    plugins.ready.map((plugin) => checkDeck(plugin, project, deck)),
+  );
+  const diagnostics = [
+    ...plugins.diagnostics,
+    ...outcomes.flatMap((outcome) => outcome.diagnostics),
+  ].filter((found) =>
+    found.slug === undefined ? found.severity === "error" : found.slug === slug,
+  );
+  return { diagnostics, skipped: plugins.skipped };
 }
 
 /** What `dekc sync` did with one plugin, for its `--json` and its notes. */
