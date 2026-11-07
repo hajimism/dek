@@ -10,11 +10,11 @@ How lint fits the workflow is in [Lint](/guide/lint). This page is the table of 
 
 Each finding is about one of three things, and the command that reports it follows from that:
 
-- **`slide`**: one slide's files, or its section in `script.md`. The finding carries that slide's `slug`. `dekc check <slug>` reports these, and only for that slide.
+- **`slide`**: one slide's files, or its section in `script.md`. The finding carries that slide's `slug`. `dekc check <slug>` reports these, and only for that slide, plus a [plugin's](/reference/plugins#when-a-plugin-does-not-run) errors on no slide, such as its data not reading or `DEK046`.
 - **`deck`**: a file every slide of the deck shares: `theme.css`, the frontmatter, `voice/voice.toml`, or `script.md` as a whole (its length, a heading above the first slide). It carries no `slug`.
 - **`project`**: `dek.toml`. Found once per project, however many decks a command covers.
 
-`dekc lint` reports all three. A rule that reads both a shared file and a slide's own has two scopes: `DEK014` in `theme.css` is a deck finding, in `slides/<id>.css` a slide finding. `dekc build` and `dekc ls` count the same findings as `dekc lint` without rumdl's and the [plugins'](/reference/plugins), which run only in `dekc lint`; `dekc ls` lists a project finding on its own `project` line, not on each deck's row.
+`dekc lint` reports all three. A rule that reads both a shared file and a slide's own has two scopes: `DEK014` in `theme.css` is a deck finding, in `slides/<id>.css` a slide finding. `dekc build` and `dekc ls` count the same findings as `dekc lint` without rumdl's and the [plugins'](/reference/plugins): rumdl runs only in `dekc lint`, and plugins in `dekc lint` and `dekc check`; `dekc ls` lists a project finding on its own `project` line, not on each deck's row.
 
 ## Rules
 
