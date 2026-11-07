@@ -269,10 +269,28 @@ describe("pluginsSection", () => {
       { name: "glossary", manifest: undefined },
     ]);
     expect(section).toContain(
-      "- `study` 0.1.0: It checks STUDY001 and STUDY002. Its data: `study.yaml`.",
+      "- `study` 0.1.0: It checks STUDY001 and STUDY002. Its data: `study.yaml` in each deck.",
     );
     expect(section).toContain("- `glossary`: not pinned yet; `dekc sync` pins it.");
     expect(section).not.toContain("sticker");
+  });
+
+  test("says which data is the project's and which each deck's, and links dek's guide", () => {
+    const section = pluginsSection([
+      {
+        name: "words",
+        manifest: {
+          schema: 1,
+          name: "words",
+          version: "0.1.0",
+          data: [{ path: "words.yaml" }, { path: "words.yaml", in: "project" }],
+        },
+        guide: "https://hajimism.github.io/dek/reference/plugins.html#dek-words",
+      },
+    ]);
+    expect(section).toContain(
+      "- `words` 0.1.0: Its data: `plugins/words/words.yaml` in the project, `words.yaml` in each deck. How to write it: https://hajimism.github.io/dek/reference/plugins.html#dek-words",
+    );
   });
 
   test("shows a run of rules as a range", () => {
@@ -330,7 +348,7 @@ describe("a manifest's page", () => {
     const section = pluginsSection([
       { name: "study", manifest: { ...manifest, page: { api: 1, keys: ["r"] } } },
     ]);
-    expect(section).toContain("Its data: `study.yaml`. Its page takes the key `r`.");
+    expect(section).toContain("Its data: `study.yaml` in each deck. Its page takes the key `r`.");
   });
 });
 
@@ -376,7 +394,7 @@ describe("a manifest's project data", () => {
       "data plugins/words/words.yaml added",
     ]);
     expect(pluginsSection([{ name: "words", manifest: words }])).toContain(
-      "- `words` 0.1.0: Its data: `plugins/words/words.yaml`, `words.yaml`.",
+      "- `words` 0.1.0: Its data: `plugins/words/words.yaml` in the project, `words.yaml` in each deck.",
     );
   });
 

@@ -118,7 +118,7 @@ These steps are for a plugin someone else wrote; an official one skips the first
 3. Run `dekc sync`. It asks the plugin for its manifest and writes it to `plugins/glossary/plugin.json`, the lock. Commit the lock.
 4. Run `dekc lint`. The plugin's findings appear with dek's, under the plugin's rule ids (`GLOSSARY001`, …).
 
-AGENTS.md lists each plugin, with its version, its rule ids, and its data files, so an agent knows what lint checks.
+AGENTS.md lists each plugin, with its version, its rule ids, and its data files, each said to be the project's or each deck's, so an agent knows what lint checks. For a plugin dek ships, it also links the section of this page on how to write its data.
 
 ### The lock
 

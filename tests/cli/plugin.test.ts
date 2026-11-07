@@ -140,7 +140,7 @@ describe("dekc sync and lint with a plugin", () => {
         expect(synced.plugins).toEqual([{ name: "quiz", status: "accepted", version: "0.1.0" }]);
         expect(synced.created).toContain(join("plugins", "quiz", "plugin.json"));
         expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain(
-          "- `quiz` 0.1.0: It checks QUIZ001 and QUIZ002. Its data: `quiz.yaml`.",
+          "- `quiz` 0.1.0: It checks QUIZ001 and QUIZ002. Its data: `quiz.yaml` in each deck.",
         );
 
         const lint = await dek(["lint", "--json"], root);

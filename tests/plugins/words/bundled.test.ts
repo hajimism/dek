@@ -73,7 +73,7 @@ describe("dek-words, the second plugin dek ships", () => {
             { name: "words", status: "accepted", version: MANIFEST.version },
           ]);
           expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain(
-            `- \`words\` ${MANIFEST.version}: It checks WORDS001 and WORDS002. Its data: \`plugins/words/words.yaml\`, \`words.yaml\`.`,
+            `- \`words\` ${MANIFEST.version}: It checks WORDS001 and WORDS002. Its data: \`plugins/words/words.yaml\` in the project, \`words.yaml\` in each deck. How to write it: https://hajimism.github.io/dek/reference/plugins.html#dek-words`,
           );
           const lint = jsonStdout<Lint>(await runMain(["lint", "--json"], root));
           const found = lint.diagnostics

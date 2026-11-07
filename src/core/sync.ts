@@ -288,7 +288,7 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 
 ## Before you report a deck as done
 
-- \`dekc lint --visual\` passes.
+- \`dekc lint --visual\` passes. Warnings do not fail it: fix each one, or tell the author which you kept and why.
 - You have read \`dekc shot --sheet\` and judged the deck's balance.
 - Say what you could not judge, such as the argument and the timing, and leave it to the author.
 ${referencesSection(root)}${pluginsSection(pinnedPlugins(root))}

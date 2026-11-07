@@ -613,6 +613,10 @@ c
       expect(agents).not.toContain("a deck is done when lint passes");
       expect(agents).toContain("A deck is not done while `dekc lint --visual` fails");
       expect(agents).toContain("## Before you report a deck as done");
+      // A warning does not fail lint, so passing it leaves each one to read.
+      expect(agents).toContain(
+        "Warnings do not fail it: fix each one, or tell the author which you kept and why.",
+      );
       expect(agents).toContain("Say what you could not judge");
     });
   });
