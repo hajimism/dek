@@ -2,6 +2,24 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.6.0](https://github.com/hajimism/dek/compare/v0.5.1...v0.6.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* a skipped check can now be "plugin" in --json (ADR 31).
+
+### Features
+
+* let a plugin the user installed check a deck in dekc lint ([847822c](https://github.com/hajimism/dek/commit/847822cdfb34f4931c284b103007cb10d0dfc450))
+* **plugins:** lay dek-study's sheet over the slides ([8886efc](https://github.com/hajimism/dek/commit/8886efc9b8a0b9bd4bc47290574654e79be32368))
+* **plugins:** let a plugin keep data for the whole project in plugins/&lt;name&gt;/ ([84add8a](https://github.com/hajimism/dek/commit/84add8ab77918fdbfd60bfced6c18a103b1de0b1))
+* **plugins:** ship dek-study inside dek as its first official plugin ([96595d5](https://github.com/hajimism/dek/commit/96595d5f3996c597a1c47564a736ef0ca5ae9413))
+* **plugins:** ship dek-study inside dek, with a sheet of stickers over the slides ([855908c](https://github.com/hajimism/dek/commit/855908c03305aa8e8284c890bea0e19e25986994))
+* **plugins:** ship dek-words, a check for a project's word list ([9eff6d1](https://github.com/hajimism/dek/commit/9eff6d13cb2727b0f0cf1aa8bdc9595ee4d5c1c1))
+* **plugins:** ship dek-words, a check for a project's word list ([07d8f54](https://github.com/hajimism/dek/commit/07d8f54908ef8cd1e52cbf9cec5e576f929e55fb))
+* **plugins:** show a plugin's page in the player and builds behind page API 1 ([b815ef6](https://github.com/hajimism/dek/commit/b815ef625444c572a13af1a6e0ab0dddfbffcb22))
+
 ## [0.5.1](https://github.com/hajimism/dek/compare/v0.5.0...v0.5.1) (2026-10-30)
 
 
