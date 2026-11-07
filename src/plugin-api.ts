@@ -34,8 +34,12 @@ export type PluginManifest<Prefix extends string = string> = {
     /** Single letters the page binds; none of dek's own (a f l m p s). */
     keys?: string[];
   };
-  /** Files in the deck the plugin reads, relative to the deck's folder; AGENTS.md names them. */
-  data?: Array<{ path: string }>;
+  /**
+   * Files the plugin reads, which AGENTS.md names: relative to the deck's folder, or, with
+   * `in: "project"`, to `plugins/<name>/` in the project, for data the whole project shares. Only
+   * the deck's are served to a page.
+   */
+  data?: Array<{ path: string; in?: "project" }>;
 };
 
 /** One slide of the deck, as `check` reads it. Each path is relative to the deck's folder, or null when the file is not there. */
@@ -53,6 +57,12 @@ export type CheckInput = {
   /** The version of the dek that runs the check. */
   dek: string;
   deck: { name: string; lang: string; slides: CheckSlide[] };
+  /**
+   * The absolute path of `plugins/<name>/` in the project, where the project's data files are,
+   * whether or not the folder exists (ADR 35). An older dek does not send it: read that as no
+   * project data.
+   */
+  pluginDir?: string;
 };
 
 /** One finding in a check's SARIF: the fields dek reads, and no others. */
@@ -62,7 +72,10 @@ export type CheckResult<RuleId extends string = string> = {
   message: { text: string };
   locations?: Array<{
     physicalLocation: {
-      /** Relative to the deck's folder, or a `file:` URL inside it. */
+      /**
+       * Relative to the deck's folder, or a `file:` URL inside it or inside `pluginDir`. dek drops
+       * a location anywhere else.
+       */
       artifactLocation: { uri: string };
       region?: { startLine: number; startColumn?: number };
     };

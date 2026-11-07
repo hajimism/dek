@@ -3,7 +3,7 @@ import { join, relative, sep } from "node:path";
 import { deckPaths } from "../core/deck-paths.ts";
 import type { LiveEvent } from "../core/live-protocol.ts";
 import { deckProjectRoot } from "../core/path.ts";
-import { pinnedPlugins } from "../core/plugin-host.ts";
+import { deckData, pinnedPlugins } from "../core/plugin-host.ts";
 import { listSlideFiles, type SlideSidecar } from "../core/resolve.ts";
 
 /** Modification times by name; a file that is gone is left out. */
@@ -66,7 +66,7 @@ function pluginMtimes(deckDir: string): Mtimes {
   // A dek.toml mid-edit names no plugin; the next scan sees them again.
   for (const { name, manifest } of pinnedPlugins(root)) {
     note(join(root, "plugins", name, "plugin.json"));
-    for (const { path } of manifest?.data ?? []) {
+    for (const { path } of manifest ? deckData(manifest) : []) {
       note(join(deckDir, path));
     }
   }

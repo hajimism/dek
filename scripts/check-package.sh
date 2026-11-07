@@ -38,10 +38,13 @@ bun add -d "$tarball" > /dev/null
 # The skill ships with the version it describes, wherever the install put the package.
 installed="$(bun -e 'console.log(require.resolve("@hajimism/dek/package.json"))')"
 for skill in dek dek-design; do test -f "$(dirname "$installed")/skills/$skill/SKILL.md"; done
-# The plugin dek ships runs from the installed package, with nothing on PATH for it (ADR 33).
-printf '\n[plugins.study]\n' >> dek.toml
+# The plugins dek ships run from the installed package, with nothing on PATH for them (ADR 34).
+printf '\n[plugins.study]\n[plugins.words]\n' >> dek.toml
 bunx dekc sync > /dev/null 2>&1
 test -f plugins/study/plugin.json
+test -f plugins/words/plugin.json
+# dek-words fails lint without the project's list (ADR 36).
+printf 'version: 1\nwords:\n  - word: 解像度\n' > plugins/words/words.yaml
 cd decks/demo
 bunx dekc --version
 bunx dekc ls > /dev/null 2>&1

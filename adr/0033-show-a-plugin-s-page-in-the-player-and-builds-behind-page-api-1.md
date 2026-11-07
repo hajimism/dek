@@ -8,6 +8,8 @@ Accepted
 
 Amends [32. Let a plugin the user installed check a deck, and pin in the project what it promised](0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md)
 
+Amended by [35. Let a plugin keep data for the whole project in plugins/<name>/](0035-let-a-plugin-keep-data-for-the-whole-project-in-plugins-name.md)
+
 ## Context
 
 A plugin can check a deck ([ADR 32](0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md)), but it cannot show anything to the person reading it. dekstudy, a study tool built on dek, needs exactly that. Its reader opens a deck they made days ago and lays a sheet over the words they want to recall, wherever they read it: in the dev server, in a built file, or on the site a build is published to. A plugin has no way into those pages.

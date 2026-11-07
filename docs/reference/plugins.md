@@ -8,7 +8,7 @@ A plugin adds checks that dek does not know, such as an event's slide rules or a
 
 ## Official plugins
 
-dek ships one plugin, dek-study, in its own package. Using it takes no install: name it in `dek.toml`, and dek runs it from its own files, never a `dek-study` on `PATH` ([ADR 34](https://github.com/hajimism/dek/blob/main/adr/0034-ship-dek-study-inside-dek-as-its-first-official-plugin.md)).
+dek ships two plugins, dek-study and dek-words, in its own package. Using one takes no install: name it in `dek.toml`, and dek runs it from its own files, never a `dek-study` or `dek-words` on `PATH` ([ADR 34](https://github.com/hajimism/dek/blob/main/adr/0034-ship-dek-study-inside-dek-as-its-first-official-plugin.md)).
 
 ### dek-study
 
@@ -51,6 +51,59 @@ Once `dekc sync` has pinned dek-study, every slide in the dev server and in `dek
 
 The sheet is never in the presenter view, a screenshot, a PDF, pptx, or video, nor in the visual lint. The rail's thumbnails do not carry it yet, so the words show there.
 
+### dek-words
+
+A list of words the project does not want in its talks, such as the ones an AI tends to write, checked in every deck. A word found is a warning, with what to write instead as its hint; the list is the project's, and dek ships none ([ADR 36](https://github.com/hajimism/dek/blob/main/adr/0036-ship-dek-words-a-check-for-a-project-s-word-list-as-the-second-official-plugin.md)).
+
+```toml
+[plugins.words]
+```
+
+The list lives in `plugins/words/words.yaml`, beside the lock, and every deck is checked against it:
+
+```yaml
+version: 1
+words:
+  - word: 解像度                # what is looked for, and how a finding names it
+    use: 何がどこまで分かっているかを書く   # what to write instead: the finding's hint
+  - word: 〜した瞬間
+    pattern: た瞬間              # a regular expression looked for instead of the word
+  - word: 効く
+    verb: godan                 # its forms too: 効か 効き 効く 効け 効こ 効い
+  - word: 突く
+    verb: godan
+    except:                     # longer words that hold it and are not it
+      - 突き抜ける
+  - word: 〇〇
+    in: slides                  # only the slides, or only the script
+```
+
+| Key | Meaning |
+| --- | --- |
+| `word` | Required. Looked for as written, with case ignored. A word that starts or ends with a Latin, Greek, or Cyrillic letter or a digit is matched only as whole words: `leverage` is not found in `leveraged` |
+| `pattern` | A regular expression, read with the `u` and `i` flags, looked for instead of `word` |
+| `verb` | `godan` or `ichidan`, to find the verb's forms. A godan verb is found by its stem and each kana of its row, with the euphonic form before て and た (効い, 待っ, 読ん). An ichidan verb is found by its stem: 落ちる is 落ち. A stem of one letter, as 見 of 見る, is in too many words, so write such a verb as a `pattern`. Write a する verb by its noun, `活用`, which finds 活用する too. Not with `pattern` |
+| `except` | Longer words that hold the word and are not it, one to a line. A place inside one of them is no finding |
+| `use` | What to write instead, shown as the hint |
+| `in` | `slides` or `script`, to look only there |
+
+A deck allows a word it needs, such as the subject of the talk, in `words.yaml` in its folder. An allow names an entry by its `word`:
+
+```yaml
+version: 1
+allow:
+  - 物差し
+```
+
+In a slide, dek-words looks at the text a reader sees, as dek-study reads it, text under `aria-hidden` included and ruby's readings (`rt`, `rp`) left out; a `<br>` is a space, and a word is never found across two block elements. A line break in the source between two Japanese letters is no space, so 解像 and 度 on two lines are found as 解像度. In `script.md`, it looks at headings without their `{#id}`, paragraphs and list items with the lines that continue them, and table cells, and not at the frontmatter, code, HTML comments, or blockquotes. A project that names the plugin and has no list fails lint with `WORDS002` until it writes one.
+
+| ID | Severity | Condition |
+| --- | --- | --- |
+| `WORDS001` | warning | A word on the list is in a slide or the script, at the place it starts. The message names the entry, and the text found when it differs; the hint is the entry's `use`, or to write the sentence without it. A word the talk needs is allowed in the deck's `words.yaml` |
+| `WORDS002` | error | The list or a deck's allows do not read: not YAML, a `version` other than 1, a key the file does not take, an entry without `word`, a `verb` other than `godan` or `ichidan` or that does not end as one, an ichidan verb with a stem of one letter, both `verb` and `pattern`, a `pattern` that is no regular expression or matches no text, an `in` other than `slides` or `script`, two entries with one `word`, or an allow that names no entry. Or the list is not there. The finding is at the line; the rest is still checked, and a mistake in the list is reported once, not for each deck |
+
+Write `except` and `allow` one item to a line: the YAML dek-words reads, as dek-study's does, takes no `[a, b]` list.
+
 ## Using a plugin
 
 These steps are for a plugin someone else wrote; an official one skips the first.
@@ -69,7 +122,7 @@ AGENTS.md lists each plugin, with its version, its rule ids, and its data files,
 
 ### The lock
 
-`plugins/<name>/plugin.json` holds the manifest the project accepted: the plugin's version, its rules and their severities, and its data files. `dekc lint` runs a plugin only while the installed one promises exactly what the lock says. So a teammate or CI with another version runs no check rather than another one, and says so.
+`plugins/<name>/plugin.json` holds the manifest the project accepted: the plugin's version, its rules and their severities, and its data files. The same folder holds the data a plugin keeps for the whole project, such as a list every deck is checked against; commit it with the lock. `dekc lint` runs a plugin only while the installed one promises exactly what the lock says. So a teammate or CI with another version runs no check rather than another one, and says so.
 
 When the installed plugin's manifest changes, for example after an update, `dekc sync` lists what changed, such as `version 0.1.0 → 0.2.0` or `GLOSSARY003 added (error)`, and leaves the lock alone. Read the changes, then accept them:
 
@@ -141,7 +194,7 @@ Prints the manifest as JSON on stdout and exits 0:
 | `check.rules` | Every rule id the check can report. An id is the name in capitals, with `_` for `-`, then three digits: `glossary` → `GLOSSARY001`, `acme-talks` → `ACME_TALKS001` |
 | `…severity` | `error` or `warning`. dek uses this, not a result's SARIF `level`; only an error fails lint |
 | `…summary` | One line, at most 120 characters. dek shows it only in SARIF's rule list |
-| `data` | Optional. Files in the deck the plugin reads, relative to the deck's folder. Not hidden, not outside the deck, and none of dek's own (`script.md`, `theme.css`, `slides/`, `assets/`, `voice/`, `dist/`). AGENTS.md names them |
+| `data` | Optional. Files the plugin reads, which AGENTS.md names. `{ "path": "glossary.yaml" }` is in the deck, relative to its folder: not hidden, not outside the deck, and none of dek's own (`script.md`, `theme.css`, `slides/`, `assets/`, `voice/`, `dist/`). `{ "path": "terms.yaml", "in": "project" }` is in `plugins/<name>/` in the project, for data every deck shares: not hidden, not outside that folder, and not `plugin.json`. Only the deck's files reach a page ([ADR 35](https://github.com/hajimism/dek/blob/main/adr/0035-let-a-plugin-keep-data-for-the-whole-project-in-plugins-name.md)) |
 
 dek ignores a field it does not know. The manifest has no field for guidance: what agents read about a plugin, dek writes from these facts. Print the same manifest every time; dek gives it 10 seconds.
 
@@ -159,11 +212,12 @@ dek runs it once per deck, in the deck's folder, with the deck as JSON on stdin:
     "slides": [
       { "slug": "planning-fallacy", "title": "計画錯誤", "html": "slides/planning-fallacy.html", "css": null, "ts": null }
     ]
-  }
+  },
+  "pluginDir": "/home/me/talks/plugins/glossary"
 }
 ```
 
-Each path is relative to the deck's folder, or `null` when the file is not there. Read the files yourself.
+Each slide's path is relative to the deck's folder, or `null` when the file is not there. `pluginDir` is the absolute path of `plugins/<name>/` in the project, where a `data` file with `"in": "project"` is, whether or not the folder exists; a dek older than this field does not send it, which means no project data. Read the files yourself.
 
 Print SARIF 2.1.0 on stdout and exit 0, with or without findings. A non-zero exit means the check itself failed. dek reads, from each result:
 
@@ -171,11 +225,11 @@ Print SARIF 2.1.0 on stdout and exit 0, with or without findings. A non-zero exi
 | --- | --- |
 | `ruleId` | `id`; it must be in `check.rules` |
 | `message.text` | `message`; required |
-| `locations[0].physicalLocation.artifactLocation.uri` | `path`: relative to the deck's folder, or a `file:` URL inside it. A location elsewhere is dropped. `slides/<slug>.html`, `.css`, or `.ts` also sets `slug` |
+| `locations[0].physicalLocation.artifactLocation.uri` | `path`: relative to the deck's folder, or a `file:` URL inside it or inside `pluginDir`. A location elsewhere is dropped. `slides/<slug>.html`, `.css`, or `.ts` also sets `slug` |
 | `…region.startLine`, `…region.startColumn` | `line`, `column` |
 | `properties.hint` | `hint`: what to do next |
 
-dek makes each message and hint one line of at most 300 characters. The severity comes from the manifest.
+dek makes each message and hint one line of at most 300 characters. The severity comes from the manifest. A finding in `pluginDir` that each deck's check reports the same way, such as a mistake in a project's data file, is reported once.
 
 A check promises to print the same output for the same input, to write no file, and to use no network. dek gives it 30 seconds per deck, then stops it with SIGTERM and later SIGKILL, and runs it on no deck after one it hung on.
 

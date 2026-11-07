@@ -131,7 +131,7 @@ describe("mergeScope", () => {
 });
 
 describe("takeSnapshot", () => {
-  test("watches each pinned plugin's lock, and the data files it declares in this deck", async () => {
+  test("watches each pinned plugin's lock, and the data files it declares in this deck, not the project's", async () => {
     await withTempProject(
       {
         toml: "[plugins.study]\n",
@@ -148,10 +148,12 @@ describe("takeSnapshot", () => {
             name: "study",
             version: "0.1.0",
             page: { api: 1, keys: ["r"] },
-            data: [{ path: "study.yaml" }],
+            data: [{ path: "study.yaml" }, { path: "shared.yaml", in: "project" }],
           }),
         );
         writeFileSync(join(deckDir, "study.yaml"), "version: 1\n");
+        writeFileSync(join(root, "plugins", "study", "shared.yaml"), "project\n");
+        writeFileSync(join(deckDir, "shared.yaml"), "deck\n");
         expect(Object.keys(takeSnapshot(deckDir).plugins).sort()).toEqual([
           "decks/demo/study.yaml",
           "plugins/study/plugin.json",

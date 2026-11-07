@@ -8,7 +8,7 @@ description: 'プラグインは dekc lint でデッキを検査する実行フ�
 
 ## 公式プラグイン
 
-dek は、自分のパッケージに一つのプラグイン dek-study を同梱しています。インストールは要りません。`dek.toml` で名前を挙げれば、dek は自分のファイルから走らせます。`PATH` 上の `dek-study` は使いません（[ADR 34](https://github.com/hajimism/dek/blob/main/adr/0034-ship-dek-study-inside-dek-as-its-first-official-plugin.md)）。
+dek は、自分のパッケージに二つのプラグイン dek-study と dek-words を同梱しています。インストールは要りません。`dek.toml` で名前を挙げれば、dek は自分のファイルから走らせます。`PATH` 上の `dek-study` や `dek-words` は使いません（[ADR 34](https://github.com/hajimism/dek/blob/main/adr/0034-ship-dek-study-inside-dek-as-its-first-official-plugin.md)）。
 
 ### dek-study
 
@@ -51,6 +51,59 @@ stickers:
 
 シートは、プレゼンター画面、スクリーンショット、PDF、pptx、動画、見た目の lint には入りません。レールのサムネイルにはまだ付かないので、そこでは言葉が見えます。
 
+### dek-words
+
+AI がよく書く言葉のように、プロジェクトが発表に入れたくない語のリストで、すべてのデッキを検査します。見つかった語は警告になり、代わりに書くことがヒントに出ます。リストはプロジェクトのもので、dek は語のリストを同梱しません（[ADR 36](https://github.com/hajimism/dek/blob/main/adr/0036-ship-dek-words-a-check-for-a-project-s-word-list-as-the-second-official-plugin.md)）。
+
+```toml
+[plugins.words]
+```
+
+リストは lock の隣の `plugins/words/words.yaml` に置きます。すべてのデッキがこのリストで検査されます。
+
+```yaml
+version: 1
+words:
+  - word: 解像度                # 探す語。指摘もこの名前で呼ぶ
+    use: 何がどこまで分かっているかを書く   # 代わりに書くこと。指摘のヒントになる
+  - word: 〜した瞬間
+    pattern: た瞬間              # 語の代わりに探す正規表現
+  - word: 効く
+    verb: godan                 # 活用形も探す：効か 効き 効く 効け 効こ 効い
+  - word: 突く
+    verb: godan
+    except:                     # その語を含むが、その語ではない長い語
+      - 突き抜ける
+  - word: 〇〇
+    in: slides                  # スライドだけ、または台本だけを見る
+```
+
+| キー | 意味 |
+| --- | --- |
+| `word` | 必須。書かれたとおりに、大文字と小文字を区別せずに探す。ラテン文字、ギリシャ文字、キリル文字、数字で始まるか終わる語は、単語単位で探す。`leverage` は `leveraged` の中には見つからない |
+| `pattern` | `word` の代わりに探す正規表現。`u` と `i` のフラグで読む |
+| `verb` | `godan` か `ichidan`。動詞の活用形を探す。五段動詞は、語幹にその行の仮名を付けた形と、「て」「た」の前の音便形（効い、待っ、読ん）で探す。一段動詞は語幹で探すので、落ちるは「落ち」になる。見るの「見」のように語幹が一文字だと多くの語に含まれるので、そうした動詞は `pattern` で書く。する動詞は名詞で書く。`活用` と書けば活用するも見つかる。`pattern` とは一緒に使えない |
+| `except` | その語を含むが、その語ではない長い語。一行に一つ書く。この中にある箇所は指摘しない |
+| `use` | 代わりに書くこと。ヒントに出る |
+| `in` | `slides` か `script`。そこだけを見る |
+
+発表の主題のように、デッキが必要とする語は、そのデッキのフォルダの `words.yaml` で許します。許す語は、エントリーの `word` で挙げます。
+
+```yaml
+version: 1
+allow:
+  - 物差し
+```
+
+スライドでは、dek-study と同じく、読む人に見える文字を見ます。`aria-hidden` の中の文字も含み、ルビの読み（`rt`、`rp`）は除きます。`<br>` は空白として読み、二つのブロック要素にまたがる語は見つけません。和文の文字どうしの間にあるソースの改行は空白として読まないので、二行に分かれた「解像」と「度」も解像度として見つかります。`script.md` では、`{#id}` を除いた見出し、続く行を含めた段落とリストの項目、表のセルを見ます。frontmatter、コード、HTML のコメント、引用は見ません。プラグインを有効にしてリストのないプロジェクトは、リストを書くまで `WORDS002` で lint に失敗します。
+
+| ID | 重大度 | 条件 |
+| --- | --- | --- |
+| `WORDS001` | warning | リストの語が、スライドか台本にある。指摘はその語が始まる位置を指す。メッセージはエントリーの名前と、それと違うときは見つかった文字を示す。ヒントはエントリーの `use`、なければ「その語を使わずに書く」。発表に必要な語は、デッキの `words.yaml` で許す |
+| `WORDS002` | error | リストかデッキの許可を読めない。YAML でない、`version` が 1 でない、ファイルが受け付けないキーがある、`word` のないエントリーがある、`verb` が `godan` でも `ichidan` でもないか、その活用の語尾で終わらない、一段動詞の語幹が一文字である、`verb` と `pattern` の両方がある、`pattern` が正規表現でないか、文字のない場所に一致する、`in` が `slides` でも `script` でもない、二つのエントリーが同じ `word` を持つ、許す語がどのエントリーでもない。またはリストがない。指摘はその行を指す。ほかの部分は検査を続け、リストの誤りはデッキごとではなく一度だけ報告する |
+
+`except` と `allow` は一行に一つ書きます。dek-words が読む YAML は、dek-study と同じく `[a, b]` の形のリストを受け付けません。
+
 ## プラグインを使う
 
 次の手順は、ほかの人が書いたプラグインのためのものです。公式プラグインは最初の手順が要りません。
@@ -69,7 +122,7 @@ AGENTS.md には、プラグインごとに版、ルール id、データファ�
 
 ### lock
 
-`plugins/<name>/plugin.json` には、プロジェクトが受け入れた申告を書きます。中身は、プラグインの版、ルールとその重大度、データファイルです。`dekc lint` は、インストールされたプラグインの申告が lock とまったく同じときだけ、そのプラグインを走らせます。そのため、別の版を入れたチームの仲間や CI では、違う検査が走るのではなく、検査が走らず、走らなかったと報告されます。
+`plugins/<name>/plugin.json` には、プロジェクトが受け入れた申告を書きます。中身は、プラグインの版、ルールとその重大度、データファイルです。同じフォルダには、すべてのデッキの検査に使うリストのように、プラグインがプロジェクト全体のために持つデータも置きます。lock と一緒にコミットします。`dekc lint` は、インストールされたプラグインの申告が lock とまったく同じときだけ、そのプラグインを走らせます。そのため、別の版を入れたチームの仲間や CI では、違う検査が走るのではなく、検査が走らず、走らなかったと報告されます。
 
 更新などで、インストールされたプラグインの申告が変わると、`dekc sync` は何が変わったかを挙げます。`version 0.1.0 → 0.2.0` や `GLOSSARY003 added (error)` のような形です。lock は書き換えません。変わったところを読んでから、受け入れます。
 
@@ -141,7 +194,7 @@ import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plug
 | `check.rules` | 検査が報告しうるルール id のすべて。id は、名前を大文字にし、`-` を `_` にして、数字三桁を続けたもの。`glossary` なら `GLOSSARY001`、`acme-talks` なら `ACME_TALKS001` |
 | `…severity` | `error` か `warning`。dek は結果の SARIF の `level` ではなく、これを使う。lint を失敗させるのは error だけ |
 | `…summary` | 一行、120 文字以内。dek は SARIF のルール一覧にだけ出す |
-| `data` | 省略できる。プラグインが読む、デッキの中のファイル。デッキのフォルダからの相対パス。隠しファイルでも、デッキの外でも、dek 自身のもの（`script.md`、`theme.css`、`slides/`、`assets/`、`voice/`、`dist/`）でもないこと。AGENTS.md に名前が載る |
+| `data` | 省略できる。プラグインが読むファイル。AGENTS.md に名前が載る。`{ "path": "glossary.yaml" }` はデッキの中のファイルで、デッキのフォルダからの相対パス。隠しファイルでも、デッキの外でも、dek 自身のもの（`script.md`、`theme.css`、`slides/`、`assets/`、`voice/`、`dist/`）でもないこと。`{ "path": "terms.yaml", "in": "project" }` はプロジェクトの `plugins/<name>/` の中のファイルで、すべてのデッキが共有するデータに使う。隠しファイルでも、そのフォルダの外でも、`plugin.json` でもないこと。ページに渡るのはデッキのファイルだけ（[ADR 35](https://github.com/hajimism/dek/blob/main/adr/0035-let-a-plugin-keep-data-for-the-whole-project-in-plugins-name.md)） |
 
 知らない欄は無視します。申告には、案内の文章を書く欄はありません。エージェントがプラグインについて読む文は、dek がこれらの事実から書きます。毎回同じ申告を出してください。制限時間は 10 秒です。
 
@@ -159,11 +212,12 @@ dek は、デッキごとに一回、デッキのフォルダで、デッキを 
     "slides": [
       { "slug": "planning-fallacy", "title": "計画錯誤", "html": "slides/planning-fallacy.html", "css": null, "ts": null }
     ]
-  }
+  },
+  "pluginDir": "/home/me/talks/plugins/glossary"
 }
 ```
 
-パスはデッキのフォルダからの相対パスで、ファイルがなければ `null` です。ファイルはプラグインが自分で読みます。
+スライドのパスはデッキのフォルダからの相対パスで、ファイルがなければ `null` です。`pluginDir` はプロジェクトの `plugins/<name>/` の絶対パスで、`"in": "project"` の `data` はここにあります。フォルダがなくても渡します。このフィールドより古い dek は渡さないので、そのときはプロジェクトのデータがないものとして扱います。ファイルはプラグインが自分で読みます。
 
 SARIF 2.1.0 を stdout に出し、指摘があってもなくても 0 で終わります。0 以外の終了は、検査そのものの失敗を意味します。dek は各結果から次を読みます。
 
@@ -171,11 +225,11 @@ SARIF 2.1.0 を stdout に出し、指摘があってもなくても 0 で終わ
 | --- | --- |
 | `ruleId` | `id`。`check.rules` にあること |
 | `message.text` | `message`。必須 |
-| `locations[0].physicalLocation.artifactLocation.uri` | `path`。デッキのフォルダからの相対パスか、デッキの中を指す `file:` URL。それ以外の場所は捨てる。`slides/<slug>.html`、`.css`、`.ts` なら `slug` も付く |
+| `locations[0].physicalLocation.artifactLocation.uri` | `path`。デッキのフォルダからの相対パスか、デッキの中か `pluginDir` の中を指す `file:` URL。それ以外の場所は捨てる。`slides/<slug>.html`、`.css`、`.ts` なら `slug` も付く |
 | `…region.startLine`、`…region.startColumn` | `line`、`column` |
 | `properties.hint` | `hint`。次にすること |
 
-dek は、メッセージとヒントを、それぞれ 300 文字以内の一行にします。重大度は申告から決まります。
+dek は、メッセージとヒントを、それぞれ 300 文字以内の一行にします。重大度は申告から決まります。プロジェクトのデータファイルの誤りのように、`pluginDir` の中への指摘をどのデッキの検査も同じ形で返すときは、一度だけ報告します。
 
 検査は、同じ入力には同じ出力を返し、ファイルを書かず、ネットワークを使わないと約束します。制限時間はデッキごとに 30 秒です。過ぎれば SIGTERM で止め、のちに SIGKILL を送ります。一度止まらなかった検査は、その後のデッキでは走らせません。
 

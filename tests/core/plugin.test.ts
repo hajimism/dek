@@ -334,6 +334,62 @@ describe("a manifest's page", () => {
   });
 });
 
+describe("a manifest's project data", () => {
+  const both = [{ path: "words.yaml", in: "project" }, { path: "words.yaml" }];
+  const words: PluginManifest = {
+    schema: 1,
+    name: "words",
+    version: "0.1.0",
+    data: [{ path: "words.yaml", in: "project" }, { path: "words.yaml" }],
+  };
+
+  test("keeps `in`, and takes one file name at both levels", () => {
+    const reading = readManifest(
+      { schema: 1, name: "words", version: "0.1.0", data: both },
+      "words",
+    );
+    expect(reading).toEqual({ ok: true, manifest: words });
+    expect(readLock(lockText(words), "words")).toEqual({ ok: true, manifest: words });
+  });
+
+  test("refuses a project file outside plugins/<name>/, hidden, or the lock", () => {
+    for (const path of ["../x.yaml", "/x.yaml", "a/../b", ".words.yaml", "plugin.json", ""]) {
+      expect(reason({ ...described, data: [{ path, in: "project" }] })).toContain("data");
+    }
+    // dek's deck files are not in plugins/<name>/, so their names are free there.
+    expect(
+      readManifest({ ...described, data: [{ path: "slides/x.yaml", in: "project" }] }, "study").ok,
+    ).toBe(true);
+  });
+
+  test("refuses an `in` other than project, and a project file named twice", () => {
+    expect(reason({ ...described, data: [{ path: "x.yaml", in: "deck" }] })).toContain("in");
+    const twice = [
+      { path: "x.yaml", in: "project" },
+      { path: "x.yaml", in: "project" },
+    ];
+    expect(reason({ ...described, data: twice })).toContain("x.yaml");
+  });
+
+  test("names a project file by its path in the project", () => {
+    expect(manifestChanges({ ...words, data: [{ path: "words.yaml" }] }, words)).toEqual([
+      "data plugins/words/words.yaml added",
+    ]);
+    expect(pluginsSection([{ name: "words", manifest: words }])).toContain(
+      "- `words` 0.1.0: Its data: `plugins/words/words.yaml`, `words.yaml`.",
+    );
+  });
+
+  test("an older dek drops `in` and reads the file named twice, so the lock does not read", () => {
+    const older = JSON.parse(lockText(words)) as { accepted: { data: Array<{ in?: string }> } };
+    for (const entry of older.accepted.data) {
+      delete entry.in;
+    }
+    const reading = readLock(JSON.stringify(older), "words");
+    expect(reading.ok === false && reading.reason).toContain("`words.yaml` is named twice");
+  });
+});
+
 test("DEK_KEYS is every letter the player binds", async () => {
   const { Glob } = await import("bun");
   const bound = new Set<string>();

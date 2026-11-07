@@ -86,7 +86,7 @@ describe("pluginPages", () => {
             name: "study",
             version: "0.1.0",
             page: { api: 1, keys: ["r"] },
-            data: [{ path: "study.yaml" }],
+            data: [{ path: "study.yaml" }, { path: "shared.yaml", in: "project" }],
           }),
         );
         expect(pluginPages(root, deckDir, scripts)).toEqual([
@@ -94,10 +94,15 @@ describe("pluginPages", () => {
         ]);
 
         writeFileSync(join(deckDir, "study.yaml"), "version: 1\n");
+        // The project's data is the check's alone (ADR 35), and never read from the deck.
+        writeFileSync(join(root, "plugins", "study", "shared.yaml"), "project\n");
+        writeFileSync(join(deckDir, "shared.yaml"), "deck\n");
         const [withData] = pluginPages(root, deckDir, scripts);
-        expect(withData?.data["study.yaml"]).toEqual({
-          text: "version: 1\n",
-          version: expect.stringMatching(/^[0-9a-f]{16}$/),
+        expect(withData?.data).toEqual({
+          "study.yaml": {
+            text: "version: 1\n",
+            version: expect.stringMatching(/^[0-9a-f]{16}$/),
+          },
         });
       },
     );
