@@ -296,7 +296,7 @@ const sendMessage = fc.tuple(socketId, payload, fc.boolean()).map(([id, message,
     (model) => model.members.has(id),
     (model, real) => {
       const socket = real.open.get(id) as unknown as Bun.ServerWebSocket<WsData>;
-      real.handler.message(socket, binary ? Buffer.from(message.text) : message.text);
+      real.handler.message?.(socket, binary ? Buffer.from(message.text) : message.text);
       const member = model.members.get(id);
       if (!member?.control) {
         return;
