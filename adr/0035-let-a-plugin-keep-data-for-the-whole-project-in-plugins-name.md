@@ -10,6 +10,8 @@ Amends [32. Let a plugin the user installed check a deck, and pin in the project
 
 Amends [33. Show a plugin's page in the player and builds behind page API 1](0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)
 
+Amended by [38. Have AGENTS.md ask for each warning to be dealt with, and say whose each plugin data file is](0038-have-agents-md-ask-for-each-warning-to-be-dealt-with-and-say-whose-each-plugin-data-file-is.md)
+
 ## Context
 
 [ADR 32](0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md) lets a plugin name data files, and each one is a path inside the deck. That fits dek-study, whose stickers belong to one deck. It does not fit a convention a team holds across its decks. The case that brings this up is a list of words a team does not want in its talks, such as the words an AI tends to write ([ADR 36](0036-ship-dek-words-a-check-for-a-project-s-word-list-as-the-second-official-plugin.md)). The project that asked for it has fifteen decks. A list in each deck would be copied fifteen times and drift apart, and a new deck would start with none.
