@@ -54,14 +54,21 @@ function binName(name: string): string {
  * any plugin does, and never from PATH: its code is the dek the project installed, which the
  * project's lockfile pins.
  */
-const BUNDLED: Record<string, { main: string; page?: string }> = {
+const BUNDLED: Record<string, { main: string; page?: string; guide: string }> = {
   study: bundled("study", { page: true }),
   words: bundled("words", { page: false }),
 };
 
-function bundled(name: string, { page }: { page: boolean }): { main: string; page?: string } {
+function bundled(
+  name: string,
+  { page }: { page: boolean },
+): { main: string; page?: string; guide: string } {
   const dir = join(import.meta.dir, "..", "plugins", name);
-  return { main: join(dir, "main.ts"), ...(page ? { page: join(dir, "page.ts") } : {}) };
+  return {
+    main: join(dir, "main.ts"),
+    ...(page ? { page: join(dir, "page.ts") } : {}),
+    guide: `https://hajimism.github.io/dek/reference/plugins.html#dek-${name}`,
+  };
 }
 
 /** The page of each plugin dek ships with one, as a file to compile for the browser (ADR 34). */
@@ -656,7 +663,12 @@ export function pinnedPlugins(root: string): PinnedPlugin[] {
     } catch {
       reading = undefined;
     }
-    return { name, manifest: reading?.ok ? reading.manifest : undefined };
+    const guide = BUNDLED[name]?.guide;
+    return {
+      name,
+      manifest: reading?.ok ? reading.manifest : undefined,
+      ...(guide === undefined ? {} : { guide }),
+    };
   });
 }
 

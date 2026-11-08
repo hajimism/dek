@@ -359,19 +359,23 @@ function checkChanges(
   return changes;
 }
 
-/** A plugin dek.toml names, with the manifest its lock pins when it has one. */
-export type PinnedPlugin = { name: string; manifest: PluginManifest | undefined };
+/**
+ * A plugin dek.toml names, with the manifest its lock pins when it has one, and dek's own page on
+ * how to write its data when dek ships it.
+ */
+export type PinnedPlugin = { name: string; manifest: PluginManifest | undefined; guide?: string };
 
 /**
  * The plugins in AGENTS.md: one line each, made from the lock and never from the executable, so
  * every sync writes the same block, the dev server's included. Each line is dek's words about
- * checked fields; the plugin's own summaries stay out. Empty when dek.toml names no plugin.
+ * checked fields; the plugin's own summaries stay out. A data file says whether it is the
+ * project's or each deck's, since the two can share a name. Empty when dek.toml names no plugin.
  */
 export function pluginsSection(plugins: PinnedPlugin[]): string {
   if (plugins.length === 0) {
     return "";
   }
-  const lines = plugins.map(({ name, manifest }) => {
+  const lines = plugins.map(({ name, manifest, guide }) => {
     if (!manifest) {
       return `- \`${name}\`: not pinned yet; \`dekc sync\` pins it.`;
     }
@@ -380,7 +384,10 @@ export function pluginsSection(plugins: PinnedPlugin[]): string {
       ...(manifest.data && manifest.data.length > 0
         ? [
             `Its data: ${projectFirst(manifest.data)
-              .map((entry) => `\`${dataPath(name, entry)}\``)
+              .map(
+                (entry) =>
+                  `\`${dataPath(name, entry)}\` ${entry.in === "project" ? "in the project" : "in each deck"}`,
+              )
               .join(", ")}.`,
           ]
         : []),
@@ -389,6 +396,7 @@ export function pluginsSection(plugins: PinnedPlugin[]): string {
             `Its page takes the ${manifest.page.keys.length === 1 ? "key" : "keys"} ${manifest.page.keys.map((key) => `\`${key}\``).join(", ")}.`,
           ]
         : []),
+      ...(guide && manifest.data && manifest.data.length > 0 ? [`How to write it: ${guide}`] : []),
     ];
     return `- \`${name}\` ${manifest.version}${facts.length > 0 ? `: ${facts.join(" ")}` : ""}`;
   });
