@@ -41,6 +41,57 @@ const finding = {
   ],
 };
 
+const twoSlides = {
+  name: "intro",
+  script: "---\ntitle: Intro\n---\n\nopening\n\n## first\n\nhello\n\n## second\n\nbye\n",
+  slides: {
+    first: '<section class="slide"><h1>hello</h1></section>',
+    second: '<section class="slide"><h1>bye</h1></section>',
+  },
+};
+
+/** A SARIF result for `quiz`, at `uri` and `startLine` when given. */
+function quizResult(ruleId: string, text: string, uri?: string, startLine?: number) {
+  return {
+    ruleId,
+    message: { text },
+    ...(uri === undefined
+      ? {}
+      : {
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: { uri },
+                ...(startLine === undefined ? {} : { region: { startLine } }),
+              },
+            },
+          ],
+        }),
+  };
+}
+
+/**
+ * One finding on each slide, two in script.md under a slide's heading (its body, line 9, and the
+ * heading, line 11) and one above every heading (line 5), an error on the plugin's own data, and a
+ * warning on the deck as a whole. QUIZ001 is an error and QUIZ002 a warning, by the manifest.
+ */
+const twoSlideFindings = {
+  version: "2.1.0",
+  runs: [
+    {
+      results: [
+        quizResult("QUIZ002", "on first", "slides/first.html", 1),
+        quizResult("QUIZ002", "on second", "slides/second.html", 1),
+        quizResult("QUIZ002", "in first's section", "script.md", 9),
+        quizResult("QUIZ002", "on second's heading", "script.md", 11),
+        quizResult("QUIZ002", "above every section", "script.md", 5),
+        quizResult("QUIZ001", "the list does not read", "quiz.yaml", 1),
+        quizResult("QUIZ002", "the deck has no closing slide"),
+      ],
+    },
+  ],
+};
+
 /** Runs dekc in this process, holding what it prints to the --json contract. */
 async function dek(args: string[], cwd: string): Promise<Awaited<ReturnType<typeof runMain>>> {
   const result = await runMain(args, cwd);
@@ -89,7 +140,7 @@ describe("dekc sync and lint with a plugin", () => {
         expect(synced.plugins).toEqual([{ name: "quiz", status: "accepted", version: "0.1.0" }]);
         expect(synced.created).toContain(join("plugins", "quiz", "plugin.json"));
         expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toContain(
-          "- `quiz` 0.1.0: `dekc lint` checks QUIZ001 and QUIZ002. Its data: `quiz.yaml`.",
+          "- `quiz` 0.1.0: It checks QUIZ001 and QUIZ002. Its data: `quiz.yaml`.",
         );
 
         const lint = await dek(["lint", "--json"], root);
@@ -249,6 +300,32 @@ describe("dekc sync and lint with a plugin", () => {
     }, '[plugins.quiz]\nbin = "/tmp/x"\n');
   });
 
+  test.serial("places a finding in script.md on the slide whose section it is in", async () => {
+    await withTempDir((outside) =>
+      withTempProject({ toml: "[plugins.quiz]\n", decks: [twoSlides] }, async (root) => {
+        const binDir = join(outside, "bin");
+        mkdirSync(binDir);
+        installPlugin(binDir, "quiz", { manifest: quizManifest(), sarif: twoSlideFindings });
+        await withEnv({ PATH: [binDir, dirname(process.execPath)].join(delimiter) }, async () => {
+          await runMain(["sync"], root);
+          const linted = jsonStdout<LintJson>(await dek(["lint", "--json"], root));
+          const places = linted.diagnostics
+            .filter(({ id }) => id.startsWith("QUIZ"))
+            .map(({ message, slug }) => [message, slug]);
+          expect(places).toEqual([
+            ["on first", "first"],
+            ["on second", "second"],
+            ["in first's section", "first"],
+            ["on second's heading", "second"],
+            ["above every section", undefined],
+            ["the list does not read", undefined],
+            ["the deck has no closing slide", undefined],
+          ]);
+        });
+      }),
+    );
+  });
+
   test.serial("the dev server's sync runs no plugin, and writes the same AGENTS.md", async () => {
     await withQuiz(async (root, plugin) => {
       await runMain(["sync"], root);
@@ -257,6 +334,75 @@ describe("dekc sync and lint with a plugin", () => {
       syncDeck(join(root, "decks", "intro"));
       expect(plugin.calls()).toHaveLength(before);
       expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toBe(agents);
+    });
+  });
+});
+
+type CheckJson = LintJson & { slug: string };
+
+/** `twoSlides`, with `quiz` installed outside it, on PATH, and pinned. */
+async function withQuizOnTwoSlides(
+  fn: (root: string, plugin: ReturnType<typeof installPlugin>) => Promise<void>,
+): Promise<void> {
+  await withTempDir((outside) =>
+    withTempProject({ toml: "[plugins.quiz]\n", decks: [twoSlides] }, async (root) => {
+      const binDir = join(outside, "bin");
+      mkdirSync(binDir);
+      const plugin = installPlugin(binDir, "quiz", {
+        manifest: quizManifest(),
+        sarif: twoSlideFindings,
+      });
+      const env = { PATH: [binDir, dirname(process.execPath)].join(delimiter) };
+      await withEnv(env, async () => {
+        await runMain(["sync"], root);
+        await fn(join(root, "decks", "intro"), plugin);
+      });
+    }),
+  );
+}
+
+describe("dekc check with a plugin", () => {
+  test.serial(
+    "reports the plugin's findings on the slide, and its errors that are on no slide",
+    async () => {
+      await withQuizOnTwoSlides(async (deckDir, plugin) => {
+        const check = await dek(["check", "first", "--json"], deckDir);
+        const found = jsonStdout<CheckJson>(check).diagnostics.filter(({ id }) =>
+          id.startsWith("QUIZ"),
+        );
+        expect(found.map(({ message }) => message)).toEqual([
+          "on first",
+          "in first's section",
+          "the list does not read",
+        ]);
+        // The list that does not read is an error, so the slide is not done.
+        expect(check.exitCode).toBe(1);
+        expect(plugin.calls().filter((call) => call.args[0] === "check")).toHaveLength(1);
+      });
+    },
+  );
+
+  test.serial("says a plugin it could not run was skipped, not passed", async () => {
+    await withQuizOnTwoSlides(async (deckDir, plugin) => {
+      plugin.set({ manifest: quizManifest({ version: "0.2.0" }), sarif: twoSlideFindings });
+      const check = jsonStdout<CheckJson>(await dek(["check", "second", "--json"], deckDir));
+      expect(check.diagnostics.some(({ id }) => id.startsWith("QUIZ"))).toBe(false);
+      expect(check.skipped).toContainEqual(
+        expect.objectContaining({ check: "plugin", plugin: "quiz" }),
+      );
+      const text = await runMain(["check", "second"], deckDir);
+      expect(text.stderr).toContain("plugin quiz: skipped");
+    });
+  });
+
+  test.serial("fails when the plugin breaks, as lint does", async () => {
+    await withQuizOnTwoSlides(async (deckDir, plugin) => {
+      plugin.set({ manifest: quizManifest(), checkExit: 2 });
+      const check = await dek(["check", "second", "--json"], deckDir);
+      expect(check.exitCode).toBe(1);
+      expect(jsonStdout<CheckJson>(check).diagnostics).toContainEqual(
+        expect.objectContaining({ id: "DEK046", data: { plugin: "quiz", version: "0.1.0" } }),
+      );
     });
   });
 });

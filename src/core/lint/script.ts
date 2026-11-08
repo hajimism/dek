@@ -1,7 +1,7 @@
 import { type Diagnostic, diag } from "../diagnostic.ts";
 import type { DekError } from "../error.ts";
 import { ScriptError } from "../parse.ts";
-import { scriptLines } from "../script-lines.ts";
+import { scriptLines, slugAtLine } from "../script-lines.ts";
 import type { LintContext } from "./context.ts";
 
 /** DEK004: a section id or a beat id used twice. */
@@ -56,7 +56,6 @@ export function strayHeadingDiagnostics(ctx: LintContext): Diagnostic[] {
   if (!script) {
     return [];
   }
-  const starts = deck.deck.sections.map((section) => ({ line: section.line, slug: section.slug }));
   const diagnostics: Diagnostic[] = [];
   // What the parser reads as text, a code block or a comment, is not a heading here either.
   for (const [offset, { text, literal }] of scriptLines(script.body).entries()) {
@@ -65,8 +64,7 @@ export function strayHeadingDiagnostics(ctx: LintContext): Diagnostic[] {
       continue;
     }
     const line = script.bodyStartLine + offset;
-    // Under a slide heading it belongs to that slide; above the first, to the deck.
-    const slug = starts.filter((start) => start.line < line).at(-1)?.slug;
+    const slug = slugAtLine(deck.deck.sections, line);
     diagnostics.push(
       diag("DEK044", {
         message: `${"#".repeat(level)} heading is not a slide or a beat; it is read as spoken text`,

@@ -10,11 +10,11 @@ lint がワークフローにどう組み込まれるかは [Lint](/ja/guide/lin
 
 指摘はそれぞれ次の 3 つのどれかについてのもので、どのコマンドが報告するかもそこから決まります。
 
-- **`slide`**: 1 枚のファイル、または `script.md` のそのセクション。指摘にはその枚の `slug` が入ります。`dekc check <slug>` が報告するのはこれだけで、その枚の分だけです。
+- **`slide`**: 1 枚のファイル、または `script.md` のそのセクション。指摘にはその枚の `slug` が入ります。`dekc check <slug>` が報告するのはこれだけで、その枚の分だけです。ただし[プラグイン](/ja/reference/plugins#プラグインが走らないとき)の、どの枚にもない error（データが読めない、`DEK046` など）も報告します。
 - **`deck`**: デッキの全スライドが共有するファイル。`theme.css`、フロントマター、`voice/voice.toml`、`script.md` 全体（長さ、最初のスライドより上の見出し）です。`slug` は入りません。
 - **`project`**: `dek.toml`。コマンドが対象にするデッキがいくつあっても、プロジェクトで 1 回だけ見つかります。
 
-`dekc lint` は 3 つすべてを報告します。共有ファイルと各スライドのファイルの両方を読むルールはスコープを 2 つ持ちます。`theme.css` の `DEK014` はデッキの指摘、`slides/<id>.css` の `DEK014` はスライドの指摘です。`dekc build` と `dekc ls` が数えるのは `dekc lint` と同じ指摘から、rumdl と[プラグイン](/ja/reference/plugins)の指摘を除いたものです。どちらも `dekc lint` でだけ動きます。`dekc ls` はプロジェクトの指摘を各デッキの行ではなく専用の `project` 行に出します。
+`dekc lint` は 3 つすべてを報告します。共有ファイルと各スライドのファイルの両方を読むルールはスコープを 2 つ持ちます。`theme.css` の `DEK014` はデッキの指摘、`slides/<id>.css` の `DEK014` はスライドの指摘です。`dekc build` と `dekc ls` が数えるのは `dekc lint` と同じ指摘から、rumdl と[プラグイン](/ja/reference/plugins)の指摘を除いたものです。rumdl は `dekc lint` でだけ、プラグインは `dekc lint` と `dekc check` で動きます。`dekc ls` はプロジェクトの指摘を各デッキの行ではなく専用の `project` 行に出します。
 
 ## ルール
 

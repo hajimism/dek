@@ -51,3 +51,14 @@ function commentOpenAfter(text: string, open: boolean): boolean {
   }
   return inside;
 }
+
+/**
+ * The slide a line of script.md belongs to: the `##` section it is in, heading included. Above the
+ * first heading it belongs to the deck, and to no slide.
+ */
+export function slugAtLine(
+  sections: ReadonlyArray<{ line: number; slug: string }>,
+  line: number,
+): string | undefined {
+  return sections.filter((section) => section.line <= line).at(-1)?.slug;
+}

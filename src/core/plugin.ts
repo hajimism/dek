@@ -376,9 +376,7 @@ export function pluginsSection(plugins: PinnedPlugin[]): string {
       return `- \`${name}\`: not pinned yet; \`dekc sync\` pins it.`;
     }
     const facts = [
-      ...(manifest.check
-        ? [`\`dekc lint\` checks ${ruleList(Object.keys(manifest.check.rules))}.`]
-        : []),
+      ...(manifest.check ? [`It checks ${ruleList(Object.keys(manifest.check.rules))}.`] : []),
       ...(manifest.data && manifest.data.length > 0
         ? [
             `Its data: ${projectFirst(manifest.data)
@@ -397,7 +395,7 @@ export function pluginsSection(plugins: PinnedPlugin[]): string {
   return `
 ## Plugins
 
-Checks installed beside dek, named in \`dek.toml\` \`[plugins]\` and pinned in \`plugins/<name>/plugin.json\`. \`dekc lint\` runs them with dek's own rules; their findings carry the plugin's rule ids.
+Checks installed beside dek, named in \`dek.toml\` \`[plugins]\` and pinned in \`plugins/<name>/plugin.json\`. \`dekc lint\` runs them with dek's own rules, and \`dekc check <slug>\` reports what they find on that slide; their findings carry the plugin's rule ids.
 
 ${lines.join("\n")}
 `;

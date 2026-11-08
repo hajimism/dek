@@ -1,10 +1,10 @@
 ---
-description: 'A plugin is a dek-<name> executable that checks decks in dekc lint: how a project uses one, and the manifest, check, and lock a plugin author writes to.'
+description: 'A plugin is a dek-<name> executable that checks decks in dekc lint and dekc check: how a project uses one, and the manifest, check, and lock a plugin author writes to.'
 ---
 
 # Plugins
 
-A plugin adds checks that dek does not know, such as an event's slide rules or a study tool's stickers, to the `dekc lint` an agent already runs. A plugin is one executable, `dek-<name>`, that the user installs. It runs in a process of its own and talks to dek in JSON and SARIF. The decision and its reasons are in [ADR 32](https://github.com/hajimism/dek/blob/main/adr/0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md).
+A plugin adds checks that dek does not know, such as an event's slide rules or a study tool's stickers, to the `dekc check` and `dekc lint` an agent already runs. A plugin is one executable, `dek-<name>`, that the user installs. It runs in a process of its own and talks to dek in JSON and SARIF. The decision and its reasons are in [ADR 32](https://github.com/hajimism/dek/blob/main/adr/0032-let-a-plugin-the-user-installed-check-a-deck-and-pin-in-the-project-what-it-promised.md).
 
 ## Official plugins
 
@@ -140,7 +140,7 @@ A plugin runs with your privileges, as anything you install does. Its own proces
 
 ### When a plugin does not run
 
-`dekc lint` never counts a plugin that did not run as a pass. Each one is listed under `skipped` in `--json` as `{ "check": "plugin", "plugin": "<name>", "reason", "hint" }`:
+`dekc lint` and `dekc check` never count a plugin that did not run as a pass. Each one is listed under `skipped` in `--json` as `{ "check": "plugin", "plugin": "<name>", "reason", "hint" }`:
 
 - it is not installed;
 - the project has no lock for it yet (`dekc sync` writes one);
@@ -149,7 +149,7 @@ A plugin runs with your privileges, as anything you install does. Its own proces
 
 A plugin that fails is [`DEK046`](/reference/lint#rules), an error. It failed if its manifest or check exits non-zero, runs past its time, prints no SARIF, or reports a rule its lock does not declare. The deck is not at fault; the hint is to tell the user.
 
-Plugins run only in `dekc lint`, like rumdl. `dekc check`, `dekc build`, and the dev server do not run them.
+`dekc lint` runs each plugin on each deck. `dekc check <slug>` runs it on the slide's deck and keeps the findings on that slide, in its HTML, CSS, or TypeScript or in its section of `script.md`, and the errors on no slide, such as a data file that does not read or `DEK046`. `dekc build` and the dev server do not run plugins, nor does `dekc check` run rumdl.
 
 ## Writing a plugin
 
