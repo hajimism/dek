@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runJsonWorker, runPiped, workerCommand } from "../../src/core/spawn.ts";
 import { withTempDir } from "../helpers/fs.ts";
+import { rejectionOf } from "../helpers/rejection.ts";
 import { WAIT_MS } from "../helpers/wait.ts";
 
 const helpers = join(import.meta.dir, "..", "helpers");
@@ -54,12 +55,19 @@ describe("runJsonWorker", () => {
   });
 
   test("kills a worker that runs past timeoutMs and says so", async () => {
-    await expect(
-      runJsonWorker(workerCommand(join(helpers, "fake-playwright-slow.ts")), { pages: [] }, parse, {
-        ...options,
-        timeoutMs: 20,
-      }),
-    ).rejects.toMatchObject({
+    expect(
+      await rejectionOf(
+        runJsonWorker(
+          workerCommand(join(helpers, "fake-playwright-slow.ts")),
+          { pages: [] },
+          parse,
+          {
+            ...options,
+            timeoutMs: 20,
+          },
+        ),
+      ),
+    ).toMatchObject({
       name: "DekError",
       message: "Playwright worker failed",
       hint: expect.stringContaining("did not finish"),
@@ -67,9 +75,11 @@ describe("runJsonWorker", () => {
   });
 
   test("a worker that exits non-zero fails with its stderr as the hint", async () => {
-    await expect(
-      runJsonWorker(workerCommand(join(helpers, "fake-playwright-fail.ts")), {}, parse, options),
-    ).rejects.toMatchObject({
+    expect(
+      await rejectionOf(
+        runJsonWorker(workerCommand(join(helpers, "fake-playwright-fail.ts")), {}, parse, options),
+      ),
+    ).toMatchObject({
       name: "DekError",
       hint: expect.stringContaining("intentional playwright worker failure"),
     });
@@ -82,9 +92,9 @@ describe("runJsonWorker", () => {
         const pid = join(dir, "pid");
         try {
           const worker = `printf '{"overflows":'; sleep 30 & echo $! > '${pid}'`;
-          await expect(
-            runJsonWorker(["sh", "-c", worker], {}, parse, options),
-          ).rejects.toMatchObject({ name: "DekError", hint: expect.stringContaining("cut short") });
+          expect(
+            await rejectionOf(runJsonWorker(["sh", "-c", worker], {}, parse, options)),
+          ).toMatchObject({ name: "DekError", hint: expect.stringContaining("cut short") });
           expect(existsSync(pid)).toBe(true);
         } finally {
           await killRecorded(pid);
@@ -95,9 +105,9 @@ describe("runJsonWorker", () => {
   );
 
   test("a worker that prints something else fails as invalid JSON", async () => {
-    await expect(
-      runJsonWorker(["bun", "-e", "console.log('nope')"], {}, parse, options),
-    ).rejects.toMatchObject({ name: "DekError", hint: "worker returned invalid JSON" });
+    expect(
+      await rejectionOf(runJsonWorker(["bun", "-e", "console.log('nope')"], {}, parse, options)),
+    ).toMatchObject({ name: "DekError", hint: "worker returned invalid JSON" });
   });
 });
 
@@ -127,13 +137,15 @@ describe("runPiped", () => {
 
   test("kills a command that runs past timeoutMs and says so", async () => {
     // The fake outlasts the test's timeout, so only killing it settles this in time.
-    await expect(
-      runPiped(["bun", join(helpers, "fake-ffmpeg-slow.ts")], {
-        label: "ffmpeg failed",
-        hint: "",
-        timeoutMs: 50,
-      }),
-    ).rejects.toMatchObject({
+    expect(
+      await rejectionOf(
+        runPiped(["bun", join(helpers, "fake-ffmpeg-slow.ts")], {
+          label: "ffmpeg failed",
+          hint: "",
+          timeoutMs: 50,
+        }),
+      ),
+    ).toMatchObject({
       name: "DekError",
       message: "ffmpeg failed",
       hint: expect.stringContaining("did not finish"),
@@ -151,13 +163,15 @@ describe("runPiped", () => {
         const started = Date.now();
         try {
           // exec: the shell becomes the sleep, so the SIGKILL ends it and nothing is left behind.
-          await expect(
-            runPiped(["sh", "-c", `trap '' TERM; echo $$ > '${ready}'; exec sleep 30`], {
-              label: "ffmpeg failed",
-              hint: "",
-              timeoutMs: 4000,
-            }),
-          ).rejects.toMatchObject({
+          expect(
+            await rejectionOf(
+              runPiped(["sh", "-c", `trap '' TERM; echo $$ > '${ready}'; exec sleep 30`], {
+                label: "ffmpeg failed",
+                hint: "",
+                timeoutMs: 4000,
+              }),
+            ),
+          ).toMatchObject({
             name: "DekError",
             hint: expect.stringContaining("did not finish"),
           });
@@ -178,13 +192,15 @@ describe("runPiped", () => {
         const pid = join(dir, "pid");
         const started = Date.now();
         try {
-          await expect(
-            runPiped(["sh", "-c", `sleep 30 & echo $! > '${pid}'; wait`], {
-              label: "ffmpeg failed",
-              hint: "",
-              timeoutMs: 4000,
-            }),
-          ).rejects.toMatchObject({
+          expect(
+            await rejectionOf(
+              runPiped(["sh", "-c", `sleep 30 & echo $! > '${pid}'; wait`], {
+                label: "ffmpeg failed",
+                hint: "",
+                timeoutMs: 4000,
+              }),
+            ),
+          ).toMatchObject({
             name: "DekError",
             hint: expect.stringContaining("did not finish"),
           });
@@ -239,12 +255,14 @@ describe("runPiped", () => {
   });
 
   test("a command that cannot start fails with the hint", async () => {
-    await expect(
-      runPiped(["/no/such/command"], {
-        label: "ffmpeg failed",
-        hint: "install ffmpeg",
-        timeoutMs: 1000,
-      }),
-    ).rejects.toMatchObject({ name: "DekError", message: "ffmpeg failed", hint: "install ffmpeg" });
+    expect(
+      await rejectionOf(
+        runPiped(["/no/such/command"], {
+          label: "ffmpeg failed",
+          hint: "install ffmpeg",
+          timeoutMs: 1000,
+        }),
+      ),
+    ).toMatchObject({ name: "DekError", message: "ffmpeg failed", hint: "install ffmpeg" });
   });
 });
