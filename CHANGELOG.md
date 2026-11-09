@@ -2,6 +2,26 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.6.1](https://github.com/hajimism/dek/compare/v0.6.0...v0.6.1) (2026-11-09)
+
+
+### Features
+
+* run a project's plugins in dekc check, for the slide it checks ([8f091ca](https://github.com/hajimism/dek/commit/8f091ca1ee65f0c2994f59ad1f40bcb30ac35141))
+* run a project's plugins in dekc check, for the slide it checks ([07cd3cc](https://github.com/hajimism/dek/commit/07cd3ccc14ec5ce0ff299880f2895780438a1510))
+
+
+### Bug Fixes
+
+* tell the agent to deal with lint's warnings, and which plugin data is whose ([8550412](https://github.com/hajimism/dek/commit/85504129dbe29b3a4b3b92b7033a903ef7c321e2))
+* tell the agent to deal with lint's warnings, and which plugin data is whose ([7e69b3b](https://github.com/hajimism/dek/commit/7e69b3b525421f08de65fe806b525d70504e7923))
+
+
+### Documentation
+
+* **adr:** record what AGENTS.md says of warnings and of whose plugin data is ([d42d28f](https://github.com/hajimism/dek/commit/d42d28f4d70572ecdd0e5ea9c15678f69b46af17))
+* say in the lint reference that plugins run in dekc check too ([c7f0cbb](https://github.com/hajimism/dek/commit/c7f0cbbbf49cf3bccab9cc7996f49d8e067d8f73))
+
 ## [0.6.0](https://github.com/hajimism/dek/compare/v0.5.1...v0.6.0) (2026-11-07)
 
 
