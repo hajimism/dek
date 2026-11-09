@@ -85,6 +85,8 @@ jobs:
           rm rumdl.tar.gz
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/rumdl" --version
+      # Lets Chromium's sandbox start on Ubuntu 24.04, whose AppArmor blocks user namespaces (ADR 29).
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Choose the seed
         id: seed
         env:
@@ -220,6 +222,9 @@ jobs:
           rm rumdl.tar.gz
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/rumdl" --version
+      # Lets Chromium's sandbox start on Ubuntu 24.04, whose AppArmor blocks user namespaces (ADR 29),
+      # so the times are those of the drawing users get.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: bun scripts/bench.ts > bench.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
