@@ -10,6 +10,8 @@ import { deckPaths } from "./deck-paths.ts";
 import { escapeAttr, escapeHtml } from "./escape.ts";
 import { type LineColumn, lineLocator } from "./lines.ts";
 import { isInside } from "./path.ts";
+import { PHRASES_ATTRIBUTE } from "./phrase-runs.ts";
+import { phraseTable } from "./phrases.ts";
 import { type ProjectDeck, readDeckFile } from "./resolve.ts";
 import { FALLBACK_LANG, type Section } from "./schema.ts";
 import { deckLayouts, type SkeletonLayouts, skeletonHtml } from "./skeleton.ts";
@@ -174,6 +176,11 @@ export type SlideStamp = {
    * adds to it.
    */
   source?: SlideSource;
+  /**
+   * Break Japanese by phrase in a browser without `word-break: auto-phrase`: the slide carries
+   * where each run of its text breaks into phrases, for the player to break it there.
+   */
+  phrases?: boolean;
 };
 
 /**
@@ -185,6 +192,7 @@ export type SlideStamp = {
 export function stampSlide(html: string, stamp: SlideStamp): string {
   let done = false;
   const spots = stamp.source && startTagSpots(html, stamp.source);
+  const phrases = stamp.phrases ? phraseTable(html) : {};
   return rewriteHtml(html, (rewriter) => {
     rewriter.on("section", {
       element(el) {
@@ -206,6 +214,9 @@ export function stampSlide(html: string, stamp: SlideStamp): string {
         if (stamp.beat) {
           el.setAttribute("data-dek-beat", String(stamp.beat.index));
           el.setAttribute("data-dek-step", stamp.beat.step);
+        }
+        if (Object.keys(phrases).length > 0) {
+          el.setAttribute(PHRASES_ATTRIBUTE, escapeAttr(JSON.stringify(phrases)));
         }
       },
     });
@@ -318,11 +329,11 @@ export function writtenElements(slides: DeckSlides, slug: string): WrittenElemen
 
 /**
  * Every slide of the deck in script order, as the player pages hold them. `sources` says where
- * each tag is written, for the dev server's pages.
+ * each tag is written, for the dev server's pages, and `phrases` where Japanese breaks.
  */
 export function collectSlidesHtml(
   deck: ProjectDeck,
-  options: { inline: boolean; sources?: boolean },
+  options: { inline: boolean; sources?: boolean; phrases?: boolean },
 ): string {
   const slides = deckSlides(deck);
   const { sections } = deck.deck;
@@ -334,6 +345,7 @@ export function collectSlidesHtml(
         place: slidePlace(sections, index),
         ...(options.inline ? { inline: { deckDir: deck.dir } } : {}),
         ...(source ? { source } : {}),
+        ...(options.phrases ? { phrases: true } : {}),
       });
     })
     .join("");

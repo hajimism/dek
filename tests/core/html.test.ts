@@ -9,6 +9,7 @@ import {
   stampSlide,
   writtenElements,
 } from "../../src/core/html.ts";
+import { phraseTable } from "../../src/core/phrases.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { stepValuesForBeat } from "../../src/core/step.ts";
 import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts";
@@ -1050,5 +1051,82 @@ describe("extractSlideSection reads markup the way the browser does", () => {
 
   test("finds none when no section is a slide", () => {
     expect(extractSlideSection(`<section data-class="slide">no</section>`)).toBeUndefined();
+  });
+});
+
+describe("phrases in a Japanese deck", () => {
+  const title = "台本を先に書いてから画面を組み立てる";
+  const slideHtml = `<section class="slide"><h2 class="slide-title">${title}</h2></section>`;
+  const japaneseDeck = (lang: string) => ({
+    name: "demo",
+    script: `---
+title: デモ
+lang: ${lang}
+---
+
+## intro
+
+台本を先に書く。
+`,
+    slides: { intro: slideDocument(slideHtml) },
+  });
+  const tableOf = (html: string) => {
+    const written = /data-dek-phrases="([^"]*)"/.exec(html)?.[1];
+    return written === undefined ? undefined : JSON.parse(written.replaceAll("&quot;", '"'));
+  };
+
+  test("stampSlide carries the slide's phrase table when asked", () => {
+    const place = { number: 1, count: 1 };
+    expect(tableOf(stampSlide(slideHtml, { slug: "intro", place, phrases: true }))).toEqual(
+      phraseTable(slideHtml),
+    );
+    expect(stampSlide(slideHtml, { slug: "intro", place })).not.toContain("data-dek-phrases");
+  });
+
+  test("stampSlide leaves a slide with no Japanese phrase without a table", () => {
+    const html = `<section class="slide"><h2>Script first</h2></section>`;
+    expect(
+      stampSlide(html, { slug: "intro", place: { number: 1, count: 1 }, phrases: true }),
+    ).not.toContain("data-dek-phrases");
+  });
+
+  test("the built and the dev player carry the table and keep-all before auto-phrase", async () => {
+    await withTempProject({ decks: [japaneseDeck("ja")] }, async (root) => {
+      const { deck } = resolveDeck(join(root, "decks", "demo"));
+      for (const target of [
+        { kind: "build" as const },
+        {
+          kind: "dev" as const,
+          mode: "player" as const,
+          includeNotes: true,
+          liveReloadScript: "",
+          annotateScript: "",
+        },
+      ]) {
+        const html = renderDeckDocument(deck, { playerScript: "", target });
+        expect(tableOf(html)).toEqual(phraseTable(slideHtml));
+        expect(html).toMatch(/word-break:\s*keep-all;\s*word-break:\s*auto-phrase/);
+        expect(html).toContain("@supports not (word-break: auto-phrase)");
+      }
+    });
+  });
+
+  test("a video, a still page, and a deck in English stay as they were", async () => {
+    await withTempProject(
+      { decks: [japaneseDeck("ja"), { ...japaneseDeck("en"), name: "english" }] },
+      async (root) => {
+        const { deck } = resolveDeck(join(root, "decks", "demo"));
+        const video = renderDeckDocument(deck, { playerScript: "", target: { kind: "video" } });
+        const still = renderSlideHtml(loadSlideSources(deck), "intro", 0);
+        const english = renderDeckDocument(resolveDeck(join(root, "decks", "english")).deck, {
+          playerScript: "",
+          target: { kind: "build" },
+        });
+        for (const html of [video, still, english]) {
+          expect(html).not.toContain("data-dek-phrases");
+          expect(html).not.toContain("keep-all");
+        }
+      },
+    );
   });
 });

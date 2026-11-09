@@ -61,4 +61,9 @@ declare module "playwright" {
       executablePath?: string;
     }): Promise<Browser>;
   };
+  /** WebKit, which only a test uses: it draws a built deck as Safari does. */
+  export const webkit: {
+    executablePath(): string;
+    launch(options?: { headless?: boolean }): Promise<Browser>;
+  };
 }

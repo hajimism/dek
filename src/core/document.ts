@@ -4,6 +4,7 @@ import { escapeAttr, escapeHtml } from "./escape.ts";
 import { collectSlidesHtml, htmlShell } from "./html.ts";
 import { type OgpImage, ogpHead } from "./ogp.ts";
 import { PAGE_ID, type PageMode, pageConfigAttrs } from "./page.ts";
+import { breaksByPhrase, phraseFallbackCss } from "./phrases.ts";
 import type { PluginPage } from "./plugin.ts";
 import {
   nextPresenterTitle,
@@ -78,8 +79,11 @@ export function renderDeckDocument(
   const data = presenterSlides(deck, scriptReader(target)).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
-  const slidesHtml = collectSlidesHtml(deck, { inline: standalone, sources: live });
-  const themeCss = readTheme(deck.dir, standalone);
+  // A video is drawn in Chromium, which breaks Japanese by phrase itself.
+  const phrases = target.kind !== "video" && breaksByPhrase(deck.deck.lang);
+  const slidesHtml = collectSlidesHtml(deck, { inline: standalone, sources: live, phrases });
+  const theme = readTheme(deck.dir, standalone);
+  const themeCss = phrases ? phraseFallbackCss(theme) : theme;
   const slideScripts = readSlideScripts(deck.dir, { strict: strictScripts });
   const state = data[0] ? presenterState(data, { slideIndex: 0, beatIndex: 0 }) : undefined;
   const budget = data[0]?.budgetSeconds !== undefined ? formatClock(data[0].budgetSeconds) : "";
