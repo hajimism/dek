@@ -492,7 +492,7 @@ function lineBreakDiagnostic(
       path: theme ? paths.theme : paths.slide(first.slug, ".html"),
       hint: theme
         ? `add word-break: auto-phrase to .slide in theme.css, so Japanese breaks between phrases on every slide; or ${yourself} where its sense breaks`
-        : `a rule gives it word-break: normal where .slide breaks by phrase: remove it from ${css} or theme.css, or ${yourself} where its sense breaks`,
+        : `a rule on ${first.box} or a box it sits in sets word-break: normal where .slide breaks by phrase: delete just that word-break declaration from ${css} or theme.css, and keep the rest of the rule and the file; or ${yourself} where its sense breaks`,
       ...common,
     });
   }

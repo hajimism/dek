@@ -272,7 +272,7 @@ describe("lintVisualDeck", () => {
           {
             message:
               'p.lede "キャッシュが冷えるとビルドが落ちる" breaks a line inside a phrase, at "キャッシュが冷え / るとビルドが落ちる", at step 1',
-            hint: "a rule gives it word-break: normal where .slide breaks by phrase: remove it from slides/intro.css or theme.css, or break the line yourself with <br> where its sense breaks",
+            hint: "a rule on p.lede or a box it sits in sets word-break: normal where .slide breaks by phrase: delete just that word-break declaration from slides/intro.css or theme.css, and keep the rest of the rule and the file; or break the line yourself with <br> where its sense breaks",
           },
           {
             message:
