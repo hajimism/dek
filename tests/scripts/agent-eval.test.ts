@@ -484,6 +484,60 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
     SCENARIO_MS,
   );
 
+  /** from-script's deck with each slide in `slides`, by its section's id. */
+  const slidesOf = (slides: Record<string, string>) => async (dir: string) => {
+    for (const [slug, html] of Object.entries(slides)) {
+      await Bun.write(join(dir, "decks/talk/slides", `${slug}.html`), html);
+    }
+  };
+  const fromScript = ["twelve-minutes", "profile", "cache", "split", "ninety-seconds"];
+  const titleSlide = (title: string, body = ""): string =>
+    `<section class="slide" data-layout="${body ? "default" : "title"}">\n  <h2 class="slide-title">${title}</h2>\n${body}</section>\n`;
+
+  test.skipIf(noBrowser)(
+    "from-script: one slide of a few words copied for every section fails though lint passes",
+    async () => {
+      const junk = titleSlide("Fourteen batched installs keyed on a lockfile");
+      const found = await checkAfter(
+        byId("from-script"),
+        slidesOf(Object.fromEntries(fromScript.map((slug) => [slug, junk]))),
+      );
+      // "Fourteen" is not "four": a word counts only whole.
+      expect(found).toContain(
+        "slides/split.html shows fewer than two of the things said in its section",
+      );
+      expect(found).toEqual(
+        expect.arrayContaining(
+          fromScript
+            .slice(1)
+            .map((slug) => `slides/${slug}.html shows the same text as slides/twelve-minutes.html`),
+        ),
+      );
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "from-script: slides that carry each section's figures in digits pass",
+    async () => {
+      const found = await checkAfter(
+        byId("from-script"),
+        slidesOf({
+          "twelve-minutes": titleSlide("12 minutes a push, 40 pushes a day"),
+          profile: titleSlide(
+            "Where the time went",
+            "  <ul>\n    <li>Install: 5 min</li>\n    <li>Build: 2 min</li>\n    <li>Tests: 5 min</li>\n  </ul>\n",
+          ),
+          cache: titleSlide("Cache the dependencies on the lockfile"),
+          split: titleSlide("Tests split 4 ways"),
+          "ninety-seconds": titleSlide("From 12 minutes to 90 seconds"),
+        }),
+      );
+      expect(found).toEqual([]);
+    },
+    SCENARIO_MS,
+  );
+
   test.skipIf(noBrowser)(
     "ja-line-break: a paragraph cut short enough to fit fails though lint passes",
     async () => {
