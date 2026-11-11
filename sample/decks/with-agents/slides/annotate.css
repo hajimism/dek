@@ -1,8 +1,9 @@
 /*
  * The presenter's schedule slide in miniature, with annotate mode over it: the two chevrons
  * picked for a note, the pins of the notes written, and the note being written. On the right,
- * the notes as the agent receives them. The plan's boxes sit where the real slide has them,
- * as shares of its 1136 × 470 plan.
+ * the notes as the agent receives them. The plan's lanes and columns sit where the real slide
+ * has them, as shares of its 1136 × 470 plan. Each row of chevrons lines up with its lane: the
+ * design lane's two rows on its top and bottom edges, the other lanes' one row on their middle.
  */
 .slide {
   --arrow: #ec9cc0;
@@ -72,13 +73,13 @@
   filter: drop-shadow(0 0 var(--hairline) var(--line-strong));
 }
 
-.c1 { left: 15.85%; top: 11.91%; width: 52.82%; }
+.c1 { left: 15.85%; top: 9.36%; width: 52.82%; }
 .c2 { left: 49.3%; top: 23.83%; width: 50.7%; }
-.c3 { left: 15.85%; top: 41.7%; width: 22.01%; }
-.c4 { left: 38.73%; top: 41.7%; width: 22.01%; }
-.c5 { left: 61.62%; top: 41.7%; width: 38.38%; }
-.c6 { left: 15.85%; top: 74.89%; width: 28.17%; }
-.c7 { left: 44.89%; top: 74.89%; width: 55.11%; }
+.c3 { left: 15.85%; top: 46.39%; width: 22.01%; }
+.c4 { left: 38.73%; top: 46.39%; width: 22.01%; }
+.c5 { left: 61.62%; top: 46.39%; width: 38.38%; }
+.c6 { left: 15.85%; top: 76.18%; width: 28.17%; }
+.c7 { left: 44.89%; top: 76.18%; width: 55.11%; }
 
 /* Pink arrows between lanes, a shaft and a head in one clip-path; the last points up. */
 .arrow {
@@ -88,10 +89,10 @@
   clip-path: polygon(20% 0, 80% 0, 80% 80%, 100% 80%, 50% 100%, 0 80%, 20% 80%);
 }
 
-.a1 { left: 54.58%; top: 35.32%; height: 6.38%; }
-.a2 { left: 79.23%; top: 53.62%; height: 21.28%; }
-.a3 { left: 49.3%; top: 53.62%; height: 21.28%; }
-.a4 { left: 95.07%; top: 35.32%; height: 39.57%; transform: scaleY(-1); }
+.a1 { left: 54.58%; top: 35.32%; height: 11.07%; }
+.a2 { left: 79.23%; top: 58.31%; height: 17.87%; }
+.a3 { left: 49.3%; top: 58.31%; height: 17.87%; }
+.a4 { left: 95.07%; top: 35.32%; height: 40.86%; transform: scaleY(-1); }
 
 .overlay {
   position: absolute;
@@ -122,7 +123,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-.pin-1 { left: 80.11%; top: 53.62%; }
+.pin-1 { left: 80.11%; top: 58.31%; }
 .pin-2 { left: 100%; top: 23.83%; }
 
 .popup {

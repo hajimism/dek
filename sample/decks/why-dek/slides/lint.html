@@ -3,9 +3,9 @@
   <h2 class="slide-title">規約は、すべて lint が確かめる</h2>
   <p class="lede">使ってよいクラス、トークン経由の値、デッキの中の画像。書いておくだけでは守られない規約を、dek はすべてルールにしました。<span class="mark">エラーがひとつもなければ完成</span>です。</p>
   <div class="stage">
-    <p class="total"><span class="stat">39</span><span class="unit">ルール　五つの層</span></p>
+    <p class="total"><span class="stat">43</span><span class="unit">ルール　五つの層</span></p>
       <div class="layer is-wide">
-        <p class="layer-head"><span class="layer-name">構造</span><span class="layer-count">14</span></p>
+        <p class="layer-head"><span class="layer-name">構造</span><span class="layer-count">15</span></p>
         <p class="note">台本と slides/ の対応</p>
         <ol>
           <li><span class="rid">DEK001</span>節に HTML がない</li>
@@ -22,6 +22,7 @@
           <li><span class="rid">DEK027</span>読めない台本</li>
           <li class="is-warn"><span class="rid">DEK028</span>相手のない morph</li>
           <li class="is-warn"><span class="rid">DEK044</span># と #### の見出し</li>
+          <li><span class="rid">DEK046</span>失敗したプラグイン</li>
         </ol>
       </div>
       <div class="layer">
@@ -43,39 +44,42 @@
       </div>
       <div class="pair">
         <div class="layer">
-          <p class="layer-head"><span class="layer-name">素材</span><span class="layer-count">4</span></p>
-          <p class="note">デッキの中で閉じているか</p>
+          <p class="layer-head"><span class="layer-name">素材</span><span class="layer-count">5</span></p>
+          <p class="note">中にあり、名前のある絵か</p>
           <ol>
             <li><span class="rid">DEK020</span>リモート URL</li>
             <li><span class="rid">DEK021</span>ファイルがない</li>
             <li><span class="rid">DEK022</span>デッキの外を指す道</li>
             <li><span class="rid">DEK023</span>assets/ 外の参照</li>
+            <li><span class="rid">DEK034</span>名前のない絵</li>
           </ol>
         </div>
         <div class="layer">
-          <p class="layer-head"><span class="layer-name">描画</span><span class="layer-count">5</span></p>
-          <p class="note">ブラウザで描いて測る</p>
+          <p class="layer-head"><span class="layer-name">音声</span><span class="layer-count">5</span></p>
+          <p class="note">読み上げと尺</p>
           <ol>
-            <li class="is-warn"><span class="rid">DEK029</span>隠して測らない文字</li>
-            <li><span class="rid">DEK030</span>はみ出し</li>
-            <li><span class="rid">DEK031</span>コントラスト</li>
-            <li><span class="rid">DEK032</span>おかしな draw</li>
-            <li><span class="rid">DEK033</span>文字の重なり</li>
+            <li class="is-warn"><span class="rid">DEK040</span>辞書にない英単語</li>
+            <li class="is-warn"><span class="rid">DEK041</span>持ち時間から外れた尺</li>
+            <li class="is-warn"><span class="rid">DEK042</span>喋らないビート</li>
+            <li class="is-warn"><span class="rid">DEK043</span>行き先のない [beats]</li>
+            <li class="is-warn"><span class="rid">DEK045</span>読めない音声の設定</li>
           </ol>
         </div>
       </div>
       <div class="layer">
-        <p class="layer-head"><span class="layer-name">音声</span><span class="layer-count">5</span></p>
-        <p class="note">読み上げと尺</p>
+        <p class="layer-head"><span class="layer-name">描画</span><span class="layer-count">7</span></p>
+        <p class="note">ブラウザで描いて測る</p>
         <ol>
-          <li class="is-warn"><span class="rid">DEK040</span>辞書にない英単語</li>
-          <li class="is-warn"><span class="rid">DEK041</span>持ち時間から外れた尺</li>
-          <li class="is-warn"><span class="rid">DEK042</span>喋らないビート</li>
-          <li class="is-warn"><span class="rid">DEK043</span>行き先のない [beats]</li>
-          <li class="is-warn"><span class="rid">DEK045</span>読めない音声の設定</li>
+          <li class="is-warn"><span class="rid">DEK029</span>隠して測らない文字</li>
+          <li><span class="rid">DEK030</span>はみ出し</li>
+          <li><span class="rid">DEK031</span>コントラスト</li>
+          <li><span class="rid">DEK032</span>おかしな draw</li>
+          <li><span class="rid">DEK033</span>文字の重なり</li>
+          <li class="is-warn"><span class="rid">DEK035</span>文節の途中の改行</li>
+          <li class="is-warn"><span class="rid">DEK036</span>揃い損ねた端</li>
         </ol>
       </div>
     <p class="legend"><span class="key"></span>エラー：完成を止める<span class="key is-warn"></span>警告：報告するが、止めない</p>
   </div>
-  <p class="source">src/core/diagnostic.ts の RULES 表（39 件）を、docs/reference/lint.md の条件で五つの層に分けたもの。</p>
+  <p class="source">src/core/diagnostic.ts の RULES 表（43 件）を、docs/reference/lint.md の条件で五つの層に分けたもの。</p>
 </section>
