@@ -53,8 +53,11 @@ export type TranscriptReport = {
 /** What `dekc lint --json` from the project root still finds once the agent has stopped. */
 export type Left = {
   errors: number;
-  /** Warnings never fail a run, so this is the only place a warning the agent ignored shows. */
-  warnings: number;
+  /**
+   * Warnings never fail a run, so this is the only place a warning the agent ignored shows. Null
+   * when lint printed no list of diagnostics: it could not look, so nothing is known to be left.
+   */
+  warnings: number | null;
   /** Each rule's diagnostics, errors and warnings both. */
   byRule: Record<string, number>;
 };
@@ -121,29 +124,30 @@ export function repeatCount(dekc: DekcReport): number {
 
 /**
  * What a `dekc lint --json` run left: its diagnostics counted by severity and rule. A lint that
- * printed no list of diagnostics could not look, as in a directory that is no dek project, and
- * that counts as one error under no rule.
+ * printed no list of diagnostics could not look, as in a directory that is no dek project: that
+ * counts as one error under no rule, and its warnings as unknown rather than none.
  */
 export function leftover(stdout: string): Left {
   let envelope: Envelope;
   try {
     envelope = JSON.parse(stdout) as Envelope;
   } catch {
-    return { errors: 1, warnings: 0, byRule: {} };
+    return blind();
   }
   if (!Array.isArray(envelope?.diagnostics)) {
-    return { errors: 1, warnings: 0, byRule: {} };
+    return blind();
   }
-  const left: Left = { errors: 0, warnings: 0, byRule: {} };
-  for (const { id, severity } of envelope.diagnostics) {
-    if (severity === "error") {
-      left.errors += 1;
-    } else {
-      left.warnings += 1;
-    }
-    left.byRule[id] = (left.byRule[id] ?? 0) + 1;
+  const byRule: Record<string, number> = {};
+  for (const { id } of envelope.diagnostics) {
+    byRule[id] = (byRule[id] ?? 0) + 1;
   }
-  return left;
+  const errors = envelope.diagnostics.filter(({ severity }) => severity === "error").length;
+  return { errors, warnings: envelope.diagnostics.length - errors, byRule };
+}
+
+/** What a lint that could not look left: its failure, and no count of warnings. */
+function blind(): Left {
+  return { errors: 1, warnings: null, byRule: {} };
 }
 
 function repeats(invocations: Invocation[]): DekcReport["repeated"] {
@@ -319,6 +323,9 @@ function leftLine(left: Left): string {
   const rules = Object.entries(left.byRule)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([id, count]) => `${id} ×${count}`);
+  if (left.warnings === null) {
+    return `Left after the run: ${plural(left.errors, "error")}, warnings unknown: lint printed no list of diagnostics.`;
+  }
   return `Left after the run: ${plural(left.errors, "error")}, ${plural(left.warnings, "warning")}${
     rules.length > 0 ? ` (${rules.join(", ")})` : ""
   }.`;
@@ -349,7 +356,7 @@ export function markdown(report: EvalReport): string {
       each((run) => repeatCount(run.dekc)),
       each((run) => run.dekc.unhinted.length),
       each((run) => (run.dekc.hinted.some((entry) => entry.ran) ? "yes" : "no")),
-      each((run) => run.left.warnings),
+      each((run) => run.left.warnings ?? "?"),
     ];
     return `| ${cells.join(" | ")} |`;
   });

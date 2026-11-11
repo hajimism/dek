@@ -1,15 +1,106 @@
 import { join } from "node:path";
+import { textRuns } from "../../../src/core/phrases.ts";
 import { skeletonRecord } from "../../../src/core/skeleton-record.ts";
 import { lintFindings, must, type Scenario, warned, writeText } from "../scenario.ts";
 
-/** Each section of the talk: its id, and words a slide showing what is said there would carry. */
-const SECTIONS: Array<{ slug: string; shows: string[] }> = [
-  { slug: "twelve-minutes", shows: ["forty", "40", "eight hours", "8 hours", "batch"] },
-  { slug: "profile", shows: ["install", "dependencies", "measure", "timed"] },
-  { slug: "cache", shows: ["lockfile", "lock file", "fifteen", "15"] },
-  { slug: "split", shows: ["shard", "four", "seventy", "70"] },
-  { slug: "ninety-seconds", shows: ["smaller", "batch", "time your", "guess"] },
+/**
+ * Each section of the talk: its id, and the things said there that a slide showing it would
+ * carry, each as the words it may be written in: a figure in digits or spelled out, a word in the
+ * forms the script uses. A plural "s" or "es" is taken on any of them.
+ */
+const SECTIONS: Array<{ slug: string; shows: string[][] }> = [
+  {
+    slug: "twelve-minutes",
+    shows: [
+      ["twelve", "12"],
+      ["minute", "min"],
+      ["forty", "40"],
+      ["push", "pushed", "pushing"],
+      ["eight", "8"],
+      ["hour"],
+      ["day", "daily"],
+      ["wait", "waited", "waiting"],
+      ["batch", "batched", "batching"],
+      ["review"],
+      ["bug"],
+      ["ci"],
+      ["pull request"],
+    ],
+  },
+  {
+    slug: "profile",
+    shows: [
+      ["measure", "measured", "measuring"],
+      ["time", "timed", "timing"],
+      ["step"],
+      ["pipeline"],
+      ["week"],
+      ["install", "installed", "installing"],
+      ["dependency", "dependencies", "deps"],
+      ["five", "5"],
+      ["minute", "min"],
+      ["build", "building"],
+      ["two", "2"],
+      ["test", "suite"],
+      ["slow", "slowest"],
+      ["machine"],
+      ["theory", "theories", "guess", "guessed"],
+    ],
+  },
+  {
+    slug: "cache",
+    shows: [
+      ["cache", "cached", "caching"],
+      ["lockfile", "lock file"],
+      ["dependency", "dependencies", "deps", "package"],
+      ["install", "installed", "installing"],
+      ["fifteen", "15"],
+      ["second", "sec"],
+      ["five", "5"],
+      ["minute", "min"],
+      ["restore", "restored"],
+      ["afternoon"],
+    ],
+  },
+  {
+    slug: "split",
+    shows: [
+      ["split", "splitting"],
+      ["shard", "sharded", "sharding"],
+      ["four", "4"],
+      ["machine", "parallel", "at once"],
+      ["seventy", "70"],
+      ["second", "sec"],
+      ["five", "5"],
+      ["minute", "min"],
+      ["test", "suite"],
+      ["balance", "balanced", "balancing"],
+      ["slow", "slowest", "heavy"],
+    ],
+  },
+  {
+    slug: "ninety-seconds",
+    shows: [
+      ["ninety", "90"],
+      ["second", "sec"],
+      ["twelve", "12"],
+      ["minute", "min"],
+      ["push"],
+      ["batch", "batched"],
+      ["review"],
+      ["small", "smaller"],
+      ["test"],
+      ["time", "timing"],
+      ["pipeline"],
+      ["week"],
+      ["guess"],
+      ["afternoon"],
+    ],
+  },
 ];
+
+/** A slide shows its section when it carries at least this many of the things said there. */
+const ENOUGH = 2;
 
 const SCRIPT = `---
 # yaml-language-server: $schema=../../.dek/schema.json
@@ -112,17 +203,30 @@ const SLIDES: Record<string, string> = {
 `,
 };
 
-/** Text as a reader sees it, with the markup and the case gone. */
+/**
+ * Text as a reader sees it, read as dek reads a slide's text: character references decoded, what
+ * is not drawn as text, such as a stylesheet, left out, and the white space and the case gone.
+ */
 const shown = (html: string): string =>
-  html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .toLowerCase();
+  textRuns(html).join(" ").replace(/\s+/g, " ").trim().toLowerCase();
+
+const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** How many of `shows` the text carries, each as a whole word: "four" is not in "fourteen". */
+function carried(text: string, shows: string[][]): number {
+  return shows.filter((forms) =>
+    new RegExp(
+      `(?<![\\p{L}\\p{N}])(?:${forms.map(escaped).join("|")})(?:e?s)?(?![\\p{L}\\p{N}])`,
+      "iu",
+    ).test(text),
+  ).length;
+}
 
 /**
  * The zero-to-one case: a finished script and no slides at all (DEK001 for every section). Done
- * is a slide of the author's own for each section, carrying what is said there, the visual
- * checks clean of their warnings too, and the script as the user wrote it.
+ * is a slide of the author's own for each section, carrying at least two of the things said
+ * there and no copy of another slide, the visual checks clean of their warnings too, and the
+ * script as the user wrote it.
  */
 export default {
   id: "from-script",
@@ -144,14 +248,27 @@ export default {
     }
     const deckDir = join(project.dir, "decks/talk");
     const record = skeletonRecord(deckDir);
+    /** Each slide judged so far, by the text it shows. */
+    const seen = new Map<string, string>();
     for (const { slug, shows } of SECTIONS) {
       const html = await project.read(`decks/talk/slides/${slug}.html`);
       if (html === undefined) {
         found.push(`slides/${slug}.html is missing`);
-      } else if (record.owns(html, undefined)) {
+        continue;
+      }
+      if (record.owns(html, undefined)) {
         found.push(`slides/${slug}.html is still the skeleton dek wrote`);
-      } else if (!shows.some((word) => shown(html).includes(word))) {
-        found.push(`slides/${slug}.html shows none of what is said in its section`);
+        continue;
+      }
+      const text = shown(html);
+      if (carried(text, shows) < ENOUGH) {
+        found.push(`slides/${slug}.html shows fewer than two of the things said in its section`);
+      }
+      const same = seen.get(text);
+      if (same === undefined) {
+        seen.set(text, slug);
+      } else {
+        found.push(`slides/${slug}.html shows the same text as slides/${same}.html`);
       }
     }
     return found;

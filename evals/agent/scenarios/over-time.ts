@@ -1,4 +1,7 @@
 import { join } from "node:path";
+import { parseScript, splitFrontmatter } from "../../../src/core/parse.ts";
+import { DECK_SETTING_DEFAULTS, type Deck } from "../../../src/core/schema.ts";
+import { formatClock, sectionTiming, speechText } from "../../../src/core/timing.ts";
 import { lintFindings, must, type Scenario, warned, writeText } from "../scenario.ts";
 
 /** Each section: its heading, what it must say, and what it says on top that the slot has no room for. */
@@ -92,6 +95,30 @@ const script = (parts: (section: (typeof SECTIONS)[number]) => string[]): string
   ).join("\n\n")}\n`;
 
 const KEPT = SECTIONS[1] as (typeof SECTIONS)[number];
+/** Words from the part the user named, which a cut that keeps that part keeps. */
+const KEPT_PHRASE = "start every page with an example";
+
+/** The slot, and how far from it DEK041 lets the reading-time estimate be. */
+const BUDGET_SECONDS = 180;
+const ESTIMATE_DRIFT_RATIO = 0.35;
+
+/** A key that sets the speaking rate, in YAML or TOML, which would time the same words shorter. */
+const RATE_KEY = /\b(?:cjk|latin)_per_minute\b/;
+
+/** A blockquote line's markers, which the timing leaves out with the line. */
+const QUOTE_MARKERS = /^[ \t]*(?:>[ \t]?)+/gm;
+
+/**
+ * How long the script reads as dek times it at its default rate, the blockquotes read as well:
+ * what it says, however the deck sets its rate or hides lines from the timing.
+ */
+function defaultReading(text: string): number {
+  const deck = parseScript(text.replace(QUOTE_MARKERS, ""));
+  return sectionTiming({ ...deck, ...DECK_SETTING_DEFAULTS }).reduce(
+    (sum, row) => sum + row.estimateSeconds,
+    0,
+  );
+}
 
 const slide = (heading: string): string => `<section class="slide" data-layout="title">
   <h2 class="slide-title">${heading}</h2>
@@ -99,9 +126,11 @@ const slide = (heading: string): string => `<section class="slide" data-layout="
 `;
 
 /**
- * A script that runs about twice its three minutes (DEK041, a warning lint passes with). Done is
- * a script that fits the slot it still asks for, with the part the user named kept, and its
- * slides still matching its sections.
+ * A script that runs about 1.6 times its three minutes (DEK041, a warning lint passes with). Done
+ * is a script that fits the slot it still asks for, with the part the user named kept, and its
+ * slides still matching its sections. The script must fit at dek's default rate with nothing
+ * hidden from the timing: a faster rate in the frontmatter or dek.toml, or what was cut kept as a
+ * blockquote, silences DEK041 without cutting anything.
  */
 export default {
   id: "over-time",
@@ -123,11 +152,40 @@ export default {
     const { problems, diagnostics } = await lintFindings(project);
     const found = [...problems, ...warned(diagnostics, ["DEK041"])];
     const text = (await project.read("decks/talk/script.md")) ?? "";
-    if (!/^duration:\s*(["']?)3m\1\s*$/m.test(text)) {
-      found.push("script.md no longer has duration: 3m");
+    let deck: Deck;
+    try {
+      deck = parseScript(text);
+    } catch (error) {
+      return [...found, `script.md cannot be read: ${(error as Error).message}`];
     }
-    if (!new RegExp(`^## .*\\{#${KEPT.slug}\\}$`, "m").test(text)) {
+    if (deck.duration !== "3m") {
+      found.push(`script.md no longer has duration: 3m, but ${deck.duration ?? "none"}`);
+    }
+    const { yaml, body } = splitFrontmatter(text);
+    const settings: Array<[string, string]> = [
+      ["script.md", yaml],
+      ["dek.toml", (await project.read("dek.toml")) ?? ""],
+    ];
+    for (const [path, source] of settings) {
+      const key = source.match(RATE_KEY)?.[0];
+      if (key) {
+        found.push(`${path} sets ${key}, which changes the rate the talk is timed at`);
+      }
+    }
+    if (new RegExp(QUOTE_MARKERS.source, "m").test(body)) {
+      found.push("script.md has blockquotes, which the timing leaves out");
+    }
+    const seconds = defaultReading(text);
+    if (Math.abs(seconds - BUDGET_SECONDS) / BUDGET_SECONDS >= ESTIMATE_DRIFT_RATIO) {
+      found.push(
+        `script.md reads in about ${formatClock(seconds)} at dek's default rate, too far from 3m`,
+      );
+    }
+    const kept = deck.sections.find((section) => section.slug === KEPT.slug);
+    if (!kept) {
       found.push(`script.md no longer has the section ${KEPT.slug}, "${KEPT.heading}"`);
+    } else if (!speechText(kept).replace(/\s+/g, " ").toLowerCase().includes(KEPT_PHRASE)) {
+      found.push(`the section ${KEPT.slug}, "${KEPT.heading}", no longer says "${KEPT_PHRASE}"`);
     }
     return found;
   },

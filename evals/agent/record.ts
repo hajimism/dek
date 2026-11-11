@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { type EvalReport, type RunReport, repeatCount } from "./report.ts";
 
 /**
@@ -15,6 +17,9 @@ type ScenarioSummary = {
   medianRepeats: number | null;
   /** Errors dek showed with no hint, over every run. */
   unhintedErrors: number;
+  /** A lint that could not look counts as one error here. */
+  medianErrorsLeft: number | null;
+  /** Over the runs whose lint could look; null when none could. */
   medianWarningsLeft: number | null;
 };
 
@@ -23,16 +28,22 @@ type ScenarioSummary = {
  * be committed as it is. The agent's command is left out as well, since it may name a path.
  */
 export type Summary = {
-  /** The dek that was measured, from package.json. */
+  /** The dek that was measured, from package.json: bumped only by the release pull request. */
   dek: string;
-  /** The day the eval started, in UTC. */
+  /** The checkout that was measured, as `git rev-parse --short HEAD`; null outside a git checkout. */
+  commit: string | null;
+  /** The day the eval started, in UTC, as `startedAt` is; not the local day. */
   date: string;
   scenarios: ScenarioSummary[];
 };
 
-export function summarize(report: EvalReport, dek: string): Summary {
+export function summarize(
+  report: EvalReport,
+  measured: { dek: string; commit: string | null },
+): Summary {
   return {
-    dek,
+    dek: measured.dek,
+    commit: measured.commit,
     date: report.startedAt.slice(0, 10),
     scenarios: report.scenarios.map(({ id, runs }) => {
       const ran = runs.filter((run) => run.outcome !== "skipped");
@@ -46,7 +57,10 @@ export function summarize(report: EvalReport, dek: string): Summary {
         medianDekcRuns: middle((run) => run.dekc.invocations),
         medianRepeats: middle((run) => repeatCount(run.dekc)),
         unhintedErrors: ran.reduce((sum, run) => sum + run.dekc.unhinted.length, 0),
-        medianWarningsLeft: middle((run) => run.left.warnings),
+        medianErrorsLeft: middle((run) => run.left.errors),
+        medianWarningsLeft: median(
+          ran.flatMap((run) => (run.left.warnings === null ? [] : [run.left.warnings])),
+        ),
       };
     }),
   };
@@ -63,12 +77,24 @@ function median(values: number[]): number | null {
     : ((sorted[half - 1] ?? 0) + (sorted[half] ?? 0)) / 2;
 }
 
-/** `<date>-v<dek>.json`, or with `-2`, `-3`, … when a record of that day and version is kept. */
-export function recordName(summary: Summary, taken: (name: string) => boolean): string {
+/**
+ * Writes `summary` into `dir` as `<date>-v<dek>.json`, or with `-2`, `-3`, … when a record of that
+ * day and version is kept, and returns its path. Each name is taken by creating the file only if
+ * it is not there, so a record made at the same moment is never overwritten either.
+ */
+export async function writeRecord(dir: string, summary: Summary): Promise<string> {
+  await mkdir(dir, { recursive: true });
+  const text = `${JSON.stringify(summary, null, 2)}\n`;
   const stem = `${summary.date}-v${summary.dek}`;
-  let name = `${stem}.json`;
-  for (let count = 2; taken(name); count++) {
-    name = `${stem}-${count}.json`;
+  for (let count = 1; ; count++) {
+    const path = join(dir, count === 1 ? `${stem}.json` : `${stem}-${count}.json`);
+    try {
+      await writeFile(path, text, { flag: "wx" });
+      return path;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
+    }
   }
-  return name;
 }
