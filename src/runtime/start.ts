@@ -9,6 +9,7 @@ import type { CreateDevLine } from "./dev-line.ts";
 import { bindInput } from "./input.ts";
 import { createLaserView, type LaserView } from "./laser-view.ts";
 import { createNavigator } from "./navigator.ts";
+import { breakPhrases } from "./phrases.ts";
 import { createPluginHost } from "./plugins.ts";
 import { createPresenterView } from "./presenter-view.ts";
 import { createRailView } from "./rail-view.ts";
@@ -24,6 +25,8 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
   if (!dataEl?.textContent) {
     return;
   }
+  // Before anything clones a slide, so the rail and the next slide break as the stage does.
+  breakPhrases(document);
   const page = readPageConfig(document.body);
   const slides = JSON.parse(dataEl.textContent) as PresenterSlide[];
   const deck = deckStops(slides);

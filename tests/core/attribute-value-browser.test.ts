@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Browser } from "playwright";
 import { attributeOf } from "../../src/core/attribute-value.ts";
 import { LEGACY_REFERENCES, NAMED_REFERENCES } from "../../src/core/html-entities.ts";
+import { textRuns } from "../../src/core/phrases.ts";
 import { importPlaywright, playwrightResolved } from "../../src/core/playwright.ts";
 import { ATTRIBUTE_VALUES } from "../helpers/attribute-values.ts";
 
@@ -74,6 +75,48 @@ describe("attribute values, as Chromium reads them", () => {
   browserTest("match dek for every numeric reference to the first 0x100 code points", async () => {
     const values = [...Array(0x100).keys()].flatMap((n) => [`&#${n};`, `&#x${n.toString(16)}`]);
     const { chromium, dek } = await readBoth(values);
+    expect(dek).toEqual(chromium);
+  });
+});
+
+/** Each text written in its own paragraph, as Chromium's text node holds it and as dek reads it. */
+async function readTexts(texts: readonly string[]): Promise<{ chromium: string[]; dek: string[] }> {
+  if (!browser) {
+    throw new Error("no browser");
+  }
+  const html = `<section class="slide">${texts.map((text) => `<p>${text}</p>`).join("")}</section>`;
+  const page = await browser.newPage();
+  try {
+    await page.setContent(`<!DOCTYPE html><body>${html}</body>`);
+    const chromium = await page.evaluate(() =>
+      [...document.querySelectorAll("p")].map((p) => p.textContent ?? ""),
+    );
+    return { chromium, dek: textRuns(html) };
+  } finally {
+    await page.close();
+  }
+}
+
+describe("texts, as Chromium reads them", () => {
+  browserTest("match dek for every named reference, with and without its ;", async () => {
+    const names = NAMED_REFERENCES.split(" ").map((entry) => entry.split(":")[0] ?? "");
+    const legacy = LEGACY_REFERENCES.split(" ");
+    const texts = [
+      ...names.flatMap((name) => [`a&${name};x`, `a&${name}`]),
+      ...legacy.flatMap((name) => [`a&${name}=`, `a&${name}x;`, `a&${name}1`, `a&${name} `]),
+    ];
+    const { chromium, dek } = await readTexts(texts);
+    expect(dek).toEqual(chromium);
+  });
+
+  browserTest("match dek for numeric references, line ends, and a NUL", async () => {
+    const texts = [
+      ...[...Array(0x100).keys()].flatMap((n) => [`a&#${n};`, `a&#x${n.toString(16)}b`]),
+      "a\r\nb\rc",
+      "a\0b",
+      "a&#xd800;b&#x110000;c",
+    ];
+    const { chromium, dek } = await readTexts(texts);
     expect(dek).toEqual(chromium);
   });
 });

@@ -1,8 +1,8 @@
 /**
- * An attribute's value as the browser reads it. Bun's HTMLRewriter gives each value as written,
- * character references and all, so `assets/Q&amp;A.png` would name a file the page never loads.
- * Every value lint or the build reads off the rewriter goes through here first; a value written
- * back into the markup is written from the one as written, never from this.
+ * An attribute's value, or a text, as the browser reads it. Bun's HTMLRewriter gives each value
+ * as written, character references and all, so `assets/Q&amp;A.png` would name a file the page
+ * never loads. Every value lint or the build reads off the rewriter goes through here first; a
+ * value written back into the markup is written from the one as written, never from this.
  */
 import { LEGACY_REFERENCES, NAMED_REFERENCES } from "./html-entities.ts";
 
@@ -83,6 +83,43 @@ export function decodeAttribute(written: string): DecodedAttribute {
       return offset;
     },
   };
+}
+
+/**
+ * `written`, text between tags as written, read the way the HTML standard reads it there: every
+ * character reference decoded, a name the standard allows without its `;` by the longest such name
+ * it starts with, whatever follows, a carriage return read as a line feed, and a NUL dropped, as
+ * the parser drops one in a body. It is a text node's data, so the build can say what the page
+ * holds.
+ */
+export function decodeText(written: string): string {
+  return written.replace(
+    REFERENCE_RE,
+    (match: string, hex?: string, decimal?: string, name = "", semicolon = "") => {
+      if (match === "\0") {
+        return "";
+      }
+      if (match.startsWith("\r")) {
+        return "\n";
+      }
+      if (hex !== undefined || decimal !== undefined) {
+        return numericReference(
+          hex === undefined ? Number.parseInt(decimal ?? "", 10) : Number.parseInt(hex, 16),
+        );
+      }
+      const whole = semicolon ? namedReferences().get(name) : undefined;
+      if (whole !== undefined) {
+        return whole;
+      }
+      for (let end = name.length; end > 0; end--) {
+        const prefix = name.slice(0, end);
+        if (legacyReferences().has(prefix)) {
+          return `${namedReferences().get(prefix) ?? ""}${name.slice(end)}${semicolon}`;
+        }
+      }
+      return match;
+    },
+  );
 }
 
 /**

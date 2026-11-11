@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 
 import { type LiveHost, slideSelector } from "./live.ts";
+import { breakPhrases } from "./phrases.ts";
 
 export function documentLiveHost(): LiveHost {
   return {
@@ -8,6 +9,10 @@ export function documentLiveHost(): LiveHost {
       const current = document.querySelector(slideSelector(slug));
       if (current) {
         current.outerHTML = html;
+        const next = document.querySelector(slideSelector(slug));
+        if (next) {
+          breakPhrases(next);
+        }
       }
     },
     setTheme(css) {

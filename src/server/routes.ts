@@ -9,6 +9,7 @@ import { deckSlides, htmlShell, slidePlace, stampSlide } from "../core/html.ts";
 import { decodePosition } from "../core/live-protocol.ts";
 import { markedPositions, toggleMark } from "../core/marks.ts";
 import { deckProjectRoot } from "../core/path.ts";
+import { breaksByPhrase, phraseFallbackCss } from "../core/phrases.ts";
 import type { Project, ProjectDeck } from "../core/resolve.ts";
 import { followInside } from "../core/safe-fs.ts";
 import { voiceCacheFile } from "../core/voice.ts";
@@ -88,6 +89,7 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
                   slug: route.slug,
                   place: slidePlace(sections, index),
                   source,
+                  ...(deck && breaksByPhrase(deck.deck.lang) ? { phrases: true } : {}),
                 }),
               )
             : notFound();
@@ -98,7 +100,7 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
         route: "theme",
         respond: () =>
           deck
-            ? new Response(readTheme(deck.dir, false), {
+            ? new Response(themeOf(deck), {
                 headers: {
                   "content-type": "text/css; charset=utf-8",
                   "cache-control": "no-store",
@@ -149,6 +151,12 @@ export function routeRequest(req: Request, ctx: RouteContext): Routed {
 }
 
 const MISSING: Routed = { route: "missing", respond: notFound };
+
+/** The deck's theme as the player's pages hold it, `keep-all` put in where Japanese needs it. */
+function themeOf(deck: ProjectDeck): string {
+  const theme = readTheme(deck.dir, false);
+  return breaksByPhrase(deck.deck.lang) ? phraseFallbackCss(theme) : theme;
+}
 
 function voiceResponse(deck: ProjectDeck | undefined, file: VoiceFile): Response {
   // A link out of the project is no voice of the deck's, and is not served.
