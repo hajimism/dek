@@ -1,6 +1,6 @@
 # dek sample
 
-Three decks about dek itself. `why-dek` is a twelve-minute talk built to double as a handout: every slide states its point in a full sentence and carries its own figure, so the PDF reads without the talk. `lightning` is a three-minute lightning talk that builds a talk in a terminal, and `with-agents` a six-minute talk about handing slides to an AI agent. Open any `script.md` and you will find the order, the spoken words, and the timing all in one place. Every slide started as the skeleton `dek` generated from it. The project is set up the way a real talk project would be, with Playwright, rumdl, and voice included.
+Three decks about dek itself. `why-dek` is a twelve-minute talk built to double as a handout: every slide states its point in a full sentence and carries its own figure, so the PDF reads without the talk. `lightning` is a three-minute lightning talk that builds a talk in a terminal, and `with-agents` a six-minute talk about handing slides to an AI agent. Open any `script.md` and you will find the order, the spoken words, and the timing all in one place. Every slide started as the skeleton `dek` generated from it. The project is set up the way a real talk project would be, with Playwright, rumdl, voice, and a word list included.
 
 [日本語](./README.ja.md)
 
@@ -44,6 +44,8 @@ The scripts do not pin a deck. From the project root they apply to every deck; f
 dek is installed as `@hajimism/dek` from `file:..`, this repository itself, next to Playwright and rumdl in the sample's `devDependencies`. A project of your own gets it from `dekc init`, which installs dek into the project it writes.
 
 The `[voice]` table in `dek.toml` is the default that `dekc new` copies into new decks. Each deck's actual settings live in its own `voice/`: `voice.toml`, and a `dict.toml` with readings for ASCII words. When the engine is down the dev server keeps running; only synthesis fails.
+
+`[plugins.words]` in `dek.toml` turns on dek-words, which checks every deck's script and slides against `plugins/words/words.yaml`: phrases that AI tends to write and that read poorly in Japanese, such as metaphorical verbs, calques, empty closing lines, and stiff nominalizations, each with what to write instead. Most entries and hints are taken from [yomiyasu](https://github.com/nanaism/yomiyasu) (MIT), narrowed to the ones a talk almost always does better without; its license sits beside the list as `YOMIYASU-LICENSE`. A finding is a warning; a deck that needs a listed word allows it in its own `words.yaml`. `plugins/words/plugin.json` is the lock `dekc sync` wrote.
 
 `decks/why-dek/voice/voice.toml` also shows the timing knobs: `lead` for the whole deck, a longer lead into the annotated script on `script`, and a longer pause after the last beat of `recap`.
 

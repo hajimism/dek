@@ -1,6 +1,6 @@
 # dek sample
 
-dek 自身を題材にした 3 つのデッキです。`why-dek` は約 12 分のトークで、配布資料としても読めるように作っています。どのスライドも言いたいことを文で書き、それぞれの図を持っているので、PDF にすれば話を聞かなくても追えます。`lightning` はターミナルで発表をひとつ作ってみせる 3 分のライトニングトーク、`with-agents` はスライドを AI エージェントに任せる話をする 6 分のトークです。どの `script.md` を開いても、順序と喋る言葉と尺がすべてそこにあります。どのスライドも、そこから `dek` が作った骨格を仕上げたものです。Playwright、rumdl、声まで入れた、実際のトーク用プロジェクトと同じ形です。
+dek 自身を題材にした 3 つのデッキです。`why-dek` は約 12 分のトークで、配布資料としても読めるように作っています。どのスライドも言いたいことを文で書き、それぞれの図を持っているので、PDF にすれば話を聞かなくても追えます。`lightning` はターミナルで発表をひとつ作ってみせる 3 分のライトニングトーク、`with-agents` はスライドを AI エージェントに任せる話をする 6 分のトークです。どの `script.md` を開いても、順序と喋る言葉と尺がすべてそこにあります。どのスライドも、そこから `dek` が作った骨格を仕上げたものです。Playwright、rumdl、声、語のリストまで入れた、実際のトーク用プロジェクトと同じ形です。
 
 [English](./README.md)
 
@@ -44,6 +44,8 @@ bun run build          # 各 decks/<deck>/dist/<deck>.html
 dek は `@hajimism/dek` として `file:..`、つまりこのリポジトリ自身から入り、Playwright と rumdl と並んで sample の `devDependencies` にあります。自分のプロジェクトでは、代わりに `dekc init` がプロジェクトを書くときに入れます。
 
 `dek.toml` の `[voice]` は、`dekc new` が新しいデッキへコピーする既定値です。各デッキの実際の設定はそれぞれの `voice/` にあり、`voice.toml` と、ASCII 語の読みを収めた `dict.toml` です。エンジンが止まっていても開発サーバは動き続けます。合成だけが失敗します。
+
+`dek.toml` の `[plugins.words]` で dek-words を有効にしています。すべてのデッキの台本とスライドを `plugins/words/words.yaml` と照らし、AI が書きがちで日本語として読みにくい言い回しを、代わりに書くことと一緒に指摘します。比喩の動詞、直訳調、中身のない結び、名詞にして硬くした言い回しなどです。語とヒントの多くは [yomiyasu](https://github.com/nanaism/yomiyasu)（MIT）から、発表ではほぼいつも直したほうがよいものに絞って取りました。そのライセンスはリストの隣の `YOMIYASU-LICENSE` にあります。指摘は警告です。リストの語が要るデッキは、そのデッキの `words.yaml` で許します。`plugins/words/plugin.json` は `dekc sync` が書いた lock です。
 
 `decks/why-dek/voice/voice.toml` にはタイミングの調整例もあります。デッキ全体の `lead`、台本に注釈を付けた `script` に入るときの長めの `lead`、`recap` の最後のビートの後の長めの `pause` です。
 

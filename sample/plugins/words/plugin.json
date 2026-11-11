@@ -1,0 +1,29 @@
+{
+  "accepted": {
+    "schema": 1,
+    "name": "words",
+    "version": "0.1.0",
+    "check": {
+      "protocol": 1,
+      "rules": {
+        "WORDS001": {
+          "severity": "warning",
+          "summary": "a word on the project's word list is in the deck"
+        },
+        "WORDS002": {
+          "severity": "error",
+          "summary": "the word list or a deck's allows cannot be read"
+        }
+      }
+    },
+    "data": [
+      {
+        "path": "words.yaml",
+        "in": "project"
+      },
+      {
+        "path": "words.yaml"
+      }
+    ]
+  }
+}
