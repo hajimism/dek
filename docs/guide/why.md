@@ -61,14 +61,18 @@ Voice and video are derived from the script. The script itself knows nothing abo
 | Authoring order | Slides first | Slides first | Slides first | Script first |
 | Unit of work | One file, one deck | One file, one deck | One repo, one deck | One project, many decks |
 | Slide source | Binary | Markdown | One `slides.md` | One HTML file per slide |
-| Speaker script | Notes (child) | Weak | HTML comments (child) | `script.md` (parent) |
+| Speaker script | Notes (child) | HTML comments (child) | HTML comments (child) | `script.md` (parent) |
 | Progressive reveal | Animations | Partial | `v-click` (slide owns order) | `###` beats (script owns order) |
-| Timing | None | None | None | `duration` + word count + optional TTS length |
+| Timing | Rehearsal timer | None | `duration` target + countdown | Estimated from the script: word count or TTS length against `duration` |
+| Checks | Accessibility checker (PowerPoint) | Overflow, experimental, in VS Code | None built in | Lint of the source and of each rendered slide: overflow, contrast, line breaks, alignment |
 | Motion | Proprietary | CSS | Vue + custom DSL | CSS + View Transitions |
-| Agent interface | Weak | Text | MCP server | CLI + `AGENTS.md` |
+| Agent interface | Weak | Text | Skill, `llms.txt`, MCP server | CLI with `--json`, `AGENTS.md`, skill, `llms.txt` |
+| Outputs | Native file, PDF | HTML, PDF, images, PPTX (editable text experimental) | Web app, PDF, images, PPTX (editable text) | One HTML file, PDF, PPTX (editable text), narrated video |
 | Best for | General use | Simple Markdown decks | Technical talks with live demos | Talks where the speaking matters most |
 
 Slidev is the most mature tool in this space, and dek borrows from it freely: presenter sync, optional Playwright, scoped CSS conventions. The decisive differences are file granularity, where the script sits in the hierarchy, and what counts as the unit of work.
+
+The outputs are mostly common ground now: Slidev hands PowerPoint users a file whose text they can edit, and Marp does so experimentally. What dek adds comes before any output. The time is estimated from what you will say, and every slide is measured where it is written.
 
 dek carries no Vue, UnoCSS, Monaco, or Mermaid. That keeps lint and build simple, and it keeps plain HTML and CSS as a strength rather than a limitation.
 
@@ -80,7 +84,8 @@ Use Slidev if you need any of the following.
 - Live coding or an embedded editor
 - A gallery of npm themes
 - An animation DSL beyond CSS and a seekable `draw(t)`
-- All of CSS as shapes you can edit in PowerPoint, Keynote export, or a WYSIWYG editor. `dekc pptx` hands a talk over with its plain boxes, images, SVGs, and text PowerPoint's own and its script in the notes, but a gradient, a shadow, or what a pseudo-element draws stays a picture
+
+Use PowerPoint or Keynote if you need a WYSIWYG editor or a Keynote file. `dekc pptx` hands a talk over with its plain boxes, images, SVGs, and text PowerPoint's own and its script in the notes, but a gradient, a shadow, or what a pseudo-element draws stays a picture.
 
 dek stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
 
