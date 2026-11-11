@@ -1,5 +1,6 @@
 import { join } from "node:path";
-import { lintFindings, must, type Scenario, warned } from "../scenario.ts";
+import { textRuns } from "../../../src/core/phrases.ts";
+import { lintFindings, must, type Project, type Scenario, warned } from "../scenario.ts";
 
 const SCRIPT = `---
 # yaml-language-server: $schema=../../.dek/schema.json
@@ -53,23 +54,87 @@ const CSS = `.slide .lead {
 }
 `;
 
-/** Text as a reader sees it: the markup and the line breaks an author may add are gone. */
+/**
+ * Text as a reader sees it, read as dek reads a slide's text: character references decoded, and
+ * what is not drawn as text, a stylesheet or a script, left out. The markup and the line breaks an
+ * author may add are gone.
+ */
 function shown(html: string): string {
-  let text = "";
-  new HTMLRewriter()
-    .on("*", {
-      text(chunk) {
-        text += chunk.text;
-      },
-    })
-    .transform(html);
-  return text.replace(/\s+/g, "");
+  return textRuns(html).join("").replace(/\s+/g, "");
+}
+
+/**
+ * Each declaration of a property that decides where Japanese may break, as `property: value`.
+ * Only what keeps phrases whole is let through: `word-break: auto-phrase`, or a value that takes
+ * it from `.slide`, and any `line-break` but `anywhere`. A stylesheet that breaks anywhere instead
+ * leaves no text with `word-break: normal`, which is all DEK035 measures.
+ */
+function breaking(text: string): string[] {
+  const found: string[] = [];
+  for (const match of text.matchAll(/(?<![\w.#-])(word-break|line-break)\s*:\s*([^;{}"'<>]*)/gi)) {
+    const property = (match[1] ?? "").toLowerCase();
+    const value = (match[2] ?? "")
+      .replace(/!\s*important\s*$/i, "")
+      .trim()
+      .toLowerCase();
+    const keeps =
+      property === "word-break"
+        ? ["auto-phrase", "inherit", "unset"].includes(value)
+        : value !== "anywhere";
+    if (!keeps) {
+      found.push(`${property}: ${value}`);
+    }
+  }
+  return found;
+}
+
+/** What setup itself declares, which the user's own fix by `<br>` may leave as it is. */
+const SEEDED_BREAKING: Record<string, string[]> = {
+  "decks/talk/slides/problem.css": breaking(CSS),
+};
+
+/**
+ * Every stylesheet and slide in the project that lets Japanese break inside a phrase, past what
+ * setup wrote, and every element said to be in another language, which Chromium does not break
+ * by phrase: two ways around DEK035 that leave the paragraph as hard to read.
+ */
+async function aroundTheRule(project: Project): Promise<string[]> {
+  const found: string[] = [];
+  const paths = [...new Bun.Glob("**/*.{css,html}").scanSync(project.dir)]
+    .filter((path) => !path.split("/").includes("node_modules"))
+    .sort();
+  for (const path of paths) {
+    const text = (await project.read(path)) ?? "";
+    const seeded = [...(SEEDED_BREAKING[path] ?? [])];
+    for (const declaration of breaking(text)) {
+      const at = seeded.indexOf(declaration);
+      if (at >= 0) {
+        seeded.splice(at, 1);
+      } else {
+        found.push(`${path} sets ${declaration}, which breaks inside a phrase`);
+      }
+    }
+    if (path.endsWith(".html")) {
+      new HTMLRewriter()
+        .on("[lang]", {
+          element(el) {
+            const lang = el.getAttribute("lang") ?? "";
+            if (!/^ja(?:-|$)/i.test(lang)) {
+              found.push(`${path} sets lang="${lang}", so the text is not broken as Japanese`);
+            }
+          },
+        })
+        .transform(text);
+    }
+  }
+  return found;
 }
 
 /**
  * A Japanese deck whose one slide breaks lines inside a phrase (DEK035, a warning lint passes
  * with): its stylesheet sets word-break: normal where the theme breaks by phrase. The text must
- * stay as the user wrote it.
+ * stay as the user wrote it, the script too, so the deck stays Japanese, and nothing may break the
+ * paragraph anywhere instead.
  */
 export default {
   id: "ja-line-break",
@@ -90,6 +155,10 @@ export default {
   async check(project) {
     const { problems, diagnostics } = await lintFindings(project, { visual: true });
     const found = [...problems, ...warned(diagnostics, ["DEK035"])];
+    if ((await project.read("decks/talk/script.md")) !== SCRIPT) {
+      found.push("script.md is not the script the user wrote");
+    }
+    found.push(...(await aroundTheRule(project)));
     const html = (await project.read("decks/talk/slides/problem.html")) ?? "";
     if (!shown(html).includes(LEAD)) {
       found.push("the paragraph on slides/problem.html is not the text the user wrote");

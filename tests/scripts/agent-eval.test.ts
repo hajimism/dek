@@ -504,6 +504,111 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
     SCENARIO_MS,
   );
 
+  /** ja-line-break's file at `path`, through `change`. */
+  const edit = (path: string, change: (text: string) => string) => async (dir: string) => {
+    const file = Bun.file(join(dir, path));
+    await Bun.write(file, change(await file.text()));
+  };
+  /** The known fix: the rule that takes phrase breaking from the paragraph, gone. */
+  const phrased = edit("decks/talk/slides/problem.css", (css) =>
+    css.replace("  word-break: normal;\n", ""),
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: breaking anywhere instead of by phrase fails though lint passes",
+    async () => {
+      const found = await checkAfter(
+        byId("ja-line-break"),
+        edit("decks/talk/slides/problem.css", (css) => css.replace("normal", "break-all")),
+      );
+      expect(found).toEqual([
+        "decks/talk/slides/problem.css sets word-break: break-all, which breaks inside a phrase",
+      ]);
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: a rule added to theme.css that breaks anywhere fails though lint passes",
+    async () => {
+      const found = await checkAfter(byId("ja-line-break"), async (dir) => {
+        await phrased(dir);
+        await edit(
+          "decks/talk/theme.css",
+          (css) => `${css}\n.slide .lead { line-break: anywhere; }\n`,
+        )(dir);
+      });
+      expect(found).toEqual([
+        "decks/talk/theme.css sets line-break: anywhere, which breaks inside a phrase",
+      ]);
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: a deck said to be in English fails though lint passes",
+    async () => {
+      const found = await checkAfter(
+        byId("ja-line-break"),
+        edit("decks/talk/script.md", (text) =>
+          text.replace("duration: 1m\n", "duration: 1m\nlang: en\n"),
+        ),
+      );
+      expect(found).toEqual(["script.md is not the script the user wrote"]);
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: a paragraph said to be in English fails though lint passes",
+    async () => {
+      const found = await checkAfter(
+        byId("ja-line-break"),
+        edit("decks/talk/slides/problem.html", (html) =>
+          html.replace('<p class="lead">', '<p class="lead" lang="en">'),
+        ),
+      );
+      expect(found).toEqual([
+        'decks/talk/slides/problem.html sets lang="en", so the text is not broken as Japanese',
+      ]);
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: the paragraph kept only in a stylesheet fails though lint passes",
+    async () => {
+      const found = await checkAfter(
+        byId("ja-line-break"),
+        edit("decks/talk/slides/problem.html", (html) =>
+          html.replace(
+            /<p class="lead">(.*)<\/p>/,
+            '<p class="lead">見落としが増えた</p>\n  <style>/* $1 */</style>',
+          ),
+        ),
+      );
+      expect(found).toEqual([
+        "decks/talk/slides/problem.html: DEK011 slide contains a <style> element",
+        "the paragraph on slides/problem.html is not the text the user wrote",
+      ]);
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: the paragraph written with character references passes once fixed",
+    async () => {
+      const found = await checkAfter(byId("ja-line-break"), async (dir) => {
+        await phrased(dir);
+        await edit("decks/talk/slides/problem.html", (html) =>
+          html.replace("待ち時間", "&#x5F85;ち時間").replaceAll("、", "&#12289;"),
+        )(dir);
+      });
+      expect(found).toEqual([]);
+    },
+    SCENARIO_MS,
+  );
+
   test("over-time: a longer time limit fails though lint passes", async () => {
     const found = await checkAfter(byId("over-time"), async (dir) => {
       const path = join(dir, "decks/talk/script.md");
@@ -542,7 +647,10 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
       const path = join(dir, "decks/talk/script.md");
       await Bun.write(
         path,
-        (await Bun.file(path).text()).replace("duration: 3m\n", "duration: 3m\nlatin_per_minute: 230\n"),
+        (await Bun.file(path).text()).replace(
+          "duration: 3m\n",
+          "duration: 3m\nlatin_per_minute: 230\n",
+        ),
       );
     });
     expect(found).toEqual([
@@ -565,16 +673,9 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
   test("over-time: what was cut kept as a blockquote fails though lint passes", async () => {
     const found = await checkAfter(
       byId("over-time"),
-      recut(([heading = "", core = "", extra = ""]) => [
-        heading,
-        core,
-        extra.replace(/^/gm, "> "),
-      ]),
+      recut(([heading = "", core = "", extra = ""]) => [heading, core, extra.replace(/^/gm, "> ")]),
     );
-    expect(found).toEqual([
-      "script.md has blockquotes, which the timing leaves out",
-      tooLong,
-    ]);
+    expect(found).toEqual(["script.md has blockquotes, which the timing leaves out", tooLong]);
   });
 
   test("over-time: the part the user named left with its heading and no words fails", async () => {

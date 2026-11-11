@@ -185,9 +185,7 @@ export default {
     if (!kept) {
       found.push(`script.md no longer has the section ${KEPT.slug}, "${KEPT.heading}"`);
     } else if (!speechText(kept).replace(/\s+/g, " ").toLowerCase().includes(KEPT_PHRASE)) {
-      found.push(
-        `the section ${KEPT.slug}, "${KEPT.heading}", no longer says "${KEPT_PHRASE}"`,
-      );
+      found.push(`the section ${KEPT.slug}, "${KEPT.heading}", no longer says "${KEPT_PHRASE}"`);
     }
     return found;
   },
