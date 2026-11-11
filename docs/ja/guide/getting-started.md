@@ -28,7 +28,7 @@ bunx @hajimism/dek init my-talks --deck 2026-04-vite
 
 ```
 installed:
-  bun add -d @hajimism/dek@0.6.2
+  bun add -d --ignore-scripts @hajimism/dek@<version>
 
 next:
   cd my-talks/decks/2026-04-vite
@@ -36,7 +36,9 @@ next:
   bunx dekc
 ```
 
-`init` は、いま動かした版の dek をプロジェクトに入れます。以降の `bunx dekc` はその dek を動かします。固定されるのは CLI のバージョンだけで、デッキの HTML が `node_modules` を見ることはありません。`--browser` を付けると Playwright と Chromium も入り、`--visual`、`dekc shot`、`dekc pdf` が使えます。付けなければ、`init` は最後にその入れ方を表示します。何も入れずにプロジェクトだけを書くなら `--no-install` です。
+`init` は、いま動かした版の dek をプロジェクトに入れます。以降の `bunx dekc` はその dek を動かします。固定されるのは CLI のバージョンだけで、デッキの HTML が `node_modules` を見ることはありません。`--browser` を付けると Playwright と Chromium も入り、`--visual`、`dekc shot`、`dekc pdf` が使えます。付けなければ、`init` は最後にその入れ方を表示します。dek を入れずにプロジェクトだけを書くなら `--no-install` です。
+
+`init` は bun を `--ignore-scripts` 付きで動かすので、`package.json` のスクリプトは走りません。dek を入れる先も、`init` が書いた `package.json` だけです。もともと `package.json` があったフォルダでは、インストールをあなたに任せ、そう表示します。Chromium のダウンロードが途中で止まったら、もう一度 `init --browser` を実行すれば続きから入ります。
 
 オフラインのときや、`bunfig.toml` の `minimumReleaseAge` が公開から日の浅い版を拒んだときなど、インストールが失敗してもプロジェクトは書いたまま残ります。`init` は `dek: not installed` と理由を表示し、`next` の先頭に `cd my-talks` と `bun add -d @hajimism/dek` が入ります。上から順に実行してください。
 

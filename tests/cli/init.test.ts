@@ -12,6 +12,7 @@ import { loadConfig } from "../../src/core/config.ts";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { PLAYWRIGHT_INSTALL } from "../../src/core/playwright.ts";
+import { OverrunError } from "../../src/core/spawn.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
@@ -340,7 +341,14 @@ describe("initCommand", () => {
 });
 
 /** An install that records what it was asked to run, and lays down what a real one would leave. */
-function fakeInstall(options: { fail?: string; throws?: string } = {}): {
+function fakeInstall(
+  options: {
+    fail?: string;
+    throws?: string;
+    /** Fail only the runs this picks, with this stderr. */
+    failWhen?: { pick: (argv: string[]) => boolean; stderr: string };
+  } = {},
+): {
   run: InstallRun;
   ran: { argv: string[]; cwd: string }[];
 } {
@@ -352,6 +360,9 @@ function fakeInstall(options: { fail?: string; throws?: string } = {}): {
     }
     if (options.fail) {
       return { exitCode: 1, stderr: `error: ${options.fail}\n` };
+    }
+    if (options.failWhen?.pick(argv)) {
+      return { exitCode: 1, stderr: options.failWhen.stderr };
     }
     const added = argv[1] === "add" ? argv.at(-1) : undefined;
     if (added?.startsWith("@hajimism/dek@")) {
@@ -367,6 +378,9 @@ function fakeInstall(options: { fail?: string; throws?: string } = {}): {
   return { run, ran };
 }
 
+const DEK_ADD = `bun add -d --ignore-scripts @hajimism/dek@${pkg.version}`;
+const isChromium = (argv: string[]): boolean => argv.includes("chromium");
+
 describe("initProject", () => {
   test("installs the dek that is running into the project, so next is only the talk", async () => {
     await withTempDir(async (dir) => {
@@ -374,9 +388,18 @@ describe("initProject", () => {
       const result = await initProject({ cwd: dir, dir: "my-talks", deck: "demo", run });
       const root = join(dir, "my-talks");
       expect(ran).toEqual([
-        { argv: [process.execPath, "add", "--dev", `@hajimism/dek@${pkg.version}`], cwd: root },
+        {
+          argv: [
+            process.execPath,
+            "add",
+            "--dev",
+            "--ignore-scripts",
+            `@hajimism/dek@${pkg.version}`,
+          ],
+          cwd: root,
+        },
       ]);
-      expect(result.installed).toEqual([`bun add -d @hajimism/dek@${pkg.version}`]);
+      expect(result.installed).toEqual([DEK_ADD]);
       expect(result.next).toEqual(["cd my-talks/decks/demo", "$EDITOR script.md", "bunx dekc"]);
       expect(result.notInstalled).toBeUndefined();
       expect(result.playwright).toBe(PLAYWRIGHT_INSTALL);
@@ -443,7 +466,7 @@ describe("initProject", () => {
         expect(result.notInstalled).toEqual([
           {
             install: "dek",
-            reason: expect.stringContaining(`bun add -d @hajimism/dek@${pkg.version} failed`),
+            reason: expect.stringContaining(`${DEK_ADD} failed`),
           },
         ]);
         expect(result.next).toContain("bun add -d @hajimism/dek");
@@ -463,14 +486,14 @@ describe("initProject", () => {
       const result = await initProject({ cwd: dir, dir: "my-talks", browser: true, run });
       const root = join(dir, "my-talks");
       expect(ran.map((step) => step.argv.slice(1))).toEqual([
-        ["add", "--dev", `@hajimism/dek@${pkg.version}`],
-        ["add", "--dev", "playwright"],
+        ["add", "--dev", "--ignore-scripts", `@hajimism/dek@${pkg.version}`],
+        ["add", "--dev", "--ignore-scripts", "playwright"],
         ["x", "--bun", "playwright", "install", "chromium"],
       ]);
       expect(ran.every((step) => step.cwd === root)).toBe(true);
       expect(result.installed).toEqual([
-        `bun add -d @hajimism/dek@${pkg.version}`,
-        "bun add -d playwright",
+        DEK_ADD,
+        "bun add -d --ignore-scripts playwright",
         "bunx --bun playwright install chromium",
       ]);
       expect(result.playwright).toBeUndefined();
@@ -484,7 +507,7 @@ describe("initProject", () => {
       expect(ran).toHaveLength(1);
       expect(result.notInstalled?.map((entry) => entry.install)).toEqual(["dek", "browser"]);
       expect(outputOf("init").notes?.(result, false)).toBe(
-        `dek: not installed (bun add -d @hajimism/dek@${pkg.version} failed: error: offline)\nbrowser: not installed (dek is not installed in the project)`,
+        `dek: not installed (${DEK_ADD} failed: offline)\nbrowser: not installed (dek is not installed in the project)`,
       );
       expect(result.playwright).toBe(PLAYWRIGHT_INSTALL);
     });
@@ -502,6 +525,110 @@ describe("initProject", () => {
       });
       await expect(attempt).rejects.toThrow("--browser needs dek installed in the project");
       expect(existsSync(target)).toBe(false);
+    });
+  });
+
+  // init runs bun in a folder that may be someone else's: their package.json's scripts must not run,
+  // and a package.json init did not write is not one init installs into.
+  test("installs into no package.json it did not write, and runs no install scripts", async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(
+        join(dir, "package.json"),
+        '{ "scripts": { "postinstall": "touch pwned" } }\n',
+      );
+      const { run, ran } = fakeInstall();
+      const result = await initProject({ cwd: dir, deck: "demo", run });
+      expect(ran).toEqual([]);
+      expect(result.notInstalled).toEqual([
+        {
+          install: "dek",
+          reason: "package.json was already here, and init installs only into one it wrote",
+        },
+      ]);
+      expect(result.next).toContain("bun add -d @hajimism/dek");
+      // One init wrote, its install not done yet, is init's to install into.
+      await withTempDir(async (fresh) => {
+        await initProject({ cwd: fresh, install: false, run });
+        const again = await initProject({ cwd: fresh, run });
+        expect(again.installed).toEqual([DEK_ADD]);
+      });
+    });
+  });
+
+  test("gives bun's first error as the reason, without its colors or its prefix", async () => {
+    await withTempDir(async (dir) => {
+      const stderr = [
+        `\x1b[31merror\x1b[0m\x1b[2m: \x1b[0m\x1b[1mNo version matching "${pkg.version}" found for specifier "@hajimism/dek"\x1b[0m \x1b[2m(blocked by minimum-release-age: 604800 seconds)\x1b[0m`,
+        `\x1b[31merror\x1b[0m: @hajimism/dek@${pkg.version} failed to resolve`,
+        "",
+      ].join("\n");
+      const install = fakeInstall({ failWhen: { pick: () => true, stderr } });
+      const result = await initProject({ cwd: dir, dir: "my-talks", run: install.run });
+      expect(result.notInstalled?.[0]?.reason).toBe(
+        `${DEK_ADD} failed: No version matching "${pkg.version}" found for specifier "@hajimism/dek" (blocked by minimum-release-age: 604800 seconds)`,
+      );
+    });
+  });
+
+  test("says an install that ran out of time did so", async () => {
+    await withTempDir(async (dir) => {
+      const run: InstallRun = async () => {
+        throw new OverrunError("bun did not finish");
+      };
+      const result = await initProject({ cwd: dir, dir: "my-talks", run });
+      expect(result.notInstalled?.[0]?.reason).toBe(`${DEK_ADD} did not finish within 10 minutes`);
+    });
+  });
+
+  test("runs Chromium's install again until it is done, and names it while it is not", async () => {
+    await withTempDir(async (dir) => {
+      const failing = fakeInstall({
+        failWhen: { pick: isChromium, stderr: "error: download failed\n" },
+      });
+      const first = await initProject({
+        cwd: dir,
+        dir: "my-talks",
+        browser: true,
+        run: failing.run,
+      });
+      expect(first.notInstalled).toEqual([
+        {
+          install: "browser",
+          reason: "bunx --bun playwright install chromium failed: download failed",
+        },
+      ]);
+      expect(first.playwright).toBe(PLAYWRIGHT_INSTALL);
+      const { run, ran } = fakeInstall();
+      const second = await initProject({ cwd: dir, dir: "my-talks", browser: true, run });
+      expect(ran.map((step) => step.argv.slice(1))).toEqual([
+        ["x", "--bun", "playwright", "install", "chromium"],
+      ]);
+      expect(second.installed).toEqual(["bunx --bun playwright install chromium"]);
+      expect(second.playwright).toBeUndefined();
+    });
+  });
+
+  test("installs no browser where the dek that runs would not find it", async () => {
+    await withTempDir(async (dir) => {
+      await mkdir(join(dir, "node_modules", ".bin"), { recursive: true });
+      await writeFile(join(dir, "node_modules", ".bin", "dekc"), "");
+      const { run, ran } = fakeInstall();
+      const result = await initProject({ cwd: dir, dir: "talks", browser: true, run });
+      expect(ran).toEqual([]);
+      expect(result.notInstalled).toEqual([
+        {
+          install: "browser",
+          reason: `dek runs from ${dir}, and finds Playwright beside itself: install it there`,
+        },
+      ]);
+      expect(result.playwright).toBe(PLAYWRIGHT_INSTALL);
+    });
+  });
+
+  test("changes into the project before adding a deck, whether or not it installed", async () => {
+    await withTempDir(async (dir) => {
+      const result = await initProject({ cwd: dir, dir: "my-talks", run: fakeInstall().run });
+      expect(result.next).toEqual(["cd my-talks", "bunx dekc new <name>"]);
     });
   });
 });

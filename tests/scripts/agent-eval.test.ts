@@ -470,7 +470,10 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
 
   test("start-from-nothing: a project whose deck has another name fails though lint passes", async () => {
     const found = await checkAfter(byId("start-from-nothing"), async (dir) => {
-      await must(openProject(dir).dekc(["init", ".", "--deck", "talk"]), "dekc init");
+      await must(
+        openProject(dir).dekc(["init", ".", "--deck", "talk", "--no-install"]),
+        "dekc init",
+      );
     });
     expect(found).toEqual(["there is no decks/lt/script.md"]);
   });

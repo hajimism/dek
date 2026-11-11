@@ -143,7 +143,7 @@ export const RESULT_FIELDS = {
     installed: z
       .array(z.string())
       .optional()
-      .describe("The installs init ran in the project, as a person would type them."),
+      .describe("The commands init ran in the project to install dek, and the browser."),
     notInstalled: z
       .array(
         z.strictObject({
@@ -152,7 +152,9 @@ export const RESULT_FIELDS = {
         }),
       )
       .optional()
-      .describe("Installs that failed or could not run; `next` then names the install to run."),
+      .describe(
+        "Installs that failed or did not run; `next`, or `playwright` for the browser, then names the install to run.",
+      ),
     playwright: z.string().optional().describe("How to install Playwright, when it is missing."),
     missingTokens: z.array(z.string()).optional(),
   }),

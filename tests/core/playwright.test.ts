@@ -151,7 +151,7 @@ describe("resolvePlaywrightModule", () => {
 describe("playwrightMissingError", () => {
   test("installs the module before the browser", () => {
     expect(playwrightMissingError().hint).toBe(
-      "bun add -d playwright && bunx playwright install chromium",
+      "bun add -d playwright && bunx --bun playwright install chromium",
     );
   });
 });

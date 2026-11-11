@@ -293,6 +293,7 @@ export function nextSteps(cwd: string, root: string, deckDir?: string): string[]
     steps.push(INSTALL_DEK);
   }
   if (!deckDir) {
+    go(root);
     return [...steps, "bunx dekc new <name>"];
   }
   go(deckDir);
@@ -301,7 +302,14 @@ export function nextSteps(cwd: string, root: string, deckDir?: string): string[]
 
 /** Whether `bunx dekc` in the project runs this dek: bunx looks in node_modules/.bin up the tree. */
 export function hasLocalDek(root: string): boolean {
-  return inNodeModules(root, ".bin", "dekc");
+  return dekHome(root) !== undefined;
+}
+
+/** The directory whose node_modules holds the dek `bunx dekc` runs in the project: it or one above. */
+export function dekHome(root: string): string | undefined {
+  return walkUp(root, (dir) =>
+    existsSync(join(dir, "node_modules", ".bin", "dekc")) ? dir : undefined,
+  );
 }
 
 /**

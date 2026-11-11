@@ -28,7 +28,7 @@ bunx @hajimism/dek init my-talks --deck 2026-04-vite
 
 ```
 installed:
-  bun add -d @hajimism/dek@0.6.2
+  bun add -d --ignore-scripts @hajimism/dek@<version>
 
 next:
   cd my-talks/decks/2026-04-vite
@@ -36,7 +36,9 @@ next:
   bunx dekc
 ```
 
-`init` installs dek into the project, pinned to the version you just ran, and from then on `bunx dekc` runs that copy. It only fixes the CLI version; deck HTML never looks inside `node_modules`. Add `--browser` to install Playwright and Chromium as well, for `--visual`, `dekc shot`, and `dekc pdf`; without it, `init` ends with the command that installs them. Pass `--no-install` to write the project and install nothing.
+`init` installs dek into the project, pinned to the version you just ran, and from then on `bunx dekc` runs that copy. It only fixes the CLI version; deck HTML never looks inside `node_modules`. Add `--browser` to install Playwright and Chromium as well, for `--visual`, `dekc shot`, and `dekc pdf`; without it, `init` ends with the command that installs them. Pass `--no-install` to write the project without installing dek.
+
+`init` runs bun with `--ignore-scripts`, so no `package.json` scripts run, and it installs dek only into the `package.json` it wrote: in a folder that already had one, it leaves that install to you and says so. If the Chromium download is cut short, run `init --browser` again; it picks up where it stopped.
 
 If the install fails, say you are offline, or a `minimumReleaseAge` in your `bunfig.toml` refuses a version published days ago, the project stays as written. `init` prints `dek: not installed` with the reason, and `next` starts with `cd my-talks` and `bun add -d @hajimism/dek`. Run the steps in order.
 

@@ -268,7 +268,7 @@ export function playwrightReady(runner?: PlaywrightRunner): boolean {
 }
 
 /** The module comes first; `playwright install` alone only fetches browsers. */
-export const PLAYWRIGHT_INSTALL = "bun add -d playwright && bunx playwright install chromium";
+export const PLAYWRIGHT_INSTALL = "bun add -d playwright && bunx --bun playwright install chromium";
 
 export function playwrightMissingError(): DekError {
   return new DekError("Playwright is not installed", { hint: PLAYWRIGHT_INSTALL });
