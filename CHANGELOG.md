@@ -2,6 +2,30 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.6.3](https://github.com/hajimism/dek/compare/v0.6.2...v0.6.3) (2026-11-11)
+
+
+### Features
+
+* have dekc init install the running dek into the project, and Playwright with --browser ([5a857c6](https://github.com/hajimism/dek/commit/5a857c6e0bb08d3f159a94f3c208e61983b45fb4))
+* have dekc init install the running dek into the project, and Playwright with --browser ([d9a6bcc](https://github.com/hajimism/dek/commit/d9a6bcc4182062fe53c873b243196acfbf1ff028))
+
+
+### Bug Fixes
+
+* have dekc init run no one's scripts, retry Chromium, and name bun's first error ([1e56ae5](https://github.com/hajimism/dek/commit/1e56ae51da4ed70000e5684235390d728b28093e))
+* name the word-break declaration DEK035 says to delete, not the file ([366038c](https://github.com/hajimism/dek/commit/366038c4eca11458e0cd1a8c55d2ab522c87a7f9))
+* name the word-break declaration DEK035 says to delete, not the file ([5c5a943](https://github.com/hajimism/dek/commit/5c5a943ced5ed3557fd57174060a032142de44d7))
+* **sample:** count what dek 0.6.3 has, and line annotate's chevrons up with their lanes ([#84](https://github.com/hajimism/dek/issues/84)) ([d521a42](https://github.com/hajimism/dek/commit/d521a421b0b11a2039f4f873f0bd1442c3bdc768))
+
+
+### Documentation
+
+* compare with Slidev and Marp as they are now, and lead with checks over outputs ([1afdc91](https://github.com/hajimism/dek/commit/1afdc9154cb7377976367dc7811a4d6ceaf31ad8))
+* compare with Slidev and Marp as they are now, and lead with checks over outputs ([0219fcf](https://github.com/hajimism/dek/commit/0219fcf9fe7946743e3ff3954c75a643839a8578))
+* **sample:** check the sample's Japanese with dek-words and a list drawn from yomiyasu ([1ab1d0c](https://github.com/hajimism/dek/commit/1ab1d0c0d5f92f3e6d7e20ffd784869af58d8d83))
+* **sample:** check the sample's Japanese with dek-words and a list drawn from yomiyasu ([233724c](https://github.com/hajimism/dek/commit/233724c1d9169b0cd6e36750e41179651c995a92))
+
 ## [0.6.2](https://github.com/hajimism/dek/compare/v0.6.1...v0.6.2) (2026-11-11)
 
 
