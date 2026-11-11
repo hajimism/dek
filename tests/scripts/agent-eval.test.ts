@@ -440,6 +440,8 @@ async function checkAfter(scenario: Scenario, wrong: (dir: string) => Promise<vo
 }
 
 describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unlessOptedIn}`, () => {
+  /** What over-time's check says of the script as set up, which runs long. */
+  const tooLong = "script.md reads in about 4:53 at dek's default rate, too far from 3m";
   const byId = (id: string): Scenario =>
     scenarios.find((scenario) => scenario.id === id) as Scenario;
 
@@ -507,7 +509,7 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
       const path = join(dir, "decks/talk/script.md");
       await Bun.write(path, (await Bun.file(path).text()).replace("duration: 3m", "duration: 5m"));
     });
-    expect(found).toEqual(["script.md no longer has duration: 3m"]);
+    expect(found).toEqual(["script.md no longer has duration: 3m, but 5m", tooLong]);
   });
 
   test("over-time: cutting the part the user named fails though lint passes", async () => {
@@ -520,6 +522,81 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
     expect(found).toEqual([
       'script.md no longer has the section examples, "Start with an example"',
     ]);
+  });
+
+  /** over-time's script with each section's paragraphs, heading first, through `keep`. */
+  const recut = (keep: (paragraphs: string[], slug: string) => string[]) => async (dir: string) => {
+    const path = join(dir, "decks/talk/script.md");
+    const [head = "", ...sections] = (await Bun.file(path).text()).split(/^(?=## )/m);
+    const kept = sections.map((section) => {
+      const paragraphs = section.trimEnd().split("\n\n");
+      return keep(paragraphs, paragraphs[0]?.match(/\{#([\w-]+)\}/)?.[1] ?? "").join("\n\n");
+    });
+    await Bun.write(path, `${head}${kept.join("\n\n")}\n`);
+  };
+  /** Each section's heading and what it must say, as the known solution cuts it. */
+  const cores = recut((paragraphs) => paragraphs.slice(0, 2));
+
+  test("over-time: a faster speaking rate in the frontmatter fails though lint passes", async () => {
+    const found = await checkAfter(byId("over-time"), async (dir) => {
+      const path = join(dir, "decks/talk/script.md");
+      await Bun.write(
+        path,
+        (await Bun.file(path).text()).replace("duration: 3m\n", "duration: 3m\nlatin_per_minute: 230\n"),
+      );
+    });
+    expect(found).toEqual([
+      "script.md sets latin_per_minute, which changes the rate the talk is timed at",
+      tooLong,
+    ]);
+  });
+
+  test("over-time: a speaking rate in dek.toml fails", async () => {
+    const found = await checkAfter(byId("over-time"), async (dir) => {
+      const path = join(dir, "dek.toml");
+      await Bun.write(path, `latin_per_minute = 230\n${await Bun.file(path).text()}`);
+    });
+    expect(found).toContain(
+      "dek.toml sets latin_per_minute, which changes the rate the talk is timed at",
+    );
+    expect(found).toContain(tooLong);
+  });
+
+  test("over-time: what was cut kept as a blockquote fails though lint passes", async () => {
+    const found = await checkAfter(
+      byId("over-time"),
+      recut(([heading = "", core = "", extra = ""]) => [
+        heading,
+        core,
+        extra.replace(/^/gm, "> "),
+      ]),
+    );
+    expect(found).toEqual([
+      "script.md has blockquotes, which the timing leaves out",
+      tooLong,
+    ]);
+  });
+
+  test("over-time: the part the user named left with its heading and no words fails", async () => {
+    const found = await checkAfter(
+      byId("over-time"),
+      recut((paragraphs, slug) => (slug === "examples" ? paragraphs.slice(0, 1) : paragraphs)),
+    );
+    expect(found).toEqual([
+      'the section examples, "Start with an example", no longer says "start every page with an example"',
+    ]);
+  });
+
+  test("over-time: the cut script passes with a comment on its time limit", async () => {
+    const found = await checkAfter(byId("over-time"), async (dir) => {
+      await cores(dir);
+      const path = join(dir, "decks/talk/script.md");
+      await Bun.write(
+        path,
+        (await Bun.file(path).text()).replace("duration: 3m\n", "duration: 3m # the slot I have\n"),
+      );
+    });
+    expect(found).toEqual([]);
   });
 
   test("start-from-nothing: a project whose deck has another name fails though lint passes", async () => {
