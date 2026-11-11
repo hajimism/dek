@@ -2,6 +2,13 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.6.2](https://github.com/hajimism/dek/compare/v0.6.1...v0.6.2) (2026-11-11)
+
+
+### Features
+
+* break Japanese by phrase in browsers without auto-phrase ([#77](https://github.com/hajimism/dek/issues/77)) ([e40780e](https://github.com/hajimism/dek/commit/e40780ef1c2b119b37348a40959225101273a41e))
+
 ## [0.6.1](https://github.com/hajimism/dek/compare/v0.6.0...v0.6.1) (2026-11-09)
 
 
