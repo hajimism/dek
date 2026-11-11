@@ -9,7 +9,8 @@
 
 .total {
   grid-column: 1 / 3;
-  grid-row: 1 / 3;
+  grid-row: 1;
+  align-self: start;
   display: flex;
   flex-direction: column;
   padding-top: calc(var(--gap) * 0.3);
@@ -107,13 +108,15 @@
   outline-offset: calc(var(--hair) * -1);
 }
 
+/* The key sits under the total, in the column the lists leave empty, so the lists keep the stage's height. */
 .legend {
-  grid-column: 3 / -1;
-  grid-row: 2;
-  display: flex;
+  grid-column: 1 / 3;
+  grid-row: 1;
+  align-self: end;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.6em;
-  margin-top: calc(var(--gap) * 0.6);
+  gap: 0.5em 0.6em;
   font-size: var(--size-caption);
   color: var(--muted);
 }
@@ -126,7 +129,6 @@
 }
 
 .key.is-warn {
-  margin-left: 1.4em;
   background: transparent;
   outline: var(--hair) solid var(--fg);
 }
