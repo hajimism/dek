@@ -50,6 +50,15 @@ export type TranscriptReport = {
   result?: string;
 };
 
+/** What `dekc lint --json` from the project root still finds once the agent has stopped. */
+export type Left = {
+  errors: number;
+  /** Warnings never fail a run, so this is the only place a warning the agent ignored shows. */
+  warnings: number;
+  /** Each rule's diagnostics, errors and warnings both. */
+  byRule: Record<string, number>;
+};
+
 export type RunReport = {
   scenario: string;
   run: number;
@@ -59,6 +68,8 @@ export type RunReport = {
   wallMs: number;
   agent: { exitCode: number | null; timedOut: boolean };
   dekc: DekcReport;
+  /** Measured after the check, with --visual when the scenario needs a browser; 0 if skipped. */
+  left: Left;
   transcript?: TranscriptReport;
   /** Where the run's transcript, dekc log, and final project are kept. */
   dir: string;
@@ -101,6 +112,38 @@ export function dekcReport(invocations: Invocation[]): DekcReport {
     ),
     hinted: hintedCommands(invocations),
   };
+}
+
+/** How many runs repeated an earlier one with the same answer. */
+export function repeatCount(dekc: DekcReport): number {
+  return dekc.repeated.reduce((sum, entry) => sum + entry.times - 1, 0);
+}
+
+/**
+ * What a `dekc lint --json` run left: its diagnostics counted by severity and rule. A lint that
+ * printed no list of diagnostics could not look, as in a directory that is no dek project, and
+ * that counts as one error under no rule.
+ */
+export function leftover(stdout: string): Left {
+  let envelope: Envelope;
+  try {
+    envelope = JSON.parse(stdout) as Envelope;
+  } catch {
+    return { errors: 1, warnings: 0, byRule: {} };
+  }
+  if (!Array.isArray(envelope?.diagnostics)) {
+    return { errors: 1, warnings: 0, byRule: {} };
+  }
+  const left: Left = { errors: 0, warnings: 0, byRule: {} };
+  for (const { id, severity } of envelope.diagnostics) {
+    if (severity === "error") {
+      left.errors += 1;
+    } else {
+      left.warnings += 1;
+    }
+    left.byRule[id] = (left.byRule[id] ?? 0) + 1;
+  }
+  return left;
 }
 
 function repeats(invocations: Invocation[]): DekcReport["repeated"] {
@@ -270,6 +313,17 @@ export function transcriptReport(text: string): TranscriptReport | undefined {
   };
 }
 
+const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+function leftLine(left: Left): string {
+  const rules = Object.entries(left.byRule)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, count]) => `${id} ×${count}`);
+  return `Left after the run: ${plural(left.errors, "error")}, ${plural(left.warnings, "warning")}${
+    rules.length > 0 ? ` (${rules.join(", ")})` : ""
+  }.`;
+}
+
 const seconds = (ms: number): string => `${Math.round(ms / 1000)}s`;
 
 const quoted = (text: string): string =>
@@ -292,9 +346,10 @@ export function markdown(report: EvalReport): string {
       `${passed}/${ran.length}${skipped > 0 ? `, ${skipped} skipped` : ""}`,
       each((run) => seconds(run.wallMs)),
       each((run) => run.dekc.invocations),
-      each((run) => run.dekc.repeated.reduce((sum, entry) => sum + entry.times - 1, 0)),
+      each((run) => repeatCount(run.dekc)),
       each((run) => run.dekc.unhinted.length),
       each((run) => (run.dekc.hinted.some((entry) => entry.ran) ? "yes" : "no")),
+      each((run) => run.left.warnings),
     ];
     return `| ${cells.join(" | ")} |`;
   });
@@ -303,8 +358,8 @@ export function markdown(report: EvalReport): string {
     "",
     `Agent: \`${report.agent}\`, started ${report.startedAt}.`,
     "",
-    "| scenario | passed | time | dekc runs | repeats | errors without a hint | ran a hinted command |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| scenario | passed | time | dekc runs | repeats | errors without a hint | ran a hinted command | warnings left |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ...rows,
     ...report.scenarios.flatMap(({ id, prompt, runs }) => [
       "",
@@ -337,6 +392,8 @@ function runSection(run: RunReport): string[] {
     `${seconds(run.wallMs)}, ${dekc.invocations} dekc runs; the agent ${agent}${
       transcript?.turns !== undefined ? ` after ${transcript.turns} turns` : ""
     }${transcript?.costUsd !== undefined ? ` for $${transcript.costUsd.toFixed(2)}` : ""}. Files: ${run.dir}`,
+    "",
+    leftLine(run.left),
     ...list("Still wrong", run.reasons),
     ...list(
       "dekc runs",

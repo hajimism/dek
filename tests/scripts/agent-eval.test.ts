@@ -1,10 +1,21 @@
 import { describe, expect, test } from "bun:test";
+import { readdirSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { dekcReport, type Invocation, transcriptReport } from "../../evals/agent/report.ts";
+import { recordName, summarize } from "../../evals/agent/record.ts";
+import {
+  dekcReport,
+  type EvalReport,
+  type Invocation,
+  leftover,
+  markdown,
+  type RunReport,
+  transcriptReport,
+} from "../../evals/agent/report.ts";
 import { quote, runScenario } from "../../evals/agent/run.ts";
 import { openProject, type Scenario } from "../../evals/agent/scenario.ts";
 import { scenarios } from "../../evals/agent/scenarios.ts";
+import pkg from "../../package.json";
 import { playwrightResolved } from "../../src/core/playwright.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { repoRoot } from "../helpers/paths.ts";
@@ -128,6 +139,148 @@ describe("dekcReport", () => {
   });
 });
 
+describe("leftover", () => {
+  test("counts the errors and warnings a --json lint left, by rule", () => {
+    const envelope = {
+      ok: false,
+      error: { message: "lint found 1 error" },
+      diagnostics: [
+        { id: "DEK035", severity: "warning", message: "breaks inside a phrase" },
+        { id: "DEK001", severity: "error", message: "missing slide" },
+        { id: "DEK035", severity: "warning", message: "breaks inside a phrase" },
+      ],
+    };
+    expect(leftover(JSON.stringify(envelope))).toEqual({
+      errors: 1,
+      warnings: 2,
+      byRule: { DEK001: 1, DEK035: 2 },
+    });
+  });
+
+  test("counts nothing left on a clean lint", () => {
+    expect(leftover('{"ok":true,"diagnostics":[]}\n')).toEqual({
+      errors: 0,
+      warnings: 0,
+      byRule: {},
+    });
+  });
+
+  test("counts a lint that could not run as one error, under no rule", () => {
+    const envelope = { ok: false, error: { message: "not a dek project" } };
+    expect(leftover(JSON.stringify(envelope))).toEqual({ errors: 1, warnings: 0, byRule: {} });
+    expect(leftover("Segmentation fault\n")).toEqual({ errors: 1, warnings: 0, byRule: {} });
+  });
+});
+
+/** A run as the runner reports it, with what each test sets. */
+const runReport = (over: Partial<RunReport> = {}): RunReport => ({
+  scenario: "overflow",
+  run: 1,
+  outcome: "passed",
+  reasons: [],
+  wallMs: 60_000,
+  agent: { exitCode: 0, timedOut: false },
+  dekc: dekcReport([]),
+  left: { errors: 0, warnings: 0, byRule: {} },
+  dir: "/tmp/dek-eval/overflow/1",
+  ...over,
+});
+
+const evalReport = (runs: RunReport[]): EvalReport => ({
+  agent: "claude -p",
+  startedAt: "2026-11-11T09:30:00.000Z",
+  scenarios: [{ id: "overflow", prompt: "Fix the timing slide.", runs }],
+});
+
+describe("markdown", () => {
+  test("shows the warnings each run left, with the rules that left them", () => {
+    const text = markdown(
+      evalReport([
+        runReport({ left: { errors: 0, warnings: 2, byRule: { DEK035: 1, DEK036: 1 } } }),
+        runReport({ run: 2, left: { errors: 1, warnings: 0, byRule: { DEK001: 1 } } }),
+      ]),
+    );
+    expect(text).toContain("| warnings left |");
+    expect(text).toMatch(/^\| overflow \| 2\/2 \|.*\| 2 \/ 0 \|$/m);
+    expect(text).toContain("Left after the run: 0 errors, 2 warnings (DEK035 ×1, DEK036 ×1).");
+    expect(text).toContain("Left after the run: 1 error, 0 warnings (DEK001 ×1).");
+  });
+});
+
+describe("summarize", () => {
+  const repeated = (times: number): Invocation[] =>
+    Array.from({ length: times }, () => run(["lint"], { stdout: "x: DEK036 warning: o\n" }));
+
+  test("keeps medians and totals per scenario, and no paths, transcripts, or agent text", () => {
+    const report = evalReport([
+      runReport({
+        wallMs: 30_000,
+        dekc: dekcReport([...repeated(2), run(["build"])]),
+        left: { errors: 0, warnings: 1, byRule: { DEK035: 1 } },
+        transcript: { bash: ["cat /tmp/secret"], denied: 0, result: "All done, see /tmp" },
+      }),
+      runReport({
+        run: 2,
+        outcome: "failed",
+        reasons: ["/tmp/dek-eval/x is wrong"],
+        wallMs: 90_000,
+        dekc: dekcReport([
+          run(["lint"], { exitCode: 1, stderr: "error: deck not found\n" }),
+          run(["lint"], { exitCode: 2, stderr: "error: something else\n" }),
+        ]),
+        left: { errors: 1, warnings: 3, byRule: { DEK001: 1, DEK035: 3 } },
+      }),
+      runReport({ run: 3, wallMs: 60_000, dekc: dekcReport(repeated(4)) }),
+      runReport({ run: 4, outcome: "skipped", reasons: ["no Playwright"], wallMs: 0 }),
+    ]);
+    const summary = summarize(report, "0.6.2");
+    expect(summary).toEqual({
+      dek: "0.6.2",
+      date: "2026-11-11",
+      scenarios: [
+        {
+          id: "overflow",
+          runs: 3,
+          passed: 2,
+          skipped: 1,
+          medianWallMs: 60_000,
+          medianDekcRuns: 3,
+          medianRepeats: 1,
+          unhintedErrors: 2,
+          medianWarningsLeft: 1,
+        },
+      ],
+    });
+    expect(JSON.stringify(summary)).not.toContain("/tmp");
+  });
+
+  test("takes the mean of the middle two over an even count, and null over no runs", () => {
+    const summary = summarize(
+      evalReport([
+        runReport({ wallMs: 10_000 }),
+        runReport({ run: 2, wallMs: 25_000 }),
+        runReport({ run: 3, outcome: "skipped", wallMs: 0 }),
+      ]),
+      "0.6.2",
+    );
+    expect(summary.scenarios[0]?.medianWallMs).toBe(17_500);
+    const none = summarize(evalReport([runReport({ outcome: "skipped" })]), "0.6.2");
+    expect(none.scenarios[0]).toMatchObject({
+      runs: 0,
+      skipped: 1,
+      medianWallMs: null,
+      medianWarningsLeft: null,
+    });
+  });
+
+  test("names the record by its date and dek version, and never overwrites one", () => {
+    const summary = summarize(evalReport([runReport()]), "0.6.2");
+    expect(recordName(summary, () => false)).toBe("2026-11-11-v0.6.2.json");
+    const taken = new Set(["2026-11-11-v0.6.2.json", "2026-11-11-v0.6.2-2.json"]);
+    expect(recordName(summary, (name) => taken.has(name))).toBe("2026-11-11-v0.6.2-3.json");
+  });
+});
+
 describe("transcriptReport", () => {
   test("lists the Bash commands and the result of a stream-json transcript", () => {
     const events = [
@@ -207,6 +360,11 @@ describe.skipIf(!endToEnd)(`scenarios end to end${unlessOptedIn}`, () => {
             scenario.solution.filter((step) => typeof step === "string").length,
           );
           expect(await Bun.file(join(out, scenario.id, "2", "dekc.jsonl")).text()).not.toBe("");
+          // What lint left is measured apart from the check: a seeded rule is there before.
+          if (/^DEK\d{3}$/.test(seeded)) {
+            expect(idle.left.byRule[seeded]).toBeGreaterThan(0);
+            expect(solved.left.byRule[seeded]).toBeUndefined();
+          }
         }),
       SCENARIO_MS,
     );
@@ -250,16 +408,18 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
     });
     expect(found).toEqual([expect.stringContaining("voicevox was not found")]);
   });
+
 });
 
 describe.skipIf(!endToEnd)(`scripts/agent-eval.ts${unlessOptedIn}`, () => {
   const script = join(repoRoot, "scripts", "agent-eval.ts");
 
   test(
-    "runs a scenario --runs times and writes report.json and report.md",
+    "runs a scenario --runs times, writes report.json and report.md, and --record a summary",
     () =>
       withTempDir(async (dir) => {
         const out = join(dir, "out");
+        const record = join(dir, "results");
         const proc = Bun.spawn(
           [
             process.execPath,
@@ -272,6 +432,8 @@ describe.skipIf(!endToEnd)(`scripts/agent-eval.ts${unlessOptedIn}`, () => {
             "2",
             "--out",
             out,
+            "--record",
+            record,
           ],
           { stdout: "pipe", stderr: "pipe" },
         );
@@ -288,6 +450,15 @@ describe.skipIf(!endToEnd)(`scripts/agent-eval.ts${unlessOptedIn}`, () => {
         const text = await Bun.file(join(out, "report.md")).text();
         expect(text).toContain("| mistyped-deck | 2/2 |");
         expect(stdout).toContain(text);
+
+        const kept = readdirSync(record);
+        expect(kept).toEqual([`${report.startedAt.slice(0, 10)}-v${pkg.version}.json`]);
+        const summary = await Bun.file(join(record, kept[0] ?? "")).text();
+        expect(JSON.parse(summary).scenarios).toEqual([
+          expect.objectContaining({ id: "mistyped-deck", runs: 2, passed: 2, skipped: 0 }),
+        ]);
+        expect(summary).not.toContain(dir);
+        expect(stdout).toContain(`wrote ${join(record, kept[0] ?? "")}`);
         await rm(out, { recursive: true, force: true });
       }),
     SCENARIO_MS,

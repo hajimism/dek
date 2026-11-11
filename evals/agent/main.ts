@@ -1,16 +1,29 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import pkg from "../../package.json";
+import { recordName, summarize } from "./record.ts";
 import { type EvalReport, markdown } from "./report.ts";
 import { DEFAULT_AGENT, runScenario } from "./run.ts";
 import { writeText } from "./scenario.ts";
 import { scenarios } from "./scenarios.ts";
 
 const USAGE =
-  "bun scripts/agent-eval.ts [--agent <cmd>] [--scenario <id>] [--runs N] [--out <dir>]";
+  "bun scripts/agent-eval.ts [--agent <cmd>] [--scenario <id>] [--runs N] [--out <dir>] [--record <dir>]";
 
-/** Runs the scenarios asked for, writes report.json and report.md, and exits 1 if any failed. */
+/**
+ * Runs the scenarios asked for, writes report.json and report.md, and with --record a summary to
+ * commit; exits 1 if any run failed.
+ */
 export async function main(argv: string[]): Promise<number> {
-  let values: { agent?: string; scenario?: string[]; runs?: string; out?: string; help?: boolean };
+  let values: {
+    agent?: string;
+    scenario?: string[];
+    runs?: string;
+    out?: string;
+    record?: string;
+    help?: boolean;
+  };
   try {
     ({ values } = parseArgs({
       args: argv,
@@ -19,6 +32,7 @@ export async function main(argv: string[]): Promise<number> {
         scenario: { type: "string", multiple: true },
         runs: { type: "string" },
         out: { type: "string" },
+        record: { type: "string" },
         help: { type: "boolean", short: "h" },
       },
     }));
@@ -70,6 +84,16 @@ export async function main(argv: string[]): Promise<number> {
   await writeText(resolve(out, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await writeText(resolve(out, "report.md"), text);
   process.stdout.write(`${text}\nwrote ${resolve(out, "report.json")} and report.md\n`);
+  if (values.record !== undefined) {
+    const summary = summarize(report, pkg.version);
+    const dir = resolve(values.record);
+    const path = resolve(
+      dir,
+      recordName(summary, (name) => existsSync(resolve(dir, name))),
+    );
+    await writeText(path, `${JSON.stringify(summary, null, 2)}\n`);
+    process.stdout.write(`wrote ${path}\n`);
+  }
   const failed = report.scenarios.some(({ runs }) => runs.some((run) => run.outcome === "failed"));
   return failed ? 1 : 0;
 }
