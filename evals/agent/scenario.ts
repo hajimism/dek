@@ -77,10 +77,12 @@ export async function must(ran: Promise<Ran>, what: string): Promise<Ran> {
   return result;
 }
 
+type Diagnostic = { id: string; severity: string; message: string; path?: string };
+
 type Envelope = {
   ok?: boolean;
   error?: { message: string };
-  diagnostics?: Array<{ id: string; severity: string; message: string; path?: string }>;
+  diagnostics?: Diagnostic[];
   skipped?: Array<{ check: string; reason: string }>;
 };
 
@@ -108,6 +110,34 @@ export function problems(ran: Ran, needed: string[] = []): string[] {
 
 /** What `dekc lint` from the project root says is still wrong; `visual` adds the browser rules. */
 export async function lintProblems(project: Project, options: { visual?: boolean } = {}) {
-  const args = ["lint", "--json", ...(options.visual ? ["--visual"] : [])];
-  return problems(await project.dekc(args), options.visual ? ["visual"] : []);
+  return (await lintFindings(project, options)).problems;
+}
+
+/**
+ * One `dekc lint --json` from the project root: what `problems` makes of it, and each of its
+ * diagnostics, warnings too, for a task that is done only once a warning is gone. Lint passes
+ * with warnings, so a check that cares about one must look for it here.
+ */
+export async function lintFindings(
+  project: Project,
+  options: { visual?: boolean } = {},
+): Promise<{ problems: string[]; diagnostics: Diagnostic[] }> {
+  const ran = await project.dekc(["lint", "--json", ...(options.visual ? ["--visual"] : [])]);
+  let diagnostics: Diagnostic[] = [];
+  try {
+    diagnostics = (JSON.parse(ran.stdout) as Envelope).diagnostics ?? [];
+  } catch {
+    // `problems` says that lint printed no JSON.
+  }
+  return { problems: problems(ran, options.visual ? ["visual"] : []), diagnostics };
+}
+
+/** Each diagnostic of the rules in `ids`, as a check reports it. */
+export function warned(diagnostics: Diagnostic[], ids: string[]): string[] {
+  return diagnostics
+    .filter((diagnostic) => ids.includes(diagnostic.id))
+    .map(
+      (diagnostic) =>
+        `${diagnostic.path ?? ""}: ${diagnostic.id} ${diagnostic.severity}: ${diagnostic.message}`,
+    );
 }

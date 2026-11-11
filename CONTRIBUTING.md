@@ -67,7 +67,7 @@ The same workflow times the agent loop. `bun scripts/bench.ts` copies `sample/` 
 
 ## Watching an agent use dek
 
-Before you change a command, a diagnostic, a hint, or what dek writes into a project's `AGENTS.md`, watch an agent work with dek, then watch again after the change. Each scenario in `evals/agent/scenarios/` makes a small project with one defect in a temporary directory outside this repository, gives the agent a task in a user's words, and checks what the agent left.
+Before you change a command, a diagnostic, a hint, or what dek writes into a project's `AGENTS.md`, watch an agent work with dek, then watch again after the change. Each scenario in `evals/agent/scenarios/` makes a small project in a temporary directory outside this repository, with one defect or with work still to do (an empty folder, a script with no slides), gives the agent a task in a user's words, and checks what the agent left.
 
 ```bash
 bun scripts/agent-eval.ts                              # every scenario once, with Claude Code

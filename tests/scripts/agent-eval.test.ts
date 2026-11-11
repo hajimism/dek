@@ -13,7 +13,7 @@ import {
   transcriptReport,
 } from "../../evals/agent/report.ts";
 import { quote, runScenario } from "../../evals/agent/run.ts";
-import { openProject, type Scenario } from "../../evals/agent/scenario.ts";
+import { must, openProject, type Scenario } from "../../evals/agent/scenario.ts";
 import { scenarios } from "../../evals/agent/scenarios.ts";
 import pkg from "../../package.json";
 import { playwrightResolved } from "../../src/core/playwright.ts";
@@ -326,6 +326,10 @@ const SEEDED: Record<string, string> = {
   "mistyped-deck": 'deck "kenote" not found',
   "ref-edit": "refs are read-only",
   "check-without-voice": "voice",
+  "from-script": "DEK001",
+  "ja-line-break": "DEK035",
+  "over-time": "DEK041",
+  "start-from-nothing": "not a dek project",
 };
 
 describe("scenarios", () => {
@@ -409,6 +413,67 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
     expect(found).toEqual([expect.stringContaining("voicevox was not found")]);
   });
 
+  test.skipIf(noBrowser)(
+    "from-script: the skeletons dekc sync writes fail though lint passes",
+    async () => {
+      const found = await checkAfter(byId("from-script"), async (dir) => {
+        await must(openProject(dir).dekc(["sync"], { cwd: "decks/talk" }), "dekc sync");
+      });
+      expect(found).toEqual(
+        ["twelve-minutes", "profile", "cache", "split", "ninety-seconds"].map(
+          (slug) => `slides/${slug}.html is still the skeleton dek wrote`,
+        ),
+      );
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: a paragraph cut short enough to fit fails though lint passes",
+    async () => {
+      const found = await checkAfter(byId("ja-line-break"), async (dir) => {
+        const path = join(dir, "decks/talk/slides/problem.html");
+        await Bun.write(
+          path,
+          (await Bun.file(path).text()).replace(
+            /<p class="lead">.*<\/p>/,
+            '<p class="lead">見落としが増えた</p>',
+          ),
+        );
+      });
+      expect(found).toEqual([
+        "the paragraph on slides/problem.html is not the text the user wrote",
+      ]);
+    },
+    SCENARIO_MS,
+  );
+
+  test("over-time: a longer time limit fails though lint passes", async () => {
+    const found = await checkAfter(byId("over-time"), async (dir) => {
+      const path = join(dir, "decks/talk/script.md");
+      await Bun.write(path, (await Bun.file(path).text()).replace("duration: 3m", "duration: 5m"));
+    });
+    expect(found).toEqual(["script.md no longer has duration: 3m"]);
+  });
+
+  test("over-time: cutting the part the user named fails though lint passes", async () => {
+    const found = await checkAfter(byId("over-time"), async (dir) => {
+      const path = join(dir, "decks/talk/script.md");
+      const text = await Bun.file(path).text();
+      await Bun.write(path, text.replace(/## Start with an example[\s\S]*?(?=## )/, ""));
+      await rm(join(dir, "decks/talk/slides/examples.html"));
+    });
+    expect(found).toEqual([
+      'script.md no longer has the section examples, "Start with an example"',
+    ]);
+  });
+
+  test("start-from-nothing: a project whose deck has another name fails though lint passes", async () => {
+    const found = await checkAfter(byId("start-from-nothing"), async (dir) => {
+      await must(openProject(dir).dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    });
+    expect(found).toEqual(["there is no decks/lt/script.md"]);
+  });
 });
 
 describe.skipIf(!endToEnd)(`scripts/agent-eval.ts${unlessOptedIn}`, () => {
