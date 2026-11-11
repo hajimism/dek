@@ -9,3 +9,5 @@ latin_per_minute = 130
 engine = "voicevox"
 speaker = "ずんだもん/ノーマル"
 speed = 1.0
+
+[plugins.words]

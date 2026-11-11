@@ -51,5 +51,11 @@ A build system for talks. Write what you will say; dek builds, measures, and shi
 - You have read `dekc shot --sheet` and judged the deck's balance.
 - Say what you could not judge, such as the argument and the timing, and leave it to the author.
 
+## Plugins
+
+Checks installed beside dek, named in `dek.toml` `[plugins]` and pinned in `plugins/<name>/plugin.json`. `dekc lint` runs them with dek's own rules, and `dekc check <slug>` reports what they find on that slide; their findings carry the plugin's rule ids.
+
+- `words` 0.1.0: It checks WORDS001 and WORDS002. Its data: `plugins/words/words.yaml` in the project, `words.yaml` in each deck. How to write it: https://hajimism.github.io/dek/reference/plugins.html#dek-words
+
 For commands, run `dekc help --agent`.
 <!-- dek:end -->
