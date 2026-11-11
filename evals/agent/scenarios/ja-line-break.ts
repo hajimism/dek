@@ -54,7 +54,17 @@ const CSS = `.slide .lead {
 `;
 
 /** Text as a reader sees it: the markup and the line breaks an author may add are gone. */
-const shown = (html: string): string => html.replace(/<[^>]*>/g, "").replace(/\s+/g, "");
+function shown(html: string): string {
+  let text = "";
+  new HTMLRewriter()
+    .on("*", {
+      text(chunk) {
+        text += chunk.text;
+      },
+    })
+    .transform(html);
+  return text.replace(/\s+/g, "");
+}
 
 /**
  * A Japanese deck whose one slide breaks lines inside a phrase (DEK035, a warning lint passes
