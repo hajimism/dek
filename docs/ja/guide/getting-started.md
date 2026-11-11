@@ -24,18 +24,21 @@ dek のリポジトリの外に、トーク用のプロジェクトを作りま�
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
 ```
 
-`init` は書いたファイルを並べ、最後に次に打つコマンドを表示します。
+`init` は書いたファイルと入れたものを並べ、最後に次に打つコマンドを表示します。
 
 ```
+installed:
+  bun add -d @hajimism/dek@0.6.2
+
 next:
-  cd my-talks
-  bun add -d @hajimism/dek
-  cd decks/2026-04-vite
+  cd my-talks/decks/2026-04-vite
   $EDITOR script.md
   bunx dekc
 ```
 
-上から順に実行します。`bun add -d` で dek をプロジェクトに入れ、以降の `bunx dekc` はその dek を動かします。固定されるのは CLI のバージョンだけで、デッキの HTML が `node_modules` を見ることはありません。
+`init` は、いま動かした版の dek をプロジェクトに入れます。以降の `bunx dekc` はその dek を動かします。固定されるのは CLI のバージョンだけで、デッキの HTML が `node_modules` を見ることはありません。`--browser` を付けると Playwright と Chromium も入り、`--visual`、`dekc shot`、`dekc pdf` が使えます。付けなければ、`init` は最後にその入れ方を表示します。何も入れずにプロジェクトだけを書くなら `--no-install` です。
+
+オフラインのときや、`bunfig.toml` の `minimumReleaseAge` が公開から日の浅い版を拒んだときなど、インストールが失敗してもプロジェクトは書いたまま残ります。`init` は `dek: not installed` と理由を表示し、`next` の先頭に `cd my-talks` と `bun add -d @hajimism/dek` が入ります。上から順に実行してください。
 
 ::: warning コマンドは `dek` ではなく `dekc`
 パッケージは `@hajimism/dek` で、入るコマンドは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。プロジェクトの中では `bunx dekc` がそこに入れた dek を動かします。プロジェクトの外では `bunx @hajimism/dek` を使ってください。
@@ -47,7 +50,7 @@ next:
 
 ```
 my-talks/
-├── package.json        # `bun add` が作り、dek のバージョンを固定する
+├── package.json        # init が書き、インストールで dek のバージョンを固定する
 ├── dek.toml            # プロジェクトの設定。既定値を変えるまでは空
 ├── AGENTS.md           # AI エージェント向けの規約。sync のたびに書き直す
 ├── .gitignore          # dist/ .cache/ .dek/server.json node_modules/ refs/

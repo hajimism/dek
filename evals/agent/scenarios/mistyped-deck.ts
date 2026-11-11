@@ -7,7 +7,7 @@ export default {
   id: "mistyped-deck",
   prompt: "Build the kenote deck into a single HTML file I can send around.",
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "keynote"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "keynote", "--no-install"]), "dekc init");
   },
   async check(project) {
     const found: string[] = [];

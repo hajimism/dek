@@ -107,7 +107,7 @@ export default {
   id: "over-time",
   prompt: `My talk in the talk deck has to fit in three minutes, but the script runs long. Cut the script so it fits; keep the time limit and keep the part about starting with an example.`,
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     for (const path of new Bun.Glob("decks/talk/slides/*").scanSync(project.dir)) {
       await Bun.file(join(project.dir, path)).delete();
     }

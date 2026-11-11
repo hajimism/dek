@@ -18,7 +18,7 @@ export default {
   prompt:
     'I renamed the first section of the talk deck\'s script to "Welcome", with the id welcome, and now lint fails. Fix it so lint passes, and keep the slide I had already made for that section.',
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     await project.write("decks/talk/slides/intro.html", SLIDE);
     const script = (await project.read("decks/talk/script.md")) ?? "";
     await project.write(

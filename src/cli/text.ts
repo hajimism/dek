@@ -72,6 +72,13 @@ export function formatSkipped(skipped: SkippedCheck[] | undefined, color = false
     .join("\n");
 }
 
+/** One `<install>: not installed (<reason>)` line per install init could not finish. */
+export function formatNotInstalled(data: InitResult): string {
+  return (data.notInstalled ?? [])
+    .map((entry) => `${entry.install}: not installed (${entry.reason})`)
+    .join("\n");
+}
+
 /** How many code points a warning names before it leaves the rest to `--json`. */
 const CODE_POINTS_SHOWN = 6;
 
@@ -179,7 +186,11 @@ export function formatInit(data: InitResult): string {
     ...data.updated.map((path) => `${path} (updated)`),
     ...data.kept.map((path) => `${path} (kept)`),
   ];
-  const done = withNext([header, ...lines.map((line) => `  ${line}`)].join("\n"), data.next);
+  const listing = [header, ...lines.map((line) => `  ${line}`)].join("\n");
+  const installed = data.installed
+    ? `${listing}\n\ninstalled:\n${data.installed.map((step) => `  ${step}`).join("\n")}`
+    : listing;
+  const done = withNext(installed, data.next);
   return data.playwright
     ? `${done}\n\nfor dekc shot, dekc pdf, and --visual:\n  ${data.playwright}`
     : done;

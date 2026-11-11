@@ -21,6 +21,14 @@ export const FLAGS = {
   version: { type: "boolean", short: "v", text: "print the dek version" },
   agent: { type: "boolean", text: "the compact reference for agents" },
   deck: { type: "string", value: "NAME", text: "target a deck by name from the project root" },
+  browser: {
+    type: "boolean",
+    text: "also install Playwright and Chromium, for --visual, dekc shot, and dekc pdf",
+  },
+  "no-install": {
+    type: "boolean",
+    text: "write the project without installing dek into it",
+  },
   "theme-from": {
     type: "string",
     value: "DECK",

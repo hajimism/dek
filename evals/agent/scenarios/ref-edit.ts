@@ -34,7 +34,7 @@ export default {
     const source = await mkdtemp(join(tmpdir(), "dek-eval-source-"));
     try {
       const sender = openProject(source);
-      await must(sender.dekc(["init", ".", "--deck", "launch"]), "dekc init");
+      await must(sender.dekc(["init", ".", "--deck", "launch", "--no-install"]), "dekc init");
       await sender.write("decks/launch/script.md", SCRIPT);
       await sender.write(
         "decks/launch/theme.css",
@@ -45,7 +45,7 @@ export default {
       }
       await sender.write("decks/launch/slides/pricing.html", slide("five"));
       await must(sender.dekc(["pack"], { cwd: "decks/launch" }), "dekc pack");
-      await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+      await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
       await must(
         project.dekc(["ref", join(source, "decks/launch/dist/launch.tgz")]),
         "dekc ref <file>.tgz",

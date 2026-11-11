@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import pkg from "../../package.json";
 import { outputOf } from "../../src/cli/commands.ts";
-import { initCommand } from "../../src/cli/init.ts";
+import { type InstallRun, initCommand, initProject } from "../../src/cli/init.ts";
 import { type LsDeckResult, lsCommand } from "../../src/cli/ls.ts";
 import { resolveTarget } from "../../src/cli/scope.ts";
 import { formatInit } from "../../src/cli/text.ts";
@@ -25,7 +26,7 @@ describe("dekc init", () => {
   test("creates a project and returns JSON", async () => {
     await withTempDir(async (dir) => {
       const target = join(dir, "my-talks");
-      const result = await runDek(["init", target, "--json"], { cwd: dir });
+      const result = await runDek(["init", target, "--no-install", "--json"], { cwd: dir });
       expect(result).toMatchObject({ exitCode: 0 });
       const json = jsonStdout<InitOk>(result);
       expect(json.ok).toBe(true);
@@ -336,4 +337,171 @@ describe("initCommand", () => {
       });
     },
   );
+});
+
+/** An install that records what it was asked to run, and lays down what a real one would leave. */
+function fakeInstall(options: { fail?: string; throws?: string } = {}): {
+  run: InstallRun;
+  ran: { argv: string[]; cwd: string }[];
+} {
+  const ran: { argv: string[]; cwd: string }[] = [];
+  const run: InstallRun = async (argv, cwd) => {
+    ran.push({ argv, cwd });
+    if (options.throws) {
+      throw new DekError(options.throws);
+    }
+    if (options.fail) {
+      return { exitCode: 1, stderr: `error: ${options.fail}\n` };
+    }
+    const added = argv[1] === "add" ? argv.at(-1) : undefined;
+    if (added?.startsWith("@hajimism/dek@")) {
+      await mkdir(join(cwd, "node_modules", ".bin"), { recursive: true });
+      await writeFile(join(cwd, "node_modules", ".bin", "dekc"), "");
+    }
+    if (added === "playwright") {
+      await mkdir(join(cwd, "node_modules", "playwright"), { recursive: true });
+      await writeFile(join(cwd, "node_modules", "playwright", "package.json"), "{}");
+    }
+    return { exitCode: 0, stderr: "" };
+  };
+  return { run, ran };
+}
+
+describe("initProject", () => {
+  test("installs the dek that is running into the project, so next is only the talk", async () => {
+    await withTempDir(async (dir) => {
+      const { run, ran } = fakeInstall();
+      const result = await initProject({ cwd: dir, dir: "my-talks", deck: "demo", run });
+      const root = join(dir, "my-talks");
+      expect(ran).toEqual([
+        { argv: [process.execPath, "add", "--dev", `@hajimism/dek@${pkg.version}`], cwd: root },
+      ]);
+      expect(result.installed).toEqual([`bun add -d @hajimism/dek@${pkg.version}`]);
+      expect(result.next).toEqual(["cd my-talks/decks/demo", "$EDITOR script.md", "bunx dekc"]);
+      expect(result.notInstalled).toBeUndefined();
+      expect(result.playwright).toBe(PLAYWRIGHT_INSTALL);
+    });
+  });
+
+  // bun adds to the nearest package.json above it: without one of its own, a project made
+  // inside another repository would put dek in that repository's.
+  test("gives the project a package.json of its own for the install to land in", async () => {
+    await withTempDir(async (dir) => {
+      await writeFile(join(dir, "package.json"), '{ "name": "outer" }\n');
+      const result = await initProject({ cwd: dir, dir: "my-talks", run: fakeInstall().run });
+      expect(result.created).toContain(join(dir, "my-talks", "package.json"));
+      expect(JSON.parse(await readFile(join(dir, "my-talks", "package.json"), "utf8"))).toEqual({
+        private: true,
+      });
+      expect(await readFile(join(dir, "package.json"), "utf8")).toBe('{ "name": "outer" }\n');
+      // Once installs have written to it, it is the project's: run again, init does not list it.
+      await writeFile(join(dir, "my-talks", "package.json"), '{ "devDependencies": {} }\n');
+      const again = await initProject({ cwd: dir, dir: "my-talks", run: fakeInstall().run });
+      expect(again.kept).toEqual([]);
+    });
+  });
+
+  test("leaves the install to the author with install: false", async () => {
+    await withTempDir(async (dir) => {
+      const { run, ran } = fakeInstall();
+      const result = await initProject({ cwd: dir, dir: "my-talks", install: false, run });
+      expect(ran).toEqual([]);
+      expect(result.installed).toBeUndefined();
+      expect(result.next).toEqual([
+        "cd my-talks",
+        "bun add -d @hajimism/dek",
+        "bunx dekc new <name>",
+      ]);
+    });
+  });
+
+  test("installs nothing when the project already has dek", async () => {
+    await withTempDir(async (dir) => {
+      await mkdir(join(dir, "node_modules", ".bin"), { recursive: true });
+      await writeFile(join(dir, "node_modules", ".bin", "dekc"), "");
+      const { run, ran } = fakeInstall();
+      const result = await initProject({ cwd: dir, dir: "my-talks", deck: "demo", run });
+      expect(ran).toEqual([]);
+      expect(result.installed).toBeUndefined();
+    });
+  });
+
+  test("keeps the project when the install fails, and says what to run instead", async () => {
+    await withTempDir(async (dir) => {
+      for (const install of [
+        fakeInstall({ fail: "GET https://registry.npmjs.org - 503" }),
+        fakeInstall({ throws: "bun add timed out" }),
+      ]) {
+        const result = await initProject({
+          cwd: dir,
+          dir: "my-talks",
+          deck: "demo",
+          run: install.run,
+        });
+        expect(existsSync(join(dir, "my-talks", "decks", "demo", "script.md"))).toBe(true);
+        expect(result.installed).toBeUndefined();
+        expect(result.notInstalled).toEqual([
+          {
+            install: "dek",
+            reason: expect.stringContaining(`bun add -d @hajimism/dek@${pkg.version} failed`),
+          },
+        ]);
+        expect(result.next).toContain("bun add -d @hajimism/dek");
+      }
+      const failed = await initProject({
+        cwd: dir,
+        dir: "other",
+        run: fakeInstall({ fail: "GET https://registry.npmjs.org - 503" }).run,
+      });
+      expect(failed.notInstalled?.[0]?.reason).toContain("GET https://registry.npmjs.org - 503");
+    });
+  });
+
+  test("installs Playwright and Chromium with browser: true, after dek", async () => {
+    await withTempDir(async (dir) => {
+      const { run, ran } = fakeInstall();
+      const result = await initProject({ cwd: dir, dir: "my-talks", browser: true, run });
+      const root = join(dir, "my-talks");
+      expect(ran.map((step) => step.argv.slice(1))).toEqual([
+        ["add", "--dev", `@hajimism/dek@${pkg.version}`],
+        ["add", "--dev", "playwright"],
+        ["x", "--bun", "playwright", "install", "chromium"],
+      ]);
+      expect(ran.every((step) => step.cwd === root)).toBe(true);
+      expect(result.installed).toEqual([
+        `bun add -d @hajimism/dek@${pkg.version}`,
+        "bun add -d playwright",
+        "bunx --bun playwright install chromium",
+      ]);
+      expect(result.playwright).toBeUndefined();
+    });
+  });
+
+  test("skips the browser when the dek install failed, since dek finds Playwright beside itself", async () => {
+    await withTempDir(async (dir) => {
+      const { run, ran } = fakeInstall({ fail: "offline" });
+      const result = await initProject({ cwd: dir, dir: "my-talks", browser: true, run });
+      expect(ran).toHaveLength(1);
+      expect(result.notInstalled?.map((entry) => entry.install)).toEqual(["dek", "browser"]);
+      expect(outputOf("init").notes?.(result, false)).toBe(
+        `dek: not installed (bun add -d @hajimism/dek@${pkg.version} failed: error: offline)\nbrowser: not installed (dek is not installed in the project)`,
+      );
+      expect(result.playwright).toBe(PLAYWRIGHT_INSTALL);
+    });
+  });
+
+  test("refuses browser: true with install: false before it writes anything", async () => {
+    await withTempDir(async (dir) => {
+      const target = join(dir, "my-talks");
+      const attempt = initProject({
+        cwd: dir,
+        dir: target,
+        install: false,
+        browser: true,
+        run: fakeInstall().run,
+      });
+      await expect(attempt).rejects.toThrow("--browser needs dek installed in the project");
+      expect(existsSync(target)).toBe(false);
+    });
+  });
 });

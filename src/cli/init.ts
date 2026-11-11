@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import pkg from "../../package.json";
 import { parseCss, publishedTokens } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
@@ -9,6 +10,7 @@ import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { refuseInsideRef } from "../core/ref.ts";
 import { readSourceIfExists } from "../core/safe-fs.ts";
+import { runPiped } from "../core/spawn.ts";
 import {
   defaultTsconfig,
   dekFilePaths,
@@ -24,6 +26,7 @@ import {
   defaultRumdl,
   defaultTheme,
   defaultToml,
+  hasLocalDek,
   nextSteps,
   type PlannedPath,
   playwrightStep,
@@ -39,6 +42,10 @@ export type InitResult = {
   kept: string[];
   /** The commands to run next, from the directory init ran in. */
   next: string[];
+  /** The installs init ran in the project, as a person would type them. */
+  installed?: string[];
+  /** The installs that failed or could not run: the project is there, and `next` installs dek. */
+  notInstalled?: NotInstalled[];
   /** The Playwright install, when the project lacks it: `dekc shot`, `dekc pdf`, and `--visual` need it. */
   playwright?: string;
   /**
@@ -62,7 +69,10 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
   checkTarget(root);
   checkFileSlots(dekFilePaths(root));
 
-  const { created, kept } = applyPlan(projectPlan(root, options.deck));
+  const planned = applyPlan(projectPlan(root, options.deck));
+  const created = planned.created;
+  // A package.json is the project's own once installs write to it: keeping it is no news.
+  const kept = planned.kept.filter((path) => path !== join(root, "package.json"));
   const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
   // A starter script init just wrote gets its skeletons as sync writes them; a script that was
   // already there is the author's, and so is whether it parses.
@@ -80,6 +90,129 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
     ...(playwright ? { playwright } : {}),
     ...(missingTokens.length > 0 ? { missingTokens } : {}),
   };
+}
+
+/** An install init could not finish, and why. */
+type NotInstalled = { install: "dek" | "browser"; reason: string };
+
+/** Runs one install in the project: `argv[0]` is bun. */
+export type InstallRun = (
+  argv: string[],
+  cwd: string,
+) => Promise<{ exitCode: number; stderr: string }>;
+
+/** One install init runs: what a person would type, and what dek runs for it. */
+type InstallStep = { shown: string; argv: string[] };
+
+/** A browser download is the long one; nothing init installs should take longer. */
+const INSTALL_TIMEOUT_MS = 10 * 60_000;
+
+const runInstall: InstallRun = (argv, cwd) =>
+  runPiped(argv, {
+    label: `bun ${argv.slice(1).join(" ")} did not finish`,
+    hint: "check that bun runs, or pass --no-install and install dek yourself",
+    timeoutMs: INSTALL_TIMEOUT_MS,
+    cwd,
+  });
+
+/**
+ * `dekc init`: the project as `initCommand` writes it, then dek installed into it, pinned to the
+ * version that is running, which is the code the author just ran. With `browser`, Playwright and
+ * its Chromium follow. An install that fails leaves the project as written and is listed in
+ * `notInstalled`; `next` then names the install to run.
+ */
+export async function initProject(options: {
+  cwd: string;
+  dir?: string;
+  deck?: string;
+  /** Install dek into the project; true unless the author passes --no-install. */
+  install?: boolean;
+  /** Install Playwright and Chromium too, for `--visual`, `dekc shot`, and `dekc pdf`. */
+  browser?: boolean;
+  run?: InstallRun;
+}): Promise<InitResult> {
+  const root = resolve(options.cwd, options.dir ?? ".");
+  const install = options.install ?? true;
+  // dek finds Playwright beside its own install, so a browser for a project without dek in it
+  // would be one no dek command uses.
+  if (options.browser && !install && !hasLocalDek(root)) {
+    throw new DekError("--browser needs dek installed in the project", {
+      hint: "drop --no-install, or run `bun add -d @hajimism/dek` in the project first",
+    });
+  }
+  const result = initCommand(options);
+  const run = options.run ?? runInstall;
+  const installed: string[] = [];
+  const notInstalled: NotInstalled[] = [];
+  const runSteps = async (
+    install: NotInstalled["install"],
+    steps: InstallStep[],
+  ): Promise<boolean> => {
+    for (const step of steps) {
+      const failure = await failureOf(run, step, root);
+      if (failure !== undefined) {
+        notInstalled.push({ install, reason: `${step.shown} failed: ${failure}` });
+        return false;
+      }
+      installed.push(step.shown);
+    }
+    return true;
+  };
+  const dekReady =
+    hasLocalDek(root) ||
+    (install && (await runSteps("dek", [bunAdd(`@hajimism/dek@${pkg.version}`)])));
+  if (options.browser && playwrightStep(root) !== undefined) {
+    if (dekReady) {
+      await runSteps("browser", [
+        bunAdd("playwright"),
+        // --bun: Playwright's CLI asks for node, which a Bun-only machine may lack.
+        {
+          shown: "bunx --bun playwright install chromium",
+          argv: [process.execPath, "x", "--bun", "playwright", "install", "chromium"],
+        },
+      ]);
+    } else {
+      notInstalled.push({ install: "browser", reason: "dek is not installed in the project" });
+    }
+  }
+  const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
+  const playwright = playwrightStep(root);
+  const { playwright: _before, ...rest } = result;
+  return {
+    ...rest,
+    next: nextSteps(options.cwd, root, deckDir),
+    ...(installed.length > 0 ? { installed } : {}),
+    ...(notInstalled.length > 0 ? { notInstalled } : {}),
+    ...(playwright ? { playwright } : {}),
+  };
+}
+
+function bunAdd(spec: string): InstallStep {
+  return { shown: `bun add -d ${spec}`, argv: [process.execPath, "add", "--dev", spec] };
+}
+
+/** Why `step` failed: the last line it wrote on stderr, or why it could not run; nothing when it ran. */
+async function failureOf(
+  run: InstallRun,
+  step: InstallStep,
+  cwd: string,
+): Promise<string | undefined> {
+  try {
+    const ran = await run(step.argv, cwd);
+    if (ran.exitCode === 0) {
+      return undefined;
+    }
+    const lines = ran.stderr
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    return lines.at(-1) ?? `exit code ${ran.exitCode}`;
+  } catch (error) {
+    if (error instanceof DekError) {
+      return error.message;
+    }
+    throw error;
+  }
 }
 
 /** The tokens every deck needs that the project's theme.css does not publish on `.slide`. */
@@ -111,6 +244,8 @@ function projectPlan(root: string, deck: string | undefined): PlannedPath[] {
     { path: join(root, ".rumdl.toml"), contents: defaultRumdl() },
     { path: join(root, ".gitignore"), contents: defaultGitignore() },
     { path: join(root, "tsconfig.json"), contents: defaultTsconfig() },
+    // The install lands here, not in a package.json of a repository the project sits in.
+    { path: join(root, "package.json"), contents: '{\n  "private": true\n}\n' },
     { path: join(root, "assets") },
     { path: join(root, "decks") },
     ...(deck ? deckPlan(root, deck, theme) : []),

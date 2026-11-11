@@ -26,12 +26,10 @@ Requires [Bun](https://bun.sh) 1.4 or later. dek runs on Bun only: it does not r
 
 ```bash
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
-cd my-talks
-bun add -d @hajimism/dek
-cd decks/2026-04-vite
+cd my-talks/decks/2026-04-vite
 ```
 
-`init` prints these same steps as it finishes. You create the project once. Once dek is a dev dependency of the project, `bunx dekc` runs it. Three commands remain, and for a live talk that is all there is.
+You create the project once. `init` installs dek into it as a dev dependency, at the version you just ran, and from then on `bunx dekc` runs that copy. Add `--browser` to install Playwright and Chromium too, so `--visual`, `dekc shot`, and `dekc pdf` work from the first run. Three commands remain, and for a live talk that is all there is.
 
 > [!WARNING]
 > The package is `@hajimism/dek`; the command it installs is `dekc`, not `dek`. `dek` on npm is an unrelated package, and `bunx dek` downloads and runs it. Inside a project, `bunx dekc` runs the dek installed there; outside one, use `bunx @hajimism/dek`.

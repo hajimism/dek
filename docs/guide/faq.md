@@ -6,7 +6,7 @@ description: 'When to use Slidev, handing a talk to PowerPoint users, whether vo
 
 ## How do I install it?
 
-Create a project with `bunx @hajimism/dek init`, then install dek inside it with `bun add -d @hajimism/dek` and use `bunx dekc` from there. See [Getting Started](./getting-started).
+Create a project with `bunx @hajimism/dek init`. It installs dek into the project, and from there you use `bunx dekc`. See [Getting Started](./getting-started).
 
 ## Why does `bunx dek` run something else?
 
@@ -46,7 +46,7 @@ Yes. `dekc build` produces one HTML file. Put it on a USB stick. Press `p` or op
 
 ## Are Playwright, ffmpeg, and VOICEVOX required?
 
-No. Each is optional, and only the commands that need it fail when it is missing, always with the install step in the hint. `--visual`, `shot`, `pdf`, and `video` use Playwright; `video` also uses ffmpeg; `voice`, `rehearse`, and `video` use a VOICEVOX-compatible engine. Engine setup is in [Voice and Video](./voice#setup).
+No. Each is optional, and only the commands that need it fail when it is missing, always with the install step in the hint. `--visual`, `shot`, `pdf`, and `video` use Playwright; `video` also uses ffmpeg; `voice`, `rehearse`, and `video` use a VOICEVOX-compatible engine. `dekc init --browser` installs Playwright along with the project. Engine setup is in [Voice and Video](./voice#setup).
 
 ## Where do I write pauses or silent time?
 

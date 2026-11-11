@@ -77,7 +77,7 @@ export default {
     "talk デッキの「待つほどレビューが大きくなる」のスライドで、日本語が単語の途中で改行されていて読みにくいです。文章は変えずに直してください。",
   needsBrowser: true,
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     for (const path of new Bun.Glob("decks/talk/slides/*").scanSync(project.dir)) {
       await Bun.file(join(project.dir, path)).delete();
     }

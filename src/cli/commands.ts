@@ -25,6 +25,7 @@ import {
   formatMv,
   formatNav,
   formatNew,
+  formatNotInstalled,
   formatPack,
   formatPdf,
   formatPluginNotes,
@@ -265,20 +266,33 @@ export const COMMANDS = {
   }),
   init: result({
     args: ["dir?"],
-    flags: ["deck"],
-    usage: ["dekc init [dir] [--deck NAME]"],
+    flags: ["deck", "browser", "no-install"],
+    usage: ["dekc init [dir] [--deck NAME] [--browser] [--no-install]"],
     summary:
-      "Create a project in dir (default: here), optionally with a first deck.\nNothing that exists is overwritten. Inside a project, add a deck with dekc new.",
+      "Create a project in dir (default: here), optionally with a first deck, and install this dek into it.\n--browser also installs Playwright and Chromium. Nothing that exists is overwritten. Inside a project, add a deck with dekc new.",
     group: "Project",
-    overview: [["dekc init [dir] [--deck NAME]", "create a project, optionally with a first deck"]],
-    agent: ["dekc init [dir] [--deck NAME]"],
+    overview: [
+      [
+        "dekc init [dir] [--deck NAME] [--browser] [--no-install]",
+        "create a project, optionally with a first deck, and install dek",
+      ],
+    ],
+    agent: ["dekc init [dir] [--deck NAME] [--browser] [--no-install]"],
     run: async ({ cwd, args, flags }) => {
-      const { initCommand } = await import("./init.ts");
-      return initCommand({ cwd, dir: args.dir, deck: flags.deck });
+      const { initProject } = await import("./init.ts");
+      return initProject({
+        cwd,
+        dir: args.dir,
+        deck: flags.deck,
+        install: flags["no-install"] !== true,
+        browser: flags.browser === true,
+      });
     },
     output: {
       text: formatInit,
-      notes: (data, color) => formatKeptTheme(data, color) || undefined,
+      notes: (data, color) =>
+        [formatKeptTheme(data, color), formatNotInstalled(data)].filter(Boolean).join("\n") ||
+        undefined,
       paths: (data, display) => ({
         ...data,
         created: data.created.map(display),

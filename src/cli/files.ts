@@ -300,7 +300,7 @@ export function nextSteps(cwd: string, root: string, deckDir?: string): string[]
 }
 
 /** Whether `bunx dekc` in the project runs this dek: bunx looks in node_modules/.bin up the tree. */
-function hasLocalDek(root: string): boolean {
+export function hasLocalDek(root: string): boolean {
   return inNodeModules(root, ".bin", "dekc");
 }
 

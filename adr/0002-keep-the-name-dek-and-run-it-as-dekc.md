@@ -6,6 +6,8 @@ Date: 2026-10-01
 
 Accepted
 
+Amended by [40. Have dekc init install the running dek into the project, and Playwright with --browser](0040-have-dekc-init-install-the-running-dek-into-the-project-and-playwright-with-browser.md)
+
 ## Context
 
 `dek` on npm is an unrelated package. With the bin named `dek`, `bunx dek` anywhere dek was not installed downloaded and ran someone else's code.

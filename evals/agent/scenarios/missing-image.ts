@@ -15,7 +15,7 @@ export default {
   prompt:
     "The logo on the last slide of the talk deck does not show up. Fix it so lint passes, and keep the logo on the slide.",
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     await project.write("assets/logo.svg", LOGO);
     await project.write("decks/talk/slides/next.html", SLIDE);
   },

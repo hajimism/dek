@@ -41,7 +41,7 @@ bun run build          # 各 decks/<deck>/dist/<deck>.html
 
 ## 構成
 
-dek は `@hajimism/dek` として `file:..`、つまりこのリポジトリ自身から入り、Playwright と rumdl と並んで sample の `devDependencies` にあります。自分のプロジェクトでは代わりに `bun add -d @hajimism/dek` で入れます。
+dek は `@hajimism/dek` として `file:..`、つまりこのリポジトリ自身から入り、Playwright と rumdl と並んで sample の `devDependencies` にあります。自分のプロジェクトでは、代わりに `dekc init` がプロジェクトを書くときに入れます。
 
 `dek.toml` の `[voice]` は、`dekc new` が新しいデッキへコピーする既定値です。各デッキの実際の設定はそれぞれの `voice/` にあり、`voice.toml` と、ASCII 語の読みを収めた `dict.toml` です。エンジンが止まっていても開発サーバは動き続けます。合成だけが失敗します。
 

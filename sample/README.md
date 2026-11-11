@@ -41,7 +41,7 @@ The scripts do not pin a deck. From the project root they apply to every deck; f
 
 ## Layout
 
-dek is installed as `@hajimism/dek` from `file:..`, this repository itself, next to Playwright and rumdl in the sample's `devDependencies`. A project of your own installs it with `bun add -d @hajimism/dek` instead.
+dek is installed as `@hajimism/dek` from `file:..`, this repository itself, next to Playwright and rumdl in the sample's `devDependencies`. A project of your own gets it from `dekc init`, which installs dek into the project it writes.
 
 The `[voice]` table in `dek.toml` is the default that `dekc new` copies into new decks. Each deck's actual settings live in its own `voice/`: `voice.toml`, and a `dict.toml` with readings for ASCII words. When the engine is down the dev server keeps running; only synthesis fails.
 

@@ -14,12 +14,10 @@ You need [Bun](https://bun.sh) 1.4 or later. Voice, video, and Playwright are no
 
 ```bash
 bunx @hajimism/dek init lightning --deck postmortem
-cd lightning
-bun add -d @hajimism/dek
-cd decks/postmortem
+cd lightning/decks/postmortem
 ```
 
-These are the steps `init` prints when it finishes. From here on, `dekc` means `bunx dekc`, which runs the dek installed in the project.
+`init` installs dek into the project and prints the `cd` when it finishes. From here on, `dekc` means `bunx dekc`, which runs the dek installed in the project.
 
 ## 2. Write the script
 

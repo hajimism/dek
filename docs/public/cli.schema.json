@@ -39,6 +39,37 @@
               },
               "description": "The commands to run next."
             },
+            "installed": {
+              "description": "The installs init ran in the project, as a person would type them.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "notInstalled": {
+              "description": "Installs that failed or could not run; `next` then names the install to run.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "install": {
+                    "type": "string",
+                    "enum": [
+                      "dek",
+                      "browser"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "install",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            },
             "playwright": {
               "description": "How to install Playwright, when it is missing.",
               "type": "string"
