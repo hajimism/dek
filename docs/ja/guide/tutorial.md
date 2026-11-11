@@ -14,12 +14,10 @@ description: '10 分のトークを最初から最後まで作る。台本、ビ
 
 ```bash
 bunx @hajimism/dek init lightning --deck postmortem
-cd lightning
-bun add -d @hajimism/dek
-cd decks/postmortem
+cd lightning/decks/postmortem
 ```
 
-これは `init` が終わりに表示する手順そのものです。以降、`dekc` と書いたら `bunx dekc`、つまりプロジェクトに入れた dek のことです。
+`init` は dek をプロジェクトに入れ、終わりにこの `cd` を表示します。以降、`dekc` と書いたら `bunx dekc`、つまりプロジェクトに入れた dek のことです。
 
 ## 2. 台本を書く
 

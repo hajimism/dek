@@ -25,7 +25,7 @@ export default {
     "People at the back cannot read the small print on the last slide of the talk deck. Fix it so lint passes with the visual checks on, and keep the small print.",
   needsBrowser: true,
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     await project.write("decks/talk/slides/next.html", SLIDE);
     await project.write("decks/talk/slides/next.css", css("#2a2a2a"));
   },

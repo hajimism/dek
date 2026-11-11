@@ -234,7 +234,7 @@ export default {
     "decks/talk/script.md is my talk. Make a slide for each part that shows what I say there, and get the deck to pass the visual checks. Don't change the script.",
   needsBrowser: true,
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     for (const path of new Bun.Glob("decks/talk/slides/*").scanSync(project.dir)) {
       await Bun.file(join(project.dir, path)).delete();
     }

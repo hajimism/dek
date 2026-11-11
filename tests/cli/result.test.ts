@@ -48,6 +48,24 @@ describe("formatText", () => {
     ).toBe("created deck demo\n\nnext:\n  cd decks/demo");
   });
 
+  test("says what init installed, before the commands to run next", () => {
+    expect(
+      formatText({
+        command: "init",
+        data: {
+          root: "/tmp/talks",
+          created: ["dek.toml"],
+          updated: [],
+          kept: [],
+          installed: ["bun add -d @hajimism/dek@0.6.2"],
+          next: ["cd talks/decks/lt", "$EDITOR script.md", "bunx dekc"],
+        },
+      }),
+    ).toBe(
+      "created project at /tmp/talks\n  dek.toml\n\ninstalled:\n  bun add -d @hajimism/dek@0.6.2\n\nnext:\n  cd talks/decks/lt\n  $EDITOR script.md\n  bunx dekc",
+    );
+  });
+
   test("prints the sheets of a shot when it made any, and its shots otherwise", () => {
     const shots = [{ slug: "intro", step: "1", path: "/c/intro.png" }];
     expect(formatText({ command: "shot", data: { shots } })).toBe("/c/intro.png");

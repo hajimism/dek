@@ -35,7 +35,7 @@ export default {
     "The timing slide in the talk deck runs off the bottom of the screen. Fix it so lint passes with the visual checks on, and keep every point on it in the talk.",
   needsBrowser: true,
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     await project.write("decks/talk/slides/timing.html", SLIDE);
   },
   async check(project) {

@@ -298,7 +298,7 @@ more
           expect(result.skipped?.find((entry) => entry.check === "visual")).toEqual({
             check: "visual",
             reason: "Playwright is not installed",
-            hint: "bun add -d playwright && bunx playwright install chromium, then run `dekc lint --visual` to measure overflow, contrast, line breaks, and alignment",
+            hint: "bun add -d playwright && bunx --bun playwright install chromium, then run `dekc lint --visual` to measure overflow, contrast, line breaks, and alignment",
           });
         });
       },

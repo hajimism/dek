@@ -19,7 +19,7 @@ tarball="$work/$(npm pack --silent --pack-destination "$work")"
 # The publint the lockfile pins, from node_modules: never a version fetched at release time.
 bun run --bun publint run "$tarball" --strict
 
-# `bunx @hajimism/dek init`, then `bun add -d @hajimism/dek`, with the tarball standing in for npm.
+# `bunx @hajimism/dek init`, with the tarball standing in for npm: --no-install, and the tarball added by hand.
 mkdir "$work/boot"
 cd "$work/boot"
 echo '{}' > package.json
@@ -32,7 +32,7 @@ echo '{ "compilerOptions": { "paths": { "zod": ["./hijack/zod.ts"] } } }' > tsco
 bunx dekc --version > /dev/null
 test ! -e hijacked
 rm -r hijack tsconfig.json
-bunx dekc init talks --deck demo > /dev/null
+bunx dekc init talks --deck demo --no-install > /dev/null
 cd talks
 bun add -d "$tarball" > /dev/null
 # The skill ships with the version it describes, wherever the install put the package.

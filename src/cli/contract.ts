@@ -140,6 +140,21 @@ export const RESULT_FIELDS = {
     updated: paths.describe("dek's own files, already there, brought up to date."),
     kept: paths.describe("Files already there that differ from what init would write."),
     next: z.array(z.string()).describe("The commands to run next."),
+    installed: z
+      .array(z.string())
+      .optional()
+      .describe("The commands init ran in the project to install dek, and the browser."),
+    notInstalled: z
+      .array(
+        z.strictObject({
+          install: z.enum(["dek", "browser"]),
+          reason: z.string(),
+        }),
+      )
+      .optional()
+      .describe(
+        "Installs that failed or did not run; `next`, or `playwright` for the browser, then names the install to run.",
+      ),
     playwright: z.string().optional().describe("How to install Playwright, when it is missing."),
     missingTokens: z.array(z.string()).optional(),
   }),

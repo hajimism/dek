@@ -63,7 +63,7 @@ Site: ${SITE}
 Japanese: ${SITE}ja/
 Repo: ${REPO}
 
-dek runs on Bun. Install dek into the project with \`bun add -d ${pkg.name}\` and run it as \`bunx ${command}\` from inside it, or \`bunx ${pkg.name}\` outside one; the command is \`${command}\`, not \`dek\`: \`dek\` on npm is an unrelated package, which \`bunx dek\` downloads and runs. Use \`bunx\`, not \`npx\`.
+dek runs on Bun. \`bunx ${pkg.name} init\` creates a project and installs dek into it; run it as \`bunx ${command}\` from inside it, or \`bunx ${pkg.name}\` outside one; the command is \`${command}\`, not \`dek\`: \`dek\` on npm is an unrelated package, which \`bunx dek\` downloads and runs. Use \`bunx\`, not \`npx\`.
 
 Agents use the same CLI as humans. Run \`${command} help --agent\`, or \`${command} help <command>\` for one command's flags; they describe the dek installed in the project, which wins over anything written here. Result commands accept \`--json\`: branch on \`ok\`; every \`"ok": false\` carries \`error\` (\`message\`, \`hint\`, optional \`path\`/\`line\`), and lint, check, build, ls, and cues always carry \`diagnostics\` (with \`line\`/\`column\` and \`data\`). A check that did not run is in \`skipped\` with its \`reason\` and \`hint\`. 0.x: the JSON shape and DEK ids may change; DEK ids are never reused. Diagnostics: \`${command} lint --format sarif\`. Do not parse human-oriented text output.
 

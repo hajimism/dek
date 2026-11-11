@@ -30,8 +30,7 @@ features:
 
 ```bash
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
-cd my-talks && bun add -d @hajimism/dek
-cd decks/2026-04-vite
+cd my-talks/decks/2026-04-vite
 $EDITOR script.md   # write what you will say
 bunx dekc           # dev server: skeleton slides, live reload, lint on save
 bunx dekc build     # dist/2026-04-vite.html — the whole talk in one file

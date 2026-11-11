@@ -39,6 +39,37 @@
               },
               "description": "The commands to run next."
             },
+            "installed": {
+              "description": "The commands init ran in the project to install dek, and the browser.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "notInstalled": {
+              "description": "Installs that failed or did not run; `next`, or `playwright` for the browser, then names the install to run.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "install": {
+                    "type": "string",
+                    "enum": [
+                      "dek",
+                      "browser"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "install",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            },
             "playwright": {
               "description": "How to install Playwright, when it is missing.",
               "type": "string"

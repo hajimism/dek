@@ -22,7 +22,7 @@ export default {
   // No engine answers here, whatever runs on the machine.
   env: { DEK_VOICE_URL: "http://127.0.0.1:9" },
   async setup(project) {
-    await must(project.dekc(["init", ".", "--deck", "talk"]), "dekc init");
+    await must(project.dekc(["init", ".", "--deck", "talk", "--no-install"]), "dekc init");
     await project.write("decks/talk/assets/clock.svg", CLOCK);
     await project.write("decks/talk/slides/timing.html", slide(""));
   },

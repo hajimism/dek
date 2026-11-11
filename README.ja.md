@@ -26,12 +26,10 @@ dek は、ビルドシステムがコードを扱うように発表を扱う CLI
 
 ```bash
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
-cd my-talks
-bun add -d @hajimism/dek
-cd decks/2026-04-vite
+cd my-talks/decks/2026-04-vite
 ```
 
-`init` は終わりに同じ手順を表示します。プロジェクトを作るのは最初の一度だけです。dek をプロジェクトの開発依存に入れたあとは `bunx dekc` で動きます。残るのは 3 手で、ライブ発表ならこれがすべてです。
+プロジェクトを作るのは最初の一度だけです。`init` は、いま動かした版の dek をプロジェクトの開発依存に入れます。以降は `bunx dekc` がその dek を動かします。`--browser` を付けると Playwright と Chromium も入り、`--visual`、`dekc shot`、`dekc pdf` が最初から使えます。残るのは 3 手で、ライブ発表ならこれがすべてです。
 
 > [!WARNING]
 > パッケージは `@hajimism/dek` で、入るコマンドは `dek` ではなく `dekc` です。npm の `dek` は無関係の別パッケージで、`bunx dek` はそれをダウンロードして実行します。プロジェクトの中では `bunx dekc` がそこに入れた dek を動かします。プロジェクトの外では `bunx @hajimism/dek` を使ってください。

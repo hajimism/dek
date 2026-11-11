@@ -174,7 +174,7 @@ describe("dekc shot where Chromium's sandbox cannot start", () => {
         `Chromium did not start, with its sandbox or without: ${CHROMIUM_MISSING}`,
       );
       expect(error.hint).toBe(
-        "bun add -d playwright && bunx playwright install chromium or check DEK_PLAYWRIGHT",
+        "bun add -d playwright && bunx --bun playwright install chromium or check DEK_PLAYWRIGHT",
       );
       expect(result.stderr).not.toContain("warning:");
     });

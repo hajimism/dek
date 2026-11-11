@@ -6,7 +6,7 @@ description: 'Slidev を使うべきとき、PowerPoint を使う人への渡し
 
 ## どうやって入れますか
 
-`bunx @hajimism/dek init` でプロジェクトを作り、その中で `bun add -d @hajimism/dek` と入れてから `bunx dekc` を使います。手順は[はじめる](./getting-started)にあります。
+`bunx @hajimism/dek init` でプロジェクトを作ります。dek はそのときプロジェクトに入るので、あとは中で `bunx dekc` を使います。手順は[はじめる](./getting-started)にあります。
 
 ## `bunx dek` で別のものが動きます
 
@@ -46,7 +46,7 @@ description: 'Slidev を使うべきとき、PowerPoint を使う人への渡し
 
 ## Playwright、ffmpeg、VOICEVOX は必須ですか
 
-いいえ。どれも任意で、足りないときはそれを必要とするコマンドだけが、インストール手順の hint 付きで失敗します。`--visual`、`shot`、`pdf`、`video` は Playwright を、`video` は加えて ffmpeg を、`voice`、`rehearse`、`video` は VOICEVOX 互換エンジンを使います。エンジンの入れ方は[声と動画](./voice#セットアップ)にあります。
+いいえ。どれも任意で、足りないときはそれを必要とするコマンドだけが、インストール手順の hint 付きで失敗します。`--visual`、`shot`、`pdf`、`video` は Playwright を、`video` は加えて ffmpeg を、`voice`、`rehearse`、`video` は VOICEVOX 互換エンジンを使います。Playwright は `dekc init --browser` でプロジェクトと一緒に入ります。エンジンの入れ方は[声と動画](./voice#セットアップ)にあります。
 
 ## 間や無音の時間はどこに書きますか
 

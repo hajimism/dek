@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import pkg from "../../package.json";
 import { parseCss, publishedTokens } from "../core/css.ts";
 import { deckPaths } from "../core/deck-paths.ts";
 import { DekError } from "../core/error.ts";
@@ -7,8 +8,10 @@ import { shellQuote } from "../core/escape.ts";
 import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
 import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
+import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
 import { refuseInsideRef } from "../core/ref.ts";
 import { readSourceIfExists } from "../core/safe-fs.ts";
+import { OverrunError, runPiped } from "../core/spawn.ts";
 import {
   defaultTsconfig,
   dekFilePaths,
@@ -24,6 +27,8 @@ import {
   defaultRumdl,
   defaultTheme,
   defaultToml,
+  dekHome,
+  hasLocalDek,
   nextSteps,
   type PlannedPath,
   playwrightStep,
@@ -39,6 +44,10 @@ export type InitResult = {
   kept: string[];
   /** The commands to run next, from the directory init ran in. */
   next: string[];
+  /** The commands init ran in the project to install dek, and the browser. */
+  installed?: string[];
+  /** The installs that failed or could not run: the project is there, and `next` installs dek. */
+  notInstalled?: NotInstalled[];
   /** The Playwright install, when the project lacks it: `dekc shot`, `dekc pdf`, and `--visual` need it. */
   playwright?: string;
   /**
@@ -62,7 +71,10 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
   checkTarget(root);
   checkFileSlots(dekFilePaths(root));
 
-  const { created, kept } = applyPlan(projectPlan(root, options.deck));
+  const planned = applyPlan(projectPlan(root, options.deck));
+  const created = planned.created;
+  // A package.json is the project's own once installs write to it: keeping it is no news.
+  const kept = planned.kept.filter((path) => path !== join(root, "package.json"));
   const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
   // A starter script init just wrote gets its skeletons as sync writes them; a script that was
   // already there is the author's, and so is whether it parses.
@@ -80,6 +92,170 @@ export function initCommand(options: { cwd: string; dir?: string; deck?: string 
     ...(playwright ? { playwright } : {}),
     ...(missingTokens.length > 0 ? { missingTokens } : {}),
   };
+}
+
+/** An install init could not finish, and why. */
+type NotInstalled = { install: "dek" | "browser"; reason: string };
+
+/** Runs one install in the project: `argv[0]` is bun. */
+export type InstallRun = (
+  argv: string[],
+  cwd: string,
+) => Promise<{ exitCode: number; stderr: string }>;
+
+/** One install init runs: what a person would type, and what dek runs for it. */
+type InstallStep = { shown: string; argv: string[] };
+
+/** A browser download is the long one; nothing init installs should take longer. */
+const INSTALL_MINUTES = 10;
+
+/** The package.json init writes; one that reads otherwise is someone's, or an install's. */
+const PACKAGE_JSON = '{\n  "private": true\n}\n';
+
+const runInstall: InstallRun = (argv, cwd) =>
+  runPiped(argv, {
+    label: "bun did not finish",
+    hint: "check that bun runs, or pass --no-install and install dek yourself",
+    timeoutMs: INSTALL_MINUTES * 60_000,
+    cwd,
+  });
+
+/**
+ * `dekc init`: the project as `initCommand` writes it, then dek installed into it, pinned to the
+ * version that is running. With `browser`, Playwright and its Chromium follow. An install that
+ * fails leaves the project as written and is listed in `notInstalled`; `next`, or `playwright`
+ * for the browser, then names the install to run.
+ *
+ * init may run in a folder that is someone else's: bun runs with --ignore-scripts, so no
+ * package.json's scripts run, and dek goes only into the package.json init wrote.
+ */
+export async function initProject(options: {
+  cwd: string;
+  dir?: string;
+  deck?: string;
+  /** Install dek into the project; true unless the author passes --no-install. */
+  install?: boolean;
+  /** Install Playwright and Chromium too, for `--visual`, `dekc shot`, and `dekc pdf`. */
+  browser?: boolean;
+  run?: InstallRun;
+}): Promise<InitResult> {
+  const root = resolve(options.cwd, options.dir ?? ".");
+  const install = options.install ?? true;
+  // dek finds Playwright beside its own install, so a browser for a project without dek in it
+  // would be one no dek command uses.
+  if (options.browser && !install && !hasLocalDek(root)) {
+    throw new DekError("--browser needs dek installed in the project", {
+      hint: "drop --no-install, or run `bun add -d @hajimism/dek` in the project first",
+    });
+  }
+  const result = initCommand(options);
+  const run = options.run ?? runInstall;
+  const installed: string[] = [];
+  const notInstalled: NotInstalled[] = [];
+  const runSteps = async (
+    install: NotInstalled["install"],
+    steps: InstallStep[],
+  ): Promise<boolean> => {
+    for (const step of steps) {
+      const failure = await failureOf(run, step, root);
+      if (failure !== undefined) {
+        notInstalled.push({ install, reason: `${step.shown} ${failure}` });
+        return false;
+      }
+      installed.push(step.shown);
+    }
+    return true;
+  };
+
+  let home = dekHome(root);
+  if (home === undefined && install) {
+    if (readSourceIfExists(join(root, "package.json"), root) !== PACKAGE_JSON) {
+      notInstalled.push({
+        install: "dek",
+        reason: "package.json was already here, and init installs only into one it wrote",
+      });
+    } else if (await runSteps("dek", [bunAdd(`@hajimism/dek@${pkg.version}`)])) {
+      home = root;
+    }
+  }
+  let browserFailed = false;
+  if (options.browser) {
+    if (home === undefined) {
+      notInstalled.push({ install: "browser", reason: "dek is not installed in the project" });
+      browserFailed = true;
+    } else if (home !== root) {
+      notInstalled.push({
+        install: "browser",
+        reason: `dek runs from ${home}, and finds Playwright beside itself: install it there`,
+      });
+      browserFailed = true;
+    } else {
+      // Chromium's install is run every time: it does nothing once the browser is there, and a
+      // download cut short leaves the package without the browser.
+      browserFailed = !(await runSteps("browser", [
+        ...(playwrightStep(root) === undefined ? [] : [bunAdd("playwright")]),
+        // --bun: Playwright's CLI asks for node, which a Bun-only machine may lack.
+        {
+          shown: "bunx --bun playwright install chromium",
+          argv: [process.execPath, "x", "--bun", "playwright", "install", "chromium"],
+        },
+      ]));
+    }
+  }
+  const deckDir = options.deck ? join(root, "decks", options.deck) : undefined;
+  const playwright = browserFailed ? PLAYWRIGHT_INSTALL : playwrightStep(root);
+  const { playwright: _before, ...rest } = result;
+  return {
+    ...rest,
+    next: nextSteps(options.cwd, root, deckDir),
+    ...(installed.length > 0 ? { installed } : {}),
+    ...(notInstalled.length > 0 ? { notInstalled } : {}),
+    ...(playwright ? { playwright } : {}),
+  };
+}
+
+function bunAdd(spec: string): InstallStep {
+  return {
+    shown: `bun add -d --ignore-scripts ${spec}`,
+    argv: [process.execPath, "add", "--dev", "--ignore-scripts", spec],
+  };
+}
+
+/** Matches the color codes bun writes when FORCE_COLOR reaches it. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+const COLOR = /\x1b\[[0-9;]*m/g;
+
+/**
+ * Why `step` failed, as words to follow its command: bun's first error, which names the cause
+ * (the later ones repeat it), or why it could not run. Nothing when it ran.
+ */
+async function failureOf(
+  run: InstallRun,
+  step: InstallStep,
+  cwd: string,
+): Promise<string | undefined> {
+  try {
+    const ran = await run(step.argv, cwd);
+    if (ran.exitCode === 0) {
+      return undefined;
+    }
+    const lines = ran.stderr
+      .replace(COLOR, "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const error = lines.find((line) => line.startsWith("error:"));
+    const cause = error?.slice("error:".length).trim() ?? lines.at(-1);
+    return `failed: ${cause ?? `exit code ${ran.exitCode}`}`;
+  } catch (error) {
+    if (error instanceof OverrunError) {
+      return `did not finish within ${INSTALL_MINUTES} minutes`;
+    }
+    if (error instanceof DekError) {
+      return `failed: ${error.message}`;
+    }
+    throw error;
+  }
 }
 
 /** The tokens every deck needs that the project's theme.css does not publish on `.slide`. */
@@ -111,6 +287,8 @@ function projectPlan(root: string, deck: string | undefined): PlannedPath[] {
     { path: join(root, ".rumdl.toml"), contents: defaultRumdl() },
     { path: join(root, ".gitignore"), contents: defaultGitignore() },
     { path: join(root, "tsconfig.json"), contents: defaultTsconfig() },
+    // The install lands here, not in a package.json of a repository the project sits in.
+    { path: join(root, "package.json"), contents: PACKAGE_JSON },
     { path: join(root, "assets") },
     { path: join(root, "decks") },
     ...(deck ? deckPlan(root, deck, theme) : []),
