@@ -3,7 +3,13 @@ import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { playwrightResolved } from "../../src/core/playwright.ts";
-import { dekcReport, type Invocation, type RunReport, transcriptReport } from "./report.ts";
+import {
+  dekcReport,
+  type Invocation,
+  leftover,
+  type RunReport,
+  transcriptReport,
+} from "./report.ts";
 import { openProject, type Scenario, writeText } from "./scenario.ts";
 
 /**
@@ -45,6 +51,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
       wallMs: 0,
       agent: { exitCode: null, timedOut: false },
       dekc: dekcReport([]),
+      left: { errors: 0, warnings: 0, byRule: {} },
     };
   }
   const root = realpathSync(await mkdtemp(join(tmpdir(), "dek-eval-")));
@@ -75,6 +82,13 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
       .filter((line) => line !== "")
       .map((line) => JSON.parse(line) as Invocation);
     const reasons = await scenario.check(project);
+    // A check asks only whether the task is done; what lint still warns about is measured apart.
+    const lint = await project.dekc([
+      "lint",
+      "--json",
+      ...(scenario.needsBrowser ? ["--visual"] : []),
+    ]);
+    const left = leftover(lint.stdout);
     await cp(projectDir, join(dir, "project"), {
       recursive: true,
       filter: (path) => !/\/node_modules(\/|$)/.test(path),
@@ -87,6 +101,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
       wallMs,
       agent,
       dekc: dekcReport(invocations),
+      left,
       ...(transcript ? { transcript } : {}),
     };
   } finally {

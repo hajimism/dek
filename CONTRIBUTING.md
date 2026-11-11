@@ -67,12 +67,13 @@ The same workflow times the agent loop. `bun scripts/bench.ts` copies `sample/` 
 
 ## Watching an agent use dek
 
-Before you change a command, a diagnostic, a hint, or what dek writes into a project's `AGENTS.md`, watch an agent work with dek, then watch again after the change. Each scenario in `evals/agent/scenarios/` makes a small project with one defect in a temporary directory outside this repository, gives the agent a task in a user's words, and checks what the agent left.
+Before you change a command, a diagnostic, a hint, or what dek writes into a project's `AGENTS.md`, watch an agent work with dek, then watch again after the change. Each scenario in `evals/agent/scenarios/` makes a small project in a temporary directory outside this repository, with one defect or with work still to do (an empty folder, a script with no slides), gives the agent a task in a user's words, and checks what the agent left.
 
 ```bash
 bun scripts/agent-eval.ts                              # every scenario once, with Claude Code
 bun scripts/agent-eval.ts --scenario renamed-section --runs 3
 bun scripts/agent-eval.ts --agent 'my-agent --cwd {dir} {prompt}'
+bun scripts/agent-eval.ts --runs 3 --record evals/agent/results   # after a release commit
 ```
 
 `--agent` takes any command line, run in the project: `{prompt}` becomes the task and `{dir}` the project, and without `{prompt}` the task arrives on stdin. The default is `claude -p` with the shell commands the scenarios need allowed by name; otherwise the agent runs with your own settings. Every `dekc` the agent runs, or `bunx dekc`, goes through a shim that logs what it printed, so the report covers any agent.
@@ -80,12 +81,13 @@ bun scripts/agent-eval.ts --agent 'my-agent --cwd {dir} {prompt}'
 The report is `report.md` and `report.json` under `.cache/agent-eval/<time>/` (or `--out <dir>`), next to each run's transcript, its `dekc` log, and the project as the agent left it. Look at:
 
 - whether the run passed, how long it took, and how many `dekc` runs it took;
+- the warnings left: after the check, the runner runs `dekc lint --json` itself (with `--visual` for a scenario that needs a browser) and counts what is still there by rule, since lint passes with warnings and a run that ignored one still passes;
 - repeats: the same command run again with the same answer, a sign that what dek said did not help;
 - every error and hint the agent saw, and the errors that came without a hint;
 - whether the agent ran a command a hint named, and whether that command worked;
 - refused tool calls: such a run measured the agent's permissions, not dek, so widen `--agent`.
 
-A run costs model usage and takes minutes, so it is never run in CI; one run is an anecdote, so compare a few before and after. To add a scenario, give it a known solution as well: `AGENT_EVAL_TESTS=1 bun test --timeout=20000 tests/scripts/agent-eval.test.ts` checks that every scenario fails as set up and passes once solved, with no model. Without the variable, `bun test --timeout=20000` runs only the report's unit tests and skips these, which take a minute and a browser.
+A run costs model usage and takes minutes, so it is never run in CI; one run is an anecdote, so compare a few before and after. Once a release commit is in, keep a record: `bun scripts/agent-eval.ts --runs 3 --record evals/agent/results` also writes `evals/agent/results/<date>-v<version>.json`, the commit measured and each scenario's passes with the median time, `dekc` runs, repeats, errors left, and warnings left, and the errors that came without a hint. It holds no paths and nothing the agent wrote, so commit it as it is; [`evals/agent/results/`](./evals/agent/results/) says how to read the records together. To add a scenario, give it a known solution as well: `AGENT_EVAL_TESTS=1 bun test --timeout=20000 tests/scripts/agent-eval.test.ts` checks that every scenario fails as set up and passes once solved, with no model. Without the variable, `bun test --timeout=20000` runs only the report's unit tests and skips these, which take several minutes and a browser.
 
 ## Working on dek with Claude Code
 
