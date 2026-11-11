@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { recordName, summarize } from "../../evals/agent/record.ts";
+import { summarize, writeRecord } from "../../evals/agent/record.ts";
 import {
   dekcReport,
   type EvalReport,
@@ -165,10 +165,10 @@ describe("leftover", () => {
     });
   });
 
-  test("counts a lint that could not run as one error, under no rule", () => {
+  test("counts a lint that could not look as one error, and its warnings as unknown", () => {
     const envelope = { ok: false, error: { message: "not a dek project" } };
-    expect(leftover(JSON.stringify(envelope))).toEqual({ errors: 1, warnings: 0, byRule: {} });
-    expect(leftover("Segmentation fault\n")).toEqual({ errors: 1, warnings: 0, byRule: {} });
+    expect(leftover(JSON.stringify(envelope))).toEqual({ errors: 1, warnings: null, byRule: {} });
+    expect(leftover("Segmentation fault\n")).toEqual({ errors: 1, warnings: null, byRule: {} });
   });
 });
 
@@ -205,7 +205,23 @@ describe("markdown", () => {
     expect(text).toContain("Left after the run: 0 errors, 2 warnings (DEK035 ×1, DEK036 ×1).");
     expect(text).toContain("Left after the run: 1 error, 0 warnings (DEK001 ×1).");
   });
+
+  test("shows the warnings of a run whose lint could not look as unknown, not as none", () => {
+    const text = markdown(
+      evalReport([
+        runReport({ left: { errors: 0, warnings: 1, byRule: { DEK035: 1 } } }),
+        runReport({ run: 2, outcome: "failed", left: { errors: 1, warnings: null, byRule: {} } }),
+      ]),
+    );
+    expect(text).toMatch(/^\| overflow \| 1\/2 \|.*\| 1 \/ \? \|$/m);
+    expect(text).toContain(
+      "Left after the run: 1 error, warnings unknown: lint printed no list of diagnostics.",
+    );
+  });
 });
+
+/** The dek a summary in these tests measured. */
+const measured = { dek: "0.6.2", commit: "d9a6bcc" };
 
 describe("summarize", () => {
   const repeated = (times: number): Invocation[] =>
@@ -233,9 +249,10 @@ describe("summarize", () => {
       runReport({ run: 3, wallMs: 60_000, dekc: dekcReport(repeated(4)) }),
       runReport({ run: 4, outcome: "skipped", reasons: ["no Playwright"], wallMs: 0 }),
     ]);
-    const summary = summarize(report, "0.6.2");
+    const summary = summarize(report, { dek: "0.6.2", commit: "d9a6bcc" });
     expect(summary).toEqual({
       dek: "0.6.2",
+      commit: "d9a6bcc",
       date: "2026-11-11",
       scenarios: [
         {
@@ -247,6 +264,7 @@ describe("summarize", () => {
           medianDekcRuns: 3,
           medianRepeats: 1,
           unhintedErrors: 2,
+          medianErrorsLeft: 0,
           medianWarningsLeft: 1,
         },
       ],
@@ -261,24 +279,60 @@ describe("summarize", () => {
         runReport({ run: 2, wallMs: 25_000 }),
         runReport({ run: 3, outcome: "skipped", wallMs: 0 }),
       ]),
-      "0.6.2",
+      measured,
     );
     expect(summary.scenarios[0]?.medianWallMs).toBe(17_500);
-    const none = summarize(evalReport([runReport({ outcome: "skipped" })]), "0.6.2");
+    const none = summarize(evalReport([runReport({ outcome: "skipped" })]), measured);
     expect(none.scenarios[0]).toMatchObject({
       runs: 0,
       skipped: 1,
       medianWallMs: null,
+      medianErrorsLeft: null,
       medianWarningsLeft: null,
     });
   });
 
-  test("names the record by its date and dek version, and never overwrites one", () => {
-    const summary = summarize(evalReport([runReport()]), "0.6.2");
-    expect(recordName(summary, () => false)).toBe("2026-11-11-v0.6.2.json");
-    const taken = new Set(["2026-11-11-v0.6.2.json", "2026-11-11-v0.6.2-2.json"]);
-    expect(recordName(summary, (name) => taken.has(name))).toBe("2026-11-11-v0.6.2-3.json");
+  test("leaves a run whose lint could not look out of the warnings left, not counted as none", () => {
+    const blind = { errors: 1, warnings: null, byRule: {} };
+    const summary = summarize(
+      evalReport([
+        runReport({ left: { errors: 0, warnings: 4, byRule: { DEK035: 4 } } }),
+        runReport({ run: 2, outcome: "failed", left: blind }),
+        runReport({ run: 3, outcome: "failed", left: blind }),
+      ]),
+      measured,
+    );
+    expect(summary.scenarios[0]).toMatchObject({ medianErrorsLeft: 1, medianWarningsLeft: 4 });
+    const never = summarize(evalReport([runReport({ outcome: "failed", left: blind })]), measured);
+    expect(never.scenarios[0]).toMatchObject({ medianErrorsLeft: 1, medianWarningsLeft: null });
   });
+
+  test("keeps the commit measured, or null outside a git checkout", () => {
+    expect(summarize(evalReport([runReport()]), measured).commit).toBe("d9a6bcc");
+    expect(summarize(evalReport([runReport()]), { dek: "0.6.2", commit: null }).commit).toBeNull();
+  });
+});
+
+describe("writeRecord", () => {
+  test("names the record by its date and dek version, and never overwrites one", () =>
+    withTempDir(async (dir) => {
+      const summary = summarize(evalReport([runReport()]), measured);
+      const first = await writeRecord(dir, summary);
+      expect(first).toBe(join(dir, "2026-11-11-v0.6.2.json"));
+      expect(await Bun.file(first).json()).toEqual(summary);
+      await Bun.write(join(dir, "2026-11-11-v0.6.2-2.json"), "kept\n");
+      expect(await writeRecord(dir, summary)).toBe(join(dir, "2026-11-11-v0.6.2-3.json"));
+      expect(await Bun.file(join(dir, "2026-11-11-v0.6.2-2.json")).text()).toBe("kept\n");
+      expect(await Bun.file(first).json()).toEqual(summary);
+    }));
+
+  test("makes the directory it writes into", () =>
+    withTempDir(async (dir) => {
+      const summary = summarize(evalReport([runReport()]), measured);
+      expect(await writeRecord(join(dir, "results"), summary)).toBe(
+        join(dir, "results", "2026-11-11-v0.6.2.json"),
+      );
+    }));
 });
 
 describe("transcriptReport", () => {
@@ -519,6 +573,8 @@ describe.skipIf(!endToEnd)(`scripts/agent-eval.ts${unlessOptedIn}`, () => {
         const kept = readdirSync(record);
         expect(kept).toEqual([`${report.startedAt.slice(0, 10)}-v${pkg.version}.json`]);
         const summary = await Bun.file(join(record, kept[0] ?? "")).text();
+        const commit = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: repoRoot });
+        expect(JSON.parse(summary).commit).toBe(commit.stdout.toString().trim());
         expect(JSON.parse(summary).scenarios).toEqual([
           expect.objectContaining({ id: "mistyped-deck", runs: 2, passed: 2, skipped: 0 }),
         ]);

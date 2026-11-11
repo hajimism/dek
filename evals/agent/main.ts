@@ -1,8 +1,7 @@
-import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import pkg from "../../package.json";
-import { recordName, summarize } from "./record.ts";
+import { summarize, writeRecord } from "./record.ts";
 import { type EvalReport, markdown } from "./report.ts";
 import { DEFAULT_AGENT, runScenario } from "./run.ts";
 import { writeText } from "./scenario.ts";
@@ -85,17 +84,28 @@ export async function main(argv: string[]): Promise<number> {
   await writeText(resolve(out, "report.md"), text);
   process.stdout.write(`${text}\nwrote ${resolve(out, "report.json")} and report.md\n`);
   if (values.record !== undefined) {
-    const summary = summarize(report, pkg.version);
-    const dir = resolve(values.record);
-    const path = resolve(
-      dir,
-      recordName(summary, (name) => existsSync(resolve(dir, name))),
-    );
-    await writeText(path, `${JSON.stringify(summary, null, 2)}\n`);
+    const summary = summarize(report, { dek: pkg.version, commit: headCommit() });
+    const path = await writeRecord(resolve(values.record), summary);
     process.stdout.write(`wrote ${path}\n`);
   }
   const failed = report.scenarios.some(({ runs }) => runs.some((run) => run.outcome === "failed"));
   return failed ? 1 : 0;
+}
+
+/** The checkout being measured, as `git rev-parse --short HEAD`, or null outside a git checkout. */
+function headCommit(): string | null {
+  try {
+    const git = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], {
+      cwd: import.meta.dir,
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    const commit = git.stdout.toString().trim();
+    return git.exitCode === 0 && commit !== "" ? commit : null;
+  } catch {
+    // No git on PATH.
+    return null;
+  }
 }
 
 function fail(message: string, hint: string): number {
