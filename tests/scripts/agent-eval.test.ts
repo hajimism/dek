@@ -600,6 +600,27 @@ describe.skipIf(!endToEnd)(`checks that a lint pass alone does not satisfy${unle
   );
 
   test.skipIf(noBrowser)(
+    "ja-line-break: the fixed deck passes once built, though the build breaks by keep-all",
+    async () => {
+      const found = await checkAfter(byId("ja-line-break"), async (dir) => {
+        await phrased(dir);
+        await must(openProject(dir).dekc(["build"], { cwd: "decks/talk" }), "dekc build");
+      });
+      expect(found).toEqual([]);
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
+    "ja-line-break: the rule setup wrote is left to DEK035, so a fix by <br> may keep it",
+    async () => {
+      const found = await checkAfter(byId("ja-line-break"), async () => {});
+      expect(found).toEqual([expect.stringContaining("DEK035")]);
+    },
+    SCENARIO_MS,
+  );
+
+  test.skipIf(noBrowser)(
     "ja-line-break: a deck said to be in English fails though lint passes",
     async () => {
       const found = await checkAfter(

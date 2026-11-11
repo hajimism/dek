@@ -71,7 +71,9 @@ function shown(html: string): string {
  */
 function breaking(text: string): string[] {
   const found: string[] = [];
-  for (const match of text.matchAll(/(?<![\w.#-])(word-break|line-break)\s*:\s*([^;{}"'<>]*)/gi)) {
+  for (const match of text.matchAll(
+    /(?<![\w.#-])(word-break|line-break)\s*:\s*([^;{}()"'<>]*)/gi,
+  )) {
     const property = (match[1] ?? "").toLowerCase();
     const value = (match[2] ?? "")
       .replace(/!\s*important\s*$/i, "")
@@ -94,15 +96,27 @@ const SEEDED_BREAKING: Record<string, string[]> = {
 };
 
 /**
- * Every stylesheet and slide in the project that lets Japanese break inside a phrase, past what
- * setup wrote, and every element said to be in another language, which Chromium does not break
- * by phrase: two ways around DEK035 that leave the paragraph as hard to read.
+ * Where a deck's own styles and slides live: what an author writes, not what the build writes
+ * from it, which puts `keep-all` before each `auto-phrase` for browsers without it.
+ */
+const SOURCES = [
+  "theme.css",
+  "decks/*/theme.css",
+  "decks/*/slides/**/*.{css,html}",
+  "decks/*/assets/**/*.css",
+];
+
+/**
+ * Every stylesheet and slide the project's author writes that lets Japanese break inside a
+ * phrase, past what setup wrote, and every element said to be in another language, which
+ * Chromium does not break by phrase: two ways around DEK035 that leave the paragraph as hard to
+ * read.
  */
 async function aroundTheRule(project: Project): Promise<string[]> {
   const found: string[] = [];
-  const paths = [...new Bun.Glob("**/*.{css,html}").scanSync(project.dir)]
-    .filter((path) => !path.split("/").includes("node_modules"))
-    .sort();
+  const paths = [
+    ...new Set(SOURCES.flatMap((source) => [...new Bun.Glob(source).scanSync(project.dir)])),
+  ].sort();
   for (const path of paths) {
     const text = (await project.read(path)) ?? "";
     const seeded = [...(SEEDED_BREAKING[path] ?? [])];
