@@ -38,14 +38,14 @@ export const isStamped = (el: Element): boolean => el.hasAttribute(SOURCE_ATTR);
  * only near it, each before anything it is inside, and the slide itself last. A line beside the
  * pointer so comes before the drawing it is in, which is under the pointer and easy to hit.
  * `elementsAt` is the document's `elementsFromPoint`, every element at a point, topmost first.
- * `counts` says which elements may be picked at all: those stamped with their source, unless a
- * page that has no such stamps, as a build, says otherwise.
+ * `counts` says which elements may be picked at all: annotate mode takes those stamped with their
+ * source (`isStamped`); a build has no stamps, and the embed API takes any.
  */
 export function candidatesAt(
   at: Point,
   slide: Element,
   elementsAt: (x: number, y: number) => readonly Element[],
-  counts: (el: Element) => boolean = isStamped,
+  counts: (el: Element) => boolean,
 ): Element[] {
   const isCandidate = (el: Element): boolean =>
     counts(el) && slide.contains(el) && isShown(el, slide);
@@ -91,18 +91,17 @@ function isShown(el: Element, slide: Element): boolean {
 export function describeElement(
   el: Element,
   slide: Element,
-  classes: (el: Element) => string[] = writtenClasses,
 ): { source: string; name: string; text: string } {
   return {
     source: el.getAttribute(SOURCE_ATTR) ?? "",
-    name: [el.tagName.toLowerCase(), ...classes(el)].join("."),
+    name: elementName(el, (el.getAttribute(CLASS_ATTR) ?? "").split(" ").filter(Boolean)),
     text: el === slide ? "" : cutText(el.textContent ?? ""),
   };
 }
 
-/** The classes the dev server saw written on `el`, or none when it stamped none. */
-export function writtenClasses(el: Element): string[] {
-  return (el.getAttribute(CLASS_ATTR) ?? "").split(" ").filter(Boolean);
+/** An element as a note names it: its tag, then each of `classes`, as `div.chevron`. */
+export function elementName(el: Element, classes: readonly string[]): string {
+  return [el.tagName.toLowerCase(), ...classes].join(".");
 }
 
 /** Where `el` is on the slide, in the slide's own pixels, whatever the stage scales it to. */

@@ -13,6 +13,7 @@ import {
   candidatesAt,
   currentStop,
   describeElement,
+  isStamped,
   SOURCE_ATTR,
   slideBox,
   slidePoint,
@@ -366,7 +367,7 @@ export function createAnnotateView(options: {
 
   function candidates(at: Point): Element[] {
     const { slide } = onScreen();
-    return slide ? candidatesAt(at, slide, elementsAt) : [];
+    return slide ? candidatesAt(at, slide, elementsAt, isStamped) : [];
   }
 
   /** An element as a note names it: its name, its text, and its line, as Copy writes them. */

@@ -4,12 +4,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildCommand } from "../../src/cli/build.ts";
 import { COMMANDS } from "../../src/cli/commands.ts";
+import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { parseCommandLine } from "../../src/cli/flags.ts";
 import { formatText } from "../../src/cli/result.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
 import { PLAYWRIGHT_INSTALL, type VisualRequest } from "../../src/core/playwright.ts";
-import type { SlideMap } from "../../src/pub/protocol.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -427,9 +427,9 @@ title: Demo
         ],
       },
       async (root) => {
-        const full = jsonStdout<{ outs: string[]; slideMaps: SlideMap[] }>(
-          await runDek(["build", "--json"], { cwd: root }),
-        );
+        const full = await buildCommand(resolveDecks(root));
+        // What --json prints for it keeps the contract, the slide maps included.
+        expect(contractIssues(printedBy(["build", "--json"]), { ok: true, ...full })).toEqual([]);
         expect(full.slideMaps.map((map) => map.deck)).toEqual(["alpha", "beta"]);
         expect(full.slideMaps.map((map) => map.out)).toEqual(full.outs);
         const [alpha] = full.slideMaps;
@@ -441,9 +441,9 @@ title: Demo
         expect(alpha?.slides[0]?.paragraphs).toEqual(["今日は三つ話します。", "速くなりました。"]);
         expect(alpha?.slides[0]?.script).toContain("目次は読み上げない");
 
-        const shared = jsonStdout<{ slideMaps: SlideMap[] }>(
-          await runDek(["build", "--json", "--public"], { cwd: join(root, "decks", "alpha") }),
-        );
+        const shared = await buildCommand(resolveDecks(join(root, "decks", "alpha")), {
+          public: true,
+        });
         expect(shared.slideMaps.map((map) => map.deck)).toEqual(["alpha"]);
         expect(shared.slideMaps[0]?.slides[0]?.script).not.toContain("目次は読み上げない");
         expect(shared.slideMaps[0]?.slides[0]?.script).toContain("今日は三つ話します。");

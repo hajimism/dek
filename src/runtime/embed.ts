@@ -3,6 +3,7 @@
 // and what the deck tells that page. It runs only in a deck that is framed, and only listens to
 // the page that frames it. Nothing it sends holds the script, the notes, or speaker data.
 
+import { cutText } from "../core/annotation-rows.ts";
 import {
   type EmbedMark,
   type EmbedMessage,
@@ -19,14 +20,7 @@ import { positionsEqual } from "../core/position.ts";
 import { logicalSize } from "../core/size.ts";
 import type { BeatRef, Position } from "../core/step.ts";
 import { RUNTIME_CLASSES } from "../core/theme-facts.ts";
-import {
-  candidatesAt,
-  describeElement,
-  isStamped,
-  slideBox,
-  windowPoint,
-  writtenClasses,
-} from "./annotate-pick.ts";
+import { candidatesAt, elementName, slideBox, windowPoint } from "./annotate-pick.ts";
 import { deckSize } from "./clone.ts";
 import { slideSelector } from "./live.ts";
 
@@ -130,7 +124,9 @@ export function createEmbed(options: {
     if (!slide || !deckEl) {
       return;
     }
-    const { name, text } = describeElement(el, slide, classes);
+    // Named as annotate mode names it; the slide's own text is the whole slide, which names nothing.
+    const name = elementName(el, classes(el));
+    const text = el === slide ? "" : cutText(el.textContent ?? "");
     post(pickedMessage({ slug, step }, { name, text, box: slideBox(el, deckEl) }));
   }
 
@@ -255,9 +251,9 @@ export function createEmbed(options: {
 }
 
 /**
- * An element's classes as the build wrote them: what the dev server stamped, or else what the
- * element had before the player or a slide script set any, less the state classes the player
- * sets. A name built from them is one an author finds in `slides/<slug>.html`.
+ * An element's classes as the build wrote them: what it had before the player or a slide script
+ * set any, less the state classes the player sets. A name built from them is one an author finds
+ * in `slides/<slug>.html`. An element a script made later has only the classes it has now.
  */
 function classesAsBuilt(deckEl: HTMLElement | null): (el: Element) => string[] {
   const own = (el: Element): string[] =>
@@ -266,7 +262,7 @@ function classesAsBuilt(deckEl: HTMLElement | null): (el: Element) => string[] {
   for (const el of deckEl?.querySelectorAll(".slide, .slide *") ?? []) {
     built.set(el, own(el));
   }
-  return (el) => (isStamped(el) ? writtenClasses(el) : (built.get(el) ?? own(el)));
+  return (el) => built.get(el) ?? own(el);
 }
 
 function viewport(): DOMRect {
