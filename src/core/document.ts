@@ -40,6 +40,8 @@ export type PageTarget =
       kind: "build";
       /** Built with `--public`, for anyone who has the link rather than the speaker. */
       public?: boolean;
+      /** Built with `--no-script`: the slides alone, with no script and no presenter view. */
+      script?: false;
       /** The built page's absolute URL, for og:url. */
       publicUrl?: string;
       /** The first slide's picture, for og:image. */
@@ -75,7 +77,10 @@ export function renderDeckDocument(
   // hours of rendering would show slides without their motion, so a broken script stops it.
   const standalone = !live;
   const strictScripts = target.kind === "video";
-  const includeNotes = target.kind === "dev" ? target.includeNotes : target.kind === "build";
+  const includeNotes =
+    target.kind === "dev"
+      ? target.includeNotes
+      : target.kind === "build" && target.script !== false;
   const data = presenterSlides(deck, scriptReader(target)).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
@@ -177,11 +182,15 @@ export function renderDeckDocument(
 
 /**
  * A page built with `--public` is for anyone who has the link, so it carries the script as the
- * audience may read it; any other page is the speaker's own. A URL alone says where the page is
- * served, not who reads it: the speaker may present from that very page.
+ * audience may read it; one built with `--no-script` carries none of it; any other page is the
+ * speaker's own. A URL alone says where the page is served, not who reads it: the speaker may
+ * present from that very page.
  */
 function scriptReader(target: PageTarget): ScriptReader {
-  return target.kind === "build" && target.public === true ? "audience" : "speaker";
+  if (target.kind !== "build") {
+    return "speaker";
+  }
+  return target.script === false ? "nobody" : target.public === true ? "audience" : "speaker";
 }
 
 export function renderRailHtml(slides: Array<{ slug: string; title: string }>): string {

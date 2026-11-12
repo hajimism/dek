@@ -823,19 +823,25 @@ export const COMMANDS = {
   build: result({
     scope: "decks",
     args: [],
-    flags: ["root-dist", "url", "public"],
-    usage: ["dekc build [deck] [--root-dist] [--url <url>] [--public]"],
+    flags: ["root-dist", "url", "public", "no-script"],
+    usage: ["dekc build [deck] [--root-dist] [--url <url>] [--public] [--no-script]"],
     summary:
       "Write the whole talk into one HTML file, dist/<deck>.html. Lint never stops a build;\nthe output says what lint found. Given the URL dist/ is served from, the first slide\nalso becomes dist/<deck>.png, the picture a shared link shows.",
     group: "Output",
-    overview: [["dekc build [--root-dist] [--url <url>] [--public]", "write a single HTML file"]],
-    agent: ["dekc build [--root-dist] [--url <url>] [--public]"],
+    overview: [
+      [
+        "dekc build [--root-dist] [--url <url>] [--public] [--no-script]",
+        "write a single HTML file",
+      ],
+    ],
+    agent: ["dekc build [--root-dist] [--url <url>] [--public] [--no-script]"],
     run: async ({ target, flags }) => {
       const { buildCommand } = await import("./build.ts");
       return buildCommand(target, {
         rootDist: flags["root-dist"],
         url: flags.url,
         public: flags.public,
+        ...(flags["no-script"] ? { script: false as const } : {}),
       });
     },
     output: {

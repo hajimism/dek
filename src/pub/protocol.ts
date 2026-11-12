@@ -67,8 +67,13 @@ export type CommentPolicy = z.infer<typeof CommentPolicy>;
 export const Rename = z.strictObject({ from: z.string(), to: z.string(), at: z.string() });
 export type Rename = z.infer<typeof Rename>;
 
-/** The files a version is made of, as the upload's form fields name them. */
-export const VERSION_FILES = ["full", "public", "source", "cover"] as const;
+/**
+ * The files a version is made of, as the upload's form fields name them: the build with the whole
+ * script, for its owner; the one with what is said aloud, for readers when the script is public;
+ * the bare one with no script, for readers when it is not; the source; and the first slide's
+ * picture.
+ */
+export const VERSION_FILES = ["full", "public", "bare", "source", "cover"] as const;
 export type VersionFile = (typeof VERSION_FILES)[number];
 
 const Sha256 = z.string().regex(/^[0-9a-f]{64}$/);

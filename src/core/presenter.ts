@@ -12,8 +12,17 @@ export {
 /**
  * Who reads the script the page carries: the speaker reads all of it, and a page anyone may open
  * carries only what is said aloud, since the directions and the comments were for the speaker.
+ * A page for `nobody` carries none of it, not even the beats' headings: the slides alone.
  */
-export type ScriptReader = "speaker" | "audience";
+export type ScriptReader = "speaker" | "audience" | "nobody";
+
+/** The section's script as `reader` may read it. */
+export function scriptFor(script: string, reader: ScriptReader): string {
+  if (reader === "nobody") {
+    return "";
+  }
+  return reflowScript(reader === "audience" ? withoutDirections(script) : script);
+}
 
 export function presenterSlides(
   deck: ProjectDeck,
@@ -26,8 +35,11 @@ export function presenterSlides(
     return {
       slug: section.slug,
       title: section.title,
-      script: reflowScript(reader === "audience" ? withoutDirections(script) : script),
-      beats: section.beats.map((beat) => ({ id: beat.id, title: beat.title })),
+      script: scriptFor(script, reader),
+      beats: section.beats.map((beat) => ({
+        id: beat.id,
+        title: reader === "nobody" ? "" : beat.title,
+      })),
       ...(budgetBySlug.get(section.slug) !== undefined
         ? { budgetSeconds: budgetBySlug.get(section.slug) }
         : {}),

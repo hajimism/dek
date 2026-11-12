@@ -104,6 +104,10 @@ export const FLAGS = {
     type: "boolean",
     text: "for anyone the file reaches: the script without its stage directions and comments",
   },
+  "no-script": {
+    type: "boolean",
+    text: "the slides alone: no script at all, and no presenter view",
+  },
 } as const satisfies Record<string, FlagSpec>;
 
 export type FlagName = keyof typeof FLAGS;

@@ -568,4 +568,15 @@ title: Why dek
       expect(html).not.toContain("押したら二つ");
     });
   });
+
+  test("leaves the whole script and the presenter view out of a page built with no script", async () => {
+    await withTempProject(spec(), async (root) => {
+      const result = await build(join(root, "decks", "demo"), { script: false, public: true });
+      const html = await readFile(result.outPath, "utf8");
+      expect(html).not.toContain("今日は三つ話します");
+      expect(html).not.toContain("目次は読み上げない");
+      expect(html).not.toContain('id="dek-presenter"');
+      expect(html).toContain("<h2");
+    });
+  });
 });
