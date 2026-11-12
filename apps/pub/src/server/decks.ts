@@ -2,7 +2,7 @@
 
 import { decks, grants, versions } from "@schema";
 import type { Context } from "hono";
-import { and, asc, db, desc, eq, or } from "void/db";
+import { and, db, desc, eq, or } from "void/db";
 import { env } from "void/env";
 import { storage } from "void/storage";
 import type { DeckStatus, LintSummary, VersionSummary } from "../../../../src/pub/protocol.ts";

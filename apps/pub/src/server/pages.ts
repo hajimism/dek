@@ -111,7 +111,7 @@ export async function loadTalk(
     return null;
   }
   const row = await deckBySlug(account.id, slug);
-  if (!row || row.currentVersion === null) {
+  if (!row || row.latestVersion === null) {
     return null;
   }
   const person = await currentPerson(c).catch(() => null);
@@ -125,7 +125,12 @@ export async function loadTalk(
     }
     throw error;
   }
-  const n = deck.currentVersion ?? 0;
+  // Readers see the current version; the owner of a deck whose versions were all uploaded with
+  // --no-promote sees the newest, so the page is never a 404 to the one who published it.
+  const n = deck.currentVersion ?? (canManage(deck, person) ? deck.latestVersion : null);
+  if (n === null) {
+    return null;
+  }
   const version = await versionRow(deck.id, n);
   if (!version) {
     return null;
@@ -138,7 +143,7 @@ export async function loadTalk(
 
   const origin = deckOrigin(env.DECK_ORIGIN, deck.id);
   let src = `${origin}/v/${n}/`;
-  if (deck.visibility !== "public") {
+  if (deck.visibility !== "public" || n !== deck.currentVersion) {
     const token = await signServeToken(env.SERVE_TOKEN_SECRET, {
       deck: deck.id,
       n,
@@ -149,7 +154,8 @@ export async function loadTalk(
   }
 
   const mayComment = canComment(deck, person, grant);
-  const comments = isOwner || mayComment ? await listComments(c, deck, { status: "all" }) : null;
+  const comments =
+    isOwner || mayComment ? await listComments(c, deck, { status: "all", version: n }) : null;
   const picture = pictureOf(
     deck,
     n,
