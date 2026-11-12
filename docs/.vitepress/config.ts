@@ -28,6 +28,7 @@ function guide(p: string, t: Record<string, string>): DefaultTheme.SidebarItem[]
       text: t.workflows,
       items: [
         { text: t.present, link: `${p}/guide/present` },
+        { text: t.publish, link: `${p}/guide/publish` },
         { text: t.voice, link: `${p}/guide/voice` },
         { text: t.ai, link: `${p}/guide/ai` },
       ],
@@ -72,6 +73,7 @@ const en = {
   lint: "Lint",
   workflows: "Workflows",
   present: "Presenting",
+  publish: "Publish on dek.pub",
   voice: "Voice and Video",
   ai: "Working with AI Agents",
   more: "More",
@@ -100,6 +102,7 @@ const ja = {
   lint: "Lint",
   workflows: "ワークフロー",
   present: "発表する",
+  publish: "dek.pub で公開する",
   voice: "声と動画",
   ai: "AI エージェントと作る",
   more: "その他",

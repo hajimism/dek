@@ -21,6 +21,7 @@ const GROUP_TITLES: Record<Group, string> = {
   Refs: "Refs (other people's decks to read as models; read-only)",
   Slide: "Slide",
   Output: "Output",
+  Publish: "Publish (dek.pub: the talk online, with its script and comments)",
   Help: "Help",
 };
 
@@ -93,11 +94,10 @@ const DOCS_URL = "https://hajimism.github.io/dek/reference/cli.html";
 export function commandHelp(command: CommandName): string {
   const flags: FlagName[] = [...commandFlags(command), "json", "help"];
   const label = (flag: FlagName): string => {
-    if (flag === "help") {
-      return "--help, -h";
-    }
+    const spec = FLAGS[flag];
+    const short = "short" in spec ? `, -${spec.short}` : "";
     const value = flagValue(flag);
-    return value ? `--${flag} ${value}` : `--${flag}`;
+    return value ? `--${flag}${short} ${value}` : `--${flag}${short}`;
   };
   const width = Math.max(...flags.map((flag) => label(flag).length)) + 3;
   const [first, ...more] = usageLines(command);

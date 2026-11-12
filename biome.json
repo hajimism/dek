@@ -12,8 +12,8 @@
       "tests/**",
       "evals/**",
       "apps/pub/**",
-      "!apps/pub/db/migrations/**",
-      "!apps/pub/.void/**"
+      "!apps/pub/db/migrations",
+      "!apps/pub/.void"
     ]
   },
   "formatter": {

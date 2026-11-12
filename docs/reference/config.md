@@ -120,6 +120,7 @@ lang: en
 | `max_classes` | no | The most classes `theme.css` may define (`DEK013`). Default `40` |
 | `cjk_per_minute` | no | Speaking rate for CJK text, in characters a minute. Default `300` |
 | `latin_per_minute` | no | Speaking rate for other text, in words a minute. Default `130` |
+| `pub` | no | The deck's ID on [dek.pub](/guide/publish), `d_` and 10 to 32 lowercase letters and digits. `dekc pub publish` writes it on the first publish; commit it, so a publish from any checkout updates the same deck. Delete it to publish as a new deck |
 
 Any other key is ignored, and lint names it as `DEK008`.
 

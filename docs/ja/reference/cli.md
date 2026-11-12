@@ -13,7 +13,7 @@ description: 'コマンド、フラグ、環境変数。'
 - **各コマンドの形は JSON Schema。** [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) で公開しており、`$defs` にコマンドごとの定義があります。
 - **形はまだ固まっていない。** dek が 0.x のあいだは、`--json` の形とルール ID がリリース間で変わることがあります。ルール ID を別のルールに使い回すことはありません。
 - **診断は SARIF。** `dekc lint --format sarif`。URI は `file://`、位置は行と列、hint・slug・data は `properties` に入り、飛ばしたチェックは tool execution notification になります。既定は ESLint 風のテキスト `path:line:column: id message` です。
-- **失敗になるのは error だけ。** 各診断は `severity` を持ちます。error が残っていれば `lint` と `check` は `"ok": false` と終了コード 1 を返し、warning だけなら終了コード 0 です。
+- **失敗になるのは error だけ。** 各診断は `severity` を持ちます。error が残っていれば `lint`・`check`・`pub publish` は `"ok": false` と終了コード 1 を返し、warning だけなら終了コード 0 です。
 - **`init` と `sync` はあなたの作業を上書きしない。** 足りないものを作り、余ったものを警告します。sync が書き直したり消したりするスライドは、誰も手を入れていない骨格だけです。元になった台本が変われば書き直し、セクションがなくなって横にスタイルシートもスクリプトもなければ消します。`AGENTS.md` で dek が持つのは `<!-- dek:begin … -->` から `<!-- dek:end -->` までのブロックだけです。リネームもしません。
 - **すべてのエラーが hint を持つ。** hint は次に叩くコマンドを示します。直し方が決まっている診断にも hint が付きます。`data-step` に使える beat id、スライドで使えるクラス、リモート画像の置き先の `assets/` パスなどです。
 - **テキスト出力には、デッキや ref が書いたエスケープコードを出さない。** 結果やエラーのテキストにある制御文字は、改行とタブを除いて U+FFFD として出すので、端末に届く色は dek 自身のものだけです。`--json` はテキストをそのまま返します。
@@ -23,7 +23,7 @@ description: 'コマンド、フラグ、環境変数。'
 - **デッキごとにファイルを書くコマンドはリストを返す。** `build` と `pdf` は、1 デッキでも対象のデッキごとのパスを `outs` で返します。
 - **ref は読むだけで、書き換えない。** `ls`・`show`・`theme`・`shot` はデッキの代わりに ref 名（`owner/repo/deck`、pack なら `file/<deck>`）を受け取ります。`dekc new --theme-from` は ref のテーマを新しいデッキにコピーします。それ以外のコマンドは ref を受け取りません。開発サーバーを含め、どのコマンドも ref のスナップショットの中のディレクトリでは動きません。[ref](#ref) を参照してください。
 - **ヘルプはコマンドごとに出る。** `dekc help <command>`、`dekc <command> --help`、`-h` で、そのコマンドの使い方、やること、受け付けるフラグをすべて表示します。`dekc --version`（`-v`）はバージョンを表示します。コマンド名やデッキ名を打ち間違えると `did you mean …?` で候補を示します。
-- **フラグはコマンドごとに確かめる。** `--json`、`--help`、`--version` はどこでも使えます。それ以外のフラグは受け付けるコマンドでだけ使え、`--deck` は `new`・`ref`・`help` 以外のすべてで使えます。綴りを間違えたフラグや別のコマンドのフラグは知らないうちに無視されることはなく、エラーになります。hint にはそのコマンドが受け付けるフラグと `dekc help <command>` が並びます。値も何かを実行する前に確かめます。`--port` は 1 から 65535 の整数、`--fps` は 0 より大きい数、`--accent` は 0 以上の整数、`--format` は `sarif` だけを受け付け、それ以外は空の値も含めて `invalid --<flag> "<value>"` になり、hint にそのフラグが受け付ける値が出ます。
+- **フラグはコマンドごとに確かめる。** `--json`、`--help`、`--version` はどこでも使えます。それ以外のフラグは受け付けるコマンドでだけ使え、`--deck` は `new`・`ref`・`help`、単独の `pub`、`pub login`・`pub logout`・`pub whoami` 以外のすべてで使えます。綴りを間違えたフラグや別のコマンドのフラグは知らないうちに無視されることはなく、エラーになります。hint にはそのコマンドが受け付けるフラグと `dekc help <command>` が並びます。値も何かを実行する前に確かめます。`--port` は 1 から 65535 の整数、`--fps` は 0 より大きい数、`--accent` は 0 以上の整数、`--format` は `sarif` だけを受け付け、それ以外は空の値も含めて `invalid --<flag> "<value>"` になり、hint にそのフラグが受け付ける値が出ます。
 - **引数もコマンドごとに確かめる。** 足りない引数は `missing <slug> for dekc show`、コマンドが受け付ける数を超えた引数は `unexpected argument "extra" for dekc ls` になり、どちらも hint にそのコマンドの使い方と `dekc help <command>` が出ます。サブコマンドを打ち間違えると `did you mean …?` で候補を示します。`dekc voice speakr` なら `dekc voice speakers` です。
 
 ## 開発
@@ -94,10 +94,31 @@ ref の文章は他人のものなので、dek は自分の言葉と分けて扱
 | `dekc voice [deck] say <text>` | 1 文を再生 |
 | `dekc voice [deck] dict add <word> <kana> [--accent N]` | `voice/dict.toml` に読みを追加。`--accent` でアクセント位置も指定する |
 | `dekc voice [deck] pin` | マスター音声と `timeline.json` を `voice/pin/` にコピー |
-| `dekc build [deck] [--root-dist] [--url <url>] [--public]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dekc lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。`--public` はリンクを知る誰もが開くページを作り、発表者ビューから台本のト書きと HTML コメントを外す。付けなければ、URL の有無にかかわらず発表者ビューに台本がすべて入る。`--json` は `outs`、`images`、`diagnostics` と `slideMaps` を返す。`slideMaps` は `outs` と同じ順にデッキごとに 1 つで、`deck`、ビルドしたファイルの `out`、各スライドの `slug`、`title`、`script.md` での見出しの行 `line`、`dekc shot --step` が受け取る形の `steps`（スライドが出た直後の `0`、続いて各ビートの `{#id}` か番号と、その `title`）、Markdown のままの `script`、読み上げる段落をプレーンテキストにした `paragraphs` を持つ。台本はそのページが持つものなので、`--public` ならト書きを含まない。 |
+| `dekc build [deck] [--root-dist] [--url <url>] [--public] [--no-script]` | HTML を 1 ファイル `decks/<deck>/dist/<deck>.html` に書く。`--root-dist` なら `<root>/dist/<deck>.html`。スライドごとの CSS とスクリプトはインライン化される。lint の結果でビルドが止まることはない。HTML のないセクションは骨格からビルドし、動かないスライドスクリプト（`DEK016`）は外して、その枚を動きなしでビルドする。dek 自身のルールが何か見つければ件数を表示し（rumdl は `dekc lint` だけが動かす）、`--json` には診断そのものが入る。ページにはリンクプレビュー用のタグが入る。`dist/` を公開する URL（`dek.toml` の `url`、または優先される `--url`）があれば、1 枚目のスライドを `og:image` 用に `dist/<deck>.png` にも書く。[Web で公開する](/ja/guide/present#web-で公開する)を参照。`--public` はリンクを知る誰もが開くページを作り、発表者ビューから台本のト書きと HTML コメントを外す。付けなければ、URL の有無にかかわらず発表者ビューに台本がすべて入る。`--no-script` はスライドだけを書く。ページには台本がビートの見出しまで一切入らず、発表者ビューもない。台本を公開しないデッキで、dek.pub が読み手に見せるのがこれ。 `--json` は `outs`、`images`、`diagnostics` と `slideMaps` を返す。`slideMaps` は `outs` と同じ順にデッキごとに 1 つで、`deck`、ビルドしたファイルの `out`、各スライドの `slug`、`title`、`script.md` での見出しの行 `line`、`dekc shot --step` が受け取る形の `steps`（スライドが出た直後の `0`、続いて各ビートの `{#id}` か番号と、その `title`）、Markdown のままの `script`、読み上げる段落をプレーンテキストにした `paragraphs` を持つ。台本はそのページが持つものなので、`--public` ならト書きを含まない。 |
 | `dekc video [deck] [slug] [--fps N] [--root-dist]` | `dekc voice` が書いた Timeline から `dist/<deck>.mp4` を焼き、`.vtt`、`.chapters.txt`、`.credits.txt` も書く。1 枚なら `.cache/video/<slug>.mp4`。`--fps` の既定は 30 |
 | `dekc pptx [deck] [--root-dist] [--public]` | `dist/<deck>.pptx` を書く。`##` 1 つが最終ビートの 1 枚で、台本をノートに入れる。色と実線の枠と角丸だけの箱を図形に、`<img>`、`<canvas>`、`<svg>` をそれぞれ 1 枚の画像にして、含むものとグループにし、図形の中の文字を段落に、それ以外の文字を 1 行ずつのテキストボックスにして、残りを 2 倍の大きさで描いた画像の上に置く。画像に残るものを覆う箱は画像に残す。テーマのトークンをファイルのテーマに、単色かまっすぐなグラデーションの背景を PowerPoint の背景にする。何も取り出せなかったスライドは出力に名前が出る。`--public` は `build --public` と同じく、ノートからト書きとコメントを除く。文字には Chromium が描いたフォントかテーマのフォントの名前を入れ、フォントは埋め込まない。[PPTX](/ja/guide/present#pptx) を参照。動かないスライドスクリプトがあると `dekc pdf` と同じく止まる。`--json` は `outs` を返す。Playwright が必要 |
 | `dekc pdf [deck] [--root-dist]` | 全枚を最終ビートで `dist/<deck>.pdf` に書く。各ページは 2 倍の大きさで描いたスライドの画像（PNG、写真のスライドは JPEG）で、選択・検索・コピーできる文字を見えない形で重ねるので、どのビューアでも同じに見える。動かないスライドスクリプトがあると `dekc video` と同じく止まる。どちらも診断を返す場所がなく、スクリプトが走らなかったかのような枚を出してしまうから |
+
+## 公開
+
+`dekc pub` はトークを [dek.pub](/ja/guide/publish) に載せます。スライド、共有した相手に見せる台本、その両方へのコメントです。各サブコマンドは `https://dek.pub`、または `--server <url>` や `DEK_PUB_SERVER` が指すサーバーと HTTPS で話します。平文の HTTP はこのマシンとだけです。送るのは `dekc pub login` が保存した API キーか `DEK_TOKEN`。30 秒（アップロードは 10 分）以内に応答がない呼び出しは失敗し、hint が `--server` を示します。dek.pub が返したエラーは、そのメッセージと hint のまま出します。
+
+| コマンド | 用途 |
+| --- | --- |
+| `dekc pub <subcommand>` | 単独では使い方のエラーになり、サブコマンドを示す。 |
+| `dekc pub login [--server <url>]` | OAuth のデバイスフローでブラウザからサインインする。dek が URL とコードを出し、人がそこでコードを承認すると、dek.pub がくれた API キーを OS のキーチェーンに保存する。キーチェーンがなければ `~/.config/dek/credentials.json`（モード 0600）。テキスト出力では URL とコードを標準エラーに出し、同じ実行のなかで待つ。`--json` では新しいサインインはすぐ `{ "status": "pending", "url", "code", "expiresAt", "next" }` を返すので、エージェントがそれを人に見せられる。コードは資格情報の隣に保存され、次の `dekc pub login --json` がその承認を待って `{ "status": "signed-in", "me", "stored" }` を返す。待っているあいだに止められても何も失わず、次の実行がコードの期限まで同じコードを待つ。断られたコードや期限切れのコードは忘れ、エラーがもう一度サインインするよう示す。 |
+| `dekc pub logout [--server <url>]` | `login` が保存したキーをサーバーで失効させ、手元から消す。サーバーに届かなくてもキーは手元から消し、`revoked` は `false`、`reason` が dek.pub で失効させるまでキーは使えると伝える。`DEK_TOKEN` のキーは利用者のものなので触らない。 |
+| `dekc pub whoami [--server <url>]` | キーが誰としてサインインするか。`key` がキーの出どころを示す。`env`（`DEK_TOKEN`）、`keychain`、`file`。 |
+| `dekc pub publish [deck] [--message <text>] [--no-promote] [--server <url>]` | 描画するルールを除いて `dekc lint` と同じようにデッキを lint する。error があれば何も送らずに止まり、`"ok": false`、`"published": false`、診断と終了コード 1 を返す。次にトークを `.cache/pub/` へ 3 通りにビルドする。台本をすべて含む持ち主用の `full.html`、`dekc build --public` と同じく読み上げる部分だけの `public.html`、`dekc build --no-script` と同じく台本のない `bare.html`。各スライドが現れたときの画像と、1 枚目の最後のビートの画像を撮る（Playwright がなければ撮らず、`skipped` が `shots` として伝える）。`source.tar` には `dist/`・`.cache/`・ドットファイルを除くデッキのファイルすべてと、効いている `dek.toml` の値の `effective-config.json` を入れ、同じファイルなら同じバイトになる。`script.md` に `pub:` がないデッキは先に dek.pub に作り（slug はフォルダ名の小文字）、frontmatter に `pub:` を書き込む。ほかのバイトはそのまま。このとき `frontmatterWritten` が `true` になり、`changed` がコミットすべき `script.md` を示す。バージョンは、公開ビルドのスライドマップ、lint が見つけた件数、最新のバージョン以後に `dekc mv` が変えた slug、`--message` と一緒にアップロードする。`--no-promote` がなければ、読み手に見えるのはこのバージョンになる。この実行が確かめたあとに別のバージョンが公開されていれば断られ、hint が `dekc pub status` を示す。 |
+| `dekc pub share [deck] [--visibility private\|link\|public] [--script shown\|hidden] [--embed on\|off] [--comments off\|signed-in\|guests] [--server <url>]` | 誰がデッキを開けるか（持ち主と共有した相手、リンクを知る誰でも、全員）、読み手にト書きを除いた台本を見せるか、ほかのサイトに埋め込めるか、誰がコメントできるかを変える。変わるのは指定した設定だけで、何も指定しなければエラー。`status` と同じくデッキを出力する。`pub:` のないデッキは断り、hint が `dekc pub publish` を示す。以下のサブコマンドも同じ。 |
+| `dekc pub status [deck] [--server <url>]` | dek.pub にあるデッキ。URL、設定、読み手に見えるバージョン、最新のバージョン、各バージョンの概要。`local.source` は `publish` がいま送るソースの sha256、`local.published` は最新のバージョンがそれから作られたかどうか。 |
+| `dekc pub open [deck] [--server <url>]` | デッキの URL を出してブラウザで開く。`BROWSER` が指すプログラム、なければ macOS では `open`、それ以外では `xdg-open` を使う。`--json` では URL だけを返し、何も開かない。 |
+| `dekc pub comments [deck] [--status open\|resolved\|all] [--server <url>]` | コメントを一覧にする。`--status` がなければ未解決のものだけ。`dekc annotations` がメモを並べるように、dek.pub にあるとおり番号、slug、step、状態（`open`、slug の変更か推測でしかスライドを見つけられなかった `moved`、その箇所や要素がいまのスライドにない `detached`、`resolved`）、書き手、本文、返信を出す。台本の引用には、いまの `script.md` での位置 `path`・`line`・`column`（見つからなければ `null` と `found: false`）が加わり、要素にはスライドのファイルが `path` として入る。`shot` はコメントのビートでそのスライドを見るコマンド。 |
+| `dekc pub comments reply [deck] <id> <text> [--server <url>]` | コメントに返信する。ID か番号で指定する。 |
+| `dekc pub comments resolve [deck] <id> [--server <url>]` | コメントを解決済みにする。 |
+| `dekc pub comments reopen [deck] <id> [--server <url>]` | 解決済みのコメントを開き直す。 |
+
+デッキに `pub` やほかのコマンドの名前は付けられません。`dekc pub` はデッキではなくコマンドを動かすので、`dekc new` と `dekc init` が断ります。
 
 ## ヘルプ
 
@@ -115,6 +136,10 @@ dek は `DEK_` で始まる変数を、起動したときの環境からだけ�
 | `DEK_FFMPEG` | `dekc video` が mux に使う ffmpeg バイナリのパス。`PATH` の `ffmpeg` より優先 |
 | `DEK_GITHUB_API` | `dekc ref` が取得に使う GitHub API のベース URL。ここにはトークンを送らない |
 | `DEK_PLAYWRIGHT` | 代わりの Playwright ワーカースクリプトのパス |
+| `DEK_PUB_SERVER` | `dekc pub` が `https://dek.pub` の代わりに話す dek.pub。`--server` が優先。HTTPS か、このマシンへの平文の HTTP |
+| `DEK_TOKEN` | CI 向けに、`dekc pub login` が保存したキーより優先して `dekc pub` が送る API キー |
+| `DEK_PUB_CREDENTIALS` | `dekc pub` が OS のキーチェーンの代わりにキーを保存するファイル。指定すると dek はキーチェーンを使わない |
+| `BROWSER` | `dekc pub open` が `open` や `xdg-open` の代わりにデッキを開くプログラム |
 | `GITHUB_TOKEN` | `dekc ref` が `api.github.com` に送るトークン。非公開リポジトリと、rate limit の引き上げに使う |
 | `GH_TOKEN` | `GITHUB_TOKEN` が無いときに、その代わりに読む |
 | `DEK_RUMDL` | rumdl バイナリのパス。`PATH` と、dek 本体のインストール先の `node_modules/.bin` より優先 |

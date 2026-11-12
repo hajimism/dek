@@ -29,6 +29,8 @@ export type BuildOptions = DistOptions & {
   url?: string;
   /** For anyone with the link: the presenter view carries only what is said aloud. */
   public?: boolean;
+  /** The slides alone: no script at all, and so no presenter view. */
+  script?: false;
   runner?: PlaywrightRunner;
 };
 
@@ -57,6 +59,7 @@ export async function buildDeck(
     target: {
       kind: "build",
       ...(options.public ? { public: true } : {}),
+      ...(options.script === false ? { script: false } : {}),
       ...(baseUrl
         ? {
             publicUrl: new URL(encodeURIComponent(basename(outPath)), baseUrl).href,

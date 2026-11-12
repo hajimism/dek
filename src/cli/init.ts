@@ -7,7 +7,6 @@ import { DekError } from "../core/error.ts";
 import { shellQuote } from "../core/escape.ts";
 import { REQUIRED_TOKENS } from "../core/lint/tokens.ts";
 import { walkUp } from "../core/optional.ts";
-import { DECK_NAME_HINT, isDeckName } from "../core/path.ts";
 import { PLAYWRIGHT_INSTALL } from "../core/playwright.ts";
 import { refuseInsideRef } from "../core/ref.ts";
 import { readSourceIfExists } from "../core/safe-fs.ts";
@@ -33,6 +32,7 @@ import {
   type PlannedPath,
   playwrightStep,
 } from "./files.ts";
+import { requireDeckName } from "./new.ts";
 
 export type InitResult = {
   root: string;
@@ -63,10 +63,8 @@ export type InitResult = {
  */
 export function initCommand(options: { cwd: string; dir?: string; deck?: string }): InitResult {
   const root = resolve(options.cwd, options.dir ?? ".");
-  if (options.deck !== undefined && !isDeckName(options.deck)) {
-    throw new DekError(`invalid deck name "${options.deck}"`, {
-      hint: DECK_NAME_HINT,
-    });
+  if (options.deck !== undefined) {
+    requireDeckName(options.deck);
   }
   checkTarget(root);
   checkFileSlots(dekFilePaths(root));

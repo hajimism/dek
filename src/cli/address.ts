@@ -54,6 +54,23 @@ export function addressCommands(
   const addressed = hint.replace(
     COMMAND_RE,
     (whole, command: string, rest: string, offset: number) => {
+      if (note >= 0 && offset >= note && offset < note + PLACEHOLDER_NOTE.length) {
+        return whole;
+      }
+      const own = ownDeckSubcommand(command, rest);
+      if (own !== undefined) {
+        const after = rest.slice(own.length + 1);
+        // A deck named as a later word of a longer subcommand would read as that subcommand.
+        const clash = DECK_SUBCOMMANDS.get(command)?.some((name) =>
+          name.startsWith(`${own} ${deck.name}`),
+        );
+        if (namesDeck(after, clash || deck.name.startsWith("-") ? undefined : word)) {
+          return whole;
+        }
+        placed ||= word === DECK_PLACEHOLDER;
+        const flag = inOther || clash === true;
+        return `\`dekc ${command} ${own} ${flag ? deckFlag(deck.name) : deckWord(deck.name)}${after}\``;
+      }
       const subcommand = SUBCOMMAND_WORDS.get(command)?.has(deck.name) === true;
       // A first word that is a subcommand, or a flag, is never the deck's name.
       const positional = !subcommand && !deck.name.startsWith("-");
@@ -123,6 +140,27 @@ const COMMAND_RE = /`dekc ([a-z]+)((?: [^`]*)?)`/g;
 const DECK_COMMANDS = new Set(
   Object.entries(COMMANDS).flatMap(([name, spec]) => ("scope" in spec && spec.scope ? [name] : [])),
 );
+
+/**
+ * The subcommands that take a deck of their own, after their words, by command, longest first:
+ * `pub`'s `publish` and `comments reply`, under a command that takes none.
+ */
+const DECK_SUBCOMMANDS = new Map(
+  Object.entries(COMMANDS).flatMap(([name, spec]) => {
+    const own = Object.entries(subcommandsOf(spec as AnySpec))
+      .filter(([, sub]) => sub.scope !== undefined)
+      .map(([sub]) => sub)
+      .sort((a, b) => b.split(" ").length - a.split(" ").length);
+    return own.length > 0 ? [[name, own] as const] : [];
+  }),
+);
+
+/** The subcommand with a deck of its own that `rest` starts with, if any. */
+function ownDeckSubcommand(command: string, rest: string): string | undefined {
+  return DECK_SUBCOMMANDS.get(command)?.find(
+    (sub) => rest === ` ${sub}` || rest.startsWith(` ${sub} `),
+  );
+}
 
 /** The first word of each command's subcommands, which a deck's name in its place would read as. */
 const SUBCOMMAND_WORDS = new Map(

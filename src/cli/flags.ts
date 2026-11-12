@@ -5,7 +5,7 @@ import { acceptedFlags, isTypedCommand, subcommandAt } from "./commands.ts";
 /** A flag's shape: a switch, a string, or a value dek checks before any command runs. */
 type FlagSpec = { text: string } & (
   | { type: "boolean"; short?: string }
-  | { type: "string"; value: string }
+  | { type: "string"; value: string; short?: string }
   | { type: "int"; value: string; min: number; max?: number; example: string }
   | { type: "number"; value: string; above: number; example: string }
   | { type: "enum"; choices: readonly string[]; example: string; note?: string }
@@ -104,6 +104,55 @@ export const FLAGS = {
     type: "boolean",
     text: "for anyone the file reaches: the script without its stage directions and comments",
   },
+  "no-script": {
+    type: "boolean",
+    text: "the slides alone: no script at all, and no presenter view",
+  },
+  server: {
+    type: "string",
+    value: "<url>",
+    text: "the dek.pub to talk to, over DEK_PUB_SERVER (default https://dek.pub)",
+  },
+  message: {
+    type: "string",
+    value: "<text>",
+    short: "m",
+    text: "what changed in this version, shown in its history",
+  },
+  "no-promote": {
+    type: "boolean",
+    text: "upload the version without making it the one readers see",
+  },
+  visibility: {
+    type: "enum",
+    choices: ["private", "link", "public"],
+    example: "dekc pub share --visibility link",
+    text: "who may open the deck: its owner and grants, anyone with the link, or everyone",
+  },
+  script: {
+    type: "enum",
+    choices: ["shown", "hidden"],
+    example: "dekc pub share --script shown",
+    text: "whether readers see the script, without its stage directions, beside the slides",
+  },
+  embed: {
+    type: "enum",
+    choices: ["on", "off"],
+    example: "dekc pub share --embed on",
+    text: "whether other sites may embed the deck",
+  },
+  comments: {
+    type: "enum",
+    choices: ["off", "signed-in", "guests"],
+    example: "dekc pub share --comments signed-in",
+    text: "who may comment: nobody else, people signed in to dek.pub, or guests too",
+  },
+  status: {
+    type: "enum",
+    choices: ["open", "resolved", "all"],
+    example: "dekc pub comments --status all",
+    text: "which comments to list (default: open)",
+  },
 } as const satisfies Record<string, FlagSpec>;
 
 export type FlagName = keyof typeof FLAGS;
@@ -141,7 +190,8 @@ function parseOptions(names: readonly FlagName[]): ParseOptions {
     names.map((name) => {
       const flag: FlagSpec = FLAGS[name];
       const type = flag.type === "boolean" ? "boolean" : "string";
-      return [name, flag.type === "boolean" && flag.short ? { type, short: flag.short } : { type }];
+      const short = "short" in flag ? flag.short : undefined;
+      return [name, short ? { type, short } : { type }];
     }),
   );
 }

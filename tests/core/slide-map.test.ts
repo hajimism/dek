@@ -56,4 +56,17 @@ describe("slideMap", () => {
     expect(audience.slides[0]?.script).not.toContain("ここで間を取る");
     expect(audience.slides[0]?.script).toContain("今日は **dek** の話をします。");
   });
+
+  test("carries no script, and no beat's heading, for a page nobody reads the script on", () => {
+    const bare = slideMap({ name: "why-dek", deck }, "out.html", "nobody");
+    expect(bare.slides.map((slide) => [slide.script, slide.paragraphs])).toEqual([
+      ["", []],
+      ["", []],
+    ]);
+    expect(bare.slides[1]?.steps).toEqual([
+      { step: "0", title: "Speed" },
+      { step: "chart", id: "chart", title: "" },
+      { step: "2", title: "" },
+    ]);
+  });
 });

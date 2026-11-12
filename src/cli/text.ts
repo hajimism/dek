@@ -1,6 +1,6 @@
 // How each command's result reads as text; commands.ts says which command prints which.
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
-import { type Diagnostic, type SkippedCheck, skippedLabel } from "../core/diagnostic.ts";
+import { type Diagnostic, type Skipped, skippedLabel } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
 import { foreignLine, type HiddenText, TITLE_MAX } from "../core/foreign-text.ts";
 import { compareCodeUnits } from "../core/order.ts";
@@ -62,7 +62,7 @@ export function formatReport(diagnostics: Diagnostic[], opts?: { color?: boolean
 }
 
 /** One `<check>: skipped (<reason>)` line per skipped check, each followed by its hint. */
-export function formatSkipped(skipped: SkippedCheck[] | undefined, color = false): string {
+export function formatSkipped(skipped: Skipped[] | undefined, color = false): string {
   const c = ansi(color);
   return (skipped ?? [])
     .flatMap((entry) => [

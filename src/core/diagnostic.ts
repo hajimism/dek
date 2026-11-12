@@ -121,7 +121,13 @@ export type SkippedCheck = {
   hint?: string;
 };
 
+/**
+ * Something a run left out and says so, as a skipped check does: what, why, and how to have it.
+ * `dekc pub publish` says so of the slides' pictures, which are no check.
+ */
+export type Skipped = Omit<SkippedCheck, "check"> & { check: string };
+
 /** A skipped check as text names it: the check, or the plugin for a plugin's. */
-export function skippedLabel(entry: SkippedCheck): string {
+export function skippedLabel(entry: Skipped): string {
   return entry.plugin === undefined ? entry.check : `plugin ${entry.plugin}`;
 }

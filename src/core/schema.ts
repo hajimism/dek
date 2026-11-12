@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DECK_ID_RE } from "../pub/protocol.ts";
 
 /** Section / beat ids. Digits-only values collide with numeric `data-step`. */
 export const Id = z
@@ -93,6 +94,14 @@ export const Frontmatter = z.object({
   latin_per_minute: DeckSettings.shape.latin_per_minute.default(
     DECK_SETTING_DEFAULTS.latin_per_minute,
   ),
+  pub: z
+    .string()
+    .regex(
+      DECK_ID_RE,
+      "write the ID dek.pub gave the deck, like d_0123456789, or delete the line and `dekc pub publish` makes a new deck",
+    )
+    .optional()
+    .describe("The deck's ID on dek.pub, which `dekc pub publish` writes on the first publish."),
 });
 
 export type Frontmatter = z.infer<typeof Frontmatter>;

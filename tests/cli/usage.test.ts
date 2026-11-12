@@ -66,7 +66,7 @@ describe("command help", () => {
   test("shows a command's usage, what it does, and its flags", () => {
     expect(
       commandHelp("build"),
-    ).toBe(`usage: dekc build [deck] [--root-dist] [--url <url>] [--public]
+    ).toBe(`usage: dekc build [deck] [--root-dist] [--url <url>] [--public] [--no-script]
 
 Write the whole talk into one HTML file, dist/<deck>.html. Lint never stops a build;
 the output says what lint found. Given the URL dist/ is served from, the first slide
@@ -77,6 +77,7 @@ flags
   --root-dist   write to <root>/dist/ instead of the deck's dist/
   --url <url>   the URL dist/ is served from, over url in dek.toml
   --public      for anyone the file reaches: the script without its stage directions and comments
+  --no-script   the slides alone: no script at all, and no presenter view
   --json        print the result, or the error, as JSON
   --help, -h    show help; dekc help <command> for one command
 
@@ -165,6 +166,7 @@ describe("the CLI reference", () => {
       Refs: "Refs",
       Slide: "Slide",
       Output: "Output",
+      Publish: "Publish",
       Help: "Help",
     },
     "docs/ja/reference/cli.md": {
@@ -173,6 +175,7 @@ describe("the CLI reference", () => {
       Refs: "ref",
       Slide: "スライド",
       Output: "成果物",
+      Publish: "公開",
       Help: "ヘルプ",
     },
   };

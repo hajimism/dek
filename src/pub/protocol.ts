@@ -55,8 +55,11 @@ export type SlideMapSlide = z.infer<typeof SlideMapSlide>;
 // ---------------------------------------------------------------------------------------------
 // Decks and versions.
 
+/** What a remote deck's ID looks like. */
+export const DECK_ID_RE = /^d_[0-9a-z]{10,32}$/;
+
 /** A remote deck's ID, as `pub:` in script.md's frontmatter holds it. */
-export const DeckId = z.string().regex(/^d_[0-9a-z]{10,32}$/);
+export const DeckId = z.string().regex(DECK_ID_RE);
 
 /** Who may open a deck: its owner and grants, anyone with the link, or everyone. */
 export const Visibility = z.enum(["private", "link", "public"]);
@@ -69,7 +72,12 @@ export type CommentPolicy = z.infer<typeof CommentPolicy>;
 export const Rename = z.strictObject({ from: z.string(), to: z.string(), at: z.string() });
 export type Rename = z.infer<typeof Rename>;
 
-/** The files a version is made of, as the upload's form fields name them. */
+/**
+ * The files a version is made of, as the upload's form fields name them: the build with the whole
+ * script, for its owner; the one with what is said aloud, for readers when the script is public;
+ * the bare one with no script, for readers when it is not; the source; and the first slide's
+ * picture.
+ */
 export const VERSION_FILES = ["full", "public", "bare", "source", "cover"] as const;
 export type VersionFile = (typeof VERSION_FILES)[number];
 

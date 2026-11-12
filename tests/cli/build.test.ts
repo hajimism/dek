@@ -451,3 +451,24 @@ title: Demo
     );
   });
 });
+
+describe("dekc build --no-script", () => {
+  test("builds the slides alone, with no script in the page", async () => {
+    const script = "---\ntitle: Demo\n---\n\n## intro\n\n今日は三つ話します。\n";
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const line = parseCommandLine(["build", "--no-script"]);
+        const result = (await COMMANDS.build.run({
+          cwd: deckDir,
+          flags: line.values,
+          args: {},
+          target: resolveDecks(deckDir),
+        })) as { outs: string[] };
+        const html = await readFile(result.outs[0] ?? "", "utf8");
+        expect(html).not.toContain("今日は三つ話します");
+      },
+    );
+  });
+});
