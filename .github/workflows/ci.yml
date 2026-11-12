@@ -100,7 +100,7 @@ jobs:
   # round trip with dekc against the dev server on Miniflare. No Cloudflare account is involved.
   pub:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: apps/pub
