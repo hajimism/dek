@@ -33,6 +33,7 @@
     onretry,
     oncopylink,
     onclose,
+    anchorTops = null,
   }: {
     comments: CardComment[];
     slideNumbers: Map<string, number>;
@@ -54,6 +55,8 @@
     onretry: (comment: CardComment) => void;
     oncopylink: (comment: CardComment) => void;
     onclose?: () => void;
+    /** Where each card's anchor is, from the top of the list; given, the cards sit beside them. */
+    anchorTops?: Map<string, number> | null;
   } = $props();
 
   const { shared, t } = useApp();
@@ -76,6 +79,56 @@
       | undefined,
   );
 
+  const GAP = 8;
+  let heights: Record<string, number> = $state({});
+
+  // Each card as near its anchor as the cards above it allow; the selected one exactly beside its
+  // anchor, the ones before it moved up to make room, as a margin of notes does.
+  const layout = $derived.by(() => {
+    if (!anchorTops) {
+      return null;
+    }
+    const tops = anchorTops;
+    const ids = [...(draft ? ["__draft"] : []), ...shown.map((comment) => comment.id)];
+    const order = ids
+      .map((id, index) => ({ id, want: tops.get(id), index }))
+      .sort((a, b) => (a.want ?? Number.POSITIVE_INFINITY) - (b.want ?? Number.POSITIVE_INFINITY) || a.index - b.index);
+    const height = (id: string) => heights[id] ?? 120;
+    const placed = new Map<string, number>();
+    let bottom = 0;
+    for (const entry of order) {
+      const y = Math.max(entry.want ?? bottom, bottom);
+      placed.set(entry.id, y);
+      bottom = y + height(entry.id) + GAP;
+    }
+    const focus = draft ? "__draft" : selectedId;
+    const at = order.findIndex((entry) => entry.id === focus);
+    const want = at === -1 ? undefined : order[at]?.want;
+    if (at !== -1 && want !== undefined) {
+      placed.set(order[at]?.id ?? "", want);
+      for (let i = at - 1; i >= 0; i--) {
+        const id = order[i]?.id ?? "";
+        const next = placed.get(order[i + 1]?.id ?? "") ?? 0;
+        placed.set(id, Math.min(placed.get(id) ?? 0, next - height(id) - GAP));
+      }
+      bottom = want + height(order[at]?.id ?? "") + GAP;
+      for (let i = at + 1; i < order.length; i++) {
+        const id = order[i]?.id ?? "";
+        const y = Math.max(order[i]?.want ?? bottom, bottom);
+        placed.set(id, y);
+        bottom = y + height(id) + GAP;
+      }
+      const first = Math.min(...placed.values());
+      if (first < 0) {
+        for (const [id, y] of placed) {
+          placed.set(id, y - first);
+        }
+        bottom -= first;
+      }
+    }
+    return { tops: placed, height: bottom };
+  });
+
   function mayResolve(comment: CardComment): boolean {
     if (!shared.viewer) {
       return false;
@@ -83,6 +136,25 @@
     return isOwner || (!comment.author.guest && comment.author.handle === shared.viewer.handle);
   }
 </script>
+
+{#snippet draftCard()}
+  {#if draft}
+      <section class="draft" aria-label={t("comment.newOn")}>
+        <p class="draft-label">{t("comment.newOn")}</p>
+        {#if draftQuote}
+          <p class="draft-quote">{draftQuote.quote}</p>
+        {:else}
+          <p class="draft-chip">
+            <Icon name={draftElement ? "crosshair" : "image"} size={12} />
+            {draftElement && draft.slideNumber !== null
+              ? t("comment.slideChip", { n: draft.slideNumber, name: draftElement.text || draftElement.name })
+              : t("talk.slideLabel", { n: draft.slideNumber ?? "?" })}
+          </p>
+        {/if}
+        <Composer {guest} autofocus oncancel={oncanceldraft} onsubmit={oncreate} />
+      </section>
+  {/if}
+{/snippet}
 
 <div class="panel">
   <header class="top">
@@ -110,21 +182,8 @@
   </div>
 
   <div class="list">
-    {#if draft}
-      <section class="draft" aria-label={t("comment.newOn")}>
-        <p class="draft-label">{t("comment.newOn")}</p>
-        {#if draftQuote}
-          <p class="draft-quote">{draftQuote.quote}</p>
-        {:else}
-          <p class="draft-chip">
-            <Icon name={draftElement ? "crosshair" : "image"} size={12} />
-            {draftElement && draft.slideNumber !== null
-              ? t("comment.slideChip", { n: draft.slideNumber, name: draftElement.text || draftElement.name })
-              : t("talk.slideLabel", { n: draft.slideNumber ?? "?" })}
-          </p>
-        {/if}
-        <Composer {guest} autofocus oncancel={oncanceldraft} onsubmit={oncreate} />
-      </section>
+    {#if draft && !anchorTops}
+      {@render draftCard()}
     {/if}
 
     {#if shown.length === 0 && !draft}
@@ -138,9 +197,18 @@
         {/if}
       </div>
     {:else}
-      <ol class="cards">
+      <ol class="cards" class:aligned={layout !== null} style:height={layout ? `${layout.height}px` : undefined}>
+        {#if draft && anchorTops}
+          <li class="placed" bind:offsetHeight={heights.__draft} style:transform="translateY({layout?.tops.get('__draft') ?? 0}px)">
+            {@render draftCard()}
+          </li>
+        {/if}
         {#each shown as comment (comment.id)}
-          <li>
+          <li
+            class:placed={layout !== null}
+            bind:offsetHeight={heights[comment.id]}
+            style:transform={layout ? `translateY(${layout.tops.get(comment.id) ?? 0}px)` : undefined}
+          >
             <CommentCard
               {comment}
               slideNumber={slideNumbers.get(comment.slug) ?? null}
@@ -260,6 +328,20 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .cards.aligned {
+    position: relative;
+    display: block;
+  }
+  .cards.aligned > li {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    transition: transform var(--dur-slow) var(--ease-out);
+  }
+  .cards.aligned .draft {
+    margin-bottom: 0;
   }
   .draft {
     margin-bottom: var(--space-3);

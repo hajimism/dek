@@ -185,6 +185,7 @@
           <button
             type="button"
             class="pin num"
+            data-id={pin.id}
             class:active={pin.id === selectedId}
             style:left="{pin.box.x + pin.box.width}%"
             style:top="{pin.box.y}%"

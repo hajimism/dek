@@ -31,6 +31,7 @@
 <label class="visually-hidden" for={id}>{label}</label>
 <input
   {id}
+  name="user_code"
   class="code"
   class:invalid={!!error}
   {value}

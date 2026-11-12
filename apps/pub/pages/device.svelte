@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { isCompleteUserCode, normalizeUserCode } from "../src/lib/device-code.ts";
   import { useApp } from "../src/ui/app.ts";
   import Avatar from "../src/ui/Avatar.svelte";
@@ -11,12 +12,8 @@
   let { code: initial }: Props = $props();
   const { shared, t } = useApp();
 
-  let code = $state("");
-  $effect.pre(() => {
-    if (!code && initial) {
-      code = initial;
-    }
-  });
+  // The code a link from the CLI carries fills the field; the page is not reloaded with another.
+  let code = $state(untrack(() => initial));
   let step: "enter" | "confirm" | "done" | "denied" = $state("enter");
   let problem: DeviceProblem | "short" | null = $state(null);
   let busy: "look" | "allow" | "deny" | null = $state(null);
@@ -97,7 +94,7 @@
       <h1 id="device-title">{t("device.title")}</h1>
       {#if shared.viewer}
         <p class="sub">{t("device.prompt")}</p>
-        <form onsubmit={submit} novalidate>
+        <form method="get" onsubmit={submit} novalidate>
           <DeviceCodeInput bind:value={code} label={t("device.codeLabel")} error={problem ? t(messages[problem]) : ""} />
           <Button variant="primary" size="lg" full type="submit" loading={busy === "look"}>{t("device.continue")}</Button>
         </form>

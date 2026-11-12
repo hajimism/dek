@@ -323,6 +323,7 @@
     width: 55%;
   }
   .art-json {
+    aspect-ratio: auto;
     padding: var(--space-4);
     background: var(--bg-subtle);
     color: var(--text);

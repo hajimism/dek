@@ -51,6 +51,67 @@
   });
 
   const sorted = $derived(byPosition(comments, talk.slides));
+  let aside: HTMLElement | undefined = $state();
+  let articleCol: HTMLElement | undefined = $state();
+  let anchorTops: Map<string, number> | null = $state(null);
+
+  /** Where each comment's anchor is, from the top of the card list, for the margin beside the article. */
+  function measure() {
+    const list = aside?.querySelector<HTMLElement>(".cards") ?? aside?.querySelector<HTMLElement>(".list");
+    if (mode !== "column" || !list) {
+      anchorTops = null;
+      return;
+    }
+    const base = list.getBoundingClientRect().top;
+    const tops = new Map<string, number>();
+    const place = (id: string, element: Element | null) => {
+      if (element) {
+        tops.set(id, element.getBoundingClientRect().top - base);
+      }
+    };
+    for (const comment of comments) {
+      const id = CSS.escape(comment.id);
+      place(
+        comment.id,
+        document.querySelector(`mark[data-ids~="${id}"]`) ??
+          document.querySelector(`.pin[data-id="${id}"]`)?.closest("figure") ??
+          document.getElementById(comment.slug),
+      );
+    }
+    if (draft) {
+      const target = draft.anchor.targets[0];
+      const holder = document.querySelector(`[data-slug="${CSS.escape(draft.anchor.slug)}"]`);
+      const paragraph =
+        target?.kind === "quote"
+          ? [...(holder?.querySelectorAll("p[data-p]") ?? [])].find((p) => p.textContent?.includes(target.quote))
+          : null;
+      place("__draft", paragraph ?? (target?.kind === "element" ? document.getElementById(draft.anchor.slug)?.closest("section")?.querySelector("figure") ?? null : document.getElementById(draft.anchor.slug)));
+    }
+    anchorTops = tops;
+  }
+
+  $effect(() => {
+    // Measured again whenever what is shown, or where, may have changed.
+    void [comments.length, comments.map((comment) => comment.status).join(), draft, filter, mode, selectedId];
+    const frame = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(frame);
+  });
+
+  $effect(() => {
+    if (!articleCol) {
+      return;
+    }
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
+    observer.observe(articleCol);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  });
   const openCount = $derived(comments.filter((comment) => comment.status !== "resolved").length);
 
   // How the comments sit: a column beside the article, a drawer, or a sheet from the bottom.
@@ -372,7 +433,7 @@
     </div>
   </header>
 
-  <div class="article-col">
+  <div class="article-col" bind:this={articleCol}>
     <Article
       slides={talk.slides}
       lang={contentLang}
@@ -393,6 +454,7 @@
       <button type="button" class="scrim" aria-label={t("comment.close")} onclick={() => (panelOpen = false)}></button>
     {/if}
     <aside
+      bind:this={aside}
       id="comments"
       class="comments {mode}"
       class:open={panelOpen}
@@ -418,6 +480,7 @@
         canComment={talk.canComment}
         {guest}
         closable={mode !== "column"}
+        anchorTops={mode === "column" ? anchorTops : null}
         onclose={() => (panelOpen = false)}
         onselect={(comment) => select(comment.id)}
         onanchor={(comment) => {
@@ -472,7 +535,7 @@
     }
     .with-comments .comments {
       grid-column: 4;
-      grid-row: 1 / span 2;
+      grid-row: 2;
     }
   }
   .title-block {
@@ -558,17 +621,21 @@
     min-width: 0;
   }
   .comments.column {
+    padding: 0 10px 24px;
+    margin: 0 -10px;
+  }
+  .comments.column :global(.top),
+  .comments.column :global(.filters) {
     position: sticky;
-    top: calc(var(--header-height) + var(--space-4));
-    align-self: start;
-    max-height: calc(100dvh - var(--header-height) - var(--space-8));
-    margin-top: var(--space-10);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    padding: 2px 10px 24px 10px;
-    margin-left: -10px;
-    margin-right: -10px;
+    z-index: 2;
+    background: var(--bg);
+  }
+  .comments.column :global(.top) {
+    top: var(--header-height);
+    padding-top: var(--space-3);
+  }
+  .comments.column :global(.filters) {
+    top: calc(var(--header-height) + 48px);
   }
   .comments.drawer,
   .comments.sheet {
