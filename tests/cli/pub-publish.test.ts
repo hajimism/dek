@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runInProcess } from "../helpers/cli.ts";
 import { type FakePub, withFakePub } from "../helpers/fake-pub.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -42,130 +42,142 @@ function signIn(fake: FakePub): void {
 }
 
 async function publish(fake: FakePub, root: string, args: string[] = [], env = {}) {
-  return runDek(["pub", "publish", "Why_Dek", "--json", ...args], {
+  return runInProcess(["pub", "publish", "Why_Dek", "--json", ...args], {
     cwd: root,
     env: { ...fake.env, DEK_PLAYWRIGHT: fakePlaywright, ...env },
   });
 }
 
 describe("dekc pub publish", () => {
-  test("makes the deck on dek.pub, writes pub: into script.md, and uploads the version", async () => {
-    await withFakePub(async (fake) => {
-      signIn(fake);
-      await withTempProject(spec(), async (root) => {
-        const scriptPath = join(root, "decks", "Why_Dek", "script.md");
-        const result = await publish(fake, root, ["-m", "first"]);
-        expect(result.exitCode).toBe(0);
-        const json = jsonStdout<Json>(result);
-        const [deck] = [...fake.decks.values()];
-        expect(json).toMatchObject({
-          ok: true,
-          action: "publish",
-          published: true,
-          server: fake.url,
-          id: deck?.id,
-          n: 1,
-          current: 1,
-          visibility: "private",
-          shots: 2,
-          frontmatterWritten: true,
-          changed: ["decks/Why_Dek/script.md"],
-        });
-        expect(deck?.slug).toBe("why-dek");
-        // Only the pub: line is new.
-        expect(readFileSync(scriptPath, "utf8")).toBe(
-          SCRIPT.replace("event: Meetup #42\n", `event: Meetup #42\npub: ${deck?.id}\n`),
-        );
+  test.serial(
+    "makes the deck on dek.pub, writes pub: into script.md, and uploads the version",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        await withTempProject(spec(), async (root) => {
+          const scriptPath = join(root, "decks", "Why_Dek", "script.md");
+          const result = await publish(fake, root, ["-m", "first"]);
+          expect(result.exitCode).toBe(0);
+          const json = jsonStdout<Json>(result);
+          const [deck] = [...fake.decks.values()];
+          expect(json).toMatchObject({
+            ok: true,
+            action: "publish",
+            published: true,
+            server: fake.url,
+            id: deck?.id,
+            n: 1,
+            current: 1,
+            visibility: "private",
+            shots: 2,
+            frontmatterWritten: true,
+            changed: ["decks/Why_Dek/script.md"],
+          });
+          expect(deck?.slug).toBe("why-dek");
+          // Only the pub: line is new.
+          expect(readFileSync(scriptPath, "utf8")).toBe(
+            SCRIPT.replace("event: Meetup #42\n", `event: Meetup #42\npub: ${deck?.id}\n`),
+          );
 
-        const upload = fake.requests.find((request) => request.path.endsWith("/versions"));
-        expect(upload?.method).toBe("POST");
-        expect(upload?.query).toEqual({});
-        expect(Object.keys(upload?.fields ?? {}).sort()).toEqual([
-          "bare",
-          "cover",
-          "full",
-          "manifest",
-          "public",
-          "shot:intro",
-          "shot:speed",
-          "source",
-        ]);
-        expect(upload?.fields?.full).toMatchObject({ type: expect.stringMatching(/^text\/html/) });
-        expect(upload?.fields?.source).toMatchObject({ type: "application/x-tar" });
-        expect(upload?.fields?.cover).toMatchObject({ type: "image/png" });
-        const [manifest] = fake.manifests.get(deck?.id ?? "") ?? [];
-        expect(manifest).toMatchObject({
-          protocol: 1,
-          deck: "Why_Dek",
-          title: "Why dek",
-          event: "Meetup #42",
-          lang: "ja",
-          base: null,
-          renames: [],
-          message: "first",
-          lint: { errors: 0 },
-        });
-        expect(manifest?.slideMap.out).toBe("public");
-        expect(manifest?.slideMap.slides.map((entry) => entry.slug)).toEqual(["intro", "speed"]);
-        expect(manifest?.slideMap.slides[0]?.script).not.toContain("目次は読み上げない");
-        expect(Object.keys(manifest?.shots ?? {})).toEqual(["intro", "speed"]);
-        expect(json.builds).toEqual({
-          full: { bytes: expect.any(Number) },
-          public: { bytes: expect.any(Number) },
-          bare: { bytes: expect.any(Number) },
-        });
+          const upload = fake.requests.find((request) => request.path.endsWith("/versions"));
+          expect(upload?.method).toBe("POST");
+          expect(upload?.query).toEqual({});
+          expect(Object.keys(upload?.fields ?? {}).sort()).toEqual([
+            "bare",
+            "cover",
+            "full",
+            "manifest",
+            "public",
+            "shot:intro",
+            "shot:speed",
+            "source",
+          ]);
+          expect(upload?.fields?.full).toMatchObject({
+            type: expect.stringMatching(/^text\/html/),
+          });
+          expect(upload?.fields?.source).toMatchObject({ type: "application/x-tar" });
+          expect(upload?.fields?.cover).toMatchObject({ type: "image/png" });
+          const [manifest] = fake.manifests.get(deck?.id ?? "") ?? [];
+          expect(manifest).toMatchObject({
+            protocol: 1,
+            deck: "Why_Dek",
+            title: "Why dek",
+            event: "Meetup #42",
+            lang: "ja",
+            base: null,
+            renames: [],
+            message: "first",
+            lint: { errors: 0 },
+          });
+          expect(manifest?.slideMap.out).toBe("public");
+          expect(manifest?.slideMap.slides.map((entry) => entry.slug)).toEqual(["intro", "speed"]);
+          expect(manifest?.slideMap.slides[0]?.script).not.toContain("目次は読み上げない");
+          expect(Object.keys(manifest?.shots ?? {})).toEqual(["intro", "speed"]);
+          expect(json.builds).toEqual({
+            full: { bytes: expect.any(Number) },
+            public: { bytes: expect.any(Number) },
+            bare: { bytes: expect.any(Number) },
+          });
 
-        // Each reader's build, as it was sent.
-        const scratch = join(root, "decks", "Why_Dek", ".cache", "pub");
-        const full = readFileSync(join(scratch, "full.html"), "utf8");
-        const open = readFileSync(join(scratch, "public.html"), "utf8");
-        const bare = readFileSync(join(scratch, "bare.html"), "utf8");
-        expect(full).toContain("目次は読み上げない");
-        expect(open).toContain("今日は三つ話します");
-        expect(open).not.toContain("目次は読み上げない");
-        expect(bare).not.toContain("今日は三つ話します");
+          // Each reader's build, as it was sent.
+          const scratch = join(root, "decks", "Why_Dek", ".cache", "pub");
+          const full = readFileSync(join(scratch, "full.html"), "utf8");
+          const open = readFileSync(join(scratch, "public.html"), "utf8");
+          const bare = readFileSync(join(scratch, "bare.html"), "utf8");
+          expect(full).toContain("目次は読み上げない");
+          expect(open).toContain("今日は三つ話します");
+          expect(open).not.toContain("目次は読み上げない");
+          expect(bare).not.toContain("今日は三つ話します");
+        });
       });
-    });
-  });
+    },
+  );
 
-  test("puts the next version on the newest, with the renames since, and --no-promote", async () => {
-    await withFakePub(async (fake) => {
-      signIn(fake);
-      await withTempProject(spec(), async (root) => {
-        expect((await publish(fake, root)).exitCode).toBe(0);
-        const [deck] = [...fake.decks.values()];
-        const since = deck?.versions[0]?.createdAt ?? "";
-        mkdirSync(join(root, ".dek"), { recursive: true });
-        writeFileSync(
-          join(root, ".dek", "renames.json"),
-          JSON.stringify({
-            version: 1,
-            decks: {
-              Why_Dek: [
-                { from: "old", to: "older", at: "2000-01-01T00:00:00.000Z" },
-                { from: "speed", to: "pace", at: new Date(Date.parse(since) + 1000).toISOString() },
-              ],
-            },
-          }),
-        );
-        const result = await publish(fake, root, ["--no-promote"]);
-        expect(jsonStdout<Json>(result)).toMatchObject({
-          ok: true,
-          n: 2,
-          current: 1,
-          frontmatterWritten: false,
-          changed: [],
+  test.serial(
+    "puts the next version on the newest, with the renames since, and --no-promote",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        await withTempProject(spec(), async (root) => {
+          expect((await publish(fake, root)).exitCode).toBe(0);
+          const [deck] = [...fake.decks.values()];
+          const since = deck?.versions[0]?.createdAt ?? "";
+          mkdirSync(join(root, ".dek"), { recursive: true });
+          writeFileSync(
+            join(root, ".dek", "renames.json"),
+            JSON.stringify({
+              version: 1,
+              decks: {
+                Why_Dek: [
+                  { from: "old", to: "older", at: "2000-01-01T00:00:00.000Z" },
+                  {
+                    from: "speed",
+                    to: "pace",
+                    at: new Date(Date.parse(since) + 1000).toISOString(),
+                  },
+                ],
+              },
+            }),
+          );
+          const result = await publish(fake, root, ["--no-promote"]);
+          expect(jsonStdout<Json>(result)).toMatchObject({
+            ok: true,
+            n: 2,
+            current: 1,
+            frontmatterWritten: false,
+            changed: [],
+          });
+          const second = fake.manifests.get(deck?.id ?? "")?.[1];
+          expect(second?.base).toBe(1);
+          expect(second?.renames.map((rename) => rename.to)).toEqual(["pace"]);
+          expect(fake.requests.at(-1)?.query).toEqual({ promote: "0" });
+          expect(fake.decks.size).toBe(1);
         });
-        const second = fake.manifests.get(deck?.id ?? "")?.[1];
-        expect(second?.base).toBe(1);
-        expect(second?.renames.map((rename) => rename.to)).toEqual(["pace"]);
-        expect(fake.requests.at(-1)?.query).toEqual({ promote: "0" });
-        expect(fake.decks.size).toBe(1);
       });
-    });
-  });
+    },
+  );
 
-  test("stops on a lint error, prints what lint found, and sends nothing", async () => {
+  test.serial("stops on a lint error, prints what lint found, and sends nothing", async () => {
     await withFakePub(async (fake) => {
       signIn(fake);
       const broken = spec();
@@ -185,7 +197,7 @@ describe("dekc pub publish", () => {
     });
   });
 
-  test("without Playwright sends no pictures and says so", async () => {
+  test.serial("without Playwright sends no pictures and says so", async () => {
     await withFakePub(async (fake) => {
       signIn(fake);
       await withTempProject(spec(), async (root) => {
@@ -207,7 +219,7 @@ describe("dekc pub publish", () => {
     });
   });
 
-  test("says another version came first, and names dekc pub status", async () => {
+  test.serial("says another version came first, and names dekc pub status", async () => {
     await withFakePub(async (fake) => {
       signIn(fake);
       await withTempProject(spec(), async (root) => {
@@ -228,14 +240,17 @@ describe("dekc pub publish", () => {
     });
   });
 
-  test("status says whether the newest version is the source as it is here", async () => {
+  test.serial("status says whether the newest version is the source as it is here", async () => {
     await withFakePub(async (fake) => {
       signIn(fake);
       await withTempProject(spec(), async (root) => {
         await publish(fake, root);
         const status = async () =>
           jsonStdout<Json>(
-            await runDek(["pub", "status", "Why_Dek", "--json"], { cwd: root, env: fake.env }),
+            await runInProcess(["pub", "status", "Why_Dek", "--json"], {
+              cwd: root,
+              env: fake.env,
+            }),
           );
         const first = await status();
         expect(first).toMatchObject({

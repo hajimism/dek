@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { CommentRow } from "../../src/pub/protocol.ts";
-import { jsonStdout, runDek } from "../helpers/cli.ts";
+import { jsonStdout, runInProcess } from "../helpers/cli.ts";
 import { type FakePub, withFakePub } from "../helpers/fake-pub.ts";
 import { withTempProject } from "../helpers/project.ts";
 
@@ -45,7 +46,7 @@ async function withPublished<T>(
 }
 
 const run = (fake: FakePub, cwd: string, args: string[]) =>
-  runDek(["pub", ...args], { cwd, env: { ...fake.env, BROWSER: "true" } });
+  runInProcess(["pub", ...args], { cwd, env: { ...fake.env, BROWSER: "true" } });
 
 const comment = (overrides: Partial<CommentRow>): CommentRow => ({
   number: 1,
@@ -65,7 +66,7 @@ const comment = (overrides: Partial<CommentRow>): CommentRow => ({
 });
 
 describe("dekc pub share", () => {
-  test("changes who may open, read, embed, and comment, as one PATCH", async () => {
+  test.serial("changes who may open, read, embed, and comment, as one PATCH", async () => {
     await withPublished(async (fake, root, id) => {
       const result = await run(fake, root, [
         "share",
@@ -96,7 +97,7 @@ describe("dekc pub share", () => {
     });
   });
 
-  test("with nothing to change says which settings it takes", async () => {
+  test.serial("with nothing to change says which settings it takes", async () => {
     await withPublished(async (fake, root) => {
       const result = await run(fake, root, ["share", "--json"]);
       expect(result.exitCode).toBe(1);
@@ -108,7 +109,7 @@ describe("dekc pub share", () => {
     });
   });
 
-  test("refuses a deck that is not on dek.pub, with publish as the way there", async () => {
+  test.serial("refuses a deck that is not on dek.pub, with publish as the way there", async () => {
     await withFakePub(async (fake) => {
       signIn(fake);
       await withTempProject({ decks: [{ name: "talk", script: script() }] }, async (root) => {
@@ -127,7 +128,7 @@ describe("dekc pub share", () => {
 });
 
 describe("dekc pub open", () => {
-  test("--json gives the URL and opens nothing; text opens it with BROWSER", async () => {
+  test.serial("--json gives the URL and opens nothing; text opens it with BROWSER", async () => {
     await withPublished(async (fake, root) => {
       const [deck] = [...fake.decks.values()];
       const json = await run(fake, root, ["open", "--json"]);
@@ -145,7 +146,7 @@ describe("dekc pub open", () => {
 });
 
 describe("dekc pub comments", () => {
-  test("places each quote in script.md and each element in its slide file", async () => {
+  test.serial("places each quote in script.md and each element in its slide file", async () => {
     await withPublished(async (fake, root) => {
       const [deck] = [...fake.decks.values()];
       deck?.rows.push(
@@ -204,7 +205,7 @@ describe("dekc pub comments", () => {
     });
   });
 
-  test("reply, resolve, and reopen take a comment by its ID or its number", async () => {
+  test.serial("reply, resolve, and reopen take a comment by its ID or its number", async () => {
     await withPublished(async (fake, root, id) => {
       const [deck] = [...fake.decks.values()];
       deck?.rows.push(comment({ number: 7, id: "c_seven" }));
@@ -236,29 +237,39 @@ describe("dekc pub comments", () => {
     });
   });
 
-  test("takes the deck after the subcommand's words, or by --deck, from the project root", async () => {
-    await withPublished(async (fake, deckDir, id) => {
-      const root = join(deckDir, "..", "..");
-      const [deck] = [...fake.decks.values()];
-      deck?.rows.push(comment({}));
-      const named = await run(fake, root, ["comments", "reply", "talk", "c_one", "はい", "--json"]);
-      expect(jsonStdout<Json>(named)).toMatchObject({ ok: true, comment: "c_one" });
-      const flagged = await run(fake, root, ["status", "--deck", "talk", "--json"]);
-      expect(jsonStdout<Json>(flagged)).toMatchObject({ ok: true, id });
-      const typo = await run(fake, root, ["status", "tlak", "--json"]);
-      expect(jsonStdout<Json>(typo)).toMatchObject({ ok: false });
-      const unnamed = await run(fake, root, ["publish", "--json"]);
-      expect(jsonStdout<Json>(unnamed)).toMatchObject({
-        ok: false,
-        error: { hint: "run `dekc pub publish talk --json`" },
+  test.serial(
+    "takes the deck after the subcommand's words, or by --deck, from the project root",
+    async () => {
+      await withPublished(async (fake, deckDir, id) => {
+        const root = join(deckDir, "..", "..");
+        const [deck] = [...fake.decks.values()];
+        deck?.rows.push(comment({}));
+        const named = await run(fake, root, [
+          "comments",
+          "reply",
+          "talk",
+          "c_one",
+          "はい",
+          "--json",
+        ]);
+        expect(jsonStdout<Json>(named)).toMatchObject({ ok: true, comment: "c_one" });
+        const flagged = await run(fake, root, ["status", "--deck", "talk", "--json"]);
+        expect(jsonStdout<Json>(flagged)).toMatchObject({ ok: true, id });
+        const typo = await run(fake, root, ["status", "tlak", "--json"]);
+        expect(jsonStdout<Json>(typo)).toMatchObject({ ok: false });
+        const unnamed = await run(fake, root, ["publish", "--json"]);
+        expect(jsonStdout<Json>(unnamed)).toMatchObject({
+          ok: false,
+          error: { hint: "run `dekc pub publish talk --json`" },
+        });
       });
-    });
-  });
+    },
+  );
 });
 
 describe("dekc pub", () => {
-  test("alone says it needs a subcommand", async () => {
-    const result = await runDek(["pub", "--json"]);
+  test.serial("alone says it needs a subcommand", async () => {
+    const result = await runInProcess(["pub", "--json"], { cwd: tmpdir() });
     expect(jsonStdout<Json>(result)).toEqual({
       ok: false,
       error: {
@@ -268,24 +279,27 @@ describe("dekc pub", () => {
     });
   });
 
-  test("a mistyped subcommand gets the likeliest one", async () => {
-    const result = await runDek(["pub", "pubish", "--json"]);
+  test.serial("a mistyped subcommand gets the likeliest one", async () => {
+    const result = await runInProcess(["pub", "pubish", "--json"], { cwd: tmpdir() });
     expect(jsonStdout<Json>(result)).toMatchObject({
       ok: false,
       error: { hint: "did you mean `dekc pub publish`?" },
     });
   });
 
-  test("dekc new refuses a deck named after a command, which `dekc pub` could not reach", async () => {
-    await withTempProject({}, async (root) => {
-      const result = await runDek(["new", "pub", "--json"], { cwd: root });
-      expect(jsonStdout<Json>(result)).toEqual({
-        ok: false,
-        error: {
-          message: 'deck name "pub" is a dekc command',
-          hint: "`dekc pub` would run the command, not the deck; name it something else, like pub-talk",
-        },
+  test.serial(
+    "dekc new refuses a deck named after a command, which `dekc pub` could not reach",
+    async () => {
+      await withTempProject({}, async (root) => {
+        const result = await runInProcess(["new", "pub", "--json"], { cwd: root });
+        expect(jsonStdout<Json>(result)).toEqual({
+          ok: false,
+          error: {
+            message: 'deck name "pub" is a dekc command',
+            hint: "`dekc pub` would run the command, not the deck; name it something else, like pub-talk",
+          },
+        });
       });
-    });
-  });
+    },
+  );
 });
