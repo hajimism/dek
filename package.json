@@ -5,6 +5,7 @@
   "license": "MIT",
   "author": "Hajime Nakagawa (https://github.com/hajimism)",
   "type": "module",
+  "workspaces": ["apps/*"],
   "bin": {
     "dekc": "src/cli.ts"
   },

@@ -1,0 +1,22 @@
+{
+  "name": "@dek/pub",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "preview": "vp preview",
+    "prepare": "void prepare"
+  },
+  "dependencies": {
+    "svelte": "5.57.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@void/svelte": "1.6.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0",
+    "vite-plus": "1.5.0",
+    "void": "1.6.2"
+  }
+}

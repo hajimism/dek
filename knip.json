@@ -1,17 +1,44 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "src/runtime/browser.ts",
-    "src/runtime/browser-live.ts",
-    "src/runtime/annotate.ts",
-    "src/core/*-worker.ts",
-    "src/video/worker.ts",
-    "src/plugins/*/main.ts",
-    "src/plugins/*/page.ts",
-    "tests/helpers/fake-*.ts",
-    "scripts/*.ts",
-    "evals/agent/shim.ts"
-  ],
-  "project": ["src/**/*.ts", "tests/**/*.ts", "evals/**/*.ts"],
-  "ignoreDependencies": ["publint"]
+  "workspaces": {
+    ".": {
+      "entry": [
+        "src/runtime/browser.ts",
+        "src/runtime/browser-live.ts",
+        "src/runtime/annotate.ts",
+        "src/core/*-worker.ts",
+        "src/video/worker.ts",
+        "src/plugins/*/main.ts",
+        "src/plugins/*/page.ts",
+        "src/pub/protocol.ts",
+        "tests/helpers/fake-*.ts",
+        "scripts/*.ts",
+        "evals/agent/shim.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts",
+        "evals/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "publint"
+      ]
+    },
+    "apps/pub": {
+      "entry": [
+        "void.config.ts",
+        "pages/**/*.{ts,svelte}",
+        "routes/**/*.ts",
+        "middleware/**/*.ts",
+        "db/schema.ts",
+        "db/seed.ts",
+        "auth.ts",
+        "env.ts"
+      ],
+      "project": [
+        "**/*.{ts,svelte}"
+      ],
+      "vite": false
+    }
+  }
 }
