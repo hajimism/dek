@@ -1,6 +1,5 @@
 // Rendering a component as a Void page would: with the shared data in context.
 
-import type { Component, ComponentProps } from "svelte";
 import { render } from "vitest-browser-svelte";
 import type { Shared } from "../../middleware/01.shared.ts";
 
@@ -18,17 +17,24 @@ export function shared(overrides: Partial<Shared> = {}): Shared {
   };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: any component, as Svelte's own ComponentProps takes one.
-export function renderPage<C extends Component<any>>(
-  component: C,
-  props: ComponentProps<C>,
+/** What a rendered page component gives a test: its props can be set again. */
+export type Rendered = { rerender: (props: Record<string, unknown>) => Promise<void> };
+
+/**
+ * Render a component with the shared data a Void page has. Props are checked by the component at
+ * run time; Svelte's generic and exporting components do not fit one static props type.
+ */
+export async function renderPage(
+  component: unknown,
+  props: Record<string, unknown>,
   overrides: Partial<Shared> = {},
-) {
-  return render(
+): Promise<Rendered> {
+  const result = await render(
     component as never,
     {
       props,
       context: new Map([["__void_shared", { value: shared(overrides) }]]),
     } as never,
   );
+  return { rerender: (next) => result.rerender(next as never) };
 }

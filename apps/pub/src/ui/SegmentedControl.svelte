@@ -25,6 +25,11 @@
 
   const index = $derived(Math.max(0, options.findIndex((option) => option.value === value)));
   let buttons: HTMLButtonElement[] = $state([]);
+  // The arrow keys move focus only; Space, Enter or a click commits, since a choice here (going
+  // public) may have consequences the owner of `value` asks about first. The one in the tab
+  // order is the focused one while focus is inside, and the chosen one otherwise.
+  let focused: number | null = $state(null);
+  const tabStop = $derived(focused ?? index);
 
   function move(event: KeyboardEvent, from: number) {
     const keys: Record<string, number> = {
@@ -45,12 +50,14 @@
       return;
     }
     event.preventDefault();
-    const option = options[to];
-    if (!option) {
-      return;
-    }
+    focused = to;
     buttons[to]?.focus();
-    onselect(option.value);
+  }
+
+  /** Put focus back on the chosen option, as after a choice was asked about and declined. */
+  export function focusChosen() {
+    focused = null;
+    buttons[index]?.focus();
   }
 </script>
 
@@ -63,6 +70,11 @@
   aria-disabled={disabled ? "true" : undefined}
   style:--count={options.length}
   style:--index={index}
+  onfocusout={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      focused = null;
+    }
+  }}
 >
   <span class="thumb" aria-hidden="true"></span>
   {#each options as option, i (option.value)}
@@ -72,10 +84,11 @@
       role="radio"
       class="segment"
       aria-checked={option.value === value}
-      tabindex={option.value === value ? 0 : -1}
+      tabindex={i === tabStop ? 0 : -1}
       {disabled}
       onclick={() => option.value !== value && onselect(option.value)}
       onkeydown={(event) => move(event, i)}
+      onfocus={() => (focused = i)}
     >
       {#if option.icon}<Icon name={option.icon} size={14} />{/if}
       <span>{option.label}</span>

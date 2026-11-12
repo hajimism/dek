@@ -18,10 +18,11 @@
 
   let { status: initial, grants }: { status: DeckStatus; grants: GrantView[] } = $props();
 
-  const { t } = useApp();
+  const { lang, t } = useApp();
   let status: DeckStatus = $state(untrack(() => initial));
   let saving: keyof ShareRequest | null = $state(null);
   let confirmPublic = $state(false);
+  let visibilityControl: ReturnType<typeof SegmentedControl> | undefined = $state();
   let active = $state("overview");
   const talkPath = $derived(`/@${status.owner}/${status.slug}`);
 
@@ -101,7 +102,7 @@
 <div class="page">
   <header class="top">
     <a class="back" href={talkPath}><Icon name="arrow-left" size={14} />{t("manage.back")}</a>
-    <h1 lang={guessLang([status.title]) ?? undefined}>{status.title}</h1>
+    <h1 lang={guessLang([status.title], lang) ?? undefined}>{status.title}</h1>
   </header>
 
   <div class="layout">
@@ -134,6 +135,7 @@
       <section id="visibility" class="section" aria-labelledby="visibility-title">
         <h2 id="visibility-title">{t("visibility.label")}</h2>
         <SegmentedControl
+          bind:this={visibilityControl}
           label={t("visibility.label")}
           options={visibilityOptions}
           value={status.visibility}
@@ -197,7 +199,14 @@
   </div>
 </div>
 
-<Dialog bind:open={confirmPublic} title={t("visibility.confirmTitle", { title: status.title })}>
+<Dialog
+  bind:open={confirmPublic}
+  title={t("visibility.confirmTitle", { title: status.title })}
+  onclose={() => {
+    // Declined or done, focus goes back to the option now chosen, which is the group's tab stop.
+    queueMicrotask(() => visibilityControl?.focusChosen());
+  }}
+>
   <p>{t("visibility.confirmBody")}</p>
   {#snippet actions()}
     <Button variant="secondary" autofocus onclick={() => (confirmPublic = false)}>{t("common.cancel")}</Button>

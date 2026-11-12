@@ -32,8 +32,10 @@ describe("SegmentedControl", () => {
     { value: "link", label: "Link only" },
     { value: "public", label: "Public" },
   ] as const;
+  const radio = (name: string) => page.getByRole("radio", { name });
+  const focusedLabel = () => document.activeElement?.textContent?.trim();
 
-  it("is a radio group with the current option checked and the only one in the tab order", async () => {
+  it("is a radio group with the chosen option checked and the only one in the tab order", async () => {
     await renderPage(SegmentedControl, {
       options,
       value: "link",
@@ -41,57 +43,70 @@ describe("SegmentedControl", () => {
       onselect: () => {},
     });
     await expect.element(page.getByRole("radiogroup", { name: "Visibility" })).toBeVisible();
-    await expect
-      .element(page.getByRole("radio", { name: "Link only" }))
-      .toHaveAttribute("aria-checked", "true");
-    await expect
-      .element(page.getByRole("radio", { name: "Link only" }))
-      .toHaveAttribute("tabindex", "0");
-    await expect
-      .element(page.getByRole("radio", { name: "Public" }))
-      .toHaveAttribute("tabindex", "-1");
+    await expect.element(radio("Link only")).toHaveAttribute("aria-checked", "true");
+    await expect.element(radio("Link only")).toHaveAttribute("tabindex", "0");
+    await expect.element(radio("Public")).toHaveAttribute("tabindex", "-1");
+    await expect.element(radio("Private")).toHaveAttribute("tabindex", "-1");
   });
 
-  it("moves with the arrow keys, Home and End, wrapping around", async () => {
+  it("moves focus with the arrow keys, Home and End, wrapping, and chooses nothing", async () => {
     const onselect = vi.fn();
     await renderPage(SegmentedControl, { options, value: "link", label: "Visibility", onselect });
-    await page.getByRole("radio", { name: "Link only" }).click();
-    expect(onselect).not.toHaveBeenCalled();
+    (radio("Link only").element() as HTMLElement).focus();
     await userEvent.keyboard("{ArrowRight}");
-    expect(onselect).toHaveBeenLastCalledWith("public");
+    expect(focusedLabel()).toBe("Public");
+    await expect.element(radio("Public")).toHaveAttribute("tabindex", "0");
+    await userEvent.keyboard("{ArrowRight}");
+    expect(focusedLabel()).toBe("Private");
     await userEvent.keyboard("{ArrowLeft}");
-    expect(onselect).toHaveBeenLastCalledWith("link");
+    expect(focusedLabel()).toBe("Public");
+    await userEvent.keyboard("{Home}");
+    expect(focusedLabel()).toBe("Private");
     await userEvent.keyboard("{End}");
+    expect(focusedLabel()).toBe("Public");
+    expect(onselect).not.toHaveBeenCalled();
+    await expect.element(radio("Link only")).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("chooses the focused option with Enter or Space", async () => {
+    const onselect = vi.fn();
+    await renderPage(SegmentedControl, { options, value: "link", label: "Visibility", onselect });
+    (radio("Link only").element() as HTMLElement).focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await userEvent.keyboard("{Enter}");
     expect(onselect).toHaveBeenLastCalledWith("public");
     await userEvent.keyboard("{Home}");
+    await userEvent.keyboard(" ");
     expect(onselect).toHaveBeenLastCalledWith("private");
   });
 
-  it("wraps from the first option to the last", async () => {
+  it("shows what the owner decides, not what was asked for", async () => {
     const onselect = vi.fn();
-    await renderPage(SegmentedControl, {
+    const view = await renderPage(SegmentedControl, {
       options,
       value: "private",
       label: "Visibility",
       onselect,
     });
-    (page.getByRole("radio", { name: "Private" }).element() as HTMLElement).focus();
-    await userEvent.keyboard("{ArrowLeft}");
-    expect(onselect).toHaveBeenLastCalledWith("public");
+    await radio("Public").click();
+    expect(onselect).toHaveBeenCalledWith("public");
+    await expect.element(radio("Public")).toHaveAttribute("aria-checked", "false");
+    await view.rerender({ value: "public" });
+    await expect.element(radio("Public")).toHaveAttribute("aria-checked", "true");
+    await expect.element(radio("Private")).toHaveAttribute("aria-checked", "false");
   });
 
-  it("asks the owner on click and leaves the choice to it", async () => {
-    const onselect = vi.fn();
+  it("puts the tab stop back on the chosen option when focus leaves", async () => {
     await renderPage(SegmentedControl, {
       options,
-      value: "private",
+      value: "link",
       label: "Visibility",
-      onselect,
+      onselect: () => {},
     });
-    await page.getByRole("radio", { name: "Public" }).click();
-    expect(onselect).toHaveBeenCalledWith("public");
-    await expect
-      .element(page.getByRole("radio", { name: "Private" }))
-      .toHaveAttribute("aria-checked", "true");
+    (radio("Link only").element() as HTMLElement).focus();
+    await userEvent.keyboard("{ArrowRight}");
+    (document.activeElement as HTMLElement).blur();
+    await expect.element(radio("Link only")).toHaveAttribute("tabindex", "0");
+    await expect.element(radio("Public")).toHaveAttribute("tabindex", "-1");
   });
 });
