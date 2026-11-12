@@ -187,6 +187,11 @@ export function createRailView(options: {
   stage: Stage;
   onPick: (slideIndex: number) => void;
   onResize: () => void;
+  /**
+   * The deck is in another page's frame, which shows the slide alone: the rail starts closed,
+   * and opening or closing it there leaves what the reader kept for the deck on its own.
+   */
+  framed?: boolean;
 }): RailView {
   const railEl = document.getElementById(PAGE_ID.rail);
   const resizeEl = document.getElementById(PAGE_ID.railResize);
@@ -194,7 +199,10 @@ export function createRailView(options: {
   if (railEl) {
     setWidth(resizeEl, readStoredRailWidth(pageStorage()));
     // What was remembered; the deck is fitted once everything is built.
-    document.body.classList.toggle("is-rail-hidden", !readStoredRailVisible(pageStorage()));
+    document.body.classList.toggle(
+      "is-rail-hidden",
+      options.framed === true || !readStoredRailVisible(pageStorage()),
+    );
     bindThumbKeys(railEl, options.slides, options.onPick);
     if (resizeEl) {
       bindResizeKeys(resizeEl, options.onResize);
@@ -207,7 +215,9 @@ export function createRailView(options: {
     isOpen: () => !document.body.classList.contains("is-rail-hidden"),
     setOpen(open) {
       document.body.classList.toggle("is-rail-hidden", !open);
-      persist(RAIL_VISIBLE_KEY, open ? "1" : "0");
+      if (!options.framed) {
+        persist(RAIL_VISIBLE_KEY, open ? "1" : "0");
+      }
       options.onResize();
     },
     fill() {

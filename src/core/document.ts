@@ -129,7 +129,7 @@ export function renderDeckDocument(
     : "";
   const currentLabel = includeNotes ? `<div class="dek-panel-label">Current</div>` : "";
   const rail = target.kind === "video" ? "" : renderRailHtml(data);
-  const hint = target.kind === "build" ? renderKeyHintHtml(deck.deck.lang) : "";
+  const hint = target.kind === "build" ? renderKeyHintHtml(deck.deck.lang, includeNotes) : "";
   const railResize = rail
     ? `<div id="${PAGE_ID.railResize}" role="separator" aria-orientation="vertical" aria-label="Resize slide list" aria-valuemin="${RAIL_WIDTH_MIN}" aria-valuemax="${RAIL_WIDTH_MAX}" aria-valuenow="${RAIL_WIDTH_DEFAULT}" tabindex="0"></div>`
     : "";
@@ -238,12 +238,15 @@ function laserLabel(lang: string): string {
 }
 
 /**
- * The keys a viewer of a built file cannot discover by looking: `s` and `p`. Shown once as
- * the file opens, it fades on its own and goes away at the first key or move.
+ * The keys a viewer of a built file cannot discover by looking: `s`, and `p` when it has a
+ * presenter view. Shown once as the file opens, it fades on its own and goes away at the first
+ * key or move.
  */
-function renderKeyHintHtml(lang: string): string {
+function renderKeyHintHtml(lang: string, presenter: boolean): string {
   const labels = lang.toLowerCase().startsWith("ja") ? KEY_HINT_LABELS.ja : KEY_HINT_LABELS.en;
-  return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span><span><kbd>p</kbd>${labels.presenter}</span></div>`;
+  // A build with no script has no presenter view to name.
+  const p = presenter ? `<span><kbd>p</kbd>${labels.presenter}</span>` : "";
+  return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span>${p}</div>`;
 }
 
 /**

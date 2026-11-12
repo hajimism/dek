@@ -141,6 +141,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     stage,
     onPick: (slideIndex) => control.request({ slideIndex, beatIndex: 0 }, "local"),
     onResize: fitAll,
+    framed,
   });
 
   function setPresenterOpen(open: boolean): void {
@@ -186,6 +187,10 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     stage.setPrinting(event.matches, nav.position()),
   );
 
+  // A framing page shows the slide alone; the keys are its to tell of, if it wants them told.
+  if (framed) {
+    dismissKeyHint();
+  }
   rail.fill();
   fitAll();
   render(nav.position());

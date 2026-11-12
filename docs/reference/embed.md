@@ -29,13 +29,15 @@ Listen before you set the frame's `src`, so you hear `dek:ready`:
 
 The sandbox above is the one dek.pub uses: the deck runs its scripts, keeps its own origin (so its URL hash works), and opens links in a new window. The deck may be served from another origin than the page; dek.pub serves each deck from an origin of its own.
 
+A framed deck shows the slide alone: its slide rail starts closed, whatever the reader chose when opening the deck on its own, and the hint naming its keys does not show. The keys still work, and `s` still opens the rail; opening or closing it in a frame leaves the reader's choice for the deck on its own as it was.
+
 ## What the deck sends
 
 The deck posts to `window.parent` with the target origin `"*"`. Nothing it sends holds the script, the speaker's notes, or anything else of the presenter view, even from a build without `--public`. What it does send reaches any page that frames it: `dek:ready` names the deck's folder, every slug, and every beat id, and `dek:picked` the text of what was picked. For a deck that is not public, keep other sites from framing it: serve it with `Content-Security-Policy: frame-ancestors` naming only your own pages, as dek.pub does.
 
 | Message | When |
 | --- | --- |
-| `{ type: "dek:ready", protocol: 1, deck, size: { width, height }, slides: [{ slug, steps }], current: { slug, step, index } }` | Once, when the player has started. `deck` is the deck's folder name, `size` the slide's own size in pixels (1280×720 for `ratio: 16:9`, 1024×768 for `4:3`), as the build wrote it on the page, and `steps` each stop of the slide in order. |
+| `{ type: "dek:ready", protocol: 1, deck, size: { width, height }, slides: [{ slug, steps }], current: { slug, step, index } }` | Once, when the player has started and takes `dek:goto`: a `dek:goto` sent as soon as it arrives moves the deck. `deck` is the deck's folder name, `size` the slide's own size in pixels (1280×720 for `ratio: 16:9`, 1024×768 for `4:3`), as the build wrote it on the page, and `steps` each stop of the slide in order. |
 | `{ type: "dek:moved", slug, step, index, by }` | On every move, as it starts. `by` is `"embed"` for a move `dek:goto` asked for, and `"reader"` for any other: a key, a click or swipe, the rail, the URL hash, or another window of the deck. A move that ends where the deck already stood sends none. Also the answer to `dek:current`, with `by: "embed"`. |
 | `{ type: "dek:picked", slug, step, target: { kind: "element", path, name, text, box } }` | In pick mode, when the reader clicks an element. |
 | `{ type: "dek:pick-cancel" }` | In pick mode, when the reader presses Escape in the frame. Pick mode is then off. |
@@ -63,7 +65,7 @@ The deck reads a message only when `event.source` is the page that frames it, an
 
 ### Moves
 
-`dek:goto` moves the deck as a key press does, and the URL hash follows. While the deck is framed, any move, the reader's too, replaces the deck's entry in the history rather than adding one, so Back in the framing page leaves the page instead of stepping the deck back. A framed deck also tells no other window of the deck where it went: two frames of one deck on one page move only when the page moves each. It still follows a window that does tell it, and says so with `by: "reader"`. A deck nobody frames keeps both as before.
+`dek:goto` moves the deck as a key press does, and the URL hash follows. A move between slides plays a view transition; in a frame that is not being drawn, such as one with `display: none` or out of view, the transition is skipped after a moment and the move goes on without it, so a page may move a deck it has not shown yet. While the deck is framed, any move, the reader's too, replaces the deck's entry in the history rather than adding one, so Back in the framing page leaves the page instead of stepping the deck back. A framed deck also tells no other window of the deck where it went: two frames of one deck on one page move only when the page moves each. It still follows a window that does tell it, and says so with `by: "reader"`. A deck nobody frames keeps both as before.
 
 ### Pick mode
 

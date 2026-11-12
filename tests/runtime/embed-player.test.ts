@@ -56,7 +56,9 @@ function fakeParent() {
 
 let root = "";
 
-async function mountFramed(options: { framed?: boolean; url?: string } = {}) {
+async function mountFramed(
+  options: { framed?: boolean; url?: string; beforeStart?: () => void } = {},
+) {
   root = realpathSync(await mkdtemp(join(tmpdir(), "dek-embed-")));
   await writeProject(root, {
     decks: [
@@ -81,6 +83,7 @@ async function mountFramed(options: { framed?: boolean; url?: string } = {}) {
       if (options.framed !== false) {
         Object.defineProperty(window, "parent", { value: page.parent, configurable: true });
       }
+      options.beforeStart?.();
     },
   });
   return page;
@@ -289,6 +292,27 @@ describe("a framed deck's embed API", () => {
     const after = page.posted.length;
     pressKey("Escape");
     expect(page.posted.length).toBe(after);
+  });
+
+  test.serial(
+    "shows the slide alone: no rail and no key hint, whatever the reader kept",
+    async () => {
+      await mountFramed({ beforeStart: () => localStorage.setItem("dek.railVisible", "1") });
+      expect(document.body.classList.contains("is-rail-hidden")).toBe(true);
+      expect(document.getElementById("dek-hint")).toBeNull();
+      // The keys still open the rail; what the reader kept for the deck on its own stays as it was.
+      pressKey("s");
+      expect(document.body.classList.contains("is-rail-hidden")).toBe(false);
+      pressKey("s");
+      expect(document.body.classList.contains("is-rail-hidden")).toBe(true);
+      expect(localStorage.getItem("dek.railVisible")).toBe("1");
+    },
+  );
+
+  test.serial("a deck nobody frames shows its rail and its key hint as before", async () => {
+    await mountFramed({ framed: false });
+    expect(document.body.classList.contains("is-rail-hidden")).toBe(false);
+    expect(document.getElementById("dek-hint")).not.toBeNull();
   });
 
   test.serial(
