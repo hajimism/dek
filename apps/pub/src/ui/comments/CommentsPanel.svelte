@@ -6,7 +6,7 @@
 </script>
 
 <script lang="ts">
-  import { type Filter, matchesFilter } from "../../lib/comment-view.ts";
+  import { type Filter, matchesFilter, mayResolve } from "../../lib/comment-view.ts";
   import { useApp } from "../app.ts";
   import Icon from "../Icon.svelte";
   import CommentCard, { type CardComment, type ReplyInput } from "./CommentCard.svelte";
@@ -129,12 +129,6 @@
     return { tops: placed, height: bottom };
   });
 
-  function mayResolve(comment: CardComment): boolean {
-    if (!shared.viewer) {
-      return false;
-    }
-    return isOwner || (!comment.author.guest && comment.author.handle === shared.viewer.handle);
-  }
 </script>
 
 {#snippet draftCard()}
@@ -213,7 +207,7 @@
               {comment}
               slideNumber={slideNumbers.get(comment.slug) ?? null}
               selected={comment.id === selectedId}
-              canResolve={mayResolve(comment)}
+              canResolve={mayResolve(comment, shared.viewer, isOwner)}
               canReply={canComment}
               {guest}
               now={shared.now}

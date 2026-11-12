@@ -2,8 +2,8 @@
 // 32 characters on each side, so the same words said twice on one slide are told apart. Pure, so
 // the composer and the highlighter agree on where a quote is.
 
-export const CONTEXT_CHARS = 32;
-export const MAX_QUOTE_CHARS = 500;
+const CONTEXT_CHARS = 32;
+const MAX_QUOTE_CHARS = 500;
 
 export type Quote = { quote: string; prefix: string; suffix: string };
 

@@ -29,10 +29,7 @@ export function matchesFilter(comment: Pick<CommentRow, "status">, filter: Filte
 type SlideText = { slug: string; paragraphs: readonly string[] | null };
 
 /** Where in the article a comment points: slide, then paragraph, then offset; the slide itself first. */
-export function positionOf(
-  comment: CommentRow,
-  slides: readonly SlideText[],
-): [number, number, number] {
+function positionOf(comment: CommentRow, slides: readonly SlideText[]): [number, number, number] {
   const slide = slides.findIndex((candidate) => candidate.slug === comment.slug);
   const at = slide === -1 ? slides.length : slide;
   const quote = quoteOf(comment);

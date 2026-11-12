@@ -3,8 +3,6 @@
 // shows it as it is, with nothing to steer. Everything that arrives is checked here, field by
 // field, because the deck runs its author's code.
 
-export const EMBED_PROTOCOL = 1;
-
 export type Box = { x: number; y: number; width: number; height: number };
 export type Size = { width: number; height: number };
 

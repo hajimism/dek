@@ -1,7 +1,7 @@
 // The code the device flow shows in the terminal: 8 letters and digits, written XXXX-XXXX. People
 // type it, paste it, or follow the CLI's link with it, with or without the hyphen, in any case.
 
-export const USER_CODE_LENGTH = 8;
+const USER_CODE_LENGTH = 8;
 
 /** The code as Better Auth stores it: letters and digits only, upper case. */
 export function normalizeUserCode(input: string): string {

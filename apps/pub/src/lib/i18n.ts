@@ -3,7 +3,7 @@
 // Labels for values an agent also reads (visibility, role, comment status) keep the `--json` names
 // as their keys, so the UI and `dekc pub … --json` say the same thing.
 
-export const LANGS = ["en", "ja"] as const;
+const LANGS = ["en", "ja"] as const;
 export type Lang = (typeof LANGS)[number];
 
 const en = {
@@ -497,8 +497,8 @@ const ja: Record<MessageKey, string> = {
 
 const DICTIONARIES: Record<Lang, Record<MessageKey, string>> = { en, ja };
 
-export function isLang(value: unknown): value is Lang {
-  return value === "en" || value === "ja";
+function isLang(value: unknown): value is Lang {
+  return (LANGS as readonly unknown[]).includes(value);
 }
 
 /** The language a request asks for: `?lang=`, then the cookie, then the browser's list. */
