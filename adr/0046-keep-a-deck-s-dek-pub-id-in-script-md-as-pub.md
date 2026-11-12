@@ -20,7 +20,7 @@ DEK008 flags every frontmatter key the schema does not name, so whatever dek wri
 
 ## Decision
 
-**The frontmatter key `pub` holds the deck's ID on dek.pub**, the string the protocol calls `DeckId`: `d_` and then 10 to 32 lowercase letters and digits. It is in the zod `Frontmatter`, so DEK008 does not flag it and `.dek/schema.json` documents it; a value of another shape stops the script from being read, with a message that says what to write and that deleting the line makes a new deck.
+**The frontmatter key `pub` holds the deck's ID on dek.pub**, the string the protocol calls `DeckId`: `d_` and then 10 to 32 lowercase letters and digits. It is in the zod `Frontmatter`, so DEK008 does not flag it and `.dek/schema.json` documents it; a value of another shape stops the script from being read, with a message that says what to write, and that without the line `dekc pub publish --slug <slug>` makes a new deck.
 
 **`dekc pub publish` writes it**, once, after dek.pub has made the deck and before the version is uploaded: an upload that fails still leaves the ID, and the next publish lands on the same deck. Its result says that script.md changed and should be committed.
 
@@ -33,6 +33,6 @@ DEK008 flags every frontmatter key the schema does not name, so whatever dek wri
 
 ## Consequences
 
-- A deck folder carries its link to dek.pub with it. Two folders that hold the same `pub:`, such as a copy of a deck, publish onto the same remote deck; deleting the line in the copy makes it a deck of its own.
+- A deck folder carries its link to dek.pub with it. Two folders that hold the same `pub:`, such as a copy of a deck, publish onto the same remote deck. Deleting the line in the copy makes it a deck of its own only under a slug of its own: the first publish asks for the folder's name as the slug, which the deck it was copied from already has, and dek.pub refuses a slug its owner has (`slug_taken`), so the copy is published with `--slug` (ADR 47).
 - `pub` joins the frontmatter table in the config reference, in both languages, and `.dek/schema.json`, which `dekc sync` writes.
 - A dek older than this one reads a script with `pub:` as having an unknown key, and DEK008 warns about it; nothing fails.

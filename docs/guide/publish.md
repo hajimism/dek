@@ -22,7 +22,7 @@ An agent cannot open a browser for you, so with `--json` the sign-in comes in tw
 
 The agent shows you the URL and the code, then runs `next`, which waits until you approve and returns `"status": "signed-in"`. If that run is stopped, the next one waits for the same code until it expires.
 
-In CI, set `DEK_TOKEN` to an API key instead; no sign-in is needed.
+In CI, set `DEK_TOKEN` to an API key instead; no sign-in is needed. dek sends it only to `https://dek.pub`, or to the server `DEK_TOKEN_SERVER` names.
 
 ## Publish a version
 
@@ -46,7 +46,7 @@ pub: d_k2m9x4q7w1
 ---
 ```
 
-Commit that line, so a publish from any checkout updates the same deck. Delete it to publish as a new deck.
+Commit that line, so a publish from any checkout updates the same deck. The deck's slug, the end of its URL, is the folder's name in lowercase; pass `--slug <slug>` on the first publish for another. A slug you already have is refused: a deck copied from another, or one whose `pub:` line was deleted, is made anew only with a `--slug` of its own.
 
 Each publish is a new version. It becomes the one readers see unless you pass `--no-promote`. Sections renamed with `dekc mv` since the last version take their comments with them.
 
