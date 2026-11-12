@@ -39,7 +39,12 @@
       "project": [
         "**/*.{ts,svelte}"
       ],
-      "vite": false
+      "vite": false,
+      "paths": {
+        "@schema": [
+          "db/schema.ts"
+        ]
+      }
     }
   }
 }

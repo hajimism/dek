@@ -151,9 +151,14 @@ export const VersionManifest = z.strictObject({
   deck: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  event: z.string().optional(),
-  date: z.string().optional(),
-  lang: z.string().optional(),
+  event: z.string().max(500).optional(),
+  /** The talk's date, as the frontmatter writes it: YYYY-MM-DD. */
+  date: z.iso.date().optional(),
+  /** A BCP 47 language tag. */
+  lang: z
+    .string()
+    .regex(/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/)
+    .optional(),
   /** The newest version this one was made on, or null for the first; 409 when it is not. */
   base: z.number().int().nullable(),
   /** The public build's map: the article and comment anchors use it. */

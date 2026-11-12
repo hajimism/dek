@@ -4,6 +4,8 @@ import type { Context } from "hono";
 import type { z } from "zod";
 import { type ErrorBody, PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export class ApiError extends Error {
   constructor(
     readonly status: 400 | 401 | 403 | 404 | 409 | 411 | 413 | 415 | 422 | 429,
@@ -44,6 +46,14 @@ export async function api(
         `this server speaks protocol ${PROTOCOL_VERSION}, not ${spoken}`,
         "use a dekc as old as the server, or wait for the server to update",
       );
+    }
+    // A cookie rides along on any request the browser makes, so a change made with one must come
+    // from a page of this origin. The CLI sends a key and no cookie.
+    if (request && !SAFE_METHODS.has(request.method) && request.headers.has("cookie")) {
+      const origin = request.headers.get("origin");
+      if (origin !== new URL(request.url).origin) {
+        throw new ApiError(403, "cross_origin", "a change must come from a page of dek.pub");
+      }
     }
     const result = await fn();
     return result instanceof Response ? result : Response.json(result);

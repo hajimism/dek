@@ -102,7 +102,7 @@ export function deckHeaders(appOrigin: string, embeddable: boolean): Headers {
       "base-uri 'none'",
       `frame-ancestors ${embeddable ? "*" : appOrigin}`,
       // The same sandbox as the iframe's, so a deck opened by its URL is held as it is framed.
-      "sandbox allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+      "sandbox allow-scripts allow-same-origin allow-popups",
     ].join("; "),
     "cross-origin-opener-policy": "same-origin",
     "permissions-policy": `camera=(), microphone=(), geolocation=(), usb=(), payment=(), fullscreen=(self "${appOrigin}")`,
