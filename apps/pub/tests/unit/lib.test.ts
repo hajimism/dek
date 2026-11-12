@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import type { SlideMap } from "../../../../src/pub/protocol.ts";
 import { DeckId } from "../../../../src/pub/protocol.ts";
 import { canComment, canManage, canView, type DeckRules } from "../../src/lib/access.ts";

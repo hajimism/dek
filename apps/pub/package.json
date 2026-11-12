@@ -9,7 +9,7 @@
     "build": "vp build",
     "preview": "vp preview",
     "check": "void prepare && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
-    "test": "vp test",
+    "test": "vitest run",
     "test:serve": "bun run --cwd serve test",
     "test:e2e": "bun tests/e2e/run.ts",
     "db:generate": "void db generate"

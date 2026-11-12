@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { playwright } from "vite-plus/test/browser-playwright";
-import { defineConfig } from "vite-plus";
+import { playwright } from "@vitest/browser-playwright";
+import { defineConfig } from "vitest/config";
 
 // The app's tests, apart from the Void dev server: pure logic in Node, components in a real
 // browser. The serve Worker has its own, in workerd (serve/vitest.config.ts); the whole app is

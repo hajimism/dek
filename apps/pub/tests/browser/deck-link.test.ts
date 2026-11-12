@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DeckLink } from "../../src/ui/talk/deck-link.svelte.ts";
 
 const ORIGIN = "http://d-abc.localhost:5176";

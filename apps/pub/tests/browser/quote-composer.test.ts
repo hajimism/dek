@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vite-plus/test";
-import { page } from "vite-plus/test/browser";
+import { describe, expect, it, vi } from "vitest";
+import { page } from "vitest/browser";
 import type { ArticleSlide } from "../../src/server/pages.ts";
 import Article from "../../src/ui/talk/Article.svelte";
 import { renderPage } from "./setup.ts";
