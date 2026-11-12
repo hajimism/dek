@@ -1,6 +1,7 @@
 import { defineHandler } from "void";
 import { NewComment } from "../../../../../../../src/pub/protocol.ts";
 import { canComment, canManage } from "../../../../../src/lib/access.ts";
+import { hideQuotes } from "../../../../../src/lib/comment-view.ts";
 import { currentPerson } from "../../../../../src/server/actor.ts";
 import { listComments, openThread } from "../../../../../src/server/comments.ts";
 import { visibleDeck } from "../../../../../src/server/decks.ts";
@@ -22,7 +23,14 @@ export const GET = defineHandler((c) =>
       throw new ApiError(422, "invalid", "status is open, resolved, or all");
     }
     const version = c.req.query("version");
-    return { comments: await listComments(c, deck, { status, version: version ? Number(version) : null }) };
+    const comments = await listComments(c, deck, {
+      status,
+      version: version ? Number(version) : null,
+    });
+    // A quoted passage is part of the script: someone the script is hidden from gets the comment
+    // without it, as the talk page shows it.
+    const seesScript = deck.scriptPublic || canManage(deck, person);
+    return { comments: seesScript ? comments : comments.map(hideQuotes) };
   }, c.req.raw),
 );
 
