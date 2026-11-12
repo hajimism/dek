@@ -1,5 +1,12 @@
 /// <reference lib="dom" />
-import { type AnnotationRow, type Box, formatNotes, type Point } from "../core/annotation-rows.ts";
+import {
+  type AnnotationRow,
+  type Box,
+  formatNotes,
+  groupNotes,
+  type NoteGroup,
+  type Point,
+} from "../core/annotation-rows.ts";
 import { ANNOTATIONS_CHANGED, PAGE_ID } from "../core/page.ts";
 import type { PresenterSlide } from "../core/presenter-state.ts";
 import {
@@ -9,9 +16,10 @@ import {
   SOURCE_ATTR,
   slideBox,
   slidePoint,
+  stopHash,
   windowPoint,
 } from "./annotate-pick.ts";
-import { placePopup } from "./annotate-place.ts";
+import { placePopup, type Rect } from "./annotate-place.ts";
 import { slideSelector } from "./live.ts";
 import { isLetterKey, isTextEntry } from "./step.ts";
 
@@ -33,6 +41,9 @@ const LABELS = {
   near: "near",
   addHint: "⌘/Ctrl-click adds more",
   notes: (n: number) => `${n} ${n === 1 ? "note" : "notes"}`,
+  list: "Notes",
+  atBeat: (step: string) => `at beat ${step}`,
+  status: { edited: "edited", gone: "gone" },
   copied: (n: number) => `Copied ${n} ${n === 1 ? "note" : "notes"}`,
   manual: "Press ⌘C or Ctrl+C to copy",
   failed: (why: string) => `Not saved: ${why}`,
@@ -91,11 +102,23 @@ textarea::placeholder { color: var(--faint); }
 [data-part=pill] { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; }
 [data-part=pill] button { border-radius: 999px; padding: 5px 10px; }
 [data-part=pill] button[data-part=clear], [data-part=pill] button[data-part=close] { padding: 5px 7px; }
-[data-part=count] { padding: 0 10px; color: var(--muted); white-space: nowrap; }
+[data-part=count] { white-space: nowrap; }
+[data-part=count][aria-expanded=true] { background: var(--raised); color: var(--ink); }
 [data-part=clear]:hover { color: #f09595; }
 [data-part=divider] { width: 1px; height: 16px; margin: 0 6px; background: var(--line); }
 [data-part=copy] { background: var(--raised); color: var(--ink); }
 [data-part=tray] { display: grid; gap: 6px; max-width: calc(100vw - 32px); padding: 8px; border-radius: 12px; }
+[data-part=list] { display: grid; gap: 8px; width: min(340px, calc(100vw - 48px)); max-height: min(50vh, 360px); overflow: auto; }
+[data-part=group] { display: grid; gap: 2px; }
+[data-part=group] h3 { padding: 2px 6px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-part=group][data-here] h3 { color: #85b7eb; }
+[data-part=item] { width: 100%; padding: 4px 6px; text-align: left; }
+[data-part=number] { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px 10px 10px 2px; background: var(--accent); color: #fff; font-weight: 600; font-size: 10px; }
+[data-status=gone] [data-part=number] { background: var(--raised); color: var(--muted); }
+[data-part=gist] { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+[data-part=gist].mono { color: var(--muted); }
+[data-part=state] { flex: none; color: var(--faint); }
+[data-status=gone] [data-part=state] { color: #f09595; }
 [data-part=manual] { width: min(460px, calc(100vw - 48px)); min-height: 9em; resize: vertical; }
 [data-part=report] { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
 [data-part=status] { color: var(--muted); }
@@ -165,15 +188,16 @@ export function createAnnotateView(options: {
 </form>
 <div data-part="bar" hidden>
   <div data-part="tray" hidden>
+    <nav data-part="list" id="dek-annotate-list" aria-label="${LABELS.list}" hidden></nav>
     <textarea data-part="manual" class="mono" readonly hidden></textarea>
-    <div data-part="report">
+    <div data-part="report" hidden>
       <p data-part="status" role="status"></p>
       <button type="button" data-part="undo" hidden>${LABELS.undo}</button>
     </div>
   </div>
   <div data-part="pill">
     <button type="button" data-part="copy">${icon("copy")}${LABELS.copy}</button>
-    <span data-part="count"></span>
+    <button type="button" data-part="count" aria-controls="dek-annotate-list" aria-expanded="false"></button>
     <button type="button" data-part="clear" aria-label="${LABELS.clear}" title="${LABELS.clear}">${icon("trash")}</button>
     <span data-part="divider" aria-hidden="true"></span>
     <button type="button" data-part="close" aria-label="${LABELS.close}" title="${LABELS.close}">${icon("close")}</button>
@@ -190,6 +214,7 @@ export function createAnnotateView(options: {
   const manual = part<HTMLTextAreaElement>("manual");
   const status = part("status");
   const tray = part("tray");
+  const list = part("list");
 
   /**
    * Say above the bar how Copy or Clear went: with the text to copy by hand when Copy could not,
@@ -202,7 +227,13 @@ export function createAnnotateView(options: {
     manual.value = extra.byHand ?? "";
     cleared = extra.undo;
     part("undo").hidden = cleared === undefined;
-    tray.hidden = text === "";
+    part("report").hidden = text === "";
+    showTray();
+  }
+
+  /** The tray shows while it has something to show: the list of notes, or what was said. */
+  function showTray(): void {
+    tray.hidden = list.hidden && part("report").hidden;
   }
   const hitStyle = document.createElement("style");
   // A decorative arrow often takes no pointer; while annotating, every element of the deck does.
@@ -211,6 +242,18 @@ export function createAnnotateView(options: {
 
   let on = false;
   let notes: AnnotationRow[] = [];
+  let listOpen = false;
+  /** The hash the view last drew for: the keys move the deck without a hashchange. */
+  let drawnFor = location.hash;
+  /** The notes and the slide on screen the list was drawn for, to keep its focus while they hold. */
+  let listed: { notes: AnnotationRow[]; slug: string } | undefined;
+  /**
+   * A note opened from the list, which the popup follows onto its slide as the move plays,
+   * until it comes to rest there or the human starts writing.
+   */
+  let arriving: AnnotationRow | undefined;
+  /** Where the popup's note or picks were when it was put beside them. */
+  let placedBy = "";
   /** What the last Clear took away, while Undo can still bring it back. */
   let cleared: unknown[] | undefined;
   let picks: Pick[] = [];
@@ -278,6 +321,7 @@ export function createAnnotateView(options: {
     layer.hidden = !on;
     part("bar").hidden = !on;
     report("");
+    listOpen = false;
     if (on) {
       document.head.append(hitStyle);
       tick();
@@ -295,6 +339,9 @@ export function createAnnotateView(options: {
 
   /** Follow what moves on the slide while the mode is on: entrances, morphs, a resized window. */
   function tick(): void {
+    if (location.hash !== drawnFor) {
+      moved();
+    }
     hoverTested = false;
     if (hoverPending) {
       hoverAt(hoverPending);
@@ -372,6 +419,18 @@ export function createAnnotateView(options: {
         marker.style.top = `${tip.y}px`;
       }
     }
+    // Anything else stays where it was put: a looping animation would drag it along, and
+    // moving it as it grows would fight a hand dragging its corner.
+    if (arriving && !popup.hidden) {
+      if (rectKey(noteRect(arriving)) !== placedBy) {
+        placeOpenPopup();
+      } else if (
+        document.querySelector(slideSelector(arriving.slug))?.classList.contains("is-current") !==
+        false
+      ) {
+        arriving = undefined;
+      }
+    }
   }
 
   /**
@@ -409,7 +468,14 @@ export function createAnnotateView(options: {
 
   /** Redraw what the state is made of: the count, the picks, the choices, and the markers. */
   function rebuild(): void {
-    part("count").textContent = LABELS.notes(notes.length);
+    const count = part<HTMLButtonElement>("count");
+    count.textContent = LABELS.notes(notes.length);
+    count.disabled = notes.length === 0;
+    listOpen &&= notes.length > 0;
+    count.setAttribute("aria-expanded", String(listOpen));
+    list.hidden = !listOpen;
+    drawList();
+    showTray();
     part<HTMLButtonElement>("copy").disabled = notes.length === 0;
     part<HTMLButtonElement>("clear").disabled = notes.length === 0;
     part("picks").replaceChildren(
@@ -467,6 +533,113 @@ export function createAnnotateView(options: {
     layout();
   }
 
+  /**
+   * Draw the list again once the notes or the slide on screen changed, not on every redraw: the
+   * pointer moving over the slide would take the focus from a note in it.
+   */
+  function drawList(): void {
+    const slug = onScreen().slug;
+    if (!listOpen) {
+      listed = undefined;
+      list.replaceChildren();
+      return;
+    }
+    if (listed?.notes === notes && listed.slug === slug) {
+      return;
+    }
+    const focused = list.contains(root.activeElement)
+      ? (root.activeElement as HTMLElement).dataset.note
+      : undefined;
+    listed = { notes, slug };
+    list.replaceChildren(...groupNotes(notes).map(listGroup));
+    if (focused) {
+      list.querySelector<HTMLElement>(`[data-note="${focused}"]`)?.focus();
+    }
+  }
+
+  /** One slide's notes at one beat, under its number and title, as Copy heads them. */
+  function listGroup(group: NoteGroup): HTMLElement {
+    const index = slides.findIndex((slide) => slide.slug === group.slug);
+    const slide = slides[index];
+    const section = document.createElement("section");
+    section.dataset.part = "group";
+    section.toggleAttribute("data-here", group.slug === onScreen().slug);
+    const heading = document.createElement("h3");
+    heading.textContent = [
+      ...(slide ? [`${index + 1}`, slide.title || slide.slug] : [group.slug]),
+      ...(group.step === "0" ? [] : [LABELS.atBeat(group.step)]),
+    ].join(" · ");
+    section.append(heading, ...group.rows.map(listItem));
+    return section;
+  }
+
+  /** A note in the list: its number, its first line or else what it points at, and its status. */
+  function listItem(note: AnnotationRow): HTMLElement {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.dataset.part = "item";
+    item.dataset.note = note.id;
+    item.dataset.status = note.status;
+    const number = document.createElement("span");
+    number.dataset.part = "number";
+    number.textContent = String(note.number);
+    const gist = document.createElement("span");
+    gist.dataset.part = "gist";
+    const [line = ""] = note.text.trim().split(/\r?\n/);
+    const first = note.targets[0];
+    if (line === "" && first) {
+      gist.className = "mono";
+      gist.textContent = label({
+        name: first.name,
+        text: first.text ?? first.was,
+        source: `${first.line}:${first.column}`,
+      });
+    } else {
+      gist.textContent = line;
+    }
+    item.append(number, gist);
+    if (note.status !== "open") {
+      const state = document.createElement("span");
+      state.dataset.part = "state";
+      state.textContent = LABELS.status[note.status];
+      item.append(state);
+    }
+    item.title = note.text;
+    press(item, () => jump(note));
+    return item;
+  }
+
+  /**
+   * Go to the stop a note was written at and open it there, as its marker would. The hash moves
+   * this window as a typed one does, and another window of the deck follows at the next key;
+   * another beat of the slide on screen takes no history entry, as a key's move takes none. A
+   * note whose slide is gone from the script opens where the deck is.
+   */
+  function jump(note: AnnotationRow): void {
+    const hash = stopHash(note.slug, note.step, slides);
+    if (hash !== "" && hash !== location.hash) {
+      if (note.slug === onScreen().slug) {
+        location.replace(hash);
+      } else {
+        location.hash = hash;
+      }
+    }
+    edit(note);
+    arriving = note;
+  }
+
+  /** The deck moved, by a key, the rail, a peer, or the hash: draw the slide it moved to. */
+  function moved(): void {
+    drawnFor = location.hash;
+    // What was picked for a note on a slide left behind is gone with it; another beat of the
+    // same slide keeps the note being written, which is written at the beat it is added at.
+    const { slide } = onScreen();
+    if (!popup.hidden && !editing && picks.some((pick) => !slide?.contains(pick.el))) {
+      closePopup();
+    }
+    rebuild();
+  }
+
   function openPopup(): void {
     popup.hidden = false;
     part("delete").hidden = editing === undefined;
@@ -478,26 +651,65 @@ export function createAnnotateView(options: {
 
   /** Put the popup beside what the note is about, so it never hides what is pointed at. */
   function placeOpenPopup(): void {
-    const rects = editing
-      ? [anchorOf(editing)?.getBoundingClientRect()].filter((rect) => rect !== undefined)
-      : picks.map((pick) => pick.el.getBoundingClientRect());
-    if (rects.length === 0) {
+    const beside = popupAnchor();
+    if (!beside) {
       return;
     }
-    const picked = {
+    placedBy = rectKey(beside);
+    const { width, height } = popup.getBoundingClientRect();
+    const at = placePopup(beside, { width, height }, { width: innerWidth, height: innerHeight });
+    popup.style.left = `${at.left}px`;
+    popup.style.top = `${at.top}px`;
+  }
+
+  /** What the open popup is about: the note being changed, or the box around every pick. */
+  function popupAnchor(): Rect | undefined {
+    if (editing) {
+      return noteRect(editing);
+    }
+    const rects = picks.map((pick) => pick.el.getBoundingClientRect());
+    if (rects.length === 0) {
+      return undefined;
+    }
+    return {
       left: Math.min(...rects.map((rect) => rect.left)),
       top: Math.min(...rects.map((rect) => rect.top)),
       right: Math.max(...rects.map((rect) => rect.right)),
       bottom: Math.max(...rects.map((rect) => rect.bottom)),
     };
-    const { width, height } = popup.getBoundingClientRect();
-    const at = placePopup(picked, { width, height }, { width: innerWidth, height: innerHeight });
-    popup.style.left = `${at.left}px`;
-    popup.style.top = `${at.top}px`;
+  }
+
+  /**
+   * Where a note is on screen: its first element; where that element was when the note was
+   * written, once an edit took it away; and the middle of the stage while its slide is not on
+   * screen, as when it is gone from the script.
+   */
+  function noteRect(note: AnnotationRow): Rect {
+    const anchor = anchorOf(note);
+    if (anchor) {
+      return anchor.getBoundingClientRect();
+    }
+    const first = note.targets[0];
+    if (first && note.slug === onScreen().slug) {
+      const { x, y, width, height } = first.box;
+      const from = windowPoint({ x, y }, deckEl as HTMLElement);
+      const to = windowPoint({ x: x + width, y: y + height }, deckEl as HTMLElement);
+      return { left: from.x, top: from.y, right: to.x, bottom: to.y };
+    }
+    const stage = stageEl?.getBoundingClientRect() ?? new DOMRect();
+    const x = stage.left + stage.width / 2;
+    const y = stage.top + stage.height / 2;
+    return { left: x, top: y, right: x, bottom: y };
+  }
+
+  function rectKey(rect: Rect): string {
+    return `${rect.left},${rect.top},${rect.right},${rect.bottom}`;
   }
 
   function closePopup(): void {
     popup.hidden = true;
+    arriving = undefined;
+    placedBy = "";
     picks = [];
     showChoices([]);
     editing = undefined;
@@ -561,6 +773,7 @@ export function createAnnotateView(options: {
     if (!first) {
       return;
     }
+    listOpen = false;
     if (editing) {
       closePopup();
     }
@@ -580,6 +793,7 @@ export function createAnnotateView(options: {
   }
 
   function edit(note: AnnotationRow): void {
+    listOpen = false;
     closePopup();
     editing = note;
     field.value = note.text;
@@ -657,7 +871,10 @@ export function createAnnotateView(options: {
       setOn(!on);
     } else if (event.key === "Escape" && on) {
       event.preventDefault();
-      if (popup.hidden) {
+      if (listOpen) {
+        listOpen = false;
+        rebuild();
+      } else if (popup.hidden) {
         setOn(false);
       } else {
         closePopup();
@@ -667,7 +884,15 @@ export function createAnnotateView(options: {
   // Keys typed into the note are the note's: the player hears a key from inside this view as
   // one on the view's host, which is not a text field, and would move the deck on a space.
   root.addEventListener("keydown", (event) => {
-    if (!(event instanceof KeyboardEvent) || !isTextEntry(event.target)) {
+    if (!(event instanceof KeyboardEvent)) {
+      return;
+    }
+    // Space and Enter on a button of the view press it, and the deck is not moved as well.
+    if (event.target instanceof HTMLButtonElement && (event.key === " " || event.key === "Enter")) {
+      event.stopPropagation();
+      return;
+    }
+    if (!isTextEntry(event.target)) {
       return;
     }
     event.stopPropagation();
@@ -683,6 +908,10 @@ export function createAnnotateView(options: {
       event.preventDefault();
       closePopup();
     }
+  });
+  // Writing settles where the popup is: it follows a note onto its slide no further.
+  field.addEventListener("input", () => {
+    arriving = undefined;
   });
   popup.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -704,16 +933,31 @@ export function createAnnotateView(options: {
   layer.addEventListener("click", (event) => {
     pickAt({ x: event.clientX, y: event.clientY }, event.metaKey || event.ctrlKey);
   });
-  const act = (name: string, fn: () => void): void => {
-    part(name).addEventListener("click", (event) => {
-      // A button left focused would take the next space, which the deck is for.
-      (event.currentTarget as HTMLElement).blur();
-      fn();
+  /**
+   * Run `fn` when `button` is pressed, saying whether by a key. A click leaves no focus behind:
+   * a button left focused would take the next space, which the deck is for. A key keeps it, for
+   * the next key to go on from.
+   */
+  function press(button: HTMLElement, fn: (byKey: boolean) => void): void {
+    button.addEventListener("click", (event) => {
+      const byKey = event.detail === 0;
+      if (!byKey) {
+        button.blur();
+      }
+      fn(byKey);
     });
-  };
+  }
+  const act = (name: string, fn: (byKey: boolean) => void): void => press(part(name), fn);
   act("cancel", closePopup);
   act("delete", remove);
   act("copy", () => void copy());
+  act("count", (byKey) => {
+    listOpen = !listOpen;
+    rebuild();
+    if (listOpen && byKey) {
+      list.querySelector<HTMLElement>("[data-part=item]")?.focus();
+    }
+  });
   act("clear", () => {
     void sync({ op: "clear" }).then((answer) => {
       const gone = answer?.removed ?? [];
@@ -727,12 +971,6 @@ export function createAnnotateView(options: {
   });
   act("close", () => setOn(false));
   toggleEl?.addEventListener("click", () => setOn(!on));
-  addEventListener("hashchange", () => {
-    if (!popup.hidden && !editing) {
-      closePopup();
-    }
-    rebuild();
-  });
   // A live update replaces a slide's section whole; the server matches its notes to the file
   // as it is now, so the page asks for them again.
   new MutationObserver((records) => {

@@ -3,6 +3,7 @@ import {
   type AnnotationRow,
   cutText,
   formatNotes,
+  groupNotes,
   reanchor,
   type TargetRow,
 } from "../../src/core/annotation-rows.ts";
@@ -165,6 +166,26 @@ To see it: \`dekc shot plan roadmap --step milestones\`
 
   test("is empty with no notes", () => {
     expect(formatNotes("plan", slides, [])).toBe("");
+  });
+});
+
+describe("groupNotes", () => {
+  test("puts a slide's notes at one beat together, where the first of them is", () => {
+    numbered = 0;
+    const rows = [
+      row("cover", "0", [arrow], "a"),
+      row("roadmap", "2", [arrow], "b"),
+      row("cover", "0", [arrow], "c"),
+    ];
+    expect(
+      groupNotes(rows).map((group) => ({
+        at: `${group.slug}@${group.step}`,
+        notes: group.rows.map((note) => note.text),
+      })),
+    ).toEqual([
+      { at: "cover@0", notes: ["a", "c"] },
+      { at: "roadmap@2", notes: ["b"] },
+    ]);
   });
 });
 
