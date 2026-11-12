@@ -2,9 +2,9 @@
 // talks. Access is decided as the API decides it (visibleDeck, canComment), and a talk someone may
 // not see loads as a missing one, so its page cannot tell the two apart.
 
-import { decks } from "@schema";
+import { decks, grants } from "@schema";
 import type { Context } from "hono";
-import { and, db, desc, eq } from "void/db";
+import { and, asc, db, desc, eq } from "void/db";
 import { env } from "void/env";
 import type {
   CommentPolicy,
@@ -71,6 +71,11 @@ export type Talk = {
   image: string | null;
   more: TalkCard[];
 };
+
+/** A talk's language when its frontmatter does not say: Japanese if its text has kana. */
+export function guessLang(texts: readonly string[]): string | null {
+  return texts.some((text) => /[\u3040-\u30ff]/.test(text)) ? "ja" : null;
+}
 
 function owner(account: Account): Owner {
   return { handle: account.handle, name: account.name, image: account.image };
@@ -164,7 +169,9 @@ export async function loadTalk(
     description: deck.description,
     event: deck.event,
     date: deck.talkDate,
-    lang: deck.lang,
+    lang:
+      deck.lang ??
+      guessLang([deck.title, ...map.slides.flatMap((slide) => [slide.title, ...slide.paragraphs])]),
     visibility: deck.visibility,
     scriptPublic: deck.scriptPublic,
     commentPolicy: deck.comments,
@@ -278,4 +285,26 @@ export async function recentPublicTalks(c: Context, limit: number): Promise<Talk
     .limit(limit)
     .all();
   return cards(c, rows);
+}
+
+export type GrantView = { id: string; who: string; role: "view" | "comment"; createdAt: string };
+
+/** The people a deck is shared with, as GET /api/decks/:id/grants lists them. */
+export async function grantList(c: Context, deckId: string): Promise<GrantView[]> {
+  const rows = await db
+    .select()
+    .from(grants)
+    .where(eq(grants.deckId, deckId))
+    .orderBy(asc(grants.createdAt))
+    .all();
+  const people = await usersById(
+    c,
+    rows.flatMap((row) => (row.userId ? [row.userId] : [])),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    who: row.userId ? (people.get(row.userId)?.handle ?? row.userId) : (row.email ?? ""),
+    role: row.role,
+    createdAt: row.createdAt,
+  }));
 }
