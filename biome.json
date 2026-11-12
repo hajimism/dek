@@ -48,9 +48,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "src/theme/**/*.css"
-      ],
+      "includes": ["src/theme/**/*.css"],
       "linter": {
         "rules": {
           "correctness": {
@@ -60,9 +58,7 @@
       }
     },
     {
-      "includes": [
-        "src/**"
-      ],
+      "includes": ["src/**"],
       "linter": {
         "rules": {
           "style": {
@@ -88,14 +84,7 @@
                   "node:child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
                   "child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
                   "bun": {
-                    "importNames": [
-                      "$",
-                      "Archive",
-                      "fetch",
-                      "spawn",
-                      "spawnSync",
-                      "write"
-                    ],
+                    "importNames": ["$", "Archive", "fetch", "spawn", "spawnSync", "write"],
                     "message": "start programs with src/core/spawn.ts, write files with src/core/safe-fs.ts, read tars with src/core/tar.ts, and give a fetch a deadline; see Raw APIs in CONTRIBUTING.md."
                   }
                 }
@@ -158,9 +147,7 @@
       }
     },
     {
-      "includes": [
-        "src/core/**"
-      ],
+      "includes": ["src/core/**"],
       "linter": {
         "rules": {
           "style": {
@@ -186,14 +173,7 @@
                   "node:child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
                   "child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
                   "bun": {
-                    "importNames": [
-                      "$",
-                      "Archive",
-                      "fetch",
-                      "spawn",
-                      "spawnSync",
-                      "write"
-                    ],
+                    "importNames": ["$", "Archive", "fetch", "spawn", "spawnSync", "write"],
                     "message": "start programs with src/core/spawn.ts, write files with src/core/safe-fs.ts, read tars with src/core/tar.ts, and give a fetch a deadline; see Raw APIs in CONTRIBUTING.md."
                   }
                 },
@@ -217,9 +197,7 @@
       }
     },
     {
-      "includes": [
-        "src/core/safe-fs.ts"
-      ],
+      "includes": ["src/core/safe-fs.ts"],
       "linter": {
         "rules": {
           "style": {
@@ -230,14 +208,7 @@
                   "node:child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
                   "child_process": "start a program with runPiped or runJsonWorker from src/core/spawn.ts, which stop it at its timeout; see Raw APIs in CONTRIBUTING.md.",
                   "bun": {
-                    "importNames": [
-                      "$",
-                      "Archive",
-                      "fetch",
-                      "spawn",
-                      "spawnSync",
-                      "write"
-                    ],
+                    "importNames": ["$", "Archive", "fetch", "spawn", "spawnSync", "write"],
                     "message": "start programs with src/core/spawn.ts, write files with src/core/safe-fs.ts, read tars with src/core/tar.ts, and give a fetch a deadline; see Raw APIs in CONTRIBUTING.md."
                   }
                 },
@@ -261,9 +232,7 @@
       }
     },
     {
-      "includes": [
-        "src/core/spawn.ts"
-      ],
+      "includes": ["src/core/spawn.ts"],
       "linter": {
         "rules": {
           "nursery": {
@@ -309,9 +278,7 @@
       }
     },
     {
-      "includes": [
-        "src/core/pack.ts"
-      ],
+      "includes": ["src/core/pack.ts"],
       "linter": {
         "rules": {
           "nursery": {
@@ -357,9 +324,7 @@
       }
     },
     {
-      "includes": [
-        "src/runtime/**"
-      ],
+      "includes": ["src/runtime/**"],
       "linter": {
         "rules": {
           "style": {

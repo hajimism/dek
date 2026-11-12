@@ -24,8 +24,11 @@ export function renderPage<C extends Component<any>>(
   props: ComponentProps<C>,
   overrides: Partial<Shared> = {},
 ) {
-  return render(component as never, {
-    props,
-    context: new Map([["__void_shared", { value: shared(overrides) }]]),
-  } as never);
+  return render(
+    component as never,
+    {
+      props,
+      context: new Map([["__void_shared", { value: shared(overrides) }]]),
+    } as never,
+  );
 }
