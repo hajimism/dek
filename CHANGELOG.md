@@ -2,6 +2,13 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.6.4](https://github.com/hajimism/dek/compare/v0.6.3...v0.6.4) (2026-11-12)
+
+
+### Features
+
+* **annotate:** list every note from the count, and go to one from it ([#88](https://github.com/hajimism/dek/issues/88)) ([c3d5ea6](https://github.com/hajimism/dek/commit/c3d5ea601fda7a99f2ba3bc961cae12e1a13f894))
+
 ## [0.6.3](https://github.com/hajimism/dek/compare/v0.6.2...v0.6.3) (2026-11-11)
 
 
