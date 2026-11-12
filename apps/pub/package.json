@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "setup": "bun scripts/setup.ts",
-    "dev": "vp dev",
+    "dev": "vp dev --strictPort",
     "build": "vp build",
     "preview": "vp preview",
     "check": "void prepare && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",

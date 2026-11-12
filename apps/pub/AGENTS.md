@@ -24,11 +24,13 @@ The dek.pub server: a Void app (Svelte 5, on Cloudflare Workers) and, in `serve/
 
 ```bash
 bun run setup        # .env from dev.env, Void's types
-bun run dev          # http://localhost:5173, decks on d-<id>.localhost:5173
+bun run dev          # http://localhost:5173, decks on d-<id>.localhost:5173; refuses to start if 5173 is taken
 bun run check        # svelte-check with TypeScript 6
 bun run test         # unit tests in Node, components in Chromium
 bun run test:serve   # the serve Worker, in workerd
 bun run test:e2e     # the whole round trip, dekc against vp dev
 ```
+
+`.env` names port 5173 in `APP_ORIGIN` and `DECK_ORIGIN`, so the dev server never moves to another port: decks would load from whatever holds 5173. To run on another port, change both.
 
 Email sign-up works only where `.env` has `DEK_PUB_DEV_LOGIN=1`, as `dev.env` does. GitHub sign-in needs a real OAuth app's ID and secret in `.env`.
