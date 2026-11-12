@@ -60,6 +60,10 @@ lang: en
 ### later {#later}
 
 two
+
+## end
+
+bye
 `;
 
 // Laid out by hand on a 1280×720 slide, so a test knows where each thing is.
@@ -72,6 +76,8 @@ const planHtml = slideDocument(`<section class="slide">
   </div>
   <svg style="position: absolute; left: 800px; top: 100px; width: 200px; height: 200px" viewBox="0 0 200 200"><line x1="0" y1="100" x2="200" y2="100" stroke="black" stroke-width="1"/></svg>
 </section>`);
+
+const endHtml = slideDocument(`<section class="slide"><h2>end</h2></section>`);
 
 const theme = `.slide { position: relative; width: 1280px; height: 720px; }
 .slide.is-current [data-step] { opacity: 0; }
@@ -86,7 +92,7 @@ beforeAll(async () => {
   }
   root = realpathSync(await mkdtemp(join(tmpdir(), "dek-")));
   await writeProject(root, {
-    decks: [{ name: "plan", script, theme, slides: { plan: planHtml } }],
+    decks: [{ name: "plan", script, theme, slides: { plan: planHtml, end: endHtml } }],
   });
 });
 
@@ -196,6 +202,20 @@ function inView(
       };
     },
     [selector, click] as const,
+  );
+}
+
+/** Write a note on the chevron of the plan slide, and wait for its marker. */
+async function writeNote(page: Page): Promise<void> {
+  await clickSlide(page, 100 + 20 + 100, 100 + 20 + 20);
+  await page.keyboard.type("右に");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () =>
+      document.getElementById("dek-annotate")?.shadowRoot?.querySelector("[data-part=marker]") !==
+      null,
+    undefined,
+    { timeout: WAIT_MS },
   );
 }
 
@@ -327,6 +347,33 @@ describe("annotate mode in a browser", () => {
       const text = (await inView(page, "[data-part=manual]"))?.value;
       expect(text).toMatch(
         /1\. section\.slide at decks\/plan\/slides\/plan\.html:8:3 \(point 1(099|100|101),(599|600|601)\)\n {3}> ここに矢印/,
+      );
+    } finally {
+      await page.close();
+    }
+  });
+  browserTest("puts the markers on a slide the keys move to", async () => {
+    const { page } = await openDevPage();
+    try {
+      await writeNote(page);
+      // The keys move the deck by history.pushState, which fires no hashchange.
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowRight");
+      await page.waitForFunction(() => location.hash === "#end", undefined, { timeout: WAIT_MS });
+      // Turned on on a slide with no notes, then moved by key to one with a note.
+      await page.keyboard.press("a");
+      await page.keyboard.press("a");
+      await page.keyboard.press("ArrowLeft");
+      await page.waitForFunction(
+        () =>
+          location.hash === "#plan/1" &&
+          [
+            ...(document
+              .getElementById("dek-annotate")
+              ?.shadowRoot?.querySelectorAll<HTMLElement>("[data-part=marker]") ?? []),
+          ].some((marker) => !marker.hidden),
+        undefined,
+        { timeout: WAIT_MS },
       );
     } finally {
       await page.close();

@@ -211,6 +211,8 @@ export function createAnnotateView(options: {
 
   let on = false;
   let notes: AnnotationRow[] = [];
+  /** The hash the view last drew for: the keys move the deck without a hashchange. */
+  let drawnFor = location.hash;
   /** What the last Clear took away, while Undo can still bring it back. */
   let cleared: unknown[] | undefined;
   let picks: Pick[] = [];
@@ -295,6 +297,9 @@ export function createAnnotateView(options: {
 
   /** Follow what moves on the slide while the mode is on: entrances, morphs, a resized window. */
   function tick(): void {
+    if (location.hash !== drawnFor) {
+      moved();
+    }
     hoverTested = false;
     if (hoverPending) {
       hoverAt(hoverPending);
@@ -465,6 +470,18 @@ export function createAnnotateView(options: {
       hover.append(tag);
     }
     layout();
+  }
+
+  /** The deck moved, by a key, the rail, a peer, or the hash: draw the slide it moved to. */
+  function moved(): void {
+    drawnFor = location.hash;
+    // What was picked for a note on a slide left behind is gone with it; another beat of the
+    // same slide keeps the note being written, which is written at the beat it is added at.
+    const { slide } = onScreen();
+    if (!popup.hidden && !editing && picks.some((pick) => !slide?.contains(pick.el))) {
+      closePopup();
+    }
+    rebuild();
   }
 
   function openPopup(): void {
@@ -727,12 +744,6 @@ export function createAnnotateView(options: {
   });
   act("close", () => setOn(false));
   toggleEl?.addEventListener("click", () => setOn(!on));
-  addEventListener("hashchange", () => {
-    if (!popup.hidden && !editing) {
-      closePopup();
-    }
-    rebuild();
-  });
   // A live update replaces a slide's section whole; the server matches its notes to the file
   // as it is now, so the page asks for them again.
   new MutationObserver((records) => {
