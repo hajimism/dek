@@ -325,13 +325,10 @@
     background: var(--bg-subtle);
     color: var(--text);
   }
-  @media (pointer: coarse) {
-    @media (min-width: 768px) {
-    h3 {
-      font-size: var(--text-xl);
-    }
-  }
-  .slide-comment {
+  /* On a touch screen or a narrow one, the button shows as its icon only, always, so the heading
+     beside it keeps its width. */
+  @media (pointer: coarse), (max-width: 767px) {
+    .slide-comment {
       opacity: 1;
       min-height: 44px;
     }
@@ -339,9 +336,10 @@
       display: none;
     }
   }
+  /* The picture keeps to the text's measure, so heading, slide and paragraphs share both edges. */
   .figure {
     position: relative;
-    max-width: var(--measure-wide);
+    max-width: var(--measure);
     margin: 0 auto var(--space-6);
   }
   .picture,
