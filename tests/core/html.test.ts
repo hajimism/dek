@@ -625,6 +625,23 @@ hello
     );
   });
 
+  // A build with no script has no presenter view, so neither its hint nor anything else names one.
+  test("names no presenter view in a build without the script", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", script: english, slides: { intro: introHtml } }] },
+      async (root) => {
+        const embed = await playerEmbed();
+        const html = renderDeckHtml(join(root, "decks", "demo"), {
+          playerScript: embed.playerScript,
+          target: { kind: "build", script: false },
+        });
+        const page = html.replace(/<script>[\s\S]*?<\/script>/g, "");
+        expect(page).toContain("<kbd>s</kbd>Slide rail");
+        expect(page).not.toMatch(/Presenter view|<kbd>p<\/kbd>|id="dek-presenter/);
+      },
+    );
+  });
+
   test("leaves out the dev server, the presenter page, and video", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

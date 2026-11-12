@@ -129,9 +129,17 @@ beforeAll(async () => {
   addEventListener("message", (event) => {
     if (event.source === frame.contentWindow) {
       heard.push({ origin: event.origin, data: event.data });
+      // ?eager: go somewhere in the same task that hears the deck is ready.
+      if (event.data.type === "dek:ready" && location.search.startsWith("?eager")) {
+        frame.contentWindow.postMessage({ type: "dek:goto", slug: "plan", step: "chart" }, "*");
+      }
     }
   });
   window.tell = (data) => frame.contentWindow.postMessage(data, "*");
+  // ?eager-hidden: a frame kept out of the layout until the deck is ready, which is never drawn.
+  if (location.search === "?eager-hidden") {
+    frame.style.display = "none";
+  }
   frame.src = ${JSON.stringify(deckUrl)};
 </script>
 </body></html>`;
@@ -314,4 +322,27 @@ describe("a built deck framed by a page on another origin", () => {
       }
     });
   });
+
+  for (const query of ["?eager", "?eager-hidden"]) {
+    browserTest(`takes a dek:goto sent as soon as it says it is ready (${query})`, async () => {
+      await withBrowser(async (browser) => {
+        const page = (await browser.newPage({
+          viewport: { width: 1280, height: 720 },
+        })) as unknown as Page;
+        try {
+          await page.goto(`http://localhost:${pageServer?.port}/${query}`);
+          expect((await waitFor(page, "dek:moved")).data).toEqual({
+            type: "dek:moved",
+            slug: "plan",
+            step: "chart",
+            index: 1,
+            by: "embed",
+          });
+          expect(await deckFrame(page).evaluate(() => location.hash)).toBe("#plan/1");
+        } finally {
+          await page.close();
+        }
+      });
+    });
+  }
 });
