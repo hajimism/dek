@@ -4,6 +4,8 @@ import { DekError } from "../core/error.ts";
 import { lintDeck, lintProject } from "../core/lint.ts";
 import { parsePublicUrl } from "../core/ogp.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "../core/playwright.ts";
+import { slideMap } from "../core/slide-map.ts";
+import type { SlideMap } from "../pub/protocol.ts";
 import { playerScript, pluginPageScripts } from "../runtime/player.ts";
 import { RENDERED_RULES, type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
 import type { DecksTarget } from "./scope.ts";
@@ -19,6 +21,11 @@ export type BuildCliResult = {
   /** dist/<deck>.png for each deck that got a link preview image. */
   images: string[];
   diagnostics: Diagnostic[];
+  /**
+   * What each deck built holds, slide by slide, in the order of `outs`: its steps and its script
+   * as the build's reader has it, so a `--public` build's map has no stage directions.
+   */
+  slideMaps: SlideMap[];
   /** Why some deck has no preview image, said once per reason. */
   skipped?: SkippedCheck[];
 };
@@ -48,9 +55,11 @@ export async function buildCommand(
   }
   const script = await playerScript();
   const pluginScripts = await pluginPageScripts();
+  const reader = options.public ? "audience" : "speaker";
   const results = await Promise.all(
-    decks.map((entry) =>
-      buildDeck(
+    decks.map(async (entry) => ({
+      entry,
+      ...(await buildDeck(
         { project, deck: entry },
         {
           playerScript: script,
@@ -60,8 +69,8 @@ export async function buildCommand(
           ...(options.public ? { public: true } : {}),
           ...(options.runner ? { runner: options.runner } : {}),
         },
-      ),
-    ),
+      )),
+    })),
   );
   const diagnostics = [
     ...lintProject(project),
@@ -76,6 +85,7 @@ export async function buildCommand(
     outs: results.map((result) => result.outPath),
     images: results.flatMap((result) => ("image" in result ? [result.image] : [])),
     diagnostics,
+    slideMaps: results.map((result) => slideMap(result.entry, result.outPath, reader)),
     ...skippedChecks([
       ...skipped,
       visualSkipped("dekc lint --visual", {

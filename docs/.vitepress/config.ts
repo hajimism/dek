@@ -52,6 +52,7 @@ function reference(p: string, t: Record<string, string>): DefaultTheme.SidebarIt
         { text: t.lintRules, link: `${p}/reference/lint` },
         { text: t.config, link: `${p}/reference/config` },
         { text: t.plugins, link: `${p}/reference/plugins` },
+        { text: t.embed, link: `${p}/reference/embed` },
       ],
     },
   ];
@@ -82,6 +83,7 @@ const en = {
   lintRules: "Lint Rules",
   config: "Configuration",
   plugins: "Plugins",
+  embed: "Embed API",
 };
 
 const ja = {
@@ -109,6 +111,7 @@ const ja = {
   lintRules: "Lint ルール",
   config: "設定",
   plugins: "プラグイン",
+  embed: "埋め込み API",
 };
 
 export default defineConfig({

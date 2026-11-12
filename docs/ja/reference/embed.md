@@ -1,0 +1,74 @@
+---
+description: '埋め込み API。ビルドしたデッキを枠に入れたページが、postMessage でデッキを動かし、今どこにあるかを聞き、スライドの要素を選ばせ、番号付きのピンを描かせる方法。'
+---
+
+# 埋め込み API
+
+`dekc build` が書いたファイルは、別のページの中に `<iframe>` で表示して、そのページから操作できます。スライドへ移動させる、今どこにあるかを聞く、読み手に要素を選ばせる、スライドに番号付きのピンを描かせる、の四つです。dek.pub はこれでデッキを台本とレビューコメントの隣に表示しており、どのページでも同じことができます。この決定とその理由は [ADR 45](https://github.com/hajimism/dek/blob/main/adr/0045-let-a-page-that-frames-a-built-deck-drive-it-through-postmessage.md) にあります。
+
+この API は、枠に入ったデッキ（`window.parent !== window`）でだけ動きます。単独で開いたデッキには何もありません。やりとりは `window.postMessage` で、メッセージはどれも `type` が `dek:` で始まる素のオブジェクトです。
+
+## デッキを枠に入れる
+
+枠の `src` を設定する前に受信を始めておくと、`dek:ready` を聞き逃しません。
+
+```html
+<iframe id="deck" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+<script>
+  const frame = document.getElementById("deck");
+  addEventListener("message", (event) => {
+    if (event.source !== frame.contentWindow) return;
+    const message = event.data;
+    if (message.type === "dek:ready") {
+      frame.contentWindow.postMessage({ type: "dek:goto", slug: "plan" }, "*");
+    }
+  });
+  frame.src = "https://example.com/talks/demo.html";
+</script>
+```
+
+上の sandbox は dek.pub が使うものです。デッキはスクリプトを実行し、自分のオリジンを保ち（だから URL のハッシュも、デッキの別のウィンドウとの連動も働く）、リンクは新しいウィンドウで開きます。デッキはページと別のオリジンから配信してかまいません。dek.pub はデッキごとに専用のオリジンから配信します。
+
+## デッキが送るもの
+
+デッキは `window.parent` に、送信先オリジン `"*"` で送ります。送るものには台本も、発表者のメモも、発表者ビューにあるほかの何も含みません。`--public` を付けずにビルドしたファイルでも同じなので、どのページが枠に入れて聞いてもかまいません。
+
+| メッセージ | いつ |
+| --- | --- |
+| `{ type: "dek:ready", protocol: 1, deck, size: { width, height }, slides: [{ slug, steps }], current: { slug, step, index } }` | プレイヤーが動き始めたときに一度。`deck` はデッキのフォルダ名、`size` はスライド自身の大きさ（px。`ratio: 16:9` なら 1280×720、`4:3` なら 1024×768）、`steps` はそのスライドの各停止位置を順に並べたもの |
+| `{ type: "dek:moved", slug, step, index }` | 移動のたびに、その始まりで。キー、クリックやスワイプ、レール、URL のハッシュ、デッキの別のウィンドウ、`dek:goto` のどれによる移動でも送る。今いる位置で終わる移動では送らない。`dek:current` への答えもこれ |
+| `{ type: "dek:picked", slug, step, target: { kind: "element", path, name, text, box } }` | 選択モードで、読み手が要素をクリックしたとき |
+| `{ type: "dek:pick-cancel" }` | 選択モードで、読み手が枠の中で Escape を押したとき。選択モードはそこで終わる |
+| `{ type: "dek:mark", id }` | 読み手がピンをクリックしたとき。`id` はそのマークのもの |
+
+`slug` は `script.md` でのスライドの id、`index` はデッキの中での位置（0 から）、`step` は `dekc shot --step` が受け取る形の停止位置です。スライドが出た直後が `"0"`、続いて各ビートの `{#id}`、id がなければその番号です。
+
+`dek:picked` では次のとおりです。
+
+- `path` はデッキの中のスライドの HTML ファイルで、`slides/intro.html` のような形。
+- `name` は要素のタグと、ビルドが書いたとおりのクラスで、`div.chevron` のような形。プレイヤーが付ける状態クラス（`is-current`、`is-shown`）と、デッキが動き始めてからスライドスクリプトが足したクラスは含まないので、スライドの HTML で見つかる名前になる。
+- `text` は要素のテキストで、空白をまとめ、40 文字を超えれば `…` で切る。クリックがスライドの何にも当たらず、スライドそのものが選ばれたときは `""`。
+- `box` は要素の位置で、スライド左上からのスライド自身の px を丸めたもの。枠がスライドをどの大きさで表示していても変わらない。注釈モードがメモを測るのと同じ測り方で、スライドの画像に重ねるには `dek:ready` の `size` で割る。
+
+## デッキが受け取るもの
+
+デッキがメッセージを読むのは、`event.source` が自分を枠に入れたページであり、かつメッセージが下の表のフィールドをちょうど正しい型で持つときだけです。それ以外は、フィールドが一つ多いだけのものも含めて、答えずに無視します。文字列は 1〜256 文字、数値は有限で、ボックスの `width` と `height` は負になりません。
+
+| メッセージ | すること |
+| --- | --- |
+| `{ type: "dek:goto", slug, step? }` | スライド `slug` の `step`（上と同じ形。省けば `"0"`）へ移動する。デッキにないスラッグや停止位置は無視する |
+| `{ type: "dek:current" }` | デッキが今いる位置を `dek:moved` で答える |
+| `{ type: "dek:pick", on }` | 選択モードを切り替える |
+| `{ type: "dek:marks", marks: [{ id, number, slug, step, box }] }` | これらのピンを、前に描いたものと入れ替えて描く。`[]` ならすべて消す。最大 1000 個で、`number` は 0 以上の整数 |
+
+### 移動
+
+`dek:goto` はキーを押したときと同じようにデッキを動かします。URL のハッシュが追随し、同じオリジンで開いている同じデッキの別のウィンドウも、キーのときと同じくついてきます。
+
+### 選択モード
+
+選択モードの間は、表示中のスライドでポインタの下、またはその数 px 以内にある要素が枠で囲まれます。ポインタを受けない要素（`pointer-events: none`）も対象です。クリックするとその要素の `dek:picked` を送り、デッキは動きません。選択モードは一度選んでも続き、`on: false` の `dek:pick` か、枠にフォーカスがあるときの Escape で終わります。キーでの移動はそのまま使えるので、別のスライドでも選べます。
+
+### ピン
+
+ピンは dek のインスペクタの青の小さな円で、マークの `number` を表示し、`box` の右上の角を中心に置かれます。ピンは `slug` のスライドが表示されている間、そのどの停止位置でも描かれます。`step` はページが自分で使うためにマークと一緒に持っておく値です。ピンをクリックすると `dek:mark` を送り、何も動きません。

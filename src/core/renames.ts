@@ -34,16 +34,37 @@ export function recordRename(
   to: string,
   now: Date = new Date(),
 ): Rename {
-  const file = readRenamesFile(root);
+  const plan = planRename(root, deck, from, to, now);
+  writeInside(plan.path, plan.after, root);
+  return plan.rename;
+}
+
+/**
+ * The file with the rename added, and the file as it is (undefined while there is none), for a
+ * caller that writes it as one step of a larger change and takes it back with the rest. Reading
+ * it first means a file that does not read refuses the change before anything is written.
+ */
+export function planRename(
+  root: string,
+  deck: string,
+  from: string,
+  to: string,
+  now: Date = new Date(),
+): { path: string; before: string | undefined; after: string; rename: Rename } {
+  const path = renamesPath(root);
+  const before = readSourceIfExists(path, root);
+  const file = parseRenamesFile(path, before);
   const rename = { from, to, at: now.toISOString() };
   const decks = { ...file.decks, [deck]: [...(file.decks[deck] ?? []), rename] };
-  writeInside(renamesPath(root), `${JSON.stringify({ version: 1, decks }, null, 2)}\n`, root);
-  return rename;
+  return { path, before, after: `${JSON.stringify({ version: 1, decks }, null, 2)}\n`, rename };
 }
 
 function readRenamesFile(root: string): RenamesFile {
   const path = renamesPath(root);
-  const text = readSourceIfExists(path, root);
+  return parseRenamesFile(path, readSourceIfExists(path, root));
+}
+
+function parseRenamesFile(path: string, text: string | undefined): RenamesFile {
   if (text === undefined) {
     return { version: 1, decks: {} };
   }

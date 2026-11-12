@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { DiagnosticValue as DiagnosticValueType } from "../core/diagnostic.ts";
+import { SlideMap } from "../pub/protocol.ts";
 import type { ResultCommand } from "./commands.ts";
 import { type CommandLine, parseCommandLine } from "./flags.ts";
 
@@ -501,6 +502,11 @@ export const RESULT_FIELDS = {
     outs: paths.describe("One file per deck built."),
     images: paths.describe("dist/<deck>.png for each deck that got a link preview image."),
     diagnostics,
+    slideMaps: z
+      .array(SlideMap)
+      .describe(
+        "One per deck built, in the order of outs: its slides, their steps, and the script as the build's reader has it.",
+      ),
     skipped,
     unsandboxed,
   }),
