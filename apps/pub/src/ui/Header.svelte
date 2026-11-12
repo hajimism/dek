@@ -4,6 +4,7 @@
   import Avatar from "./Avatar.svelte";
   import { useApp } from "./app.ts";
   import Icon from "./Icon.svelte";
+  import { followLang } from "./lang-link.ts";
   import Menu from "./Menu.svelte";
   import { applyTheme } from "./theme.ts";
 
@@ -42,7 +43,7 @@
       <span class="mark" aria-hidden="true"></span><span>dek<span class="dot">.</span>pub</span>
     </a>
     <nav class="tools" aria-label={t("lang.label")}>
-      <a class="lang" href={lang === "ja" ? "?lang=en" : "?lang=ja"} hreflang={lang === "ja" ? "en" : "ja"} lang={lang === "ja" ? "en" : "ja"}>
+      <a class="lang" href={lang === "ja" ? "?lang=en" : "?lang=ja"} onclick={(event) => followLang(event, lang === "ja" ? "en" : "ja")} hreflang={lang === "ja" ? "en" : "ja"} lang={lang === "ja" ? "en" : "ja"}>
         {lang === "ja" ? "EN" : "日本語"}
       </a>
       <Menu label="{t('theme.label')}: {t(`theme.${theme}`)}">

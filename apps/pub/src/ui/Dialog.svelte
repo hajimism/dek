@@ -16,7 +16,8 @@
   } = $props();
 
   let dialog: HTMLDialogElement | undefined = $state();
-  const titleId = `dialog-${Math.random().toString(36).slice(2, 9)}`;
+  const uid = $props.id();
+  const titleId = `dek-dialog-${uid}`;
 
   $effect(() => {
     if (!dialog) {

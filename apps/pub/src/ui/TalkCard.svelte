@@ -18,7 +18,7 @@
     {/if}
   </span>
   <span class="text">
-    <span class="title" lang={guessLang([card.title]) ?? undefined}>{card.title}</span>
+    <span class="title" lang={guessLang([card.title], lang) ?? undefined}>{card.title}</span>
     <span class="meta">
       {#if card.event}<span>{card.event}</span><span aria-hidden="true">·</span>{/if}
       {#if card.date}<time datetime={card.date}>{formatDate(lang, card.date)}</time><span aria-hidden="true">·</span>{/if}

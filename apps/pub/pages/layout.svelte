@@ -5,14 +5,16 @@
   import Footer from "../src/ui/Footer.svelte";
   import Header from "../src/ui/Header.svelte";
   import Toaster from "../src/ui/Toaster.svelte";
+  import { startClock } from "../src/ui/clock.svelte.ts";
 
   let { children }: { children: Snippet } = $props();
   const { t } = useApp();
+  $effect(startClock);
 </script>
 
-<a class="skip" href="#main">{t("nav.skip")}</a>
+<a class="skip" href="#dek-main">{t("nav.skip")}</a>
 <Header />
-<main id="main" tabindex="-1">
+<main id="dek-main" tabindex="-1">
   {@render children()}
 </main>
 <Footer />

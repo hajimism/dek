@@ -50,7 +50,7 @@
   let sending = $state(false);
   let error = $state("");
   let field: HTMLTextAreaElement | undefined = $state();
-  const uid = Math.random().toString(36).slice(2, 8);
+  const uid = $props.id();
 
   $effect(() => {
     if (guest && !guestName) {
@@ -76,7 +76,7 @@
     }
     if (guest && !guestName.trim()) {
       error = t("comment.guestName");
-      document.getElementById(`guest-${uid}`)?.focus();
+      document.getElementById(`dek-guest-${uid}`)?.focus();
       return;
     }
     sending = true;
@@ -118,13 +118,13 @@
 >
   {#if guest}
     <div class="guest">
-      <label for="guest-{uid}">{t("comment.guestName")}</label>
-      <input id="guest-{uid}" bind:value={guestName} autocomplete="name" maxlength="60" required />
+      <label for="dek-guest-{uid}">{t("comment.guestName")}</label>
+      <input id="dek-guest-{uid}" bind:value={guestName} autocomplete="name" maxlength="60" required />
     </div>
   {/if}
-  <label class="visually-hidden" for="text-{uid}">{placeholder ?? t("comment.placeholder")}</label>
+  <label class="visually-hidden" for="dek-text-{uid}">{placeholder ?? t("comment.placeholder")}</label>
   <textarea
-    id="text-{uid}"
+    id="dek-text-{uid}"
     bind:this={field}
     bind:value={text}
     placeholder={placeholder ?? t("comment.placeholder")}

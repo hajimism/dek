@@ -5,6 +5,7 @@
   import { useApp } from "../app.ts";
   import Badge from "../Badge.svelte";
   import Button from "../Button.svelte";
+  import { now } from "../clock.svelte.ts";
   import Dialog from "../Dialog.svelte";
   import { toast } from "../toast.svelte.ts";
 
@@ -58,7 +59,7 @@
           {#if current}<Badge tone="accent">{t("manage.versions.current")}</Badge>{/if}
         </p>
         <p class="meta">
-          <time datetime={version.createdAt} title={absoluteTime(lang, version.createdAt)}>{relativeTime(lang, version.createdAt, shared.now)}</time>
+          <time datetime={version.createdAt} title={absoluteTime(lang, version.createdAt)}>{relativeTime(lang, version.createdAt, now(shared.now))}</time>
           <span aria-hidden="true">·</span>
           <span>{t("manage.versions.dek", { version: version.dekVersion })}</span>
           {#if version.changed && version.changed.length > 0}

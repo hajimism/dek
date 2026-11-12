@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import type { CommentRow, CommentTarget, NewComment } from "../../../../../src/pub/protocol.ts";
-  import { byPosition, elementOf, type Filter } from "../../lib/comment-view.ts";
+  import { byPosition, elementOf, type Filter, hideQuotes } from "../../lib/comment-view.ts";
   import { withSlide } from "../../lib/embed.ts";
   import { formatDate } from "../../lib/i18n.ts";
   import type { Talk } from "../../server/pages.ts";
@@ -42,7 +42,12 @@
   const unsent = new Map<string, NewComment>();
   let tempCount = 0;
 
-  const link = new DeckLink(untrack(() => talk.viewer.origin), {
+  const link = new DeckLink({
+    origin: untrack(() => talk.viewer.origin),
+    slugs: untrack(() => talk.slides.map((slide) => slide.slug)),
+    canComment: untrack(() => talk.canComment),
+    hasComment: (id) => comments.some((comment) => comment.id === id && !comment.pending),
+    events: {
     onpicked: ({ slug, step, target }) => {
       draft = { anchor: { slug, step, targets: [target] }, slideNumber: slideNumbers.get(slug) ?? null };
       openPanel();
@@ -54,6 +59,7 @@
       }
     },
     onmark: (id) => select(id, { reveal: "card" }),
+    },
   });
 
   const sorted = $derived(byPosition(comments, talk.slides));
@@ -138,7 +144,7 @@
 
   // A link to a slide or a comment opens there.
   $effect(() => {
-    const hash = decodeURIComponent(window.location.hash.slice(1));
+    const hash = readHash();
     if (!hash) {
       return;
     }
@@ -194,11 +200,64 @@
     link.marks(marks);
   });
 
-  function openPanel() {
-    if (mode !== "column") {
-      panelOpen = true;
+  /** The fragment, decoded; a fragment that is not valid percent-encoding names nothing. */
+  function readHash(): string {
+    try {
+      return decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      return "";
     }
   }
+
+  let returnFocus: HTMLElement | null = null;
+
+  /** Open the drawer or sheet, moving focus to its heading; in the column it is always open. */
+  function openPanel() {
+    if (mode === "column" || panelOpen) {
+      return;
+    }
+    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panelOpen = true;
+    requestAnimationFrame(() => aside?.querySelector<HTMLElement>("[data-panel-title]")?.focus({ preventScroll: true }));
+  }
+
+  /** Close it, and give focus back to what opened it unless the reader is sent elsewhere. */
+  function closePanel(restore = true) {
+    if (!panelOpen) {
+      return;
+    }
+    panelOpen = false;
+    if (restore) {
+      const back = returnFocus;
+      // The pill that opened the sheet is drawn again only once it is closed.
+      requestAnimationFrame(() =>
+        (back?.isConnected ? back : document.querySelector<HTMLElement>(".pill"))?.focus({
+          preventScroll: true,
+        }),
+      );
+    }
+    returnFocus = null;
+  }
+
+  // While the sheet covers the page, what is behind it is out of reach.
+  $effect(() => {
+    if (mode !== "sheet" || !panelOpen) {
+      return;
+    }
+    const behind = [
+      ...document.querySelectorAll<HTMLElement>(
+        "header.header, footer.footer, #dek-main > :not(.body), .body > :not(#dek-comments)",
+      ),
+    ];
+    for (const element of behind) {
+      element.inert = true;
+    }
+    return () => {
+      for (const element of behind) {
+        element.inert = false;
+      }
+    };
+  });
 
   function scrollToViewer() {
     frame?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -260,7 +319,7 @@
     const mark = document.querySelector<HTMLElement>(`mark[data-ids~="${CSS.escape(comment.id)}"]`);
     const target = mark ?? document.getElementById(comment.slug);
     if (mode === "sheet") {
-      panelOpen = false;
+      closePanel(false);
     }
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
     if (elementOf(comment) && link.ready) {
@@ -268,7 +327,8 @@
     }
   }
 
-  function replace(row: CommentRow, oldId = row.id) {
+  function replace(given: CommentRow, oldId = given.id) {
+    const row = talk.script === "hidden" ? hideQuotes(given) : given;
     const at = comments.findIndex((comment) => comment.id === oldId);
     if (at === -1) {
       comments.push(row);
@@ -327,7 +387,7 @@
       version: talk.version,
       url: "",
       thread: [],
-      createdAt: new Date(shared.now).toISOString(),
+      createdAt: new Date().toISOString(),
       resolvedAt: null,
       pending: true,
     });
@@ -394,8 +454,9 @@
 
 <svelte:window
   onkeydown={(event) => {
-    if (event.key === "Escape" && panelOpen && mode !== "column") {
-      panelOpen = false;
+    if (event.key === "Escape" && !event.defaultPrevented && panelOpen && mode !== "column") {
+      event.preventDefault();
+      closePanel();
     }
   }}
 />
@@ -439,12 +500,14 @@
             icon="message"
             class="comments-toggle"
             aria-expanded={mode === "column" ? undefined : panelOpen}
-            aria-controls="comments"
+            aria-controls="dek-comments"
             onclick={() => {
               if (mode === "column") {
-                document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                document.getElementById("dek-comments")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+              } else if (panelOpen) {
+                closePanel();
               } else {
-                panelOpen = !panelOpen;
+                openPanel();
               }
             }}
           >
@@ -478,22 +541,25 @@
 
   {#if commentsOn}
     {#if mode === "sheet" && panelOpen}
-      <button type="button" class="scrim" aria-label={t("comment.close")} onclick={() => (panelOpen = false)}></button>
+      <button type="button" class="scrim" tabindex="-1" aria-label={t("comment.close")} onclick={() => closePanel()}></button>
     {/if}
     <aside
       bind:this={aside}
-      id="comments"
+      id="dek-comments"
       class="comments {mode}"
       class:open={panelOpen}
       class:tall={sheetTall}
-      aria-label={t("talk.comments")}
+      role={mode === "column" ? undefined : "dialog"}
+      aria-modal={mode === "sheet" && panelOpen ? "true" : undefined}
+      aria-labelledby="dek-comments-title"
       inert={mode !== "column" && !panelOpen}
     >
       {#if mode === "sheet"}
         <button
           type="button"
           class="grabber"
-          aria-label={sheetTall ? "↓" : "↑"}
+          aria-label={sheetTall ? t("comment.collapse") : t("comment.expand")}
+          aria-expanded={sheetTall}
           onclick={() => (sheetTall = !sheetTall)}
         ><span></span></button>
       {/if}
@@ -508,7 +574,7 @@
         {guest}
         closable={mode !== "column"}
         anchorTops={mode === "column" ? anchorTops : null}
-        onclose={() => (panelOpen = false)}
+        onclose={() => closePanel()}
         onselect={(comment) => select(comment.id)}
         onanchor={(comment) => {
           select(comment.id);
@@ -524,7 +590,7 @@
       />
     </aside>
     {#if mode !== "column" && !panelOpen}
-      <button type="button" class="pill" onclick={() => (panelOpen = true)}>
+      <button type="button" class="pill" aria-controls="dek-comments" aria-expanded="false" onclick={openPanel}>
         <Icon name="message" />{t("talk.comments")}<span class="num">{openCount}</span>
       </button>
     {/if}
@@ -532,8 +598,8 @@
 </div>
 
 {#if talk.more.length > 0}
-  <section class="more" aria-labelledby="more-title">
-    <h2 id="more-title">{t("talk.moreBy", { name: talk.owner.name })}</h2>
+  <section class="more" aria-labelledby="dek-more-title">
+    <h2 id="dek-more-title">{t("talk.moreBy", { name: talk.owner.name })}</h2>
     <ul class="grid">
       {#each talk.more as card (card.slug)}
         <li><TalkCardView {card} /></li>
@@ -672,9 +738,7 @@
     overscroll-behavior: contain;
     background: var(--surface-raised);
     box-shadow: var(--shadow-lg);
-    transition:
-      transform var(--dur-slow) var(--ease-out),
-      height var(--dur-slow) var(--ease-out);
+    transition: transform var(--dur-slow) var(--ease-out);
   }
   .comments.drawer {
     top: var(--header-height);
@@ -689,17 +753,25 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 60dvh;
+    /* Always 92% tall; at rest it is moved down to show 60%, so only transform animates. */
+    height: 92dvh;
     padding: 0 var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     transform: translateY(100%);
   }
-  .comments.sheet.tall {
-    height: 92dvh;
-  }
-  .comments.open {
+  .comments.drawer.open {
     transform: none;
+  }
+  .comments.sheet.open {
+    transform: translateY(32dvh);
+  }
+  .comments.sheet.open.tall {
+    transform: none;
+  }
+  /* The part moved below the screen at rest is padding, so the last card can still be read. */
+  .comments.sheet.open:not(.tall) {
+    padding-bottom: calc(32dvh + var(--space-4) + env(safe-area-inset-bottom));
   }
   /* Before the script knows the width, the panel stays out of the way below 1280px. */
   @media (max-width: 1279px) {

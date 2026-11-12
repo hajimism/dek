@@ -1,5 +1,6 @@
 <script lang="ts">
   import { useApp } from "./app.ts";
+  import { followLang } from "./lang-link.ts";
 
   const { lang, t } = useApp();
 </script>
@@ -14,7 +15,7 @@
     <nav aria-label="Footer">
       <a href="https://hajimism.github.io/dek/{lang === 'ja' ? 'ja/' : ''}">{t("footer.docs")}</a>
       <a href="https://github.com/hajimism/dek">{t("footer.source")}</a>
-      <a href={lang === "ja" ? "?lang=en" : "?lang=ja"} lang={lang === "ja" ? "en" : "ja"}>{lang === "ja" ? "English" : "日本語"}</a>
+      <a href={lang === "ja" ? "?lang=en" : "?lang=ja"} onclick={(event) => followLang(event, lang === "ja" ? "en" : "ja")} lang={lang === "ja" ? "en" : "ja"}>{lang === "ja" ? "English" : "日本語"}</a>
     </nav>
   </div>
 </footer>

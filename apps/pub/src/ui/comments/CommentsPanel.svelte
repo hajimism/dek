@@ -152,7 +152,7 @@
 
 <div class="panel">
   <header class="top">
-    <h2 class="title">
+    <h2 class="title" id="dek-comments-title" tabindex="-1" data-panel-title>
       {t("talk.comments")}
       <span class="count num">{counts.open}</span>
     </h2>
@@ -242,6 +242,12 @@
     justify-content: space-between;
     gap: var(--space-2);
     padding: 0 0 var(--space-3);
+  }
+  .title:focus {
+    outline: none;
+  }
+  .title:focus-visible {
+    outline: var(--focus-width) solid var(--focus);
   }
   .title {
     display: flex;

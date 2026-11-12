@@ -11,6 +11,7 @@
   import { absoluteTime, relativeTime } from "../../lib/i18n.ts";
   import { elementOf, quoteOf } from "../../lib/comment-view.ts";
   import { useApp } from "../app.ts";
+  import { now as currentTime } from "../clock.svelte.ts";
   import Avatar from "../Avatar.svelte";
   import Badge from "../Badge.svelte";
   import Icon from "../Icon.svelte";
@@ -79,11 +80,16 @@
 </script>
 
 {#snippet when(iso: string)}
-  <time datetime={iso} title={absoluteTime(lang, iso)}>{relativeTime(lang, iso, now)}</time>
+  <time datetime={iso} title={absoluteTime(lang, iso)}>{relativeTime(lang, iso, currentTime(now))}</time>
 {/snippet}
 
 {#snippet anchor()}
-  {#if quote}
+  {#if quote && !quote.quote}
+    <button type="button" class="chip" onclick={onanchor}>
+      <Icon name="message" size={12} />
+      {slideNumber !== null ? `${t("talk.slideLabel", { n: slideNumber })} · ` : ""}{t("comment.quotedScript")}
+    </button>
+  {:else if quote}
     <button type="button" class="quote" class:gone={comment.status === "detached"} onclick={onanchor}>
       <span class="quote-text">{quote.quote}</span>
     </button>

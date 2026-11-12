@@ -64,7 +64,7 @@
                     {/if}
                   </span>
                   <span class="text">
-                    <span class="title" lang={guessLang([talk.title]) ?? undefined}>{talk.title}</span>
+                    <span class="title" lang={guessLang([talk.title], lang) ?? undefined}>{talk.title}</span>
                     <span class="meta">
                       {#if talk.event}<span>{talk.event}</span><span aria-hidden="true">·</span>{/if}
                       {#if talk.date}<time datetime={talk.date}>{formatDate(lang, talk.date)}</time><span aria-hidden="true">·</span>{/if}

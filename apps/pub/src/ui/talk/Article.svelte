@@ -50,6 +50,12 @@
   const { t } = useApp();
   let root: HTMLDivElement | undefined = $state();
   let pending: (QuoteSelection & { x: number; y: number }) | null = $state(null);
+  let shortcut = $state("Ctrl+Alt+M");
+  $effect(() => {
+    if (/Mac|iPhone|iPad/.test(navigator.platform)) {
+      shortcut = "⌘⌥M";
+    }
+  });
 
   const marksBySlide = $derived(
     new Map(
@@ -140,7 +146,17 @@
   }
 </script>
 
-<div class="article" bind:this={root} id="script">
+<svelte:document
+  onkeydown={(event) => {
+    // ⌘⌥M / Ctrl+Alt+M comments on the selected words, as in most editors, for the keyboard.
+    if (pending && event.code === "KeyM" && event.altKey && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      commentOnPending();
+    }
+  }}
+/>
+
+<div class="article" bind:this={root} id="dek-script">
   <h2 class="visually-hidden">{t("talk.script")}</h2>
   {#if script === "hidden"}
     <p class="notice"><Icon name="lock" size={14} />{t("talk.scriptHidden")}</p>
@@ -189,7 +205,7 @@
             class:active={pin.id === selectedId}
             style:left="{pin.box.x + pin.box.width}%"
             style:top="{pin.box.y}%"
-            aria-label="#{pin.number}"
+            aria-label={t("comment.pin", { n: pin.number })}
             onclick={() => onselect?.(pin.id)}>{pin.number}</button
           >
         {/each}
@@ -210,12 +226,15 @@
       <button
         type="button"
         aria-label={t("comment.onSelection")}
+        aria-keyshortcuts="Meta+Alt+M Control+Alt+M"
+        title={t("comment.selectionKeys", { keys: shortcut })}
         onpointerdown={(event) => event.preventDefault()}
         onclick={commentOnPending}
       >
         <Icon name="message" size={14} />{t("comment.post")}
       </button>
     </div>
+    <p class="visually-hidden" role="status">{t("comment.selectionKeys", { keys: shortcut })}</p>
     <div class="adder-bar" role="region" aria-label={t("comment.onSelection")}>
       <button type="button" onpointerdown={(event) => event.preventDefault()} onclick={commentOnPending}>
         <Icon name="message" />{t("comment.onSelection")}
