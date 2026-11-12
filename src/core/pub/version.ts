@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Rename, SlideMap, VersionFile } from "../../pub/protocol.ts";
-import { playerScript, pluginPageScripts } from "../../runtime/player.ts";
 import { loadConfig } from "../config.ts";
 import { renderDeckDocument } from "../document.ts";
 import { DekError } from "../error.ts";
@@ -23,7 +22,7 @@ import { writeTar } from "../tar-write.ts";
 /** A source larger than this is no talk; the server would refuse it too. */
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024;
 
-export type PreparedFile = {
+type PreparedFile = {
   field: VersionFile;
   bytes: Uint8Array<ArrayBuffer>;
   type: string;
@@ -42,11 +41,16 @@ type Target = { project: Project; deck: ProjectDeck };
 
 export async function prepareVersion(
   { project, deck }: Target,
-  options: { runner?: PlaywrightRunner } = {},
+  options: {
+    playerScript: string;
+    /** The pages of the plugins dek ships, compiled, by name, as a build takes them. */
+    pluginScripts: Record<string, string>;
+    runner?: PlaywrightRunner;
+  },
 ): Promise<PreparedVersion> {
   const scratch = join(deck.dir, ".cache", "pub");
-  const script = await playerScript();
-  const plugins = pluginPages(project.root, deck.dir, await pluginPageScripts());
+  const script = options.playerScript;
+  const plugins = pluginPages(project.root, deck.dir, options.pluginScripts);
   const page = (target: { public?: true; script?: false }) =>
     new TextEncoder().encode(
       renderDeckDocument(deck, {

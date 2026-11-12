@@ -2495,6 +2495,2521 @@
         }
       ]
     },
+    "pub": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "login"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "status": {
+              "type": "string",
+              "const": "pending"
+            },
+            "url": {
+              "type": "string",
+              "description": "Where a person approves the sign-in."
+            },
+            "code": {
+              "type": "string",
+              "description": "The code the page asks for, already in url."
+            },
+            "expiresAt": {
+              "type": "string"
+            },
+            "next": {
+              "type": "string",
+              "description": "The command that waits for the approval and signs in."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "status",
+            "url",
+            "code",
+            "expiresAt",
+            "next",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "login"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "status": {
+              "type": "string",
+              "const": "signed-in"
+            },
+            "me": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "handle",
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "stored": {
+              "type": "string",
+              "enum": [
+                "keychain",
+                "file"
+              ],
+              "description": "Where the API key is kept."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "status",
+            "me",
+            "stored",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "logout"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "revoked": {
+              "type": "boolean",
+              "description": "The server took the key back."
+            },
+            "forgotten": {
+              "type": "boolean",
+              "description": "dek held a key for the server and no longer does."
+            },
+            "reason": {
+              "description": "Why the key was not revoked, when it was not.",
+              "type": "string"
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "revoked",
+            "forgotten",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "whoami"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "me": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "handle",
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "key": {
+              "type": "string",
+              "enum": [
+                "env",
+                "keychain",
+                "file"
+              ],
+              "description": "Where the key came from: DEK_TOKEN, or where login kept it."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "me",
+            "key",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "publish"
+            },
+            "published": {
+              "type": "boolean",
+              "const": true
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$"
+            },
+            "n": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "The version uploaded."
+            },
+            "url": {
+              "type": "string"
+            },
+            "current": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version readers see now."
+            },
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "private",
+                "link",
+                "public"
+              ]
+            },
+            "builds": {
+              "type": "object",
+              "properties": {
+                "full": {
+                  "type": "object",
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                },
+                "public": {
+                  "type": "object",
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                },
+                "bare": {
+                  "type": "object",
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "full",
+                "public",
+                "bare"
+              ],
+              "additionalProperties": false
+            },
+            "shots": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Pictures of slides sent, one per slide as it arrives."
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Diagnostic"
+              },
+              "description": "What lint found, warnings only: an error stops publish."
+            },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/SkippedCheck"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "check": {
+                        "type": "string",
+                        "const": "shots"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "hint": {
+                        "type": "string",
+                        "description": "What to do so that the pictures are taken."
+                      }
+                    },
+                    "required": [
+                      "check",
+                      "reason",
+                      "hint"
+                    ],
+                    "additionalProperties": false,
+                    "description": "No picture of the slides, the cover's included, went with the version."
+                  }
+                ]
+              }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
+            "frontmatterWritten": {
+              "type": "boolean",
+              "description": "publish wrote pub: into script.md."
+            },
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Files of the project publish changed, to commit."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "published",
+            "server",
+            "id",
+            "n",
+            "url",
+            "current",
+            "visibility",
+            "builds",
+            "shots",
+            "diagnostics",
+            "frontmatterWritten",
+            "changed",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "publish"
+            },
+            "published": {
+              "type": "boolean",
+              "const": false
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Diagnostic"
+              },
+              "description": "What lint found; the errors stopped publish."
+            },
+            "skipped": {
+              "description": "Absent when every check ran.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SkippedCheck"
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "published",
+            "server",
+            "diagnostics",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$"
+            },
+            "slug": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "private",
+                "link",
+                "public"
+              ]
+            },
+            "scriptPublic": {
+              "type": "boolean"
+            },
+            "embed": {
+              "type": "boolean"
+            },
+            "comments": {
+              "type": "string",
+              "enum": [
+                "off",
+                "signed-in",
+                "guests"
+              ]
+            },
+            "current": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latest": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "files": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "public",
+                  "bare",
+                  "source",
+                  "cover"
+                ]
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "versions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "n": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "dekVersion": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "lint": {
+                    "type": "object",
+                    "properties": {
+                      "errors": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "warnings": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "errors",
+                      "warnings"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "changed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "n",
+                  "dekVersion",
+                  "message",
+                  "bytes",
+                  "lint",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "action": {
+              "type": "string",
+              "const": "share"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "id",
+            "slug",
+            "owner",
+            "title",
+            "url",
+            "visibility",
+            "scriptPublic",
+            "embed",
+            "comments",
+            "current",
+            "latest",
+            "files",
+            "versions",
+            "action",
+            "server",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$"
+            },
+            "slug": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "private",
+                "link",
+                "public"
+              ]
+            },
+            "scriptPublic": {
+              "type": "boolean"
+            },
+            "embed": {
+              "type": "boolean"
+            },
+            "comments": {
+              "type": "string",
+              "enum": [
+                "off",
+                "signed-in",
+                "guests"
+              ]
+            },
+            "current": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latest": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "files": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "public",
+                  "bare",
+                  "source",
+                  "cover"
+                ]
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "versions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "n": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "dekVersion": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "lint": {
+                    "type": "object",
+                    "properties": {
+                      "errors": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "warnings": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "errors",
+                      "warnings"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "changed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "n",
+                  "dekVersion",
+                  "message",
+                  "bytes",
+                  "lint",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "action": {
+              "type": "string",
+              "const": "status"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "local": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$",
+                  "description": "sha256 of the deck's source as publish would send it now."
+                },
+                "published": {
+                  "type": "boolean",
+                  "description": "The newest version was made from this very source."
+                }
+              },
+              "required": [
+                "source",
+                "published"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "id",
+            "slug",
+            "owner",
+            "title",
+            "url",
+            "visibility",
+            "scriptPublic",
+            "embed",
+            "comments",
+            "current",
+            "latest",
+            "files",
+            "versions",
+            "action",
+            "server",
+            "local",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "open"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "url": {
+              "type": "string"
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "url",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "comments"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "comments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "Per deck, in the order the threads were opened."
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "step": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "moved",
+                      "detached",
+                      "resolved"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "element"
+                            },
+                            "path": {
+                              "type": "string",
+                              "description": "The slide's HTML file in the project."
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "box": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number"
+                                },
+                                "height": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "path",
+                            "name",
+                            "text",
+                            "box"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "quote"
+                            },
+                            "quote": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "prefix": {
+                              "type": "string",
+                              "maxLength": 32
+                            },
+                            "suffix": {
+                              "type": "string",
+                              "maxLength": 32
+                            },
+                            "path": {
+                              "type": "string",
+                              "description": "The deck's script.md, which the article is made from."
+                            },
+                            "line": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Where the passage starts now; null when not found."
+                            },
+                            "column": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "1-based, in UTF-16 units as editors count; null when not found."
+                            },
+                            "found": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "quote",
+                            "prefix",
+                            "suffix",
+                            "path",
+                            "line",
+                            "column",
+                            "found"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "author": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "handle": {
+                        "type": "string"
+                      },
+                      "guest": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "guest"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "thread": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "author": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "handle": {
+                              "type": "string"
+                            },
+                            "guest": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "guest"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "author",
+                        "text",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "resolvedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shot": {
+                    "type": "string",
+                    "description": "The command that shows the slide at the comment's beat."
+                  }
+                },
+                "required": [
+                  "number",
+                  "id",
+                  "slug",
+                  "step",
+                  "status",
+                  "text",
+                  "targets",
+                  "author",
+                  "version",
+                  "url",
+                  "thread",
+                  "createdAt",
+                  "resolvedAt",
+                  "shot"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "comments",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "reply"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "comment": {
+              "type": "string"
+            },
+            "reply": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "handle": {
+                      "type": "string"
+                    },
+                    "guest": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "guest"
+                  ],
+                  "additionalProperties": false
+                },
+                "text": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "author",
+                "text",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "comment",
+            "reply",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "resolve",
+                "reopen"
+              ]
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "comment": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "open",
+                "moved",
+                "detached",
+                "resolved"
+              ]
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "comment",
+            "status",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "login"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "status": {
+              "type": "string",
+              "const": "pending"
+            },
+            "url": {
+              "type": "string",
+              "description": "Where a person approves the sign-in."
+            },
+            "code": {
+              "type": "string",
+              "description": "The code the page asks for, already in url."
+            },
+            "expiresAt": {
+              "type": "string"
+            },
+            "next": {
+              "type": "string",
+              "description": "The command that waits for the approval and signs in."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "status",
+            "url",
+            "code",
+            "expiresAt",
+            "next",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "login"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "status": {
+              "type": "string",
+              "const": "signed-in"
+            },
+            "me": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "handle",
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "stored": {
+              "type": "string",
+              "enum": [
+                "keychain",
+                "file"
+              ],
+              "description": "Where the API key is kept."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "status",
+            "me",
+            "stored",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "logout"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "revoked": {
+              "type": "boolean",
+              "description": "The server took the key back."
+            },
+            "forgotten": {
+              "type": "boolean",
+              "description": "dek held a key for the server and no longer does."
+            },
+            "reason": {
+              "description": "Why the key was not revoked, when it was not.",
+              "type": "string"
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "revoked",
+            "forgotten",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "whoami"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "me": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "handle",
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "key": {
+              "type": "string",
+              "enum": [
+                "env",
+                "keychain",
+                "file"
+              ],
+              "description": "Where the key came from: DEK_TOKEN, or where login kept it."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "me",
+            "key",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "publish"
+            },
+            "published": {
+              "type": "boolean",
+              "const": true
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$"
+            },
+            "n": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "The version uploaded."
+            },
+            "url": {
+              "type": "string"
+            },
+            "current": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version readers see now."
+            },
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "private",
+                "link",
+                "public"
+              ]
+            },
+            "builds": {
+              "type": "object",
+              "properties": {
+                "full": {
+                  "type": "object",
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                },
+                "public": {
+                  "type": "object",
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                },
+                "bare": {
+                  "type": "object",
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "full",
+                "public",
+                "bare"
+              ],
+              "additionalProperties": false
+            },
+            "shots": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Pictures of slides sent, one per slide as it arrives."
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Diagnostic"
+              },
+              "description": "What lint found, warnings only: an error stops publish."
+            },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/SkippedCheck"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "check": {
+                        "type": "string",
+                        "const": "shots"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "hint": {
+                        "type": "string",
+                        "description": "What to do so that the pictures are taken."
+                      }
+                    },
+                    "required": [
+                      "check",
+                      "reason",
+                      "hint"
+                    ],
+                    "additionalProperties": false,
+                    "description": "No picture of the slides, the cover's included, went with the version."
+                  }
+                ]
+              }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
+            "frontmatterWritten": {
+              "type": "boolean",
+              "description": "publish wrote pub: into script.md."
+            },
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Files of the project publish changed, to commit."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "published",
+            "server",
+            "id",
+            "n",
+            "url",
+            "current",
+            "visibility",
+            "builds",
+            "shots",
+            "diagnostics",
+            "frontmatterWritten",
+            "changed",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "publish"
+            },
+            "published": {
+              "type": "boolean",
+              "const": false
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Diagnostic"
+              },
+              "description": "What lint found; the errors stopped publish."
+            },
+            "skipped": {
+              "description": "Absent when every check ran.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SkippedCheck"
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "published",
+            "server",
+            "diagnostics",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$"
+            },
+            "slug": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "private",
+                "link",
+                "public"
+              ]
+            },
+            "scriptPublic": {
+              "type": "boolean"
+            },
+            "embed": {
+              "type": "boolean"
+            },
+            "comments": {
+              "type": "string",
+              "enum": [
+                "off",
+                "signed-in",
+                "guests"
+              ]
+            },
+            "current": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latest": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "files": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "public",
+                  "bare",
+                  "source",
+                  "cover"
+                ]
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "versions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "n": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "dekVersion": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "lint": {
+                    "type": "object",
+                    "properties": {
+                      "errors": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "warnings": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "errors",
+                      "warnings"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "changed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "n",
+                  "dekVersion",
+                  "message",
+                  "bytes",
+                  "lint",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "action": {
+              "type": "string",
+              "const": "share"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "id",
+            "slug",
+            "owner",
+            "title",
+            "url",
+            "visibility",
+            "scriptPublic",
+            "embed",
+            "comments",
+            "current",
+            "latest",
+            "files",
+            "versions",
+            "action",
+            "server",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$"
+            },
+            "slug": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "private",
+                "link",
+                "public"
+              ]
+            },
+            "scriptPublic": {
+              "type": "boolean"
+            },
+            "embed": {
+              "type": "boolean"
+            },
+            "comments": {
+              "type": "string",
+              "enum": [
+                "off",
+                "signed-in",
+                "guests"
+              ]
+            },
+            "current": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latest": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "files": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "public",
+                  "bare",
+                  "source",
+                  "cover"
+                ]
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "versions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "n": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "dekVersion": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "lint": {
+                    "type": "object",
+                    "properties": {
+                      "errors": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "warnings": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "errors",
+                      "warnings"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "changed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "n",
+                  "dekVersion",
+                  "message",
+                  "bytes",
+                  "lint",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "action": {
+              "type": "string",
+              "const": "status"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "local": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$",
+                  "description": "sha256 of the deck's source as publish would send it now."
+                },
+                "published": {
+                  "type": "boolean",
+                  "description": "The newest version was made from this very source."
+                }
+              },
+              "required": [
+                "source",
+                "published"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "id",
+            "slug",
+            "owner",
+            "title",
+            "url",
+            "visibility",
+            "scriptPublic",
+            "embed",
+            "comments",
+            "current",
+            "latest",
+            "files",
+            "versions",
+            "action",
+            "server",
+            "local",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "open"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "url": {
+              "type": "string"
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "url",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "comments"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "comments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "Per deck, in the order the threads were opened."
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "step": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "moved",
+                      "detached",
+                      "resolved"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "element"
+                            },
+                            "path": {
+                              "type": "string",
+                              "description": "The slide's HTML file in the project."
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "box": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number"
+                                },
+                                "height": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "path",
+                            "name",
+                            "text",
+                            "box"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "quote"
+                            },
+                            "quote": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "prefix": {
+                              "type": "string",
+                              "maxLength": 32
+                            },
+                            "suffix": {
+                              "type": "string",
+                              "maxLength": 32
+                            },
+                            "path": {
+                              "type": "string",
+                              "description": "The deck's script.md, which the article is made from."
+                            },
+                            "line": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Where the passage starts now; null when not found."
+                            },
+                            "column": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "1-based, in UTF-16 units as editors count; null when not found."
+                            },
+                            "found": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "quote",
+                            "prefix",
+                            "suffix",
+                            "path",
+                            "line",
+                            "column",
+                            "found"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "author": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "handle": {
+                        "type": "string"
+                      },
+                      "guest": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "guest"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "thread": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "author": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "handle": {
+                              "type": "string"
+                            },
+                            "guest": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "guest"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "author",
+                        "text",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "resolvedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shot": {
+                    "type": "string",
+                    "description": "The command that shows the slide at the comment's beat."
+                  }
+                },
+                "required": [
+                  "number",
+                  "id",
+                  "slug",
+                  "step",
+                  "status",
+                  "text",
+                  "targets",
+                  "author",
+                  "version",
+                  "url",
+                  "thread",
+                  "createdAt",
+                  "resolvedAt",
+                  "shot"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "comments",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "reply"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "comment": {
+              "type": "string"
+            },
+            "reply": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "handle": {
+                      "type": "string"
+                    },
+                    "guest": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "guest"
+                  ],
+                  "additionalProperties": false
+                },
+                "text": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "author",
+                "text",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "comment",
+            "reply",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "resolve",
+                "reopen"
+              ]
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "comment": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "open",
+                "moved",
+                "detached",
+                "resolved"
+              ]
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "comment",
+            "status",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "help": {
       "anyOf": [
         {

@@ -225,9 +225,14 @@ export async function publishCommand(
   }
 
   // After pub: is written, so the source sent is the one status compares with.
+  const { playerScript, pluginPageScripts } = await import("../runtime/player.ts");
   const version = await prepareVersion(
     { project, deck },
-    options.runner ? { runner: options.runner } : {},
+    {
+      playerScript: await playerScript(),
+      pluginScripts: await pluginPageScripts(),
+      ...(options.runner ? { runner: options.runner } : {}),
+    },
   );
 
   const { description, event, date, lang } = deck.deck;

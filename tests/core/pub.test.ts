@@ -166,11 +166,10 @@ describe("a version's source", () => {
   });
 
   test("sends the renames made since the newest version, and none for a new deck", () => {
-    const renames = [
-      { from: "a", to: "b", at: "2026-01-01T00:00:00.000Z" },
-      { from: "b", to: "c", at: "2026-03-01T00:00:00.000Z" },
-    ];
-    expect(renamesSince(renames, "2026-02-01T00:00:00.000Z")).toEqual([renames[1]]);
+    const early = { from: "a", to: "b", at: "2026-01-01T00:00:00.000Z" };
+    const late = { from: "b", to: "c", at: "2026-03-01T00:00:00.000Z" };
+    const renames = [early, late];
+    expect(renamesSince(renames, "2026-02-01T00:00:00.000Z")).toEqual([late]);
     expect(renamesSince(renames, undefined)).toEqual([]);
   });
 });

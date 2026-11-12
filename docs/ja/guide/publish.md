@@ -1,0 +1,87 @@
+---
+description: 'dekc pub でトークを dek.pub に載せる。サインイン、バージョンの公開、台本を読める人とコメントできる人の選択、ターミナルからのコメントへの返信。'
+---
+
+# dek.pub で公開する
+
+[dek.pub](https://dek.pub) はトークをオンラインで見せます。スライド、共有した相手にはその横に台本、そしてスライドや台本の一節へのコメントです。`dekc pub` は、`dekc build` がファイルに書くのと同じようにプロジェクトからデッキをそこへ載せ、コメントをその対象のファイルへ持ち帰ります。
+
+## サインインする
+
+```bash
+dekc pub login
+```
+
+dek が標準エラーに URL とコードを出します。URL を開いて dek.pub にサインインし、コードを承認してください。dek はそれを待ち、dek.pub がくれた API キーを OS のキーチェーンに保存します。キーチェーンがなければ、あなただけが読める `~/.config/dek/credentials.json` に保存します。`dekc pub whoami` は誰としてサインインしているかを示し、`dekc pub logout` はキーを失効させて手元から消します。
+
+エージェントはあなたのためにブラウザを開けないので、`--json` ではサインインが 2 回の実行に分かれます。1 回目はすぐに返ります。
+
+```json
+{ "ok": true, "action": "login", "status": "pending", "url": "https://dek.pub/device?user_code=WDJB-MJHT", "code": "WDJB-MJHT", "expiresAt": "…", "next": "dekc pub login --json", "server": "https://dek.pub" }
+```
+
+エージェントは URL とコードをあなたに見せてから `next` を実行します。これはあなたが承認するまで待ち、`"status": "signed-in"` を返します。その実行が止められても、次の実行がコードの期限まで同じコードを待ちます。
+
+CI では代わりに `DEK_TOKEN` に API キーを設定します。サインインはいりません。
+
+## バージョンを公開する
+
+```bash
+dekc pub publish -m "通し練習 1 回目"
+```
+
+publish は、トークを共有する前に手でやることをこなし、手でやるなら止まるところで止まります。
+
+1. `dekc lint` と同じようにデッキを lint します。error があれば診断と終了コード 1 を返して止まり、何も送りません。warning はバージョンと一緒に送ります。
+2. トークを 3 通りにビルドします。あなた用に台本をすべて含むもの、台本を見せるときの読み手用に `dekc build --public` と同じく読み上げる部分だけのもの、見せないときの読み手用に `dekc build --no-script` と同じく台本のまったくないもの。dek.pub は読み手ごとに、読んでよいビルドを出します。
+3. Playwright が入っていれば、各スライドが現れたときの画像と、リンクプレビュー用に 1 枚目の最後のビートの画像を撮ります。
+4. `dist/` と `.cache/` を除いてデッキのソースをまとめます。`dekc pub status` が、最新のバージョンが手元のものと同じかを見分けられるようにです。
+
+初めての公開で dek.pub にデッキを作り、その ID を `script.md` に書き込みます。
+
+```yaml
+---
+title: HTML スライドツールを作った話
+pub: d_k2m9x4q7w1
+---
+```
+
+この行はコミットしてください。どのチェックアウトから公開しても同じデッキが更新されます。消すと新しいデッキとして公開します。
+
+公開するたびに新しいバージョンになり、`--no-promote` を付けなければ読み手に見えるのはそのバージョンになります。前のバージョンのあと `dekc mv` で名前を変えたセクションには、コメントも付いていきます。
+
+## 共有する
+
+新しいデッキは非公開です。誰が開けるかなどは `dekc pub share` で選びます。
+
+```bash
+dekc pub share --visibility link --script shown --comments signed-in
+```
+
+| フラグ | 値 |
+| --- | --- |
+| `--visibility` | `private`: あなたと共有した相手、`link`: リンクを知る誰でも、`public`: 全員 |
+| `--script` | `shown`: 読み手はスライドの横に、ト書きとコメントを除いた台本を見る。`hidden`: スライドだけ |
+| `--embed` | `on` でほかのサイトがデッキを埋め込める |
+| `--comments` | `off`、`signed-in`、`guests` |
+
+`dekc pub status` は設定、バージョン、最新のバージョンがプロジェクトにあるソースと同じかを出します。`dekc pub open` はデッキをブラウザで開きます。
+
+## コメントに答える
+
+```bash
+dekc pub comments
+```
+
+各コメントは、それがどこにあるかを示します。台本の一節なら、いまの `script.md` での行と列。スライドの要素なら、そのスライドのファイル。エージェントは `dekc annotations` を読むのと同じように `--json` で読み、`shot` がコメントのあるスライドを見るコマンドです。対応したら、ID か番号で返信し、解決済みにします。
+
+```bash
+dekc pub comments reply 3 "次のバージョンで言い換えました"
+dekc pub comments resolve 3
+```
+
+`--status resolved` や `--status all` でほかのものも一覧にでき、`dekc pub comments reopen <id>` で開き直せます。
+
+## 別のサーバー
+
+どのサブコマンドも `--server <url>` を受け付け、`DEK_PUB_SERVER` はシェル全体に同じことを設定します。開発中に手元で動かす dek.pub などに使います。キーは HTTPS か、このマシンへの平文の HTTP でだけ送り、サーバーごとに別のキーを持ちます。フラグとフィールドはすべて [CLI リファレンス](/ja/reference/cli#公開) にあります。

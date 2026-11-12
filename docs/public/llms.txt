@@ -32,6 +32,7 @@ An optional skill, `dek-design`, is for slides that read at a glance; it install
 - [Themes](https://hajimism.github.io/dek/guide/theme.html): Thirteen tokens on `.slide`. Growing the vocabulary is a design decision.
 - [Lint](https://hajimism.github.io/dek/guide/lint.html): Lint decides what a rule can measure; `--visual` measures geometry. The rest is the author's call.
 - [Presenting](https://hajimism.github.io/dek/guide/present.html): Dev server, presenter view, keys and touch, marks and annotations, one file on a USB stick, print, remote, PDF, and PPTX with editable text and shapes.
+- [Publish on dek.pub](https://hajimism.github.io/dek/guide/publish.html): Put a talk on dek.pub with dekc pub: sign in, publish a version, choose who reads the script and who comments, and answer the comments from the terminal.
 - [Voice and Video](https://hajimism.github.io/dek/guide/voice.html): Opt-in. Cue, Timeline, rehearse, video.
 - [Working with AI Agents](https://hajimism.github.io/dek/guide/ai.html): The CLI, `AGENTS.md`, the official skill, and an optional design skill. `check --shot`, `show` a slide or a ref's as a model, and `dekc annotations` for what the human pointed at. No MCP.
 - [FAQ](https://hajimism.github.io/dek/guide/faq.html): When to use Slidev, handing a talk to PowerPoint users, whether voice is required, and more.
@@ -83,10 +84,15 @@ dekc sync --accept <plugin>  pin a plugin's changed manifest, once the user has 
 dekc lint [--fix] [--visual] [--format sarif]
 dekc cues
 dekc voice [speakers | say <text> | dict add <word> <kana> [--accent N] | pin]
-dekc build [--root-dist] [--url <url>] [--public]
+dekc build [--root-dist] [--url <url>] [--public] [--no-script]
 dekc video [slug] [--fps N] [--root-dist]
 dekc pdf [--root-dist]
 dekc pptx [--root-dist] [--public]   boxes, pictures, and text editable over a picture of the rest; script in notes
+dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait
+dekc pub whoami | logout
+dekc pub publish [--message <text>] [--no-promote]   lint errors stop it; commit script.md when it writes pub:
+dekc pub share --visibility private|link|public --script shown|hidden --embed on|off --comments off|signed-in|guests
+dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>
 dekc help [command] | dekc <command> --help | dekc --version
 
 Errors include hint with the next command to run.

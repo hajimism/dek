@@ -20,7 +20,7 @@ DEK008 flags every frontmatter key the schema does not name, so whatever dek wri
 
 ## Decision
 
-**The frontmatter key `pub` holds the deck's ID on dek.pub**, the string the protocol calls `DeckId`: `d_` and then 10 to 32 lowercase letters and digits. It is in the zod `Frontmatter`, so DEK008 does not flag it and `.dek/schema.json` describes it; a value of another shape stops the script from being read, with a message that says what to write and that deleting the line makes a new deck.
+**The frontmatter key `pub` holds the deck's ID on dek.pub**, the string the protocol calls `DeckId`: `d_` and then 10 to 32 lowercase letters and digits. It is in the zod `Frontmatter`, so DEK008 does not flag it and `.dek/schema.json` documents it; a value of another shape stops the script from being read, with a message that says what to write and that deleting the line makes a new deck.
 
 **`dekc pub publish` writes it**, once, after dek.pub has made the deck and before the version is uploaded: an upload that fails still leaves the ID, and the next publish lands on the same deck. Its result says that script.md changed and should be committed.
 

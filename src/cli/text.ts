@@ -1,11 +1,6 @@
 // How each command's result reads as text; commands.ts says which command prints which.
 // The pieces the dev server's log shares, such as diagnostics and tables, are in format.ts.
-import {
-  type Diagnostic,
-  type Skipped,
-  type SkippedCheck,
-  skippedLabel,
-} from "../core/diagnostic.ts";
+import { type Diagnostic, type Skipped, skippedLabel } from "../core/diagnostic.ts";
 import { shellQuote } from "../core/escape.ts";
 import { foreignLine, type HiddenText, TITLE_MAX } from "../core/foreign-text.ts";
 import { compareCodeUnits } from "../core/order.ts";
