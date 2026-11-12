@@ -45,7 +45,6 @@
 
 <div class="page">
   <section class="card" aria-labelledby="signin-title">
-    <span class="logo" aria-hidden="true">dek<span>.</span>pub</span>
     <h1 id="signin-title">{t("signin.title")}</h1>
 
     {#if shared.viewer}
@@ -112,14 +111,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-  }
-  .logo {
-    font-weight: var(--weight-semibold);
-    font-size: var(--text-lg);
-    letter-spacing: -0.02em;
-  }
-  .logo span {
-    color: var(--accent);
   }
   h1 {
     margin-bottom: var(--space-4);
