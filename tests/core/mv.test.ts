@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
 import { renameSection, reorderSection } from "../../src/core/mv.ts";
+import { readRenames, renamesPath } from "../../src/core/renames.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -459,5 +460,87 @@ hello
         expect(script.indexOf("## intro")).toBeLessThan(script.indexOf("## architecture"));
       },
     );
+  });
+});
+
+describe("the renames dekc mv keeps for dek.pub", () => {
+  const at = new Date("2026-11-12T00:00:00Z");
+  const twoSlides = {
+    decks: [
+      {
+        name: "demo",
+        script: "---\ntitle: Demo\n---\n\n## intro\n\nhello\n\n## outro\n\nbye\n",
+        slides: { intro: introHtml, outro: architectureHtml },
+      },
+    ],
+  };
+
+  test("records a rename once it is done, in the project's .dek/renames.json", async () => {
+    await withTempProject(twoSlides, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      renameSection(deckDir, "intro", "cover", at);
+      renameSection(deckDir, "cover", "opening", at);
+      expect(readRenames(root, "demo")).toEqual([
+        { from: "intro", to: "cover", at: at.toISOString() },
+        { from: "cover", to: "opening", at: at.toISOString() },
+      ]);
+    });
+  });
+
+  test("records the rename finished from a heading edited first, and not a rename already done", async () => {
+    await withTempProject(twoSlides, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      const script = join(deckDir, "script.md");
+      await writeFile(script, (await readFile(script, "utf8")).replace("## intro", "## cover"));
+      renameSection(deckDir, "intro", "cover", at);
+      renameSection(deckDir, "intro", "cover", at);
+      expect(readRenames(root, "demo")).toEqual([
+        { from: "intro", to: "cover", at: at.toISOString() },
+      ]);
+    });
+  });
+
+  test("records neither a reorder nor a rename that was refused", async () => {
+    await withTempProject(twoSlides, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      reorderSection(deckDir, "outro", { before: "intro" });
+      expect(() => renameSection(deckDir, "intro", "outro", at)).toThrow("already exists");
+      expect(existsSync(renamesPath(root))).toBe(false);
+    });
+  });
+
+  // The record is the rename's last step: one that cannot be written takes the rename back.
+  test.skipIf(process.getuid?.() === 0)(
+    "takes the rename back when the record cannot be written",
+    async () => {
+      await withTempProject(twoSlides, async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const dotDek = join(root, ".dek");
+        await mkdir(dotDek, { recursive: true });
+        await chmod(dotDek, 0o555);
+        const script = await readFile(join(deckDir, "script.md"), "utf8");
+        try {
+          expect(() => renameSection(deckDir, "intro", "cover", at)).toThrow();
+        } finally {
+          await chmod(dotDek, 0o755);
+        }
+        expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(script);
+        expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);
+        expect(existsSync(join(deckDir, "slides", "cover.html"))).toBe(false);
+        expect(existsSync(renamesPath(root))).toBe(false);
+      });
+    },
+  );
+
+  test("refuses a rename while .dek/renames.json does not read, changing nothing", async () => {
+    await withTempProject(twoSlides, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      await mkdir(join(root, ".dek"), { recursive: true });
+      await writeFile(renamesPath(root), "{");
+      expect(() => renameSection(deckDir, "intro", "cover", at)).toThrow(
+        ".dek/renames.json does not read",
+      );
+      expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);
+    });
   });
 });
