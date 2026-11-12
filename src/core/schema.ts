@@ -98,7 +98,7 @@ export const Frontmatter = z.object({
     .string()
     .regex(
       DECK_ID_RE,
-      "write the ID dek.pub gave the deck, like d_0123456789, or delete the line and `dekc pub publish` makes a new deck",
+      "write the ID dek.pub gave the deck, like d_0123456789; without the line, `dekc pub publish --slug <slug>` makes a new deck",
     )
     .optional()
     .describe("The deck's ID on dek.pub, which `dekc pub publish` writes on the first publish."),

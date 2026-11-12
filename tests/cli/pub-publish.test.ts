@@ -38,6 +38,7 @@ function signIn(fake: FakePub): void {
   writeFileSync(
     fake.credentials,
     JSON.stringify({ version: 1, keys: { [fake.url]: fake.issueKey() } }),
+    { mode: 0o600 },
   );
 }
 
@@ -74,6 +75,13 @@ describe("dekc pub publish", () => {
             changed: ["decks/Why_Dek/script.md"],
           });
           expect(deck?.slug).toBe("why-dek");
+          // The map is of script.md as sent: with the pub: line, each heading is a line lower.
+          const written = readFileSync(scriptPath, "utf8").split("\n");
+          const [manifestFirst] = fake.manifests.get(deck?.id ?? "") ?? [];
+          expect(manifestFirst?.slideMap.slides.map((entry) => entry.line)).toEqual([
+            written.indexOf("## intro") + 1,
+            written.indexOf("## speed") + 1,
+          ]);
           // Only the pub: line is new.
           expect(readFileSync(scriptPath, "utf8")).toBe(
             SCRIPT.replace("event: Meetup #42\n", `event: Meetup #42\npub: ${deck?.id}\n`),
@@ -134,7 +142,7 @@ describe("dekc pub publish", () => {
   );
 
   test.serial(
-    "puts the next version on the newest, with the renames since, and --no-promote",
+    "puts the next version on the newest, with every rename recorded, and --no-promote",
     async () => {
       await withFakePub(async (fake) => {
         signIn(fake);
@@ -169,7 +177,8 @@ describe("dekc pub publish", () => {
           });
           const second = fake.manifests.get(deck?.id ?? "")?.[1];
           expect(second?.base).toBe(1);
-          expect(second?.renames.map((rename) => rename.to)).toEqual(["pace"]);
+          // Every rename goes; the server takes each once.
+          expect(second?.renames.map((rename) => rename.to)).toEqual(["older", "pace"]);
           expect(fake.requests.at(-1)?.query).toEqual({ promote: "0" });
           expect(fake.decks.size).toBe(1);
         });
@@ -226,7 +235,7 @@ describe("dekc pub publish", () => {
         expect((await publish(fake, root)).exitCode).toBe(0);
         fake.respond = (request) =>
           request.path.endsWith("/versions")
-            ? Response.json({ error: { code: "conflict", message: "newer" } }, { status: 409 })
+            ? Response.json({ error: { code: "stale_base", message: "newer" } }, { status: 409 })
             : undefined;
         const result = await publish(fake, root);
         expect(jsonStdout<Json>(result)).toMatchObject({
@@ -262,6 +271,57 @@ describe("dekc pub publish", () => {
         });
         writeFileSync(join(root, "decks", "Why_Dek", "slides", "speed.html"), slide("faster"));
         expect(await status()).toMatchObject({ local: { published: false } });
+      });
+    });
+  });
+
+  test.serial("--slug names a new deck's slug; a slug taken says to pass another", async () => {
+    await withFakePub(async (fake) => {
+      signIn(fake);
+      fake.addDeck({ slug: "why-dek" });
+      await withTempProject(spec(), async (root) => {
+        const taken = await publish(fake, root);
+        expect(jsonStdout<Json>(taken)).toMatchObject({
+          ok: false,
+          error: { message: "you already have a deck at /@hajime/why-dek" },
+        });
+        expect(String((jsonStdout<Json>(taken).error as { hint: string }).hint)).toContain(
+          "pass --slug <slug>",
+        );
+        expect(readFileSync(join(root, "decks", "Why_Dek", "script.md"), "utf8")).toBe(SCRIPT);
+        const named = await publish(fake, root, ["--slug", "why-dek-2026"]);
+        expect(jsonStdout<Json>(named)).toMatchObject({ ok: true, n: 1 });
+        expect([...fake.decks.values()].map((deck) => deck.slug)).toEqual([
+          "why-dek",
+          "why-dek-2026",
+        ]);
+        const again = await publish(fake, root, ["--slug", "other"]);
+        expect(jsonStdout<Json>(again)).toMatchObject({
+          ok: false,
+          error: { hint: "drop --slug; a deck keeps the slug it was made with" },
+        });
+        const invalid = await publish(fake, root, ["--slug", "Bad Slug"]);
+        expect(jsonStdout<Json>(invalid)).toMatchObject({ ok: false });
+      });
+    });
+  });
+
+  test.serial("says how large a version may be when the server refuses one", async () => {
+    await withFakePub(async (fake) => {
+      signIn(fake);
+      await withTempProject(spec(), async (root) => {
+        fake.respond = (request) =>
+          request.path.endsWith("/versions")
+            ? Response.json({ error: { code: "too_large", message: "too big" } }, { status: 413 })
+            : undefined;
+        const result = await publish(fake, root);
+        expect(jsonStdout<Json>(result)).toMatchObject({
+          ok: false,
+          error: {
+            message: "too big",
+            hint: "a version holds 50 MiB at most, every build, the source, and the pictures together; make the deck's assets smaller, then publish again",
+          },
+        });
       });
     });
   });

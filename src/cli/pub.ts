@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import pkg from "../../package.json";
@@ -10,14 +11,22 @@ import { PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "../core/playwright.ts
 import { PubError, request, serverOrigin, UPLOAD_TIMEOUT_MS } from "../core/pub/client.ts";
 import { asPending, awaitLogin, pendingLogin, startLogin } from "../core/pub/login.ts";
 import { locateQuote } from "../core/pub/quote.ts";
-import { forgetKey, type Key, readKey, readStoredKey } from "../core/pub/store.ts";
-import { deckSource, fileName, prepareVersion, renamesSince, sha256 } from "../core/pub/version.ts";
+import { forgetKey, type Key, readKey, readStoredKey, tokenFor } from "../core/pub/store.ts";
+import {
+  deckSource,
+  fileName,
+  prepareVersion,
+  requireUploadable,
+  sha256,
+} from "../core/pub/version.ts";
 import { readRenames } from "../core/renames.ts";
+import { resolveProject } from "../core/resolve.ts";
 import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
 import {
   CommentList,
   CommentPolicy,
   CommentRow,
+  CreateDeckRequest,
   DeckStatus,
   Me,
   PROTOCOL_VERSION,
@@ -104,9 +113,35 @@ export async function loginCommand(flags: FlagValues): Promise<PubResult> {
       `open ${login.url} and enter ${login.userCode} to sign in (the code works for ${minutes} min)\nwaiting for the approval...\n`,
     );
   }
-  const signedIn = await awaitLogin(origin, login);
-  return { action: "login", server: origin, ...signedIn };
+  // An agent's call waits a minute at most, then hears that the code still waits.
+  const answer = await awaitLogin(
+    origin,
+    login,
+    flags.json === true ? { budgetMs: JSON_WAIT_MS } : {},
+  );
+  if (answer.status === "pending") {
+    return {
+      action: "login",
+      server: origin,
+      ...answer,
+      next: `${pubCommand("login", flags)} --json`,
+    };
+  }
+  return {
+    action: "login",
+    server: origin,
+    ...answer,
+    ...(tokenFor(origin) !== undefined
+      ? {
+          warning:
+            "DEK_TOKEN is set for this server and is sent instead of the key login kept; unset DEK_TOKEN to use it",
+        }
+      : {}),
+  };
 }
+
+/** How long one `dekc pub login --json` waits for the approval before it says it still waits. */
+const JSON_WAIT_MS = 60 * 1000;
 
 /**
  * `dekc pub logout`: revoke the key login kept, then forget it, even when the server is away. A key
@@ -119,19 +154,17 @@ export async function logoutCommand(flags: FlagValues): Promise<PubResult> {
   let reason: string | undefined;
   if (key !== undefined) {
     try {
-      await request(
+      const answer = await request(
         origin,
-        { method: "DELETE", path: paths.revokeKey, what: "the API key", key: key.key },
-        z.unknown(),
+        { method: "DELETE", path: paths.revokeKey, what: "the API key", key },
+        Revoked,
       );
-      revoked = true;
-    } catch (error) {
-      if (error instanceof PubError && error.status === 401) {
-        // A key the server no longer knows is as revoked as it gets.
-        revoked = true;
-      } else {
-        reason = `${error instanceof Error ? error.message : String(error)}; the key still works until it is revoked on dek.pub`;
+      revoked = answer.revoked;
+      if (!revoked) {
+        reason = "the server did not know the key, which no longer works";
       }
+    } catch (error) {
+      reason = `${error instanceof Error ? error.message : String(error)}; the key still works until it is revoked on dek.pub`;
     }
   }
   const forgotten = await forgetKey(origin);
@@ -144,13 +177,16 @@ export async function logoutCommand(flags: FlagValues): Promise<PubResult> {
   };
 }
 
+/** What revoking a key answers: whether the server knew it and took it back. */
+const Revoked = z.object({ revoked: z.boolean() });
+
 /** `dekc pub whoami`. */
 export async function whoamiCommand(flags: FlagValues): Promise<PubResult> {
   const origin = serverOrigin(flags.server);
   const key = await requireKey(origin, flags);
   const me = await request(
     origin,
-    { method: "GET", path: paths.me, what: "your account", key: key.key },
+    { method: "GET", path: paths.me, what: "your account", key },
     Me,
   );
   return { action: "whoami", server: origin, me, key: key.source };
@@ -159,7 +195,11 @@ export async function whoamiCommand(flags: FlagValues): Promise<PubResult> {
 // ---------------------------------------------------------------------------------------------
 // Publishing.
 
-/** A deck folder's name as a slug dek.pub takes: lowercase letters, digits, and hyphens. */
+/**
+ * A deck folder's name as a slug dek.pub takes: lowercase letters, digits, and hyphens. A name
+ * with none of those, such as one in Japanese, becomes `deck-` and eight hex digits of its hash,
+ * so two such decks do not take the same slug.
+ */
 export function deckSlug(name: string): string {
   const slug = name
     .toLowerCase()
@@ -167,7 +207,29 @@ export function deckSlug(name: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 63)
     .replace(/-+$/, "");
-  return slug === "" ? "deck" : slug;
+  return slug === "" ? `deck-${sha256(new TextEncoder().encode(name)).slice(0, 8)}` : slug;
+}
+
+/** The slug a first publish asks for: --slug, checked, or the folder's name as a slug. */
+function newSlug({ deck }: ReadableDeck, flags: FlagValues): string {
+  if (flags.slug === undefined) {
+    return deckSlug(deck.name);
+  }
+  if (deck.deck.pub !== undefined) {
+    throw new DekError(
+      `--slug names the slug of a new deck, and deck "${deck.name}" is on dek.pub`,
+      {
+        path: deck.scriptPath,
+        hint: "drop --slug; a deck keeps the slug it was made with",
+      },
+    );
+  }
+  if (!CreateDeckRequest.shape.slug.safeParse(flags.slug).success) {
+    throw new DekError(`invalid --slug "${flags.slug}"`, {
+      hint: "--slug takes up to 63 lowercase letters, digits, and hyphens, starting with a letter or a digit, like why-dek-2026",
+    });
+  }
+  return flags.slug;
 }
 
 /**
@@ -179,9 +241,11 @@ export async function publishCommand(
   target: ReadableDeck,
   options: { cwd: string; flags: FlagValues; runner?: PlaywrightRunner },
 ): Promise<PubResult> {
-  const { project, deck } = target;
+  const { project } = target;
+  let { deck } = target;
   const { flags } = options;
   const origin = serverOrigin(flags.server);
+  const slug = newSlug(target, flags);
   const key = await requireKey(origin, flags);
   const lint = await lintCommand({ project, decks: [deck], deck }, { cwd: options.cwd });
   const skippedLint = lint.skipped ?? [];
@@ -196,32 +260,22 @@ export async function publishCommand(
   }
   let id = deck.deck.pub;
   let base: number | null = null;
-  let since: string | undefined;
   let frontmatterWritten = false;
   if (id === undefined) {
-    const created = await request(
-      origin,
-      {
-        method: "POST",
-        path: paths.decks,
-        what: "a new deck",
-        key: key.key,
-        json: { slug: deckSlug(deck.name), title: deck.deck.title },
-      },
-      DeckStatus,
-    );
+    const created = await createDeck(origin, key, { slug, title: deck.deck.title }, flags);
     id = created.id;
     // Before the upload, so a failed one leaves the next publish on the same deck.
     writePubId(target, id);
     frontmatterWritten = true;
+    // The line pub: added moves every heading below it; the slide map must say where they are now.
+    deck = reread(target);
   } else {
     const status = await request(
       origin,
-      { method: "GET", path: paths.deck(id), what: "the deck", key: key.key },
+      { method: "GET", path: paths.deck(id), what: "the deck", key },
       DeckStatus,
     );
     base = status.latest;
-    since = status.versions.find((entry) => entry.n === status.latest)?.createdAt;
   }
 
   // After pub: is written, so the source sent is the one status compares with.
@@ -248,11 +302,13 @@ export async function publishCommand(
     base,
     slideMap: version.slideMap,
     lint: { errors: 0, warnings: lint.diagnostics.length },
-    renames: renamesSince(readRenames(project.root, deck.name), base === null ? undefined : since),
+    // Every rename recorded: the server takes each once, by its from, to, and time.
+    renames: readRenames(project.root, deck.name),
     ...(flags.message !== undefined ? { message: flags.message } : {}),
     files: Object.fromEntries(version.files.map((file) => [file.field, file.sha256])),
     shots: Object.fromEntries((version.shots ?? []).map((shot) => [shot.slug, shot.sha256])),
   };
+  requireUploadable(version, deck.dir);
   const form = new FormData();
   form.append("manifest", JSON.stringify(manifest));
   for (const file of version.files) {
@@ -273,7 +329,7 @@ export async function publishCommand(
         method: "POST",
         path: paths.versions(id),
         what: "the new version",
-        key: key.key,
+        key,
         form,
         ...(flags["no-promote"] ? { query: { promote: "0" } } : {}),
         timeoutMs: UPLOAD_TIMEOUT_MS,
@@ -281,7 +337,7 @@ export async function publishCommand(
       PublishResult,
     );
   } catch (error) {
-    if (error instanceof PubError && error.status === 409) {
+    if (error instanceof PubError && error.status === 409 && error.code === "stale_base") {
       throw new DekError("another version of the deck was published since this run looked", {
         hint: `run \`${pubCommand("status", flags)}\` to see the versions, then \`${pubCommand("publish", flags)}\` again`,
         cause: error,
@@ -322,6 +378,42 @@ export async function publishCommand(
   };
 }
 
+/** Make the deck on dek.pub; a slug already taken says how to pick another. */
+async function createDeck(
+  origin: string,
+  key: Key,
+  body: { slug: string; title: string },
+  flags: FlagValues,
+): Promise<DeckStatus> {
+  try {
+    return await request(
+      origin,
+      { method: "POST", path: paths.decks, what: "a new deck", key, json: body },
+      DeckStatus,
+    );
+  } catch (error) {
+    if (error instanceof PubError && error.code === "slug_taken") {
+      throw new DekError(error.message, {
+        hint: `pass --slug <slug> to make this deck under another slug, or put the ID of the deck at ${body.slug} in pub: in script.md to publish onto it; \`${pubCommand("status", flags)}\` reads a deck by its pub:`,
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
+
+/** The deck as script.md has it now, after publish changed it. */
+function reread({ project, deck }: ReadableDeck): ReadableDeck["deck"] {
+  const fresh = resolveProject(project.root).decks.find((entry) => entry.name === deck.name);
+  if (fresh === undefined) {
+    throw new DekError(`deck "${deck.name}" no longer reads after pub: was written`, {
+      path: deck.scriptPath,
+      hint: "run `dekc lint` to see why, then publish again",
+    });
+  }
+  return fresh;
+}
+
 function writePubId({ project, deck }: ReadableDeck, id: string): void {
   const source = readSourceIfExists(deck.scriptPath, project.root) ?? "";
   writeInside(deck.scriptPath, withFrontmatterKey(source, "pub", id), project.root);
@@ -337,7 +429,7 @@ export async function statusCommand(target: ReadableDeck, flags: FlagValues): Pr
   const key = await requireKey(origin, flags);
   const status = await request(
     origin,
-    { method: "GET", path: paths.deck(id), what: "the deck", key: key.key },
+    { method: "GET", path: paths.deck(id), what: "the deck", key },
     DeckStatus,
   );
   const source = sha256(deckSource(target));
@@ -374,7 +466,7 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
       method: "PATCH",
       path: paths.deck(id),
       what: "the deck's settings",
-      key: key.key,
+      key,
       json: change,
     },
     DeckStatus,
@@ -392,14 +484,34 @@ export async function openCommand(target: ReadableDeck, flags: FlagValues): Prom
   const key = await requireKey(origin, flags);
   const status = await request(
     origin,
-    { method: "GET", path: paths.deck(id), what: "the deck", key: key.key },
+    { method: "GET", path: paths.deck(id), what: "the deck", key },
     DeckStatus,
   );
+  const url = deckUrl(status.url, origin);
   if (flags.json !== true) {
     const { openInBrowser } = await import("./open-url.ts");
-    await openInBrowser(status.url);
+    await openInBrowser(url);
   }
-  return { action: "open", server: origin, url: status.url };
+  return { action: "open", server: origin, url };
+}
+
+/**
+ * The deck's URL as the server gave it, when it is a web page on that server: anything else, such
+ * as a `file:` URL or another host, is not opened, nor handed to an agent to open.
+ */
+function deckUrl(raw: string, origin: string): string {
+  let url: URL | undefined;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = undefined;
+  }
+  if (!url || !["http:", "https:"].includes(url.protocol) || url.origin !== origin) {
+    throw new DekError(`${origin} gave the deck an address that is not one of its pages`, {
+      hint: "check that --server or DEK_PUB_SERVER names a dek.pub",
+    });
+  }
+  return url.href;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -416,7 +528,7 @@ export async function commentsCommand(target: ReadableDeck, flags: FlagValues): 
       method: "GET",
       path: paths.comments(id),
       what: "the deck's comments",
-      key: key.key,
+      key,
       query: { status: flags.status ?? "open" },
     },
     CommentList,
@@ -427,6 +539,9 @@ export async function commentsCommand(target: ReadableDeck, flags: FlagValues): 
     comments: list.comments.map((row) => localComment(target, row)),
   };
 }
+
+/** A slide's own HTML file, as an element target names it: `slides/<slug>.html`. */
+const SLIDE_FILE = /^slides\/[a-z0-9-]+\.html$/;
 
 /** A comment with each target where the deck has it now, as `dekc annotations` places a note's. */
 function localComment({ project, deck }: ReadableDeck, row: CommentRow) {
@@ -444,7 +559,13 @@ function localComment({ project, deck }: ReadableDeck, row: CommentRow) {
     ...row,
     targets: row.targets.map((target) => {
       if (target.kind === "element") {
-        return { ...target, path: join(deck.dir, target.path) };
+        // Another person wrote the path; only a slide's own file of this deck is followed.
+        const file = SLIDE_FILE.test(target.path) ? join(deck.dir, target.path) : undefined;
+        return {
+          ...target,
+          path: file ?? null,
+          found: file !== undefined && existsSync(file),
+        };
       }
       const place = locateQuote(source, target, range);
       return {
@@ -479,7 +600,7 @@ async function commentId(
       method: "GET",
       path: paths.comments(deckId),
       what: "the deck's comments",
-      key: key.key,
+      key,
       query: { status: "all" },
     },
     CommentList,
@@ -509,7 +630,7 @@ export async function replyCommand(
       method: "POST",
       path: paths.replies(id, comment),
       what: "the reply",
-      key: key.key,
+      key,
       json: { text: args.text },
     },
     Reply,
@@ -534,7 +655,7 @@ export async function settleCommand(
       method: "POST",
       path: action === "resolve" ? paths.resolve(id, comment) : paths.reopen(id, comment),
       what: action === "resolve" ? "resolving the comment" : "reopening the comment",
-      key: key.key,
+      key,
     },
     CommentRow,
   );

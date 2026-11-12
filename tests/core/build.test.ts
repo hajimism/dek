@@ -570,13 +570,53 @@ title: Why dek
   });
 
   test("leaves the whole script and the presenter view out of a page built with no script", async () => {
-    await withTempProject(spec(), async (root) => {
-      const result = await build(join(root, "decks", "demo"), { script: false, public: true });
-      const html = await readFile(result.outPath, "utf8");
-      expect(html).not.toContain("今日は三つ話します");
-      expect(html).not.toContain("目次は読み上げない");
-      expect(html).not.toContain('id="dek-presenter"');
-      expect(html).toContain("<h2");
-    });
+    const beats = `---
+title: Why dek
+---
+
+## intro
+
+> 目次は読み上げない。
+
+今日は三つ話します。<!-- 押したら二つ -->
+
+### 一つ目の話 {#first}
+
+速くなりました。
+
+### 二つ目の話
+
+軽くなりました。
+`;
+    await withTempProject(
+      { decks: [{ name: "demo", script: beats, slides: { intro: extraSource } }] },
+      async (root) => {
+        const result = await build(join(root, "decks", "demo"), { script: false, public: true });
+        const html = await readFile(result.outPath, "utf8");
+        for (const words of [
+          "今日は三つ話します",
+          "目次は読み上げない",
+          "押したら二つ",
+          "速くなりました",
+          "軽くなりました",
+          "一つ目の話",
+          "二つ目の話",
+        ]) {
+          expect({ words, found: html.includes(words) }).toEqual({ words, found: false });
+        }
+        expect(html).not.toContain('id="dek-presenter"');
+        expect(html).not.toContain('id="dek-progress"');
+        const data = html.match(
+          /<script type="application\/json" id="dek-data">([\s\S]*?)<\/script>/,
+        )?.[1];
+        const slides = JSON.parse(data ?? "null") as Array<{
+          script: string;
+          beats: Array<{ id?: string; title: string }>;
+        }>;
+        expect(slides.map((slide) => slide.script)).toEqual([""]);
+        // The beats stay, for the player to step through, with their ids and no headings.
+        expect(slides[0]?.beats).toEqual([{ id: "first", title: "" }, { title: "" }]);
+      },
+    );
   });
 });

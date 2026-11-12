@@ -61,7 +61,7 @@ export function formatPub(data: PubResult): string {
           const author = row.author.handle ? `@${row.author.handle}` : `${row.author.name} (guest)`;
           const targets = row.targets.map((target) =>
             target.kind === "element"
-              ? `   ${target.path}  ${target.name}`
+              ? `   ${target.path ?? "(no slide file)"}  ${target.name}${target.found ? "" : " (not found)"}`
               : target.found
                 ? `   ${target.path}:${target.line}:${target.column}  ${JSON.stringify(target.quote)}`
                 : `   ${target.path}  ${JSON.stringify(target.quote)} (not found)`,
@@ -119,7 +119,9 @@ export function pubPaths(data: PubResult, display: (path: string) => string): Pu
         ...data,
         comments: data.comments.map((row) => ({
           ...row,
-          targets: row.targets.map((target) => ({ ...target, path: display(target.path) })),
+          targets: row.targets.map((target) =>
+            target.path === null ? target : { ...target, path: display(target.path) },
+          ),
         })),
       };
     default:
