@@ -11,7 +11,7 @@ import type {
   SlideMap,
 } from "../../../../src/pub/protocol.ts";
 import type { Person } from "../lib/access.ts";
-import { placeComment } from "../lib/anchors.ts";
+import { placeComment, saysQuote } from "../lib/anchors.ts";
 import { newReplyId, newThreadId } from "../lib/ids.ts";
 import { type DeckRow, talkUrl, versionRow } from "./decks.ts";
 import { ApiError } from "./http.ts";
@@ -76,13 +76,16 @@ export async function listComments(
 
   return wanted.map((row) => {
     const targets = JSON.parse(row.targets) as CommentTarget[];
-    const placed = map
-      ? placeComment(
-          { slug: row.slug, targets, n: row.n, resolved: row.resolvedAt !== null },
-          map,
-          renameRows,
-        )
-      : { slug: row.slug, status: row.resolvedAt ? ("resolved" as const) : ("open" as const) };
+    // A thread opened on a version newer than the one shown stays as it was written.
+    const placed =
+      map && n !== null && row.n <= n
+        ? placeComment(
+            { slug: row.slug, targets, n: row.n, resolved: row.resolvedAt !== null },
+            map,
+            renameRows,
+            n,
+          )
+        : { slug: row.slug, status: row.resolvedAt ? ("resolved" as const) : ("open" as const) };
     return {
       number: row.number,
       id: row.id,
@@ -128,7 +131,12 @@ export async function openThread(
   person: Person | null,
   comment: NewComment,
 ): Promise<ThreadRow> {
-  const n = deck.currentVersion;
+  // The version the commenter was reading, which may be older than the current one by now;
+  // the thread is kept on it, so the renames since are followed when it is shown.
+  const n = comment.version ?? deck.currentVersion;
+  if (n !== null && n > (deck.latestVersion ?? 0)) {
+    throw new ApiError(422, "unknown_version", `the deck has no version ${n}`);
+  }
   const map = await slideMapOf(deck, n);
   if (n === null || !map) {
     throw new ApiError(409, "no_version", "the deck has no version to comment on yet");
@@ -143,6 +151,15 @@ export async function openThread(
       "unknown_step",
       `slide ${slide.slug} has no step ${comment.anchor.step}`,
     );
+  }
+  for (const target of comment.anchor.targets) {
+    if (target.kind === "quote" && !saysQuote(slide.paragraphs, target.quote)) {
+      throw new ApiError(
+        422,
+        "unknown_quote",
+        `slide ${slide.slug} does not say the quoted passage`,
+      );
+    }
   }
   const [counter] = await db
     .update(decks)

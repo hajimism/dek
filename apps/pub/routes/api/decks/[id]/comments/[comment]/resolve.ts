@@ -21,5 +21,5 @@ export const POST = defineHandler((c) =>
       throw notFound("comment");
     }
     return row;
-  }),
+  }, c.req.raw),
 );

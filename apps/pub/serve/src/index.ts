@@ -64,7 +64,8 @@ export async function handleServe(
   headers.set("content-type", "text/html; charset=utf-8");
   headers.set(
     "cache-control",
-    open ? "public, max-age=300, stale-while-revalidate=86400" : "private, no-store",
+    // A public deck can become private or roll back at any time, so a cache keeps it a minute.
+    open ? "public, max-age=60" : "private, no-store",
   );
   headers.set("etag", object.httpEtag);
   return new Response(request.method === "HEAD" ? null : object.body, { headers });
@@ -100,7 +101,10 @@ export function deckHeaders(appOrigin: string, embeddable: boolean): Headers {
       "form-action 'none'",
       "base-uri 'none'",
       `frame-ancestors ${embeddable ? "*" : appOrigin}`,
+      // The same sandbox as the iframe's, so a deck opened by its URL is held as it is framed.
+      "sandbox allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox",
     ].join("; "),
+    "cross-origin-opener-policy": "same-origin",
     "permissions-policy": `camera=(), microphone=(), geolocation=(), usb=(), payment=(), fullscreen=(self "${appOrigin}")`,
     "cross-origin-resource-policy": "cross-origin",
     "x-content-type-options": "nosniff",

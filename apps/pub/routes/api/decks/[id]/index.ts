@@ -10,7 +10,7 @@ export const GET = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
     return deckStatus(c, await ownedDeck(c.req.param("id") ?? "", person));
-  }),
+  }, c.req.raw),
 );
 
 /** Change who may see the deck, its script, embedding, and comments. */
@@ -27,7 +27,7 @@ export const PATCH = defineHandler((c) =>
     if (!updated) {
       throw new Error("the deck just updated is not there");
     }
-    await writeAccess(updated);
+    await writeAccess(updated.id);
     return deckStatus(c, updated);
-  }),
+  }, c.req.raw),
 );

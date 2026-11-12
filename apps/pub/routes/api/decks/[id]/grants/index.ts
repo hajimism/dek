@@ -1,6 +1,6 @@
 import { grants } from "@schema";
 import { defineHandler } from "void";
-import { asc, db, eq } from "void/db";
+import { and, asc, db, eq } from "void/db";
 import { NewGrant } from "../../../../../../../src/pub/protocol.ts";
 import { isHandle } from "../../../../../src/lib/handle.ts";
 import { newGrantId } from "../../../../../src/lib/ids.ts";
@@ -25,7 +25,7 @@ export const GET = defineHandler((c) =>
         createdAt: row.createdAt,
       })),
     };
-  }),
+  }, c.req.raw),
 );
 
 /** Share the deck with one person, by handle, or by an email address no account has yet. */
@@ -55,6 +55,11 @@ export const POST = defineHandler((c) =>
       .insert(grants)
       .values({ id, deckId: deck.id, ...target, role })
       .onConflictDoUpdate({ target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email], set: { role } });
-    return Response.json({ who: name, role }, { status: 201 });
-  }),
+    const row = await db
+      .select({ id: grants.id, createdAt: grants.createdAt })
+      .from(grants)
+      .where(target.userId ? and(eq(grants.deckId, deck.id), eq(grants.userId, target.userId)) : and(eq(grants.deckId, deck.id), eq(grants.email, target.email ?? "")))
+      .get();
+    return Response.json({ id: row?.id ?? id, who: name, role, createdAt: row?.createdAt ?? "" }, { status: 201 });
+  }, c.req.raw),
 );

@@ -23,7 +23,7 @@ export const GET = defineHandler((c) =>
     }
     const version = c.req.query("version");
     return { comments: await listComments(c, deck, { status, version: version ? Number(version) : null }) };
-  }),
+  }, c.req.raw),
 );
 
 export const POST = defineHandler((c) =>
@@ -43,5 +43,5 @@ export const POST = defineHandler((c) =>
     const thread = await openThread(deck, person, body);
     const [row] = (await listComments(c, deck, { status: "all" })).filter((comment) => comment.id === thread.id);
     return Response.json(row, { status: 201 });
-  }),
+  }, c.req.raw),
 );

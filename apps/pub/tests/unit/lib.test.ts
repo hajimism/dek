@@ -68,6 +68,7 @@ describe("placeComment", () => {
       { slug: "speed", targets: [quote], n: 1, resolved: false },
       map([["speed", ["ビルドが三倍速くなった。"]]]),
       [],
+      9,
     );
     expect(placed).toEqual({ slug: "speed", status: "open" });
   });
@@ -80,6 +81,7 @@ describe("placeComment", () => {
         { fromSlug: "speed", toSlug: "fast", n: 2 },
         { fromSlug: "fast", toSlug: "faster", n: 3 },
       ],
+      9,
     );
     expect(placed).toEqual({ slug: "faster", status: "moved" });
   });
@@ -89,6 +91,7 @@ describe("placeComment", () => {
       { slug: "speed", targets: [quote], n: 1, resolved: false },
       map([["speed", ["少し速くなった。"]]]),
       [],
+      9,
     );
     expect(placed.status).toBe("detached");
   });
@@ -98,6 +101,7 @@ describe("placeComment", () => {
       { slug: "speed", targets: [quote], n: 1, resolved: false },
       map([["results", ["結果、三倍速くなった。"]]]),
       [],
+      9,
     );
     expect(placed).toEqual({ slug: "results", status: "moved" });
   });
@@ -107,6 +111,7 @@ describe("placeComment", () => {
       { slug: "a", targets: [{ ...quote, quote: "It got\n  faster" }], n: 1, resolved: false },
       map([["a", ["It got faster today."]]]),
       [],
+      9,
     );
     expect(placed.status).toBe("open");
   });
@@ -116,12 +121,47 @@ describe("placeComment", () => {
       { slug: "speed", targets: [], n: 1, resolved: true },
       map([["speed", []]]),
       [],
+      9,
     );
     expect(placed.status).toBe("resolved");
   });
 });
 
+describe("placeComment on an older version", () => {
+  it("applies only the renames up to the version shown", () => {
+    const quote = { kind: "quote" as const, quote: "faster", prefix: "", suffix: "" };
+    const placed = placeComment(
+      { slug: "speed", targets: [quote], n: 1, resolved: false },
+      map([["speed", ["It got faster."]]]),
+      [{ fromSlug: "speed", toSlug: "fast", n: 3 }],
+      2,
+    );
+    expect(placed).toEqual({ slug: "speed", status: "open" });
+  });
+
+  it("finds a quote that runs from one paragraph into the next", () => {
+    const quote = { kind: "quote" as const, quote: "end. Start", prefix: "", suffix: "" };
+    const placed = placeComment(
+      { slug: "a", targets: [quote], n: 1, resolved: false },
+      map([["a", ["The end.", "Start again."]]]),
+      [],
+      1,
+    );
+    expect(placed.status).toBe("open");
+  });
+});
+
 describe("slideChanges", () => {
+  it("compares a renamed slide with itself under its old name", () => {
+    const before = { map: map([["intro", ["one"]]]), shots: { intro: "1" } };
+    const after = { map: map([["opening", ["one"]]]), shots: { opening: "1" } };
+    for (const slide of after.map.slides) {
+      slide.title = "intro";
+      slide.steps = [{ step: "0", title: "intro" }];
+    }
+    expect(slideChanges(before, after, [{ from: "intro", to: "opening" }])).toEqual([]);
+  });
+
   it("lists slides added, changed and removed, picture changes included", () => {
     const before = {
       map: map([

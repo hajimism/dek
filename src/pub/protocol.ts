@@ -26,8 +26,13 @@ export const SlideMapStep = z.strictObject({
 });
 
 export const SlideMapSlide = z.strictObject({
-  slug: z.string(),
-  title: z.string(),
+  /** A section ID as script.md has it: lowercase letters, digits and hyphens, a letter among them. */
+  slug: z
+    .string()
+    .max(100)
+    .regex(/^[a-z0-9-]+$/)
+    .refine((value) => /[a-z]/.test(value)),
+  title: z.string().max(500),
   /** The `##` heading's line in script.md. */
   line: z.number().int(),
   steps: z.array(SlideMapStep),
@@ -41,7 +46,7 @@ export const SlideMap = z.strictObject({
   deck: z.string(),
   /** The built HTML file the map is for. */
   out: z.string(),
-  slides: z.array(SlideMapSlide),
+  slides: z.array(SlideMapSlide).max(1000),
 });
 
 export type SlideMap = z.infer<typeof SlideMap>;
@@ -177,11 +182,11 @@ export const Box = z.strictObject({
 export const ElementTarget = z.strictObject({
   kind: z.literal("element"),
   /** The slide's HTML file in the deck, as `slides/intro.html`. */
-  path: z.string(),
+  path: z.string().max(300),
   /** Its tag and classes, as `div.chevron`. */
-  name: z.string(),
+  name: z.string().max(300),
   /** Its text when the comment was written, cut short. */
-  text: z.string(),
+  text: z.string().max(300),
   box: Box,
 });
 
@@ -247,6 +252,8 @@ export const CommentList = z.strictObject({ comments: z.array(CommentRow) });
 
 export const NewComment = z.strictObject({
   anchor: CommentAnchor,
+  /** The version the commenter was reading; the current one when absent. */
+  version: z.number().int().min(1).optional(),
   text: z.string().min(1).max(4000),
   /** A guest's name; ignored when signed in. */
   guestName: z.string().min(1).max(60).optional(),

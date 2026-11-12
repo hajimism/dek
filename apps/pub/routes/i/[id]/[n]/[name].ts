@@ -4,6 +4,7 @@
 
 import { defineHandler } from "void";
 import { storage } from "void/storage";
+import { canManage } from "../../../../src/lib/access.ts";
 import { versionKey } from "../../../../src/lib/deck-origin.ts";
 import { currentPerson } from "../../../../src/server/actor.ts";
 import { visibleDeck } from "../../../../src/server/decks.ts";
@@ -16,7 +17,10 @@ export const GET = defineHandler((c) =>
     const n = Number(c.req.param("n"));
     const name = c.req.param("name") ?? "";
     const file = name === "cover" ? "cover.png" : name.startsWith("s-") ? `shots/${name.slice(2)}.png` : null;
-    if (!file || !Number.isInteger(n) || n < 1 || n > (deck.latestVersion ?? 0)) {
+    // Readers see the version the owner made current; a version uploaded with --no-promote is the
+    // owner's until it is.
+    const allowed = canManage(deck, person) ? n >= 1 && n <= (deck.latestVersion ?? 0) : n === deck.currentVersion;
+    if (!file || !Number.isInteger(n) || !allowed) {
       throw notFound("picture");
     }
     const object = await storage.get(versionKey(deck.id, n, file));
@@ -27,10 +31,10 @@ export const GET = defineHandler((c) =>
     return new Response(object.body, {
       headers: {
         "content-type": "image/png",
-        "cache-control": open ? "public, max-age=86400" : "private, max-age=300",
+        "cache-control": open ? "public, max-age=300" : "private, no-store",
         "x-content-type-options": "nosniff",
         etag: object.httpEtag,
       },
     });
-  }),
+  }, c.req.raw),
 );

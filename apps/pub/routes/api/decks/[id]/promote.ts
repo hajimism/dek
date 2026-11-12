@@ -23,7 +23,7 @@ export const POST = defineHandler((c) =>
     if (!updated) {
       throw new Error("the deck just updated is not there");
     }
-    await writeAccess(updated);
+    await writeAccess(updated.id);
     return deckStatus(c, updated);
-  }),
+  }, c.req.raw),
 );

@@ -8,7 +8,11 @@ const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export async function checkGuest(token: string | undefined, ip: string | undefined): Promise<void> {
   if (env.TURNSTILE_SECRET === "off") {
-    return;
+    // Off only where development sign-in is on too: a deployed app never runs without the check.
+    if (env.DEK_PUB_DEV_LOGIN === "1") {
+      return;
+    }
+    throw new Error("TURNSTILE_SECRET is off outside development");
   }
   if (!token) {
     throw new ApiError(
@@ -24,6 +28,7 @@ export async function checkGuest(token: string | undefined, ip: string | undefin
   if (ip) {
     body.set("remoteip", ip);
   }
+  // biome-ignore lint/style/noRestrictedGlobals: the check gives up after five seconds.
   const response = await fetch(VERIFY_URL, {
     method: "POST",
     body,

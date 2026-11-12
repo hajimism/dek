@@ -11,5 +11,5 @@ export const DELETE = defineHandler((c) =>
     const deck = await ownedDeck(c.req.param("id") ?? "", person);
     await db.delete(grants).where(and(eq(grants.deckId, deck.id), eq(grants.id, c.req.param("grant") ?? "")));
     return { removed: true };
-  }),
+  }, c.req.raw),
 );

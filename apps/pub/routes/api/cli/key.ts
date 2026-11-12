@@ -7,6 +7,9 @@ import { requirePerson } from "../../../src/server/actor.ts";
 import { ApiError, api } from "../../../src/server/http.ts";
 import { authOf } from "../../../src/server/void-auth.ts";
 
+/** A key lasts a year; `dekc pub login` makes a new one. */
+const KEY_SECONDS = 365 * 24 * 60 * 60;
+
 export const POST = defineHandler((c) =>
   api(async () => {
     if (!c.get("user")) {
@@ -14,12 +17,19 @@ export const POST = defineHandler((c) =>
     }
     const person = await requirePerson(c);
     const agent = c.req.header("user-agent") ?? "dekc";
-    const created = (await authOf(c).api.createApiKey({
-      body: { userId: person.id, name: `dekc (${agent.slice(0, 60)})` },
+    const auth = authOf(c);
+    const created = (await auth.api.createApiKey({
+      body: { userId: person.id, name: `dekc (${agent.slice(0, 60)})`, expiresIn: KEY_SECONDS },
     })) as { key: string };
+    // The device flow's session existed only to be traded for the key; it ends here.
+    const session = c.get("session") as { token?: string } | null;
+    if (session?.token && c.req.header("authorization")?.startsWith("Bearer ")) {
+      const context = await auth.$context;
+      await context.internalAdapter.deleteSession(session.token);
+    }
     const body: CliKey = { key: created.key, me: { id: person.id, handle: person.handle, name: person.name } };
     return body;
-  }),
+  }, c.req.raw),
 );
 
 export const DELETE = defineHandler((c) =>
@@ -35,5 +45,5 @@ export const DELETE = defineHandler((c) =>
       await context.adapter.delete({ model: "apikey", where: [{ field: "id", value: result.key.id }] });
     }
     return { revoked: result.valid };
-  }),
+  }, c.req.raw),
 );

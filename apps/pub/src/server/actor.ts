@@ -8,14 +8,20 @@ import type { Person } from "../lib/access.ts";
 import { ApiError } from "./http.ts";
 import { authOf } from "./void-auth.ts";
 
-type UserRow = { id: string; name: string; email?: string; handle?: string | null };
+type UserRow = {
+  id: string;
+  name: string;
+  email?: string;
+  emailVerified?: boolean;
+  handle?: string | null;
+};
 
 function person(user: UserRow): Person {
   return {
     id: user.id,
     name: user.name,
     handle: user.handle ?? user.id,
-    ...(user.email ? { email: user.email } : {}),
+    ...(user.email ? { email: user.email, emailVerified: user.emailVerified === true } : {}),
   };
 }
 

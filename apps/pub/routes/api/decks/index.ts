@@ -26,9 +26,9 @@ export const POST = defineHandler((c) =>
     if (!deck) {
       throw new Error("the deck just made is not there");
     }
-    await writeAccess(deck);
+    await writeAccess(deck.id);
     return Response.json(await deckStatus(c, deck), { status: 201 });
-  }),
+  }, c.req.raw),
 );
 
 /** The caller's own decks, newest first. */
@@ -37,5 +37,5 @@ export const GET = defineHandler((c) =>
     const person = await requirePerson(c);
     const rows = await db.select().from(decks).where(eq(decks.ownerId, person.id)).orderBy(desc(decks.updatedAt)).all();
     return { decks: await Promise.all(rows.map((row) => deckStatus(c, row))) };
-  }),
+  }, c.req.raw),
 );

@@ -8,5 +8,5 @@ export const GET = defineHandler((c) =>
     const person = await requirePerson(c);
     const me: Me = { id: person.id, handle: person.handle, name: person.name };
     return me;
-  }),
+  }, c.req.raw),
 );

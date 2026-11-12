@@ -28,5 +28,5 @@ export const POST = defineHandler((c) =>
     await addReply(thread, person, body.text, body.guestName);
     const [row] = (await listComments(c, deck, { status: "all" })).filter((comment) => comment.id === thread.id);
     return Response.json(row, { status: 201 });
-  }),
+  }, c.req.raw),
 );

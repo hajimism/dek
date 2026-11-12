@@ -17,15 +17,17 @@ export type RenameRow = { fromSlug: string; toSlug: string; n: number };
 
 export type Placement = { slug: string; status: CommentStatus };
 
+/** Place a thread on version `viewed`, whose slide map is `map`. */
 export function placeComment(
   anchor: ThreadAnchor,
   map: SlideMap,
   renames: readonly RenameRow[],
+  viewed: number,
 ): Placement {
   let slug = anchor.slug;
   let renamed = false;
   for (const rename of renames) {
-    if (rename.n > anchor.n && rename.fromSlug === slug) {
+    if (rename.n > anchor.n && rename.n <= viewed && rename.fromSlug === slug) {
       slug = rename.toSlug;
       renamed = true;
     }
@@ -52,9 +54,9 @@ export function placeComment(
   return { slug, status: status(false, false) };
 }
 
-function saysQuote(paragraphs: readonly string[], quote: string): boolean {
-  const wanted = squash(quote);
-  return paragraphs.some((paragraph) => squash(paragraph).includes(wanted));
+/** Whether the slide says the quote, which may run from one paragraph into the next. */
+export function saysQuote(paragraphs: readonly string[], quote: string): boolean {
+  return squash(paragraphs.join(" ")).includes(squash(quote));
 }
 
 /** Whitespace differs between how a browser hands a selection over and how the map joins lines. */

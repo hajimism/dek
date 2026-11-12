@@ -29,24 +29,33 @@ export async function deckBySlug(ownerId: string, slug: string): Promise<DeckRow
   );
 }
 
-/** The role a person was granted on a deck, by account or by the address they signed in with. */
-export async function grantRole(
-  deck: DeckRow,
-  person: Person | null,
-  email?: string,
-): Promise<GrantRole | null> {
+/**
+ * The role a person was granted on a deck: by account, or by an email address only once the
+ * account has shown it owns that address. A grant by address is tied to the account the first
+ * time it matches. Of two grants, the one that allows more counts.
+ */
+export async function grantRole(deck: DeckRow, person: Person | null): Promise<GrantRole | null> {
   if (!person) {
     return null;
   }
+  const email = person.emailVerified ? person.email?.toLowerCase() : undefined;
   const match = email
-    ? or(eq(grants.userId, person.id), eq(grants.email, email.toLowerCase()))
+    ? or(eq(grants.userId, person.id), eq(grants.email, email))
     : eq(grants.userId, person.id);
-  const row = await db
-    .select({ role: grants.role })
+  const rows = await db
+    .select({ id: grants.id, role: grants.role, userId: grants.userId })
     .from(grants)
     .where(and(eq(grants.deckId, deck.id), match))
-    .get();
-  return row?.role ?? null;
+    .all();
+  for (const row of rows) {
+    if (row.userId === null) {
+      await db.update(grants).set({ userId: person.id }).where(eq(grants.id, row.id));
+    }
+  }
+  if (rows.some((row) => row.role === "comment")) {
+    return "comment";
+  }
+  return rows.length > 0 ? "view" : null;
 }
 
 /** The deck, if `person` may see it; a deck they may not see is as missing as one that is not. */
@@ -58,7 +67,7 @@ export async function visibleDeck(
   if (!deck) {
     throw notFound();
   }
-  const grant = await grantRole(deck, person, person?.email);
+  const grant = await grantRole(deck, person);
   if (!canView(deck, person, grant)) {
     throw notFound();
   }
@@ -140,15 +149,32 @@ export async function deckStatus(c: Context, deck: DeckRow): Promise<DeckStatus>
   };
 }
 
-/** Tell the serve Worker what it may hand out for this deck without a token. */
-export async function writeAccess(deck: DeckRow): Promise<void> {
-  const access: DeckAccess = {
-    visibility: deck.visibility,
-    scriptPublic: deck.scriptPublic,
-    embed: deck.embed,
-    current: deck.currentVersion,
-  };
-  await storage.put(accessKey(deck.id), JSON.stringify(access), {
-    httpMetadata: { contentType: "application/json" },
-  });
+/**
+ * Tell the serve Worker what it may hand out for this deck without a token. The deck is read
+ * from D1 here, not taken from the caller, and the file is replaced only if it has not changed
+ * since it was read, so of two requests that change the deck at once, the later state is the one
+ * that stays: a slower request cannot put back what a faster one took away.
+ */
+export async function writeAccess(deckId: string): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const existing = await storage.head(accessKey(deckId));
+    const deck = await deckById(deckId);
+    if (!deck) {
+      return;
+    }
+    const access: DeckAccess = {
+      visibility: deck.visibility,
+      scriptPublic: deck.scriptPublic,
+      embed: deck.embed,
+      current: deck.currentVersion,
+    };
+    const written = await storage.put(accessKey(deckId), JSON.stringify(access), {
+      httpMetadata: { contentType: "application/json" },
+      onlyIf: existing ? { etagMatches: existing.etag } : { uploadedBefore: new Date(0) },
+    });
+    if (written) {
+      return;
+    }
+  }
+  throw new Error(`the access file of ${deckId} kept changing under the write`);
 }
