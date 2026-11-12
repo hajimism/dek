@@ -14,6 +14,7 @@ import type {
 } from "../../../../src/pub/protocol.ts";
 import { canComment, canManage } from "../lib/access.ts";
 import { deckOrigin } from "../lib/deck-origin.ts";
+import { guessLang } from "../lib/i18n.ts";
 import { signServeToken } from "../lib/serve-token.ts";
 import { currentPerson } from "./actor.ts";
 import { listComments } from "./comments.ts";
@@ -71,11 +72,6 @@ export type Talk = {
   image: string | null;
   more: TalkCard[];
 };
-
-/** A talk's language when its frontmatter does not say: Japanese if its text has kana. */
-export function guessLang(texts: readonly string[]): string | null {
-  return texts.some((text) => /[\u3040-\u30ff]/.test(text)) ? "ja" : null;
-}
 
 function owner(account: Account): Owner {
   return { handle: account.handle, name: account.name, image: account.image };

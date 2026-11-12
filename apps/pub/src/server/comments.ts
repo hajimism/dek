@@ -19,7 +19,7 @@ import { type Account, userById, usersById } from "./users.ts";
 
 export type ThreadRow = typeof threads.$inferSelect;
 
-export async function slideMapOf(deck: DeckRow, n: number | null): Promise<SlideMap | null> {
+async function slideMapOf(deck: DeckRow, n: number | null): Promise<SlideMap | null> {
   if (n === null) {
     return null;
   }

@@ -34,7 +34,7 @@ export async function deckBySlug(ownerId: string, slug: string): Promise<DeckRow
  * account has shown it owns that address. A grant by address is tied to the account the first
  * time it matches. Of two grants, the one that allows more counts.
  */
-export async function grantRole(deck: DeckRow, person: Person | null): Promise<GrantRole | null> {
+async function grantRole(deck: DeckRow, person: Person | null): Promise<GrantRole | null> {
   if (!person) {
     return null;
   }
@@ -100,16 +100,6 @@ export async function versionRow(deckId: string, n: number): Promise<VersionRow 
       .get()) ?? null
   );
 }
-
-export async function versionsAscending(deckId: string): Promise<VersionRow[]> {
-  return db
-    .select()
-    .from(versions)
-    .where(eq(versions.deckId, deckId))
-    .orderBy(asc(versions.n))
-    .all();
-}
-
 export function versionSummary(row: VersionRow): VersionSummary {
   const lint: LintSummary = { errors: row.lintErrors, warnings: row.lintWarnings };
   return {

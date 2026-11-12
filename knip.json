@@ -31,9 +31,10 @@
         "routes/**/*.ts",
         "middleware/**/*.ts",
         "db/schema.ts",
-        "db/seed.ts",
         "auth.ts",
-        "env.ts"
+        "env.ts",
+        "scripts/*.ts",
+        "tests/**/*.ts"
       ],
       "project": [
         "**/*.{ts,svelte}"
