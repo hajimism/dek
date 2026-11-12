@@ -201,14 +201,16 @@ export async function addReply(
   person: Person | null,
   text: string,
   guestName?: string,
-): Promise<void> {
+): Promise<string> {
+  const id = newReplyId();
   await db.insert(replies).values({
-    id: newReplyId(),
+    id,
     threadId: thread.id,
     text,
     authorId: person?.id ?? null,
     guestName: person ? null : (guestName ?? null),
   });
+  return id;
 }
 
 /** The deck's owner, and whoever opened the thread, may resolve it or open it again. */

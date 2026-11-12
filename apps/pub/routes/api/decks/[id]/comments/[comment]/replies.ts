@@ -25,8 +25,15 @@ export const POST = defineHandler((c) =>
       }
       await checkGuest(body.turnstile, c.req.header("cf-connecting-ip"));
     }
-    await addReply(thread, person, body.text, body.guestName);
-    const [row] = (await listComments(c, deck, { status: "all" })).filter((comment) => comment.id === thread.id);
-    return Response.json(row, { status: 201 });
+    const replyId = await addReply(thread, person, body.text, body.guestName);
+    const [row] = (await listComments(c, deck, { status: "all" })).filter(
+      (comment) => comment.id === thread.id,
+    );
+    // The answer is the reply made, as protocol Reply; the thread it joined is a GET away.
+    const reply = row?.thread.find((each) => each.id === replyId);
+    if (!reply) {
+      throw new Error("the reply just made is not there");
+    }
+    return Response.json(reply, { status: 201 });
   }, c.req.raw),
 );
