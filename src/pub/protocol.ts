@@ -50,8 +50,11 @@ export type SlideMapSlide = z.infer<typeof SlideMapSlide>;
 // ---------------------------------------------------------------------------------------------
 // Decks and versions.
 
+/** What a remote deck's ID looks like. */
+export const DECK_ID_RE = /^d_[0-9a-z]{10,32}$/;
+
 /** A remote deck's ID, as `pub:` in script.md's frontmatter holds it. */
-export const DeckId = z.string().regex(/^d_[0-9a-z]{10,32}$/);
+export const DeckId = z.string().regex(DECK_ID_RE);
 
 /** Who may open a deck: its owner and grants, anyone with the link, or everyone. */
 export const Visibility = z.enum(["private", "link", "public"]);

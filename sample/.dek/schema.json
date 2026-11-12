@@ -48,6 +48,11 @@
       "default": 130,
       "type": "number",
       "description": "Speaking rate for other text, in words a minute."
+    },
+    "pub": {
+      "description": "The deck's ID on dek.pub, which `dekc pub publish` writes on the first publish.",
+      "type": "string",
+      "pattern": "^d_[0-9a-z]{10,32}$"
     }
   },
   "required": [
