@@ -2262,6 +2262,86 @@
                 "$ref": "#/$defs/Diagnostic"
               }
             },
+            "slideMaps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "deck": {
+                    "type": "string"
+                  },
+                  "out": {
+                    "type": "string"
+                  },
+                  "slides": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "line": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "step": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "step",
+                              "title"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "script": {
+                          "type": "string"
+                        },
+                        "paragraphs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "title",
+                        "line",
+                        "steps",
+                        "script",
+                        "paragraphs"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "deck",
+                  "out",
+                  "slides"
+                ],
+                "additionalProperties": false
+              },
+              "description": "One per deck built, in the order of outs: its slides, their steps, and the script as the build's reader has it."
+            },
             "skipped": {
               "description": "Absent when every check ran.",
               "type": "array",
@@ -2282,6 +2362,7 @@
             "outs",
             "images",
             "diagnostics",
+            "slideMaps",
             "ok"
           ],
           "additionalProperties": false

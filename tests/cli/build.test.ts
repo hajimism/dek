@@ -9,6 +9,7 @@ import { parseCommandLine } from "../../src/cli/flags.ts";
 import { formatText } from "../../src/cli/result.ts";
 import { resolveDecks } from "../../src/cli/scope.ts";
 import { PLAYWRIGHT_INSTALL, type VisualRequest } from "../../src/core/playwright.ts";
+import type { SlideMap } from "../../src/pub/protocol.ts";
 import { jsonStdout, runDek } from "../helpers/cli.ts";
 import { slideDocument } from "../helpers/html.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -396,6 +397,56 @@ title: Demo
         const html = await readFile(result.outs[0] ?? "", "utf8");
         expect(html).toContain("今日は三つ話します。");
         expect(html).not.toContain("目次は読み上げない");
+      },
+    );
+  });
+});
+
+describe("dekc build --json slideMaps", () => {
+  const script = `---
+title: Demo
+---
+
+## intro
+
+> 目次は読み上げない。
+
+今日は三つ話します。
+
+### chart {#chart}
+
+速くなりました。
+`;
+
+  test("maps each deck built to its slides, steps, and what is said, as the reader reads it", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "alpha", script, slides: { intro: introHtml } },
+          { name: "beta", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const full = jsonStdout<{ outs: string[]; slideMaps: SlideMap[] }>(
+          await runDek(["build", "--json"], { cwd: root }),
+        );
+        expect(full.slideMaps.map((map) => map.deck)).toEqual(["alpha", "beta"]);
+        expect(full.slideMaps.map((map) => map.out)).toEqual(full.outs);
+        const [alpha] = full.slideMaps;
+        expect(alpha?.slides.map((slide) => slide.slug)).toEqual(["intro"]);
+        expect(alpha?.slides[0]?.steps).toEqual([
+          { step: "0", title: "intro" },
+          { step: "chart", id: "chart", title: "chart" },
+        ]);
+        expect(alpha?.slides[0]?.paragraphs).toEqual(["今日は三つ話します。", "速くなりました。"]);
+        expect(alpha?.slides[0]?.script).toContain("目次は読み上げない");
+
+        const shared = jsonStdout<{ slideMaps: SlideMap[] }>(
+          await runDek(["build", "--json", "--public"], { cwd: join(root, "decks", "alpha") }),
+        );
+        expect(shared.slideMaps.map((map) => map.deck)).toEqual(["alpha"]);
+        expect(shared.slideMaps[0]?.slides[0]?.script).not.toContain("目次は読み上げない");
+        expect(shared.slideMaps[0]?.slides[0]?.script).toContain("今日は三つ話します。");
       },
     );
   });
