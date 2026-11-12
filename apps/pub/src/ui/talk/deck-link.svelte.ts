@@ -4,6 +4,8 @@
 
 import {
   DEFAULT_SIZE,
+  EARLY_KEY,
+  type EarlyMessage,
   type Mark,
   type PageMessage,
   type PickedElement,
@@ -40,6 +42,16 @@ export class DeckLink {
     this.#frame = frame;
     const onMessage = (event: MessageEvent) => this.#receive(event);
     window.addEventListener("message", onMessage);
+    // A server-rendered iframe may say it is ready before this page's script runs; the page's
+    // head keeps what it said (EARLY_LISTENER), and it is read here as if it had just arrived.
+    const early = (window as unknown as { [EARLY_KEY]?: EarlyMessage[] })[EARLY_KEY] ?? [];
+    for (const message of early.splice(0)) {
+      this.#receive({
+        origin: message.origin,
+        source: message.source,
+        data: message.data,
+      } as MessageEvent);
+    }
     return () => {
       window.removeEventListener("message", onMessage);
       this.#frame = null;

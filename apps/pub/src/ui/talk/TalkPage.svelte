@@ -46,6 +46,12 @@
     onpicked: ({ slug, step, target }) => {
       draft = { anchor: { slug, step, targets: [target] }, slideNumber: slideNumbers.get(slug) ?? null };
       openPanel();
+      if (mode === "column") {
+        // The new card sits beside the slide's picture in the article; bring the two into view.
+        requestAnimationFrame(() =>
+          document.getElementById(slug)?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        );
+      }
     },
     onmark: (id) => select(id, { reveal: "card" }),
   });
@@ -146,14 +152,30 @@
       }
     } else if (slugs.includes(hash)) {
       initialSlug = hash;
-      src = withSlide(src, hash);
+      if (!untrack(() => link.ready)) {
+        // A deck that has not said it is ready, or never will, still opens at the slide.
+        src = withSlide(src, hash);
+      }
     }
   });
 
   $effect(() => {
     if (link.ready && initialSlug) {
-      link.goto(initialSlug);
+      const slug = initialSlug;
       initialSlug = null;
+      // A deck just started may still be settling where it opens; ask again until it is there.
+      const tries = [0, 400, 1200].map((delay) =>
+        setTimeout(() => {
+          if (untrack(() => link.current?.slug) !== slug) {
+            link.goto(slug);
+          }
+        }, delay),
+      );
+      return () => {
+        for (const timer of tries) {
+          clearTimeout(timer);
+        }
+      };
     }
   });
 

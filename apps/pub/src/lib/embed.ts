@@ -151,3 +151,12 @@ export function withSlide(src: string, slug: string): string {
   const hashAt = src.indexOf("#");
   return `${hashAt === -1 ? src : src.slice(0, hashAt)}#${encodeURIComponent(slug)}`;
 }
+
+// A server-rendered iframe can speak before the page's script listens: this head script keeps its
+// `dek:ready` until then.
+export const EARLY_KEY = "__dekEarly";
+
+export type EarlyMessage = { origin: string; source: MessageEventSource | null; data: unknown };
+
+/** For the page's head: keeps the deck's first word until the page's script listens. */
+export const EARLY_LISTENER = `window.${EARLY_KEY}=[];addEventListener("message",function(e){var d=e.data;if(d&&typeof d==="object"&&d.type==="dek:ready"&&window.${EARLY_KEY})window.${EARLY_KEY}.push({origin:e.origin,source:e.source,data:d})});`;

@@ -1,6 +1,7 @@
 import { defineHandler, defineHead, type InferProps } from "void";
 import { translate } from "../../../src/lib/i18n.ts";
 import { loadTalk } from "../../../src/server/pages.ts";
+import { EARLY_LISTENER } from "../../../src/lib/embed.ts";
 
 export type Props = InferProps<typeof loader>;
 
@@ -37,5 +38,6 @@ export const head = defineHead<Props>((c, { talk }) => {
       ...(talk.visibility === "public" ? [] : [{ name: "robots", content: "noindex" }]),
     ],
     link: [{ rel: "canonical", href: talk.url }],
+    script: [{ innerHTML: EARLY_LISTENER }],
   };
 });
