@@ -620,7 +620,10 @@ export function createAnnotateView(options: {
     const hash = stopHash(note.slug, note.step, slides);
     if (hash !== "" && hash !== location.hash) {
       if (note.slug === onScreen().slug) {
-        location.replace(hash);
+        // Only the fragment changes; the navigator hears it as it hears a typed hash.
+        const oldURL = location.href;
+        history.replaceState(history.state, "", hash);
+        dispatchEvent(new HashChangeEvent("hashchange", { oldURL, newURL: location.href }));
       } else {
         location.hash = hash;
       }
