@@ -6,6 +6,7 @@ import type { PresenterSlide } from "../core/presenter-state.ts";
 import type { Position } from "../core/step.ts";
 import { createDeckControl } from "./deck-control.ts";
 import type { CreateDevLine } from "./dev-line.ts";
+import { createEmbed, type Embed } from "./embed.ts";
 import { bindInput } from "./input.ts";
 import { createLaserView, type LaserView } from "./laser-view.ts";
 import { createNavigator } from "./navigator.ts";
@@ -37,6 +38,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     stage.fit();
     presenter.fit();
     rail.fit();
+    embed?.layout();
   }
 
   /** Draw every view at `pos`. */
@@ -46,6 +48,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     rail.markCurrent(pos.slideIndex);
     marks?.render(pos);
     plugins.render(pos);
+    embed?.layout();
   }
 
   /**
@@ -96,6 +99,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
       if (!positionsEqual(from, to)) {
         stage.showMove(from, to);
       }
+      embed?.moved(from, to);
     },
     afterMove: () => {
       presenter.startClock();
@@ -109,6 +113,19 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
   });
 
   const marks = dev?.marks;
+
+  // A page that frames the deck drives it through the embed API; one standing alone has no parent.
+  // Its moves are the reader's own, as a key press is, so other windows of the deck follow them.
+  const embed: Embed | undefined =
+    window.parent === window
+      ? undefined
+      : createEmbed({
+          deck: page.deck,
+          slides,
+          parent: window.parent,
+          position: () => nav.position(),
+          go: (next) => control.request(next, "local"),
+        });
 
   // Plugins' pages run after the player and call window.dek.plugin, which this defines.
   const plugins = createPluginHost({
@@ -173,6 +190,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
   // A hash that named a beat past the slide's last now says where the deck opened.
   nav.writeHash("replace");
   stage.showMotion(nav.position(), page.mode === "video" ? "hold" : "final");
+  embed?.ready(nav.position());
   // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekGo"]
   window["dekGo"] = (next) => nav.go(next, "capture");
   // The video recorder seeks slide scripts the way it seeks Web Animations.

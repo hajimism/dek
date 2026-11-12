@@ -30,32 +30,36 @@ export function ringPoints(at: Point): Point[] {
   return points;
 }
 
+/** Whether the dev server stamped `el` with where it is written: what annotate mode can name. */
+export const isStamped = (el: Element): boolean => el.hasAttribute(SOURCE_ATTR);
+
 /**
  * The elements of `slide` that can be picked at `at`: what is under the pointer, then what is
  * only near it, each before anything it is inside, and the slide itself last. A line beside the
  * pointer so comes before the drawing it is in, which is under the pointer and easy to hit.
  * `elementsAt` is the document's `elementsFromPoint`, every element at a point, topmost first.
+ * `counts` says which elements may be picked at all: those stamped with their source, unless a
+ * page that has no such stamps, as a build, says otherwise.
  */
 export function candidatesAt(
   at: Point,
   slide: Element,
   elementsAt: (x: number, y: number) => readonly Element[],
+  counts: (el: Element) => boolean = isStamped,
 ): Element[] {
+  const isCandidate = (el: Element): boolean =>
+    counts(el) && slide.contains(el) && isShown(el, slide);
   const found: Element[] = [];
   for (const point of ringPoints(at)) {
     for (const el of elementsAt(point.x, point.y)) {
-      if (el === slide || found.includes(el) || !isCandidate(el, slide)) {
+      if (el === slide || found.includes(el) || !isCandidate(el)) {
         continue;
       }
       const outer = found.findIndex((other) => other.contains(el));
       found.splice(outer < 0 ? found.length : outer, 0, el);
     }
   }
-  return isCandidate(slide, slide) ? [...found, slide] : found;
-}
-
-function isCandidate(el: Element, slide: Element): boolean {
-  return el.hasAttribute(SOURCE_ATTR) && slide.contains(el) && isShown(el, slide);
+  return isCandidate(slide) ? [...found, slide] : found;
 }
 
 /** Whether `el` shows: neither it nor anything it is in on the slide is transparent or hidden. */
@@ -87,13 +91,18 @@ function isShown(el: Element, slide: Element): boolean {
 export function describeElement(
   el: Element,
   slide: Element,
+  classes: (el: Element) => string[] = writtenClasses,
 ): { source: string; name: string; text: string } {
-  const classes = (el.getAttribute(CLASS_ATTR) ?? "").split(" ").filter(Boolean);
   return {
     source: el.getAttribute(SOURCE_ATTR) ?? "",
-    name: [el.tagName.toLowerCase(), ...classes].join("."),
+    name: [el.tagName.toLowerCase(), ...classes(el)].join("."),
     text: el === slide ? "" : cutText(el.textContent ?? ""),
   };
+}
+
+/** The classes the dev server saw written on `el`, or none when it stamped none. */
+export function writtenClasses(el: Element): string[] {
+  return (el.getAttribute(CLASS_ATTR) ?? "").split(" ").filter(Boolean);
 }
 
 /** Where `el` is on the slide, in the slide's own pixels, whatever the stage scales it to. */
