@@ -2,8 +2,11 @@ import type { Position } from "../core/step.ts";
 import type { GoOrigin } from "./navigator.ts";
 import type { RehearseController } from "./rehearse.ts";
 
-/** Where a move someone asked for came from: a key or a click on this page, or a peer. */
-export type RequestOrigin = Extract<GoOrigin, "local" | "remote">;
+/**
+ * Where a move someone asked for came from: a key or a click on this page, a peer, or the page
+ * that frames this one.
+ */
+export type RequestOrigin = Extract<GoOrigin, "local" | "remote" | "embed">;
 
 export type DeckControl = {
   /** Move the deck to `next`; nothing at either end of the talk. */

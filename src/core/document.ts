@@ -153,6 +153,7 @@ export function renderDeckDocument(
       mode,
       deck: deck.name,
       ...(liveToken ? { liveToken } : {}),
+      size,
     })}`,
     body: `${progress}
   <div id="${PAGE_ID.shell}">

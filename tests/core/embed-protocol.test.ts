@@ -3,6 +3,7 @@ import {
   EMBED_PROTOCOL,
   embedStop,
   gotoPosition,
+  movedMessage,
   pickedMessage,
   readEmbedRequest,
   readyMessage,
@@ -102,6 +103,24 @@ describe("readEmbedRequest", () => {
     }
   });
 
+  test("takes no list of marks with a hole in it or a field besides its marks", () => {
+    const mark = { id: "c_1", number: 1, slug: "plan", step: "0", box };
+    const sparse = [mark, mark];
+    delete sparse[0];
+    expect(readEmbedRequest({ type: "dek:marks", marks: sparse })).toBeUndefined();
+    expect(readEmbedRequest({ type: "dek:marks", marks: new Array(3) })).toBeUndefined();
+    expect(readEmbedRequest(structuredClone({ type: "dek:marks", marks: sparse }))).toBeUndefined();
+    const extra = Object.assign([mark], { more: mark });
+    expect(readEmbedRequest({ type: "dek:marks", marks: extra })).toBeUndefined();
+  });
+
+  test("hands back marks of its own, not the message's", () => {
+    const marks = [{ id: "c_1", number: 1, slug: "plan", step: "0", box }];
+    const read = readEmbedRequest({ type: "dek:marks", marks });
+    expect(read).toEqual({ type: "dek:marks", marks });
+    expect(read?.type === "dek:marks" && read.marks).not.toBe(marks);
+  });
+
   test("reads only the fields it names, not ones inherited", () => {
     const inherited = Object.create({ slug: "plan" }) as Record<string, unknown>;
     inherited.type = "dek:goto";
@@ -141,6 +160,16 @@ describe("the messages a framed deck sends", () => {
         { slug: "plan", steps: ["0", "chart", "2"] },
       ],
       current: { slug: "plan", step: "chart", index: 1 },
+    });
+  });
+
+  test("moved says whether the framing page moved the deck or the reader did", () => {
+    expect(movedMessage(slides, { slideIndex: 1, beatIndex: 0 }, "embed")).toEqual({
+      type: "dek:moved",
+      slug: "plan",
+      step: "0",
+      index: 1,
+      by: "embed",
     });
   });
 

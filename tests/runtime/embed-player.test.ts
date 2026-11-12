@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EmbedMessage } from "../../src/core/embed-protocol.ts";
+import { encodePosition } from "../../src/core/live-protocol.ts";
 import {
   currentSlug,
   mountPlayer,
@@ -15,8 +16,10 @@ import {
 import { slideDocument } from "../helpers/html.ts";
 import { writeProject } from "../helpers/project.ts";
 
+// 4:3, so the size dek:ready names is the page's own and not the default a measure falls back on.
 const script = `---
 title: Demo
+ratio: "4:3"
 ---
 
 ## intro
@@ -61,7 +64,9 @@ async function mountFramed(options: { framed?: boolean; url?: string } = {}) {
         name: "demo",
         script,
         slides: {
-          intro: slideDocument(`<section class="slide"><h2 class="lead">intro</h2></section>`),
+          intro: slideDocument(
+            `<section class="slide"><h2 class="lead">intro</h2><input aria-label="note"></section>`,
+          ),
           plan: slideDocument(
             `<section class="slide"><h2>plan</h2><div class="chart" data-step="chart">chart</div></section>`,
           ),
@@ -91,15 +96,17 @@ const shadow = (): ShadowRoot | null | undefined =>
 
 describe("a framed deck's embed API", () => {
   test.serial(
-    "says it is ready with its slides and where it stands, and nothing of the script",
+    "says it is ready with its slides, its size, and where it stands, and nothing of the script",
     async () => {
       const page = await mountFramed({ url: "file:///deck.html#plan/1" });
+      // The script is in the page, for its presenter view; none of it is sent.
+      expect(document.getElementById("dek-data")?.textContent).toContain("秘密");
       expect(page.messages()).toEqual([
         {
           type: "dek:ready",
           protocol: 1,
           deck: "demo",
-          size: { width: 1280, height: 720 },
+          size: { width: 1024, height: 768 },
           slides: [
             { slug: "intro", steps: ["0"] },
             { slug: "plan", steps: ["0", "chart"] },
@@ -113,36 +120,38 @@ describe("a framed deck's embed API", () => {
   );
 
   test.serial(
-    "goes where the framing page says, as a move of its own, and says where it went",
+    "goes where the framing page says, keeping it off the channel and the history",
     async () => {
       const page = await mountFramed();
       const peer = new BroadcastChannel(playerChannelName());
       const heard: unknown[] = [];
       peer.addEventListener("message", (event) => heard.push(event.data));
+      const entries = history.length;
       try {
         page.send({ type: "dek:goto", slug: "plan", step: "chart" });
         await settle();
         await settle();
         expect(currentSlug()).toBe("plan");
         expect(location.hash).toBe("#plan/1");
+        expect(history.length).toBe(entries);
         expect(page.messages().at(-1)).toEqual({
           type: "dek:moved",
           slug: "plan",
           step: "chart",
           index: 1,
+          by: "embed",
         });
-        // Another window of the deck follows it, as it follows a key press.
-        expect(heard.map((data) => JSON.parse(String(data)))).toEqual([
-          { slideIndex: 1, beatIndex: 1 },
-        ]);
+        // Another frame of the deck under the same page is the framing page's to move.
+        expect(heard).toEqual([]);
       } finally {
         peer.close();
       }
     },
   );
 
-  test.serial("says where it went whatever moved it, and answers when asked", async () => {
+  test.serial("says where the reader moved it, by a key, the hash, or another window", async () => {
     const page = await mountFramed();
+    const entries = history.length;
     pressKey("ArrowRight");
     await settle();
     expect(page.messages().at(-1)).toEqual({
@@ -150,15 +159,50 @@ describe("a framed deck's embed API", () => {
       slug: "plan",
       step: "0",
       index: 1,
+      by: "reader",
     });
+    // A framed deck's moves replace its history entry: the history is the framing page's.
+    expect(history.length).toBe(entries);
+
+    location.hash = "#intro";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await settle();
+    expect(page.messages().at(-1)).toEqual({
+      type: "dek:moved",
+      slug: "intro",
+      step: "0",
+      index: 0,
+      by: "reader",
+    });
+
+    const peer = new BroadcastChannel(playerChannelName());
+    try {
+      peer.postMessage(encodePosition({ slideIndex: 1, beatIndex: 1 }));
+      await Bun.sleep(20);
+      await settle();
+      expect(page.messages().at(-1)).toEqual({
+        type: "dek:moved",
+        slug: "plan",
+        step: "chart",
+        index: 1,
+        by: "reader",
+      });
+    } finally {
+      peer.close();
+    }
+  });
+
+  test.serial("answers where it stands when asked", async () => {
+    const page = await mountFramed();
     const count = page.posted.length;
     page.send({ type: "dek:current" });
     expect(page.posted.length).toBe(count + 1);
     expect(page.messages().at(-1)).toEqual({
       type: "dek:moved",
-      slug: "plan",
+      slug: "intro",
       step: "0",
-      index: 1,
+      index: 0,
+      by: "embed",
     });
   });
 
@@ -205,6 +249,21 @@ describe("a framed deck's embed API", () => {
     },
   );
 
+  test.serial("keeps the marks it had, and moving, when a list of marks has a hole", async () => {
+    const page = await mountFramed();
+    const box = { x: 100, y: 50, width: 200, height: 40 };
+    const mark = { id: "c_1", number: 1, slug: "intro", step: "0", box };
+    page.send({ type: "dek:marks", marks: [mark] });
+    const sparse = [mark, mark];
+    delete sparse[0];
+    page.send(structuredClone({ type: "dek:marks", marks: sparse }));
+    const pins = () => [...(shadow()?.querySelectorAll<HTMLElement>("[data-part=pin]") ?? [])];
+    expect(pins().map((pin) => pin.textContent)).toEqual(["1"]);
+    pressKey("ArrowRight");
+    await settle();
+    expect(page.messages().at(-1)).toMatchObject({ type: "dek:moved", slug: "plan" });
+  });
+
   test.serial("picks until told to stop, and says so when Escape cancels", async () => {
     const page = await mountFramed();
     const layer = () => shadow()?.querySelector<HTMLElement>("[data-part=layer]");
@@ -215,17 +274,41 @@ describe("a framed deck's embed API", () => {
     expect(layer()?.hidden).toBe(true);
 
     page.send({ type: "dek:pick", on: true });
+    // Escape typed into a field on a slide is the field's.
+    const count = page.posted.length;
+    const field = document.querySelector("#deck input");
+    expect(field).not.toBeNull();
+    pressKey("Escape", {}, field as Element);
+    expect(layer()?.hidden).toBe(false);
+    expect(page.posted.length).toBe(count);
+
     expect(pressKey("Escape")).toBe(true);
     expect(layer()?.hidden).toBe(true);
     expect(page.messages().at(-1)).toEqual({ type: "dek:pick-cancel" });
     // Escape outside pick mode is not the embed API's.
-    const count = page.posted.length;
+    const after = page.posted.length;
     pressKey("Escape");
-    expect(page.posted.length).toBe(count);
+    expect(page.posted.length).toBe(after);
   });
 
-  test.serial("a deck nobody frames has no embed API", async () => {
-    await mountFramed({ framed: false });
-    expect(document.getElementById("dek-embed")).toBeNull();
-  });
+  test.serial(
+    "a deck nobody frames has no embed API, and keeps its history and its channel",
+    async () => {
+      await mountFramed({ framed: false });
+      expect(document.getElementById("dek-embed")).toBeNull();
+      const peer = new BroadcastChannel(playerChannelName());
+      const heard: unknown[] = [];
+      peer.addEventListener("message", (event) => heard.push(event.data));
+      const entries = history.length;
+      try {
+        pressKey("ArrowRight");
+        await settle();
+        await Bun.sleep(20);
+        expect(history.length).toBe(entries + 1);
+        expect(heard).toHaveLength(1);
+      } finally {
+        peer.close();
+      }
+    },
+  );
 });

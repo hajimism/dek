@@ -3,6 +3,7 @@
 import { PAGE_ID, readPageConfig } from "../core/page.ts";
 import { deckStops, moveTarget, positionsEqual } from "../core/position.ts";
 import type { PresenterSlide } from "../core/presenter-state.ts";
+import { logicalSize } from "../core/size.ts";
 import type { Position } from "../core/step.ts";
 import { createDeckControl } from "./deck-control.ts";
 import type { CreateDevLine } from "./dev-line.ts";
@@ -29,6 +30,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
   // Before anything clones a slide, so the rail and the next slide break as the stage does.
   breakPhrases(document);
   const page = readPageConfig(document.body);
+  const framed = window.parent !== window;
   const slides = JSON.parse(dataEl.textContent) as PresenterSlide[];
   const deck = deckStops(slides);
   const stage = createStage({ slides, deck, videoMode: page.mode === "video" });
@@ -89,7 +91,8 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     present: stage.present,
     hurry: stage.hurry,
     beforeMove: dismissKeyHint,
-    onMove: (from, to) => {
+    framed,
+    onMove: (from, to, origin) => {
       render(to);
       if (from.slideIndex !== to.slideIndex) {
         stage.announce(to);
@@ -99,7 +102,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
       if (!positionsEqual(from, to)) {
         stage.showMove(from, to);
       }
-      embed?.moved(from, to);
+      embed?.moved(from, to, origin === "embed" ? "embed" : "reader");
     },
     afterMove: () => {
       presenter.startClock();
@@ -115,17 +118,16 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
   const marks = dev?.marks;
 
   // A page that frames the deck drives it through the embed API; one standing alone has no parent.
-  // Its moves are the reader's own, as a key press is, so other windows of the deck follow them.
-  const embed: Embed | undefined =
-    window.parent === window
-      ? undefined
-      : createEmbed({
-          deck: page.deck,
-          slides,
-          parent: window.parent,
-          position: () => nav.position(),
-          go: (next) => control.request(next, "local"),
-        });
+  const embed: Embed | undefined = framed
+    ? createEmbed({
+        deck: page.deck,
+        size: page.size ?? logicalSize(),
+        slides,
+        parent: window.parent,
+        position: () => nav.position(),
+        go: (next) => control.request(next, "embed"),
+      })
+    : undefined;
 
   // Plugins' pages run after the player and call window.dek.plugin, which this defines.
   const plugins = createPluginHost({

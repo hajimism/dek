@@ -104,6 +104,44 @@ export function elementName(el: Element, classes: readonly string[]): string {
   return [el.tagName.toLowerCase(), ...classes].join(".");
 }
 
+/** Elements whose text is never on screen. */
+const UNSHOWN_TAGS = new Set(["STYLE", "SCRIPT", "TEMPLATE", "NOSCRIPT"]);
+
+/**
+ * The text of `el` a reader can see on `slide` now: its text nodes, less those in an element that
+ * is hidden, transparent, or not laid out, such as a beat not reached yet, or a `<style>`.
+ */
+export function visibleText(el: Element, slide: Element): string {
+  const view = el.ownerDocument.defaultView;
+  const seen = new Map<Element, boolean>();
+  const shows = (parent: Element): boolean => {
+    const known = seen.get(parent);
+    if (known !== undefined) {
+      return known;
+    }
+    let shown = !UNSHOWN_TAGS.has(parent.tagName) && isShown(parent, slide);
+    for (let node: Element | null = parent; shown && node; node = node.parentElement) {
+      if (UNSHOWN_TAGS.has(node.tagName) || view?.getComputedStyle(node).display === "none") {
+        shown = false;
+      }
+      if (node === el || node === slide) {
+        break;
+      }
+    }
+    seen.set(parent, shown);
+    return shown;
+  };
+  const walker = el.ownerDocument.createTreeWalker(el, 4 /* NodeFilter.SHOW_TEXT */);
+  let text = "";
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = node.parentElement;
+    if (parent && shows(parent)) {
+      text += node.nodeValue ?? "";
+    }
+  }
+  return text;
+}
+
 /** Where `el` is on the slide, in the slide's own pixels, whatever the stage scales it to. */
 export function slideBox(el: Element, deck: HTMLElement): Box {
   const scale = deckScale(deck);

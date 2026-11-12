@@ -66,6 +66,10 @@ ratio: "4:3"
 
 秘密にしたい台本の一文。
 
+### more {#more}
+
+もう一つ。
+
 ## plan
 
 計画を話す。
@@ -96,7 +100,7 @@ beforeAll(async () => {
         slides: {
           // A decorative shape that takes no pointer can still be picked.
           intro: slideDocument(`<section class="slide">
-  <div class="chevron is-lit" style="position: absolute; left: ${CHEVRON.x}px; top: ${CHEVRON.y}px; width: ${CHEVRON.width}px; height: ${CHEVRON.height}px; pointer-events: none; background: #345;">cut short</div>
+  <div class="chevron is-lit" style="position: absolute; left: ${CHEVRON.x}px; top: ${CHEVRON.y}px; width: ${CHEVRON.width}px; height: ${CHEVRON.height}px; pointer-events: none; background: #345;">cut <style>.chevron { color: #fff; }</style><span data-step="more">later </span>short</div>
 </section>`),
           plan: slideDocument(
             `<section class="slide"><h2 class="slide-title">plan</h2><p data-step="chart">chart</p></section>`,
@@ -201,13 +205,18 @@ describe("a built deck framed by a page on another origin", () => {
             deck: "demo",
             size: { width: 1024, height: 768 },
             slides: [
-              { slug: "intro", steps: ["0"] },
+              { slug: "intro", steps: ["0", "more"] },
               { slug: "plan", steps: ["0", "chart"] },
             ],
             current: { slug: "intro", step: "0", index: 0 },
           },
         });
         const frame = deckFrame(page);
+        // The full build carries the script, for its presenter view; no message does.
+        expect(
+          await frame.evaluate(() => document.getElementById("dek-data")?.textContent ?? ""),
+        ).toContain("秘密");
+        const entries = await page.evaluate(() => history.length, undefined);
 
         // goto moves the deck, writes its hash, and the deck says where it went.
         let count = (await heard(page)).length;
@@ -217,8 +226,11 @@ describe("a built deck framed by a page on another origin", () => {
           slug: "plan",
           step: "chart",
           index: 1,
+          by: "embed",
         });
         expect(await frame.evaluate(() => location.hash)).toBe("#plan/1");
+        // The framing page's Back stays the framing page's: the deck adds no history entry.
+        expect(await page.evaluate(() => history.length, undefined)).toBe(entries);
         count = (await heard(page)).length;
         await tell(page, { type: "dek:goto", slug: "intro" });
         await waitFor(page, "dek:moved", count);
