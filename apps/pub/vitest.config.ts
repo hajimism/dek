@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { playwright } from "vite-plus/test/browser-playwright";
 import { defineConfig } from "vite-plus";
@@ -17,7 +18,11 @@ export default defineConfig({
       },
       {
         plugins: [svelte()],
-        resolve: { conditions: ["browser"] },
+        resolve: {
+          conditions: ["browser"],
+          // Components read the page's shared data through @void/svelte; tests give it directly.
+          alias: { "@void/svelte": fileURLToPath(new URL("./tests/browser/void-svelte.ts", import.meta.url)) },
+        },
         test: {
           name: "browser",
           include: ["tests/browser/**/*.test.ts"],

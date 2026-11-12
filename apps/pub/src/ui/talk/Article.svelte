@@ -206,7 +206,12 @@
 
   {#if pending}
     <div class="adder" style:left="{pending.x}px" style:top="{pending.y}px">
-      <button type="button" onpointerdown={(event) => event.preventDefault()} onclick={commentOnPending}>
+      <button
+        type="button"
+        aria-label={t("comment.onSelection")}
+        onpointerdown={(event) => event.preventDefault()}
+        onclick={commentOnPending}
+      >
         <Icon name="message" size={14} />{t("comment.post")}
       </button>
     </div>
