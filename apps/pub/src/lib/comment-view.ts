@@ -100,3 +100,16 @@ export function mayResolve(
   }
   return isOwner || (!comment.author.guest && comment.author.handle === viewer.handle);
 }
+
+/**
+ * The comment as a reader who may not see the script gets it: a quote keeps its place as a quote,
+ * but not its words or their surroundings.
+ */
+export function hideQuotes<T extends Pick<CommentRow, "targets">>(comment: T): T {
+  return {
+    ...comment,
+    targets: comment.targets.map((target) =>
+      target.kind === "quote" ? { kind: "quote", quote: "", prefix: "", suffix: "" } : target,
+    ),
+  };
+}

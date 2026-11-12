@@ -13,8 +13,10 @@ import type {
   Visibility,
 } from "../../../../src/pub/protocol.ts";
 import { canComment, canManage } from "../lib/access.ts";
+import { hideQuotes } from "../lib/comment-view.ts";
 import { deckOrigin } from "../lib/deck-origin.ts";
-import { guessLang } from "../lib/i18n.ts";
+import { guessLang, type Lang } from "../lib/i18n.ts";
+import { handleOf } from "../lib/profile-path.ts";
 import { signServeToken } from "../lib/serve-token.ts";
 import { currentPerson } from "./actor.ts";
 import { listComments } from "./comments.ts";
@@ -75,12 +77,6 @@ export type Talk = {
 
 function owner(account: Account): Owner {
   return { handle: account.handle, name: account.name, image: account.image };
-}
-
-/** `@handle` as the URL carries it, else null: a profile URL always starts with `@`. */
-export function handleOf(segment: string | undefined): string | null {
-  const value = decodeURIComponent(segment ?? "");
-  return value.startsWith("@") && value.length > 1 ? value.slice(1).toLowerCase() : null;
 }
 
 function pictureOf(
@@ -154,8 +150,10 @@ export async function loadTalk(
   }
 
   const mayComment = canComment(deck, person, grant);
-  const comments =
+  const rows =
     isOwner || mayComment ? await listComments(c, deck, { status: "all", version: n }) : null;
+  // A reader who may not see the script does not see it quoted either.
+  const comments = rows && script === "hidden" ? rows.map(hideQuotes) : rows;
   const picture = pictureOf(
     deck,
     n,
@@ -173,7 +171,10 @@ export async function loadTalk(
     date: deck.talkDate,
     lang:
       deck.lang ??
-      guessLang([deck.title, ...map.slides.flatMap((slide) => [slide.title, ...slide.paragraphs])]),
+      guessLang(
+        [deck.title, ...map.slides.flatMap((slide) => [slide.title, ...slide.paragraphs])],
+        (c.get("shared") as { lang?: Lang } | undefined)?.lang,
+      ),
     visibility: deck.visibility,
     scriptPublic: deck.scriptPublic,
     commentPolicy: deck.comments,
@@ -309,4 +310,22 @@ export async function grantList(c: Context, deckId: string): Promise<GrantView[]
     role: row.role,
     createdAt: row.createdAt,
   }));
+}
+
+/**
+ * The talk the landing page shows as a sample, named by FEATURED_TALK as `@handle/slug`: chosen by
+ * whoever runs the site, never just the newest talk, and only while it is public.
+ */
+export async function featuredTalk(c: Context, name: string): Promise<TalkCard | null> {
+  const match = /^(@[^/]+)\/([a-z0-9][a-z0-9-]*)$/.exec(name.trim());
+  const handle = match ? handleOf(match[1]) : null;
+  if (!match || !handle) {
+    return null;
+  }
+  const account = await userByHandle(c, handle);
+  if (!account) {
+    return null;
+  }
+  const cards = await talkCards(c, account, { publicOnly: true });
+  return cards.find((card) => card.slug === match[2]) ?? null;
 }

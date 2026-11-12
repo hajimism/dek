@@ -11,6 +11,8 @@ export default defineEnv({
   DEK_PUB_DEV_LOGIN: string().default("0"),
   /** Turnstile's secret; `off` skips the check, on a machine that cannot reach Cloudflare. */
   TURNSTILE_SECRET: string(),
+  /** The talk the landing page shows as its sample, as `@handle/slug`; empty shows none. */
+  FEATURED_TALK: string().default(""),
   /** Turnstile's site key, for the widget; empty where the check is off. */
   TURNSTILE_SITE_KEY: string().default(""),
   AUTH_GITHUB_CLIENT_ID: string(),

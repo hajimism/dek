@@ -1,13 +1,16 @@
 import { defineHandler, defineHead, type InferProps } from "void";
 import { env } from "void/env";
 import { translate } from "../src/lib/i18n.ts";
-import { recentPublicTalks } from "../src/server/pages.ts";
+import { featuredTalk, recentPublicTalks } from "../src/server/pages.ts";
 
 export type Props = InferProps<typeof loader>;
 
 export const loader = defineHandler(async (c) => {
-  const talks = await recentPublicTalks(c, 9);
-  return { talks };
+  const [talks, featured] = await Promise.all([
+    recentPublicTalks(c, 9),
+    featuredTalk(c, env.FEATURED_TALK),
+  ]);
+  return { talks, featured };
 });
 
 export const head = defineHead<Props>((c) => {

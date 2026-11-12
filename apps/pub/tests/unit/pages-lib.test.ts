@@ -1,13 +1,24 @@
 import { describe, expect, it } from "vite-plus/test";
+import { hideQuotes } from "../../src/lib/comment-view.ts";
 import {
   formatUserCode,
   isCompleteUserCode,
   normalizeUserCode,
 } from "../../src/lib/device-code.ts";
 import { boxToPercent, readDeckMessage, withSlide } from "../../src/lib/embed.ts";
-import { formatDate, pickLang, relativeTime, slideCount, translate } from "../../src/lib/i18n.ts";
+import {
+  formatDate,
+  guessLang,
+  pickLang,
+  relativeTime,
+  slideCount,
+  translate,
+} from "../../src/lib/i18n.ts";
 import { safeNext } from "../../src/lib/next-path.ts";
+import { handleOf } from "../../src/lib/profile-path.ts";
 import { locateQuote, quoteAt, segments } from "../../src/lib/quote.ts";
+import { rssDate, xmlText } from "../../src/lib/rss.ts";
+import { langHref } from "../../src/ui/lang-link.ts";
 
 describe("quoteAt", () => {
   const text = "今日は、dek というスライドの道具を紹介します。dek は台本を先に書く道具です。";
@@ -173,5 +184,65 @@ describe("embed messages", () => {
       "http://d-x.localhost/v/1/?t=abc#intro",
     );
     expect(withSlide("http://d-x.localhost/v/1/#old", "new")).toBe("http://d-x.localhost/v/1/#new");
+  });
+});
+
+describe("rss", () => {
+  it("drops characters XML refuses and escapes the rest", () => {
+    expect(xmlText("a\u0000b\u0007c\u000bd & <e> \"f\" 'g'\tok")).toBe(
+      "abcd &amp; &lt;e&gt; &quot;f&quot; &apos;g&apos;\tok",
+    );
+    expect(xmlText("台本 😀")).toBe("台本 😀");
+  });
+
+  it("dates an item by its talk, else its update, else not at all", () => {
+    expect(rssDate("2026-09-25", "2026-11-01T00:00:00Z")).toBe("Fri, 25 Sep 2026 00:00:00 GMT");
+    expect(rssDate("someday", "2026-11-01T00:00:00Z")).toBe("Sun, 01 Nov 2026 00:00:00 GMT");
+    expect(rssDate(null, "not a date")).toBeNull();
+  });
+});
+
+describe("handleOf", () => {
+  it("takes a handle after @ as Hono hands it over, without decoding it again", () => {
+    expect(handleOf("@Demo")).toBe("demo");
+    expect(handleOf("@%")).toBeNull();
+    expect(handleOf("demo")).toBeNull();
+    expect(handleOf("@")).toBeNull();
+  });
+});
+
+describe("hideQuotes", () => {
+  it("keeps a quote's place but not its words", () => {
+    const hidden = hideQuotes({
+      targets: [
+        { kind: "quote", quote: "secret words", prefix: "the ", suffix: " here" },
+        {
+          kind: "element",
+          path: "slides/a.html",
+          name: "h1",
+          text: "Title",
+          box: { x: 0, y: 0, width: 1, height: 1 },
+        },
+      ],
+    });
+    expect(hidden.targets[0]).toEqual({ kind: "quote", quote: "", prefix: "", suffix: "" });
+    expect(hidden.targets[1]?.kind).toBe("element");
+  });
+});
+
+describe("langHref", () => {
+  it("keeps the path, the rest of the query and the fragment", () => {
+    expect(langHref(new URL("http://x/@demo/talk?user_code=AB&lang=en#c_1"), "ja")).toBe(
+      "/@demo/talk?user_code=AB&lang=ja#c_1",
+    );
+  });
+});
+
+describe("guessLang", () => {
+  it("reads kana as Japanese, and kanji alone only on a Japanese page", () => {
+    expect(guessLang(["台本から、発表まで"])).toBe("ja");
+    expect(guessLang(["発表論"])).toBeNull();
+    expect(guessLang(["発表論"], "ja")).toBe("ja");
+    expect(guessLang(["Why dek"], "ja")).toBeNull();
   });
 });

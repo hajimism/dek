@@ -6,9 +6,9 @@
   import TalkCard from "../src/ui/TalkCard.svelte";
   import type { Props } from "./index.server";
 
-  let { talks }: Props = $props();
+  let { talks, featured }: Props = $props();
   const { shared, t } = useApp();
-  const sample = $derived(talks[0]);
+  const sample = $derived(featured);
 </script>
 
 <div class="landing">
