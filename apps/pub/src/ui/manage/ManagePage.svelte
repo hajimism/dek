@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import type { CommentPolicy, DeckStatus, ShareRequest, Visibility } from "../../../../../src/pub/protocol.ts";
+  import { guessLang } from "../../lib/i18n.ts";
   import type { GrantView } from "../../server/pages.ts";
   import { ApiFailure, api } from "../api.ts";
   import { useApp } from "../app.ts";
@@ -100,7 +101,7 @@
 <div class="page">
   <header class="top">
     <a class="back" href={talkPath}><Icon name="arrow-left" size={14} />{t("manage.back")}</a>
-    <h1>{status.title}</h1>
+    <h1 lang={guessLang([status.title]) ?? undefined}>{status.title}</h1>
   </header>
 
   <div class="layout">

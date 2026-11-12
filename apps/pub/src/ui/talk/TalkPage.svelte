@@ -348,12 +348,17 @@
 
   async function reply(comment: CardComment, input: ReplyInput): Promise<boolean> {
     try {
-      replace(
-        await api<CommentRow>(`/api/decks/${talk.id}/comments/${comment.id}/replies`, {
-          method: "POST",
-          body: input,
-        }),
+      // The API answers with the reply alone; it joins the end of its thread.
+      const answer = await api<CommentRow | CommentRow["thread"][number]>(
+        `/api/decks/${talk.id}/comments/${comment.id}/replies`,
+        { method: "POST", body: input },
       );
+      if ("thread" in answer) {
+        replace(answer);
+      } else {
+        const current = comments.find((candidate) => candidate.id === comment.id) ?? comment;
+        replace({ ...current, thread: [...current.thread, answer] });
+      }
       return true;
     } catch (error) {
       toast(failure(error), { tone: "error" });

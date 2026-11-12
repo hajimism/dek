@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatDate, slideCount } from "../../src/lib/i18n.ts";
+  import { formatDate, guessLang, slideCount } from "../../src/lib/i18n.ts";
   import type { TalkCard } from "../../src/server/pages.ts";
   import { useApp } from "../../src/ui/app.ts";
   import Avatar from "../../src/ui/Avatar.svelte";
@@ -64,7 +64,7 @@
                     {/if}
                   </span>
                   <span class="text">
-                    <span class="title">{talk.title}</span>
+                    <span class="title" lang={guessLang([talk.title]) ?? undefined}>{talk.title}</span>
                     <span class="meta">
                       {#if talk.event}<span>{talk.event}</span><span aria-hidden="true">·</span>{/if}
                       {#if talk.date}<time datetime={talk.date}>{formatDate(lang, talk.date)}</time><span aria-hidden="true">·</span>{/if}
@@ -160,6 +160,7 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    align-self: flex-start;
     width: 144px;
     aspect-ratio: 16 / 9;
     border-radius: 6px;

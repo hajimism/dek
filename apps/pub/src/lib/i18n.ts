@@ -607,3 +607,8 @@ export function absoluteTime(lang: Lang, iso: string): string {
     timeZone: "UTC",
   }).format(date);
 }
+
+/** A text's language when nothing says: Japanese if it has kana. */
+export function guessLang(texts: readonly string[]): string | null {
+  return texts.some((text) => /[\u3040-\u30ff]/.test(text)) ? "ja" : null;
+}
