@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { Rename, SlideMap, VersionFile } from "../../pub/protocol.ts";
+import { MAX_VERSION_BYTES, type SlideMap, type VersionFile } from "../../pub/protocol.ts";
 import { loadConfig } from "../config.ts";
 import { renderDeckDocument } from "../document.ts";
 import { DekError } from "../error.ts";
@@ -18,9 +18,6 @@ import { writeTar } from "../tar-write.ts";
  * and a picture of each slide as it arrives. Each is kept under the deck's `.cache/pub/`, as it
  * was sent.
  */
-
-/** A source larger than this is no talk; the server would refuse it too. */
-const MAX_SOURCE_BYTES = 100 * 1024 * 1024;
 
 type PreparedFile = {
   field: VersionFile;
@@ -124,9 +121,9 @@ export function deckSource({ project, deck }: Target): Uint8Array<ArrayBuffer> {
         continue;
       }
       size += stat.size;
-      if (size > MAX_SOURCE_BYTES) {
+      if (size > MAX_VERSION_BYTES) {
         throw new DekError(
-          `deck "${deck.name}" is larger than dek.pub takes, ${MAX_SOURCE_BYTES / 1024 / 1024} MB`,
+          `deck "${deck.name}" is larger than dek.pub takes, ${mebibytes(MAX_VERSION_BYTES)} MiB`,
           { path: deck.dir, hint: "check the deck's assets for files the talk does not show" },
         );
       }
@@ -143,13 +140,34 @@ export function deckSource({ project, deck }: Target): Uint8Array<ArrayBuffer> {
 }
 
 /**
- * The renames made since the version uploaded at `since`, which the server applies to the comments
- * on it; none for a deck with no version yet, which has no comments to move.
+ * Refuse a version larger than dek.pub takes, before anything is sent: every file and picture
+ * together, with the largest named, since each build carries the pictures the slides show.
  */
-export function renamesSince(renames: Rename[], since: string | undefined): Rename[] {
-  if (since === undefined) {
-    return [];
+export function requireUploadable(
+  version: Pick<PreparedVersion, "files" | "shots">,
+  deckDir: string,
+): void {
+  const parts = [
+    ...version.files.map((file) => ({ name: fileName(file.field), bytes: file.bytes.byteLength })),
+    ...(version.shots ?? []).map((shot) => ({
+      name: `the picture of ${shot.slug}`,
+      bytes: shot.bytes.byteLength,
+    })),
+  ];
+  const total = parts.reduce((sum, part) => sum + part.bytes, 0);
+  if (total <= MAX_VERSION_BYTES) {
+    return;
   }
-  const after = Date.parse(since);
-  return renames.filter((rename) => Date.parse(rename.at) > after);
+  const largest = [...parts].sort((a, b) => b.bytes - a.bytes).slice(0, 3);
+  throw new DekError(
+    `the version is ${mebibytes(total)} MiB, and dek.pub takes ${mebibytes(MAX_VERSION_BYTES)} MiB at most`,
+    {
+      path: deckDir,
+      hint: `make the deck's assets smaller, such as its pictures and videos, which each build carries; the largest parts are ${largest.map((part) => `${part.name} (${mebibytes(part.bytes)} MiB)`).join(", ")}`,
+    },
+  );
+}
+
+function mebibytes(bytes: number): string {
+  return (bytes / 1024 / 1024).toFixed(1).replace(/\.0$/, "");
 }

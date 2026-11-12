@@ -6,6 +6,7 @@ import {
   type CommentRow,
   CreateDeckRequest,
   type DeckStatus,
+  MAX_VERSION_BYTES,
   type Me,
   NewReply,
   PROTOCOL_HEADER,
@@ -153,7 +154,12 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     },
   });
   fake.url = `http://127.0.0.1:${server.port}`;
-  fake.env = { DEK_PUB_SERVER: fake.url, DEK_PUB_CREDENTIALS: fake.credentials, DEK_TOKEN: "" };
+  fake.env = {
+    DEK_PUB_SERVER: fake.url,
+    DEK_PUB_CREDENTIALS: fake.credentials,
+    DEK_TOKEN: "",
+    DEK_TOKEN_SERVER: "",
+  };
 
   function signedIn(request: FakeRequest): boolean {
     return fake.keys.has(request.headers[API_KEY_HEADER] ?? "");
@@ -205,12 +211,12 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       }
       return Response.json({ key: fake.issueKey(), me: fake.me });
     }
-    if (!signedIn(request)) {
-      return error(401, "unauthorized", "the key is not valid", "run `dekc pub login`");
+    // As the server does: revoking needs a key sent, not a valid one.
+    if (method === "DELETE" && path === "/api/cli/key" && request.headers[API_KEY_HEADER]) {
+      return Response.json({ revoked: fake.keys.delete(request.headers[API_KEY_HEADER] ?? "") });
     }
-    if (method === "DELETE" && path === "/api/cli/key") {
-      fake.keys.delete(request.headers[API_KEY_HEADER] ?? "");
-      return new Response(null, { status: 204 });
+    if (!signedIn(request)) {
+      return error(401, "signed_out", "the key is not valid", "run `dekc pub login`");
     }
     if (method === "GET" && path === "/api/me") {
       return Response.json(fake.me);
@@ -218,7 +224,15 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     if (method === "POST" && path === "/api/decks") {
       const parsed = CreateDeckRequest.safeParse(body);
       if (!parsed.success) {
-        return error(400, "invalid", parsed.error.message);
+        return error(422, "invalid", parsed.error.message);
+      }
+      if ([...fake.decks.values()].some((deck) => deck.slug === parsed.data.slug)) {
+        return error(
+          409,
+          "slug_taken",
+          `you already have a deck at /@${fake.me.handle}/${parsed.data.slug}`,
+          "put that deck's ID in pub: in script.md, or rename the deck folder",
+        );
       }
       return Response.json(status(fake.addDeck(parsed.data)), { status: 201 });
     }
@@ -234,12 +248,19 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     if (method === "PATCH" && rest === "") {
       const parsed = ShareRequest.safeParse(body);
       if (!parsed.success) {
-        return error(400, "invalid", parsed.error.message);
+        return error(422, "invalid", parsed.error.message);
       }
       Object.assign(deck, parsed.data);
       return Response.json(status(deck));
     }
     if (method === "POST" && rest === "/versions") {
+      const length = Number(request.headers["content-length"]);
+      if (!Number.isFinite(length) || length <= 0) {
+        return error(411, "length_required", "send the upload with its content-length");
+      }
+      if (length > MAX_VERSION_BYTES + 4 * 1024 * 1024) {
+        return error(413, "too_large", "a version may hold 50 MiB at most");
+      }
       return version(deck, request, form);
     }
     if (method === "GET" && rest === "/comments") {
@@ -262,7 +283,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if (comment[2] === "replies") {
         const parsed = NewReply.safeParse(body);
         if (!parsed.success) {
-          return error(400, "invalid", parsed.error.message);
+          return error(422, "invalid", parsed.error.message);
         }
         const reply = {
           id: id("r_"),
@@ -284,15 +305,20 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     const raw = form?.get("manifest");
     const parsed = VersionManifest.safeParse(typeof raw === "string" ? JSON.parse(raw) : undefined);
     if (!parsed.success) {
-      return error(400, "invalid", `manifest: ${parsed.error.message}`);
+      return error(422, "invalid", `manifest: ${parsed.error.message}`);
     }
     const manifest = parsed.data;
     if (manifest.base !== deck.latest) {
-      return error(409, "conflict", "a newer version is there", "run `dekc pub status`");
+      return error(
+        409,
+        "stale_base",
+        `version ${deck.latest} is the newest, not ${manifest.base ?? "none"}`,
+        "someone published since; run `dekc pub status` and publish again",
+      );
     }
     for (const field of ["full", "public", "bare", "source"] as const) {
       if (!(form?.get(field) instanceof Blob)) {
-        return error(400, "invalid", `no ${field}`);
+        return error(422, "invalid", `no ${field}`);
       }
     }
     for (const field of VERSION_FILES) {
@@ -300,13 +326,13 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if (file instanceof Blob) {
         const sha = new Bun.CryptoHasher("sha256").update(await file.arrayBuffer()).digest("hex");
         if (manifest.files[field] !== sha) {
-          return error(400, "invalid", `${field} does not match its sha256`);
+          return error(422, "invalid", `${field} does not match its sha256`);
         }
       }
     }
     for (const slug of Object.keys(manifest.shots)) {
       if (!(form?.get(shotField(slug)) instanceof Blob)) {
-        return error(400, "invalid", `no picture of ${slug}`);
+        return error(422, "invalid", `no picture of ${slug}`);
       }
     }
     const n = (deck.latest ?? 0) + 1;

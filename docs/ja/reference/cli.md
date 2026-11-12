@@ -101,24 +101,24 @@ ref の文章は他人のものなので、dek は自分の言葉と分けて扱
 
 ## 公開
 
-`dekc pub` はトークを [dek.pub](/ja/guide/publish) に載せます。スライド、共有した相手に見せる台本、その両方へのコメントです。各サブコマンドは `https://dek.pub`、または `--server <url>` や `DEK_PUB_SERVER` が指すサーバーと HTTPS で話します。平文の HTTP はこのマシンとだけです。送るのは `dekc pub login` が保存した API キーか `DEK_TOKEN`。30 秒（アップロードは 10 分）以内に応答がない呼び出しは失敗し、hint が `--server` を示します。dek.pub が返したエラーは、そのメッセージと hint のまま出します。
+`dekc pub` はトークを [dek.pub](/ja/guide/publish) に載せます。スライド、共有した相手に見せる台本、その両方へのコメントです。各サブコマンドは `https://dek.pub`、または `--server <url>` や `DEK_PUB_SERVER` が指すサーバーと HTTPS で話します。平文の HTTP はこのマシンとだけです。送るのは `dekc pub login` が保存した API キーか、そのサーバー向けの `DEK_TOKEN`。30 秒（アップロードは 10 分）以内に応答がない呼び出しは失敗し、hint が `--server` を示します。dek.pub が返したエラーは、そのメッセージと hint のまま出します。新しい dek.pub が足したフィールドを含む応答も読み、知らないフィールドは捨てます。コメントの中身は他人が書いたもので、`--json` はそのフィールドごとにそう記します。
 
 | コマンド | 用途 |
 | --- | --- |
 | `dekc pub <subcommand>` | 単独では使い方のエラーになり、サブコマンドを示す。 |
-| `dekc pub login [--server <url>]` | OAuth のデバイスフローでブラウザからサインインする。dek が URL とコードを出し、人がそこでコードを承認すると、dek.pub がくれた API キーを OS のキーチェーンに保存する。キーチェーンがなければ `~/.config/dek/credentials.json`（モード 0600）。テキスト出力では URL とコードを標準エラーに出し、同じ実行のなかで待つ。`--json` では新しいサインインはすぐ `{ "status": "pending", "url", "code", "expiresAt", "next" }` を返すので、エージェントがそれを人に見せられる。コードは資格情報の隣に保存され、次の `dekc pub login --json` がその承認を待って `{ "status": "signed-in", "me", "stored" }` を返す。待っているあいだに止められても何も失わず、次の実行がコードの期限まで同じコードを待つ。断られたコードや期限切れのコードは忘れ、エラーがもう一度サインインするよう示す。 |
-| `dekc pub logout [--server <url>]` | `login` が保存したキーをサーバーで失効させ、手元から消す。サーバーに届かなくてもキーは手元から消し、`revoked` は `false`、`reason` が dek.pub で失効させるまでキーは使えると伝える。`DEK_TOKEN` のキーは利用者のものなので触らない。 |
+| `dekc pub login [--server <url>]` | OAuth のデバイスフローでブラウザからサインインする。dek が URL とコードを出し、人がそこでコードを承認すると、dek.pub がくれた API キーを OS のキーチェーンに保存する。キーチェーンがなければ `~/.config/dek/credentials.json`（モード 0600）。テキスト出力では URL とコードを標準エラーに出し、同じ実行のなかで待つ。`--json` では新しいサインインはすぐ `{ "status": "pending", "url", "code", "expiresAt", "next" }` を返すので、エージェントがそれを人に見せられる。コードは資格情報の隣に保存され、次の `dekc pub login --json` が最長 1 分その承認を待ち、`{ "status": "signed-in", "me", "stored" }` を返すか、もう一度実行するよう同じ pending の応答を返す。待っているあいだに止められても何も失わず、次の実行がコードの期限まで同じコードを待つ。断られたコード、期限切れのコード、サーバーがほかのエラーを返したコードは忘れ、エラーが `dekc pub login` をもう一度実行するよう示す。そのサーバー向けの `DEK_TOKEN` があるときは、保存したキーの代わりにそれを送ることを `warning` が伝える。 |
+| `dekc pub logout [--server <url>]` | `login` が保存したキーをサーバーで失効させ、手元から消す。`revoked` はサーバーの答えで、サーバーがキーをもう知らなければ `false` と `reason` になる。サーバーに届かなくてもキーは手元から消し、`revoked` は `false`、`reason` が dek.pub で失効させるまでキーは使えると伝える。`DEK_TOKEN` のキーは利用者のものなので触らない。 |
 | `dekc pub whoami [--server <url>]` | キーが誰としてサインインするか。`key` がキーの出どころを示す。`env`（`DEK_TOKEN`）、`keychain`、`file`。 |
-| `dekc pub publish [deck] [--message <text>] [--no-promote] [--server <url>]` | 描画するルールを除いて `dekc lint` と同じようにデッキを lint する。error があれば何も送らずに止まり、`"ok": false`、`"published": false`、診断と終了コード 1 を返す。次にトークを `.cache/pub/` へ 3 通りにビルドする。台本をすべて含む持ち主用の `full.html`、`dekc build --public` と同じく読み上げる部分だけの `public.html`、`dekc build --no-script` と同じく台本のない `bare.html`。各スライドが現れたときの画像と、1 枚目の最後のビートの画像を撮る（Playwright がなければ撮らず、`skipped` が `shots` として伝える）。`source.tar` には `dist/`・`.cache/`・ドットファイルを除くデッキのファイルすべてと、効いている `dek.toml` の値の `effective-config.json` を入れ、同じファイルなら同じバイトになる。`script.md` に `pub:` がないデッキは先に dek.pub に作り（slug はフォルダ名の小文字）、frontmatter に `pub:` を書き込む。ほかのバイトはそのまま。このとき `frontmatterWritten` が `true` になり、`changed` がコミットすべき `script.md` を示す。バージョンは、公開ビルドのスライドマップ、lint が見つけた件数、最新のバージョン以後に `dekc mv` が変えた slug、`--message` と一緒にアップロードする。`--no-promote` がなければ、読み手に見えるのはこのバージョンになる。この実行が確かめたあとに別のバージョンが公開されていれば断られ、hint が `dekc pub status` を示す。 |
+| `dekc pub publish [deck] [--message <text>] [--no-promote] [--slug <slug>] [--server <url>]` | 描画するルールを除いて `dekc lint` と同じようにデッキを lint する。error があれば何も送らずに止まり、`"ok": false`、`"published": false`、診断と終了コード 1 を返す。次にトークを `.cache/pub/` へ 3 通りにビルドする。台本をすべて含む持ち主用の `full.html`、`dekc build --public` と同じく読み上げる部分だけの `public.html`、`dekc build --no-script` と同じく台本のない `bare.html`。各スライドが現れたときの画像と、1 枚目の最後のビートの画像を撮る（Playwright がなければ撮らず、`skipped` が `shots` として伝える）。`source.tar` には `dist/`・`.cache/`・ドットファイルを除くデッキのファイルすべてと、効いている `dek.toml` の値の `effective-config.json` を入れ、同じファイルなら同じバイトになる。`script.md` に `pub:` がないデッキは先に dek.pub に作る。slug は `--slug` が指すもの、なければフォルダ名の小文字、ASCII の英字も数字もない名前なら `deck-` と 16 進 8 桁。アカウントがすでに持つ slug は断られ、hint が `--slug` を示す。続いて frontmatter に `pub:` を書き込む。ほかのバイトはそのまま。このとき `frontmatterWritten` が `true` になり、`changed` がコミットすべき `script.md` を示す。バージョンは、書き込んだあとの `script.md` から作った公開ビルドのスライドマップ、lint が見つけた件数、`dekc mv` が記録した slug の変更すべて（サーバーはそれぞれ 1 度だけ受け取る）、`--message` と一緒にアップロードする。ビルド、ソース、画像を合わせて 50 MiB を超えるバージョンは送る前に断り、hint が大きい部分を示す。`--no-promote` がなければ、読み手に見えるのはこのバージョンになる。この実行が確かめたあとに別のバージョンが公開されていれば断られ、hint が `dekc pub status` を示す。 |
 | `dekc pub share [deck] [--visibility private\|link\|public] [--script shown\|hidden] [--embed on\|off] [--comments off\|signed-in\|guests] [--server <url>]` | 誰がデッキを開けるか（持ち主と共有した相手、リンクを知る誰でも、全員）、読み手にト書きを除いた台本を見せるか、ほかのサイトに埋め込めるか、誰がコメントできるかを変える。変わるのは指定した設定だけで、何も指定しなければエラー。`status` と同じくデッキを出力する。`pub:` のないデッキは断り、hint が `dekc pub publish` を示す。以下のサブコマンドも同じ。 |
 | `dekc pub status [deck] [--server <url>]` | dek.pub にあるデッキ。URL、設定、読み手に見えるバージョン、最新のバージョン、各バージョンの概要。`local.source` は `publish` がいま送るソースの sha256、`local.published` は最新のバージョンがそれから作られたかどうか。 |
-| `dekc pub open [deck] [--server <url>]` | デッキの URL を出してブラウザで開く。`BROWSER` が指すプログラム、なければ macOS では `open`、それ以外では `xdg-open` を使う。`--json` では URL だけを返し、何も開かない。 |
-| `dekc pub comments [deck] [--status open\|resolved\|all] [--server <url>]` | コメントを一覧にする。`--status` がなければ未解決のものだけ。`dekc annotations` がメモを並べるように、dek.pub にあるとおり番号、slug、step、状態（`open`、slug の変更か推測でしかスライドを見つけられなかった `moved`、その箇所や要素がいまのスライドにない `detached`、`resolved`）、書き手、本文、返信を出す。台本の引用には、いまの `script.md` での位置 `path`・`line`・`column`（見つからなければ `null` と `found: false`）が加わり、要素にはスライドのファイルが `path` として入る。`shot` はコメントのビートでそのスライドを見るコマンド。 |
-| `dekc pub comments reply [deck] <id> <text> [--server <url>]` | コメントに返信する。ID か番号で指定する。 |
+| `dekc pub open [deck] [--server <url>]` | デッキの URL を出してブラウザで開く。開くのは、問い合わせたサーバー上の `http` か `https` のページだけ。`BROWSER` が指すプログラム、なければ macOS では `open`、それ以外では `xdg-open` を使う。`--json` では URL だけを返し、何も開かない。 |
+| `dekc pub comments [deck] [--status open\|resolved\|all] [--server <url>]` | コメントを一覧にする。`--status` がなければ未解決のものだけ。`dekc annotations` がメモを並べるように、dek.pub にあるとおり番号、slug、step、状態（`open`、slug の変更か推測でしかスライドを見つけられなかった `moved`、その箇所や要素がいまのスライドにない `detached`、`resolved`）、書き手、本文、返信を出す。台本の引用には、いまの `script.md` での位置 `path`・`line`・`column`（見つからなければ `null` と `found: false`）が加わり、要素にはスライドのファイルが `path` として、それがあるかが `found` として入る。コメントが `slides/<slug>.html` を指していなければ `path` は `null`。`shot` はコメントのビートでそのスライドを見るコマンド。 |
+| `dekc pub comments reply [deck] <id> <text> [--server <url>]` | コメントに返信する。ID か番号で指定する。ID の前にデッキ名があれば、どこで実行してもそれがデッキになる。 |
 | `dekc pub comments resolve [deck] <id> [--server <url>]` | コメントを解決済みにする。 |
 | `dekc pub comments reopen [deck] <id> [--server <url>]` | 解決済みのコメントを開き直す。 |
 
-デッキに `pub` やほかのコマンドの名前は付けられません。`dekc pub` はデッキではなくコマンドを動かすので、`dekc new` と `dekc init` が断ります。
+デッキに `pub` やほかのコマンドの名前は付けられません。`dekc pub` はデッキではなくコマンドを動かすので、`dekc new` と `dekc init` が断ります。すでに `pub` という名前のデッキは `dekc --deck pub` で開き、単独の `dekc pub` の hint がそれを示します。
 
 ## ヘルプ
 
@@ -137,8 +137,9 @@ dek は `DEK_` で始まる変数を、起動したときの環境からだけ�
 | `DEK_GITHUB_API` | `dekc ref` が取得に使う GitHub API のベース URL。ここにはトークンを送らない |
 | `DEK_PLAYWRIGHT` | 代わりの Playwright ワーカースクリプトのパス |
 | `DEK_PUB_SERVER` | `dekc pub` が `https://dek.pub` の代わりに話す dek.pub。`--server` が優先。HTTPS か、このマシンへの平文の HTTP |
-| `DEK_TOKEN` | CI 向けに、`dekc pub login` が保存したキーより優先して `dekc pub` が送る API キー |
-| `DEK_PUB_CREDENTIALS` | `dekc pub` が OS のキーチェーンの代わりにキーを保存するファイル。指定すると dek はキーチェーンを使わない |
+| `DEK_TOKEN` | CI 向けに、`dekc pub login` が保存したキーより優先して `dekc pub` が送る API キー。送り先は `https://dek.pub` だけで、`DEK_TOKEN_SERVER` があればそのサーバー |
+| `DEK_TOKEN_SERVER` | `DEK_TOKEN` を送るサーバー。`https://dek.pub` の代わり。ほかのサーバーには `DEK_TOKEN` を送らない |
+| `DEK_PUB_CREDENTIALS` | `dekc pub` が OS のキーチェーンの代わりにキーを保存するファイル。指定すると dek はキーチェーンを使わない。資格情報のファイルは、利用者自身のもので、ほかの誰も読み書きできないときだけ読む |
 | `BROWSER` | `dekc pub open` が `open` や `xdg-open` の代わりにデッキを開くプログラム |
 | `GITHUB_TOKEN` | `dekc ref` が `api.github.com` に送るトークン。非公開リポジトリと、rate limit の引き上げに使う |
 | `GH_TOKEN` | `GITHUB_TOKEN` が無いときに、その代わりに読む |

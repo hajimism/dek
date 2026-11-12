@@ -119,6 +119,11 @@ export const FLAGS = {
     short: "m",
     text: "what changed in this version, shown in its history",
   },
+  slug: {
+    type: "string",
+    value: "<slug>",
+    text: "the slug in a new deck's URL, over the folder's name; only for the first publish",
+  },
   "no-promote": {
     type: "boolean",
     text: "upload the version without making it the one readers see",

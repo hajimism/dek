@@ -14,6 +14,7 @@ function signIn(fake: FakePub): void {
   writeFileSync(
     fake.credentials,
     JSON.stringify({ version: 1, keys: { [fake.url]: fake.issueKey() } }),
+    { mode: 0o600 },
   );
 }
 
@@ -39,7 +40,12 @@ async function withPublished<T>(
     signIn(fake);
     const deck = fake.addDeck({ current: 1, latest: 1 });
     // Run in the deck, as an agent does, so the deck needs no name.
-    return withTempProject({ decks: [{ name: "talk", script: script(deck.id) }] }, (root) =>
+    const deckSpec = {
+      name: "talk",
+      script: script(deck.id),
+      slides: { intro: '<section class="slide"><h2>intro</h2></section>\n' },
+    };
+    return withTempProject({ decks: [deckSpec] }, (root) =>
       fn(fake, join(root, "decks", "talk"), deck.id),
     );
   });
@@ -128,6 +134,20 @@ describe("dekc pub share", () => {
 });
 
 describe("dekc pub open", () => {
+  test.serial("opens only a page on the server it asked", async () => {
+    await withPublished(async (fake, root) => {
+      const [deck] = [...fake.decks.values()];
+      if (deck) {
+        deck.url = "file:///etc/passwd";
+      }
+      const result = await run(fake, root, ["open", "--json"]);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: false,
+        error: { message: `${fake.url} gave the deck an address that is not one of its pages` },
+      });
+    });
+  });
+
   test.serial("--json gives the URL and opens nothing; text opens it with BROWSER", async () => {
     await withPublished(async (fake, root) => {
       const [deck] = [...fake.decks.values()];
@@ -161,6 +181,13 @@ describe("dekc pub comments", () => {
               box: { x: 0, y: 0, width: 10, height: 10 },
             },
             { kind: "quote", quote: "ない言葉", prefix: "", suffix: "" },
+            {
+              kind: "element",
+              path: "../../../.ssh/id_ed25519",
+              name: "div",
+              text: "",
+              box: { x: 0, y: 0, width: 1, height: 1 },
+            },
           ],
         }),
         comment({ number: 2, id: "c_two", status: "resolved", slug: "end" }),
@@ -185,6 +212,7 @@ describe("dekc pub comments", () => {
           name: "h2.slide-title",
           text: "intro",
           box: { x: 0, y: 0, width: 10, height: 10 },
+          found: true,
         },
         {
           kind: "quote",
@@ -194,6 +222,14 @@ describe("dekc pub comments", () => {
           path: "script.md",
           line: null,
           column: null,
+          found: false,
+        },
+        {
+          kind: "element",
+          path: null,
+          name: "div",
+          text: "",
+          box: { x: 0, y: 0, width: 1, height: 1 },
           found: false,
         },
       ]);
@@ -253,6 +289,20 @@ describe("dekc pub comments", () => {
           "--json",
         ]);
         expect(jsonStdout<Json>(named)).toMatchObject({ ok: true, comment: "c_one" });
+        // In the deck, its name before the ID is still the deck, not the comment.
+        const inside = await run(fake, deckDir, [
+          "comments",
+          "reply",
+          "talk",
+          "c_one",
+          "ええ",
+          "--json",
+        ]);
+        expect(jsonStdout<Json>(inside)).toMatchObject({
+          ok: true,
+          comment: "c_one",
+          reply: { text: "ええ" },
+        });
         const flagged = await run(fake, root, ["status", "--deck", "talk", "--json"]);
         expect(jsonStdout<Json>(flagged)).toMatchObject({ ok: true, id });
         const typo = await run(fake, root, ["status", "tlak", "--json"]);
@@ -278,6 +328,21 @@ describe("dekc pub", () => {
       },
     });
   });
+
+  test.serial(
+    "alone, in a project with a deck named pub, says how to serve that deck",
+    async () => {
+      await withTempProject({ decks: [{ name: "pub" }] }, async (root) => {
+        const result = await runInProcess(["pub", "--json"], { cwd: root });
+        expect(jsonStdout<Json>(result)).toMatchObject({
+          ok: false,
+          error: {
+            hint: "to serve the deck named pub, run `dekc --deck pub`; usage: dekc pub <subcommand>; run `dekc help pub`",
+          },
+        });
+      });
+    },
+  );
 
   test.serial("a mistyped subcommand gets the likeliest one", async () => {
     const result = await runInProcess(["pub", "pubish", "--json"], { cwd: tmpdir() });

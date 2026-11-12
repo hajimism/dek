@@ -1,10 +1,12 @@
 // biome-ignore lint/style/noRestrictedImports: mkdirSync, for the folder in the user's config directory dek keeps its dek.pub key in, outside any project for safe-fs to hold it to.
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { DekError } from "../error.ts";
-import { readSourceIfExists, removeInside, writeInside } from "../safe-fs.ts";
+import { shellQuote } from "../escape.ts";
+import { readSourceIfExists, removeInside, requireInside, writeInside } from "../safe-fs.ts";
+import { DEFAULT_SERVER } from "./client.ts";
 
 /**
  * Where dek keeps what signing in to dek.pub leaves: the API key of each server, and a sign-in
@@ -36,13 +38,36 @@ function keychainAllowed(env: NodeJS.ProcessEnv): boolean {
   return !env.DEK_PUB_CREDENTIALS?.trim() && typeof Bun.secrets?.get === "function";
 }
 
-/** The key dek sends to `origin`: DEK_TOKEN's, else the one login kept. */
+/** The key dek sends to `origin`: DEK_TOKEN's when it is for that server, else the one login kept. */
 export async function readKey(
   origin: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<Key | undefined> {
-  const token = env.DEK_TOKEN?.trim();
+  const token = tokenFor(origin, env);
   return token ? { key: token, source: "env" } : readStoredKey(origin, env);
+}
+
+/**
+ * DEK_TOKEN, when it is meant for `origin`: dek.pub's, unless DEK_TOKEN_SERVER names the server
+ * it is for. A token set for one server never goes to another that --server names.
+ */
+export function tokenFor(origin: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const token = env.DEK_TOKEN?.trim();
+  if (!token) {
+    return undefined;
+  }
+  const named = env.DEK_TOKEN_SERVER?.trim();
+  let server = DEFAULT_SERVER;
+  if (named) {
+    try {
+      server = new URL(named).origin;
+    } catch {
+      throw new DekError(`invalid DEK_TOKEN_SERVER "${named}"`, {
+        hint: `name the server DEK_TOKEN is for by its address, like ${DEFAULT_SERVER}`,
+      });
+    }
+  }
+  return server === origin ? token : undefined;
 }
 
 /** The key login kept for `origin`: the keychain's, else the file's. */
@@ -182,6 +207,7 @@ function readJson<S extends z.ZodType>(path: string, schema: S): z.infer<S> | un
   if (text === undefined) {
     return undefined;
   }
+  refuseShared(path, dir);
   let value: unknown;
   try {
     value = JSON.parse(text);
@@ -196,6 +222,28 @@ function readJson<S extends z.ZodType>(path: string, schema: S): z.infer<S> | un
     });
   }
   return parsed.data;
+}
+
+/**
+ * A file of credentials is read only when it is the user's own and no one else may read or write
+ * it: one another account owns, or one open to the group or to others, may hold a key someone
+ * else put there, or one someone else has read.
+ */
+function refuseShared(path: string, dir: string): void {
+  const stat = statSync(requireInside(path, dir));
+  const uid = process.getuid?.();
+  if (uid !== undefined && stat.uid !== uid) {
+    throw new DekError(`${path} belongs to another account`, {
+      path,
+      hint: `delete it and run \`dekc pub login\` again`,
+    });
+  }
+  if ((stat.mode & 0o077) !== 0) {
+    throw new DekError(`${path} may be read or written by others`, {
+      path,
+      hint: `run \`chmod 600 ${shellQuote(path)}\`, or delete it and run \`dekc pub login\` again`,
+    });
+  }
 }
 
 /** Write `value` as the file at `path`, readable by its owner alone, or remove it when undefined. */

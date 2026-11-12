@@ -938,7 +938,7 @@ export const COMMANDS = {
       ["dekc pub logout", "revoke the key and forget it"],
       ["dekc pub whoami", "who the key signs in as"],
       [
-        "dekc pub publish [deck] [--message <text>] [--no-promote]",
+        "dekc pub publish [deck] [--message <text>] [--no-promote] [--slug <slug>]",
         "lint, build, and upload the next version; writes pub: on the first",
       ],
       [
@@ -956,13 +956,22 @@ export const COMMANDS = {
     agent: [
       "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
       "dekc pub whoami | logout",
-      "dekc pub publish [--message <text>] [--no-promote]   lint errors stop it; commit script.md when it writes pub:",
+      "dekc pub publish [--message <text>] [--no-promote] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
       "dekc pub share --visibility private|link|public --script shown|hidden --embed on|off --comments off|signed-in|guests",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
     ],
-    run: async () => {
+    run: async ({ cwd }) => {
       const { usageError } = await import("./usage.ts");
-      throw usageError("pub", "dekc pub needs a subcommand", { match: "<subcommand>" });
+      const { namesDeck } = await import("./scope.ts");
+      const error = usageError("pub", "dekc pub needs a subcommand", { match: "<subcommand>" });
+      // A deck named pub, made before the command was, is served by --deck now.
+      if (namesDeck(cwd, "pub")) {
+        const { DekError } = await import("../core/error.ts");
+        throw new DekError(error.message, {
+          hint: `to serve the deck named pub, run \`dekc --deck pub\`; ${error.hint}`,
+        });
+      }
+      throw error;
     },
     subcommands: {
       login: {
@@ -995,8 +1004,10 @@ export const COMMANDS = {
       publish: {
         scope: "deck",
         args: [],
-        flags: ["server", "message", "no-promote"],
-        usage: ["dekc pub publish [deck] [--message <text>] [--no-promote] [--server <url>]"],
+        flags: ["server", "message", "no-promote", "slug"],
+        usage: [
+          "dekc pub publish [deck] [--message <text>] [--no-promote] [--slug <slug>] [--server <url>]",
+        ],
         run: async ({ cwd, flags, target }) => {
           const { publishCommand } = await import("./pub.ts");
           return publishCommand(target, { cwd, flags });
@@ -1078,7 +1089,11 @@ export const COMMANDS = {
     output: {
       text: formatPub,
       notes: (data, color) =>
-        data.action === "publish" ? formatSkipped(data.skipped, color) || undefined : undefined,
+        data.action === "publish"
+          ? formatSkipped(data.skipped, color) || undefined
+          : data.action === "login" && data.status === "signed-in"
+            ? data.warning
+            : undefined,
       paths: (data, display) => pubPaths(data, display),
       failure: (data) => pubFailure(data),
     },

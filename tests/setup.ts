@@ -17,6 +17,7 @@ delete process.env.NO_COLOR;
 // talks to a server starts tests/helpers/fake-pub.ts, which sets its own; one that forgets fails
 // at once on a closed port.
 delete process.env.DEK_TOKEN;
+delete process.env.DEK_TOKEN_SERVER;
 process.env.DEK_PUB_SERVER = "http://127.0.0.1:9";
 process.env.DEK_PUB_CREDENTIALS = join(
   tmpdir(),
