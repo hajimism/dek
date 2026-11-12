@@ -25,13 +25,6 @@ export const SlideMapStep = z.strictObject({
   title: z.string(),
 });
 
-export const SlideMapParagraph = z.strictObject({
-  /** A paragraph said aloud, as plain text: inline Markdown unwrapped, lines joined. */
-  text: z.string(),
-  /** Its first line in script.md. */
-  line: z.number().int(),
-});
-
 export const SlideMapSlide = z.strictObject({
   slug: z.string(),
   title: z.string(),
@@ -40,7 +33,8 @@ export const SlideMapSlide = z.strictObject({
   steps: z.array(SlideMapStep),
   /** The section's script as this build carries it, as Markdown. */
   script: z.string(),
-  paragraphs: z.array(SlideMapParagraph),
+  /** The paragraphs said aloud, as plain text: inline Markdown unwrapped, lines joined. */
+  paragraphs: z.array(z.string()),
 });
 
 export const SlideMap = z.strictObject({
