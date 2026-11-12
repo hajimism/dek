@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { Rename } from "../pub/protocol.ts";
 import { DekError } from "./error.ts";
-import { readSourceIfExists, writeInside } from "./safe-fs.ts";
+import { readSourceIfExists, removeInside, writeInside } from "./safe-fs.ts";
 import { formatZodIssues } from "./zod.ts";
 
 /**
@@ -34,29 +34,68 @@ export function recordRename(
   to: string,
   now: Date = new Date(),
 ): Rename {
-  const plan = planRename(root, deck, from, to, now);
-  writeInside(plan.path, plan.after, root);
-  return plan.rename;
+  const record = renameRecord(root, deck, from, to, { now });
+  record.apply();
+  return { from, to, at: now.toISOString() };
 }
 
 /**
- * The file with the rename added, and the file as it is (undefined while there is none), for a
- * caller that writes it as one step of a larger change and takes it back with the rest. Reading
- * it first means a file that does not read refuses the change before anything is written.
+ * The record of one rename, for a caller that writes it as one step of a larger change and takes
+ * it back with the rest. Making it reads the file, so a file that does not read refuses the change
+ * before anything is written. `apply` reads it again and appends, so a record another `dekc mv`
+ * wrote in between is kept; `undo` takes out only the entry `apply` added. With `once`, nothing
+ * is added when the deck's last entry is already this rename.
  */
-export function planRename(
+export function renameRecord(
   root: string,
   deck: string,
   from: string,
   to: string,
-  now: Date = new Date(),
-): { path: string; before: string | undefined; after: string; rename: Rename } {
+  options: { now?: Date; once?: boolean } = {},
+): { path: string; apply(): void; undo(): void } {
   const path = renamesPath(root);
-  const before = readSourceIfExists(path, root);
-  const file = parseRenamesFile(path, before);
-  const rename = { from, to, at: now.toISOString() };
-  const decks = { ...file.decks, [deck]: [...(file.decks[deck] ?? []), rename] };
-  return { path, before, after: `${JSON.stringify({ version: 1, decks }, null, 2)}\n`, rename };
+  readRenamesFile(root);
+  const rename: Rename = { from, to, at: (options.now ?? new Date()).toISOString() };
+  let added: { existed: boolean } | undefined;
+  return {
+    path,
+    apply() {
+      const existed = readSourceIfExists(path, root) !== undefined;
+      const file = readRenamesFile(root);
+      const entries = file.decks[deck] ?? [];
+      const last = entries.at(-1);
+      if (options.once && last?.from === from && last.to === to) {
+        return;
+      }
+      writeRenamesFile(root, { ...file.decks, [deck]: [...entries, rename] });
+      added = { existed };
+    },
+    undo() {
+      if (!added) {
+        return;
+      }
+      const file = readRenamesFile(root);
+      const entries = [...(file.decks[deck] ?? [])];
+      const index = entries.findLastIndex(
+        (entry) => entry.from === rename.from && entry.to === rename.to && entry.at === rename.at,
+      );
+      if (index >= 0) {
+        entries.splice(index, 1);
+      }
+      const { [deck]: _, ...others } = file.decks;
+      const decks = entries.length > 0 ? { ...others, [deck]: entries } : others;
+      if (!added.existed && Object.keys(decks).length === 0) {
+        removeInside(path, root);
+      } else {
+        writeRenamesFile(root, decks);
+      }
+      added = undefined;
+    },
+  };
+}
+
+function writeRenamesFile(root: string, decks: RenamesFile["decks"]): void {
+  writeInside(renamesPath(root), `${JSON.stringify({ version: 1, decks }, null, 2)}\n`, root);
 }
 
 function readRenamesFile(root: string): RenamesFile {

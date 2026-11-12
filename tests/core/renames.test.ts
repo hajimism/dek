@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readRenames, recordRename, renamesPath } from "../../src/core/renames.ts";
+import { readRenames, recordRename, renameRecord, renamesPath } from "../../src/core/renames.ts";
 import { withTempDir } from "../helpers/fs.ts";
 
 describe("renames", () => {
@@ -24,6 +24,47 @@ describe("renames", () => {
       mkdirSync(join(root, ".dek"));
       writeFileSync(renamesPath(root), "{");
       expect(() => readRenames(root, "talk")).toThrow(".dek/renames.json does not read");
+    });
+  });
+
+  test("appends to the file as it is when the record is written, and takes back only its own entry", async () => {
+    await withTempDir(async (root) => {
+      const at = new Date("2026-11-12T00:00:00Z");
+      const record = renameRecord(root, "talk", "intro", "opening", { now: at });
+      // Another dekc mv, on another deck, records between this one's plan and its write.
+      recordRename(root, "other", "a", "b", at);
+      record.apply();
+      expect(readRenames(root, "talk")).toEqual([
+        { from: "intro", to: "opening", at: at.toISOString() },
+      ]);
+      expect(readRenames(root, "other")).toEqual([{ from: "a", to: "b", at: at.toISOString() }]);
+      recordRename(root, "talk", "opening", "hello", at);
+      record.undo();
+      expect(readRenames(root, "talk")).toEqual([
+        { from: "opening", to: "hello", at: at.toISOString() },
+      ]);
+      expect(readRenames(root, "other")).toHaveLength(1);
+    });
+  });
+
+  test("removes the file its undo leaves empty, when there was none before", async () => {
+    await withTempDir(async (root) => {
+      const record = renameRecord(root, "talk", "intro", "opening");
+      record.apply();
+      expect(existsSync(renamesPath(root))).toBe(true);
+      record.undo();
+      expect(existsSync(renamesPath(root))).toBe(false);
+    });
+  });
+
+  test("records a rename once when asked to, if the deck's last entry is that rename", async () => {
+    await withTempDir(async (root) => {
+      const at = new Date("2026-11-12T00:00:00Z");
+      renameRecord(root, "talk", "intro", "opening", { now: at, once: true }).apply();
+      renameRecord(root, "talk", "intro", "opening", { now: at, once: true }).apply();
+      renameRecord(root, "other", "intro", "opening", { now: at, once: true }).apply();
+      expect(readRenames(root, "talk")).toHaveLength(1);
+      expect(readRenames(root, "other")).toHaveLength(1);
     });
   });
 });

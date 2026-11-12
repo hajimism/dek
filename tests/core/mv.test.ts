@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import { lintDeck } from "../../src/core/lint.ts";
@@ -500,6 +500,20 @@ describe("the renames dekc mv keeps for dek.pub", () => {
     });
   });
 
+  test("records a rename made wholly by hand once, when dekc mv is run after it", async () => {
+    await withTempProject(twoSlides, async (root) => {
+      const deckDir = join(root, "decks", "demo");
+      const script = join(deckDir, "script.md");
+      await writeFile(script, (await readFile(script, "utf8")).replace("## intro", "## cover"));
+      await rename(join(deckDir, "slides", "intro.html"), join(deckDir, "slides", "cover.html"));
+      renameSection(deckDir, "intro", "cover", at);
+      renameSection(deckDir, "intro", "cover", at);
+      expect(readRenames(root, "demo")).toEqual([
+        { from: "intro", to: "cover", at: at.toISOString() },
+      ]);
+    });
+  });
+
   test("records neither a reorder nor a rename that was refused", async () => {
     await withTempProject(twoSlides, async (root) => {
       const deckDir = join(root, "decks", "demo");
@@ -537,10 +551,36 @@ describe("the renames dekc mv keeps for dek.pub", () => {
       const deckDir = join(root, "decks", "demo");
       await mkdir(join(root, ".dek"), { recursive: true });
       await writeFile(renamesPath(root), "{");
+      const before = await readFile(join(deckDir, "script.md"), "utf8");
       expect(() => renameSection(deckDir, "intro", "cover", at)).toThrow(
         ".dek/renames.json does not read",
       );
+      expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(before);
       expect(existsSync(join(deckDir, "slides", "intro.html"))).toBe(true);
+      expect(existsSync(join(deckDir, "slides", "cover.html"))).toBe(false);
+      expect(await readFile(renamesPath(root), "utf8")).toBe("{");
     });
   });
+
+  test.skipIf(process.getuid?.() === 0)(
+    "takes the rename back and keeps the renames already recorded when the record fails",
+    async () => {
+      await withTempProject(twoSlides, async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        renameSection(deckDir, "outro", "ending", at);
+        const recorded = await readFile(renamesPath(root), "utf8");
+        const script = await readFile(join(deckDir, "script.md"), "utf8");
+        const dotDek = join(root, ".dek");
+        await chmod(dotDek, 0o555);
+        try {
+          expect(() => renameSection(deckDir, "intro", "cover", at)).toThrow();
+        } finally {
+          await chmod(dotDek, 0o755);
+        }
+        expect(await readFile(join(deckDir, "script.md"), "utf8")).toBe(script);
+        expect(existsSync(join(deckDir, "slides", "cover.html"))).toBe(false);
+        expect(await readFile(renamesPath(root), "utf8")).toBe(recorded);
+      });
+    },
+  );
 });

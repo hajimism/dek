@@ -7,6 +7,7 @@ import { cutText } from "../core/annotation-rows.ts";
 import {
   type EmbedMark,
   type EmbedMessage,
+  type EmbedMover,
   type EmbedRequest,
   embedStop,
   gotoPosition,
@@ -17,18 +18,17 @@ import {
 } from "../core/embed-protocol.ts";
 import { PAGE_ID } from "../core/page.ts";
 import { positionsEqual } from "../core/position.ts";
-import { logicalSize } from "../core/size.ts";
 import type { BeatRef, Position } from "../core/step.ts";
 import { RUNTIME_CLASSES } from "../core/theme-facts.ts";
-import { candidatesAt, elementName, slideBox, windowPoint } from "./annotate-pick.ts";
-import { deckSize } from "./clone.ts";
+import { candidatesAt, elementName, slideBox, visibleText, windowPoint } from "./annotate-pick.ts";
 import { slideSelector } from "./live.ts";
+import { isTextEntry } from "./step.ts";
 
 export type Embed = {
   /** The player has mounted, standing at `pos`. */
   ready(pos: Position): void;
-  /** The deck moved from `from` to `to`, by whatever moved it. */
-  moved(from: Position, to: Position): void;
+  /** The deck moved from `from` to `to`, at the framing page's asking or the reader's. */
+  moved(from: Position, to: Position, by: EmbedMover): void;
   /** Put the outline and the pins where their elements and boxes are now. */
   layout(): void;
 };
@@ -53,6 +53,8 @@ const STYLE = `
  */
 export function createEmbed(options: {
   deck: string;
+  /** The slide's own size, as the build stamped it: the pixels every box is in. */
+  size: { width: number; height: number };
   slides: ReadonlyArray<{ slug: string; beats: BeatRef[] }>;
   parent: Parent;
   position: () => Position;
@@ -83,7 +85,7 @@ export function createEmbed(options: {
 
   let picking = false;
   let hovered: Element | undefined;
-  let marks: EmbedMark[] = [];
+  let marks = new Map<string, EmbedMark>();
 
   function post(message: EmbedMessage): void {
     // Nothing a message holds is secret, so it may go to whichever page frames the deck.
@@ -126,7 +128,7 @@ export function createEmbed(options: {
     }
     // Named as annotate mode names it; the slide's own text is the whole slide, which names nothing.
     const name = elementName(el, classes(el));
-    const text = el === slide ? "" : cutText(el.textContent ?? "");
+    const text = el === slide ? "" : cutText(visibleText(el, slide));
     post(pickedMessage({ slug, step }, { name, text, box: slideBox(el, deckEl) }));
   }
 
@@ -134,7 +136,7 @@ export function createEmbed(options: {
   function drawPins(): void {
     const { slug } = onScreen();
     pins.replaceChildren(
-      ...marks
+      ...[...marks.values()]
         .filter((mark) => mark.slug === slug)
         .map((mark) => {
           const pin = document.createElement("button");
@@ -159,7 +161,7 @@ export function createEmbed(options: {
       place(hover, hovered.getBoundingClientRect());
     }
     for (const pin of pins.children) {
-      const mark = marks.find((each) => each.id === (pin as HTMLElement).dataset.mark);
+      const mark = marks.get((pin as HTMLElement).dataset.mark ?? "");
       if (pin instanceof HTMLElement && mark && deckEl) {
         // On the top right corner of the box, as annotate mode pins a note.
         const at = windowPoint({ x: mark.box.x + mark.box.width, y: mark.box.y }, deckEl);
@@ -179,13 +181,13 @@ export function createEmbed(options: {
         return;
       }
       case "dek:current":
-        post(movedMessage(slides, options.position()));
+        post(movedMessage(slides, options.position(), "embed"));
         return;
       case "dek:pick":
         setPicking(request.on);
         return;
       case "dek:marks":
-        marks = request.marks;
+        marks = new Map(request.marks.map((mark) => [mark.id, mark]));
         drawPins();
         return;
     }
@@ -215,7 +217,8 @@ export function createEmbed(options: {
     }
   });
   document.addEventListener("keydown", (event) => {
-    if (picking && event.key === "Escape") {
+    // Escape typed into a field on a slide is the field's.
+    if (picking && event.key === "Escape" && !isTextEntry(event.target)) {
       event.preventDefault();
       setPicking(false);
       post({ type: "dek:pick-cancel" });
@@ -224,22 +227,14 @@ export function createEmbed(options: {
 
   return {
     ready(pos) {
-      // The deck's size before the stage scales it: what slideBox divides by, so every box sent
-      // and every mark taken is in the pixels this says.
-      post(
-        readyMessage(
-          { name: options.deck, size: deckEl ? deckSize(deckEl) : logicalSize() },
-          slides,
-          pos,
-        ),
-      );
+      post(readyMessage({ name: options.deck, size: options.size }, slides, pos));
     },
-    moved(from, to) {
+    moved(from, to, by) {
       if (positionsEqual(from, to)) {
         return;
       }
       hovered = undefined;
-      post(movedMessage(slides, to));
+      post(movedMessage(slides, to, by));
       if (from.slideIndex !== to.slideIndex) {
         drawPins();
       } else {

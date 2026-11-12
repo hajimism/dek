@@ -23,9 +23,10 @@ import type { PositionHandlers, PositionSocket } from "./socket.ts";
 /**
  * Where a move came from. Local moves, and the rehearsal clock's, are published to peers; remote
  * ones arrived from one; a hash move came from the URL, which already holds its history entry.
- * Capture (the video recorder and morph shots, through `window.dekGo`) drives this page alone.
+ * Capture (the video recorder and morph shots, through `window.dekGo`) drives this page alone, as
+ * the embed API (the page that frames the deck, through `dek:goto`) does.
  */
-export type GoOrigin = "local" | "rehearse" | "remote" | "hash" | "capture";
+export type GoOrigin = "local" | "rehearse" | "remote" | "hash" | "capture" | "embed";
 
 export type Navigator = {
   /** What is on screen. */
@@ -61,8 +62,14 @@ export function createNavigator(options: {
   present: (from: Position, to: Position, apply: () => void) => Promise<void>;
   /** A newer move is waiting: cut the one in flight short. */
   hurry: () => void;
-  /** The deck now stands on `to`. */
-  onMove: (from: Position, to: Position) => void;
+  /** The deck now stands on `to`, moved from `origin`. */
+  onMove: (from: Position, to: Position, origin: GoOrigin) => void;
+  /**
+   * The deck is in another page's frame. Its moves then replace its history entry, since the
+   * history is the framing page's, and go to no other window: the deck's peers there are other
+   * frames of the framing page, which moves each frame itself.
+   */
+  framed?: boolean;
   /** A move is about to run. */
   beforeMove?: () => void;
   /** A move has played out. */
@@ -101,8 +108,8 @@ export function createNavigator(options: {
       await options.present(pos, next, () => {
         const from = pos;
         pos = next;
-        writeHash(origin === "hash" ? "replace" : historyMode(from, next));
-        options.onMove(from, next);
+        writeHash(origin === "hash" || options.framed ? "replace" : historyMode(from, next));
+        options.onMove(from, next, origin);
       });
       options.afterMove?.();
     },
@@ -113,7 +120,9 @@ export function createNavigator(options: {
 
   /** Tell the other windows and the server where the deck is headed. */
   function publish(position: Position): void {
-    channel.postMessage(encodePosition(position));
+    if (!options.framed) {
+      channel.postMessage(encodePosition(position));
+    }
     remote?.publish(position);
   }
 

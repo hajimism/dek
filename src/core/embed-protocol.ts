@@ -13,6 +13,9 @@ export type EmbedBox = { x: number; y: number; width: number; height: number };
 /** Where the deck stands: the slide's slug, its step as `dekc shot --step` takes it, its index. */
 export type EmbedStop = { slug: string; step: string; index: number };
 
+/** Who moved the deck: the framing page, through this API, or the reader, by anything else. */
+export type EmbedMover = "embed" | "reader";
+
 /** A numbered pin the framing page asks the deck to draw on a slide. */
 export type EmbedMark = { id: string; number: number; slug: string; step: string; box: EmbedBox };
 
@@ -43,7 +46,8 @@ export type EmbedMessage =
       slides: Array<{ slug: string; steps: string[] }>;
       current: EmbedStop;
     }
-  | ({ type: "dek:moved" } & EmbedStop)
+  /** `by` is `embed` for a move the framing page asked for, and its answer to `dek:current`. */
+  | ({ type: "dek:moved"; by: EmbedMover } & EmbedStop)
   | { type: "dek:picked"; slug: string; step: string; target: EmbedElementTarget }
   | { type: "dek:pick-cancel" }
   | { type: "dek:mark"; id: string };
@@ -106,12 +110,27 @@ const REQUESTS: Record<EmbedRequest["type"], (value: unknown) => boolean> = {
     (!Object.hasOwn(value, "step") || isText(value.step)),
   "dek:current": (value) => hasOnly(value, ["type"]),
   "dek:pick": (value) => hasOnly(value, ["type", "on"]) && typeof value.on === "boolean",
-  "dek:marks": (value) =>
-    hasOnly(value, ["type", "marks"]) &&
-    Array.isArray(value.marks) &&
-    value.marks.length <= MAX_MARKS &&
-    value.marks.every(isMark),
+  "dek:marks": (value) => hasOnly(value, ["type", "marks"]) && isMarks(value.marks),
 };
+
+/**
+ * A list of marks with no hole and nothing but its marks: `every` would pass over a hole, which
+ * a message keeps, and a hole read later is no mark.
+ */
+function isMarks(value: unknown): value is EmbedMark[] {
+  if (!Array.isArray(value) || value.length > MAX_MARKS) {
+    return false;
+  }
+  if (Object.keys(value).length !== value.length) {
+    return false;
+  }
+  for (let index = 0; index < value.length; index++) {
+    if (!Object.hasOwn(value, index) || !isMark(value[index])) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * The request a message holds, or undefined for anything else: a message of another kind, one
@@ -125,7 +144,14 @@ export function readEmbedRequest(value: unknown): EmbedRequest | undefined {
   if (typeof type !== "string" || !Object.hasOwn(REQUESTS, type)) {
     return undefined;
   }
-  return REQUESTS[type as EmbedRequest["type"]](value) ? (value as EmbedRequest) : undefined;
+  if (!REQUESTS[type as EmbedRequest["type"]](value)) {
+    return undefined;
+  }
+  const request = value as EmbedRequest;
+  // The deck keeps the marks it draws; the sender's list stays the sender's.
+  return request.type === "dek:marks"
+    ? { type: "dek:marks", marks: request.marks.map((mark) => ({ ...mark, box: { ...mark.box } })) }
+    : request;
 }
 
 /** Where `dek:goto` goes: the slide named, at the stop named, as `dekc shot --step` takes it. */
@@ -161,8 +187,8 @@ export function readyMessage(
   };
 }
 
-export function movedMessage(slides: Slides, pos: Position): EmbedMessage {
-  return { type: "dek:moved", ...embedStop(slides, pos) };
+export function movedMessage(slides: Slides, pos: Position, by: EmbedMover): EmbedMessage {
+  return { type: "dek:moved", ...embedStop(slides, pos), by };
 }
 
 /** The element picked on the slide `at`, named by its slide's HTML file. */
