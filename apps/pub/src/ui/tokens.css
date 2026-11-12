@@ -1,0 +1,368 @@
+/* dek.pub's design tokens and base rules, as the design brief sets them: warm near-neutral paper,
+   one ink-blue accent, and type tuned for Japanese and English together. Components use these
+   custom properties in their own scoped styles; nothing else is global. */
+
+:root {
+  color-scheme: light dark;
+
+  --font-sans:
+    "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Segoe UI", Meiryo, system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Noto Sans Mono", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-base: 1rem;
+  --text-article: 1.0625rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 1.875rem;
+  --text-3xl: 2.375rem;
+  --text-4xl: 3rem;
+  --leading-tight: 1.25;
+  --leading-snug: 1.4;
+  --leading-ui: 1.5;
+  --leading-read-en: 1.65;
+  --leading-read-ja: 1.9;
+  --tracking-heading-en: -0.015em;
+  --tracking-heading-ja: 0.02em;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --measure: 42.5rem;
+  --measure-wide: 52.5rem;
+
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --gutter: 16px;
+  --gutter-lg: 32px;
+  --page-gutter: var(--gutter);
+  --container: 1200px;
+  --header-height: 56px;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  --border-width: 1px;
+  --border-width-strong: 2px;
+
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-header: 20;
+  --z-drawer: 30;
+  --z-popover: 40;
+  --z-overlay: 50;
+  --z-dialog: 60;
+  --z-toast: 70;
+  --z-tooltip: 80;
+
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  --focus-width: 2px;
+  --focus-offset: 2px;
+
+  --gray-100: #fcfcfb;
+  --gray-200: #f4f4f2;
+  --gray-300: #ebebe8;
+  --gray-400: #e0e0db;
+  --gray-500: #cdcdc7;
+  --gray-600: #8c8c85;
+  --gray-700: #6f6f68;
+  --gray-800: #5e5e57;
+  --gray-900: #3a3a36;
+  --gray-1000: #1c1c1a;
+
+  --bg: var(--gray-100);
+  --bg-subtle: var(--gray-200);
+  --bg-active: var(--gray-300);
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --overlay: rgb(28 28 26 / 0.4);
+  --text: var(--gray-1000);
+  --text-muted: var(--gray-800);
+  --text-faint: var(--gray-700);
+  --border: var(--gray-400);
+  --border-hover: var(--gray-500);
+  --border-strong: var(--gray-600);
+  --header-bg: rgb(252 252 251 / 0.85);
+
+  --accent: #3451d1;
+  --accent-hover: #2a43b5;
+  --accent-subtle: #eef1fd;
+  --accent-border: #bcc7f4;
+  --on-accent: #ffffff;
+
+  --success: #1d7a4b;
+  --success-subtle: #e8f5ee;
+  --warning: #8f5b00;
+  --warning-subtle: #fdf3e0;
+  --danger: #c42b2b;
+  --danger-hover: #a82222;
+  --danger-subtle: #fcedec;
+  --on-danger: #ffffff;
+
+  --highlight: #fde8b5;
+  --highlight-active: #fed983;
+  --highlight-underline: #d99a00;
+  --pin: var(--accent);
+
+  --focus: var(--accent);
+
+  --shadow-sm: 0 1px 2px rgb(28 28 26 / 0.06);
+  --shadow-md: 0 4px 12px rgb(28 28 26 / 0.08), 0 1px 3px rgb(28 28 26 / 0.06);
+  --shadow-lg: 0 16px 40px rgb(28 28 26 / 0.14), 0 2px 6px rgb(28 28 26 / 0.06);
+  --floating-border: transparent;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --page-gutter: var(--gutter-lg);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --gray-100: #111110;
+    --gray-200: #20201e;
+    --gray-300: #2a2a27;
+    --gray-400: #2e2e2b;
+    --gray-500: #3d3d39;
+    --gray-600: #6e6e68;
+    --gray-700: #8a8a83;
+    --gray-800: #a6a69e;
+    --gray-900: #c8c8c1;
+    --gray-1000: #ededea;
+    --surface: #181817;
+    --surface-raised: #1e1e1c;
+    --overlay: rgb(0 0 0 / 0.6);
+    --header-bg: rgb(17 17 16 / 0.85);
+    --accent: #8ea2ff;
+    --accent-hover: #a9b8ff;
+    --accent-subtle: #1c2242;
+    --accent-border: #3a4785;
+    --on-accent: #0e1433;
+    --success: #5ccb92;
+    --success-subtle: #12291d;
+    --warning: #e9b44c;
+    --warning-subtle: #2c2210;
+    --danger: #ff8a80;
+    --danger-hover: #ffa39b;
+    --danger-subtle: #2e1513;
+    --on-danger: #111110;
+    --highlight: #453818;
+    --highlight-active: #67511d;
+    --highlight-underline: #e9b44c;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
+    --floating-border: var(--border);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --gray-100: #111110;
+  --gray-200: #20201e;
+  --gray-300: #2a2a27;
+  --gray-400: #2e2e2b;
+  --gray-500: #3d3d39;
+  --gray-600: #6e6e68;
+  --gray-700: #8a8a83;
+  --gray-800: #a6a69e;
+  --gray-900: #c8c8c1;
+  --gray-1000: #ededea;
+  --surface: #181817;
+  --surface-raised: #1e1e1c;
+  --overlay: rgb(0 0 0 / 0.6);
+  --header-bg: rgb(17 17 16 / 0.85);
+  --accent: #8ea2ff;
+  --accent-hover: #a9b8ff;
+  --accent-subtle: #1c2242;
+  --accent-border: #3a4785;
+  --on-accent: #0e1433;
+  --success: #5ccb92;
+  --success-subtle: #12291d;
+  --warning: #e9b44c;
+  --warning-subtle: #2c2210;
+  --danger: #ff8a80;
+  --danger-hover: #ffa39b;
+  --danger-subtle: #2e1513;
+  --on-danger: #111110;
+  --highlight: #453818;
+  --highlight-active: #67511d;
+  --highlight-underline: #e9b44c;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
+  --floating-border: var(--border);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: calc(var(--header-height) + var(--space-4));
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font: var(--weight-regular) var(--text-md) / var(--leading-ui) var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:lang(ja) {
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+  letter-spacing: var(--tracking-heading-en);
+  font-weight: var(--weight-semibold);
+}
+
+:lang(ja) :is(h1, h2, h3, .lead) {
+  font-feature-settings: "palt";
+  letter-spacing: var(--tracking-heading-ja);
+  word-break: auto-phrase;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
+}
+
+.num,
+time,
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+::selection {
+  background: var(--accent-subtle);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.prose {
+  max-width: var(--measure);
+  font-size: var(--text-base);
+  line-height: var(--leading-read-en);
+  text-wrap: pretty;
+}
+
+.prose:lang(ja) {
+  line-height: var(--leading-read-ja);
+}
+
+@media (min-width: 768px) {
+  .prose {
+    font-size: var(--text-article);
+  }
+}
+
+@supports (text-autospace: ideograph-alpha) {
+  .prose:lang(ja) {
+    text-autospace: ideograph-alpha ideograph-numeric;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    /* biome-ignore lint/complexity/noImportantStyles: a reader who asked for less motion wins */
+    animation-duration: 1ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: a reader who asked for less motion wins */
+    transition-duration: 1ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: a reader who asked for less motion wins */
+    scroll-behavior: auto !important;
+  }
+}
