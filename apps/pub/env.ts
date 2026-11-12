@@ -9,8 +9,10 @@ export default defineEnv({
   APP_ORIGIN: url().default("https://dek.pub"),
   /** Set to 1 on a machine where email sign-up stands in for GitHub; never in production. */
   DEK_PUB_DEV_LOGIN: string().default("0"),
-  /** Turnstile's secret; Cloudflare's always-pass test secret in development. */
-  TURNSTILE_SECRET: string().default("1x0000000000000000000000000000000AA"),
+  /** Turnstile's secret; `off` skips the check, on a machine that cannot reach Cloudflare. */
+  TURNSTILE_SECRET: string(),
+  /** Turnstile's site key, for the widget; empty where the check is off. */
+  TURNSTILE_SITE_KEY: string().default(""),
   AUTH_GITHUB_CLIENT_ID: string(),
   AUTH_GITHUB_CLIENT_SECRET: string(),
 });

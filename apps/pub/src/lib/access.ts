@@ -2,7 +2,7 @@
 
 import type { CommentPolicy, Visibility } from "../../../../src/pub/protocol.ts";
 
-export type Person = { id: string; handle: string; name: string };
+export type Person = { id: string; handle: string; name: string; email?: string };
 
 export type DeckRules = {
   ownerId: string;

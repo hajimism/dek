@@ -58,11 +58,7 @@ export async function visibleDeck(
   if (!deck) {
     throw notFound();
   }
-  const grant = await grantRole(
-    deck,
-    person,
-    person && "email" in person ? person.email : undefined,
-  );
+  const grant = await grantRole(deck, person, person?.email);
   if (!canView(deck, person, grant)) {
     throw notFound();
   }

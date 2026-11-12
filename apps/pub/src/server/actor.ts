@@ -11,7 +11,12 @@ import { authOf } from "./void-auth.ts";
 type UserRow = { id: string; name: string; email?: string; handle?: string | null };
 
 function person(user: UserRow): Person {
-  return { id: user.id, name: user.name, handle: user.handle ?? user.id };
+  return {
+    id: user.id,
+    name: user.name,
+    handle: user.handle ?? user.id,
+    ...(user.email ? { email: user.email } : {}),
+  };
 }
 
 export async function currentPerson(c: Context): Promise<Person | null> {
