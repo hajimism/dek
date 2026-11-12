@@ -76,4 +76,4 @@ CI では `biome ci`、`typecheck`、`knip`、全テスト（ブラウザを使�
 
 ## ライセンス
 
-MIT
+MIT。ビルドしたデッキに dek が入れるランタイムとテーマ（`src/runtime/` と `src/theme/`）は MIT No Attribution で、共有するデッキに著作権表示を残す必要はありません。`apps/pub/` の dek.pub サーバーは AGPL-3.0 です。
