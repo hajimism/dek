@@ -22,7 +22,7 @@ Void (VoidZero's full-stack Vite framework, GA 2026-10-15) runs on Cloudflare Wo
 
 **The serve Worker (`apps/pub/serve`) is a plain Worker, outside Void, deployed with wrangler.** It answers `d-<id>.dekusercontent.com/v/<n>/` with one build from R2 under a content security policy that stops every request out of the page. It reads no database: the app writes `decks/<id>/access.json` beside each deck in R2, which says what may be served without a token (a public deck's current version), and anything else needs an HMAC token the app signs for one deck, version and build, good for ten minutes.
 
-**Local development runs on Miniflare, with no account.** `vp dev` serves the app on `localhost:5173`; a development-only middleware (`middleware/00.deck-host.dev.ts`) answers `d-<id>.localhost:5173` with the serve Worker's handler and the same local R2, so a deck still gets an origin of its own that the app's cookies do not reach. `bun run setup` writes `.env` from `dev.env`. Turnstile's secret `off` skips the human check where Cloudflare is unreachable.
+**Local development runs on Miniflare, with no account.** `vp dev` serves the app on `localhost:5173`; a development-only middleware (`middleware/00.deck-host.ts`, folded out of the production build) answers `d-<id>.localhost:5173` with the serve Worker's handler and the same local R2, so a deck still gets an origin of its own that the app's cookies do not reach. `bun run setup` writes `.env` from `dev.env`. Turnstile's secret `off` skips the human check where Cloudflare is unreachable.
 
 **Type checking and tests:**
 

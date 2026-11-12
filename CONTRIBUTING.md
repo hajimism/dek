@@ -30,6 +30,17 @@ bun run docs:build     # docs and the sample decks
 bash scripts/check-package.sh   # the tarball npm would ship, installed and run
 ```
 
+CI also checks the dek.pub server with these, from `apps/pub/`, on the Node that `mise.toml` pins. Run them when `apps/pub/` or `src/pub/` changed:
+
+```bash
+bun run setup          # .env from dev.env, and Void's types
+bun run check          # svelte-check, on TypeScript 6
+bun run test           # unit tests in Node, components in Chromium
+bun run test:serve     # the serve Worker, in workerd
+bun run build
+bun run test:e2e       # dekc pub against the dev server on Miniflare
+```
+
 - **Agents are users.** Read the [Agent Usability Criteria](https://hajimism.github.io/dek/guide/agent-criteria.html) before changing a command, a diagnostic, or a convention.
 - **Docs come in two languages.** A change to `docs/` or a README lands in both English and Japanese.
 - **The command is `dekc`.** Write the product, the package, and its files as dek; write anything you type to run it as `dekc`.

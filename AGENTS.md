@@ -9,6 +9,7 @@ A build system for talks, written in TypeScript on Bun. This file is for working
 - `docs/`: the VitePress site, in English and in Japanese under `docs/ja/`.
 - `sample/`: sample decks, built from this checkout.
 - `adr/`: decision records.
+- `apps/pub/`: the dek.pub server, AGPL-3.0, with its own `AGENTS.md`.
 
 ## Rules
 
@@ -34,4 +35,4 @@ Fill every section. Never rewrite an accepted ADR to change the decision; supers
 
 ## Before you report work as done
 
-Run what CI runs, listed in [CONTRIBUTING.md](CONTRIBUTING.md): `bunx biome ci .`, `bun run typecheck`, `bun run knip`, `bun test`, and `bun run docs:build` when docs or samples changed.
+Run what CI runs, listed in [CONTRIBUTING.md](CONTRIBUTING.md): `bunx biome ci .`, `bun run typecheck`, `bun run knip`, `bun test`, and `bun run docs:build` when docs or samples changed. When `apps/pub/` or `src/pub/` changed, also run, from `apps/pub/`: `bun run check`, `bun run test`, `bun run test:serve`, `bun run build`, and `bun run test:e2e` (see `apps/pub/AGENTS.md`).
