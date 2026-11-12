@@ -68,6 +68,11 @@ export type Rename = z.infer<typeof Rename>;
 export const VERSION_FILES = ["full", "public", "source", "cover"] as const;
 export type VersionFile = (typeof VERSION_FILES)[number];
 
+const Sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+
+/** The form field a slide's picture is sent in, a PNG of the slide as it arrives. */
+export const shotField = (slug: string) => `shot:${slug}`;
+
 export const LintSummary = z.strictObject({
   errors: z.number().int(),
   warnings: z.number().int(),
@@ -93,7 +98,9 @@ export const VersionManifest = z.strictObject({
   renames: z.array(Rename),
   message: z.string().optional(),
   /** sha256 of each file sent, hex. */
-  files: z.partialRecord(z.enum(VERSION_FILES), z.string().regex(/^[0-9a-f]{64}$/)),
+  files: z.partialRecord(z.enum(VERSION_FILES), Sha256),
+  /** sha256 of each slide's picture as it arrives, by slug; each is sent as `shot:<slug>`. */
+  shots: z.record(z.string(), Sha256),
 });
 export type VersionManifest = z.infer<typeof VersionManifest>;
 
