@@ -504,3 +504,80 @@ describe("annotate mode", () => {
     expect(texts("[data-part=marker]")).toEqual(["1"]);
   });
 });
+
+describe("the list of notes", () => {
+  const cover = (): HTMLElement =>
+    document.querySelector('#deck > [data-slug="cover"]') as HTMLElement;
+  const count = (): HTMLButtonElement => part<HTMLButtonElement>("[data-part=count]");
+  const items = (): HTMLButtonElement[] => [
+    ...ui().querySelectorAll<HTMLButtonElement>("[data-part=item]"),
+  ];
+
+  test.serial("opens from the count, every note by slide and beat as Copy has them", async () => {
+    pressKey("ArrowLeft");
+    await waitFor(() => currentSlug() === "cover");
+    under(cover().querySelector("h2") as Element, cover());
+    pointAt("click");
+    part<HTMLTextAreaElement>("textarea").value = "大きく";
+    part<HTMLButtonElement>("[data-part=add]").click();
+    await waitFor(() => count().textContent === "2 notes");
+    pressKey("ArrowRight");
+    await waitFor(() => currentSlug() === "plan");
+
+    expect(shown("[data-part=list]")).toBe(false);
+    expect(count().getAttribute("aria-expanded")).toBe("false");
+    count().click();
+    expect(shown("[data-part=list]")).toBe(true);
+    expect(count().getAttribute("aria-expanded")).toBe("true");
+    expect(texts("[data-part=group] h3")).toEqual(["1 · cover", "2 · plan"]);
+    expect(texts("[data-part=item] [data-part=number]")).toEqual(["1", "2"]);
+    expect(texts("[data-part=item] [data-part=gist]")).toEqual(["大きく", "kept"]);
+    // The slide on screen is the one marked.
+    expect(
+      [...ui().querySelectorAll("[data-part=group]")].map((group) =>
+        group.hasAttribute("data-here"),
+      ),
+    ).toEqual([false, true]);
+  });
+
+  test.serial("goes to a note on another slide and opens it there", async () => {
+    items()[0]?.click();
+    expect(shown("[data-part=list]")).toBe(false);
+    expect(shown("[data-part=popup]")).toBe(true);
+    expect(part<HTMLTextAreaElement>("textarea").value).toBe("大きく");
+    expect(shown("[data-part=delete]")).toBe(true);
+    await waitFor(() => currentSlug() === "cover");
+    expect(location.hash).toBe("#cover");
+    pressKey("Escape", { composed: true }, part("textarea"));
+  });
+
+  test.serial("Escape closes the list before it leaves the mode", () => {
+    count().click();
+    pressKey("Escape");
+    expect(shown("[data-part=list]")).toBe(false);
+    expect(shown("[data-part=layer]")).toBe(true);
+  });
+
+  test.serial("opens a note no marker shows, once an edit took its element away", async () => {
+    await edit(arrowGone.replace(/\n\s*<div class="chevron">.*<\/div>/, ""));
+    count().click();
+    await waitFor(() => texts("[data-part=item] [data-part=state]").join() === "gone");
+    items()[1]?.click();
+    await waitFor(() => currentSlug() === "plan");
+    expect(texts("[data-part=marker]")).toEqual([]);
+    expect(shown("[data-part=popup]")).toBe(true);
+    expect(part<HTMLTextAreaElement>("textarea").value).toBe("kept");
+    part<HTMLButtonElement>("[data-part=delete]").click();
+    await waitFor(() => count().textContent === "1 note");
+  });
+
+  test.serial("closes once Clear leaves nothing to list, and says so above it", async () => {
+    count().click();
+    part<HTMLButtonElement>("[data-part=clear]").click();
+    await waitFor(() => count().textContent === "0 notes");
+    expect(count().disabled).toBe(true);
+    expect(shown("[data-part=list]")).toBe(false);
+    expect(shown("[data-part=tray]")).toBe(true);
+    expect(part("[data-part=status]").textContent).toBe("Cleared 1 note");
+  });
+});

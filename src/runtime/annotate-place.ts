@@ -1,6 +1,6 @@
 // Where annotate mode's popup goes: beside what was picked, never over it, inside the window.
 
-type Rect = { left: number; top: number; right: number; bottom: number };
+export type Rect = { left: number; top: number; right: number; bottom: number };
 type Size = { width: number; height: number };
 
 /** How far the popup keeps from what was picked and from the window's edges. */

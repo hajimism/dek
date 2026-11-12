@@ -7,6 +7,7 @@ import {
   ringPoints,
   slideBox,
   slidePoint,
+  stopHash,
   windowPoint,
 } from "../../src/runtime/annotate-pick.ts";
 
@@ -157,5 +158,28 @@ describe("currentStop", () => {
     expect(currentStop("#plan/2", slides)).toEqual({ slideIndex: 1, step: "2" });
     expect(currentStop("#plan", slides)).toEqual({ slideIndex: 1, step: "0" });
     expect(currentStop("", slides)).toEqual({ slideIndex: 0, step: "0" });
+  });
+});
+
+describe("stopHash", () => {
+  const slides = [
+    { slug: "cover", beats: [] },
+    { slug: "plan", beats: [{ id: "base" }, {}] },
+  ];
+
+  test("names the stop a note was written at as the hash the deck shows it at", () => {
+    expect(stopHash("plan", "base", slides)).toBe("#plan/1");
+    expect(stopHash("plan", "2", slides)).toBe("#plan/2");
+    expect(stopHash("plan", "0", slides)).toBe("#plan");
+    expect(currentStop(stopHash("plan", "base", slides), slides)).toEqual({
+      slideIndex: 1,
+      step: "base",
+    });
+  });
+
+  test("goes as near the beat as the script still has, and nowhere once the slide is gone", () => {
+    expect(stopHash("plan", "later", slides)).toBe("#plan");
+    expect(stopHash("plan", "3", slides)).toBe("#plan/2");
+    expect(stopHash("gone", "0", slides)).toBe("");
   });
 });

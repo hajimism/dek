@@ -97,6 +97,21 @@ export function reanchor<T extends Named>(target: Named, present: readonly T[]):
 /** A slide as the page lists it. */
 export type SlideInfo = { slug: string; title: string };
 
+/** One slide's notes at one beat, which Copy writes under one heading and the page lists. */
+export type NoteGroup = { slug: string; step: string; rows: AnnotationRow[] };
+
+/** The notes by slide and beat, each group where its first note is in the order given. */
+export function groupNotes(rows: readonly AnnotationRow[]): NoteGroup[] {
+  const groups = new Map<string, NoteGroup>();
+  for (const row of rows) {
+    const key = `${row.slug}\n${row.step}`;
+    const group = groups.get(key) ?? { slug: row.slug, step: row.step, rows: [] };
+    group.rows.push(row);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
 /**
  * The notes as one Markdown block for an agent, in the order given, grouped by slide and beat:
  * each element with the file and line it is written at now, and how to see the slide at that
@@ -111,12 +126,6 @@ export function formatNotes(
   if (rows.length === 0) {
     return "";
   }
-  const groups = new Map<string, AnnotationRow[]>();
-  for (const row of rows) {
-    const key = `${row.slug}\n${row.step}`;
-    groups.set(key, [...(groups.get(key) ?? []), row]);
-  }
-
   // The deck's folder and the notes file are the project's text, which a clone brings along.
   const folder = shown(deck, "<deck>");
   const lines = [
@@ -124,18 +133,18 @@ export function formatNotes(
     "",
     "Boxes and points are in the slide's own pixels, from its top left.",
   ];
-  for (const group of groups.values()) {
-    const first = group[0];
+  for (const group of groupNotes(rows)) {
+    const first = group.rows[0];
     if (!first) {
       continue;
     }
-    const index = slides.findIndex((slide) => slide.slug === first.slug);
+    const index = slides.findIndex((slide) => slide.slug === group.slug);
     const title = slides[index]?.title;
     lines.push(
       "",
-      `### Slide ${index + 1} of ${slides.length}, ${shown(first.slug, "<slug>")}${title ? ` (${JSON.stringify(title)})` : ""}, ${beatLabel(first.step)}`,
+      `### Slide ${index + 1} of ${slides.length}, ${shown(group.slug, "<slug>")}${title ? ` (${JSON.stringify(title)})` : ""}, ${beatLabel(group.step)}`,
     );
-    for (const row of group) {
+    for (const row of group.rows) {
       const where = (target: TargetRow): string =>
         `${describe(target)} at decks/${folder}/slides/${shown(row.slug, "<slug>")}.html:${target.line}:${target.column} (${measure(target)})${target.found ? "" : ", as written before an edit; the line may have moved"}`;
       lines.push("");

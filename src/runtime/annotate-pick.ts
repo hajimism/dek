@@ -4,8 +4,8 @@
 // they are written count, so every one can be named by its file and line.
 
 import { type Box, cutText } from "../core/annotation-rows.ts";
-import { deckStops, positionFromHash } from "../core/position.ts";
-import { type BeatRef, stepKey } from "../core/step.ts";
+import { deckStops, formatHash, positionFromHash } from "../core/position.ts";
+import { type BeatRef, lastStop, resolveStop, stepKey } from "../core/step.ts";
 
 /** The attribute the dev server writes on each start tag of a slide: `<line>:<column>`. */
 export const SOURCE_ATTR = "data-dek-source";
@@ -141,4 +141,28 @@ export function currentStop(
     slideIndex: pos.slideIndex,
     step: stepKey(slides[pos.slideIndex]?.beats ?? [], pos.beatIndex),
   };
+}
+
+/**
+ * The hash that shows `slug` at `step`, the stop a note was written at: its last beat once a
+ * beat by number is past the slide's last, as a typed hash goes; the slide as it arrives once a
+ * beat by id is gone from the script; and nothing once the slide is.
+ */
+export function stopHash(
+  slug: string,
+  step: string,
+  slides: ReadonlyArray<{ slug: string; beats: BeatRef[] }>,
+): string {
+  const slideIndex = slides.findIndex((slide) => slide.slug === slug);
+  const slide = slides[slideIndex];
+  if (!slide) {
+    return "";
+  }
+  return formatHash(
+    {
+      slideIndex,
+      beatIndex: resolveStop(slide.beats, step) ?? (/^\d+$/.test(step) ? lastStop(slide.beats) : 0),
+    },
+    slides.map((each) => each.slug),
+  );
 }

@@ -73,6 +73,7 @@ const planHtml = slideDocument(`<section class="slide">
     <div class="next" style="position: absolute; left: 20px; top: 70px; width: 200px; height: 40px">試作</div>
     <div class="arrow" style="position: absolute; left: 400px; top: 20px; width: 4px; height: 200px; background: pink; pointer-events: none"></div>
     <div class="later" data-step="later" style="position: absolute; left: 20px; top: 120px; width: 200px; height: 40px">later</div>
+    <div class="pulse" style="position: absolute; left: 300px; top: 230px; width: 100px; height: 40px">pulse</div>
   </div>
   <svg style="position: absolute; left: 800px; top: 100px; width: 200px; height: 200px" viewBox="0 0 200 200"><line x1="0" y1="100" x2="200" y2="100" stroke="black" stroke-width="1"/></svg>
 </section>`);
@@ -80,6 +81,8 @@ const planHtml = slideDocument(`<section class="slide">
 const endHtml = slideDocument(`<section class="slide"><h2>end</h2></section>`);
 
 const theme = `.slide { position: relative; width: 1280px; height: 720px; }
+.slide .pulse { animation: wob 0.4s linear infinite alternate; }
+@keyframes wob { to { transform: translateX(40px); } }
 .slide.is-current [data-step] { opacity: 0; }
 .slide.is-current [data-step].is-shown { opacity: 1; }
 `;
@@ -203,6 +206,22 @@ function inView(
     },
     [selector, click] as const,
   );
+}
+
+/** The view's open popup: whether it shows, where it is, and what its field holds. */
+function popupNow(
+  page: Page,
+): Promise<{ shown: boolean; left: string; top: string; text: string }> {
+  return page.evaluate(() => {
+    const view = document.getElementById("dek-annotate")?.shadowRoot as ShadowRoot;
+    const popup = view.querySelector("[data-part=popup]") as HTMLElement;
+    return {
+      shown: !popup.hidden,
+      left: popup.style.left,
+      top: popup.style.top,
+      text: (view.querySelector("textarea") as HTMLTextAreaElement).value,
+    };
+  }, undefined);
 }
 
 /** Write a note on the chevron of the plan slide, and wait for its marker. */
@@ -379,4 +398,137 @@ describe("annotate mode in a browser", () => {
       await page.close();
     }
   });
+
+  browserTest("goes to a note from the list and opens it beside its element", async () => {
+    const { page, errors } = await openDevPage();
+    try {
+      await writeNote(page);
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowRight");
+      await page.waitForFunction(() => location.hash === "#end", undefined, { timeout: WAIT_MS });
+      await inView(page, "[data-part=count]", true);
+      await inView(page, "[data-part=item]", true);
+      // Under the chevron once the plan slide is on screen, however long the move took.
+      await page.waitForFunction(
+        () => {
+          const popup = document
+            .getElementById("dek-annotate")
+            ?.shadowRoot?.querySelector("[data-part=popup]") as HTMLElement;
+          const chevron = document.querySelector(
+            '#deck > [data-slug="plan"] .chevron',
+          ) as HTMLElement;
+          const at = popup.getBoundingClientRect();
+          const under = chevron.getBoundingClientRect();
+          return (
+            location.hash === "#plan" &&
+            !popup.hidden &&
+            Math.abs(at.left - under.left) < 2 &&
+            Math.abs(at.top - (under.bottom + 8)) < 2
+          );
+        },
+        undefined,
+        { timeout: WAIT_MS },
+      );
+      expect((await inView(page, "textarea"))?.value).toBe("右に");
+      expect(errors).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+  browserTest("leaves the popup where it was put beside an element that never stops", async () => {
+    const { page } = await openDevPage();
+    try {
+      await clickSlide(page, 100 + 300 + 50, 100 + 230 + 20);
+      expect((await choices(page)).chosen).toStartWith("div.pulse ");
+      await page.keyboard.type("揺れる");
+      const places = new Set<string>();
+      for (let frame = 0; frame < 8; frame++) {
+        const now = await popupNow(page);
+        places.add(`${now.left},${now.top}`);
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)), undefined);
+      }
+      expect(places.size).toBe(1);
+    } finally {
+      await page.close();
+    }
+  });
+
+  browserTest("keeps a note being written through a beat of its slide", async () => {
+    const { page } = await openDevPage();
+    try {
+      await clickSlide(page, 100 + 20 + 100, 100 + 20 + 20);
+      await page.keyboard.type("draft");
+      await page.evaluate(() => {
+        const field = document.getElementById("dek-annotate")?.shadowRoot?.activeElement;
+        (field as HTMLElement | null | undefined)?.blur();
+      }, undefined);
+      await page.keyboard.press("ArrowRight");
+      await page.waitForFunction(() => location.hash === "#plan/1", undefined, {
+        timeout: WAIT_MS,
+      });
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)), undefined);
+      expect(await popupNow(page)).toMatchObject({ shown: true, text: "draft" });
+    } finally {
+      await page.close();
+    }
+  });
+
+  browserTest("goes to another beat of the slide on screen without a history entry", async () => {
+    const { page } = await openDevPage();
+    try {
+      await page.keyboard.press("ArrowRight");
+      await page.waitForFunction(() => location.hash === "#plan/1", undefined, {
+        timeout: WAIT_MS,
+      });
+      await writeNote(page);
+      await page.keyboard.press("ArrowLeft");
+      await page.waitForFunction(() => location.hash === "#plan", undefined, { timeout: WAIT_MS });
+      const entries = await page.evaluate(() => history.length, undefined);
+      await inView(page, "[data-part=count]", true);
+      await inView(page, "[data-part=item]", true);
+      await page.waitForFunction(() => location.hash === "#plan/1", undefined, {
+        timeout: WAIT_MS,
+      });
+      expect(await page.evaluate(() => history.length, undefined)).toBe(entries);
+      expect((await popupNow(page)).text).toBe("右に");
+    } finally {
+      await page.close();
+    }
+  });
+
+  browserTest(
+    "opens the list and a note in it from the keyboard, without moving the deck",
+    async () => {
+      const { page } = await openDevPage();
+      try {
+        await writeNote(page);
+        await page.evaluate(() => {
+          const count = document
+            .getElementById("dek-annotate")
+            ?.shadowRoot?.querySelector("[data-part=count]") as HTMLElement;
+          count.focus();
+        }, undefined);
+        await page.keyboard.press("Enter");
+        const focused = () =>
+          page.evaluate(
+            () =>
+              (document.getElementById("dek-annotate")?.shadowRoot?.activeElement as HTMLElement)
+                ?.dataset.part ?? "",
+            undefined,
+          );
+        expect(await focused()).toBe("item");
+        // The pointer moving over the slide redraws the view; the list keeps its focus.
+        const at = await onScreen(page, 100 + 20 + 100, 100 + 70 + 20);
+        await page.mouse.move(at.x, at.y);
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)), undefined);
+        expect(await focused()).toBe("item");
+        await page.keyboard.press(" ");
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)), undefined);
+        expect(await page.evaluate(() => location.hash, undefined)).toBe("#plan");
+        expect(await popupNow(page)).toMatchObject({ shown: true, text: "右に" });
+      } finally {
+        await page.close();
+      }
+    },
+  );
 });
