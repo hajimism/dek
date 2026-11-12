@@ -9,6 +9,7 @@ import { isRefName } from "../core/ref-name.ts";
 import { readDeckFile } from "../core/resolve.ts";
 import { readSourceIfExists } from "../core/safe-fs.ts";
 import { syncDeck } from "../core/sync.ts";
+import { isTypedCommand } from "./commands.ts";
 import { applyPlan, deckPlan, nextSteps } from "./files.ts";
 import {
   hiddenField,
@@ -35,13 +36,26 @@ export type NewResult = {
   hidden?: HiddenText[];
 };
 
-export function newCommand(options: { cwd: string; name: string; themeFrom?: string }): NewResult {
-  const { name } = options;
+/**
+ * Refuse a name `dekc new` and `dekc init` may not give a deck: one that is no plain name, and
+ * one that is a command's, such as `pub`, since `dekc <name>` would run the command, not the deck.
+ */
+export function requireDeckName(name: string): void {
   if (!isDeckName(name)) {
     throw new DekError(`invalid deck name "${name}"`, {
       hint: DECK_NAME_HINT,
     });
   }
+  if (isTypedCommand(name)) {
+    throw new DekError(`deck name "${name}" is a dekc command`, {
+      hint: `\`dekc ${name}\` would run the command, not the deck; name it something else, like ${name}-talk`,
+    });
+  }
+}
+
+export function newCommand(options: { cwd: string; name: string; themeFrom?: string }): NewResult {
+  const { name } = options;
+  requireDeckName(name);
 
   const project = requireProject(options.cwd);
   const dir = join(project.root, "decks", name);

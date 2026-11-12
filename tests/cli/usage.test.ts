@@ -166,6 +166,7 @@ describe("the CLI reference", () => {
       Refs: "Refs",
       Slide: "Slide",
       Output: "Output",
+      Publish: "Publish",
       Help: "Help",
     },
     "docs/ja/reference/cli.md": {
@@ -174,6 +175,7 @@ describe("the CLI reference", () => {
       Refs: "ref",
       Slide: "スライド",
       Output: "成果物",
+      Publish: "公開",
       Help: "ヘルプ",
     },
   };

@@ -1,5 +1,16 @@
 import { z } from "zod";
 import type { DiagnosticValue as DiagnosticValueType } from "../core/diagnostic.ts";
+import {
+  CommentRow,
+  CommentStatus,
+  DeckId,
+  DeckStatus,
+  ElementTarget,
+  Me,
+  QuoteTarget,
+  Reply,
+  Visibility,
+} from "../pub/protocol.ts";
 import type { ResultCommand } from "./commands.ts";
 import { type CommandLine, parseCommandLine } from "./flags.ts";
 
@@ -131,6 +142,127 @@ const shotFile = z.strictObject({
   to: z.string().optional().describe("A morph frame: the slide the transition goes to."),
   at: z.number().optional().describe("A morph frame: where in the transition, 0..1."),
 });
+
+const server = z.string().describe("The origin of the dek.pub the command talked to.");
+
+const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+
+const ShotsSkipped = z
+  .strictObject({
+    check: z.literal("shots"),
+    reason: z.string(),
+    hint: z.string().describe("What to do so that the pictures are taken."),
+  })
+  .describe("No picture of the slides, the cover's included, went with the version.");
+
+const PubComment = CommentRow.extend({
+  targets: z.array(
+    z.discriminatedUnion("kind", [
+      ElementTarget.extend({
+        path: z.string().describe("The slide's HTML file in the project."),
+      }),
+      QuoteTarget.extend({
+        path: z.string().describe("The deck's script.md, which the article is made from."),
+        line: z
+          .number()
+          .int()
+          .nullable()
+          .describe("Where the passage starts now; null when not found."),
+        column: z
+          .number()
+          .int()
+          .nullable()
+          .describe("1-based, in UTF-16 units as editors count; null when not found."),
+        found: z.boolean(),
+      }),
+    ]),
+  ),
+  shot: z.string().describe("The command that shows the slide at the comment's beat."),
+});
+
+/** What each `dekc pub` subcommand prints, by its action. */
+const PUB_FIELDS = z.union([
+  z.strictObject({
+    action: z.literal("login"),
+    server,
+    status: z.literal("pending"),
+    url: z.string().describe("Where a person approves the sign-in."),
+    code: z.string().describe("The code the page asks for, already in url."),
+    expiresAt: z.string(),
+    next: z.string().describe("The command that waits for the approval and signs in."),
+  }),
+  z.strictObject({
+    action: z.literal("login"),
+    server,
+    status: z.literal("signed-in"),
+    me: Me,
+    stored: z.enum(["keychain", "file"]).describe("Where the API key is kept."),
+  }),
+  z.strictObject({
+    action: z.literal("logout"),
+    server,
+    revoked: z.boolean().describe("The server took the key back."),
+    forgotten: z.boolean().describe("dek held a key for the server and no longer does."),
+    reason: z.string().optional().describe("Why the key was not revoked, when it was not."),
+  }),
+  z.strictObject({
+    action: z.literal("whoami"),
+    server,
+    me: Me,
+    key: z
+      .enum(["env", "keychain", "file"])
+      .describe("Where the key came from: DEK_TOKEN, or where login kept it."),
+  }),
+  z.strictObject({
+    action: z.literal("publish"),
+    published: z.literal(true),
+    server,
+    id: DeckId,
+    n: z.number().int().describe("The version uploaded."),
+    url: z.string(),
+    current: z.number().int().nullable().describe("The version readers see now."),
+    visibility: Visibility,
+    builds: z.strictObject({
+      full: z.strictObject({ bytes: z.number().int() }),
+      public: z.strictObject({ bytes: z.number().int() }),
+      bare: z.strictObject({ bytes: z.number().int() }),
+    }),
+    shots: z.number().int().describe("Pictures of slides sent, one per slide as it arrives."),
+    diagnostics: diagnostics.describe("What lint found, warnings only: an error stops publish."),
+    skipped: z.array(z.union([SkippedCheck, ShotsSkipped])).optional(),
+    unsandboxed,
+    frontmatterWritten: z.boolean().describe("publish wrote pub: into script.md."),
+    changed: paths.describe("Files of the project publish changed, to commit."),
+  }),
+  z.strictObject({
+    action: z.literal("publish"),
+    published: z.literal(false),
+    server,
+    diagnostics: diagnostics.describe("What lint found; the errors stopped publish."),
+    skipped,
+  }),
+  DeckStatus.extend({ action: z.literal("share"), server }),
+  DeckStatus.extend({
+    action: z.literal("status"),
+    server,
+    local: z.strictObject({
+      source: sha256.describe("sha256 of the deck's source as publish would send it now."),
+      published: z.boolean().describe("The newest version was made from this very source."),
+    }),
+  }),
+  z.strictObject({ action: z.literal("open"), server, url: z.string() }),
+  z.strictObject({ action: z.literal("comments"), server, comments: z.array(PubComment) }),
+  z.strictObject({ action: z.literal("reply"), server, comment: z.string(), reply: Reply }),
+  z.strictObject({
+    action: z.enum(["resolve", "reopen"]),
+    server,
+    comment: z.string(),
+    status: CommentStatus,
+  }),
+]);
+
+/** What `dekc pub` prints beside `ok`, stated apart so the commands can name it. */
+export type PubFields = z.input<typeof PUB_FIELDS>;
 
 /** The fields each result command prints beside `ok`: one object, or one per form it takes. */
 export const RESULT_FIELDS = {
@@ -517,6 +649,7 @@ export const RESULT_FIELDS = {
     outs: paths,
     warnings: z.array(z.string()).describe("Once per project: the packs carry no license."),
   }),
+  pub: PUB_FIELDS,
 } satisfies Record<ResultCommand, FieldsSchema>;
 
 type FieldsSchema = z.ZodObject | z.ZodUnion<readonly z.ZodObject[]>;
@@ -525,7 +658,11 @@ type FieldsSchema = z.ZodObject | z.ZodUnion<readonly z.ZodObject[]>;
 export type ResultFields = { [K in ResultCommand]: z.input<(typeof RESULT_FIELDS)[K]> };
 
 /** The commands that can do their job and still fail: on an error among their findings. */
-export const FAILS_ON_FINDINGS = ["lint", "check"] as const satisfies readonly ResultCommand[];
+export const FAILS_ON_FINDINGS = [
+  "lint",
+  "check",
+  "pub",
+] as const satisfies readonly ResultCommand[];
 
 /** What any command line prints when it cannot run. */
 const Thrown = z.strictObject({ ok: z.literal(false), error: Failure });

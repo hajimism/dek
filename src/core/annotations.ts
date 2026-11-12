@@ -317,7 +317,8 @@ function toRow(
  * that no word holds alike in every shell is a placeholder, and one that starts with a dash goes
  * after `--`, where it reads as no flag.
  */
-function shotCommand(deck: string, slug: string, step: string): string {
+/** The command that shows `slug` of `deck` at `step`, quoted to run as written. */
+export function shotCommand(deck: string, slug: string, step: string): string {
   const [name, slide, beat] = [
     shellName(deck) ?? "<deck>",
     shellName(slug) ?? "<slug>",

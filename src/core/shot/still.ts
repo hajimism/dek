@@ -118,6 +118,19 @@ export async function coverShot(
   return shot ? still.screenshotPath : undefined;
 }
 
+/**
+ * Each slide as it arrives, before its first beat, as dek.pub shows a slide among the others: the
+ * same cached shots `dekc shot <slug> --step 0` takes. Undefined when Playwright is not installed.
+ */
+export async function arrivalShots(
+  deck: ResolvedDeck["deck"],
+  runner?: PlaywrightRunner,
+): Promise<ShotFile[] | undefined> {
+  const stills = stillPages(deck, deck.deck.sections, "0");
+  const shot = await shootStills(deck, stills, runner, { ifMissing: "skip" });
+  return shot ? stills.map(shotOf) : undefined;
+}
+
 export type Still = {
   html: string;
   slug: string;

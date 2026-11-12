@@ -8,6 +8,7 @@ import type { ResultFields } from "./contract.ts";
 import type { FlagName, FlagValues } from "./flags.ts";
 import { type FormattedError, formatCreated } from "./format.ts";
 import type { NavResult } from "./goto.ts";
+import { formatPub, pubFailure, pubPaths } from "./pub-text.ts";
 import type { DeckScope, DecksTarget, ReadableDeck } from "./scope.ts";
 import {
   countSummary,
@@ -84,7 +85,7 @@ export type Output<D> = {
   sarif?(data: D): object;
 };
 
-export type Group = "Development" | "Project" | "Refs" | "Slide" | "Output" | "Help";
+export type Group = "Development" | "Project" | "Refs" | "Slide" | "Output" | "Publish" | "Help";
 
 /** One way to call a command: the words after it and its deck, its flags, and its usage. */
 export type Form = {
@@ -97,8 +98,12 @@ export type Form = {
 
 type Runs<D> = { run(ctx: AnyCtx): Promise<D> };
 
-/** A command's second word, such as `pin` in `dekc voice pin`, with its own words and flags. */
-export type SubSpec<D> = Form & Runs<D>;
+/**
+ * A command's second word, such as `pin` in `dekc voice pin`, with its own words and flags. Under
+ * a command that works on no deck, a subcommand may work on one: it then takes the deck after its
+ * own words, as `dekc pub publish [deck]`, and --deck.
+ */
+export type SubSpec<D> = Form & Runs<D> & { scope?: "deck" };
 
 type Base = Form & {
   summary: string;
@@ -139,6 +144,11 @@ type Typed<A extends readonly string[], S extends DeckScope | undefined, D> = Om
   run(ctx: Ctx<A, S>): Promise<D>;
 };
 
+/** A subcommand as declared: it works on its command's decks, or on one deck of its own. */
+type SubTyped<A extends readonly string[], S extends DeckScope | undefined, D> =
+  | (Typed<A, S, D> & { scope?: undefined })
+  | (Typed<A, "deck", D> & { scope: "deck" });
+
 type Declared<A extends readonly string[], S extends DeckScope | undefined, D> = Omit<
   Base,
   "args" | "scope"
@@ -156,7 +166,7 @@ function result<
 >(
   spec: Declared<A, S, D> & {
     output: Output<D> & { json?(data: D): J };
-    subcommands?: { [K in keyof U]: Typed<U[K], S, D> };
+    subcommands?: { [K in keyof U]: SubTyped<U[K], S, D> };
   },
 ): ResultSpec<D> & Printed<[J] extends [never] ? D : J> {
   return { kind: "result", ...spec } as unknown as ResultSpec<D> &
@@ -913,6 +923,166 @@ export const COMMANDS = {
     },
     output: { text: formatPptx, json: ({ lifted: _lifted, ...data }) => data },
   }),
+  pub: result({
+    args: [],
+    flags: [],
+    usage: ["dekc pub <subcommand>"],
+    summary:
+      "Put the talk on dek.pub: sign in, publish a version, set who may read and comment, and\nanswer the comments. Each subcommand takes --server <url> and DEK_PUB_SERVER for another\ndek.pub than https://dek.pub, and DEK_TOKEN as its key in CI.",
+    group: "Publish",
+    overview: [
+      [
+        "dekc pub login [--server <url>]",
+        "sign in through the browser; --json prints the code, then waits",
+      ],
+      ["dekc pub logout", "revoke the key and forget it"],
+      ["dekc pub whoami", "who the key signs in as"],
+      [
+        "dekc pub publish [deck] [--message <text>] [--no-promote]",
+        "lint, build, and upload the next version; writes pub: on the first",
+      ],
+      [
+        "dekc pub share [deck] --visibility|--script|--embed|--comments <value>",
+        "who may open the deck, read its script, embed it, and comment",
+      ],
+      ["dekc pub status [deck]", "the deck's settings, versions, and whether it is up to date"],
+      ["dekc pub open [deck]", "open the deck on dek.pub"],
+      [
+        "dekc pub comments [deck] [--status open|resolved|all]",
+        "list comments, each placed in script.md or its slide",
+      ],
+      ["dekc pub comments reply <id> <text>", "reply; resolve <id> and reopen <id> settle one"],
+    ],
+    agent: [
+      "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
+      "dekc pub whoami | logout",
+      "dekc pub publish [--message <text>] [--no-promote]   lint errors stop it; commit script.md when it writes pub:",
+      "dekc pub share --visibility private|link|public --script shown|hidden --embed on|off --comments off|signed-in|guests",
+      "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
+    ],
+    run: async () => {
+      const { usageError } = await import("./usage.ts");
+      throw usageError("pub", "dekc pub needs a subcommand", { match: "<subcommand>" });
+    },
+    subcommands: {
+      login: {
+        args: [],
+        flags: ["server"],
+        usage: ["dekc pub login [--server <url>]"],
+        run: async ({ flags }) => {
+          const { loginCommand } = await import("./pub.ts");
+          return loginCommand(flags);
+        },
+      },
+      logout: {
+        args: [],
+        flags: ["server"],
+        usage: ["dekc pub logout [--server <url>]"],
+        run: async ({ flags }) => {
+          const { logoutCommand } = await import("./pub.ts");
+          return logoutCommand(flags);
+        },
+      },
+      whoami: {
+        args: [],
+        flags: ["server"],
+        usage: ["dekc pub whoami [--server <url>]"],
+        run: async ({ flags }) => {
+          const { whoamiCommand } = await import("./pub.ts");
+          return whoamiCommand(flags);
+        },
+      },
+      publish: {
+        scope: "deck",
+        args: [],
+        flags: ["server", "message", "no-promote"],
+        usage: ["dekc pub publish [deck] [--message <text>] [--no-promote] [--server <url>]"],
+        run: async ({ cwd, flags, target }) => {
+          const { publishCommand } = await import("./pub.ts");
+          return publishCommand(target, { cwd, flags });
+        },
+      },
+      share: {
+        scope: "deck",
+        args: [],
+        flags: ["server", "visibility", "script", "embed", "comments"],
+        usage: [
+          "dekc pub share [deck] [--visibility private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in|guests] [--server <url>]",
+        ],
+        run: async ({ flags, target }) => {
+          const { shareCommand } = await import("./pub.ts");
+          return shareCommand(target, flags);
+        },
+      },
+      status: {
+        scope: "deck",
+        args: [],
+        flags: ["server"],
+        usage: ["dekc pub status [deck] [--server <url>]"],
+        run: async ({ flags, target }) => {
+          const { statusCommand } = await import("./pub.ts");
+          return statusCommand(target, flags);
+        },
+      },
+      open: {
+        scope: "deck",
+        args: [],
+        flags: ["server"],
+        usage: ["dekc pub open [deck] [--server <url>]"],
+        run: async ({ flags, target }) => {
+          const { openCommand } = await import("./pub.ts");
+          return openCommand(target, flags);
+        },
+      },
+      comments: {
+        scope: "deck",
+        args: [],
+        flags: ["server", "status"],
+        usage: ["dekc pub comments [deck] [--status open|resolved|all] [--server <url>]"],
+        run: async ({ flags, target }) => {
+          const { commentsCommand } = await import("./pub.ts");
+          return commentsCommand(target, flags);
+        },
+      },
+      "comments reply": {
+        scope: "deck",
+        args: ["id", "text..."],
+        flags: ["server"],
+        usage: ["dekc pub comments reply [deck] <id> <text> [--server <url>]"],
+        run: async ({ flags, target, args }) => {
+          const { replyCommand } = await import("./pub.ts");
+          return replyCommand(target, { id: args.id, text: args.text }, flags);
+        },
+      },
+      "comments resolve": {
+        scope: "deck",
+        args: ["id"],
+        flags: ["server"],
+        usage: ["dekc pub comments resolve [deck] <id> [--server <url>]"],
+        run: async ({ flags, target, args }) => {
+          const { settleCommand } = await import("./pub.ts");
+          return settleCommand(target, "resolve", args.id, flags);
+        },
+      },
+      "comments reopen": {
+        scope: "deck",
+        args: ["id"],
+        flags: ["server"],
+        usage: ["dekc pub comments reopen [deck] <id> [--server <url>]"],
+        run: async ({ flags, target, args }) => {
+          const { settleCommand } = await import("./pub.ts");
+          return settleCommand(target, "reopen", args.id, flags);
+        },
+      },
+    },
+    output: {
+      text: formatPub,
+      notes: (data, color) =>
+        data.action === "publish" ? formatSkipped(data.skipped, color) || undefined : undefined,
+      paths: (data, display) => pubPaths(data, display),
+      failure: (data) => pubFailure(data),
+    },
+  }),
   help: {
     kind: "help",
     args: ["command?"],
@@ -977,7 +1147,8 @@ export function subcommandsOf(spec: AnySpec): Record<string, SubSpec<unknown>> {
 
 /**
  * The subcommand a command line names, and the index of its first word in `positionals`
- * (the command word is 0). It follows the command, or the deck when the command takes one.
+ * (the command word is 0). It follows the command, or the deck when the command takes one. Of
+ * two that both fit, such as `comments` and `comments reply`, the longer is named.
  */
 export function subcommandAt(
   name: CommandName,
@@ -985,8 +1156,11 @@ export function subcommandAt(
 ): { name: string; at: number } | undefined {
   const spec = COMMANDS[name] as AnySpec;
   const starts = spec.scope ? [1, 2] : [1];
+  const subs = Object.keys(subcommandsOf(spec)).sort(
+    (a, b) => b.split(" ").length - a.split(" ").length,
+  );
   for (const at of starts) {
-    for (const sub of Object.keys(subcommandsOf(spec))) {
+    for (const sub of subs) {
       const words = sub.split(" ");
       if (words.every((word, index) => positionals[at + index] === word)) {
         return { name: sub, at };
@@ -997,15 +1171,22 @@ export function subcommandAt(
 }
 
 /** The form a command line runs: a subcommand's, or the command's own. */
-export function formOf(name: CommandName, sub?: string): Form & Partial<Runs<unknown>> {
+export function formOf(
+  name: CommandName,
+  sub?: string,
+): Form & Partial<Runs<unknown>> & { scope?: DeckScope } {
   const spec = COMMANDS[name] as AnySpec;
   return (sub === undefined ? undefined : subcommandsOf(spec)[sub]) ?? spec;
 }
 
+/** The decks a form works on: its command's, or a subcommand's own deck. */
+export function scopeOf(name: CommandName, sub?: string): DeckScope | undefined {
+  return (COMMANDS[name] as AnySpec).scope ?? formOf(name, sub).scope;
+}
+
 /** The flags a form takes on top of the global ones: --deck with a scope, then its own. */
 export function acceptedFlags(name: CommandName, sub?: string): FlagName[] {
-  const spec = COMMANDS[name] as AnySpec;
-  return [...(spec.scope ? (["deck"] as const) : []), ...formOf(name, sub).flags];
+  return [...(scopeOf(name, sub) ? (["deck"] as const) : []), ...formOf(name, sub).flags];
 }
 
 /** Every flag a command takes in any of its forms, for its help. */
