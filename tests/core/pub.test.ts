@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { deckSlug } from "../../src/cli/pub.ts";
 import { DEFAULT_SERVER, serverOrigin } from "../../src/core/pub/client.ts";
 import { awaitLogin, startLogin } from "../../src/core/pub/login.ts";
 import { locateQuote } from "../../src/core/pub/quote.ts";
 import { forgetKey, readKey, storeKey } from "../../src/core/pub/store.ts";
-import { deckSource, renamesSince } from "../../src/core/pub/version.ts";
+import { deckSource, requireUploadable } from "../../src/core/pub/version.ts";
 import { resolveProject } from "../../src/core/resolve.ts";
+import { answerOf, CommentList, paths } from "../../src/pub/protocol.ts";
 import { withFakePub } from "../helpers/fake-pub.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -47,11 +48,16 @@ describe("the key store", () => {
     });
   });
 
-  test("takes DEK_TOKEN over any key kept", async () => {
+  test("takes DEK_TOKEN over any key kept, for dek.pub or the server DEK_TOKEN_SERVER names", async () => {
     await withTempDir(async (dir) => {
       const env = { DEK_PUB_CREDENTIALS: join(dir, "credentials.json"), DEK_TOKEN: " ci " };
-      await storeKey("https://a.example", "kept", env);
-      expect(await readKey("https://a.example", env)).toEqual({ key: "ci", source: "env" });
+      await storeKey(DEFAULT_SERVER, "kept", env);
+      await storeKey("https://a.example", "other", env);
+      expect(await readKey(DEFAULT_SERVER, env)).toEqual({ key: "ci", source: "env" });
+      expect(await readKey("https://a.example", env)).toEqual({ key: "other", source: "file" });
+      const named = { ...env, DEK_TOKEN_SERVER: "https://a.example/" };
+      expect(await readKey("https://a.example", named)).toEqual({ key: "ci", source: "env" });
+      expect(await readKey(DEFAULT_SERVER, named)).toEqual({ key: "kept", source: "file" });
     });
   });
 
@@ -59,6 +65,7 @@ describe("the key store", () => {
     await withTempDir(async (dir) => {
       const path = join(dir, "credentials.json");
       await Bun.write(path, "{");
+      chmodSync(path, 0o600);
       await expect(readKey("https://a.example", { DEK_PUB_CREDENTIALS: path })).rejects.toThrow(
         "does not read",
       );
@@ -78,9 +85,11 @@ describe("the device flow", () => {
       expect(login.interval).toBe(0);
       const waits: number[] = [];
       const signedIn = await awaitLogin(fake.url, login, {
-        now: () => Date.now(),
-        sleep: async (ms) => {
-          waits.push(ms);
+        clock: {
+          now: () => Date.now(),
+          sleep: async (ms) => {
+            waits.push(ms);
+          },
         },
       });
       expect(signedIn).toEqual({ status: "signed-in", me: fake.me, stored: "file" });
@@ -91,13 +100,38 @@ describe("the device flow", () => {
     });
   });
 
+  test("stops waiting after its budget, and keeps the code for the next run", async () => {
+    await withFakePub(async (fake) => {
+      fake.pendingPolls = 100;
+      fake.interval = 5;
+      const login = await startLogin(fake.url);
+      let now = Date.now();
+      const answer = await awaitLogin(fake.url, login, {
+        budgetMs: 60_000,
+        clock: {
+          now: () => now,
+          sleep: async (ms) => {
+            now += ms;
+          },
+        },
+      });
+      expect(answer).toEqual({
+        status: "pending",
+        url: login.url,
+        code: login.userCode,
+        expiresAt: login.expiresAt,
+      });
+      expect(existsSync(join(fake.credentials, "..", "login.json"))).toBe(true);
+    });
+  });
+
   test("gives up once the code would expire, and forgets it", async () => {
     await withFakePub(async (fake) => {
       fake.pendingPolls = 100;
       const login = await startLogin(fake.url);
       const later = Date.parse(login.expiresAt) + 1;
       await expect(
-        awaitLogin(fake.url, login, { now: () => later, sleep: async () => {} }),
+        awaitLogin(fake.url, login, { clock: { now: () => later, sleep: async () => {} } }),
       ).rejects.toThrow("the sign-in code expired before it was approved");
       expect(existsSync(join(fake.credentials, "..", "login.json"))).toBe(false);
     });
@@ -164,20 +198,68 @@ describe("a version's source", () => {
       expect(text).not.toContain(".DS_Store");
     });
   });
-
-  test("sends the renames made since the newest version, and none for a new deck", () => {
-    const early = { from: "a", to: "b", at: "2026-01-01T00:00:00.000Z" };
-    const late = { from: "b", to: "c", at: "2026-03-01T00:00:00.000Z" };
-    const renames = [early, late];
-    expect(renamesSince(renames, "2026-02-01T00:00:00.000Z")).toEqual([late]);
-    expect(renamesSince(renames, undefined)).toEqual([]);
-  });
 });
 
 describe("deckSlug", () => {
   test("lowercases a folder name to what dek.pub takes", () => {
     expect(deckSlug("2026-10_Why Dek!")).toBe("2026-10-why-dek");
-    expect(deckSlug("発表")).toBe("deck");
+    expect(deckSlug("発表")).toMatch(/^deck-[0-9a-f]{8}$/);
+    expect(deckSlug("発表")).not.toBe(deckSlug("講演"));
     expect(deckSlug("a".repeat(80))).toHaveLength(63);
+  });
+});
+
+describe("the protocol", () => {
+  test("an answer may carry fields this dekc does not know, at any depth", () => {
+    const row = {
+      number: 1,
+      id: "c_1",
+      slug: "intro",
+      step: "0",
+      status: "open",
+      text: "t",
+      targets: [{ kind: "quote", quote: "q", prefix: "", suffix: "", score: 1 }],
+      author: { name: "Ann", guest: true, avatar: "x" },
+      version: 1,
+      url: "https://dek.pub/x",
+      thread: [],
+      createdAt: "2026-11-12T00:00:00.000Z",
+      resolvedAt: null,
+      reactions: 3,
+    };
+    expect(CommentList.safeParse({ comments: [row] }).success).toBe(false);
+    const read = answerOf(CommentList).parse({ comments: [row], next: null });
+    expect(read.comments[0]?.targets[0]).toEqual({
+      kind: "quote",
+      quote: "q",
+      prefix: "",
+      suffix: "",
+    });
+    expect(read.comments[0]?.author).toEqual({ name: "Ann", guest: true });
+    expect(() => answerOf(CommentList).parse({ comments: [{ ...row, status: "lost" }] })).toThrow();
+  });
+
+  test("puts each ID in its path as one segment", () => {
+    expect(paths.replies("d_0123456789", "../../me")).toBe(
+      "/api/decks/d_0123456789/comments/..%2F..%2Fme/replies",
+    );
+  });
+});
+
+describe("requireUploadable", () => {
+  const file = (field: "full" | "source", mib: number) => ({
+    field,
+    bytes: new Uint8Array(mib * 1024 * 1024),
+    type: "text/html",
+    sha256: "",
+  });
+
+  test("passes a version within 50 MiB and names the largest parts of one past it", () => {
+    expect(() =>
+      requireUploadable({ files: [file("full", 20)], shots: undefined }, "/d"),
+    ).not.toThrow();
+    expect(() =>
+      requireUploadable({ files: [file("full", 30), file("source", 25)], shots: [] }, "/d"),
+    ).toThrow("the version is 55 MiB, and dek.pub takes 50 MiB at most");
   });
 });

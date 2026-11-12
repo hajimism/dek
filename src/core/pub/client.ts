@@ -2,11 +2,14 @@ import type { z } from "zod";
 import pkg from "../../../package.json";
 import {
   API_KEY_HEADER,
+  answerOf,
   ErrorBody,
+  MAX_VERSION_BYTES,
   PROTOCOL_HEADER,
   PROTOCOL_VERSION,
 } from "../../pub/protocol.ts";
 import { DekError } from "../error.ts";
+import type { Key } from "./store.ts";
 
 /** Where `dekc pub` goes when neither --server nor DEK_PUB_SERVER names another. */
 export const DEFAULT_SERVER = "https://dek.pub";
@@ -74,8 +77,8 @@ export type PubCall = {
   json?: unknown;
   /** A multipart body. */
   form?: FormData;
-  /** The API key, sent as x-api-key. */
-  key?: string;
+  /** The API key, sent as x-api-key, and where it came from, for the hint when it is refused. */
+  key?: Key;
   /** The device flow's access token, sent as a Bearer token. */
   bearer?: string;
   timeoutMs?: number;
@@ -96,7 +99,7 @@ export async function send(origin: string, call: PubCall): Promise<Response> {
     accept: "application/json",
     "user-agent": `dekc/${pkg.version}`,
     [PROTOCOL_HEADER]: String(PROTOCOL_VERSION),
-    ...(call.key !== undefined ? { [API_KEY_HEADER]: call.key } : {}),
+    ...(call.key !== undefined ? { [API_KEY_HEADER]: call.key.key } : {}),
     ...(call.bearer !== undefined ? { authorization: `Bearer ${call.bearer}` } : {}),
     ...(call.json !== undefined ? { "content-type": "application/json" } : {}),
   };
@@ -124,7 +127,10 @@ export async function send(origin: string, call: PubCall): Promise<Response> {
   }
 }
 
-/** `send`, then the answer read as `schema`, or the error the server gave as a PubError. */
+/**
+ * `send`, then the answer read as `schema`, or the error the server gave as a PubError. The answer
+ * is read through `answerOf`: a field a newer server added is dropped, not refused.
+ */
 export async function request<S extends z.ZodType>(
   origin: string,
   call: PubCall,
@@ -135,11 +141,11 @@ export async function request<S extends z.ZodType>(
   if (!response.ok) {
     throw failure(response.status, body, origin, call);
   }
-  const parsed = schema.safeParse(body);
+  const parsed = answerOf(schema).safeParse(body);
   if (!parsed.success) {
     throw unreadable(origin, call);
   }
-  return parsed.data;
+  return parsed.data as z.infer<S>;
 }
 
 async function readBody(response: Response, origin: string, call: PubCall): Promise<unknown> {
@@ -164,15 +170,28 @@ async function readBody(response: Response, origin: string, call: PubCall): Prom
 
 /** A failed answer as the error dek prints: the server's own words when it sent an ErrorBody. */
 export function failure(status: number, body: unknown, origin: string, call: PubCall): PubError {
-  const parsed = ErrorBody.safeParse(body);
+  const parsed = answerOf(ErrorBody).safeParse(body);
+  // dek knows better than the server what to do about a key it was handed, or a size it sent.
+  const own = ownHint(status, call);
   if (parsed.success) {
     const { code, message, hint } = parsed.data.error;
-    return new PubError(message, { status, code, hint: hint ?? statusHint(status) });
+    return new PubError(message, { status, code, hint: own ?? hint ?? statusHint(status) });
   }
   return new PubError(`${origin} answered ${status} for ${call.what}`, {
     status,
-    hint: statusHint(status),
+    hint: own ?? statusHint(status),
   });
+}
+
+/** The hint dek gives whatever the server says: for a key from DEK_TOKEN, and for a size. */
+function ownHint(status: number, call: PubCall): string | undefined {
+  if (status === 401 && call.key?.source === "env") {
+    return "the server does not take the key in DEK_TOKEN: replace it with a key that works, or unset DEK_TOKEN to use the one `dekc pub login` keeps";
+  }
+  if (status === 413) {
+    return `a version holds ${MAX_VERSION_BYTES / 1024 / 1024} MiB at most, every build, the source, and the pictures together; make the deck's assets smaller, then publish again`;
+  }
+  return undefined;
 }
 
 function statusHint(status: number): string {

@@ -1,11 +1,62 @@
 // What `dekc pub` and the dek.pub server say to each other over HTTP. Both sides import this
 // file: the CLI from the package, the server (apps/pub) by a relative path. It holds shapes and
 // paths only, no I/O, so neither side depends on how the other runs.
+//
+// What a side sends is held to these shapes strictly. An answer may grow: a server may add a field
+// to any answer within a protocol version, and a reader takes an answer through `answerOf`, which
+// drops the fields it does not know, so a dekc already installed keeps working. A field is never
+// removed, renamed, or given a value its type does not allow without bumping PROTOCOL_VERSION.
 
 import { z } from "zod";
 
 /** Bumped when a shape changes in a way an older side cannot read; the server reads one back. */
 export const PROTOCOL_VERSION = 1;
+
+/**
+ * `schema` as a reader takes an answer: every object in it, however deep, drops the fields it does
+ * not name instead of refusing them. Bounds on strings and arrays are kept; what a field may hold
+ * is part of the protocol, and only a new field is a change an older reader must live with.
+ */
+export function answerOf<S extends z.ZodType>(schema: S): S {
+  return loosened(schema) as S;
+}
+
+function loosened(schema: z.ZodType): z.ZodType {
+  if (schema instanceof z.ZodObject) {
+    const shape = Object.fromEntries(
+      Object.entries(schema.shape as Record<string, z.ZodType>).map(([key, value]) => [
+        key,
+        loosened(value),
+      ]),
+    );
+    return z.object(shape);
+  }
+  if (schema instanceof z.ZodOptional) {
+    return loosened(schema.unwrap() as z.ZodType).optional();
+  }
+  if (schema instanceof z.ZodNullable) {
+    return loosened(schema.unwrap() as z.ZodType).nullable();
+  }
+  if (schema instanceof z.ZodArray) {
+    const checks = (schema._zod.def.checks ?? []) as z.core.$ZodCheck<unknown[]>[];
+    return z.array(loosened(schema.element as z.ZodType)).check(...checks);
+  }
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    const options = (schema.options as z.ZodType[]).map(loosened) as [
+      z.ZodObject,
+      ...z.ZodObject[],
+    ];
+    return z.discriminatedUnion(schema._zod.def.discriminator, options);
+  }
+  if (schema instanceof z.ZodUnion) {
+    const options = (schema.options as z.ZodType[]).map(loosened) as [z.ZodType, ...z.ZodType[]];
+    return z.union(options);
+  }
+  return schema;
+}
+
+/** The most a version may hold, every file and picture together; the server refuses more. */
+export const MAX_VERSION_BYTES = 50 * 1024 * 1024;
 
 /** The header the CLI sends its protocol version in. */
 export const PROTOCOL_HEADER = "dek-protocol";
@@ -319,19 +370,27 @@ export const paths = {
   cliKey: "/api/cli/key",
   revokeKey: "/api/cli/key",
   decks: "/api/decks",
-  deck: (id: string) => `/api/decks/${id}`,
-  versions: (id: string) => `/api/decks/${id}/versions`,
-  promote: (id: string) => `/api/decks/${id}/promote`,
-  comments: (id: string) => `/api/decks/${id}/comments`,
-  replies: (id: string, comment: string) => `/api/decks/${id}/comments/${comment}/replies`,
-  resolve: (id: string, comment: string) => `/api/decks/${id}/comments/${comment}/resolve`,
-  reopen: (id: string, comment: string) => `/api/decks/${id}/comments/${comment}/reopen`,
-  grants: (id: string) => `/api/decks/${id}/grants`,
-  grant: (id: string, grant: string) => `/api/decks/${id}/grants/${grant}`,
+  deck: (id: string) => `/api/decks/${segment(id)}`,
+  versions: (id: string) => `/api/decks/${segment(id)}/versions`,
+  promote: (id: string) => `/api/decks/${segment(id)}/promote`,
+  comments: (id: string) => `/api/decks/${segment(id)}/comments`,
+  replies: (id: string, comment: string) =>
+    `/api/decks/${segment(id)}/comments/${segment(comment)}/replies`,
+  resolve: (id: string, comment: string) =>
+    `/api/decks/${segment(id)}/comments/${segment(comment)}/resolve`,
+  reopen: (id: string, comment: string) =>
+    `/api/decks/${segment(id)}/comments/${segment(comment)}/reopen`,
+  grants: (id: string) => `/api/decks/${segment(id)}/grants`,
+  grant: (id: string, grant: string) => `/api/decks/${segment(id)}/grants/${segment(grant)}`,
   /** Better Auth's device authorization endpoints, under its base path. */
   deviceCode: "/api/auth/device/code",
   deviceToken: "/api/auth/device/token",
 } as const;
+
+/** An ID as one path segment: a `/`, `?`, `#`, or `..` in it cannot reach another path. */
+function segment(id: string): string {
+  return encodeURIComponent(id);
+}
 
 /** The client ID the CLI names itself by in the device flow. */
 export const CLI_CLIENT_ID = "dekc";

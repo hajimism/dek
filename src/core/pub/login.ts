@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CLI_CLIENT_ID, CliKey, type Me, paths } from "../../pub/protocol.ts";
 import { DekError } from "../error.ts";
-import { failure, request, send, unreadable } from "./client.ts";
+import { failure, PubError, request, send, unreadable } from "./client.ts";
 import {
   type KeySource,
   type PendingLogin,
@@ -85,48 +85,76 @@ type Clock = { now: () => number; sleep: (ms: number) => Promise<void> };
 
 const REAL_CLOCK: Clock = { now: () => Date.now(), sleep: (ms) => Bun.sleep(ms) };
 
+const AGAIN = "run `dekc pub login` again, and approve the new code";
+
 /**
- * Poll until the code is approved, then keep the key the server gives for it. A denied or expired
- * code is forgotten, and the error says to sign in again.
+ * Poll until the code is approved, then keep the key the server gives for it, or until `budgetMs`
+ * has passed, when the sign-in is still pending and the code is kept for the next run. A code the
+ * server turns down, lets expire, or answers any other error for is forgotten, and the error says
+ * to sign in again; a network that fails keeps it, to wait again once it is back.
  */
 export async function awaitLogin(
   origin: string,
   login: PendingLogin,
-  clock: Clock = REAL_CLOCK,
-): Promise<SignedIn> {
+  options: { clock?: Clock; budgetMs?: number } = {},
+): Promise<SignedIn | Pending> {
+  const clock = options.clock ?? REAL_CLOCK;
+  const started = clock.now();
   let interval = login.interval;
   const expires = Date.parse(login.expiresAt);
+  const giveUp = (message: string, cause?: unknown): never => {
+    writePendingLogin(origin, undefined);
+    throw new DekError(message, { hint: AGAIN, cause });
+  };
   for (;;) {
-    const token = await pollToken(origin, login);
+    const token = await terminal(() => pollToken(origin, login), giveUp);
     if (token.kind === "token") {
-      const issued = await request(
-        origin,
-        { method: "POST", path: paths.cliKey, what: "an API key", bearer: token.accessToken },
-        CliKey,
+      const issued = await terminal(
+        () =>
+          request(
+            origin,
+            { method: "POST", path: paths.cliKey, what: "an API key", bearer: token.accessToken },
+            CliKey,
+          ),
+        giveUp,
       );
       const stored = await storeKey(origin, issued.key);
       writePendingLogin(origin, undefined);
       return { status: "signed-in", me: issued.me, stored };
     }
-    if (token.kind === "denied" || token.kind === "expired") {
-      writePendingLogin(origin, undefined);
-      throw new DekError(
-        token.kind === "denied"
-          ? "the sign-in was turned down in the browser"
-          : "the sign-in code expired before it was approved",
-        { hint: "run `dekc pub login` again, and approve the new code" },
-      );
+    if (token.kind === "denied") {
+      giveUp("the sign-in was turned down in the browser");
+    }
+    if (token.kind === "expired") {
+      giveUp("the sign-in code expired before it was approved");
     }
     if (token.kind === "slow") {
       interval += SLOW_DOWN_S;
+      writePendingLogin(origin, { ...login, interval });
     }
-    if (clock.now() + interval * 1000 >= expires) {
-      writePendingLogin(origin, undefined);
-      throw new DekError("the sign-in code expired before it was approved", {
-        hint: "run `dekc pub login` again, and approve the new code",
-      });
+    const next = clock.now() + interval * 1000;
+    if (next >= expires) {
+      giveUp("the sign-in code expired before it was approved");
+    }
+    if (options.budgetMs !== undefined && next - started > options.budgetMs) {
+      return asPending(login);
     }
     await clock.sleep(interval * 1000);
+  }
+}
+
+/** `call`, with an answer from the server that ends the sign-in handed to `giveUp`. */
+async function terminal<T>(
+  call: () => Promise<T>,
+  giveUp: (message: string, cause?: unknown) => never,
+): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof PubError) {
+      giveUp(`the sign-in failed: ${error.message}`, error);
+    }
+    throw error;
   }
 }
 
