@@ -32,6 +32,11 @@ declare module "void" {
 
 const YEAR = 60 * 60 * 24 * 365;
 
+/** The wordmark's slide, as a 32px icon: an ink-blue frame on paper. */
+const FAVICON = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3451d1"/><rect x="7" y="10" width="18" height="12" rx="2" fill="none" stroke="#fff" stroke-width="2.5"/><path d="M11 18h10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>',
+)}`;
+
 export default defineMiddleware(async (c, next) => {
   const url = new URL(c.req.url);
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/i/")) {
@@ -57,6 +62,12 @@ export default defineMiddleware(async (c, next) => {
     now: Date.now(),
   });
   c.set("headDefaults", {
+    meta: [
+      { charset: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "color-scheme", content: theme === "system" ? "light dark" : theme },
+    ],
+    link: [{ rel: "icon", href: FAVICON }],
     htmlAttrs: { lang, ...(theme === "system" ? {} : { "data-theme": theme }) },
   });
   await next();
