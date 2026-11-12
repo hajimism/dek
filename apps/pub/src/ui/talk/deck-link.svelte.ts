@@ -1,6 +1,8 @@
 // The talk page's side of the embed protocol: it listens to the deck in the iframe, and only to
 // that deck (its origin and its window), and steers it once the deck has said it is ready. A deck
-// that never says so is shown as it is: nothing here then sends it anything.
+// that never says so is shown as it is: nothing here then sends it anything. The deck runs its
+// author's code, so what it says is believed only as far as the page asked for it: a pick only
+// while picking, on a slide the talk has; a mark only for a comment the page shows.
 
 import {
   DEFAULT_SIZE,
@@ -21,6 +23,18 @@ export type DeckEvents = {
   onmark?: (id: string) => void;
 };
 
+export type DeckLinkOptions = {
+  /** The deck's own origin, the only one heard. */
+  origin: string;
+  /** The talk's slides; a move, pick or mark naming any other slug is not heard. */
+  slugs: readonly string[];
+  /** Whether this person may comment; without it nothing is picked or marked. */
+  canComment: boolean;
+  /** Whether a comment with this ID is on the page. */
+  hasComment?: (id: string) => boolean;
+  events?: DeckEvents;
+};
+
 export class DeckLink {
   ready = $state(false);
   size: Size = $state(DEFAULT_SIZE);
@@ -30,11 +44,17 @@ export class DeckLink {
 
   #frame: HTMLIFrameElement | null = null;
   #origin: string;
+  #slugs: Set<string>;
+  #canComment: boolean;
+  #hasComment: (id: string) => boolean;
   #events: DeckEvents;
 
-  constructor(origin: string, events: DeckEvents = {}) {
-    this.#origin = origin;
-    this.#events = events;
+  constructor(options: DeckLinkOptions) {
+    this.#origin = options.origin;
+    this.#slugs = new Set(options.slugs);
+    this.#canComment = options.canComment;
+    this.#hasComment = options.hasComment ?? (() => false);
+    this.#events = options.events ?? {};
   }
 
   /** Start listening; returns the function that stops. */
@@ -44,8 +64,11 @@ export class DeckLink {
     window.addEventListener("message", onMessage);
     // A server-rendered iframe may say it is ready before this page's script runs; the page's
     // head keeps what it said (EARLY_LISTENER), and it is read here as if it had just arrived.
-    const early = (window as unknown as { [EARLY_KEY]?: EarlyMessage[] })[EARLY_KEY] ?? [];
-    for (const message of early.splice(0)) {
+    const holder = window as unknown as { [EARLY_KEY]?: EarlyMessage[] | null };
+    const early = holder[EARLY_KEY] ?? [];
+    // From here the page listens itself; the head script stops keeping messages.
+    holder[EARLY_KEY] = null;
+    for (const message of early) {
       this.#receive({
         origin: message.origin,
         source: message.source,
@@ -78,18 +101,28 @@ export class DeckLink {
         this.current = message.current;
         break;
       case "dek:moved":
-        this.current = { slug: message.slug, step: message.step, index: message.index };
+        if (this.#slugs.has(message.slug)) {
+          this.current = { slug: message.slug, step: message.step, index: message.index };
+        }
         break;
       case "dek:picked":
-        this.picking = false;
+        // A pick nobody asked for, or of a slide the talk lacks, is not a comment's target.
+        if (!this.picking || !this.#slugs.has(message.slug)) {
+          return;
+        }
+        this.pick(false);
         this.#events.onpicked?.({ slug: message.slug, step: message.step, target: message.target });
         break;
       case "dek:pick-cancel":
-        this.picking = false;
-        this.#events.onpickcancel?.();
+        if (this.picking) {
+          this.picking = false;
+          this.#events.onpickcancel?.();
+        }
         break;
       case "dek:mark":
-        this.#events.onmark?.(message.id);
+        if (this.#canComment && this.#hasComment(message.id)) {
+          this.#events.onmark?.(message.id);
+        }
         break;
     }
   }
@@ -116,11 +149,17 @@ export class DeckLink {
   }
 
   pick(on: boolean): void {
+    if (!this.#canComment) {
+      return;
+    }
     this.picking = on && this.ready;
     this.#send({ type: "dek:pick", on });
   }
 
   marks(marks: Mark[]): void {
+    if (!this.#canComment) {
+      return;
+    }
     this.#send({ type: "dek:marks", marks: $state.snapshot(marks) });
   }
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slideCount } from "../../lib/i18n.ts";
   import { useApp } from "../app.ts";
   import Icon from "../Icon.svelte";
   import { toast } from "../toast.svelte.ts";
@@ -58,7 +59,7 @@
 
   function readScript(event: MouseEvent) {
     event.preventDefault();
-    document.getElementById("script")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("dek-script")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 </script>
 
@@ -69,7 +70,7 @@
         bind:this={frame}
         {src}
         title={t("talk.viewerTitle", { title })}
-        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        sandbox="allow-scripts allow-same-origin allow-popups"
         allow="fullscreen"
         referrerpolicy="no-referrer"
       ></iframe>
@@ -106,7 +107,7 @@
           <span class="visually-hidden">{t("talk.position", { n: link.current.index + 1, total })}</span>
           <span aria-hidden="true">{link.current.index + 1}<span class="sep">/</span>{total}</span>
         {:else}
-          <span>{lang === "ja" ? `${total} 枚` : `${total} slides`}</span>
+          <span>{slideCount(lang, total)}</span>
         {/if}
       </span>
       <button
@@ -132,7 +133,7 @@
       <button type="button" class="tool" aria-label={t("talk.fullscreen")} title={t("talk.fullscreen")} onclick={fullscreen}>
         <Icon name="fullscreen" />
       </button>
-      <a class="tool wide read hide-sm" href="#script" onclick={readScript}>
+      <a class="tool wide read hide-sm" href="#dek-script" onclick={readScript}>
         {t("talk.read")}<Icon name="arrow-down" />
       </a>
     </div>
