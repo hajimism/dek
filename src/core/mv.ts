@@ -5,7 +5,7 @@ import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { escapeRegExp, isPlainWord, shellName } from "./escape.ts";
 import { joinLines, sectionChunks, splitLines } from "./lines.ts";
-import { planRename } from "./renames.ts";
+import { renameRecord } from "./renames.ts";
 import {
   asResolvedDeck,
   type ResolvedDeck,
@@ -41,10 +41,8 @@ export function renameSection(
         hint: "run `dekc lint` to see which slides have no section",
       });
     }
-    // A rename already done moves nothing, and is not recorded again.
-    if (steps.length > 0) {
-      applySteps([...steps, recordStep(project.root, deck.name, from, to, now)]);
-    }
+    // A rename done wholly by hand moves nothing here, but is recorded, once.
+    applySteps([...steps, recordStep(project.root, deck.name, from, to, now, steps.length === 0)]);
     return;
   }
   const section = requireSection(deck, from);
@@ -192,18 +190,19 @@ function removeStep(root: string, path: string, before: string): FileStep {
 
 /**
  * The rename added to `.dek/renames.json`, for dek.pub to move comments on `from` to `to`. It is
- * planned before any step runs, so a file that does not read refuses the rename, and it runs last,
- * so it is written only once every file moved.
+ * made before any step runs, so a file that does not read refuses the rename, and it runs last,
+ * so it is written only once every file moved. With `once`, a rename the deck's last entry already
+ * names is not recorded again.
  */
-function recordStep(root: string, deck: string, from: string, to: string, now: Date): FileStep {
-  const plan = planRename(root, deck, from, to, now);
-  return plan.before === undefined
-    ? {
-        path: plan.path,
-        apply: () => writeInside(plan.path, plan.after, root),
-        undo: () => unlinkSync(plan.path),
-      }
-    : writeStep(root, plan.path, plan.before, plan.after);
+function recordStep(
+  root: string,
+  deck: string,
+  from: string,
+  to: string,
+  now: Date,
+  once = false,
+): FileStep {
+  return renameRecord(root, deck, from, to, { now, once });
 }
 
 function renameStep(from: string, to: string): FileStep {
