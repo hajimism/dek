@@ -14,6 +14,12 @@
 
   // The code a link from the CLI carries fills the field; the page is not reloaded with another.
   let code = $state(untrack(() => initial));
+  // A code that came in the link, not typed, is where phishing starts: someone sends a link with
+  // their own code, and whoever allows it lets them publish as themselves. So such a code needs
+  // the reader to say their own terminal shows it.
+  const fromLink = untrack(() => initial !== "");
+  let matches = $state(false);
+  let mustMatch = $state(false);
   let step: "enter" | "confirm" | "done" | "denied" = $state("enter");
   let problem: DeviceProblem | "short" | null = $state(null);
   let busy: "look" | "allow" | "deny" | null = $state(null);
@@ -35,6 +41,11 @@
     event.preventDefault();
     if (!isCompleteUserCode(code)) {
       problem = "short";
+      return;
+    }
+    if (fromLink && normalizeUserCode(code) === normalizeUserCode(initial) && !matches) {
+      mustMatch = true;
+      document.getElementById("device-matches")?.focus();
       return;
     }
     busy = "look";
@@ -85,6 +96,7 @@
         <li><Icon name="message" size={14} />{t("device.scope.comments")}</li>
       </ul>
       <p class="code-line">{t("device.code", { code })}</p>
+      <p class="confirm-warning"><Icon name="alert" size={14} />{t("device.confirmWarning")}</p>
       <div class="buttons">
         <Button variant="ghost" size="lg" loading={busy === "deny"} disabled={busy !== null} onclick={() => answer(false)}>{t("device.deny")}</Button>
         <Button variant="primary" size="lg" loading={busy === "allow"} disabled={busy !== null} onclick={() => answer(true)}>{t("device.allow")}</Button>
@@ -95,7 +107,30 @@
       {#if shared.viewer}
         <p class="sub">{t("device.prompt")}</p>
         <form method="get" onsubmit={submit} novalidate>
+          {#if fromLink}
+            <div class="warning" role="note">
+              <Icon name="alert" size={16} />
+              <div>
+                <p class="warning-title">{t("device.fromLink")}</p>
+                <p>{t("device.fromLinkBody")}</p>
+              </div>
+            </div>
+          {/if}
           <DeviceCodeInput bind:value={code} label={t("device.codeLabel")} error={problem ? t(messages[problem]) : ""} />
+          {#if fromLink && normalizeUserCode(code) === normalizeUserCode(initial)}
+            <label class="check" class:invalid={mustMatch && !matches}>
+              <input
+                id="device-matches"
+                type="checkbox"
+                bind:checked={matches}
+                aria-describedby={mustMatch && !matches ? "device-matches-error" : undefined}
+              />
+              <span>{t("device.matches", { code })}</span>
+            </label>
+            {#if mustMatch && !matches}
+              <p class="check-error" id="device-matches-error" role="alert">{t("device.mustMatch")}</p>
+            {/if}
+          {/if}
           <Button variant="primary" size="lg" full type="submit" loading={busy === "look"}>{t("device.continue")}</Button>
         </form>
       {:else}
@@ -177,6 +212,64 @@
   }
   .scopes :global(svg) {
     color: var(--text-faint);
+  }
+  .warning {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-md);
+    background: var(--warning-subtle);
+    color: var(--warning);
+    font-size: var(--text-sm);
+  }
+  .warning :global(svg) {
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .warning-title {
+    margin-bottom: 2px;
+    font-weight: var(--weight-semibold);
+  }
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-size: var(--text-md);
+    cursor: pointer;
+  }
+  .check.invalid {
+    border-color: var(--danger);
+  }
+  .check input {
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+  }
+  .check span {
+    font-variant-numeric: tabular-nums;
+  }
+  .check-error {
+    margin-top: calc(-1 * var(--space-2));
+    color: var(--danger);
+    font-size: var(--text-sm);
+  }
+  .confirm-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    color: var(--warning);
+    font-size: var(--text-sm);
+  }
+  .confirm-warning :global(svg) {
+    margin-top: 3px;
+    flex-shrink: 0;
   }
   .code-line {
     color: var(--text-faint);

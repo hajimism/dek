@@ -188,6 +188,17 @@ const en = {
   "comment.shortcut": "⌘↵ to send",
   "comment.closed": "Comments are off for this talk.",
   "comment.version": "On v{n}",
+  "comment.expand": "Show more of the comments",
+  "comment.collapse": "Show less of the comments",
+  "comment.quotedScript": "Quoted the script",
+  "comment.pin": "Comment {n}",
+  "comment.selectionKeys": "Press {keys} to comment on the selected words.",
+  "device.fromLink": "This code came with the link you opened.",
+  "device.fromLinkBody":
+    "Only continue if you just ran `dekc pub login` yourself and your terminal shows this same code. Someone who sends you a link like this could otherwise publish as you.",
+  "device.matches": "My terminal shows {code}",
+  "device.mustMatch": "Check that your terminal shows this code first.",
+  "device.confirmWarning": "If you did not start this from your own terminal just now, cancel.",
 
   "manage.title": "Manage “{title}”",
   "manage.back": "Back to the talk",
@@ -435,6 +446,18 @@ const ja: Record<MessageKey, string> = {
   "comment.shortcut": "⌘↵ で送信",
   "comment.closed": "このトークではコメントを受け付けていません。",
   "comment.version": "v{n} へのコメント",
+  "comment.expand": "コメントを広げて表示",
+  "comment.collapse": "コメントを狭めて表示",
+  "comment.quotedScript": "台本を引用したコメント",
+  "comment.pin": "コメント {n}",
+  "comment.selectionKeys": "{keys} で選んだ文にコメントできます。",
+  "device.fromLink": "このコードは、開いたリンクに含まれていたものです。",
+  "device.fromLinkBody":
+    "たった今あなた自身が `dekc pub login` を実行し、ターミナルに同じコードが表示されている場合だけ続けてください。そうでなければ、このリンクを送った人があなたとして公開できてしまいます。",
+  "device.matches": "ターミナルに {code} と表示されている",
+  "device.mustMatch": "先に、ターミナルにこのコードが表示されていることを確かめてください。",
+  "device.confirmWarning":
+    "たった今ご自身のターミナルから始めたのでなければ、キャンセルしてください。",
 
   "manage.title": "「{title}」の管理",
   "manage.back": "トークに戻る",
@@ -608,7 +631,13 @@ export function absoluteTime(lang: Lang, iso: string): string {
   }).format(date);
 }
 
-/** A text's language when nothing says: Japanese if it has kana. */
-export function guessLang(texts: readonly string[]): string | null {
-  return texts.some((text) => /[\u3040-\u30ff]/.test(text)) ? "ja" : null;
+/**
+ * A text's language when nothing says: Japanese if it has kana, or kanji alone on a page that is
+ * Japanese already (a title such as 「発表論」 is more likely Japanese than Chinese there).
+ */
+export function guessLang(texts: readonly string[], context?: Lang): string | null {
+  if (texts.some((text) => /[\u3040-\u30ff]/.test(text))) {
+    return "ja";
+  }
+  return context === "ja" && texts.some((text) => /[\u4e00-\u9fff]/.test(text)) ? "ja" : null;
 }
