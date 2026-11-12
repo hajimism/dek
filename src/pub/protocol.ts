@@ -65,7 +65,7 @@ export const Rename = z.strictObject({ from: z.string(), to: z.string(), at: z.s
 export type Rename = z.infer<typeof Rename>;
 
 /** The files a version is made of, as the upload's form fields name them. */
-export const VERSION_FILES = ["full", "public", "source", "cover"] as const;
+export const VERSION_FILES = ["full", "public", "bare", "source", "cover"] as const;
 export type VersionFile = (typeof VERSION_FILES)[number];
 
 const Sha256 = z.string().regex(/^[0-9a-f]{64}$/);
@@ -77,6 +77,7 @@ export const LintSummary = z.strictObject({
   errors: z.number().int(),
   warnings: z.number().int(),
 });
+export type LintSummary = z.infer<typeof LintSummary>;
 
 /** The `manifest` field of a version upload, beside its files. */
 export const VersionManifest = z.strictObject({
@@ -285,6 +286,7 @@ export type Me = z.infer<typeof Me>;
 
 /** What the server gives the CLI for the session the device flow made. */
 export const CliKey = z.strictObject({ key: z.string(), me: Me });
+export type CliKey = z.infer<typeof CliKey>;
 
 /** Every error answer. `code` is stable; `message` is for people. */
 export const ErrorBody = z.strictObject({

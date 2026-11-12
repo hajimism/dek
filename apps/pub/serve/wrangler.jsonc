@@ -1,0 +1,12 @@
+// The serve Worker: hands out built decks from R2 on d-<id>.dekusercontent.com. It sets no
+// cookie and reads no database; what it may serve is decided by the app, through an access file
+// beside each deck in R2 and short-lived signed tokens.
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "dek-pub-serve",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-30",
+  "r2_buckets": [{ "binding": "STORAGE", "bucket_name": "dek-pub" }],
+  "vars": { "APP_ORIGIN": "https://dek.pub" }
+  // SERVE_TOKEN_SECRET is a secret: `wrangler secret put SERVE_TOKEN_SECRET`.
+}

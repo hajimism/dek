@@ -4,19 +4,30 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "scripts": {
+    "setup": "bun scripts/setup.ts",
     "dev": "vp dev",
     "build": "vp build",
     "preview": "vp preview",
-    "prepare": "void prepare"
+    "check": "void prepare && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "test": "vp test",
+    "test:serve": "cd serve && vitest run",
+    "test:e2e": "bun tests/e2e/run.ts",
+    "db:generate": "void db generate"
   },
   "dependencies": {
+    "@better-auth/api-key": "1.7.17",
+    "better-auth": "1.7.17",
+    "hono": "^4.13.16",
     "svelte": "5.57.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@void/svelte": "1.6.2",
+    "svelte-check": "4.7.8",
+    "typescript": "~6.0.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0",
     "vite-plus": "1.5.0",
-    "void": "1.6.2"
+    "void": "1.6.2",
+    "@cloudflare/workers-types": "^5.20261102.1"
   }
 }

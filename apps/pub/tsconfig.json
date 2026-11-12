@@ -5,19 +5,12 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": [
-      "void/env"
-    ]
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["void/env", "@cloudflare/workers-types"]
   },
-  "include": [
-    "src",
-    "pages",
-    "routes",
-    "middleware",
-    "crons",
-    "queues",
-    "db"
-  ]
+  "include": ["src", "pages", "routes", "middleware", "db", "tests", "auth.ts", "env.ts", "void.config.ts", "vite.config.ts", "vitest.config.ts", "serve/src"]
 }
