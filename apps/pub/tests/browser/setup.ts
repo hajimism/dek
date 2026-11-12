@@ -18,12 +18,13 @@ export function shared(overrides: Partial<Shared> = {}): Shared {
   };
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: any component, as Svelte's own ComponentProps takes one.
 export function renderPage<C extends Component<any>>(
   component: C,
   props: ComponentProps<C>,
   overrides: Partial<Shared> = {},
 ) {
-  return render(component, {
+  return render(component as never, {
     props,
     context: new Map([["__void_shared", { value: shared(overrides) }]]),
   } as never);
