@@ -370,6 +370,34 @@ describe("navigation", () => {
     expect(transitions).toBe(0);
   });
 
+  // A frame hidden or scrolled out of view is not drawn, and a view transition there never gets
+  // to its update: the move goes on without the transition rather than waiting for a frame.
+  test.serial("moves even when the slide transition is never drawn", async () => {
+    await mount("#intro");
+    let skipped = 0;
+    (document as { startViewTransition?: unknown }).startViewTransition = (fn: () => void) => {
+      let done: () => void = () => undefined;
+      const finished = new Promise<void>((resolve) => {
+        done = resolve;
+      });
+      return {
+        finished,
+        ready: Promise.reject(new Error("skipped")),
+        updateCallbackDone: finished,
+        skipTransition() {
+          skipped += 1;
+          setTimeout(() => {
+            fn();
+            done();
+          }, 0);
+        },
+      };
+    };
+    pressKey("ArrowRight");
+    await waitFor(() => currentSlug() === "steps");
+    expect(skipped).toBe(1);
+  });
+
   test.serial("still shows the deck when the browser blocks storage", async () => {
     await mount("#steps", () => {
       Object.defineProperty(window, "localStorage", {

@@ -35,6 +35,9 @@ export type Stage = {
   motion: DekMotionHandle;
 };
 
+/** How long a slide transition may wait for its first frame before it is skipped. */
+const UNDRAWN_MS = 250;
+
 /** How the script draws a move: one beat forward animates, anything else jumps to its end. */
 export function motionModeFor(
   from: Position,
@@ -192,13 +195,28 @@ export function createStage(options: {
   }
 
   async function present(from: Position, to: Position, apply: () => void): Promise<void> {
-    const viewTransition = startTransition(slides, from, to, apply);
+    let applied = false;
+    const viewTransition = startTransition(slides, from, to, () => {
+      applied = true;
+      apply();
+    });
+    // A page that is not drawn, as a frame hidden or scrolled out of view, never gets a view
+    // transition to its update, and the move would wait for a frame that does not come: one
+    // whose update has not run soon is skipped, which runs the update without the animation.
+    const watchdog = viewTransition
+      ? window.setTimeout(() => {
+          if (!applied) {
+            viewTransition.skipTransition();
+          }
+        }, UNDRAWN_MS)
+      : undefined;
     if (viewTransition) {
       inFlight = viewTransition;
     }
     try {
       await waitForPlaybackSettle({ animations: [...document.getAnimations()], viewTransition });
     } finally {
+      window.clearTimeout(watchdog);
       inFlight = undefined;
     }
   }
