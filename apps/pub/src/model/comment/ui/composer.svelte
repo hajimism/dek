@@ -19,13 +19,16 @@
 </script>
 
 <script lang="ts">
+  import type { ThreadScope } from "../../../../../../src/pub/protocol.ts";
   import type { ReplyInput } from "../type.ts";
   import { useApp } from "../../../shell/use-app.ts";
   import Button from "../../../common/ui/button.svelte";
+  import SegmentedControl from "../../../common/ui/segmented-control.svelte";
   import Turnstile from "./turnstile.svelte";
 
   let {
     guest = false,
+    scopes = false,
     placeholder,
     submitLabel,
     compact = false,
@@ -34,6 +37,8 @@
     onsubmit,
   }: {
     guest?: boolean;
+    /** Offer to keep the thread to the team, as it is unless changed, or share it with the client. */
+    scopes?: boolean;
     placeholder?: string;
     submitLabel?: string;
     compact?: boolean;
@@ -44,6 +49,7 @@
 
   const { shared, t } = useApp();
   let text = $state("");
+  let scope: ThreadScope = $state("team");
   let guestName = $state("");
   let token = $state("");
   let resetKey = $state(0);
@@ -85,6 +91,7 @@
     }
     const ok = await onsubmit({
       text: text.trim(),
+      ...(scopes ? { scope } : {}),
       ...(guest ? { guestName: guestName.trim() } : {}),
       ...(guest && token ? { turnstile: token } : {}),
     });
@@ -132,6 +139,19 @@
     maxlength="4000"
     {onkeydown}
   ></textarea>
+  {#if scopes}
+    <div class="scope">
+      <SegmentedControl
+        label={t("comment.scope")}
+        options={[
+          { value: "team", label: t("comment.scope.team"), icon: "lock" },
+          { value: "shared", label: t("comment.scope.shared") },
+        ]}
+        value={scope}
+        onselect={(next: ThreadScope) => (scope = next)}
+      />
+    </div>
+  {/if}
   {#if guest && shared.turnstileSiteKey}
     <Turnstile siteKey={shared.turnstileSiteKey} bind:token {resetKey} />
   {/if}
@@ -152,6 +172,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+  }
+  .scope {
+    display: flex;
   }
   .guest {
     display: flex;

@@ -7,6 +7,7 @@ import {
   type CommentAnchor,
   type CommentRow,
   CommentTarget,
+  type ThreadScope,
 } from "../../../../../src/pub/protocol.ts";
 
 export type ThreadRow = typeof threads.$inferSelect;
@@ -19,7 +20,13 @@ export type Filter = "open" | "resolved" | "all";
 /** A row from the API, or one being sent: shown at once, faded until the server has it. */
 export type CardComment = CommentRow & { pending?: boolean; failed?: boolean };
 
-export type ReplyInput = { text: string; guestName?: string; turnstile?: string };
+/** What a composer sends; `scope` only from one that offered the choice, to open a thread. */
+export type ReplyInput = {
+  text: string;
+  scope?: ThreadScope;
+  guestName?: string;
+  turnstile?: string;
+};
 
 /** A comment being written: what it will point at. */
 export type Draft = { anchor: CommentAnchor; slideNumber: number | null };

@@ -18,7 +18,9 @@ export type DeckLinkOptions = {
   origin: string;
   /** The talk's slides; a move, pick or mark naming any other slug is not heard. */
   slugs: readonly string[];
-  /** Whether this person may comment; without it nothing is picked or marked. */
+  /** Whether this person may read the comments; without it nothing is marked. */
+  canRead: boolean;
+  /** Whether this person may comment; without it nothing is picked. */
   canComment: boolean;
   /** Whether a comment with this ID is on the page. */
   hasComment?: (id: string) => boolean;
@@ -35,6 +37,7 @@ export class DeckLink {
   #frame: HTMLIFrameElement | null = null;
   #origin: string;
   #slugs: Set<string>;
+  #canRead: boolean;
   #canComment: boolean;
   #hasComment: (id: string) => boolean;
   #events: DeckEvents;
@@ -42,6 +45,7 @@ export class DeckLink {
   constructor(options: DeckLinkOptions) {
     this.#origin = options.origin;
     this.#slugs = new Set(options.slugs);
+    this.#canRead = options.canRead;
     this.#canComment = options.canComment;
     this.#hasComment = options.hasComment ?? (() => false);
     this.#events = options.events ?? {};
@@ -110,7 +114,7 @@ export class DeckLink {
         }
         break;
       case "dek:mark":
-        if (this.#canComment && this.#hasComment(message.id)) {
+        if (this.#canRead && this.#hasComment(message.id)) {
           this.#events.onmark?.(message.id);
         }
         break;
@@ -147,7 +151,7 @@ export class DeckLink {
   }
 
   marks(marks: Mark[]): void {
-    if (!this.#canComment) {
+    if (!this.#canRead) {
       return;
     }
     this.#send({ type: "dek:marks", marks: $state.snapshot(marks) });

@@ -14,15 +14,18 @@ export const GET = defineHandler((c) =>
   }, c.req.raw),
 );
 
-/** Share the deck with one person, by handle, or by an email address no account has yet. */
+/**
+ * Share the deck with one person, by handle, or by an email address no account has yet, on the
+ * team's side or the client's.
+ */
 export const POST = defineHandler((c) =>
   api(async () => {
     const deck = await ownedDeck(c.req.param("id") ?? "", await requirePerson(c));
-    const { who, role } = await jsonBody(c, NewGrant);
+    const { who, role, side } = await jsonBody(c, NewGrant);
     const grantee = granteeOf(who);
     if (!grantee) {
       throw new ApiError(422, "invalid", "name a handle or an email address");
     }
-    return Response.json(await share(c, deck, grantee, role), { status: 201 });
+    return Response.json(await share(c, deck, grantee, role, side), { status: 201 });
   }, c.req.raw),
 );

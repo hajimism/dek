@@ -355,6 +355,74 @@ try {
     "the granted colleague sees the private talk",
   );
 
+  // Team and client: a view grant reads the threads its side may, and the client's side never
+  // learns of a thread kept to the team until it is shared.
+  const strangerHandle = (await stranger.fetch("/api/me").then((r) => r.json())).handle;
+  const clientList = async () =>
+    (await (await stranger.fetch(`/api/decks/${id}/comments?status=all`)).json()) as {
+      comments?: Array<{ id: string; number: number; scope: string }>;
+    };
+  check(
+    Array.isArray((await clientList()).comments),
+    "a colleague granted a view reads the comments",
+  );
+  const teamNote = await author.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "社内だけのメモ" },
+  });
+  const teamRow = (await teamNote.json()) as { id: string; scope: string; number: number };
+  check(
+    teamNote.status === 201 && teamRow.scope === "team",
+    "the owner's thread is kept to the team unless shared",
+    teamRow,
+  );
+  check(
+    !(await clientList()).comments?.some((row) => row.id === teamRow.id),
+    "the client's side does not see a team thread",
+  );
+  check(
+    (await stranger.fetch(`/api/decks/${id}/comments/${teamRow.id}/widen`, { method: "POST" }))
+      .status === 404,
+    "the client's side cannot reach a team thread at all",
+  );
+  await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: `@${strangerHandle}`, role: "comment" },
+  });
+  const asTeam = await stranger.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: {
+      anchor: { slug: renamed, step: "0", targets: [] },
+      text: "チームだけに",
+      scope: "team",
+    },
+  });
+  check(
+    asTeam.status === 403 && (await asTeam.json()).error?.code === "team_only",
+    "the client's side cannot open a thread for the team alone",
+  );
+  const widened = await author.fetch(`/api/decks/${id}/comments/${teamRow.id}/widen`, {
+    method: "POST",
+  });
+  const widenedRow = (await widened.json()) as { scope: string; number: number };
+  const shownToClient = (await clientList()).comments?.find((row) => row.id === teamRow.id);
+  check(
+    widened.status === 200 &&
+      widenedRow.scope === "shared" &&
+      shownToClient?.number === Math.max(...rows.map((row) => row.number)) + 1,
+    "a shared team thread reaches the client under the next shared number",
+    { widenedRow, shownToClient },
+  );
+  const teamGrant = await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: `@${strangerHandle}`, role: "comment", side: "team" },
+  });
+  check(
+    ((await teamGrant.json()) as { side?: string }).side === "team" &&
+      ((await clientList()).comments ?? []).some((row) => row.scope === "team"),
+    "a colleague moved to the team's side reads the team's threads",
+  );
+
   // What changed between the versions.
   const status2 = await dekc(["pub", "status"]);
   const v2 = (

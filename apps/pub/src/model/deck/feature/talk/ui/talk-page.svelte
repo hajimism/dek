@@ -52,6 +52,7 @@
   const link = new DeckLink({
     origin: untrack(() => talk.viewer.origin),
     slugs: untrack(() => talk.slides.map((slide) => slide.slug)),
+    canRead: untrack(() => talk.comments !== null),
     canComment: untrack(() => talk.canComment),
     hasComment: (id) => comments.some((comment) => comment.id === id && !comment.pending),
     events: {
@@ -351,6 +352,7 @@
       anchor: $state.snapshot(draft.anchor),
       text: input.text,
       version: talk.version,
+      ...(input.scope ? { scope: input.scope } : {}),
       ...(input.guestName ? { guestName: input.guestName } : {}),
       ...(input.turnstile ? { turnstile: input.turnstile } : {}),
     };
@@ -506,6 +508,7 @@
         {draft}
         isOwner={talk.isOwner}
         canComment={talk.canComment}
+        scopes={talk.side === "team"}
         {guest}
         closable={mode !== "column"}
         anchorTops={mode === "column" ? anchorTops : null}
@@ -517,6 +520,11 @@
         }}
         onresolve={(comment) => list.setResolved(comment, true)}
         onreopen={(comment) => list.setResolved(comment, false)}
+        onwiden={async (comment) => {
+          if (await list.widen(comment)) {
+            toast(t("comment.widened"));
+          }
+        }}
         onreply={(comment, input) => list.reply(comment, input)}
         oncreate={create}
         oncanceldraft={() => (draft = null)}

@@ -24,6 +24,9 @@ What it does not do:
   - There is no way to see comments where they sat on an older version. The API's `?version=` filter is used by neither the CLI nor the pages, and a reader may ask it for the current version only.
   - Which versions were once current is not kept. So a reader comments on the current version only: a page opened before a promote gets 409 `stale_version` and must be reloaded, and a thread opened on a version newer than the current one is the owner's alone until that version is current.
 - **What changed.** Only the manage page lists the slides a version changed. The talk page does not mark changed slides for someone coming back to review.
+- **Team and client** (ADR 51, 52).
+  - A thread's scope is set only on the page and by the API: `dekc pub comments` has no command to share a team thread, and no flag to open one, since the CLI opens no threads.
+  - The pins the deck draws show a team thread's bare number, so on the team's side `T3` and `3` both show as 3 there (the embed API takes a number).
 - **Text.** Comments are plain text: no Markdown, no mentions.
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.
 - **Drafts.** A draft is lost on reload.
@@ -31,6 +34,17 @@ What it does not do:
   - `TURNSTILE_SITE_KEY` (`env.ts`) is missing from `dev.env` and from ADR 43's list of production settings.
   - The composer shows the widget only when the site key is set, yet the server asks for a token whenever `TURNSTILE_SECRET` is not `off`. With the secret set and no site key, a guest cannot comment.
   - No e2e check posts as a guest.
+
+## Comments for client work
+
+The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51) and anyone a deck is shared with reads its threads (ADR 52). Still to come, each with its own ADR:
+
+- **Mail.** A mail provider, sign-in by magic link for invited and existing addresses, invitation mail, and notifications of new threads, replies and resolves. A sending domain and DKIM records are needed first.
+- **Drafts for the team.** The team's side reads versions not yet current and chooses which one the page shows; the client's side reads the current version only. A promote command in `dekc`.
+- **The full-screen viewer.** A header that shows on demand with the title, the author, the page and a comments button, and a comments mode with the panel to the right of a smaller slide. The `c` key reaches the page only from a deck built with a dek that passes it on.
+- **Public comments and likes**, on `public` and `link` decks; the comment policy then governs those only, and review threads are for grantees.
+- **The side column** of the talk page: the slides' titles as a table of contents, and the deck's details.
+- **Projects.** A `dek.toml` key naming a project on dek.pub, which holds its decks, members and settings; grants to a project; `/projects/<id>/<deck>` URLs.
 
 ## Gaps in phases 1 and 2
 

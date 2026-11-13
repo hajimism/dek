@@ -3438,10 +3438,18 @@
                     "type": "integer",
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991,
-                    "description": "Per deck, in the order the threads were opened."
+                    "description": "Per deck and scope, in the order the threads were opened or shared; a team thread's is shown as T and the number."
                   },
                   "id": {
                     "type": "string"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "team",
+                      "shared"
+                    ],
+                    "description": "team: the deck's team only; shared: its clients too."
                   },
                   "slug": {
                     "type": "string"
@@ -3685,6 +3693,7 @@
                 "required": [
                   "number",
                   "id",
+                  "scope",
                   "slug",
                   "step",
                   "status",
@@ -4714,10 +4723,18 @@
                     "type": "integer",
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991,
-                    "description": "Per deck, in the order the threads were opened."
+                    "description": "Per deck and scope, in the order the threads were opened or shared; a team thread's is shown as T and the number."
                   },
                   "id": {
                     "type": "string"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "team",
+                      "shared"
+                    ],
+                    "description": "team: the deck's team only; shared: its clients too."
                   },
                   "slug": {
                     "type": "string"
@@ -4961,6 +4978,7 @@
                 "required": [
                   "number",
                   "id",
+                  "scope",
                   "slug",
                   "step",
                   "status",

@@ -8,6 +8,7 @@ function row(overrides: Partial<CommentRow> = {}): CommentRow {
   return {
     number: 3,
     id: "c_abc",
+    scope: "shared",
     slug: "intro",
     step: "0",
     status: "open",
@@ -46,6 +47,30 @@ describe("CommentCard", () => {
     await renderPage(CommentCard, { comment: row(), slideNumber: 4, now: NOW });
     await expect.element(page.getByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
     await expect.element(page.getByRole("button", { name: "Reply" })).not.toBeInTheDocument();
+  });
+
+  it("marks a team thread, numbers it with a T, and offers to show it to the client", async () => {
+    const onwiden = vi.fn();
+    await renderPage(CommentCard, {
+      comment: row({ scope: "team" }),
+      slideNumber: 4,
+      now: NOW,
+      canWiden: true,
+      onwiden,
+    });
+    await expect.element(page.getByText("Team only")).toBeVisible();
+    await expect.element(page.getByText("#T3")).toBeVisible();
+    await page.getByRole("button", { name: "Show to client" }).click();
+    expect(onwiden).toHaveBeenCalledOnce();
+  });
+
+  it("offers nothing to widen on a shared thread", async () => {
+    await renderPage(CommentCard, { comment: row(), slideNumber: 4, now: NOW, canWiden: true });
+    await expect.element(page.getByText("#3")).toBeVisible();
+    await expect.element(page.getByText("Team only")).not.toBeInTheDocument();
+    await expect
+      .element(page.getByRole("button", { name: "Show to client" }))
+      .not.toBeInTheDocument();
   });
 
   it("marks a comment whose slide moved", async () => {

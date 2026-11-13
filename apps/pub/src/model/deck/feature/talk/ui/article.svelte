@@ -10,6 +10,7 @@
 
 <script lang="ts">
   import type { CommentRow } from "../../../../../../../../src/pub/protocol.ts";
+  import { threadLabel } from "../../../../../../../../src/pub/thread.ts";
   import { elementOf, paragraphMarks } from "../../../../comment/view.ts";
   import { boxToPercent } from "../embed.ts";
   import { quoteAt, segments } from "../../../../comment/quote.ts";
@@ -61,14 +62,14 @@
     ),
   );
   const pinsBySlide = $derived.by(() => {
-    const pins = new Map<string, { id: string; number: number; box: ReturnType<typeof boxToPercent> }[]>();
+    const pins = new Map<string, { id: string; label: string; box: ReturnType<typeof boxToPercent> }[]>();
     for (const comment of comments) {
       const element = elementOf(comment);
       if (!element || comment.status === "resolved" || comment.status === "detached") {
         continue;
       }
       const list = pins.get(comment.slug) ?? [];
-      list.push({ id: comment.id, number: comment.number, box: boxToPercent(element.box, size) });
+      list.push({ id: comment.id, label: threadLabel(comment), box: boxToPercent(element.box, size) });
       pins.set(comment.slug, list);
     }
     return pins;
@@ -203,8 +204,8 @@
             class:active={pin.id === selectedId}
             style:left="{pin.box.x + pin.box.width}%"
             style:top="{pin.box.y}%"
-            aria-label={t("comment.pin", { n: pin.number })}
-            onclick={() => onselect?.(pin.id)}>{pin.number}</button
+            aria-label={t("comment.pin", { n: pin.label })}
+            onclick={() => onselect?.(pin.id)}>{pin.label}</button
           >
         {/each}
       </figure>

@@ -57,7 +57,7 @@ export function byPosition(
         return diff;
       }
     }
-    return a.comment.number - b.comment.number;
+    return a.comment.createdAt.localeCompare(b.comment.createdAt);
   });
   return keyed.map((entry) => entry.comment);
 }

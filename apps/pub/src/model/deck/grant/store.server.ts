@@ -8,8 +8,8 @@ import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
 import { peopleById, personByHandle } from "../../person/store.server.ts";
 import type { Person } from "../../person/type.ts";
-import { strongestRole, waitingGrants } from "./grant.ts";
-import type { Grantee, GrantRole, GrantRow, GrantView } from "./type.ts";
+import { strongestRole, waitingGrants, widestSide } from "./grant.ts";
+import type { Grantee, GrantRole, GrantRow, GrantSide, GrantView } from "./type.ts";
 
 /** The grants that name `person` on a deck: by account, or by an address they have verified. */
 export async function grantsOf(deckId: string, person: Person | null): Promise<GrantRow[]> {
@@ -29,6 +29,10 @@ export async function grantsOf(deckId: string, person: Person | null): Promise<G
 
 export function roleOf(rows: readonly GrantRow[]): GrantRole | null {
   return strongestRole(rows.map((row) => row.role));
+}
+
+export function grantedSide(rows: readonly GrantRow[]): GrantSide | null {
+  return widestSide(rows.map((row) => row.side));
 }
 
 /** Tie the grants by address among `rows` to `person`'s account, as waitingGrants picks them. */
@@ -64,16 +68,21 @@ export async function grantList(c: Context, deckId: string): Promise<GrantView[]
     id: row.id,
     who: row.userId ? (people.get(row.userId)?.handle ?? row.userId) : (row.email ?? ""),
     role: row.role,
+    side: row.side,
     createdAt: row.createdAt,
   }));
 }
 
-/** Share a deck with one person, or change what an earlier share allows them. */
+/**
+ * Share a deck with one person, or change what an earlier share allows them. A new share is on
+ * the client's side unless `side` says otherwise; an earlier one keeps its side unless it does.
+ */
 export async function share(
   c: Context,
   deck: { id: string; ownerId: string },
   grantee: Grantee,
   role: GrantRole,
+  side?: GrantSide,
 ): Promise<GrantView> {
   let target: { userId: string | null; email: string | null };
   if ("email" in grantee) {
@@ -96,13 +105,13 @@ export async function share(
   const id = newGrantId();
   await db
     .insert(grants)
-    .values({ id, deckId: deck.id, ...target, role })
+    .values({ id, deckId: deck.id, ...target, role, side: side ?? "client" })
     .onConflictDoUpdate({
       target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
-      set: { role },
+      set: side ? { role, side } : { role },
     });
   const row = await db
-    .select({ id: grants.id, createdAt: grants.createdAt })
+    .select({ id: grants.id, side: grants.side, createdAt: grants.createdAt })
     .from(grants)
     .where(
       and(
@@ -115,6 +124,7 @@ export async function share(
     id: row?.id ?? id,
     who: "email" in grantee ? grantee.email : grantee.handle,
     role,
+    side: row?.side ?? side ?? "client",
     createdAt: row?.createdAt ?? "",
   };
 }

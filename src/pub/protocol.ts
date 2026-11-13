@@ -294,9 +294,22 @@ export const Reply = z.strictObject({
   createdAt: z.string(),
 });
 
+/**
+ * Who reads a thread: `team`, the owner and those invited on the team's side; `shared`, the
+ * clients too.
+ */
+export const ThreadScope = z.enum(["team", "shared"]);
+export type ThreadScope = z.infer<typeof ThreadScope>;
+
 export const CommentRow = z.strictObject({
-  number: z.number().int().describe("Per deck, in the order the threads were opened."),
+  number: z
+    .number()
+    .int()
+    .describe(
+      "Per deck and scope, in the order the threads were opened or shared; a team thread's is shown as T and the number.",
+    ),
   id: z.string(),
+  scope: ThreadScope.describe("team: the deck's team only; shared: its clients too."),
   slug: z.string(),
   step: z.string(),
   status: CommentStatus,
@@ -319,6 +332,8 @@ export const NewComment = z.strictObject({
   /** The version the commenter was reading; the current one when absent. */
   version: z.number().int().min(1).optional(),
   text: z.string().min(1).max(4000),
+  /** Who reads it; when absent, `team` for one on the team's side and `shared` for anyone else. */
+  scope: ThreadScope.optional(),
   /** A guest's name; ignored when signed in. */
   guestName: z.string().min(1).max(60).optional(),
   /** Turnstile's token, for a guest. */
@@ -336,14 +351,22 @@ export const NewReply = z.strictObject({
 // Grants: people other than the owner who may open, or comment on, a deck that is not public.
 
 export const GrantRole = z.enum(["view", "comment"]);
+/** Which side of the work a grantee is on: the `team` that makes the deck, or its `client`. */
+export const GrantSide = z.enum(["team", "client"]);
 export const Grant = z.strictObject({
   id: z.string(),
   /** A signed-in person's handle, or an email address no account has claimed yet. */
   who: z.string(),
   role: GrantRole,
+  side: GrantSide,
   createdAt: z.string(),
 });
-export const NewGrant = z.strictObject({ who: z.string().min(1).max(254), role: GrantRole });
+export const NewGrant = z.strictObject({
+  who: z.string().min(1).max(254),
+  role: GrantRole,
+  /** When absent, `client` for a new grant, and unchanged for one already made. */
+  side: GrantSide.optional(),
+});
 
 // ---------------------------------------------------------------------------------------------
 // Signing in and who is signed in.
@@ -385,6 +408,8 @@ export const paths = {
     `/api/decks/${segment(id)}/comments/${segment(comment)}/resolve`,
   reopen: (id: string, comment: string) =>
     `/api/decks/${segment(id)}/comments/${segment(comment)}/reopen`,
+  widen: (id: string, comment: string) =>
+    `/api/decks/${segment(id)}/comments/${segment(comment)}/widen`,
   grants: (id: string) => `/api/decks/${segment(id)}/grants`,
   grant: (id: string, grant: string) => `/api/decks/${segment(id)}/grants/${segment(grant)}`,
   /** Better Auth's device authorization endpoints, under its base path. */

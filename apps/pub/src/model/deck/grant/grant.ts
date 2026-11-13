@@ -1,7 +1,7 @@
 // What a grant means: whom it names and how much it allows.
 
 import { isHandle } from "../../person/handle.ts";
-import type { Grantee, GrantRole } from "./type.ts";
+import type { Grantee, GrantRole, GrantSide } from "./type.ts";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -20,6 +20,14 @@ export function strongestRole(roles: readonly GrantRole[]): GrantRole | null {
     return "comment";
   }
   return roles.length > 0 ? "view" : null;
+}
+
+/** Of the grants one person holds on a deck, the side that sees more counts. */
+export function widestSide(sides: readonly GrantSide[]): GrantSide | null {
+  if (sides.includes("team")) {
+    return "team";
+  }
+  return sides.length > 0 ? "client" : null;
 }
 
 /**

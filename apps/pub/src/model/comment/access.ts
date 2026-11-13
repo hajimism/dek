@@ -1,32 +1,53 @@
-// Who may resolve a comment or open it again: the deck's owner, and whoever wrote it. The server
-// knows people by account and decides; the page knows them by handle and only shows the button.
+// Who may read a deck's threads, which of them, and who may resolve one, open it again or share it
+// with the client: the deck's owner, and whoever wrote it. The server knows people by account and
+// decides; the page knows them by handle and only shows the button.
 
-import type { CommentRow } from "../../../../../src/pub/protocol.ts";
+import type { CommentRow, ThreadScope } from "../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../common/api-error.ts";
 import { canComment, canManage, type DeckRules } from "../deck/access.ts";
-import type { GrantRole } from "../deck/grant/type.ts";
+import type { GrantRole, GrantSide } from "../deck/grant/type.ts";
 import type { Person } from "../person/type.ts";
 import type { ThreadRow } from "./type.ts";
 
-/** The owner, and those who may comment, read a deck's comments. */
+/** The owner, those who may comment, and anyone the deck is shared with read its comments. */
 export function canReadComments(
   deck: DeckRules,
   person: Pick<Person, "id"> | null,
   grant: GrantRole | null,
 ): boolean {
-  return canManage(deck, person) || canComment(deck, person, grant);
+  return canManage(deck, person) || grant !== null || canComment(deck, person, grant);
 }
 
 /**
- * Whether `person` may see a thread: the owner any; anyone else one opened on a version no newer
- * than the current one, so a note on a version held back stays the owner's while it is.
+ * Whether `person`, on `side`, may see a thread. By version: the owner any; anyone else one opened
+ * on a version no newer than the current one, so a note on a version held back stays the owner's
+ * while it is. By scope: the team's side any; the client's a shared one only.
  */
 export function canSeeThread(
   deck: { ownerId: string; currentVersion: number | null },
-  thread: Pick<ThreadRow, "n">,
+  thread: Pick<ThreadRow, "n" | "scope">,
   person: Pick<Person, "id"> | null,
+  side: GrantSide,
 ): boolean {
-  return canManage(deck, person) || thread.n <= (deck.currentVersion ?? 0);
+  const byVersion = canManage(deck, person) || thread.n <= (deck.currentVersion ?? 0);
+  const byScope = thread.scope === "shared" || side === "team";
+  return byVersion && byScope;
+}
+
+/**
+ * The scope a thread opened by someone on `side` takes: what they asked, or by default the
+ * narrower one their side may have. The client's side opens shared threads only.
+ */
+export function scopeFor(asked: ThreadScope | undefined, side: GrantSide): ThreadScope {
+  if (side === "client" && asked === "team") {
+    throw new ApiError(
+      403,
+      "team_only",
+      "only the deck's team may open a thread for the team alone",
+      "leave scope out, or send shared",
+    );
+  }
+  return asked ?? (side === "team" ? "team" : "shared");
 }
 
 export function canResolve(
@@ -46,6 +67,15 @@ export function mayResolve(
     return false;
   }
   return isOwner || (!comment.author.guest && comment.author.handle === viewer.handle);
+}
+
+/** Whether the page offers to share a team thread with the client: to whom may resolve it. */
+export function mayWiden(
+  comment: Pick<CommentRow, "author" | "scope">,
+  viewer: { handle: string } | null,
+  isOwner: boolean,
+): boolean {
+  return comment.scope === "team" && mayResolve(comment, viewer, isOwner);
 }
 
 /** Refuse a writer the deck's comments are not open to. */

@@ -3,7 +3,7 @@
 
 import type { CommentPolicy, Visibility } from "../../../../../src/pub/protocol.ts";
 import type { Person } from "../person/type.ts";
-import type { GrantRole } from "./grant/type.ts";
+import type { GrantRole, GrantSide } from "./grant/type.ts";
 
 type Caller = Pick<Person, "id"> | null;
 
@@ -41,6 +41,18 @@ export function canComment(deck: DeckRules, person: Caller, grant: GrantRole | n
     return false;
   }
   return person !== null || deck.comments === "guests";
+}
+
+/**
+ * Which side of the work `person` is on: the owner the team's; a grantee the one their grants
+ * give; anyone else, guests included, the client's.
+ */
+export function sideOf(
+  deck: Pick<DeckRules, "ownerId">,
+  person: Caller,
+  granted: GrantSide | null,
+): GrantSide {
+  return canManage(deck, person) ? "team" : (granted ?? "client");
 }
 
 export function canManage(deck: Pick<DeckRules, "ownerId">, person: Caller): boolean {

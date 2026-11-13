@@ -1,3 +1,4 @@
+import { threadLabel } from "../pub/thread.ts";
 import type { FormattedError } from "./format.ts";
 import type { PubResult } from "./pub.ts";
 import { countSummary, displayDiagnostics } from "./text.ts";
@@ -72,7 +73,7 @@ export function formatPub(data: PubResult): string {
               .filter((line) => line.trim() !== "")
               .map((line) => `   ${mark} ${line}`);
           return [
-            `${row.number}  ${beat}${status}  ${author}  [${row.id}]`,
+            `${threadLabel(row)}  ${beat}${status}  ${author}  [${row.id}]`,
             ...targets,
             ...words(row.text, ">"),
             ...row.thread.flatMap((reply) => [

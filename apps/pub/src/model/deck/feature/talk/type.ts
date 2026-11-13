@@ -8,6 +8,7 @@ import type {
 } from "../../../../../../../src/pub/protocol.ts";
 import type { Quote } from "../../../comment/quote.ts";
 import type { Profile } from "../../../person/type.ts";
+import type { GrantSide } from "../../grant/type.ts";
 import type { TalkCard } from "../../type.ts";
 
 export type ArticleSlide = {
@@ -40,6 +41,8 @@ export type Talk = {
   /** What the comments API would answer this person; null when it would not. */
   comments: CommentRow[] | null;
   canComment: boolean;
+  /** The side of the work the reader is on; the team's may open a thread for the team alone. */
+  side: GrantSide;
   /** The picture link previews show, as an absolute URL. */
   image: string | null;
   more: TalkCard[];

@@ -37,6 +37,7 @@ import {
   type VersionManifest,
   Visibility,
 } from "../pub/protocol.ts";
+import { threadLabel, threadOfLabel } from "../pub/thread.ts";
 import type { PubFields } from "./contract.ts";
 import type { FlagValues } from "./flags.ts";
 import { lintCommand } from "./lint.ts";
@@ -581,8 +582,8 @@ function localComment({ project, deck }: ReadableDeck, row: CommentRow) {
 }
 
 /**
- * The ID of the comment `word` names: an ID as dek.pub gives it, or its number in the deck, as
- * `dekc pub comments` lists it.
+ * The ID of the comment `word` names: an ID as dek.pub gives it, or its number in the deck as
+ * `dekc pub comments` lists it, a team thread's with a T before it.
  */
 async function commentId(
   origin: string,
@@ -591,7 +592,8 @@ async function commentId(
   word: string,
   flags: Flags,
 ): Promise<string> {
-  if (!/^\d+$/.test(word)) {
+  const label = threadOfLabel(word);
+  if (!label) {
     return word;
   }
   const list = await request(
@@ -605,9 +607,11 @@ async function commentId(
     },
     CommentList,
   );
-  const found = list.comments.find((row) => row.number === Number(word));
+  const found = list.comments.find(
+    (row) => row.number === label.number && row.scope === label.scope,
+  );
   if (found === undefined) {
-    throw new DekError(`the deck has no comment ${word}`, {
+    throw new DekError(`the deck has no comment ${threadLabel(label)}`, {
       hint: `run \`${pubCommand("comments --status all", flags)}\` to see each comment's number`,
     });
   }

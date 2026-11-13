@@ -11,10 +11,10 @@ import { appUrl } from "../../common/http.server.ts";
 import { newDeckId } from "../../common/ids.ts";
 import { personById } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
-import { canManage, canView } from "./access.ts";
+import { canManage, canView, sideOf } from "./access.ts";
 import { talkPath } from "./deck.ts";
-import { claimGrants, grantsOf, roleOf } from "./grant/store.server.ts";
-import type { GrantRole } from "./grant/type.ts";
+import { claimGrants, grantedSide, grantsOf, roleOf } from "./grant/store.server.ts";
+import type { GrantRole, GrantSide } from "./grant/type.ts";
 import { syncAccess } from "./sync-access.server.ts";
 import type { Deck, DeckPatch } from "./type.ts";
 import { versionsOf } from "./version/store.server.ts";
@@ -109,14 +109,14 @@ async function mustFind(id: string): Promise<Deck> {
 }
 
 /**
- * The deck, if `person` may see it, with the role their grants give them; a deck they may not
- * see is as missing as one that is not. Grants waiting on an address they have shown is theirs
- * are claimed for their account here.
+ * The deck, if `person` may see it, with the role their grants give them and the side of the work
+ * they are on; a deck they may not see is as missing as one that is not. Grants waiting on an
+ * address they have shown is theirs are claimed for their account here.
  */
 export async function visibleDeck(
   id: string,
   person: Person | null,
-): Promise<{ deck: Deck; grant: GrantRole | null }> {
+): Promise<{ deck: Deck; grant: GrantRole | null; side: GrantSide }> {
   const deck = await deckById(id);
   if (!deck) {
     throw notFound();
@@ -129,7 +129,7 @@ export async function visibleDeck(
   if (!canView(deck, person, grant)) {
     throw notFound();
   }
-  return { deck, grant };
+  return { deck, grant, side: sideOf(deck, person, grantedSide(grants)) };
 }
 
 export async function ownedDeck(id: string, person: Person): Promise<Deck> {

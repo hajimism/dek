@@ -2,7 +2,7 @@
 <script lang="ts">
   import Icon from "../../../common/ui/icon.svelte";
   import { useApp } from "../../../shell/use-app.ts";
-  import { mayResolve } from "../access.ts";
+  import { mayResolve, mayWiden } from "../access.ts";
   import type { CardComment, Draft, Filter, ReplyInput } from "../type.ts";
   import { matchesFilter } from "../view.ts";
   import CommentCard from "./comment-card.svelte";
@@ -16,6 +16,7 @@
     draft = null,
     isOwner = false,
     canComment = false,
+    scopes = false,
     guest = false,
     closable = false,
     signinHref,
@@ -23,6 +24,7 @@
     onanchor,
     onresolve,
     onreopen,
+    onwiden,
     onreply,
     oncreate,
     oncanceldraft,
@@ -38,6 +40,8 @@
     draft?: Draft | null;
     isOwner?: boolean;
     canComment?: boolean;
+    /** The reader is on the team's side: a new thread may be kept to the team. */
+    scopes?: boolean;
     guest?: boolean;
     closable?: boolean;
     signinHref?: string;
@@ -45,6 +49,7 @@
     onanchor: (comment: CardComment) => void;
     onresolve: (comment: CardComment) => Promise<void>;
     onreopen: (comment: CardComment) => Promise<void>;
+    onwiden: (comment: CardComment) => Promise<void>;
     onreply: (comment: CardComment, input: ReplyInput) => Promise<boolean>;
     oncreate: (input: ReplyInput) => Promise<boolean>;
     oncanceldraft: () => void;
@@ -141,7 +146,7 @@
               : t("talk.slideLabel", { n: draft.slideNumber ?? "?" })}
           </p>
         {/if}
-        <Composer {guest} autofocus oncancel={oncanceldraft} onsubmit={oncreate} />
+        <Composer {guest} {scopes} autofocus oncancel={oncanceldraft} onsubmit={oncreate} />
       </section>
   {/if}
 {/snippet}
@@ -207,12 +212,14 @@
               selected={comment.id === selectedId}
               canResolve={mayResolve(comment, shared.viewer, isOwner)}
               canReply={canComment}
+              canWiden={mayWiden(comment, shared.viewer, isOwner)}
               {guest}
               now={shared.now}
               onselect={() => onselect(comment)}
               onanchor={() => onanchor(comment)}
               onresolve={() => onresolve(comment)}
               onreopen={() => onreopen(comment)}
+              onwiden={() => onwiden(comment)}
               onreply={(input) => onreply(comment, input)}
               onretry={() => onretry(comment)}
               oncopylink={() => oncopylink(comment)}

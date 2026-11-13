@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { ApiError } from "../../src/common/api-error.ts";
 import {
   canReadComments,
   canResolve,
   canSeeThread,
   mayResolve,
+  mayWiden,
+  scopeFor,
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
@@ -211,17 +214,56 @@ describe("who may resolve", () => {
 
   it("shows a thread on a version held back to the owner only", () => {
     const shown = { ownerId: "u1", currentVersion: 2 };
-    expect(canSeeThread(shown, { n: 2 }, { id: "u2" })).toBe(true);
-    expect(canSeeThread(shown, { n: 1 }, null)).toBe(true);
-    expect(canSeeThread(shown, { n: 3 }, { id: "u2" })).toBe(false);
-    expect(canSeeThread(shown, { n: 3 }, { id: "u1" })).toBe(true);
-    expect(canSeeThread({ ...shown, currentVersion: null }, { n: 1 }, { id: "u2" })).toBe(false);
+    const at = (n: number) => ({ n, scope: "shared" as const });
+    expect(canSeeThread(shown, at(2), { id: "u2" }, "client")).toBe(true);
+    expect(canSeeThread(shown, at(1), null, "client")).toBe(true);
+    expect(canSeeThread(shown, at(3), { id: "u2" }, "team")).toBe(false);
+    expect(canSeeThread(shown, at(3), { id: "u1" }, "team")).toBe(true);
+    expect(canSeeThread({ ...shown, currentVersion: null }, at(1), { id: "u2" }, "team")).toBe(
+      false,
+    );
   });
 
-  it("reads comments as the owner, or as one who may comment", () => {
+  it("shows a team thread to the team's side only", () => {
+    const shown = { ownerId: "u1", currentVersion: 2 };
+    const team = { n: 1, scope: "team" as const };
+    expect(canSeeThread(shown, team, { id: "u1" }, "team")).toBe(true);
+    expect(canSeeThread(shown, team, { id: "u2" }, "team")).toBe(true);
+    expect(canSeeThread(shown, team, { id: "u3" }, "client")).toBe(false);
+    expect(canSeeThread(shown, team, null, "client")).toBe(false);
+  });
+
+  it("reads comments as the owner, as one who may comment, or as anyone granted the deck", () => {
     expect(canReadComments(deck, { id: "u1" }, null)).toBe(true);
     expect(canReadComments(deck, { id: "u2" }, null)).toBe(true);
     expect(canReadComments({ ...deck, comments: "off" }, { id: "u2" }, null)).toBe(false);
     expect(canReadComments({ ...deck, comments: "off" }, { id: "u2" }, "comment")).toBe(true);
+    const closed = { ...deck, visibility: "private" as const };
+    expect(canReadComments(closed, { id: "u2" }, "view")).toBe(true);
+    expect(canReadComments(closed, { id: "u2" }, null)).toBe(false);
+  });
+});
+
+describe("thread scope", () => {
+  it("opens a team thread for the team's side unless asked, and a shared one for anyone else", () => {
+    expect(scopeFor(undefined, "team")).toBe("team");
+    expect(scopeFor("shared", "team")).toBe("shared");
+    expect(scopeFor(undefined, "client")).toBe("shared");
+    expect(scopeFor("shared", "client")).toBe("shared");
+  });
+
+  it("refuses a team thread from the client's side", () => {
+    expect(() => scopeFor("team", "client")).toThrow(ApiError);
+  });
+
+  it("lets the owner and the author share a team thread, and nothing narrows a shared one", () => {
+    const by = (handle: string, scope: "team" | "shared") => ({
+      scope,
+      author: { name: handle, handle, guest: false },
+    });
+    expect(mayWiden(by("sato", "team"), { handle: "sato" }, false)).toBe(true);
+    expect(mayWiden(by("sato", "team"), { handle: "kato" }, true)).toBe(true);
+    expect(mayWiden(by("sato", "team"), { handle: "kato" }, false)).toBe(false);
+    expect(mayWiden(by("sato", "shared"), { handle: "sato" }, true)).toBe(false);
   });
 });

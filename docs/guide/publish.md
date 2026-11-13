@@ -65,6 +65,8 @@ dekc pub share --visibility link --script shown --comments signed-in
 | `--embed` | `on` lets other sites embed the deck |
 | `--comments` | `off`, `signed-in`, or `guests` |
 
+You share a deck with people on its manage page on dek.pub, by handle or email address, each to view or to comment, and each on the team's side or the client's. The team reads every thread; a client reads only those shared with them, and never learns of the others. A thread you or your team open is kept to the team unless you choose to share it, and one kept to the team can be shared later, never taken back.
+
 `dekc pub status` prints the settings, the versions, and whether the newest is the source as it is in your project. `dekc pub open` opens the deck in the browser.
 
 ## Answer the comments
@@ -73,7 +75,7 @@ dekc pub share --visibility link --script shown --comments signed-in
 dekc pub comments
 ```
 
-Each comment says where it is: a passage of the script, with the line and column where `script.md` has it now, or an element of a slide, with the slide's file. An agent reads the same with `--json`, as it reads `dekc annotations`, and `shot` is the command that shows the slide the comment is on. Reply, and resolve a comment once it is dealt with, by its ID or its number:
+Each comment says where it is: a passage of the script, with the line and column where `script.md` has it now, or an element of a slide, with the slide's file. An agent reads the same with `--json`, as it reads `dekc annotations`, and `shot` is the command that shows the slide the comment is on. A thread the deck's team keeps to itself is numbered on its own, with a T, as `T2`. Reply, and resolve a comment once it is dealt with, by its ID or its number:
 
 ```bash
 dekc pub comments reply 3 "Reworded in the next version"
