@@ -9,6 +9,7 @@ import type { Rename, VersionManifest } from "../../../../../../src/pub/protocol
 import { ApiError } from "../../../common/api-error.ts";
 import { now } from "../../../common/db.server.ts";
 import { versionKey } from "../serving/origin.ts";
+import { syncAccess } from "../sync-access.server.ts";
 import type { RenameRow, Version } from "./type.ts";
 import { versionOf } from "./version.ts";
 
@@ -102,7 +103,8 @@ export async function versionFile(deckId: string, n: number, name: string) {
 
 /**
  * Record a claimed version, all at once: its row, the renames new with it, and on the deck the
- * title and details the manifest gives and, unless held back, the version readers see.
+ * title and details the manifest gives and, unless held back, the version readers see. The access
+ * file is written after it whatever changed, so one a failed write left behind is put right.
  */
 export async function recordVersion(
   deckId: string,
@@ -148,4 +150,5 @@ export async function recordVersion(
         .values({ deckId, fromSlug: rename.from, toSlug: rename.to, at: rename.at, n }),
     ),
   ]);
+  await syncAccess(deckId);
 }

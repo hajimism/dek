@@ -1,11 +1,9 @@
-// Decks in D1, and the access file the serve Worker reads beside each in R2. Every change to a
-// deck goes through updateDeck, which writes the access file again whenever what it says may have
-// changed, so the two never stay apart for longer than one failed write.
+// Decks in D1. Every change an owner makes to a deck goes through updateDeck, which writes the
+// access file again whenever what it says may have changed; recording a version writes it too.
 
 import { decks } from "@schema";
 import type { Context } from "hono";
 import { and, db, desc, eq } from "void/db";
-import { storage } from "void/storage";
 import type { DeckStatus } from "../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
@@ -17,8 +15,7 @@ import { canManage, canView } from "./access.ts";
 import { talkPath } from "./deck.ts";
 import { claimGrants, grantsOf, roleOf } from "./grant/store.server.ts";
 import type { GrantRole } from "./grant/type.ts";
-import { accessOf } from "./serving/access-file.ts";
-import { accessKey } from "./serving/origin.ts";
+import { syncAccess } from "./sync-access.server.ts";
 import type { Deck, DeckPatch } from "./type.ts";
 import { versionsOf } from "./version/store.server.ts";
 import { summaryOf } from "./version/version.ts";
@@ -109,32 +106,6 @@ async function mustFind(id: string): Promise<Deck> {
     throw new Error(`the deck ${id} just written is not there`);
   }
   return deck;
-}
-
-/**
- * Tell the serve Worker what it may hand out for this deck without a token. The deck is read
- * from D1 here, not taken from the caller, and the file is replaced only if it has not changed
- * since it was read, so of two requests that change the deck at once, the later state is the one
- * that stays: a slower request cannot put back what a faster one took away. A write that fails
- * after D1 changed leaves the file behind until the next change to the deck, or the next publish,
- * which writes it whatever changed.
- */
-export async function syncAccess(deckId: string): Promise<void> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const existing = await storage.head(accessKey(deckId));
-    const deck = await deckById(deckId);
-    if (!deck) {
-      return;
-    }
-    const written = await storage.put(accessKey(deckId), JSON.stringify(accessOf(deck)), {
-      httpMetadata: { contentType: "application/json" },
-      onlyIf: existing ? { etagMatches: existing.etag } : { uploadedBefore: new Date(0) },
-    });
-    if (written) {
-      return;
-    }
-  }
-  throw new Error(`the access file of ${deckId} kept changing under the write`);
 }
 
 /**

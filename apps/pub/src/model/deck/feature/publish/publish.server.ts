@@ -9,7 +9,7 @@ import {
   type VersionFile,
 } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../../common/api-error.ts";
-import { deckById, syncAccess, talkUrl } from "../../store.server.ts";
+import { deckById, talkUrl } from "../../store.server.ts";
 import type { Deck } from "../../type.ts";
 import {
   claimVersion,
@@ -110,13 +110,14 @@ export async function publish(
       promote: options.promote,
     });
   } catch (error) {
-    await releaseVersion(deck.id, n, base);
+    // A version recorded stays, even if writing the access file after it failed; one not recorded
+    // gives its number back.
+    if (!(await findVersion(deck.id, n))) {
+      await releaseVersion(deck.id, n, base);
+    }
     throw error;
   }
 
-  // Every publish writes the access file, whatever changed, so one that failed to be written
-  // after an earlier change is put right here.
-  await syncAccess(deck.id);
   const updated = (await deckById(deck.id)) ?? deck;
   return {
     id: deck.id,
