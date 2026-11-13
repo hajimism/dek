@@ -38,6 +38,7 @@
   let mode: "column" | "drawer" | "sheet" = $state("column");
   let src = $state(untrack(() => talk.viewer.src));
   let frame: HTMLIFrameElement | undefined = $state();
+  let viewer: Viewer | undefined = $state();
   let initialSlug: string | null = null;
   const unsent = new Map<string, NewComment>();
   let tempCount = 0;
@@ -263,12 +264,14 @@
     frame?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  // The deck takes the keys from here on, so the arrows turn its slides.
   function showSlide(slug: string) {
     if (link.ready) {
       link.goto(slug);
     } else {
       src = withSlide(src, slug);
     }
+    viewer?.focusDeck();
     scrollToViewer();
   }
 
@@ -462,6 +465,7 @@
 />
 
 <Viewer
+  bind:this={viewer}
   src={src}
   title={talk.title}
   url={talk.url}
@@ -609,32 +613,30 @@
 {/if}
 
 <style>
+  /* One left edge from the header down: the viewer's, the title's and the article's. Beside a
+     column of comments, the comments end where the viewer does. */
   .body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, var(--measure));
     max-width: var(--container);
     margin: 0 auto;
     padding: 0 var(--page-gutter);
   }
   @media (min-width: 1280px) {
     .body.with-comments {
-      grid-template-columns: minmax(0, 1fr) minmax(0, var(--measure-wide)) 40px 320px minmax(0, 1fr);
-      max-width: none;
-      padding: 0 var(--gutter-lg);
+      grid-template-columns: minmax(0, var(--measure)) minmax(var(--space-10), 1fr) 320px;
     }
     .with-comments .title-block,
     .with-comments .article-col {
-      grid-column: 2;
+      grid-column: 1;
     }
     .with-comments .comments {
-      grid-column: 4;
+      grid-column: 3;
       grid-row: 2;
     }
   }
   .title-block {
-    width: 100%;
-    max-width: var(--measure-wide);
-    margin: var(--space-10) auto var(--space-12);
+    margin: var(--space-10) 0 var(--space-12);
   }
   .eyebrow {
     display: flex;
@@ -701,6 +703,10 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-1);
+  }
+  /* A borderless button last in the row ends at the text's edge with its label, not its padding. */
+  .actions:has(> :global(.ghost:last-child)) {
+    margin-right: -14px;
   }
   .count {
     margin-left: 2px;

@@ -32,12 +32,20 @@
   const total = $derived(link.ready ? link.slides.length : slugs.length);
   const ratio = $derived(link.size.width / link.size.height);
   const currentSlug = $derived(link.current?.slug ?? null);
+  /** The deck has the keys because someone moved there with them: the frame shows a ring. */
+  let keyed = $state(false);
 
   $effect(() => {
     if (frame) {
       return link.attach(frame);
     }
   });
+
+  /** Hands the keys to the deck, as a click inside it would. The page does not scroll. */
+  export function focusDeck() {
+    keyed = document.activeElement?.matches(":focus-visible") ?? false;
+    frame?.focus({ preventScroll: true });
+  }
 
   function fullscreen() {
     if (document.fullscreenElement) {
@@ -63,32 +71,31 @@
   }
 </script>
 
-<section class="viewer" aria-label={t("talk.viewerTitle", { title })}>
-  <div class="stage-wrap">
-    <div class="stage" bind:this={stage} style:--ratio={ratio} class:picking={link.picking}>
-      <iframe
-        bind:this={frame}
-        {src}
-        title={t("talk.viewerTitle", { title })}
-        sandbox="allow-scripts allow-same-origin allow-popups"
-        allow="fullscreen"
-        referrerpolicy="no-referrer"
-      ></iframe>
-      {#if link.picking}
-        <div class="pick-hint" role="status">
-          <Icon name="crosshair" size={14} />
-          <span class="pick-text-fine">{t("comment.pickHint")}</span>
-          <span class="pick-text-touch">{t("comment.pickHintTouch")}</span>
-          <button
-            type="button"
-            onclick={() => {
-              link.pick(false);
-              onpickcancel?.();
-            }}>{t("comment.cancelPick")}</button
-          >
-        </div>
-      {/if}
-    </div>
+<section class="viewer" style:--ratio={ratio} aria-label={t("talk.viewerTitle", { title })}>
+  <div class="stage" bind:this={stage} class:keyed class:picking={link.picking}>
+    <iframe
+      bind:this={frame}
+      {src}
+      title={t("talk.viewerTitle", { title })}
+      sandbox="allow-scripts allow-same-origin allow-popups"
+      allow="fullscreen"
+      referrerpolicy="no-referrer"
+      onblur={() => (keyed = false)}
+    ></iframe>
+    {#if link.picking}
+      <div class="pick-hint" role="status">
+        <Icon name="crosshair" size={14} />
+        <span class="pick-text-fine">{t("comment.pickHint")}</span>
+        <span class="pick-text-touch">{t("comment.pickHintTouch")}</span>
+        <button
+          type="button"
+          onclick={() => {
+            link.pick(false);
+            onpickcancel?.();
+          }}>{t("comment.cancelPick")}</button
+        >
+      </div>
+    {/if}
   </div>
   <div class="bar">
     <div class="nav">
@@ -141,18 +148,17 @@
 </section>
 
 <style>
+  /* The stage and its bar share one width, and the page's left edge: the header's, the title's
+     and the article's. A window too short for the slide narrows it from the right. */
   .viewer {
+    --stage-width: min(100%, calc((100dvh - var(--header-height) - 56px - 48px) * var(--ratio)));
     max-width: var(--container);
     margin: 0 auto;
     padding: var(--space-4) var(--page-gutter) 0;
   }
-  .stage-wrap {
-    display: flex;
-    justify-content: center;
-  }
   .stage {
     position: relative;
-    width: min(100%, calc((100dvh - var(--header-height) - 56px - 48px) * var(--ratio)));
+    width: var(--stage-width);
     min-width: min(100%, 320px);
     aspect-ratio: var(--ratio);
     border-radius: var(--radius-md);
@@ -175,6 +181,11 @@
     display: block;
     background: transparent;
     color-scheme: normal;
+  }
+  .stage.keyed {
+    box-shadow:
+      0 0 0 1px var(--border),
+      0 0 0 calc(var(--focus-offset) + var(--focus-width) + 1px) var(--focus);
   }
   .picking {
     box-shadow:
@@ -231,15 +242,23 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    max-width: 100%;
+    width: var(--stage-width);
+    min-width: min(100%, 320px);
     height: 48px;
-    margin: var(--space-1) auto 0;
+    margin-top: var(--space-1);
   }
   .nav,
   .actions {
     display: flex;
     align-items: center;
     gap: 2px;
+  }
+  /* The first and last glyphs, not their buttons, meet the stage's edges. */
+  .nav {
+    margin-left: -10px;
+  }
+  .actions {
+    margin-right: -10px;
   }
   .position {
     min-width: 64px;
@@ -289,18 +308,24 @@
   }
   @media (max-width: 767px) {
     .viewer {
+      --stage-width: 100%;
       padding: 0;
     }
     .stage {
-      width: 100%;
       border-radius: 0;
       box-shadow: none;
     }
     .bar {
       height: 44px;
-      padding: 0 calc(var(--page-gutter) - 8px);
+      padding: 0 calc(var(--page-gutter) - 14px);
       border-bottom: 1px solid var(--border);
       margin-top: 0;
+    }
+    .nav {
+      margin-left: 0;
+    }
+    .actions {
+      margin-right: 0;
     }
     .tool {
       min-width: 44px;
