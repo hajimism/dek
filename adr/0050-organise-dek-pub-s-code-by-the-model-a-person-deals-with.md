@@ -24,20 +24,21 @@ Void gives `.server.ts` a meaning only beside a page loader. Its client build tu
 
 **The code is grouped by the model a person deals with: `src/model/person/`, `src/model/deck/` and `src/model/comment/`.** A deck holds `grant/`, `version/` and `serving/` inside it, since none of them exists without a deck. A model's folder holds its types in `type.ts`, its rules in plain files, its storage in `*.server.ts` files, and the components that show it in `ui/`. Routes, page loaders and middleware stay where Void wants them and only call into the models.
 
-**A task that spans models, or reaches outside, is a feature: `src/model/<name>/feature/<task>/`.** They are `deck/feature/publish`, `deck/feature/talk` and `deck/feature/manage`, and `person/feature/connect-cli` and `person/feature/profile`. A feature has its own `type.ts`, loader and components. A task one store function does, such as resolving a comment or promoting a version, stays in its model.
+**A task that spans models, or reaches outside, is a feature: `src/model/<name>/feature/<task>/`.** They are `deck/feature/publish`, `deck/feature/talk` and `deck/feature/manage`, and `person/feature/connect-cli` and `person/feature/profile`. A feature may have its own `type.ts`, loader and components. A task one store function does, such as resolving a comment or promoting a version, stays in its model.
 
 **What may import what:**
 
-- Models come in the order person, deck, comment. Each may import the ones before it, and the ones after it only from a feature.
+- Models come in the order person, deck, comment. Each may import the ones before it, and the ones after it only from a feature. The shell sits between person and deck: deck and comment may use it, the person model may not.
 - A model's own files import no feature. Pages and routes import features; features import no other feature.
 - `src/shell/` (the data the middleware hands each page, the header, the footer) knows `src/common/` and the person model. `src/common/` (HTTP helpers, IDs, words, generic components) knows no model.
 - `deck/serving/` is what the app shares with the serve Worker: it imports only itself and the protocol, and the Worker imports only it.
-- Only a `*.server.ts` file imports `void`, `void/db`, `void/env`, `void/storage`, `void/auth` or another `*.server.ts`. Any other file takes row types from `@schema` with `import type` and nothing more.
-- `tests/unit/boundaries.test.ts` checks every one of these and names each import that breaks one.
+- In `src/` and `pages/`, only a `*.server.ts` file imports `void`, `void/db`, `void/env`, `void/storage`, `void/auth` or another `*.server.ts`. Any other file takes row types from `@schema`, and a page its loader's props, with `import type` and nothing more. Routes, middleware and `auth.ts` run only on the server and are not held to this.
+- Nothing a component imports as a value, however far down, imports zod.
+- `tests/unit/boundaries.test.ts` checks every rule in this list and names each import that breaks one.
 
-**Types are in `type.ts`, and zod reads what comes from outside the code.** On the server and in the serve Worker, zod reads Better Auth's user records into one `Person`, the JSON columns of versions and threads, the access file, the serve token and the theme cookie. Row types are Drizzle's own, through `import type`. Wire shapes stay in `src/pub/protocol.ts` and are imported, not written again. Code that runs in the browser does not use zod: it added 25 kB gzipped to the talk page, and `zod/mini` 7 kB. The embed messages and the device flow's answers are read by hand there, as before.
+**A model's or feature's types are in its `type.ts`, and zod reads what comes from outside the code.** A type that only one file's functions take, such as a slide change or a quote, stays beside them; no test checks where a type is. On the server and in the serve Worker, zod reads Better Auth's user records into one `Person`, the JSON columns of versions and threads, the access file, the serve token and the theme cookie. Row types are Drizzle's own, through `import type`. Wire shapes stay in `src/pub/protocol.ts` and are imported, not written again. Code that runs in the browser does not use zod: it added 25 kB gzipped to the talk page, and `zod/mini` 7 kB. The embed messages and the device flow's answers are read by hand there, as before.
 
-**Every change to a deck goes through `updateDeck`.** It writes the access file again whenever a column the file is made from changes. Every publish writes the file whatever changed, so a write that failed after D1 changed is put right then.
+**Every change an owner makes to a deck goes through `updateDeck`.** It writes the access file again whenever a column the file is made from changes. Recording a version writes the file too, whatever changed, so a write that failed after D1 changed is put right then. Besides these, only the counters are written on the deck's row: the newest version's number, by the version store, and the next thread's, by the comment store.
 
 **File names are kebab-case, Svelte components included.** Names Void reads stay as Void reads them: `pages/` with `index`, `layout`, `[param]` and `.server`, and the numbered middleware.
 
@@ -55,7 +56,7 @@ This replaces two places in ADR 43. Its Decision put domain logic in `src/lib/`,
 
 - A file's path says what it holds: a model's types are in its `type.ts`, what is stored in its `*.server.ts`.
 - The serve Worker's bundle includes zod.
-- The fix to opening a comment on a held-back version, and to quoting a hidden script, fell out of writing the version rules once, in `deck/access.ts`.
+- Writing the version rules once, in `deck/access.ts`, showed that opening a comment followed neither of them. Which versions were once current is not kept, so a reader now comments on the current version only, and one whose page is older is asked to reload it.
 - A new model or feature has to take a place in the order; the boundaries test says when one does not.
 - Imports of `src/pub/protocol.ts` from deep in a model have long relative paths.
 - The comment model's insides are still taking shape, as the app's own list of open work says. Its folder and what it may import are settled, not how it works inside.

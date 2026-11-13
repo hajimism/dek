@@ -7,10 +7,10 @@ The dek.pub server: a Void app (Svelte 5, on Cloudflare Workers) and, in `serve/
 - `pages/`: server-rendered pages, `.server.ts` beside each for its loader.
 - `routes/api/`: the JSON API `dekc pub` and the pages call. Its shapes are `../../src/pub/protocol.ts`, shared with the CLI.
 - `src/model/<name>/`: one folder for each thing a person deals with on dek.pub: `person`, `deck` (with `grant/`, `version/` and `serving/` inside), `comment`. A model holds its types in `type.ts`, its rules in plain files, its storage in `*.server.ts` files, and the components that show it in `ui/`.
-- `src/model/<name>/feature/<task>/`: a task that spans models or reaches outside, with its own `type.ts`, loader and components: `deck/feature/publish`, `talk` and `manage`; `person/feature/connect-cli` and `profile`.
+- `src/model/<name>/feature/<task>/`: a task that spans models or reaches outside, with its own loader and components, and its `type.ts` when it has types of its own: `deck/feature/publish`, `talk` and `manage`; `person/feature/connect-cli` and `profile`.
 - `src/shell/`: what every page shares: the data the middleware hands each page, the header and the footer.
 - `src/common/`: what knows no model: the HTTP helpers, IDs, words in each language, and generic components with the design tokens. `src/common/void-auth.server.ts` is the only file that reaches into Void's internals.
-- `tests/unit/`: one file for each model, plus `boundaries.test.ts`; `tests/browser/`: components and the browser-side classes.
+- `tests/unit/`: one file for each model and for `common` and `shell`, plus `boundaries.test.ts`; `tests/browser/`: components and the browser-side classes.
 - `db/schema.ts`: dek.pub's tables. After a change, run `bun run db:generate` and commit the SQL in `db/migrations/`.
 - `serve/`: the serve Worker, a plain Worker deployed with wrangler.
 
@@ -21,9 +21,9 @@ The dek.pub server: a Void app (Svelte 5, on Cloudflare Workers) and, in `serve/
 - **A deck someone may not see is a 404, the same as one that does not exist.**
 - **Never render a deck's text as HTML.** The script article prints paragraphs as text.
 - **A change to the HTTP API changes `src/pub/protocol.ts` and both sides in one pull request.**
-- **Only a `*.server.ts` file calls Void or imports another `*.server.ts`.** Models import in the order person, deck, comment; a model's own files import no feature, and a feature no other feature. `tests/unit/boundaries.test.ts` says what may import what, and fails on an import that breaks it (ADR 50).
-- **Types go in the `type.ts` of their model or feature.** Read what comes from outside the code (Better Auth, a JSON column, R2, a cookie) through a zod schema there; take row types from `@schema` with `import type`, and wire shapes from the protocol. Code that runs in the browser does not import zod.
-- **Every change to a deck goes through `updateDeck`** in `src/model/deck/store.server.ts`, which keeps the access file the serve Worker reads in step.
+- **In `src/` and `pages/`, only a `*.server.ts` file calls Void or imports another `*.server.ts`.** The order is common, person, shell, deck, comment: each imports only those before it, and a later model only from a feature. A model's own files import no feature, and a feature no other feature. `tests/unit/boundaries.test.ts` says what may import what, and fails on an import that breaks it (ADR 50).
+- **A model's or feature's types go in its `type.ts`;** a type only one file's functions take may stay beside them. Read what comes from outside the code (Better Auth, a JSON column, R2, a cookie) through a zod schema there; take row types from `@schema` with `import type`, and wire shapes from the protocol. Nothing a component imports may import zod; the boundaries test follows the imports to check.
+- **Every change an owner makes to a deck goes through `updateDeck`** in `src/model/deck/store.server.ts`, and every version through `recordVersion`; both write the access file the serve Worker reads (`syncAccess`).
 - **File names are kebab-case**, Svelte components included, except the names Void reads in `pages/` and `middleware/`.
 
 ## Run it
