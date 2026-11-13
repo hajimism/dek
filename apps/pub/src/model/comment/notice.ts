@@ -35,7 +35,7 @@ export function mayBeNoticed(
     !held.muted &&
     canView(deck, person, held.role) &&
     canReadComments(deck, person, held.role) &&
-    canSeeThread(deck, thread, person, sideOf(deck, person, held.side))
+    canSeeThread(deck, thread, sideOf(deck, person, held.side))
   );
 }
 

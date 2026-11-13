@@ -213,25 +213,22 @@ describe("who may resolve", () => {
     expect(mayResolve(by("sato"), null, true)).toBe(false);
   });
 
-  it("shows a thread on a version held back to the owner only", () => {
-    const shown = { ownerId: "u1", currentVersion: 2 };
+  it("shows a thread on a version not yet current to the team's side only", () => {
+    const shown = { currentVersion: 2 };
     const at = (n: number) => ({ n, scope: "shared" as const });
-    expect(canSeeThread(shown, at(2), { id: "u2" }, "client")).toBe(true);
-    expect(canSeeThread(shown, at(1), null, "client")).toBe(true);
-    expect(canSeeThread(shown, at(3), { id: "u2" }, "team")).toBe(false);
-    expect(canSeeThread(shown, at(3), { id: "u1" }, "team")).toBe(true);
-    expect(canSeeThread({ ...shown, currentVersion: null }, at(1), { id: "u2" }, "team")).toBe(
-      false,
-    );
+    expect(canSeeThread(shown, at(2), "client")).toBe(true);
+    expect(canSeeThread(shown, at(1), "client")).toBe(true);
+    expect(canSeeThread(shown, at(3), "client")).toBe(false);
+    expect(canSeeThread(shown, at(3), "team")).toBe(true);
+    expect(canSeeThread({ currentVersion: null }, at(1), "client")).toBe(false);
+    expect(canSeeThread({ currentVersion: null }, at(1), "team")).toBe(true);
   });
 
   it("shows a team thread to the team's side only", () => {
-    const shown = { ownerId: "u1", currentVersion: 2 };
+    const shown = { currentVersion: 2 };
     const team = { n: 1, scope: "team" as const };
-    expect(canSeeThread(shown, team, { id: "u1" }, "team")).toBe(true);
-    expect(canSeeThread(shown, team, { id: "u2" }, "team")).toBe(true);
-    expect(canSeeThread(shown, team, { id: "u3" }, "client")).toBe(false);
-    expect(canSeeThread(shown, team, null, "client")).toBe(false);
+    expect(canSeeThread(shown, team, "team")).toBe(true);
+    expect(canSeeThread(shown, team, "client")).toBe(false);
   });
 
   it("reads comments as the owner, as one who may comment, or as anyone granted the deck", () => {

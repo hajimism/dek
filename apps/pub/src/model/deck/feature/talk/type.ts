@@ -20,6 +20,9 @@ export type ArticleSlide = {
   picture: string | null;
 };
 
+/** A version the team's side may switch the page to. */
+export type TalkVersion = { n: number; message: string | null; createdAt: string };
+
 export type Talk = {
   id: string;
   slug: string;
@@ -33,7 +36,12 @@ export type Talk = {
   commentPolicy: CommentPolicy;
   url: string;
   owner: Profile;
+  /** The version the page shows. */
   version: number;
+  /** The version the client's side reads; null while none is. */
+  current: number | null;
+  /** The versions the reader may switch to, newest first: the team's side only, else null. */
+  versions: TalkVersion[] | null;
   viewer: { src: string; origin: string };
   slides: ArticleSlide[];
   script: "public" | "owner" | "hidden";

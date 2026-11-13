@@ -72,6 +72,51 @@ const comment = (overrides: Partial<CommentRow>): CommentRow => ({
   ...overrides,
 });
 
+describe("dekc pub promote", () => {
+  test.serial("makes a version the one the client's side reads", async () => {
+    await withPublished(async (fake, root, id) => {
+      const deck = fake.decks.get(id);
+      if (deck) {
+        deck.latest = 3;
+      }
+      const result = await run(fake, root, ["promote", "3", "--json"]);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: true,
+        action: "promote",
+        id,
+        current: 3,
+      });
+      expect(fake.requests.at(-1)).toMatchObject({
+        method: "POST",
+        path: `/api/decks/${id}/promote`,
+        json: { n: 3 },
+      });
+    });
+  });
+
+  test.serial("takes a version's number only, and sends nothing for anything else", async () => {
+    await withPublished(async (fake, root) => {
+      const result = await run(fake, root, ["promote", "v3", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: false,
+        error: {
+          message: 'no version "v3": a version is a whole number, as `dekc pub status` lists them',
+        },
+      });
+      expect(fake.requests).toEqual([]);
+    });
+  });
+
+  test.serial("refuses a version the deck does not have", async () => {
+    await withPublished(async (fake, root) => {
+      const result = await run(fake, root, ["promote", "9", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({ ok: false });
+    });
+  });
+});
+
 describe("dekc pub share", () => {
   test.serial("changes who may open, read, embed, and comment, as one PATCH", async () => {
     await withPublished(async (fake, root, id) => {

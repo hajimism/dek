@@ -231,21 +231,31 @@ describe("versions and the script, by who asks", () => {
     latestVersion: 3,
   };
 
-  it("shows readers the current version, and the owner the newest when none is current", () => {
-    expect(shownVersion(deck, other)).toBe(2);
-    expect(shownVersion(deck, owner)).toBe(2);
-    expect(shownVersion({ ...deck, currentVersion: null }, owner)).toBe(3);
-    expect(shownVersion({ ...deck, currentVersion: null }, other)).toBeNull();
+  it("shows the client's side the current version, and the team's any it asks for", () => {
+    expect(shownVersion(deck, "client", null)).toBe(2);
+    expect(shownVersion(deck, "team", null)).toBe(2);
+    expect(shownVersion(deck, "team", 3)).toBe(3);
+    expect(shownVersion(deck, "team", 1)).toBe(1);
+    expect(shownVersion(deck, "client", 2)).toBe(2);
+    expect(shownVersion(deck, "client", 3)).toBeNull();
+    expect(shownVersion(deck, "client", 1)).toBeNull();
+    expect(shownVersion(deck, "team", 4)).toBeNull();
   });
 
-  it("lets readers read the current version only, and the owner any uploaded", () => {
-    expect(mayReadVersion(deck, other, 2)).toBe(true);
-    expect(mayReadVersion(deck, other, 1)).toBe(false);
-    expect(mayReadVersion(deck, null, 3)).toBe(false);
-    expect(mayReadVersion(deck, owner, 3)).toBe(true);
-    expect(mayReadVersion(deck, owner, 4)).toBe(false);
-    expect(mayReadVersion(deck, owner, 0)).toBe(false);
-    expect(mayReadVersion(deck, owner, Number.NaN)).toBe(false);
+  it("shows the team's side the newest version when none is current, and the client's none", () => {
+    expect(shownVersion({ ...deck, currentVersion: null }, "team", null)).toBe(3);
+    expect(shownVersion({ ...deck, currentVersion: null }, "client", null)).toBeNull();
+  });
+
+  it("lets the client's side read the current version only, and the team's any uploaded", () => {
+    expect(mayReadVersion(deck, "client", 2)).toBe(true);
+    expect(mayReadVersion(deck, "client", 1)).toBe(false);
+    expect(mayReadVersion(deck, "client", 3)).toBe(false);
+    expect(mayReadVersion(deck, "team", 3)).toBe(true);
+    expect(mayReadVersion(deck, "team", 1)).toBe(true);
+    expect(mayReadVersion(deck, "team", 4)).toBe(false);
+    expect(mayReadVersion(deck, "team", 0)).toBe(false);
+    expect(mayReadVersion(deck, "team", Number.NaN)).toBe(false);
   });
 
   it("shows the script to anyone once it is public, else to its owner", () => {

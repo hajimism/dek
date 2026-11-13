@@ -68,28 +68,24 @@ export function canSeeScript(
 }
 
 /**
- * The version the talk page shows: the current one; for the owner of a deck whose versions were
- * all uploaded with --no-promote, the newest, so the page is never a 404 to the one who
- * published it.
+ * The version the talk page shows. The client's side reads the current one, and asking for any
+ * other finds nothing. The team's side reads the one it asks for, of those uploaded; by default
+ * the current one, or the newest while none is current, so a deck whose versions were all
+ * uploaded with --no-promote is never missing to the team that made it.
  */
-export function shownVersion(
-  deck: Pick<DeckRules, "ownerId"> & Versions,
-  person: Caller,
-): number | null {
-  return deck.currentVersion ?? (canManage(deck, person) ? deck.latestVersion : null);
+export function shownVersion(deck: Versions, side: GrantSide, asked: number | null): number | null {
+  if (asked !== null) {
+    return mayReadVersion(deck, side, asked) ? asked : null;
+  }
+  return side === "team" ? (deck.currentVersion ?? deck.latestVersion) : deck.currentVersion;
 }
 
 /**
- * Whether `person` may read version `n`, its pictures and the comments placed on it: readers the
- * current version only; the owner any version uploaded, as one held back is theirs until it is
- * promoted.
+ * Whether someone on `side` may read version `n`, its pictures and the comments placed on it: the
+ * client's side the current version only; the team's any version uploaded, the drafts included.
  */
-export function mayReadVersion(
-  deck: Pick<DeckRules, "ownerId"> & Versions,
-  person: Caller,
-  n: number,
-): boolean {
-  if (canManage(deck, person)) {
+export function mayReadVersion(deck: Versions, side: GrantSide, n: number): boolean {
+  if (side === "team") {
     return Number.isInteger(n) && n >= 1 && n <= (deck.latestVersion ?? 0);
   }
   return n === deck.currentVersion;

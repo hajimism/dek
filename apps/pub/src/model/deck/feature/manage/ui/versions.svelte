@@ -42,6 +42,12 @@
     }
   }
 
+  /** The talk page on this version: the team's side may open a draft there before it is current. */
+  function viewHref(version: VersionSummary): string {
+    const path = new URL(status.url).pathname;
+    return version.n === status.current ? path : `${path}?v=${version.n}`;
+  }
+
   function changedLine(version: VersionSummary): string {
     const n = version.changed?.length ?? 0;
     return n === 1 ? t("manage.versions.changedOne") : t("manage.versions.changed", { n });
@@ -76,9 +82,12 @@
           </p>
         {/if}
       </div>
-      {#if !current}
-        <Button variant="secondary" size="sm" onclick={() => ask(version)}>{t("manage.versions.makeCurrent")}</Button>
-      {/if}
+      <div class="buttons">
+        <Button variant="ghost" size="sm" href={viewHref(version)}>{t("manage.versions.view")}</Button>
+        {#if !current}
+          <Button variant="secondary" size="sm" onclick={() => ask(version)}>{t("manage.versions.makeCurrent")}</Button>
+        {/if}
+      </div>
     </li>
   {/each}
 </ol>
@@ -94,6 +103,11 @@
 </Dialog>
 
 <style>
+  .buttons {
+    display: flex;
+    flex: none;
+    gap: var(--space-1);
+  }
   .list {
     margin: var(--space-2) 0 0;
     padding: 0;

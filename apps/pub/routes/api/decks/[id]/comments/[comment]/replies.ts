@@ -19,7 +19,7 @@ export const POST = defineHandler((c) =>
     const person = await currentPerson(c);
     const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
     mustComment(canComment(deck, person, grant), person);
-    const thread = await visibleThread(deck, person, side, c.req.param("comment") ?? "");
+    const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
     const body = await jsonBody(c, NewReply);
     await admitGuest(c, person, body, "reply");
     const replyId = await addReply(thread, person, body.text, body.guestName);

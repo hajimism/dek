@@ -11,6 +11,7 @@ import {
   NewReply,
   PROTOCOL_HEADER,
   PROTOCOL_VERSION,
+  PromoteRequest,
   ShareRequest,
   shotField,
   VERSION_FILES,
@@ -251,6 +252,17 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
         return error(422, "invalid", parsed.error.message);
       }
       Object.assign(deck, parsed.data);
+      return Response.json(status(deck));
+    }
+    if (method === "POST" && rest === "/promote") {
+      const parsed = PromoteRequest.safeParse(body);
+      if (!parsed.success) {
+        return error(422, "invalid", parsed.error.message);
+      }
+      if (parsed.data.n < 1 || parsed.data.n > (deck.latest ?? 0)) {
+        return error(404, "not_found", "no such version");
+      }
+      deck.current = parsed.data.n;
       return Response.json(status(deck));
     }
     if (method === "POST" && rest === "/versions") {

@@ -538,6 +538,63 @@ try {
     },
   );
 
+  // Drafts: a version uploaded with --no-promote is the team's to read and comment on, and reaches
+  // the client's side only once it is current.
+  const draft = await dekc(["pub", "publish", "-m", "draft", "--no-promote"]);
+  check(draft.ok && draft.current !== draft.n, "publish --no-promote uploads a draft", draft);
+  const frameOn = async (who: Browser, path: string) => {
+    const response = await who.fetch(path);
+    return {
+      status: response.status,
+      frame: /<iframe[^>]+src="([^"]+)"/.exec(await response.text())?.[1] ?? "",
+    };
+  };
+  const teamDraft = await frameOn(stranger, `${talkPath}?v=${draft.n}`);
+  check(
+    teamDraft.status === 200 && teamDraft.frame.includes(`/v/${draft.n}/`),
+    "the team's side opens the draft on the talk page",
+    teamDraft,
+  );
+  check(
+    (await client.fetch(`${talkPath}?v=${draft.n}`)).status === 404,
+    "a draft is missing to the client's side",
+  );
+  check(
+    (await frameOn(client, talkPath)).frame.includes(`/v/${draft.current}/`),
+    "the client's side reads the current version meanwhile",
+  );
+  const onDraft = await stranger.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: {
+      anchor: { slug: renamed, step: "0", targets: [] },
+      text: "この版でよさそうです",
+      scope: "shared",
+      version: draft.n,
+    },
+  });
+  const onDraftRow = (await onDraft.json()) as { id: string; version: number };
+  const clientSees = async () =>
+    (
+      (await (await client.fetch(`/api/decks/${id}/comments?status=all`)).json()) as {
+        comments: Array<{ id: string }>;
+      }
+    ).comments.some((row) => row.id === onDraftRow.id);
+  check(
+    onDraft.status === 201 && onDraftRow.version === draft.n && !(await clientSees()),
+    "a shared thread on a draft stays with the team while the draft is one",
+    onDraftRow,
+  );
+  const promoted = await dekc(["pub", "promote", String(draft.n)]);
+  check(
+    promoted.ok && promoted.action === "promote" && promoted.current === draft.n,
+    "dekc pub promote makes the draft current",
+    promoted,
+  );
+  check(
+    (await clientSees()) && (await frameOn(client, talkPath)).frame.includes(`/v/${draft.n}/`),
+    "once it is current, the client's side reads the version and the thread on it",
+  );
+
   // What changed between the versions.
   const status2 = await dekc(["pub", "status"]);
   const v2 = (

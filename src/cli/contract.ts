@@ -268,6 +268,7 @@ const PUB_FIELDS = z.union([
     skipped,
   }),
   DeckStatus.extend({ action: z.literal("share"), server }),
+  DeckStatus.extend({ action: z.literal("promote"), server }),
   DeckStatus.extend({
     action: z.literal("status"),
     server,
