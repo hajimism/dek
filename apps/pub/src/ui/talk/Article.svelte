@@ -371,7 +371,20 @@
     font: inherit;
     font-size: var(--text-sm);
     cursor: pointer;
-    transition: color var(--dur-instant) var(--ease-out);
+    opacity: 0;
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      color var(--dur-instant) var(--ease-out);
+  }
+  /* Like the Comment button by the heading: there while the slide's part is under the pointer. */
+  .slide:hover .jump button,
+  .jump button:focus-visible {
+    opacity: 1;
+  }
+  @media (pointer: coarse) {
+    .jump button {
+      opacity: 1;
+    }
   }
   .jump button:hover {
     color: var(--accent);

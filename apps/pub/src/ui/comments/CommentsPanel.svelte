@@ -151,28 +151,30 @@
 {/snippet}
 
 <div class="panel">
-  <header class="top">
-    <h2 class="title" id="dek-comments-title" tabindex="-1" data-panel-title>
-      {t("talk.comments")}
-      <span class="count num">{counts.open}</span>
-    </h2>
-    {#if closable}
-      <button type="button" class="close" aria-label={t("comment.close")} onclick={onclose}>
-        <Icon name="x" />
-      </button>
-    {/if}
-  </header>
-  <div class="filters" role="group" aria-label={t("comment.filter")}>
-    {#each filters as value (value)}
-      <button
-        type="button"
-        aria-pressed={filter === value}
-        class="filter"
-        onclick={() => (filter = value)}
-      >
-        {t(`comment.filter.${value}`)}<span class="num">{counts[value]}</span>
-      </button>
-    {/each}
+  <div class="panel-head">
+    <header class="top">
+      <h2 class="title" id="dek-comments-title" tabindex="-1" data-panel-title>
+        {t("talk.comments")}
+        <span class="count num">{counts.open}</span>
+      </h2>
+      {#if closable}
+        <button type="button" class="close" aria-label={t("comment.close")} onclick={onclose}>
+          <Icon name="x" />
+        </button>
+      {/if}
+    </header>
+    <div class="filters" role="group" aria-label={t("comment.filter")}>
+      {#each filters as value (value)}
+        <button
+          type="button"
+          aria-pressed={filter === value}
+          class="filter"
+          onclick={() => (filter = value)}
+        >
+          {t(`comment.filter.${value}`)}<span class="num">{counts[value]}</span>
+        </button>
+      {/each}
+    </div>
   </div>
 
   <div class="list">
@@ -235,6 +237,9 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
+  }
+  .panel-head {
+    flex: none;
   }
   .top {
     display: flex;

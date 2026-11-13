@@ -624,7 +624,8 @@
   }
   @media (min-width: 1280px) {
     .body.with-comments {
-      grid-template-columns: minmax(0, var(--measure)) minmax(var(--space-10), 1fr) 320px;
+      --measure: 48rem;
+      grid-template-columns: minmax(0, var(--measure)) minmax(var(--space-12), 1fr) 320px;
     }
     .with-comments .title-block,
     .with-comments .article-col {
@@ -723,18 +724,15 @@
     padding: 0 10px 24px;
     margin: 0 -10px;
   }
-  .comments.column :global(.top),
-  .comments.column :global(.filters) {
+  /* The heading and the filters stick as one piece, so nothing shows between them, and over the
+     column's side padding, where a selected card leans out. */
+  .comments.column :global(.panel-head) {
     position: sticky;
-    z-index: 2;
-    background: var(--bg);
-  }
-  .comments.column :global(.top) {
     top: var(--header-height);
-    padding-top: var(--space-3);
-  }
-  .comments.column :global(.filters) {
-    top: calc(var(--header-height) + 48px);
+    z-index: 2;
+    margin: 0 -10px;
+    padding: var(--space-3) 10px 0;
+    background: var(--bg);
   }
   .comments.drawer,
   .comments.sheet {
