@@ -28,6 +28,8 @@
   import { withSlide } from "../embed.ts";
   import type { QuoteSelection, Talk } from "../type.ts";
   import Article from "./article.svelte";
+  import SideColumn from "./side-column.svelte";
+  import SlideToc from "./slide-toc.svelte";
   import Theater from "./theater.svelte";
   import VersionPicker from "./version-picker.svelte";
   import Viewer from "./viewer.svelte";
@@ -67,7 +69,7 @@
   let draft: Draft | null = $state(null);
   let panelOpen = $state(false);
   let sheetTall = $state(false);
-  let mode: "column" | "drawer" | "sheet" = $state("column");
+  let mode: "drawer" | "sheet" = $state("drawer");
   let src = $state(untrack(() => talk.viewer.src));
   let frame: HTMLIFrameElement | undefined = $state();
   let viewer: Viewer | undefined = $state();
@@ -87,12 +89,6 @@
         return;
       }
       openPanel();
-      if (mode === "column") {
-        // The new card sits beside the slide's picture in the article; bring the two into view.
-        requestAnimationFrame(() =>
-          document.getElementById(slug)?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" }),
-        );
-      }
     },
     onmark: (id) => select(id, { reveal: "card" }),
     onkey: () => theater?.toggleReview(),
@@ -111,82 +107,18 @@
     reviewScope === "all" ? sorted : sorted.filter((comment) => comment.slug === link.current?.slug),
   );
   let aside: HTMLElement | undefined = $state();
-  let articleCol: HTMLElement | undefined = $state();
-  let anchorTops: Map<string, number> | null = $state(null);
-
-  /** Where each comment's anchor is, from the top of the card list, for the margin beside the article. */
-  function measure() {
-    const list = aside?.querySelector<HTMLElement>(".cards") ?? aside?.querySelector<HTMLElement>(".list");
-    if (mode !== "column" || !list) {
-      anchorTops = null;
-      return;
-    }
-    const base = list.getBoundingClientRect().top;
-    const tops = new Map<string, number>();
-    const place = (id: string, element: Element | null) => {
-      if (element) {
-        tops.set(id, element.getBoundingClientRect().top - base);
-      }
-    };
-    for (const comment of comments) {
-      const id = CSS.escape(comment.id);
-      place(
-        comment.id,
-        document.querySelector(`mark[data-ids~="${id}"]`) ??
-          document.querySelector(`.pin[data-id="${id}"]`)?.closest("figure") ??
-          document.getElementById(comment.slug),
-      );
-    }
-    if (draft) {
-      const target = draft.anchor.targets[0];
-      const holder = document.querySelector(`[data-slug="${CSS.escape(draft.anchor.slug)}"]`);
-      const paragraph =
-        target?.kind === "quote"
-          ? [...(holder?.querySelectorAll("p[data-p]") ?? [])].find((p) => p.textContent?.includes(target.quote))
-          : null;
-      place("__draft", paragraph ?? (target?.kind === "element" ? document.getElementById(draft.anchor.slug)?.closest("section")?.querySelector("figure") ?? null : document.getElementById(draft.anchor.slug)));
-    }
-    anchorTops = tops;
-  }
-
-  $effect(() => {
-    // Measured again whenever what is shown, or where, may have changed.
-    void [comments.length, comments.map((comment) => comment.status).join(), draft, filter, mode, selectedId];
-    const frame = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(frame);
-  });
-
-  $effect(() => {
-    if (!articleCol) {
-      return;
-    }
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
-    });
-    observer.observe(articleCol);
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  });
   const openCount = $derived(comments.filter((comment) => comment.status !== "resolved").length);
 
-  // How the comments sit: a column beside the article, a drawer, or a sheet from the bottom.
+  // How the review panel opens beside the page: a drawer, or a sheet from the bottom. Beside
+  // the article, a wide screen has the side column instead.
   $effect(() => {
-    const wide = window.matchMedia("(min-width: 1280px)");
     const mid = window.matchMedia("(min-width: 1024px)");
     const update = () => {
-      mode = wide.matches ? "column" : mid.matches ? "drawer" : "sheet";
+      mode = mid.matches ? "drawer" : "sheet";
     };
     update();
-    wide.addEventListener("change", update);
     mid.addEventListener("change", update);
-    return () => {
-      wide.removeEventListener("change", update);
-      mid.removeEventListener("change", update);
-    };
+    return () => mid.removeEventListener("change", update);
   });
 
   // A link to a slide or a comment opens there.
@@ -260,7 +192,7 @@
 
   /** Open the drawer or sheet, moving focus to its heading; in the column it is always open. */
   function openPanel() {
-    if (mode === "column" || panelOpen) {
+    if (panelOpen) {
       return;
     }
     returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -473,10 +405,9 @@
     canComment={talk.canComment}
     scopes={talk.side === "team"}
     {guest}
-    closable={inTheater || mode !== "column"}
+    closable
     {muted}
     onmute={setMuted}
-    anchorTops={!inTheater && mode === "column" ? anchorTops : null}
     onclose={() => (inTheater ? (reviewing = false) : closePanel())}
     onselect={(comment) => select(comment.id)}
     onanchor={(comment) => {
@@ -504,7 +435,7 @@
 
 <svelte:window
   onkeydown={(event) => {
-    if (event.key === "Escape" && !event.defaultPrevented && panelOpen && mode !== "column") {
+    if (event.key === "Escape" && !event.defaultPrevented && panelOpen) {
       event.preventDefault();
       closePanel();
     }
@@ -585,7 +516,26 @@
 </Theater>
 </div>
 
-<div class="body" class:with-comments={commentsOn}>
+{#if talk.slides.length > 1}
+  <details class="toc-fold" lang={contentLang}>
+    <summary>{t("side.slides")} <span class="num">{talk.slides.length}</span></summary>
+    <SlideToc slides={talk.slides} current={link.current?.slug ?? null} onslide={showSlide} />
+  </details>
+{/if}
+
+<div class="body">
+  <aside class="side-col" aria-label={t("side.details")} lang={contentLang}>
+    <SideColumn
+      slides={talk.slides}
+      current={link.current?.slug ?? null}
+      author={talk.owner.name}
+      date={talk.date}
+      version={talk.version}
+      review={commentsOn ? { open: openCount } : null}
+      onslide={showSlide}
+      onreview={() => theater?.enter(true)}
+    />
+  </aside>
   <header class="title-block" lang={contentLang}>
     {#if talk.event || talk.date}
       <p class="eyebrow">
@@ -615,12 +565,10 @@
             variant="ghost"
             icon="message"
             class="comments-toggle"
-            aria-expanded={mode === "column" ? undefined : panelOpen}
+            aria-expanded={panelOpen}
             aria-controls="dek-comments"
             onclick={() => {
-              if (mode === "column") {
-                document.getElementById("dek-comments")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-              } else if (panelOpen) {
+              if (panelOpen) {
                 closePanel();
               } else {
                 openPanel();
@@ -637,7 +585,7 @@
     </div>
   </header>
 
-  <div class="article-col" bind:this={articleCol}>
+  <div class="article-col">
     <Article
       slides={talk.slides}
       lang={contentLang}
@@ -683,16 +631,16 @@
     {#if mode === "sheet" && panelOpen}
       <button type="button" class="scrim" tabindex="-1" aria-label={t("comment.close")} onclick={() => closePanel()}></button>
     {/if}
-    <aside
+    <div
       bind:this={aside}
       id="dek-comments"
       class="comments {mode}"
       class:open={panelOpen}
       class:tall={sheetTall}
-      role={mode === "column" ? undefined : "dialog"}
+      role="dialog"
       aria-modal={mode === "sheet" && panelOpen ? "true" : undefined}
       aria-labelledby="dek-comments-title"
-      inert={mode !== "column" && !panelOpen}
+      inert={!panelOpen}
     >
       {#if mode === "sheet"}
         <button
@@ -704,8 +652,8 @@
         ><span></span></button>
       {/if}
       {@render review(false)}
-    </aside>
-    {#if mode !== "column" && !panelOpen}
+    </div>
+    {#if !panelOpen}
       <button type="button" class="pill" aria-controls="dek-comments" aria-expanded="false" onclick={openPanel}>
         <Icon name="message" />{t("talk.comments")}<span class="num">{openCount}</span>
       </button>
@@ -764,19 +712,46 @@
     margin: 0 auto;
     padding: 0 var(--page-gutter);
   }
+  /* A wide screen has the side column beside the article; a narrower one folds the slides
+     under the viewer instead. */
+  .side-col {
+    display: none;
+  }
   @media (min-width: 1280px) {
-    .body.with-comments {
+    .body {
       --measure: 48rem;
-      grid-template-columns: minmax(0, var(--measure)) minmax(var(--space-12), 1fr) 320px;
+      grid-template-columns: minmax(0, var(--measure)) minmax(var(--space-12), 1fr) 280px;
     }
-    .with-comments .title-block,
-    .with-comments .article-col {
+    .title-block,
+    .article-col {
       grid-column: 1;
     }
-    .with-comments .comments {
+    .side-col {
+      display: block;
       grid-column: 3;
-      grid-row: 2;
+      grid-row: 1 / span 2;
+      padding-top: var(--space-10);
     }
+    .toc-fold {
+      display: none;
+    }
+  }
+  .toc-fold {
+    max-width: var(--container);
+    margin: var(--space-3) auto 0;
+    padding: 0 var(--page-gutter);
+  }
+  .toc-fold summary {
+    display: inline-flex;
+    gap: var(--space-2);
+    padding: 6px 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+  }
+  .toc-fold[open] summary {
+    margin-bottom: var(--space-2);
   }
   .title-block {
     margin: var(--space-10) 0 var(--space-12);
@@ -862,20 +837,6 @@
   .comments {
     min-width: 0;
   }
-  .comments.column {
-    padding: 0 10px 24px;
-    margin: 0 -10px;
-  }
-  /* The heading and the filters stick as one piece, so nothing shows between them, and over the
-     column's side padding, where a selected card leans out. */
-  .comments.column :global(.panel-head) {
-    position: sticky;
-    top: var(--header-height);
-    z-index: 2;
-    margin: 0 -10px;
-    padding: var(--space-3) 10px 0;
-    background: var(--bg);
-  }
   .comments.drawer,
   .comments.sheet {
     position: fixed;
@@ -918,12 +879,6 @@
   /* The part moved below the screen at rest is padding, so the last card can still be read. */
   .comments.sheet.open:not(.tall) {
     padding-bottom: calc(32dvh + var(--space-4) + env(safe-area-inset-bottom));
-  }
-  /* Before the script knows the width, the panel stays out of the way below 1280px. */
-  @media (max-width: 1279px) {
-    .comments.column {
-      display: none;
-    }
   }
   .grabber {
     position: sticky;
