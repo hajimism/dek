@@ -1,7 +1,7 @@
 // Rendering a component as a Void page would: with the shared data in context.
 
 import { render } from "vitest-browser-svelte";
-import type { Shared } from "../../middleware/01.shared.ts";
+import type { Shared } from "../../src/shell/type.ts";
 
 export const NOW = Date.parse("2026-11-13T12:00:00Z");
 

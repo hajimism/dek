@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type { CommentRow } from "../../../../src/pub/protocol.ts";
-import CommentCard from "../../src/ui/comments/CommentCard.svelte";
+import CommentCard from "../../src/model/comment/ui/comment-card.svelte";
 import { NOW, renderPage } from "./setup.ts";
 
 function row(overrides: Partial<CommentRow> = {}): CommentRow {

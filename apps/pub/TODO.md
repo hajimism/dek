@@ -16,11 +16,13 @@ What it does not do:
 - **Moderation.** The owner can resolve any thread but cannot hide or delete one. A guest cannot resolve or reopen their own thread, because resolving needs a signed-in account.
 - **Guest identity.** A guest's name is remembered in the browser (`dek-pub:guest-name`). Nothing ties a guest to their earlier comments.
 - **Anchoring to beats.** An element comment keeps the beat it was picked at. A comment on a quote, and one on a slide made before the deck reported ready, are saved at step `"0"`. Pins are drawn at every beat of their slide (ADR 45).
-- **Re-anchoring after a publish** (`src/lib/anchors.ts`).
+- **Re-anchoring after a publish** (`src/model/comment/anchor.ts`).
   - Quotes are searched for again, and renames are followed.
   - An element comment's path and box are never checked again. When its slide's HTML changes, the comment stays `open`, still pointing at the old box. It becomes `moved` only through a rename, and never `detached`.
   - So the "Moved" and "Changed" badges appear only for quotes and renames.
-- **Versions.** There is no way to see comments where they sat on an older version. The API's `?version=` filter is used by neither the CLI nor the pages.
+- **Versions.**
+  - There is no way to see comments where they sat on an older version. The API's `?version=` filter is used by neither the CLI nor the pages, and a reader may ask it for the current version only.
+  - Which versions were once current is not kept. So a reader comments on the current version only: a page opened before a promote gets 409 `stale_version` and must be reloaded, and a thread opened on a version newer than the current one is the owner's alone until that version is current.
 - **What changed.** Only the manage page lists the slides a version changed. The talk page does not mark changed slides for someone coming back to review.
 - **Text.** Comments are plain text: no Markdown, no mentions.
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.

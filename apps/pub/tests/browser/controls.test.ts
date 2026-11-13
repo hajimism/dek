@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import DeviceCodeInput from "../../src/ui/DeviceCodeInput.svelte";
-import SegmentedControl from "../../src/ui/SegmentedControl.svelte";
+import SegmentedControl from "../../src/common/ui/segmented-control.svelte";
+import DeviceCodeInput from "../../src/model/person/feature/connect-cli/ui/device-code-input.svelte";
 import { renderPage } from "./setup.ts";
 
 describe("DeviceCodeInput", () => {

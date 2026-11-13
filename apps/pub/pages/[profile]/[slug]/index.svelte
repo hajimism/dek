@@ -1,6 +1,6 @@
 <script lang="ts">
-  import NotFound from "../../../src/ui/NotFound.svelte";
-  import TalkPage from "../../../src/ui/talk/TalkPage.svelte";
+  import NotFound from "../../../src/shell/ui/not-found.svelte";
+  import TalkPage from "../../../src/model/deck/feature/talk/ui/talk-page.svelte";
   import type { Props } from "./index.server";
 
   let { talk }: Props = $props();

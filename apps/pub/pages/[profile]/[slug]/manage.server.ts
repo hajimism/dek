@@ -1,23 +1,15 @@
 import { defineHandler, defineHead, type InferProps } from "void";
-import { translate } from "../../../src/lib/i18n.ts";
-import { deckStatus } from "../../../src/server/decks.ts";
-import { grantList, loadOwnedDeck } from "../../../src/server/pages.ts";
+import { translate } from "../../../src/common/i18n.ts";
+import { loadManage } from "../../../src/model/deck/feature/manage/load.server.ts";
 
 export type Props = InferProps<typeof loader>;
 
 export const loader = defineHandler(async (c) => {
-  const owned = await loadOwnedDeck(c, c.req.param("profile"), c.req.param("slug"));
-  if (!owned) {
+  const manage = await loadManage(c, c.req.param("profile"), c.req.param("slug"));
+  if (!manage) {
     c.set("pageStatus", 404);
-    return { manage: null };
   }
-  return {
-    manage: {
-      status: await deckStatus(c, owned.deck),
-      grants: await grantList(c, owned.deck.id),
-      owner: owned.owner,
-    },
-  };
+  return { manage };
 });
 
 export const head = defineHead<Props>((c, { manage }) => {

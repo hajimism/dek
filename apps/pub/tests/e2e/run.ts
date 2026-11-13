@@ -230,6 +230,98 @@ try {
     after,
   );
 
+  // A version held back with --no-promote is the owner's: a reader can neither read the comments
+  // placed on it nor open a thread on it, and so learns nothing of its slides.
+  const held = await dekc(["pub", "publish", "--no-promote", "-m", "held back"]);
+  check(
+    held.ok && held.n === 3 && held.current === 2,
+    "publish --no-promote holds version 3 back",
+    held,
+  );
+  const onHeld = await stranger.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "早見え", version: 3 },
+  });
+  check(
+    onHeld.status === 422 && (await onHeld.json()).error?.code === "unknown_version",
+    "a reader cannot open a thread on a version held back",
+  );
+  check(
+    (await stranger.fetch(`/api/decks/${id}/comments?status=all&version=3`)).status === 404,
+    "a reader cannot read comments placed on a version held back",
+  );
+  check(
+    (await author.fetch(`/api/decks/${id}/comments?status=all&version=3`)).status === 200,
+    "the owner reads comments placed on a version held back",
+  );
+  const ownerHeld = await author.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "保留版のメモ", version: 3 },
+  });
+  check(ownerHeld.status === 201, "the owner opens a thread on the version held back");
+  const ownerThread = ((await ownerHeld.json()) as { id: string }).id;
+  const readerSees = (await (
+    await stranger.fetch(`/api/decks/${id}/comments?status=all`)
+  ).json()) as { comments: Array<{ id: string }> };
+  check(
+    !readerSees.comments.some((row) => row.id === ownerThread),
+    "a reader does not see a thread on a version held back",
+  );
+  check(
+    (
+      await stranger.fetch(`/api/decks/${id}/comments/${ownerThread}/replies`, {
+        method: "POST",
+        json: { text: "見えた" },
+      })
+    ).status === 404,
+    "a reader cannot reply to a thread on a version held back",
+  );
+
+  // Older than the current version is not the same as once current: version 3 was never shown,
+  // so with version 4 current a reader still learns nothing of it.
+  const fourth = await dekc(["pub", "publish", "-m", "after the held one"]);
+  check(fourth.ok && fourth.n === 4 && fourth.current === 4, "publish uploads version 4", fourth);
+  const probe = await stranger.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: { anchor: { slug: "no-such-slide", step: "0", targets: [] }, text: "探り", version: 3 },
+  });
+  check(
+    probe.status === 409 && (await probe.json()).error?.code === "stale_version",
+    "a reader cannot probe a held-back version below the current one",
+  );
+  await author.fetch(`/api/decks/${id}/comments/${ownerThread}/resolve`, { method: "POST" });
+
+  // A hidden script cannot be quoted, so a reader cannot test a guess at its words.
+  await dekc(["pub", "share", "--script", "hidden"]);
+  const guess = await stranger.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: {
+      anchor: {
+        slug: renamed,
+        step: "0",
+        targets: [{ kind: "quote", quote, prefix: "", suffix: "" }],
+      },
+      text: "推測",
+    },
+  });
+  check(
+    guess.status === 403 && (await guess.json()).error?.code === "script_hidden",
+    "a reader cannot quote a hidden script",
+  );
+  const quotedId = ((await quoted.json()) as { id: string }).id;
+  const closed = await stranger.fetch(`/api/decks/${id}/comments/${quotedId}/resolve`, {
+    method: "POST",
+  });
+  const closedRow = (await closed.json()) as { targets: Array<{ kind: string; quote?: string }> };
+  check(
+    closed.status === 200 &&
+      closedRow.targets.every((target) => target.kind !== "quote" || target.quote === ""),
+    "a reader's own thread comes back without the words of a hidden script",
+    closedRow,
+  );
+  await stranger.fetch(`/api/decks/${id}/comments/${quotedId}/reopen`, { method: "POST" });
+  await dekc(["pub", "share", "--script", "shown"]);
+
   // Reply, then resolve them all from the CLI.
   const reply = await dekc(["pub", "comments", "reply", String(rows[0]?.number), "直しました"]);
   check(reply.ok, "dekc pub comments reply answers a thread", reply);

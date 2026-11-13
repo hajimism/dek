@@ -10,5 +10,5 @@
     "allowImportingTsExtensions": true,
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
   },
-  "include": ["src", "test", "../src/lib"]
+  "include": ["src", "test", "../src/model/deck/serving"]
 }

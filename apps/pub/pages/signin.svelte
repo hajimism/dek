@@ -1,8 +1,8 @@
 <script lang="ts">
   import { auth } from "void/client";
-  import { useApp } from "../src/ui/app.ts";
-  import Button from "../src/ui/Button.svelte";
-  import Icon from "../src/ui/Icon.svelte";
+  import { useApp } from "../src/shell/use-app.ts";
+  import Button from "../src/common/ui/button.svelte";
+  import Icon from "../src/common/ui/icon.svelte";
   import type { Props } from "./signin.server";
 
   let { next }: Props = $props();

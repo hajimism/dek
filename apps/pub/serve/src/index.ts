@@ -2,13 +2,10 @@
 // else: no cookie, no database, no other deck. A public deck's current version is served to
 // anyone; every other build needs a token the app signed for that deck, version and build.
 
-import {
-  accessKey,
-  type DeckAccess,
-  deckIdFromHost,
-  versionKey,
-} from "../../src/lib/deck-origin.ts";
-import { type Variant, verifyServeToken } from "../../src/lib/serve-token.ts";
+import { isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
+import { accessKey, deckIdFromHost, versionKey } from "../../src/model/deck/serving/origin.ts";
+import { verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
+import { DeckAccess, type Variant } from "../../src/model/deck/serving/type.ts";
 
 export type ServeEnv = {
   STORAGE: R2Bucket;
@@ -49,8 +46,8 @@ export async function handleServe(
     }
     variant = claims.variant;
     open = false;
-  } else if (access.visibility === "public" && access.current === n) {
-    variant = access.scriptPublic ? "public" : "bare";
+  } else if (isOpen(access, n)) {
+    variant = readerVariant(access.scriptPublic);
     open = true;
   } else {
     return plain(404, "not found");
@@ -77,7 +74,8 @@ async function readAccess(bucket: R2Bucket, deckId: string): Promise<DeckAccess 
     return null;
   }
   try {
-    return (await object.json()) as DeckAccess;
+    const access = DeckAccess.safeParse(await object.json());
+    return access.success ? access.data : null;
   } catch {
     return null;
   }

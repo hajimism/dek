@@ -1,12 +1,6 @@
 import { defineHandler } from "void";
-import type { Me } from "../../../../src/pub/protocol.ts";
-import { requirePerson } from "../../src/server/actor.ts";
-import { api } from "../../src/server/http.ts";
+import { api } from "../../src/common/http.server.ts";
+import { requirePerson } from "../../src/model/person/actor.server.ts";
+import { meOf } from "../../src/model/person/person.ts";
 
-export const GET = defineHandler((c) =>
-  api(async () => {
-    const person = await requirePerson(c);
-    const me: Me = { id: person.id, handle: person.handle, name: person.name };
-    return me;
-  }, c.req.raw),
-);
+export const GET = defineHandler((c) => api(async () => meOf(await requirePerson(c)), c.req.raw));
