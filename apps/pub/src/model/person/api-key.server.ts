@@ -14,7 +14,11 @@ export async function checkKey(
   c: Context,
   key: string,
 ): Promise<{ id: string; userId: string } | null> {
-  const result = KeyCheck.parse(await authOf(c).api.verifyApiKey({ body: { key } }));
+  const checked = KeyCheck.safeParse(await authOf(c).api.verifyApiKey({ body: { key } }));
+  if (!checked.success) {
+    return null;
+  }
+  const result = checked.data;
   const userId = result.key?.referenceId ?? result.key?.userId;
   return result.valid && result.key && userId ? { id: result.key.id, userId } : null;
 }

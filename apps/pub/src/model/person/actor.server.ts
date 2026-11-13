@@ -5,13 +5,14 @@ import type { Context } from "hono";
 import { API_KEY_HEADER } from "../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../common/api-error.ts";
 import { checkKey } from "./api-key.server.ts";
+import { readAccount } from "./person.ts";
 import { personById } from "./store.server.ts";
-import { Account, type Person } from "./type.ts";
+import type { Person } from "./type.ts";
 
 export async function currentPerson(c: Context): Promise<Person | null> {
   const user = c.get("user");
   if (user) {
-    return Account.parse(user);
+    return readAccount(user);
   }
   const key = c.req.header(API_KEY_HEADER);
   if (!key) {

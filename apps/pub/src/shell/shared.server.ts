@@ -6,11 +6,15 @@ import { getCookie, setCookie } from "hono/cookie";
 import { getUser } from "void/auth";
 import { env } from "void/env";
 import { pickLang } from "../common/i18n.ts";
-import { selfOf } from "../model/person/person.ts";
-import { Account } from "../model/person/type.ts";
+import { readAccount, selfOf } from "../model/person/person.ts";
 import { type Shared, Theme } from "./type.ts";
 
 const YEAR = 60 * 60 * 24 * 365;
+
+function viewerOf(user: unknown) {
+  const person = user ? readAccount(user) : null;
+  return person ? selfOf(person) : null;
+}
 
 export function sharedOf(c: Context): Shared {
   const asked = new URL(c.req.url).searchParams.get("lang");
@@ -20,7 +24,7 @@ export function sharedOf(c: Context): Shared {
   }
   const user = getUser();
   return {
-    viewer: user ? selfOf(Account.parse(user)) : null,
+    viewer: viewerOf(user),
     lang,
     theme: Theme.parse(getCookie(c, "theme")),
     devLogin: env.DEK_PUB_DEV_LOGIN === "1",

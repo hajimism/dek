@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   formatUserCode,
   isCompleteUserCode,
@@ -6,7 +6,7 @@ import {
 } from "../../src/model/person/feature/connect-cli/device-code.ts";
 import { rssDate, talkFeed, xmlText } from "../../src/model/person/feature/profile/rss.ts";
 import { safeNext } from "../../src/model/person/next-path.ts";
-import { meOf, profileOf, selfOf } from "../../src/model/person/person.ts";
+import { meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
@@ -97,6 +97,14 @@ describe("Account", () => {
 
   it("refuses a record that is not an account", () => {
     expect(Account.safeParse({ id: "u1", name: "Hajime" }).success).toBe(false);
+  });
+
+  it("reads a record it cannot as no one, and says so, rather than failing the request", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(readAccount({ id: "u1", name: "Hajime" })).toBeNull();
+    expect(error).toHaveBeenCalledOnce();
+    expect(readAccount(user)?.id).toBe("u1");
+    error.mockRestore();
   });
 
   it("shows pages and other people no email address", () => {

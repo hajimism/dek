@@ -3,7 +3,8 @@
 
 import type { Context } from "hono";
 import { authOf } from "../../common/void-auth.server.ts";
-import { Account, type Person } from "./type.ts";
+import { readAccount } from "./person.ts";
+import type { Person } from "./type.ts";
 
 export async function personByHandle(c: Context, handle: string): Promise<Person | null> {
   const context = await authOf(c).$context;
@@ -11,13 +12,13 @@ export async function personByHandle(c: Context, handle: string): Promise<Person
     model: "user",
     where: [{ field: "handle", value: handle }],
   });
-  return user ? Account.parse(user) : null;
+  return user ? readAccount(user) : null;
 }
 
 export async function personById(c: Context, id: string): Promise<Person | null> {
   const context = await authOf(c).$context;
   const user = await context.internalAdapter.findUserById(id);
-  return user ? Account.parse(user) : null;
+  return user ? readAccount(user) : null;
 }
 
 export async function peopleById(c: Context, ids: readonly string[]): Promise<Map<string, Person>> {
@@ -30,6 +31,6 @@ export async function peopleById(c: Context, ids: readonly string[]): Promise<Ma
     model: "user",
     where: [{ field: "id", operator: "in", value: unique }],
   })) as unknown[];
-  const people = users.map((user) => Account.parse(user));
+  const people = users.flatMap((user) => readAccount(user) ?? []);
   return new Map(people.map((person) => [person.id, person]));
 }
