@@ -34,7 +34,7 @@ Publish does what you would do by hand before sharing a talk, and stops where yo
 
 1. It lints the deck as `dekc lint` does. An error stops it, with the diagnostics and exit 1, and nothing is sent; warnings go along with the version.
 2. It builds the talk three times: with the whole script, for you; with what is said aloud, as `dekc build --public` does, for readers when the script is shown; and with no script at all, as `dekc build --no-script` does, for readers when it is not. dek.pub serves each reader the build they may read.
-3. It takes a picture of each slide as it arrives, and of the first at its last beat for the link preview, when Playwright is installed.
+3. It takes a picture of each slide at its last beat, as `dekc shot` does, for the script article, and of the first for the link preview, when Playwright is installed.
 4. It packs the deck's source, without `dist/` and `.cache/`, so `dekc pub status` can tell whether the newest version is what you have.
 
 The first publish makes the deck on dek.pub and writes its ID into `script.md`:

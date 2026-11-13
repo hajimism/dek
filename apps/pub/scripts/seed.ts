@@ -216,7 +216,8 @@ function filesUnder(path: string): string[] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Pictures: each slide as it arrives, from the public build opened in Chromium.
+// Pictures: each slide with every beat shown, as `dekc pub publish` takes them, from the public
+// build opened in Chromium.
 
 type ElementTarget = Extract<CommentTarget, { kind: "element" }>;
 
@@ -239,8 +240,10 @@ async function shootDeck(browser: Browser, build: Build, dir: string): Promise<S
   await requireFullStage(page);
 
   const shots: Shots = { pngs: new Map(), headings: new Map() };
-  for (const slug of slugs) {
-    await showSlide(page, slug);
+  for (const slide of build.map.slides) {
+    const slug = slide.slug;
+    // The hash names a beat by its number; the last is the count of beats.
+    await showSlide(page, slug, slide.steps.length - 1);
     shots.pngs.set(slug, new Uint8Array(await page.screenshot({ type: "png" })));
     const heading = await headingOf(page, slug);
     if (heading) {
@@ -261,10 +264,10 @@ async function requireFullStage(page: Page): Promise<void> {
 }
 
 /** Goes to `slug` by its hash and waits until that slide is the current one and has settled. */
-async function showSlide(page: Page, slug: string): Promise<void> {
+async function showSlide(page: Page, slug: string, beat = 0): Promise<void> {
   await page.evaluate((hash) => {
     location.hash = hash;
-  }, `#${slug}`);
+  }, beat > 0 ? `#${slug}/${beat}` : `#${slug}`);
   try {
     await page.waitForFunction(
       ({ selector, want }) => document.querySelector<HTMLElement>(selector)?.dataset.slug === want,

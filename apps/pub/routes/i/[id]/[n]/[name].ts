@@ -1,5 +1,5 @@
 // A version's pictures, for the script article and link previews: `cover`, or `s-<slug>` for a
-// slide as it arrives. They are passive images, so they come from the app's origin, after the
+// slide with every beat shown. They are passive images, so they come from the app's origin, after the
 // same check as the talk page.
 
 import { defineHandler } from "void";

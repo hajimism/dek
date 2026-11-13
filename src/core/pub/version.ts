@@ -8,14 +8,14 @@ import type { PlaywrightRunner } from "../playwright.ts";
 import { pluginPages } from "../plugin-host.ts";
 import type { Project, ProjectDeck } from "../resolve.ts";
 import { requireInside, writeInside } from "../safe-fs.ts";
-import { arrivalShots, coverShot } from "../shot/still.ts";
+import { coverShot, slideShots } from "../shot/still.ts";
 import { slideMap } from "../slide-map.ts";
 import { writeTar } from "../tar-write.ts";
 
 /**
  * What one version of a deck on dek.pub is made of, built from the project as it is: three builds
  * of the talk, for who may read how much of its script; its source; the first slide's picture;
- * and a picture of each slide as it arrives. Each is kept under the deck's `.cache/pub/`, as it
+ * and a picture of each slide with every beat shown. Each is kept under the deck's `.cache/pub/`, as it
  * was sent.
  */
 
@@ -28,7 +28,7 @@ type PreparedFile = {
 
 export type PreparedVersion = {
   files: PreparedFile[];
-  /** Each slide's picture as it arrives, by slug; undefined without Playwright. */
+  /** Each slide's picture with every beat shown, by slug; undefined without Playwright. */
   shots: Array<{ slug: string; bytes: Uint8Array<ArrayBuffer>; sha256: string }> | undefined;
   /** The public build's map, which places the article and the comments. */
   slideMap: SlideMap;
@@ -66,7 +66,7 @@ export async function prepareVersion(
   if (cover !== undefined) {
     files.push(prepared("cover", new Uint8Array(readFileSync(cover)), "image/png"));
   }
-  const arrived = await arrivalShots(deck, options.runner);
+  const arrived = await slideShots(deck, options.runner);
   for (const file of files) {
     writeInside(join(scratch, fileName(file.field)), file.bytes, project.root);
   }

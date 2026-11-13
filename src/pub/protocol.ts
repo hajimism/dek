@@ -134,7 +134,7 @@ export type VersionFile = (typeof VERSION_FILES)[number];
 
 const Sha256 = z.string().regex(/^[0-9a-f]{64}$/);
 
-/** The form field a slide's picture is sent in, a PNG of the slide as it arrives. */
+/** The form field a slide's picture is sent in, a PNG of the slide with every beat shown. */
 export const shotField = (slug: string) => `shot:${slug}`;
 
 export const LintSummary = z.strictObject({
@@ -169,7 +169,7 @@ export const VersionManifest = z.strictObject({
   message: z.string().optional(),
   /** sha256 of each file sent, hex. */
   files: z.partialRecord(z.enum(VERSION_FILES), Sha256),
-  /** sha256 of each slide's picture as it arrives, by slug; each is sent as `shot:<slug>`. */
+  /** sha256 of each slide's picture with every beat shown, by slug; each is sent as `shot:<slug>`. */
   shots: z.record(z.string(), Sha256),
 });
 export type VersionManifest = z.infer<typeof VersionManifest>;
