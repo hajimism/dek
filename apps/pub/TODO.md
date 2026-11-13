@@ -45,13 +45,12 @@ What it does not do:
 
 ## Comments for client work
 
-The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), the team's side reads drafts (ADR 55), and the talk goes full screen with a header and a review mode (ADR 57, 58). Still to come, each with its own ADR:
+The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), the team's side reads drafts (ADR 55), the talk goes full screen with a header and a review mode (ADR 57, 58), and a side column holds the slides, the details and the way into the review (ADR 59). Still to come, each with its own ADR:
 
 - **Mail, beyond what is built.** Sign-in links, invitations and notices of threads, replies and resolves are built (ADR 53, 54). Still to come:
   - a digest of a person's notices, once a day or an hour, which needs a cron job and a record of what was sent
   - muting a project's mail, with projects
   - mail in the reader's language
-- **The side column** of the talk page: the slides' titles as a table of contents, and the deck's details.
 - **Projects.** A `dek.toml` key naming a project on dek.pub, which holds its decks, members and settings; grants to a project; `/projects/<id>/<deck>` URLs.
 
 ## Gaps in phases 1 and 2
