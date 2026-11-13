@@ -274,6 +274,20 @@
     height: 32px;
     font-size: var(--text-sm);
   }
+  @media (max-width: 639px) {
+    /* The name keeps the first line; the role, the side and remove go under it. */
+    .row {
+      flex-wrap: wrap;
+      row-gap: var(--space-2);
+    }
+    .name {
+      flex-basis: calc(100% - 28px - var(--space-3));
+    }
+    .row select.compact {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+  }
   .remove {
     display: grid;
     place-items: center;
