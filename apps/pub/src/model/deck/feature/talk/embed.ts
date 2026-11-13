@@ -90,6 +90,9 @@ export function readDeckMessage(data: unknown): DeckMessage | null {
       return { type: "dek:pick-cancel" };
     case "dek:mark":
       return isString(data.id) ? { type: "dek:mark", id: data.id } : null;
+    // The keys a deck passes on (ADR 57): `c`, for the comments.
+    case "dek:key":
+      return data.key === "c" ? { type: "dek:key", key: "c" } : null;
     default:
       return null;
   }

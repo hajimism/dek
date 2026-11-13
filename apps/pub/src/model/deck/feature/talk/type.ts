@@ -100,7 +100,8 @@ export type DeckMessage =
   | ({ type: "dek:moved" } & Position)
   | { type: "dek:picked"; slug: string; step: string; target: PickedElement }
   | { type: "dek:pick-cancel" }
-  | { type: "dek:mark"; id: string };
+  | { type: "dek:mark"; id: string }
+  | { type: "dek:key"; key: "c" };
 
 /** A numbered mark the deck draws over an element a comment points at. */
 export type Mark = { id: string; number: number; slug: string; step: string; box: Box };

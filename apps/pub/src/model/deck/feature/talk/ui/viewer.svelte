@@ -13,6 +13,8 @@
     link,
     frame = $bindable(),
     canComment = false,
+    immersive = false,
+    onfullscreen,
     oncommentslide,
     onpickcancel,
   }: {
@@ -23,6 +25,10 @@
     link: DeckLink;
     frame?: HTMLIFrameElement;
     canComment?: boolean;
+    /** Full screen in the talk page's theater: the slide alone, as large as it fits. */
+    immersive?: boolean;
+    /** The theater that takes the page full screen; without it, the stage alone goes. */
+    onfullscreen?: () => void;
     oncommentslide?: (slug: string) => void;
     onpickcancel?: () => void;
   } = $props();
@@ -48,7 +54,9 @@
   }
 
   function fullscreen() {
-    if (document.fullscreenElement) {
+    if (onfullscreen) {
+      onfullscreen();
+    } else if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
       stage?.requestFullscreen?.().catch(() => {});
@@ -71,7 +79,7 @@
   }
 </script>
 
-<section class="viewer" style:--ratio={ratio} aria-label={t("talk.viewerTitle", { title })}>
+<section class="viewer" class:immersive style:--ratio={ratio} aria-label={t("talk.viewerTitle", { title })}>
   <div class="stage" bind:this={stage} class:keyed class:picking={link.picking}>
     <iframe
       bind:this={frame}
@@ -165,6 +173,25 @@
     background: var(--gray-1000);
     box-shadow: 0 0 0 1px var(--border);
     overflow: hidden;
+  }
+  /* In the theater, the slide is as large as the room beside the review panel lets it be. */
+  .viewer.immersive {
+    --stage-width: min(100cqw, calc(100cqh * var(--ratio)));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    padding: 0;
+  }
+  .viewer.immersive .stage {
+    min-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .viewer.immersive .bar {
+    display: none;
   }
   .stage:fullscreen {
     width: 100%;

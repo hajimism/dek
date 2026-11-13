@@ -209,6 +209,12 @@ describe("embed messages", () => {
     expect(readDeckMessage("dek:ready")).toBeNull();
   });
 
+  it("reads the c key a deck passes on, and no other", () => {
+    expect(readDeckMessage({ type: "dek:key", key: "c" })).toEqual({ type: "dek:key", key: "c" });
+    expect(readDeckMessage({ type: "dek:key", key: "x" })).toBeNull();
+    expect(readDeckMessage({ type: "dek:key" })).toBeNull();
+  });
+
   it("places a box as fractions of the slide", () => {
     expect(
       boxToPercent({ x: 640, y: 180, width: 128, height: 72 }, { width: 1280, height: 720 }),
