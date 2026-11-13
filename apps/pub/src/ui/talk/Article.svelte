@@ -20,6 +20,7 @@
   import type { ArticleSlide } from "../../server/pages.ts";
   import { useApp } from "../app.ts";
   import Icon from "../Icon.svelte";
+  import SlideZoom from "./SlideZoom.svelte";
 
   let {
     slides,
@@ -48,6 +49,7 @@
   } = $props();
 
   const { t } = useApp();
+  let zoom: SlideZoom | undefined = $state();
   let root: HTMLDivElement | undefined = $state();
   let pending: (QuoteSelection & { x: number; y: number }) | null = $state(null);
   let shortcut = $state("Ctrl+Alt+M");
@@ -179,7 +181,7 @@
       </div>
       <figure class="figure">
         {#if slide.picture}
-          <button type="button" class="picture" onclick={() => onshowslide?.(slide.slug)} aria-label={t("talk.showSlide", { n: i + 1 })}>
+          <button type="button" class="picture" onclick={() => zoom?.show(slide, i, lang)} aria-label={t("talk.zoomSlide", { n: i + 1 })} aria-haspopup="dialog">
             <img src={slide.picture} alt={slide.title} loading={i < 2 ? "eager" : "lazy"} decoding="async" width={size.width} height={size.height} />
           </button>
         {:else}
@@ -210,6 +212,13 @@
           >
         {/each}
       </figure>
+      {#if slide.picture}
+        <p class="jump">
+          <button type="button" onclick={() => onshowslide?.(slide.slug)} aria-label={t("talk.showSlide", { n: i + 1 })}>
+            {t("talk.jumpToSlide")}<Icon name="arrow-up" size={13} />
+          </button>
+        </p>
+      {/if}
       {#if slide.paragraphs && slide.paragraphs.length > 0}
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div class="script prose" data-slug={slide.slug} {lang} onclick={onScriptClick}>
@@ -242,6 +251,8 @@
     </div>
   {/if}
 </div>
+
+<SlideZoom bind:this={zoom} total={slides.length} />
 
 <style>
   .article {
@@ -341,6 +352,29 @@
     position: relative;
     max-width: var(--measure);
     margin: 0 auto var(--space-6);
+  }
+  .jump {
+    display: flex;
+    justify-content: flex-end;
+    max-width: var(--measure);
+    margin: calc(var(--space-6) * -1 + var(--space-2)) auto var(--space-6);
+  }
+  .jump button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--text-faint);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: color var(--dur-instant) var(--ease-out);
+  }
+  .jump button:hover {
+    color: var(--accent);
   }
   .picture,
   .placeholder {
