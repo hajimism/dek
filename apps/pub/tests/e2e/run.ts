@@ -138,11 +138,29 @@ try {
   const versions = (status as { versions?: Array<{ n: number }> }).versions ?? [];
   check(status.ok && versions.length === 1, "status lists the version", status);
 
-  // A colleague comments on a sentence of the script and on an element of a slide.
+  // Review threads are for the people a deck is shared with: a signed-in reader with the link
+  // reads none until the owner grants them the deck, which mails them a link to it.
+  check(
+    (await stranger.fetch(`/api/decks/${id}/comments?status=all`)).status === 404,
+    "a signed-in reader with no grant reads no review threads",
+  );
+  const commentGrant = await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: `@${strangerMe.handle}`, role: "comment" },
+  });
+  check(commentGrant.status === 201, "the owner grants the colleague comment");
+  const invited = await inbox.waitFor(strangerMe.email, "shared");
+  check(
+    invited.length === 1 && invited[0]?.text.includes(talkPath),
+    "a new grant mails the colleague a link to the talk",
+    invited,
+  );
+
+  // The colleague comments on a sentence of the script and on an element of a slide.
   const map = (await (await stranger.fetch(`/api/decks/${id}/comments?status=all`)).json()) as {
     comments?: unknown[];
   };
-  check(Array.isArray(map.comments), "a signed-in reader may read the comments", map);
+  check(Array.isArray(map.comments), "a colleague granted the deck reads the review threads", map);
   const deck = (await (await author.fetch(`/api/decks/${id}`)).json()) as {
     versions: Array<{ n: number }>;
   };
@@ -343,12 +361,124 @@ try {
     open,
   );
 
+  // Public comments, at the bottom of a talk anyone with the link may open: posted as the
+  // comment policy lets, by people who read no review threads, and a like from each account.
+  const reader = new Browser(server.url);
+  await reader.signUp("Reader");
+  const publicPath = `/api/decks/${id}/public-comments`;
+  const review = await reader.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "レビュー" },
+  });
+  check(review.status === 403, "a reader with no grant writes no review thread");
+  const posted = await reader.fetch(publicPath, {
+    method: "POST",
+    json: { text: "良い発表でした" },
+  });
+  const postedRow = (await posted.json()) as { id: string; author: { guest: boolean } };
+  check(
+    posted.status === 201 && !postedRow.author.guest,
+    "a signed-in reader posts a public comment",
+  );
+  const publicReply = await reader.fetch(publicPath, {
+    method: "POST",
+    json: { text: "補足: 資料はこちら", parentId: postedRow.id },
+  });
+  const repliedRow = (await publicReply.json()) as { id: string };
+  const publicList = async (who: Browser) =>
+    (
+      (await (await who.fetch(publicPath)).json()) as {
+        comments: Array<{
+          id: string;
+          text: string;
+          editedAt: string | null;
+          replies: Array<{ id: string }>;
+        }>;
+      }
+    ).comments;
+  const publicRows = await publicList(stranger);
+  check(
+    publicReply.status === 201 &&
+      publicRows[0]?.id === postedRow.id &&
+      publicRows[0]?.replies[0]?.id === repliedRow.id,
+    "a reply sits under the comment it answers, for anyone to read",
+    publicRows,
+  );
+  check(
+    (
+      await reader.fetch(publicPath, {
+        method: "POST",
+        json: { text: "x", parentId: repliedRow.id },
+      })
+    ).status === 422,
+    "a reply answers a comment, not another reply",
+  );
+  const edited = await reader.fetch(`${publicPath}/${postedRow.id}`, {
+    method: "PATCH",
+    json: { text: "とても良い発表でした" },
+  });
+  check(
+    edited.status === 200 &&
+      ((await edited.json()) as { editedAt: string | null }).editedAt !== null,
+    "its author changes a public comment",
+  );
+  check(
+    (
+      await stranger.fetch(`${publicPath}/${postedRow.id}`, {
+        method: "PATCH",
+        json: { text: "x" },
+      })
+    ).status === 403,
+    "no one else changes it",
+  );
+  check(
+    (await author.fetch(`${publicPath}/${postedRow.id}`, { method: "DELETE" })).status === 200 &&
+      (await publicList(reader)).length === 0,
+    "the owner removes a public comment, and its replies go with it",
+  );
+  await dekc(["pub", "share", "--comments", "off"]);
+  check(
+    (await reader.fetch(publicPath, { method: "POST", json: { text: "x" } })).status === 403 &&
+      (await reader.fetch(publicPath)).status === 200,
+    "with the policy off, no one posts and anyone still reads",
+  );
+  await dekc(["pub", "share", "--comments", "guests"]);
+  const guest = new Browser(server.url);
+  const asGuest = await guest.fetch(publicPath, {
+    method: "POST",
+    json: { text: "ゲストです", guestName: "来場者" },
+  });
+  check(
+    asGuest.status === 201 &&
+      ((await asGuest.json()) as { author: { guest: boolean } }).author.guest,
+    "under guests, a guest posts with a name",
+  );
+  await dekc(["pub", "share", "--comments", "signed-in"]);
+  const likePath = `/api/decks/${id}/like`;
+  const liked = (await (await reader.fetch(likePath, { method: "PUT" })).json()) as {
+    count: number;
+    liked: boolean;
+  };
+  await author.fetch(likePath, { method: "PUT" });
+  await reader.fetch(likePath, { method: "PUT" });
+  const unliked = (await (await reader.fetch(likePath, { method: "DELETE" })).json()) as {
+    count: number;
+    liked: boolean;
+  };
+  check(
+    liked.count === 1 && liked.liked && unliked.count === 1 && !unliked.liked,
+    "each account likes a talk once, and may take it back",
+    { liked, unliked },
+  );
+  check((await guest.fetch(likePath, { method: "PUT" })).status === 401, "a guest cannot like");
+
   // Grants: a private deck shared with one person by handle.
   await dekc(["pub", "share", "--visibility", "private"]);
   check(
-    (await stranger.fetch(talkPath)).status === 404,
-    "back to private, the talk is a 404 again",
+    (await reader.fetch(talkPath)).status === 404,
+    "back to private, the talk is a 404 again to anyone not granted it",
   );
+  check((await author.fetch(publicPath)).status === 404, "a private talk has no public comments");
   const grant = await author.fetch(`/api/decks/${id}/grants`, {
     method: "POST",
     json: {
@@ -357,11 +487,9 @@ try {
     },
   });
   check(grant.status === 201, "the owner grants the colleague a view", await grant.clone().text());
-  const invited = await inbox.waitFor(strangerMe.email, "shared");
   check(
-    invited.length === 1 && invited[0]?.text.includes(talkPath),
-    "a new grant mails the colleague a link to the talk",
-    invited,
+    (await inbox.waitFor(strangerMe.email, "shared")).length === 1,
+    "changing a grant mails nothing",
   );
   check(
     (await stranger.fetch(talkPath)).status === 200,

@@ -21,3 +21,4 @@ export const newDeckId = (): string => randomId("d_", 16);
 export const newThreadId = (): string => randomId("c_", 16);
 export const newReplyId = (): string => randomId("r_", 16);
 export const newGrantId = (): string => randomId("g_", 16);
+export const newPublicCommentId = (): string => randomId("p_", 16);

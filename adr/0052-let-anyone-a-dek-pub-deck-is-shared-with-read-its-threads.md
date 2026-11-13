@@ -4,7 +4,9 @@ Date: 2026-11-13
 
 ## Status
 
-Accepted
+Superseded
+
+Superseded by [56. Split dek.pub comments into public comments and review threads, and add a like](0056-split-dek-pub-comments-into-public-comments-and-review-threads-and-add-a-like.md)
 
 ## Context
 

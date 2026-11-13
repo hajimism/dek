@@ -4,6 +4,8 @@
 import type {
   CommentPolicy,
   CommentRow,
+  LikeState,
+  PublicComment,
   Visibility,
 } from "../../../../../../../src/pub/protocol.ts";
 import type { Quote } from "../../../comment/quote.ts";
@@ -51,6 +53,12 @@ export type Talk = {
   canComment: boolean;
   /** Whether the signed-in reader of the comments has muted their mail; null for anyone else. */
   muted: boolean | null;
+  /** The public comments at the bottom of the page; null on a private deck, which has none. */
+  publicComments: PublicComment[] | null;
+  /** Whether the deck's comment policy lets this reader post one. */
+  canPostPublic: boolean;
+  /** The talk's likes; null on a private deck. `liked` is false for a reader not signed in. */
+  likes: LikeState | null;
   /** The side of the work the reader is on; the team's may open a thread for the team alone. */
   side: GrantSide;
   /** The picture link previews show, as an absolute URL. */

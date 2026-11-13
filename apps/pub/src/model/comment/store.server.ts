@@ -91,14 +91,14 @@ async function listComments(
       status: placed.status,
       text: row.text,
       targets,
-      author: author(row, people),
+      author: authorOf(row, people),
       version: row.n,
       url: `${url}#${row.id}`,
       thread: replyRows
         .filter((reply) => reply.threadId === row.id)
         .map((reply) => ({
           id: reply.id,
-          author: author(reply, people),
+          author: authorOf(reply, people),
           text: reply.text,
           createdAt: reply.createdAt,
         })),
@@ -108,7 +108,8 @@ async function listComments(
   });
 }
 
-function author(
+/** Who wrote a comment, as anyone who reads it is told: a signed-in author by handle, else a guest. */
+export function authorOf(
   row: { authorId: string | null; guestName: string | null },
   people: Map<string, Person>,
 ) {

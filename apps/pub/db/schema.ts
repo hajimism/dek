@@ -147,3 +147,36 @@ export const mutes = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.deckId] })],
 );
+
+/**
+ * The comments at the bottom of a talk anyone may open, on the talk as a whole. A reply names the
+ * comment it answers; replies answer top-level comments only.
+ */
+export const publicComments = sqliteTable(
+  "public_comments",
+  {
+    id: text("id").primaryKey(),
+    deckId: text("deck_id").notNull(),
+    parentId: text("parent_id"),
+    authorId: text("author_id"),
+    guestName: text("guest_name"),
+    text: text("text").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+    editedAt: text("edited_at"),
+  },
+  (table) => [
+    index("public_comments_deck").on(table.deckId, table.createdAt),
+    index("public_comments_parent").on(table.parentId),
+  ],
+);
+
+/** One account's like of one talk. */
+export const likes = sqliteTable(
+  "likes",
+  {
+    deckId: text("deck_id").notNull(),
+    userId: text("user_id").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+  },
+  (table) => [primaryKey({ columns: [table.deckId, table.userId] })],
+);

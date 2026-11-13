@@ -8,6 +8,8 @@ import { appUrl } from "../../../../common/http.server.ts";
 import { guessLang, type Lang } from "../../../../common/i18n.ts";
 import { canReadComments } from "../../../comment/access.ts";
 import { isMuted } from "../../../comment/mute.server.ts";
+import { canPostPublic, publicCommentsOn } from "../../../comment/public/access.ts";
+import { publicCommentsOf } from "../../../comment/public/store.server.ts";
 import { commentsFor } from "../../../comment/store.server.ts";
 import { viewerOf } from "../../../person/actor.server.ts";
 import { profileOf } from "../../../person/person.ts";
@@ -16,6 +18,7 @@ import { personByHandle } from "../../../person/store.server.ts";
 import { canComment, canManage, canSeeScript, shownVersion } from "../../access.ts";
 import { talksBy } from "../../card.server.ts";
 import { talkPath } from "../../deck.ts";
+import { likeState } from "../../like/store.server.ts";
 import { deckBySlug, visibleDeck } from "../../store.server.ts";
 import { findVersion, versionsOf } from "../../version/store.server.ts";
 import { coverOf, slidePicture } from "../../version/version.ts";
@@ -100,6 +103,9 @@ export async function loadTalk(
       : null,
     canComment: canComment(deck, person, grant),
     muted: person && readsComments ? await isMuted(person.id, deck.id) : null,
+    publicComments: publicCommentsOn(deck) ? await publicCommentsOf(c, deck.id) : null,
+    canPostPublic: canPostPublic(deck, person),
+    likes: publicCommentsOn(deck) ? await likeState(deck.id, person?.id ?? null) : null,
     side,
     image: picture ? appUrl(picture) : null,
     more: (await talksBy(c, owner, { publicOnly: true, limit: 4 }))

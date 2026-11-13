@@ -348,6 +348,40 @@ export const NewReply = z.strictObject({
 });
 
 // ---------------------------------------------------------------------------------------------
+// Public comments and likes, at the bottom of a talk anyone may open: on the talk as a whole, by
+// whoever the deck's comment policy lets post. The review threads above are for those it is
+// shared with. Only the pages use these; dekc reads the review threads alone.
+
+export const PublicReply = z.strictObject({
+  id: z.string(),
+  author: Author,
+  text: z.string(),
+  createdAt: z.string(),
+  editedAt: z.string().nullable(),
+});
+export type PublicReply = z.infer<typeof PublicReply>;
+
+export const PublicComment = PublicReply.extend({ replies: z.array(PublicReply) });
+export type PublicComment = z.infer<typeof PublicComment>;
+
+export const PublicCommentList = z.strictObject({ comments: z.array(PublicComment) });
+
+/** A comment, or with `parentId` a reply to one; a guest gives a name and passes Turnstile. */
+export const NewPublicComment = z.strictObject({
+  text: z.string().min(1).max(4000),
+  parentId: z.string().optional(),
+  guestName: z.string().min(1).max(60).optional(),
+  turnstile: z.string().optional(),
+});
+export type NewPublicComment = z.infer<typeof NewPublicComment>;
+
+export const EditPublicComment = z.strictObject({ text: z.string().min(1).max(4000) });
+
+/** How many accounts like a talk, and whether the one asking is among them. */
+export const LikeState = z.strictObject({ count: z.number().int(), liked: z.boolean() });
+export type LikeState = z.infer<typeof LikeState>;
+
+// ---------------------------------------------------------------------------------------------
 // Grants: people other than the owner who may open, or comment on, a deck that is not public.
 
 export const GrantRole = z.enum(["view", "comment"]);
@@ -415,6 +449,10 @@ export const paths = {
   widen: (id: string, comment: string) =>
     `/api/decks/${segment(id)}/comments/${segment(comment)}/widen`,
   mute: (id: string) => `/api/decks/${segment(id)}/mute`,
+  publicComments: (id: string) => `/api/decks/${segment(id)}/public-comments`,
+  publicComment: (id: string, comment: string) =>
+    `/api/decks/${segment(id)}/public-comments/${segment(comment)}`,
+  like: (id: string) => `/api/decks/${segment(id)}/like`,
   grants: (id: string) => `/api/decks/${segment(id)}/grants`,
   grant: (id: string, grant: string) => `/api/decks/${segment(id)}/grants/${segment(grant)}`,
   /** Better Auth's device authorization endpoints, under its base path. */

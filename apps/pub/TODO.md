@@ -28,23 +28,27 @@ What it does not do:
   - A thread's scope is set only on the page and by the API: `dekc pub comments` has no command to share a team thread, and no flag to open one, since the CLI opens no threads.
   - The pins the deck draws show a team thread's bare number, so on the team's side `T3` and `3` both show as 3 there (the embed API takes a number).
 - **Text.** Comments are plain text: no Markdown, no mentions.
+- **Editing.** A review thread or reply cannot be changed or removed by its author, as public comments can (ADR 56).
+- **Public comments** (ADR 56).
+  - `dekc pub comments` lists the review threads only, and no mail tells the owner of a public comment.
+  - Nothing reports or hides a public comment but its removal; there is no rate limit on posting.
+  - The like appears beside the title only; the full-screen header that is to carry it is not built.
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.
 - **Drafts.** A draft is lost on reload.
 - **Turnstile setup.**
   - `TURNSTILE_SITE_KEY` (`env.ts`) is missing from `dev.env` and from ADR 43's list of production settings.
   - The composer shows the widget only when the site key is set, yet the server asks for a token whenever `TURNSTILE_SECRET` is not `off`. With the secret set and no site key, a guest cannot comment.
-  - No e2e check posts as a guest.
+  - The e2e run posts a guest's public comment with the check off; nothing exercises Turnstile itself.
 
 ## Comments for client work
 
-The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads (ADR 52), and the team's side reads drafts (ADR 55). Still to come, each with its own ADR:
+The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), and the team's side reads drafts (ADR 55). Still to come, each with its own ADR:
 
 - **Mail, beyond what is built.** Sign-in links, invitations and notices of threads, replies and resolves are built (ADR 53, 54). Still to come:
   - a digest of a person's notices, once a day or an hour, which needs a cron job and a record of what was sent
   - muting a project's mail, with projects
   - mail in the reader's language
 - **The full-screen viewer.** A header that shows on demand with the title, the author, the page and a comments button, and a comments mode with the panel to the right of a smaller slide. The `c` key reaches the page only from a deck built with a dek that passes it on.
-- **Public comments and likes**, on `public` and `link` decks; the comment policy then governs those only, and review threads are for grantees.
 - **The side column** of the talk page: the slides' titles as a table of contents, and the deck's details.
 - **Projects.** A `dek.toml` key naming a project on dek.pub, which holds its decks, members and settings; grants to a project; `/projects/<id>/<deck>` URLs.
 
