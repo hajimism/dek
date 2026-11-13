@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { docsUrl } from "../../src/common/docs.ts";
 import {
   formatDate,
   guessLang,
@@ -47,5 +48,18 @@ describe("mail", () => {
     expect(excerpt("  一行目\n\n二行目  ")).toBe("一行目 二行目");
     expect(excerpt("a".repeat(300), 10)).toBe(`${"a".repeat(9)}…`);
     expect(excerpt("short", 10)).toBe("short");
+  });
+});
+
+describe("docsUrl", () => {
+  it("points at a page of dek's docs, in the reader's language", () => {
+    expect(docsUrl("en")).toBe("https://hajimism.github.io/dek/");
+    expect(docsUrl("ja")).toBe("https://hajimism.github.io/dek/ja/");
+    expect(docsUrl("en", "guide/publish")).toBe(
+      "https://hajimism.github.io/dek/guide/publish.html",
+    );
+    expect(docsUrl("ja", "guide/publish")).toBe(
+      "https://hajimism.github.io/dek/ja/guide/publish.html",
+    );
   });
 });

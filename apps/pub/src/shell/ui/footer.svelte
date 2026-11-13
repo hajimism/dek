@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { docsUrl } from "../../common/docs.ts";
   import { followLang } from "../lang-link.ts";
   import { useApp } from "../use-app.ts";
 
@@ -10,10 +11,10 @@
     <p class="built">
       <a href="/" class="name">dek.pub</a>
       <span aria-hidden="true">·</span>
-      <a href="https://hajimism.github.io/dek/{lang === 'ja' ? 'ja/' : ''}">{t("footer.builtWith")}</a>
+      <a href={docsUrl(lang)}>{t("footer.builtWith")}</a>
     </p>
     <nav aria-label="Footer">
-      <a href="https://hajimism.github.io/dek/{lang === 'ja' ? 'ja/' : ''}">{t("footer.docs")}</a>
+      <a href={docsUrl(lang)}>{t("footer.docs")}</a>
       <a href="https://github.com/hajimism/dek">{t("footer.source")}</a>
       <a href={lang === "ja" ? "?lang=en" : "?lang=ja"} onclick={(event) => followLang(event, lang === "ja" ? "en" : "ja")} lang={lang === "ja" ? "en" : "ja"}>{lang === "ja" ? "English" : "日本語"}</a>
     </nav>

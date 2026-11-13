@@ -1,6 +1,7 @@
 <script lang="ts">
   import { talkPath } from "../../src/model/deck/deck.ts";
   import { profilePath } from "../../src/model/person/profile-path.ts";
+  import { docsUrl } from "../../src/common/docs.ts";
   import { formatDate, guessLang, slideCount } from "../../src/common/i18n.ts";
   import type { TalkCard } from "../../src/model/deck/type.ts";
   import { useApp } from "../../src/shell/use-app.ts";
@@ -48,7 +49,7 @@
           <p>{profile.isOwner ? t("profile.emptyOwner") : t("profile.empty")}</p>
           {#if profile.isOwner}
             <CopyField value="dekc pub publish" label="dekc pub publish" kind="command" prompt />
-            <a href="https://hajimism.github.io/dek/{lang === 'ja' ? 'ja/' : ''}">{t("profile.howPublishing")}</a>
+            <a class="guide" href={docsUrl(lang, "guide/publish")} target="_blank" rel="noopener">{t("profile.howPublishing")}<Icon name="external" size={14} /></a>
           {/if}
         </div>
       {:else}
@@ -211,6 +212,11 @@
     padding: var(--space-8) 0;
     color: var(--text-muted);
     font-size: var(--text-base);
+  }
+  .guide {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
   }
   .empty :global(.field) {
     width: 100%;
