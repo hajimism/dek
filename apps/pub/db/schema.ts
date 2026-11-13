@@ -136,3 +136,14 @@ export const grants = sqliteTable(
     uniqueIndex("grants_deck_email").on(table.deckId, table.email),
   ],
 );
+
+/** A deck whose comments one person hears nothing of by mail. */
+export const mutes = sqliteTable(
+  "mutes",
+  {
+    userId: text("user_id").notNull(),
+    deckId: text("deck_id").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.deckId] })],
+);

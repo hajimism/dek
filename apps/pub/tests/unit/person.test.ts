@@ -5,6 +5,7 @@ import {
   normalizeUserCode,
 } from "../../src/model/person/feature/connect-cli/device-code.ts";
 import { rssDate, talkFeed, xmlText } from "../../src/model/person/feature/profile/rss.ts";
+import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
 import { safeNext } from "../../src/model/person/next-path.ts";
 import { meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
@@ -146,5 +147,18 @@ describe("talkFeed", () => {
     expect(xml).toContain('<enclosure url="https://dek.pub/i/d_x/1/cover"');
     expect(xml).toContain('<atom:link href="https://dek.pub/@hajimism/rss"');
     expect(xml).toContain("<pubDate>Sun, 01 Nov 2026 00:00:00 GMT</pubDate>");
+  });
+});
+
+describe("signInMail", () => {
+  it("carries the link and says what to do with it", () => {
+    const mail = signInMail(
+      "sato@example.com",
+      "https://dek.pub/api/auth/magic-link/verify?token=t",
+    );
+    expect(mail.to).toBe("sato@example.com");
+    expect(mail.subject).toBe("Sign in to dek.pub");
+    expect(mail.text).toContain("https://dek.pub/api/auth/magic-link/verify?token=t");
+    expect(mail.text).toContain("15 minutes");
   });
 });

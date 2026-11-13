@@ -3,6 +3,9 @@ import { defineConfig } from "void/config";
 export default defineConfig({
   cloudflare: { name: "dek-pub" },
   auth: { providers: ["github", "email"] },
+  // Sign-in links, invitations and notices. The domain is set up for Cloudflare Email Sending by
+  // `void deploy`; until then the dev server keeps every mail in its own inbox.
+  email: { from: "dek.pub <noreply@mail.dek.pub>" },
   head: {
     titleTemplate: "%s · dek.pub",
     htmlAttrs: { lang: "en" },

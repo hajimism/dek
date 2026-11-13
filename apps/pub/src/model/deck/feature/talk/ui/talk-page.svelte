@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import type { NewComment } from "../../../../../../../../src/pub/protocol.ts";
   import { formatDate } from "../../../../../common/i18n.ts";
-  import { ApiFailure } from "../../../../../common/ui/api.ts";
+  import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -38,6 +38,20 @@
     (error) => toast(failure(error), { tone: "error" }),
   );
   const comments = $derived(list.rows);
+  let muted = $state(untrack(() => talk.muted));
+
+  /** Turn the reader's mail of these comments off or on, showing the change before it is made. */
+  async function setMuted(next: boolean) {
+    const before = muted;
+    muted = next;
+    try {
+      await api(`/api/decks/${encodeURIComponent(talk.id)}/mute`, { method: next ? "PUT" : "DELETE" });
+      toast(t(next ? "comment.muted" : "comment.unmuted"));
+    } catch (error) {
+      muted = before;
+      toast(failure(error), { tone: "error" });
+    }
+  }
   let filter: Filter = $state("open");
   let selectedId: string | null = $state(null);
   let draft: Draft | null = $state(null);
@@ -511,6 +525,8 @@
         scopes={talk.side === "team"}
         {guest}
         closable={mode !== "column"}
+        {muted}
+        onmute={setMuted}
         anchorTops={mode === "column" ? anchorTops : null}
         onclose={() => closePanel()}
         onselect={(comment) => select(comment.id)}

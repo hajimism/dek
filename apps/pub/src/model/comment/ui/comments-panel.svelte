@@ -19,6 +19,8 @@
     scopes = false,
     guest = false,
     closable = false,
+    muted = null,
+    onmute,
     signinHref,
     onselect,
     onanchor,
@@ -44,6 +46,9 @@
     scopes?: boolean;
     guest?: boolean;
     closable?: boolean;
+    /** Whether the reader turned off mail of these comments; null for one who gets none. */
+    muted?: boolean | null;
+    onmute?: (muted: boolean) => void;
     signinHref?: string;
     onselect: (comment: CardComment) => void;
     onanchor: (comment: CardComment) => void;
@@ -158,11 +163,25 @@
         {t("talk.comments")}
         <span class="count num">{counts.open}</span>
       </h2>
-      {#if closable}
-        <button type="button" class="close" aria-label={t("comment.close")} onclick={onclose}>
-          <Icon name="x" />
-        </button>
-      {/if}
+      <div class="head-tools">
+        {#if muted !== null}
+          <button
+            type="button"
+            class="close"
+            aria-label={t("comment.mail")}
+            title={t("comment.mail")}
+            aria-pressed={!muted}
+            onclick={() => onmute?.(!muted)}
+          >
+            <Icon name={muted ? "bell-off" : "bell"} />
+          </button>
+        {/if}
+        {#if closable}
+          <button type="button" class="close" aria-label={t("comment.close")} onclick={onclose}>
+            <Icon name="x" />
+          </button>
+        {/if}
+      </div>
     </header>
     <div class="filters" role="group" aria-label={t("comment.filter")}>
       {#each filters as value (value)}
@@ -276,6 +295,10 @@
     color: var(--text-muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
+  }
+  .head-tools {
+    display: flex;
+    gap: 2px;
   }
   .close {
     display: grid;

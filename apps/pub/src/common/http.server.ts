@@ -82,3 +82,16 @@ export async function jsonBody<T extends z.ZodType>(c: Context, schema: T): Prom
 export function appUrl(path: string): string {
   return `${env.APP_ORIGIN}${path}`;
 }
+
+/**
+ * Let `task` finish after the answer has gone, as mail does: the Worker is kept alive for it,
+ * and what it throws is logged. Without a Worker's context, the task simply runs on.
+ */
+export function afterAnswer(c: Context, task: Promise<unknown>): void {
+  const settled = task.catch((error: unknown) => console.error(error));
+  try {
+    c.executionCtx.waitUntil(settled);
+  } catch {
+    // No execution context: nothing to keep alive.
+  }
+}

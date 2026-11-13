@@ -7,6 +7,7 @@ import {
   slideCount,
   translate,
 } from "../../src/common/i18n.ts";
+import { excerpt } from "../../src/common/mail.ts";
 
 describe("i18n", () => {
   it("picks ?lang=, then the cookie, then Accept-Language", () => {
@@ -38,5 +39,13 @@ describe("guessLang", () => {
     expect(guessLang(["発表論"])).toBeNull();
     expect(guessLang(["発表論"], "ja")).toBe("ja");
     expect(guessLang(["Why dek"], "ja")).toBeNull();
+  });
+});
+
+describe("mail", () => {
+  it("quotes a comment on one line, cut where it runs long", () => {
+    expect(excerpt("  一行目\n\n二行目  ")).toBe("一行目 二行目");
+    expect(excerpt("a".repeat(300), 10)).toBe(`${"a".repeat(9)}…`);
+    expect(excerpt("short", 10)).toBe("short");
   });
 });

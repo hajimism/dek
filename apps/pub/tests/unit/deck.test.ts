@@ -25,6 +25,7 @@ import {
   waitingGrants,
   widestSide,
 } from "../../src/model/deck/grant/grant.ts";
+import { invitationMail } from "../../src/model/deck/grant/invite.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
 import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
@@ -391,5 +392,31 @@ describe("publishing", () => {
   it("refuses a form with no manifest, or one that is not JSON", () => {
     expect(() => readManifest("{")).toThrow("not JSON");
     expect(() => readManifest(undefined)).toThrow("no manifest");
+  });
+});
+
+describe("invitationMail", () => {
+  const base = {
+    to: "sato@example.com",
+    inviter: "Hajime",
+    title: "Why dek",
+    url: "https://dek.pub/@hajimism/why-dek",
+  };
+
+  it("says who shared which talk, and what the grant lets them do", () => {
+    const mail = invitationMail({ ...base, role: "comment", byEmail: false });
+    expect(mail.to).toBe("sato@example.com");
+    expect(mail.subject).toBe("Hajime shared “Why dek” with you");
+    expect(mail.text).toContain("to read and comment on");
+    expect(mail.text).toContain(base.url);
+    expect(invitationMail({ ...base, role: "view", byEmail: false }).text).toContain("to read.");
+  });
+
+  it("tells an address with no account yet to sign in with it", () => {
+    const mail = invitationMail({ ...base, role: "view", byEmail: true });
+    expect(mail.text).toContain("sign in with sato@example.com");
+    expect(invitationMail({ ...base, role: "view", byEmail: false }).text).not.toContain(
+      "sign in with",
+    );
   });
 });
