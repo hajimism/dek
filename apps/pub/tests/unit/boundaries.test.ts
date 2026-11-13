@@ -3,10 +3,13 @@
 // component that reached the database would build and then fail in the browser. These rules are
 // what keeps the layers apart:
 //
-// - Only a `*.server.ts` file calls Void (`void/db`, `void/env`, `void/storage`, `void/auth`) or
-//   imports another `*.server.ts`. Anything else may take row types from `@schema` with
-//   `import type`, and nothing more.
-// - `src/common/` knows no model. `src/shell/` knows `common` and the `person` model.
+// - In `src/` and `pages/`, only a `*.server.ts` file calls Void (`void/db`, `void/env`,
+//   `void/storage`, `void/auth`) or imports another `*.server.ts`. Anything else may take row
+//   types from `@schema`, and a page its loader's props, with `import type`, and nothing more.
+//   Routes, middleware and `auth.ts` run on the server only and are not held to it.
+// - `src/common/` knows no model. `src/shell/` knows `common` and the `person` model, and the
+//   person model does not know the shell; deck and comment may use it. So the order is common,
+//   person, shell, deck, comment.
 // - Models come in the order person, deck, comment: each may import the ones before it, and the
 //   ones after it only from a feature.
 // - A model's own files never import a `feature/`, and a feature imports no other feature.
@@ -33,7 +36,10 @@ function sources(dir: string): string[] {
 }
 
 function importsOf(file: string): Import[] {
-  const text = readFileSync(file, "utf8");
+  return importsIn(readFileSync(file, "utf8"), file);
+}
+
+function importsIn(text: string, file: string): Import[] {
   const found: Import[] = [];
   const statement =
     /(?:^|\n)\s*(import|export)\s+(type\s+)?(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g;
@@ -51,8 +57,8 @@ function importsOf(file: string): Import[] {
 /** Where a file sits: its layer, its model, and its feature if it is in one. */
 function placeOf(file: string): { layer: string; model?: string; feature?: string; sub?: string } {
   const path = relative(APP, file).split("/");
-  if (path[0] === "serve") {
-    return { layer: "serve" };
+  if (path[0] === "serve" || path[0] === "pages") {
+    return { layer: path[0] };
   }
   if (path[1] === "model") {
     const model = path[2] ?? "";
@@ -71,7 +77,7 @@ const isServer = (file: string) => file.endsWith(".server.ts");
 
 function problems(): string[] {
   const found: string[] = [];
-  const files = [...sources("src"), ...sources("serve/src")];
+  const files = [...sources("src"), ...sources("serve/src"), ...sources("pages")];
   for (const file of files) {
     const from = placeOf(file);
     const name = relative(APP, file);
@@ -84,7 +90,8 @@ function problems(): string[] {
         if (spec === "@schema" && !typeOnly) {
           say("only a *.server.ts file reads the tables; take row types with import type");
         }
-        if (target?.endsWith(".server.ts") || target?.endsWith(".server")) {
+        const page = from.layer === "pages" && typeOnly;
+        if (!page && (target?.endsWith(".server.ts") || target?.endsWith(".server"))) {
           say("only a *.server.ts file imports another");
         }
       }
@@ -92,12 +99,12 @@ function problems(): string[] {
         continue;
       }
       const to = placeOf(target);
-      if (from.layer === "serve" || (from.model === "deck" && from.sub === "serving")) {
-        if (
-          !(to.model === "deck" && to.sub === "serving" && !isServer(target)) &&
-          to.layer !== "serve"
-        ) {
-          say("the serving files and the serve Worker share only deck/serving");
+      const serving = (place: ReturnType<typeof placeOf>) =>
+        place.model === "deck" && place.sub === "serving";
+      if (from.layer === "serve" || serving(from)) {
+        const shared = serving(to) && !isServer(target);
+        if (!(shared || (from.layer === "serve" && to.layer === "serve"))) {
+          say("the serving files import only each other, and the serve Worker only them");
         }
         continue;
       }
@@ -160,6 +167,33 @@ function zodInTheBrowser(): string[] {
 }
 
 describe("import boundaries", () => {
+  it("read every way a file imports", () => {
+    const text = [
+      '<script lang="ts">',
+      '  import Icon from "./icon.svelte";',
+      "  import {",
+      "    a,",
+      "    type b,",
+      '  } from "./many.ts";',
+      '  import type { Row } from "@schema";',
+      '  export * from "./again.ts";',
+      '  import "./tokens.css";',
+      '  const later = import("./later.ts");',
+      "</script>",
+    ].join("\n");
+    expect(
+      importsIn(text, join(APP, "src/x.svelte")).map((found) => [found.spec, found.typeOnly]),
+    ).toEqual([
+      ["./icon.svelte", false],
+      ["./many.ts", false],
+      ["@schema", true],
+      ["./again.ts", false],
+      ["./tokens.css", false],
+      ["./later.ts", false],
+    ]);
+    expect(importsOf(join(APP, "src/model/deck/store.server.ts")).length).toBeGreaterThan(10);
+  });
+
   it("keep Void code, layers, models and features apart", () => {
     expect(problems()).toEqual([]);
   });

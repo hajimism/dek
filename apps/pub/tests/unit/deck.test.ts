@@ -18,7 +18,7 @@ import {
   readDeckMessage,
   withSlide,
 } from "../../src/model/deck/feature/talk/embed.ts";
-import { granteeOf, strongestRole } from "../../src/model/deck/grant/grant.ts";
+import { granteeOf, strongestRole, waitingGrants } from "../../src/model/deck/grant/grant.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
 import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
@@ -287,6 +287,21 @@ describe("grants", () => {
     expect(granteeOf("sato")).toEqual({ handle: "sato" });
     expect(granteeOf("Sato@Example.com")).toEqual({ email: "sato@example.com" });
     expect(granteeOf("not a name")).toBeNull();
+  });
+
+  it("claims a grant by address for the account, unless it holds one by handle on that deck", () => {
+    const row = (id: string, deckId: string, userId: string | null) => ({ id, deckId, userId });
+    expect(
+      waitingGrants(
+        [
+          row("g1", "d_a", null),
+          row("g2", "d_b", null),
+          row("g3", "d_b", "u1"),
+          row("g4", "d_c", "u1"),
+        ],
+        "u1",
+      ).map((grant) => grant.id),
+    ).toEqual(["g1"]);
   });
 
   it("counts the grant that allows more", () => {

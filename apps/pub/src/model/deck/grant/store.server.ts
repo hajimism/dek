@@ -8,7 +8,7 @@ import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
 import { peopleById, personByHandle } from "../../person/store.server.ts";
 import type { Person } from "../../person/type.ts";
-import { strongestRole } from "./grant.ts";
+import { strongestRole, waitingGrants } from "./grant.ts";
 import type { Grantee, GrantRole, GrantRow, GrantView } from "./type.ts";
 
 /** The grants that name `person` on a deck: by account, or by an address they have verified. */
@@ -31,16 +31,9 @@ export function roleOf(rows: readonly GrantRow[]): GrantRole | null {
   return strongestRole(rows.map((row) => row.role));
 }
 
-/**
- * Tie the grants by address among `rows` to `person`'s account. A grant the account already holds
- * by handle on the same deck stays the one that is tied; the one by address keeps waiting, and
- * still counts while the address is theirs.
- */
+/** Tie the grants by address among `rows` to `person`'s account, as waitingGrants picks them. */
 export async function claimGrants(rows: readonly GrantRow[], person: Person): Promise<void> {
-  const byAccount = new Set(
-    rows.filter((row) => row.userId === person.id).map((row) => row.deckId),
-  );
-  const waiting = rows.filter((row) => row.userId === null && !byAccount.has(row.deckId));
+  const waiting = waitingGrants(rows, person.id);
   if (waiting.length === 0) {
     return;
   }

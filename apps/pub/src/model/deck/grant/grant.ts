@@ -21,3 +21,17 @@ export function strongestRole(roles: readonly GrantRole[]): GrantRole | null {
   }
   return roles.length > 0 ? "view" : null;
 }
+
+/**
+ * The grants by address among `rows` to tie to `userId`'s account. A grant the account already
+ * holds by handle on the same deck stays the one that is tied: two grants for one account on one
+ * deck cannot both be. The one by address keeps waiting, and still counts while the address is
+ * theirs.
+ */
+export function waitingGrants<T extends { deckId: string; userId: string | null }>(
+  rows: readonly T[],
+  userId: string,
+): T[] {
+  const byAccount = new Set(rows.filter((row) => row.userId === userId).map((row) => row.deckId));
+  return rows.filter((row) => row.userId === null && !byAccount.has(row.deckId));
+}
