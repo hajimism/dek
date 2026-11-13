@@ -16,14 +16,14 @@ import { currentPerson } from "../../../../../../src/model/person/actor.server.t
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, grant } = await visibleDeck(c.req.param("id") ?? "", person);
+    const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
     mustComment(canComment(deck, person, grant), person);
-    const thread = await visibleThread(deck, person, c.req.param("comment") ?? "");
+    const thread = await visibleThread(deck, person, side, c.req.param("comment") ?? "");
     const body = await jsonBody(c, NewReply);
     await admitGuest(c, person, body, "reply");
     const replyId = await addReply(thread, person, body.text, body.guestName);
     // The answer is the reply made, as protocol Reply; the thread it joined is a GET away.
-    const reply = (await commentFor(c, deck, person, thread.id)).thread.find(
+    const reply = (await commentFor(c, deck, person, side, thread.id)).thread.find(
       (each) => each.id === replyId,
     );
     if (!reply) {

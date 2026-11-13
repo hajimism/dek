@@ -57,6 +57,7 @@ const run = (fake: FakePub, cwd: string, args: string[]) =>
 const comment = (overrides: Partial<CommentRow>): CommentRow => ({
   number: 1,
   id: "c_one",
+  scope: "shared",
   slug: "intro",
   step: "0",
   status: "open",
@@ -269,6 +270,28 @@ describe("dekc pub comments", () => {
       expect(jsonStdout<Json>(missing)).toMatchObject({
         ok: false,
         error: { message: "the deck has no comment 9" },
+      });
+    });
+  });
+
+  test.serial("names a team thread by T and its number, apart from the shared one", async () => {
+    await withPublished(async (fake, root) => {
+      const [deck] = [...fake.decks.values()];
+      deck?.rows.push(
+        comment({ number: 7, id: "c_shared" }),
+        comment({ number: 7, id: "c_team", scope: "team" }),
+      );
+      const listed = await run(fake, root, ["comments"]);
+      expect(listed.stdout).toContain("T7  intro  @ann  [c_team]");
+      expect(listed.stdout).toContain("7  intro  @ann  [c_shared]");
+      const team = await run(fake, root, ["comments", "resolve", "T7", "--json"]);
+      expect(jsonStdout<Json>(team)).toMatchObject({ comment: "c_team" });
+      const shared = await run(fake, root, ["comments", "resolve", "#7", "--json"]);
+      expect(jsonStdout<Json>(shared)).toMatchObject({ comment: "c_shared" });
+      const missing = await run(fake, root, ["comments", "resolve", "T8", "--json"]);
+      expect(jsonStdout<Json>(missing)).toMatchObject({
+        ok: false,
+        error: { message: "the deck has no comment T8" },
       });
     });
   });

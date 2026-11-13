@@ -42,7 +42,13 @@ function say(from: HTMLIFrameElement | null, data: unknown, origin = ORIGIN) {
 }
 
 function link(options: Partial<ConstructorParameters<typeof DeckLink>[0]> = {}) {
-  return new DeckLink({ origin: ORIGIN, slugs: ["intro", "end"], canComment: true, ...options });
+  return new DeckLink({
+    origin: ORIGIN,
+    slugs: ["intro", "end"],
+    canRead: true,
+    canComment: true,
+    ...options,
+  });
 }
 
 afterEach(() => {
@@ -124,7 +130,7 @@ describe("DeckLink", () => {
     stop();
   });
 
-  it("passes on a mark only for a comment the page has, and only to someone who may comment", () => {
+  it("passes on a mark only for a comment the page has, and only to someone who may read them", () => {
     const deck = frame();
     const onmark = vi.fn();
     const view = link({ hasComment: (id) => id === "c_known", events: { onmark } });
@@ -141,8 +147,20 @@ describe("DeckLink", () => {
     say(deck, { type: "dek:mark", id: "c_known" });
     reader.pick(true);
     expect(reader.picking).toBe(false);
-    expect(onmark).toHaveBeenCalledOnce();
+    expect(onmark).toHaveBeenCalledTimes(2);
     stopReader();
+
+    const stranger = link({
+      canRead: false,
+      canComment: false,
+      hasComment: () => true,
+      events: { onmark },
+    });
+    const stopStranger = stranger.attach(deck);
+    say(deck, ready);
+    say(deck, { type: "dek:mark", id: "c_known" });
+    expect(onmark).toHaveBeenCalledTimes(2);
+    stopStranger();
   });
 
   it("does not follow a move to a slide the talk lacks", () => {

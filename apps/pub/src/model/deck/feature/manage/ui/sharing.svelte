@@ -6,13 +6,14 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
-  import type { GrantView } from "../../../grant/type.ts";
+  import type { GrantRole, GrantSide, GrantView } from "../../../grant/type.ts";
 
   let { deckId, initial }: { deckId: string; initial: GrantView[] } = $props();
   const { t } = useApp();
   let grants: GrantView[] = $state(untrack(() => initial));
   let who = $state("");
-  let role: "view" | "comment" = $state("view");
+  let role: GrantRole = $state("view");
+  let side: GrantSide = $state("client");
   let adding = $state(false);
   let error = $state("");
 
@@ -37,7 +38,7 @@
     }
     adding = true;
     try {
-      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: name, role } });
+      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: name, role, side } });
       await reload();
       toast(t("manage.sharing.added", { who: name }));
       who = "";
@@ -48,9 +49,9 @@
     }
   }
 
-  async function changeRole(grant: GrantView, next: "view" | "comment") {
+  async function change(grant: GrantView, next: Pick<GrantView, "role" | "side">) {
     try {
-      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: grant.who, role: next } });
+      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: grant.who, ...next } });
       await reload();
       toast(t("saved"));
     } catch (err) {
@@ -64,7 +65,7 @@
     try {
       await api(`/api/decks/${deckId}/grants/${grant.id}`, { method: "DELETE" });
       toast(t("manage.sharing.removed", { who: label(grant) }), {
-        action: { label: t("undo"), run: () => changeRole(grant, grant.role) },
+        action: { label: t("undo"), run: () => change(grant, { role: grant.role, side: grant.side }) },
       });
     } catch (err) {
       grants = before;
@@ -102,9 +103,17 @@
       <option value="comment">{t("role.comment")}</option>
     </select>
   </div>
+  <div class="field">
+    <label for="grant-side">{t("side.label")}</label>
+    <select id="grant-side" bind:value={side} aria-describedby="grant-side-hint">
+      <option value="client">{t("side.client")}</option>
+      <option value="team">{t("side.team")}</option>
+    </select>
+  </div>
   <Button variant="primary" type="submit" icon="plus" loading={adding}>{t("manage.sharing.add")}</Button>
 </form>
 {#if error}<p class="error" id="grant-error" role="alert"><Icon name="alert" size={14} />{error}</p>{/if}
+<p class="side-hint" id="grant-side-hint">{t("manage.sharing.sideHint")}</p>
 
 {#if grants.length === 0}
   <p class="empty">{t("manage.sharing.empty")}</p>
@@ -122,10 +131,20 @@
           id="role-{grant.id}"
           class="compact"
           value={grant.role}
-          onchange={(event) => changeRole(grant, event.currentTarget.value as "view" | "comment")}
+          onchange={(event) => change(grant, { role: event.currentTarget.value as GrantRole, side: grant.side })}
         >
           <option value="view">{t("role.view")}</option>
           <option value="comment">{t("role.comment")}</option>
+        </select>
+        <label class="visually-hidden" for="side-{grant.id}">{t("side.label")}: {label(grant)}</label>
+        <select
+          id="side-{grant.id}"
+          class="compact"
+          value={grant.side}
+          onchange={(event) => change(grant, { role: grant.role, side: event.currentTarget.value as GrantSide })}
+        >
+          <option value="client">{t("side.client")}</option>
+          <option value="team">{t("side.team")}</option>
         </select>
         <button type="button" class="remove" aria-label={t("manage.sharing.remove", { who: label(grant) })} title={t("manage.sharing.remove", { who: label(grant) })} onclick={() => remove(grant)}>
           <Icon name="x" size={14} />
@@ -205,6 +224,11 @@
     align-items: center;
     gap: 6px;
     color: var(--danger);
+    font-size: var(--text-sm);
+  }
+  .side-hint {
+    margin-top: var(--space-2);
+    color: var(--text-faint);
     font-size: var(--text-sm);
   }
   .empty {

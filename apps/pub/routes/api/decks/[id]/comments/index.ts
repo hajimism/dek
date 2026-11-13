@@ -18,7 +18,7 @@ const STATUSES = ["open", "resolved", "all"] as const;
 export const GET = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, grant } = await visibleDeck(c.req.param("id") ?? "", person);
+    const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
     if (!canReadComments(deck, person, grant)) {
       throw notFound("comments");
     }
@@ -32,18 +32,18 @@ export const GET = defineHandler((c) =>
     if (version !== null && !mayReadVersion(deck, person, version)) {
       throw notFound("version");
     }
-    return { comments: await commentsFor(c, deck, person, { status, version }) };
+    return { comments: await commentsFor(c, deck, person, side, { status, version }) };
   }, c.req.raw),
 );
 
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, grant } = await visibleDeck(c.req.param("id") ?? "", person);
+    const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
     mustComment(canComment(deck, person, grant), person);
     const body = await jsonBody(c, NewComment);
     await admitGuest(c, person, body, "comment");
-    const id = await openThread(deck, person, body);
-    return Response.json(await commentFor(c, deck, person, id), { status: 201 });
+    const id = await openThread(deck, person, side, body);
+    return Response.json(await commentFor(c, deck, person, side, id), { status: 201 });
   }, c.req.raw),
 );

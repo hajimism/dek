@@ -42,7 +42,7 @@ export async function loadTalk(
   if (!seen) {
     return null;
   }
-  const { deck, grant } = seen;
+  const { deck, grant, side } = seen;
   const n = shownVersion(deck, person);
   const version = n === null ? null : await findVersion(deck.id, n);
   if (n === null || !version) {
@@ -83,9 +83,10 @@ export async function loadTalk(
     script,
     isOwner,
     comments: canReadComments(deck, person, grant)
-      ? await commentsFor(c, deck, person, { status: "all", version: n })
+      ? await commentsFor(c, deck, person, side, { status: "all", version: n })
       : null,
     canComment: canComment(deck, person, grant),
+    side,
     image: picture ? appUrl(picture) : null,
     more: (await talksBy(c, owner, { publicOnly: true, limit: 4 }))
       .filter((card) => card.slug !== deck.slug)

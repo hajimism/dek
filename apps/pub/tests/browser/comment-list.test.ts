@@ -8,6 +8,7 @@ function row(overrides: Partial<CommentRow> = {}): CommentRow {
   return {
     number: 1,
     id: "c_1",
+    scope: "shared",
     slug: "intro",
     step: "0",
     status: "open",
@@ -60,6 +61,28 @@ describe("CommentList", () => {
     expect(list.rows[1]?.pending).toBeUndefined();
     expect(fetch).toHaveBeenCalledWith(
       "/api/decks/d_x/comments",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("guesses a new thread's number within its scope", async () => {
+    answers(null);
+    const list = new CommentList(
+      "d_x",
+      [row({ number: 4 }), row({ id: "c_t", scope: "team", number: 1 })],
+      () => {},
+    );
+    await list.create({ ...body, scope: "team" }, author);
+    expect(list.rows[2]).toMatchObject({ scope: "team", number: 2 });
+  });
+
+  it("shares a team thread with the client and shows it as the server answers", async () => {
+    const fetch = answers(row({ id: "c_t", scope: "shared", number: 5 }));
+    const list = new CommentList("d_x", [row({ id: "c_t", scope: "team", number: 1 })], () => {});
+    expect(await list.widen(list.rows[0] as NonNullable<(typeof list.rows)[0]>)).toBe(true);
+    expect(list.rows[0]).toMatchObject({ scope: "shared", number: 5 });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/decks/d_x/comments/c_t/widen",
       expect.objectContaining({ method: "POST" }),
     );
   });

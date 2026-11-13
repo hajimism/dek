@@ -214,6 +214,7 @@ describe("the protocol", () => {
     const row = {
       number: 1,
       id: "c_1",
+      scope: "shared",
       slug: "intro",
       step: "0",
       status: "open",

@@ -13,8 +13,8 @@ import { requirePerson } from "../../../../../../src/model/person/actor.server.t
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
-    const { deck } = await visibleDeck(c.req.param("id") ?? "", person);
-    const thread = await visibleThread(deck, person, c.req.param("comment") ?? "");
+    const { deck, side } = await visibleDeck(c.req.param("id") ?? "", person);
+    const thread = await visibleThread(deck, person, side, c.req.param("comment") ?? "");
     if (!canResolve(deck, thread, person)) {
       throw new ApiError(
         403,
@@ -23,6 +23,6 @@ export const POST = defineHandler((c) =>
       );
     }
     await setResolved(thread, person, false);
-    return commentFor(c, deck, person, thread.id);
+    return commentFor(c, deck, person, side, thread.id);
   }, c.req.raw),
 );

@@ -27,7 +27,9 @@ export const decks = sqliteTable(
       .default("signed-in"),
     currentVersion: integer("current_version"),
     latestVersion: integer("latest_version"),
+    /** The next number a shared thread takes; a team thread's come from `nextTeamThread`. */
     nextThread: integer("next_thread").notNull().default(1),
+    nextTeamThread: integer("next_team_thread").notNull().default(1),
     createdAt: text("created_at").notNull().default(now),
     updatedAt: text("updated_at").notNull().default(now),
   },
@@ -78,7 +80,11 @@ export const threads = sqliteTable(
   {
     id: text("id").primaryKey(),
     deckId: text("deck_id").notNull(),
+    /** Per deck and scope, so a client cannot count the team's threads by the gaps. */
     number: integer("number").notNull(),
+    scope: text("scope", { enum: ["team", "shared"] })
+      .notNull()
+      .default("team"),
     /** The version the thread was opened on. */
     n: integer("n").notNull(),
     slug: text("slug").notNull(),
@@ -93,7 +99,7 @@ export const threads = sqliteTable(
     createdAt: text("created_at").notNull().default(now),
   },
   (table) => [
-    uniqueIndex("threads_deck_number").on(table.deckId, table.number),
+    uniqueIndex("threads_deck_number").on(table.deckId, table.scope, table.number),
     index("threads_deck_slug").on(table.deckId, table.slug),
   ],
 );
@@ -120,6 +126,9 @@ export const grants = sqliteTable(
     userId: text("user_id"),
     email: text("email"),
     role: text("role", { enum: ["view", "comment"] }).notNull(),
+    side: text("side", { enum: ["team", "client"] })
+      .notNull()
+      .default("client"),
     createdAt: text("created_at").notNull().default(now),
   },
   (table) => [

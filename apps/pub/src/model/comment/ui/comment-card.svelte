@@ -1,5 +1,6 @@
 
 <script lang="ts">
+  import { threadLabel } from "../../../../../../src/pub/thread.ts";
   import { absoluteTime, relativeTime } from "../../../common/i18n.ts";
   import Badge from "../../../common/ui/badge.svelte";
   import { now as currentTime } from "../../../common/ui/clock.svelte.ts";
@@ -16,12 +17,14 @@
     selected = false,
     canResolve = false,
     canReply = false,
+    canWiden = false,
     guest = false,
     now,
     onselect,
     onanchor,
     onresolve,
     onreopen,
+    onwiden,
     onreply,
     onretry,
     oncopylink,
@@ -32,12 +35,15 @@
     selected?: boolean;
     canResolve?: boolean;
     canReply?: boolean;
+    /** Offer to share a team thread with the client. */
+    canWiden?: boolean;
     guest?: boolean;
     now: number;
     onselect?: () => void;
     onanchor?: () => void;
     onresolve?: () => Promise<void> | void;
     onreopen?: () => Promise<void> | void;
+    onwiden?: () => Promise<void> | void;
     onreply?: (input: ReplyInput) => Promise<boolean>;
     onretry?: () => void;
     oncopylink?: () => void;
@@ -47,6 +53,8 @@
   const quote = $derived(quoteOf(comment));
   const element = $derived(elementOf(comment));
   const resolved = $derived(comment.status === "resolved");
+  const label = $derived(threadLabel(comment));
+  const teamOnly = $derived(comment.scope === "team");
   let expanded = $state(false);
   let showAllReplies = $state(false);
   let replying = $state(false);
@@ -117,7 +125,7 @@
   class:selected
   class:pending={comment.pending}
   class:resolved={resolved && !expanded}
-  aria-label="#{comment.number} {comment.author.name}"
+  aria-label="#{label} {comment.author.name}"
 >
   {#if resolved && !expanded}
     <div class="collapsed">
@@ -137,13 +145,16 @@
         onselect?.();
       }
     }}>
-      {#if comment.status === "moved" || comment.status === "detached" || resolved}
+      {#if comment.status === "moved" || comment.status === "detached" || resolved || teamOnly}
         <div class="badges">
+          {#if teamOnly}
+            <Badge tone="outline"><Icon name="lock" size={12} />{t("comment.teamOnly")}</Badge>
+          {/if}
           {#if comment.status === "moved"}
             <Badge tone="accent"><Icon name="arrow-up-right" size={12} />{t("comment.moved")}</Badge>
           {:else if comment.status === "detached"}
             <Badge tone="warning"><Icon name="alert" size={12} />{t("comment.detachedBadge")}</Badge>
-          {:else}
+          {:else if resolved}
             <Badge tone="neutral"><Icon name="check" size={12} />{t("comment.resolvedBy")}</Badge>
           {/if}
           <span class="version">{t("comment.version", { n: comment.version })}</span>
@@ -151,7 +162,7 @@
       {/if}
       <div class="anchor">
         {@render anchor()}
-        <span class="number num">#{comment.number}</span>
+        <span class="number num">#{label}</span>
       </div>
       {#if comment.status === "detached"}
         <p class="note">{t("comment.detached", { n: comment.version })}</p>
@@ -163,6 +174,11 @@
         {@render byline(comment.author, comment.createdAt)}
         {#if !comment.pending && !comment.failed}
           <span class="tools">
+            {#if canWiden && teamOnly}
+              <button type="button" class="link-btn" disabled={busy} onclick={() => run(onwiden)}>
+                {t("comment.widen")}
+              </button>
+            {/if}
             {#if canResolve}
               {#if resolved}
                 <button type="button" class="link-btn" disabled={busy} onclick={() => run(onreopen)}>

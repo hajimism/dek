@@ -1,22 +1,24 @@
 // Comment threads: stored on the version they were opened on, shown on the one asked for, placed
-// again through the renames and the slide map of that version. Opening a thread takes its number
-// from the deck's own counter, the one write a comment makes to the deck.
+// again through the renames and the slide map of that version, to the side of the work that may
+// read them. Opening a thread takes its number from the deck's own counter for its scope, the one
+// write a comment makes to the deck; sharing a team thread takes the next shared number.
 
 import { decks, replies, threads } from "@schema";
 import type { Context } from "hono";
 import { and, asc, db, eq, inArray, sql } from "void/db";
-import type { CommentRow, NewComment } from "../../../../../src/pub/protocol.ts";
+import type { CommentRow, NewComment, ThreadScope } from "../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
 import { canSeeScript, mayReadVersion } from "../deck/access.ts";
+import type { GrantSide } from "../deck/grant/type.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
 import { findVersion, renamesOf } from "../deck/version/store.server.ts";
 import { peopleById } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
-import { canSeeThread } from "./access.ts";
+import { canSeeThread, scopeFor } from "./access.ts";
 import { placeComment, saysQuote } from "./anchor.ts";
 import { CommentTargets, type ThreadRow } from "./type.ts";
 import { hideQuotes } from "./view.ts";
@@ -38,7 +40,7 @@ async function listComments(
         ? and(eq(threads.deckId, deck.id), eq(threads.id, options.id))
         : eq(threads.deckId, deck.id),
     )
-    .orderBy(asc(threads.number))
+    .orderBy(asc(threads.createdAt), asc(threads.id))
     .all();
   const wanted = rows.filter((row) =>
     options.status === "all"
@@ -83,6 +85,7 @@ async function listComments(
     return {
       number: row.number,
       id: row.id,
+      scope: row.scope,
       slug: placed.slug,
       step: row.step,
       status: placed.status,
@@ -121,18 +124,19 @@ function author(
 }
 
 /**
- * A deck's comments as `person` reads them, placed on `version` (the current one when absent).
- * A quoted passage is part of the script, so someone the script is hidden from gets each comment
- * without it.
+ * A deck's comments as `person`, on `side`, reads them, placed on `version` (the current one when
+ * absent). A quoted passage is part of the script, so someone the script is hidden from gets each
+ * comment without it.
  */
 export async function commentsFor(
   c: Context,
   deck: Deck,
   person: Person | null,
+  side: GrantSide,
   options: { status: Status; version?: number | null },
 ): Promise<CommentRow[]> {
   const rows = (await listComments(c, deck, options)).filter((row) =>
-    canSeeThread(deck, { n: row.version }, person),
+    canSeeThread(deck, { n: row.version, scope: row.scope }, person, side),
   );
   return canSeeScript(deck, person) ? rows : rows.map(hideQuotes);
 }
@@ -142,10 +146,11 @@ export async function commentFor(
   c: Context,
   deck: Deck,
   person: Person | null,
+  side: GrantSide,
   id: string,
 ): Promise<CommentRow> {
   const [row] = await listComments(c, deck, { status: "all", id });
-  if (!row || !canSeeThread(deck, { n: row.version }, person)) {
+  if (!row || !canSeeThread(deck, { n: row.version, scope: row.scope }, person, side)) {
     throw notFound("comment");
   }
   return canSeeScript(deck, person) ? row : hideQuotes(row);
@@ -154,8 +159,10 @@ export async function commentFor(
 export async function openThread(
   deck: Deck,
   person: Person | null,
+  side: GrantSide,
   comment: NewComment,
 ): Promise<string> {
+  const scope = scopeFor(comment.scope, side);
   // The version the commenter was reading, which may be older than the current one by now;
   // the thread is kept on it, so the renames since are followed when it is shown.
   const n = comment.version ?? deck.currentVersion;
@@ -204,16 +211,12 @@ export async function openThread(
       );
     }
   }
-  const [counter] = await db
-    .update(decks)
-    .set({ nextThread: sql`${decks.nextThread} + 1` })
-    .where(eq(decks.id, deck.id))
-    .returning({ next: decks.nextThread });
   const id = newThreadId();
   await db.insert(threads).values({
     id,
     deckId: deck.id,
-    number: (counter?.next ?? 2) - 1,
+    number: await takeNumber(deck.id, scope),
+    scope,
     n,
     slug: comment.anchor.slug,
     step: comment.anchor.step,
@@ -225,10 +228,29 @@ export async function openThread(
   return id;
 }
 
-/** A thread `person` may see, to reply to or resolve; any other is as missing as one that is not. */
+/** The next number in the deck's count of threads of `scope`. */
+async function takeNumber(deckId: string, scope: ThreadScope): Promise<number> {
+  const column = scope === "team" ? decks.nextTeamThread : decks.nextThread;
+  const [counter] = await db
+    .update(decks)
+    .set(
+      scope === "team"
+        ? { nextTeamThread: sql`${column} + 1` }
+        : { nextThread: sql`${column} + 1` },
+    )
+    .where(eq(decks.id, deckId))
+    .returning({ next: column });
+  return (counter?.next ?? 2) - 1;
+}
+
+/**
+ * A thread `person`, on `side`, may see, to reply to, resolve or share; any other is as missing as
+ * one that is not.
+ */
 export async function visibleThread(
   deck: Deck,
   person: Person | null,
+  side: GrantSide,
   id: string,
 ): Promise<ThreadRow> {
   const thread = await db
@@ -236,7 +258,7 @@ export async function visibleThread(
     .from(threads)
     .where(and(eq(threads.deckId, deck.id), eq(threads.id, id)))
     .get();
-  if (!thread || !canSeeThread(deck, thread, person)) {
+  if (!thread || !canSeeThread(deck, thread, person, side)) {
     throw notFound("comment");
   }
   return thread;
@@ -257,6 +279,20 @@ export async function addReply(
     guestName: person ? null : (guestName ?? null),
   });
   return id;
+}
+
+/**
+ * Share a team thread with the client, under the next shared number, so the client's count of
+ * threads has no gap where it was. A shared thread is left as it is: none is ever narrowed.
+ */
+export async function widenThread(thread: ThreadRow): Promise<void> {
+  if (thread.scope === "shared") {
+    return;
+  }
+  await db
+    .update(threads)
+    .set({ scope: "shared", number: await takeNumber(thread.deckId, "shared") })
+    .where(eq(threads.id, thread.id));
 }
 
 export async function setResolved(

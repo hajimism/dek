@@ -48,10 +48,15 @@ export class CommentList {
   /** Open a thread; the row the server made, or null when it did not take it. */
   async create(body: NewComment, author: CommentRow["author"]): Promise<CommentRow | null> {
     const id = `tmp_${++this.#count}`;
-    const highest = this.rows.reduce((max, comment) => Math.max(max, comment.number), 0);
+    // The server numbers each scope on its own and decides one left out; this is a guess till then.
+    const scope = body.scope ?? "shared";
+    const highest = this.rows
+      .filter((comment) => comment.scope === scope)
+      .reduce((max, comment) => Math.max(max, comment.number), 0);
     this.rows.push({
       number: highest + 1,
       id,
+      scope,
       slug: body.anchor.slug,
       step: body.anchor.step,
       status: "open",
@@ -88,6 +93,17 @@ export class CommentList {
       );
       const current = this.rows.find((candidate) => candidate.id === comment.id) ?? comment;
       this.#replace({ ...current, thread: [...current.thread, answer] });
+      return true;
+    } catch (error) {
+      this.#failed(error);
+      return false;
+    }
+  }
+
+  /** Share a team thread with the client; it comes back under its shared number. */
+  async widen(comment: CardComment): Promise<boolean> {
+    try {
+      this.#replace(await api<CommentRow>(`${this.#path}/${comment.id}/widen`, { method: "POST" }));
       return true;
     } catch (error) {
       this.#failed(error);

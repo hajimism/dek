@@ -9,6 +9,7 @@ import {
   type DeckRules,
   mayReadVersion,
   shownVersion,
+  sideOf,
 } from "../../src/model/deck/access.ts";
 import { talkNamed, talkPath } from "../../src/model/deck/deck.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
@@ -18,7 +19,12 @@ import {
   readDeckMessage,
   withSlide,
 } from "../../src/model/deck/feature/talk/embed.ts";
-import { granteeOf, strongestRole, waitingGrants } from "../../src/model/deck/grant/grant.ts";
+import {
+  granteeOf,
+  strongestRole,
+  waitingGrants,
+  widestSide,
+} from "../../src/model/deck/grant/grant.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
 import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
@@ -62,6 +68,14 @@ describe("access", () => {
     expect(canComment(deck("link", "guests"), null, null)).toBe(true);
     expect(canComment(deck("public", "off"), other, null)).toBe(false);
     expect(canComment(deck("public", "off"), owner, null)).toBe(true);
+  });
+
+  it("puts the owner on the team's side, a grantee where the grant says, and anyone else with the client", () => {
+    expect(sideOf(deck("private"), owner, null)).toBe("team");
+    expect(sideOf(deck("private"), other, "team")).toBe("team");
+    expect(sideOf(deck("private"), other, "client")).toBe("client");
+    expect(sideOf(deck("public"), other, null)).toBe("client");
+    expect(sideOf(deck("public"), null, null)).toBe("client");
   });
 
   it("lets only the owner manage", () => {
@@ -308,6 +322,12 @@ describe("grants", () => {
     expect(strongestRole(["view", "comment"])).toBe("comment");
     expect(strongestRole(["view"])).toBe("view");
     expect(strongestRole([])).toBeNull();
+  });
+
+  it("counts the side that sees more", () => {
+    expect(widestSide(["client", "team"])).toBe("team");
+    expect(widestSide(["client"])).toBe("client");
+    expect(widestSide([])).toBeNull();
   });
 });
 
