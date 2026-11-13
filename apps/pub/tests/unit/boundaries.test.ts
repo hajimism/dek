@@ -12,8 +12,10 @@
 // - A model's own files never import a `feature/`, and a feature imports no other feature.
 // - `deck/serving/` is shared with the serve Worker, so it imports only itself and the protocol,
 //   and the serve Worker imports only it.
+// - Nothing a page sends to the browser imports zod, which would add 25 kB to it: no component,
+//   and nothing a component imports, other than with `import type`.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -128,8 +130,41 @@ function problems(): string[] {
   return found;
 }
 
+/** Each file the browser loads, by following what components import as values, that imports zod. */
+function zodInTheBrowser(): string[] {
+  const seen = new Set<string>();
+  const queue = [...sources("src"), ...sources("pages")].filter((file) =>
+    /\.svelte(\.ts)?$/.test(file),
+  );
+  const found: string[] = [];
+  while (queue.length > 0) {
+    const file = queue.pop() ?? "";
+    if (seen.has(file)) {
+      continue;
+    }
+    seen.add(file);
+    for (const { spec, typeOnly, target } of importsOf(file)) {
+      if (typeOnly) {
+        continue;
+      }
+      if (spec === "zod" || spec.startsWith("zod/")) {
+        found.push(`${relative(APP, file)} imports ${spec}, and a component reaches it`);
+      }
+      const path = target && !existsSync(target) ? `${target}.ts` : target;
+      if (path && existsSync(path) && !path.endsWith(".server.ts")) {
+        queue.push(path);
+      }
+    }
+  }
+  return found;
+}
+
 describe("import boundaries", () => {
   it("keep Void code, layers, models and features apart", () => {
     expect(problems()).toEqual([]);
+  });
+
+  it("keep zod out of what the browser loads", () => {
+    expect(zodInTheBrowser()).toEqual([]);
   });
 });
