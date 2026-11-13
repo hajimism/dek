@@ -20,7 +20,7 @@ bunx dekc pub login --server http://localhost:5173
 bunx dekc pub publish why-dek --server http://localhost:5173
 ```
 
-構成と決まりは `AGENTS.md` に、この作りにした理由はリポジトリのルートの `adr/0042-*` と `adr/0043-*` にあります。
+構成と決まりは `AGENTS.md` に、この作りにした理由はリポジトリのルートの `adr/0042-*` と `adr/0043-*` にあります。まだできていないことは `TODO.md` にまとめてあります。特にコメントまわりは、まだ作っている途中です。
 
 ## ライセンス
 

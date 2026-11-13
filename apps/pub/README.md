@@ -20,7 +20,7 @@ bunx dekc pub login --server http://localhost:5173
 bunx dekc pub publish why-dek --server http://localhost:5173
 ```
 
-See `AGENTS.md` for the layout and the rules, and `adr/0042-*` and `adr/0043-*` at the repository root for why it is built this way.
+See `AGENTS.md` for the layout and the rules, and `adr/0042-*` and `adr/0043-*` at the repository root for why it is built this way. `TODO.md` lists what it does not do yet; the comments in particular are still taking shape.
 
 ## License
 
