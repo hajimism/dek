@@ -6,6 +6,8 @@ Date: 2026-11-12
 
 Accepted
 
+Amended by [50. Organise dek.pub's code by the model a person deals with](0050-organise-dek-pub-s-code-by-the-model-a-person-deals-with.md)
+
 ## Context
 
 dek.pub needs server-rendered pages (the script article must reach search engines and link previews), a JSON API for the CLI, sign-in through GitHub with a device flow for the CLI, a relational store for decks, versions and comments, object storage for the built files, and, from phase 3, a room per presentation for live sync. The deck itself is its author's JavaScript, so it must be served from an origin that holds nothing: no cookie, no database, no other deck.
