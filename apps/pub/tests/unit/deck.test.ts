@@ -19,6 +19,7 @@ import {
   readDeckMessage,
   withSlide,
 } from "../../src/model/deck/feature/talk/embed.ts";
+import { readingSlug } from "../../src/model/deck/feature/talk/reading.ts";
 import {
   granteeOf,
   strongestRole,
@@ -231,6 +232,24 @@ describe("embed messages", () => {
       "http://d-x.localhost/v/1/?t=abc#intro",
     );
     expect(withSlide("http://d-x.localhost/v/1/#old", "new")).toBe("http://d-x.localhost/v/1/#new");
+  });
+});
+
+describe("the slide being read", () => {
+  const headings = [
+    { slug: "cover", top: -900 },
+    { slug: "plan", top: -40 },
+    { slug: "end", top: 600 },
+  ];
+
+  it("is the last heading at or above the reading line", () => {
+    expect(readingSlug(headings, 200)).toBe("plan");
+    expect(readingSlug(headings, 600)).toBe("end");
+  });
+
+  it("is none while the article is still below the line", () => {
+    expect(readingSlug([{ slug: "cover", top: 400 }], 200)).toBeNull();
+    expect(readingSlug([], 200)).toBeNull();
   });
 });
 

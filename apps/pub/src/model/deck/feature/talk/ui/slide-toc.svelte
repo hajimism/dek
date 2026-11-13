@@ -1,5 +1,7 @@
 <script lang="ts">
-  // The slides by their titles, the one on screen marked; a click moves the deck there.
+  // The slides by their titles, as links to their sections of the article, the one being read
+  // marked. A plain click hands the slide to `onslide`, which scrolls there; a link opened in a
+  // new tab, or copied, goes by its fragment.
   import { useApp } from "../../../../../shell/use-app.ts";
 
   let {
@@ -13,20 +15,28 @@
   } = $props();
 
   const { t } = useApp();
+
+  function follow(event: MouseEvent, slug: string) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    onslide(slug);
+  }
 </script>
 
 <nav class="toc" aria-label={t("side.slides")}>
   <ol>
     {#each slides as slide, i (slide.slug)}
       <li>
-        <button
-          type="button"
-          aria-current={slide.slug === current ? "true" : undefined}
-          onclick={() => onslide(slide.slug)}
+        <a
+          href="#{slide.slug}"
+          aria-current={slide.slug === current ? "location" : undefined}
+          onclick={(event) => follow(event, slide.slug)}
         >
           <span class="n num">{i + 1}</span>
           <span class="title">{slide.title || slide.slug}</span>
-        </button>
+        </a>
       </li>
     {/each}
   </ol>
@@ -40,26 +50,25 @@
     padding: 0;
     list-style: none;
   }
-  button {
+  a {
     display: flex;
     align-items: baseline;
     gap: var(--space-2);
     width: 100%;
     padding: 6px 8px;
-    border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-muted);
     font-size: var(--text-sm);
     line-height: var(--leading-ui);
     text-align: left;
-    cursor: pointer;
+    text-decoration: none;
   }
-  button:hover {
+  a:hover {
     background: var(--bg-subtle);
     color: var(--text);
   }
-  button[aria-current="true"] {
+  a[aria-current="location"] {
     background: var(--accent-subtle);
     color: var(--text);
     font-weight: var(--weight-medium);

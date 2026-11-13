@@ -19,19 +19,22 @@ const base = {
 };
 
 describe("SideColumn", () => {
-  it("lists the slides by title, marks the one on screen, and goes to the one clicked", async () => {
+  it("lists the slides by title as links into the article, and marks the one being read", async () => {
     const onslide = vi.fn();
     await renderPage(SideColumn, { ...base, review: null, onslide });
     const toc = page.getByRole("navigation", { name: "Slides" });
     await expect
-      .element(toc.getByRole("button", { name: "2 The plan" }))
-      .toHaveAttribute("aria-current", "true");
+      .element(toc.getByRole("link", { name: "2 The plan" }))
+      .toHaveAttribute("aria-current", "location");
     await expect
-      .element(toc.getByRole("button", { name: "1 Why dek" }))
+      .element(toc.getByRole("link", { name: "1 Why dek" }))
       .not.toHaveAttribute("aria-current");
     // A slide with no title goes by its slug.
-    await toc.getByRole("button", { name: "3 end" }).click();
+    const end = toc.getByRole("link", { name: "3 end" });
+    await expect.element(end).toHaveAttribute("href", "#end");
+    await end.click();
     expect(onslide).toHaveBeenCalledWith("end");
+    expect(location.hash).toBe("");
   });
 
   it("gives the talk's details", async () => {
