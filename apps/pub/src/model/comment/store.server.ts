@@ -10,7 +10,7 @@ import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
-import { canSeeScript } from "../deck/access.ts";
+import { canSeeScript, mayCommentOnVersion } from "../deck/access.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
 import { findVersion, renamesOf } from "../deck/version/store.server.ts";
@@ -156,8 +156,16 @@ export async function openThread(
   // The version the commenter was reading, which may be older than the current one by now;
   // the thread is kept on it, so the renames since are followed when it is shown.
   const n = comment.version ?? deck.currentVersion;
-  if (n !== null && n > (deck.latestVersion ?? 0)) {
+  if (n !== null && !mayCommentOnVersion(deck, person, n)) {
     throw new ApiError(422, "unknown_version", `the deck has no version ${n}`);
+  }
+  // Whether a passage is in the script is the script's to tell, so one it is hidden from may not
+  // quote it at all.
+  if (
+    !canSeeScript(deck, person) &&
+    comment.anchor.targets.some((target) => target.kind === "quote")
+  ) {
+    throw new ApiError(403, "script_hidden", "the script is not public, so it cannot be quoted");
   }
   const version = n === null ? null : await findVersion(deck.id, n);
   if (n === null || !version) {

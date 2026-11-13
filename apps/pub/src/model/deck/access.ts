@@ -82,3 +82,19 @@ export function mayReadVersion(
   }
   return n === deck.currentVersion;
 }
+
+/**
+ * Whether `person` may open a thread on version `n`: one they may read, or, for a reader, one
+ * that was current before a newer one was promoted while their page was open. A version held back
+ * is never one, so a reader learns nothing of its slides from what a comment on it is told.
+ */
+export function mayCommentOnVersion(
+  deck: Pick<DeckRules, "ownerId"> & Versions,
+  person: Caller,
+  n: number,
+): boolean {
+  if (mayReadVersion(deck, person, n)) {
+    return true;
+  }
+  return Number.isInteger(n) && n >= 1 && n <= (deck.currentVersion ?? 0);
+}

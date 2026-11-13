@@ -230,6 +230,50 @@ try {
     after,
   );
 
+  // A version held back with --no-promote is the owner's: a reader can neither read the comments
+  // placed on it nor open a thread on it, and so learns nothing of its slides.
+  const held = await dekc(["pub", "publish", "--no-promote", "-m", "held back"]);
+  check(
+    held.ok && held.n === 3 && held.current === 2,
+    "publish --no-promote holds version 3 back",
+    held,
+  );
+  const onHeld = await stranger.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "早見え", version: 3 },
+  });
+  check(
+    onHeld.status === 422 && (await onHeld.json()).error?.code === "unknown_version",
+    "a reader cannot open a thread on a version held back",
+  );
+  check(
+    (await stranger.fetch(`/api/decks/${id}/comments?status=all&version=3`)).status === 404,
+    "a reader cannot read comments placed on a version held back",
+  );
+  check(
+    (await author.fetch(`/api/decks/${id}/comments?status=all&version=3`)).status === 200,
+    "the owner reads comments placed on a version held back",
+  );
+
+  // A hidden script cannot be quoted, so a reader cannot test a guess at its words.
+  await dekc(["pub", "share", "--script", "hidden"]);
+  const guess = await stranger.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: {
+      anchor: {
+        slug: renamed,
+        step: "0",
+        targets: [{ kind: "quote", quote, prefix: "", suffix: "" }],
+      },
+      text: "推測",
+    },
+  });
+  check(
+    guess.status === 403 && (await guess.json()).error?.code === "script_hidden",
+    "a reader cannot quote a hidden script",
+  );
+  await dekc(["pub", "share", "--script", "shown"]);
+
   // Reply, then resolve them all from the CLI.
   const reply = await dekc(["pub", "comments", "reply", String(rows[0]?.number), "直しました"]);
   check(reply.ok, "dekc pub comments reply answers a thread", reply);

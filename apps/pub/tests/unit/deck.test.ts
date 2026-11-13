@@ -7,6 +7,7 @@ import {
   canSeeScript,
   canView,
   type DeckRules,
+  mayCommentOnVersion,
   mayReadVersion,
   shownVersion,
 } from "../../src/model/deck/access.ts";
@@ -231,6 +232,15 @@ describe("versions and the script, by who asks", () => {
     expect(mayReadVersion(deck, owner, 4)).toBe(false);
     expect(mayReadVersion(deck, owner, 0)).toBe(false);
     expect(mayReadVersion(deck, owner, Number.NaN)).toBe(false);
+  });
+
+  it("lets readers comment on the current version, or one current before it, never one held back", () => {
+    expect(mayCommentOnVersion(deck, other, 2)).toBe(true);
+    expect(mayCommentOnVersion(deck, other, 1)).toBe(true);
+    expect(mayCommentOnVersion(deck, other, 3)).toBe(false);
+    expect(mayCommentOnVersion(deck, null, 0)).toBe(false);
+    expect(mayCommentOnVersion(deck, owner, 3)).toBe(true);
+    expect(mayCommentOnVersion({ ...deck, currentVersion: null }, other, 1)).toBe(false);
   });
 
   it("shows the script to anyone once it is public, else to its owner", () => {
