@@ -114,6 +114,28 @@ describe("LikeButton", () => {
     await expect.element(button).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("bursts when a reader likes, and not for a like already there", async () => {
+    let likes = { count: 4, liked: true };
+    const rendered = await renderPage(LikeButton, { likes, canLike: true, onlike });
+    function onlike(liked: boolean) {
+      likes = { count: likes.count + (liked ? 1 : -1), liked };
+      rendered.rerender({ likes, canLike: true, onlike });
+    }
+    const button = page.getByRole("button", { name: "Like" });
+    await expect.element(button).toHaveAttribute("aria-pressed", "true");
+    expect(document.querySelector("[data-motion]")).toBeNull();
+    expect(document.querySelector(".burst")).toBeNull();
+
+    await button.click();
+    await expect.element(button).toHaveAttribute("data-motion", "unlike");
+    expect(document.querySelector(".burst")).toBeNull();
+
+    await button.click();
+    await expect.element(button).toHaveAttribute("data-motion", "like");
+    await expect.element(button).toHaveTextContent("4");
+    expect(document.querySelector(".burst")).not.toBeNull();
+  });
+
   it("sends a reader not signed in to sign in", async () => {
     await renderPage(
       LikeButton,
