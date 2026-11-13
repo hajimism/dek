@@ -345,7 +345,7 @@
   }
   .draft {
     margin-bottom: var(--space-3);
-    padding: var(--space-3);
+    padding: 12px 14px 14px;
     border: 1px solid var(--accent-border);
     border-radius: var(--radius-md);
     background: var(--surface);
@@ -359,7 +359,7 @@
     font-weight: var(--weight-semibold);
   }
   .draft-quote {
-    margin-bottom: var(--space-3);
+    margin-bottom: 10px;
     padding-left: 10px;
     border-left: 2px solid var(--highlight-underline);
     color: var(--text-muted);
@@ -371,17 +371,16 @@
     overflow: hidden;
   }
   .draft-chip {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: var(--space-3);
-    padding: 3px 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xs);
-    background: var(--bg-subtle);
-    color: var(--text-muted);
+    margin-bottom: 10px;
+    color: var(--text-faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .empty {
     display: flex;

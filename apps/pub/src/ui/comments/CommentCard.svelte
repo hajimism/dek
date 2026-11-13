@@ -85,26 +85,37 @@
 
 {#snippet anchor()}
   {#if quote && !quote.quote}
-    <button type="button" class="chip" onclick={onanchor}>
+    <button type="button" class="context" onclick={onanchor}>
       <Icon name="message" size={12} />
-      {slideNumber !== null ? `${t("talk.slideLabel", { n: slideNumber })} · ` : ""}{t("comment.quotedScript")}
+      <span class="context-text">
+        {slideNumber !== null ? `${t("talk.slideLabel", { n: slideNumber })} · ` : ""}{t("comment.quotedScript")}
+      </span>
     </button>
   {:else if quote}
     <button type="button" class="quote" class:gone={comment.status === "detached"} onclick={onanchor}>
       <span class="quote-text">{quote.quote}</span>
     </button>
   {:else}
-    <button type="button" class="chip" onclick={onanchor}>
+    <button type="button" class="context" onclick={onanchor}>
       <Icon name={element ? "crosshair" : "image"} size={12} />
-      {#if slideNumber !== null}
-        {element
-          ? t("comment.slideChip", { n: slideNumber, name: element.text || element.name })
-          : t("talk.slideLabel", { n: slideNumber })}
-      {:else}
-        {comment.slug}
-      {/if}
+      <span class="context-text">
+        {#if slideNumber !== null}
+          {element
+            ? t("comment.slideChip", { n: slideNumber, name: element.text || element.name })
+            : t("talk.slideLabel", { n: slideNumber })}
+        {:else}
+          {comment.slug}
+        {/if}
+      </span>
     </button>
   {/if}
+{/snippet}
+
+{#snippet byline(author: { name: string; guest: boolean }, iso: string)}
+  <Avatar name={author.name} size={20} guest={author.guest} />
+  <span class="name">{author.name}</span>
+  {#if author.guest}<Badge tone="outline">{t("comment.guestBadge")}</Badge>{/if}
+  <span class="time">{@render when(iso)}</span>
 {/snippet}
 
 <article
@@ -145,7 +156,10 @@
           <span class="version">{t("comment.version", { n: comment.version })}</span>
         </div>
       {/if}
-      {@render anchor()}
+      <div class="anchor">
+        {@render anchor()}
+        <span class="number num">#{comment.number}</span>
+      </div>
       {#if comment.status === "detached"}
         <p class="note">{t("comment.detached", { n: comment.version })}</p>
       {:else if comment.status === "moved"}
@@ -153,10 +167,32 @@
       {/if}
 
       <header class="head">
-        <Avatar name={comment.author.name} size={20} guest={comment.author.guest} />
-        <span class="name">{comment.author.name}</span>
-        {#if comment.author.guest}<Badge tone="outline">{t("comment.guestBadge")}</Badge>{/if}
-        <span class="meta"><span class="number">#{comment.number}</span> · {@render when(comment.createdAt)}</span>
+        {@render byline(comment.author, comment.createdAt)}
+        {#if !comment.pending && !comment.failed}
+          <span class="tools">
+            {#if canResolve}
+              {#if resolved}
+                <button type="button" class="link-btn" disabled={busy} onclick={() => run(onreopen)}>
+                  {t("comment.reopen")}
+                </button>
+              {:else}
+                <button
+                  type="button"
+                  class="tool"
+                  aria-label={t("comment.resolve")}
+                  title={t("comment.resolve")}
+                  disabled={busy}
+                  onclick={() => run(onresolve)}
+                >
+                  <Icon name="check" size={14} />
+                </button>
+              {/if}
+            {/if}
+            <button type="button" class="tool" aria-label={t("comment.copyLink")} title={t("comment.copyLink")} onclick={oncopylink}>
+              <Icon name="link" size={14} />
+            </button>
+          </span>
+        {/if}
       </header>
       <p class="body">{comment.text}</p>
 
@@ -170,80 +206,63 @@
       {#if comment.thread.length > 0}
         <ol class="replies">
           {#if collapsedReplies > 0}
-            <li>
-              <button type="button" class="link-btn more" onclick={() => (showAllReplies = true)}>
+            <li class="more">
+              <button type="button" class="link-btn" onclick={() => (showAllReplies = true)}>
                 {t("comment.moreReplies", { n: collapsedReplies })}
               </button>
             </li>
           {/if}
           {#each shownReplies as reply (reply.id)}
             <li class="reply">
-              <header class="head">
-                <Avatar name={reply.author.name} size={20} guest={reply.author.guest} />
-                <span class="name">{reply.author.name}</span>
-                {#if reply.author.guest}<Badge tone="outline">{t("comment.guestBadge")}</Badge>{/if}
-                <span class="meta">{@render when(reply.createdAt)}</span>
-              </header>
+              <header class="head">{@render byline(reply.author, reply.createdAt)}</header>
               <p class="body">{reply.text}</p>
             </li>
           {/each}
         </ol>
       {/if}
-
-      {#if !comment.pending && !comment.failed}
-        {#if replying && onreply}
-          <div class="reply-box">
-            <Composer
-              compact
-              {guest}
-              placeholder={t("comment.replyPlaceholder")}
-              submitLabel={t("comment.reply")}
-              autofocus
-              oncancel={() => (replying = false)}
-              onsubmit={async (input) => {
-                const ok = await onreply(input);
-                if (ok) {
-                  replying = false;
-                }
-                return ok;
-              }}
-            />
-          </div>
-        {:else}
-          <footer class="actions">
-            {#if canReply}
-              <button type="button" class="action" onclick={() => (replying = true)}>
-                <Icon name="reply" size={14} />{t("comment.reply")}
-              </button>
-            {/if}
-            {#if canResolve}
-              {#if resolved}
-                <button type="button" class="action" disabled={busy} onclick={() => run(onreopen)}>
-                  {t("comment.reopen")}
-                </button>
-              {:else}
-                <button type="button" class="action" disabled={busy} onclick={() => run(onresolve)}>
-                  <Icon name="check" size={14} />{t("comment.resolve")}
-                </button>
-              {/if}
-            {/if}
-            <button type="button" class="action icon" aria-label={t("comment.copyLink")} title={t("comment.copyLink")} onclick={oncopylink}>
-              <Icon name="link" size={14} />
-            </button>
-          </footer>
-        {/if}
-      {/if}
     </div>
+
+    {#if !comment.pending && !comment.failed && canReply}
+      <footer class="reply-row">
+        {#if replying && onreply}
+          <Composer
+            compact
+            {guest}
+            placeholder={t("comment.replyPlaceholder")}
+            submitLabel={t("comment.reply")}
+            autofocus
+            oncancel={() => (replying = false)}
+            onsubmit={async (input) => {
+              const ok = await onreply(input);
+              if (ok) {
+                replying = false;
+              }
+              return ok;
+            }}
+          />
+        {:else}
+          <button type="button" class="reply-open" aria-label={t("comment.reply")} onclick={() => (replying = true)}>
+            {t("comment.replyPlaceholder")}
+          </button>
+        {/if}
+      </footer>
+    {/if}
   {/if}
 </article>
 
 <style>
+  /* After Linear's threads: one quiet surface, the context above it, each message indented under
+     its author, the actions out of sight until the card is in hand, and the reply as a field. */
   .card {
+    --pad: 14px;
+    --indent: 28px;
     position: relative;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--surface);
+    box-shadow: var(--shadow-sm);
     font-size: var(--text-md);
+    overflow: clip;
     transition:
       border-color var(--dur-instant) var(--ease-out),
       box-shadow var(--dur-base) var(--ease-out),
@@ -266,7 +285,7 @@
     opacity: 0.6;
   }
   .main {
-    padding: var(--space-3);
+    padding: 12px var(--pad) var(--pad);
   }
   .badges {
     display: flex;
@@ -279,16 +298,53 @@
     font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
   }
+
+  .anchor {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-bottom: 10px;
+  }
+  .number {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+    line-height: 18px;
+  }
+  .context {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+  }
+  .context-text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .context:hover {
+    color: var(--text);
+  }
   .quote {
     display: block;
-    width: 100%;
-    margin: 0 0 var(--space-2);
+    flex: 1;
+    min-width: 0;
     padding: 0 0 0 10px;
     border: 0;
     border-left: 2px solid var(--highlight-underline);
     background: transparent;
     color: var(--text-muted);
     font-size: var(--text-sm);
+    line-height: var(--leading-snug);
     text-align: left;
     cursor: pointer;
   }
@@ -306,120 +362,113 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 100%;
-    height: 24px;
-    margin: 0 0 var(--space-2);
-    padding: 0 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xs);
-    background: var(--bg-subtle);
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-medium);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-  }
-  .chip:hover {
-    color: var(--text);
-    border-color: var(--border-hover);
-  }
   .note {
-    margin: -2px 0 var(--space-2);
+    margin: -4px 0 10px;
     color: var(--warning);
     font-size: var(--text-xs);
   }
+
   .head {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
+    min-height: 24px;
   }
   .name {
-    font-weight: var(--weight-medium);
+    min-width: 0;
     color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .meta {
-    margin-left: auto;
+  .time {
+    flex-shrink: 0;
     color: var(--text-faint);
     font-size: var(--text-xs);
     white-space: nowrap;
   }
-  .number {
-    font-variant-numeric: tabular-nums;
+  /* With a pointer, the actions float over the end of the row while the card is in hand, so a
+     long name keeps its room; on touch they stay in the row. */
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 -6px 0 auto;
+  }
+  @media (pointer: fine) {
+    .tools {
+      position: absolute;
+      top: 50%;
+      right: 0;
+      padding-left: var(--space-2);
+      background: linear-gradient(to right, transparent, var(--surface) var(--space-2));
+      opacity: 0;
+      transform: translateY(-50%);
+      transition: opacity var(--dur-fast) var(--ease-out);
+    }
+    .card:hover .tools,
+    .card:focus-within .tools,
+    .card.selected .tools {
+      opacity: 1;
+    }
+  }
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+  }
+  .tool:hover:not(:disabled) {
+    background: var(--bg-subtle);
+    color: var(--text);
+  }
+  .tool:disabled {
+    opacity: 0.5;
+    cursor: progress;
   }
   .body {
-    margin-top: 6px;
+    margin: 2px 0 0 var(--indent);
     color: var(--text);
+    line-height: var(--leading-ui);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
   :global(:lang(ja)) .body {
     line-height: 1.7;
   }
+
   .replies {
-    margin: var(--space-3) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin: var(--space-4) 0 0;
     padding: 0;
     list-style: none;
   }
-  .replies > li {
-    padding-top: var(--space-3);
-    margin-top: var(--space-3);
-    border-top: 1px solid var(--border);
+  .more {
+    padding-left: var(--indent);
+    font-size: var(--text-xs);
   }
-  .replies > li:first-child {
-    margin-top: 0;
+  .more .link-btn {
+    font-size: inherit;
   }
-  .actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    margin: var(--space-2) calc(-1 * var(--space-2)) calc(-1 * var(--space-1));
-  }
-  .action {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 8px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    cursor: pointer;
-  }
-  .action.icon {
-    margin-left: auto;
-    width: 28px;
-    padding: 0;
-    justify-content: center;
-  }
-  .action:hover:not(:disabled) {
-    background: var(--bg-subtle);
-    color: var(--text);
-  }
-  .action:disabled {
-    opacity: 0.5;
-    cursor: progress;
-  }
-  .reply-box {
-    margin-top: var(--space-3);
-  }
+
   .failed {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: var(--space-2);
+    margin: var(--space-2) 0 0 var(--indent);
     color: var(--danger);
     font-size: var(--text-sm);
   }
@@ -435,19 +484,51 @@
   .link-btn:hover {
     text-decoration: underline;
   }
-  .more {
+  .head .link-btn {
+    margin-right: 6px;
     font-size: var(--text-xs);
   }
+
+  .reply-row {
+    border-top: 1px solid var(--border);
+  }
+  .reply-row:has(.reply-open) {
+    padding: 0;
+  }
+  .reply-row:not(:has(.reply-open)) {
+    padding: var(--space-3) var(--pad) var(--pad);
+  }
+  .reply-open {
+    display: block;
+    width: 100%;
+    padding: 10px var(--pad);
+    border: 0;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: text;
+    transition: background-color var(--dur-instant) var(--ease-out);
+  }
+  .reply-open:hover {
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+  }
+  .reply-open:focus-visible {
+    outline-offset: calc(-1 * var(--focus-width));
+  }
+
   .collapsed {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     min-height: 40px;
-    padding: 0 var(--space-3);
+    padding: 0 var(--pad);
     color: var(--text-muted);
     font-size: var(--text-sm);
   }
   .collapsed > :global(svg) {
+    flex-shrink: 0;
     color: var(--success);
   }
   .collapsed-text {
@@ -473,5 +554,6 @@
   }
   .card.resolved {
     background: var(--bg-subtle);
+    box-shadow: none;
   }
 </style>
