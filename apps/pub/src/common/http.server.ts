@@ -1,21 +1,12 @@
 // How the API answers: JSON, and every error as protocol ErrorBody with a stable code.
 
 import type { Context } from "hono";
+import { env } from "void/env";
 import type { z } from "zod";
 import { type ErrorBody, PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
+import { ApiError } from "./api-error.ts";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-
-export class ApiError extends Error {
-  constructor(
-    readonly status: 400 | 401 | 403 | 404 | 409 | 411 | 413 | 415 | 422 | 429,
-    readonly code: string,
-    message: string,
-    readonly hint?: string,
-  ) {
-    super(message);
-  }
-}
 
 function errorResponse(error: ApiError): Response {
   const body: ErrorBody = {
@@ -87,5 +78,7 @@ export async function jsonBody<T extends z.ZodType>(c: Context, schema: T): Prom
   return parsed.data;
 }
 
-export const notFound = (what = "deck"): ApiError =>
-  new ApiError(404, "not_found", `no such ${what}, or it is not yours to see`);
+/** A path of the app as an absolute URL, for the CLI, feeds and link previews. */
+export function appUrl(path: string): string {
+  return `${env.APP_ORIGIN}${path}`;
+}

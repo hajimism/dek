@@ -1,11 +1,13 @@
 <script lang="ts">
+  
   import { auth } from "void/client";
-  import type { Theme } from "../../../middleware/01.shared.ts";
   import Icon from "../../common/ui/icon.svelte";
   import Menu from "../../common/ui/menu.svelte";
+import { profilePath } from "../../model/person/profile-path.ts";
   import Avatar from "../../model/person/ui/avatar.svelte";
   import { followLang } from "../lang-link.ts";
   import { applyTheme } from "../theme.ts";
+  import type { Theme } from "../type.ts";
   import { useApp } from "../use-app.ts";
 
   const { shared, lang, t } = useApp();
@@ -76,7 +78,7 @@
               {t("nav.signedInAs")}<br /><strong class="who">@{viewer.handle}</strong>
             </div>
             <hr />
-            <a role="menuitem" href="/@{viewer.handle}"><Icon name="user" />{t("nav.profile")}</a>
+            <a role="menuitem" href={profilePath(viewer.handle)}><Icon name="user" />{t("nav.profile")}</a>
             <button type="button" role="menuitem" onclick={signOut}><Icon name="signout" />{t("nav.signout")}</button>
           {/snippet}
         </Menu>

@@ -2,7 +2,7 @@
 // a machine with no network to Cloudflare, such as a test run; the deployed app has a real one.
 
 import { env } from "void/env";
-import { ApiError } from "../../common/http.server.ts";
+import { ApiError } from "../../common/api-error.ts";
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 

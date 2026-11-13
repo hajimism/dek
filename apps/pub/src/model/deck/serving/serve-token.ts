@@ -2,17 +2,7 @@
 // public, or the speaker's full build. A token names one deck, one version, one build and an
 // expiry, and is good for minutes: it rides in an iframe's URL, which can end up in a history.
 
-export type Variant = "full" | "public" | "bare";
-
-export type ServeClaims = {
-  deck: string;
-  n: number;
-  variant: Variant;
-  /** Expiry, in seconds since the epoch. */
-  exp: number;
-};
-
-const VARIANTS: readonly string[] = ["full", "public", "bare"];
+import { ServeClaims } from "./type.ts";
 
 export async function signServeToken(secret: string, claims: ServeClaims): Promise<string> {
   const payload = base64url(new TextEncoder().encode(JSON.stringify(claims)));
@@ -38,30 +28,14 @@ export async function verifyServeToken(
   if (!bytes) {
     return null;
   }
-  let claims: unknown;
+  let json: unknown;
   try {
-    claims = JSON.parse(new TextDecoder().decode(bytes));
+    json = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     return null;
   }
-  if (!isClaims(claims) || claims.exp <= nowSeconds) {
-    return null;
-  }
-  return claims;
-}
-
-function isClaims(value: unknown): value is ServeClaims {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const claims = value as Record<string, unknown>;
-  return (
-    typeof claims.deck === "string" &&
-    Number.isInteger(claims.n) &&
-    typeof claims.variant === "string" &&
-    VARIANTS.includes(claims.variant) &&
-    Number.isInteger(claims.exp)
-  );
+  const claims = ServeClaims.safeParse(json);
+  return claims.success && claims.data.exp > nowSeconds ? claims.data : null;
 }
 
 async function hmac(secret: string, data: string): Promise<Uint8Array> {

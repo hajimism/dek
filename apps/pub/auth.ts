@@ -6,7 +6,7 @@ import { apiKey } from "@better-auth/api-key";
 import { bearer, deviceAuthorization } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
-import { API_KEY_PREFIX } from "./src/model/person/feature/connect-cli/keys.ts";
+import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
 import { handleFromEmail, normalizeHandle } from "./src/model/person/handle.ts";
 
 export default defineAuth(({ defaults, env }) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
-import type { ArticleSlide } from "../../src/model/deck/feature/talk/load.server.ts";
+import type { ArticleSlide } from "../../src/model/deck/feature/talk/type.ts";
 import Article from "../../src/model/deck/feature/talk/ui/article.svelte";
 import { renderPage } from "./setup.ts";
 

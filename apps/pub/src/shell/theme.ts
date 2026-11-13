@@ -1,6 +1,6 @@
 // The reader's theme, kept in a cookie so the server renders the right one on the first paint.
 
-import type { Theme } from "../../middleware/01.shared.ts";
+import type { Theme } from "./type.ts";
 
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;

@@ -19,7 +19,7 @@
 </script>
 
 <script lang="ts">
-  import type { ReplyInput } from "./comment-card.svelte";
+  import type { ReplyInput } from "../type.ts";
   import { useApp } from "../../../shell/use-app.ts";
   import Button from "../../../common/ui/button.svelte";
   import Turnstile from "./turnstile.svelte";

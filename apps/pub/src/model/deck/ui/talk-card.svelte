@@ -1,15 +1,17 @@
 <script lang="ts">
+  
   import { formatDate, guessLang, slideCount } from "../../../common/i18n.ts";
   import Icon from "../../../common/ui/icon.svelte";
   import { useApp } from "../../../shell/use-app.ts";
   import Avatar from "../../person/ui/avatar.svelte";
-  import type { TalkCard } from "../feature/talk/load.server.ts";
+import { talkPath } from "../deck.ts";
+  import type { TalkCard } from "../type.ts";
 
   let { card, showOwner = true }: { card: TalkCard; showOwner?: boolean } = $props();
   const { lang } = useApp();
 </script>
 
-<a class="card" href="/@{card.owner.handle}/{card.slug}">
+<a class="card" href={talkPath(card.owner.handle, card.slug)}>
   <span class="thumb">
     {#if card.picture}
       <img src={card.picture} alt="" loading="lazy" decoding="async" width="1280" height="720" />

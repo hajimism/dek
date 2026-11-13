@@ -22,11 +22,3 @@ export function versionKey(deckId: string, n: number, file: string): string {
 export function accessKey(deckId: string): string {
   return `decks/${deckId}/access.json`;
 }
-
-/** What the serve Worker may hand out without a token: a public deck's current version. */
-export type DeckAccess = {
-  visibility: "private" | "link" | "public";
-  scriptPublic: boolean;
-  embed: boolean;
-  current: number | null;
-};

@@ -4,7 +4,8 @@
   import { useApp } from "../src/shell/use-app.ts";
   import Avatar from "../src/model/person/ui/avatar.svelte";
   import Button from "../src/common/ui/button.svelte";
-  import { decide, type DeviceProblem, lookUp } from "../src/model/person/feature/connect-cli/device-api.ts";
+  import { decide, lookUp } from "../src/model/person/feature/connect-cli/device-api.ts";
+  import type { DeviceProblem } from "../src/model/person/feature/connect-cli/type.ts";
   import DeviceCodeInput from "../src/model/person/feature/connect-cli/ui/device-code-input.svelte";
   import Icon from "../src/common/ui/icon.svelte";
   import type { Props } from "./device.server";

@@ -3,24 +3,8 @@
 // first render sets, so changing either reloads the document.
 
 import { defineMiddleware } from "void";
-import { getUser } from "void/auth";
-import { env } from "void/env";
-import { getCookie, setCookie } from "hono/cookie";
-import { type Lang, pickLang } from "../src/common/i18n.ts";
-
-export type Theme = "system" | "light" | "dark";
-
-export type Viewer = { id: string; handle: string; name: string; image: string | null };
-
-export type Shared = {
-  viewer: Viewer | null;
-  lang: Lang;
-  theme: Theme;
-  devLogin: boolean;
-  turnstileSiteKey: string;
-  /** The time the page was made, so relative times render the same on the server and in the browser. */
-  now: number;
-};
+import { sharedOf } from "../src/shell/shared.server.ts";
+import type { Shared } from "../src/shell/type.ts";
 
 declare module "void" {
   interface CloudContextVariables {
@@ -29,8 +13,6 @@ declare module "void" {
     pageStatus?: 404;
   }
 }
-
-const YEAR = 60 * 60 * 24 * 365;
 
 /** The wordmark's slide, as a 32px icon: an ink-blue frame on paper. */
 const FAVICON = `data:image/svg+xml,${encodeURIComponent(
@@ -42,25 +24,9 @@ export default defineMiddleware(async (c, next) => {
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/i/")) {
     return next();
   }
-  const asked = url.searchParams.get("lang");
-  const lang = pickLang(asked, getCookie(c, "lang"), c.req.header("accept-language"));
-  if (asked === lang) {
-    setCookie(c, "lang", lang, { path: "/", maxAge: YEAR, sameSite: "Lax" });
-  }
-  const themeCookie = getCookie(c, "theme");
-  const theme: Theme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : "system";
-  const user = getUser() as (ReturnType<typeof getUser> & { handle?: string | null }) | null;
-
-  c.set("shared", {
-    viewer: user
-      ? { id: user.id, handle: user.handle ?? user.id, name: user.name, image: user.image ?? null }
-      : null,
-    lang,
-    theme,
-    devLogin: env.DEK_PUB_DEV_LOGIN === "1",
-    turnstileSiteKey: env.TURNSTILE_SITE_KEY,
-    now: Date.now(),
-  });
+  const shared = sharedOf(c);
+  const { lang, theme } = shared;
+  c.set("shared", shared);
   c.set("headDefaults", {
     meta: [
       { charset: "utf-8" },

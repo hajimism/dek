@@ -1,11 +1,7 @@
 // The device flow's three calls, from the /device page, to Better Auth's endpoints. Looking a code
 // up while signed in claims it for this account, which approving or denying it then requires.
 
-export type DeviceProblem = "invalid" | "expired" | "used" | "offline";
-
-export type DeviceLookup =
-  | { ok: true; scope: string | null }
-  | { ok: false; problem: DeviceProblem };
+import type { DeviceLookup, DeviceProblem } from "./type.ts";
 
 const DEADLINE_MS = 15_000;
 

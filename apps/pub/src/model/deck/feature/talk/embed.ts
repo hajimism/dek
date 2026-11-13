@@ -3,42 +3,7 @@
 // shows it as it is, with nothing to steer. Everything that arrives is checked here, field by
 // field, because the deck runs its author's code.
 
-export type Box = { x: number; y: number; width: number; height: number };
-export type Size = { width: number; height: number };
-
-export type Position = { slug: string; step: string; index: number };
-
-export type ReadySlide = { slug: string; steps: string[] };
-
-export type PickedElement = {
-  kind: "element";
-  path: string;
-  name: string;
-  text: string;
-  box: Box;
-};
-
-export type DeckMessage =
-  | {
-      type: "dek:ready";
-      protocol: number;
-      deck: string;
-      size: Size;
-      slides: ReadySlide[];
-      current: Position;
-    }
-  | ({ type: "dek:moved" } & Position)
-  | { type: "dek:picked"; slug: string; step: string; target: PickedElement }
-  | { type: "dek:pick-cancel" }
-  | { type: "dek:mark"; id: string };
-
-export type Mark = { id: string; number: number; slug: string; step: string; box: Box };
-
-export type PageMessage =
-  | { type: "dek:goto"; slug: string; step?: string }
-  | { type: "dek:current" }
-  | { type: "dek:pick"; on: boolean }
-  | { type: "dek:marks"; marks: Mark[] };
+import type { Box, DeckMessage, Position, ReadySlide, Size } from "./type.ts";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

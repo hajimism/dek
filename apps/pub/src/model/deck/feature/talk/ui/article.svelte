@@ -1,8 +1,4 @@
 <script lang="ts" module>
-  import type { Quote } from "../../../../comment/quote.ts";
-
-  export type QuoteSelection = { slug: string; quote: Quote };
-
   /** How many characters of `container`'s text come before (`node`, `offset`). */
   export function textOffset(container: Node, node: Node, offset: number): number {
     const range = document.createRange();
@@ -15,9 +11,9 @@
 <script lang="ts">
   import type { CommentRow } from "../../../../../../../../src/pub/protocol.ts";
   import { elementOf, paragraphMarks } from "../../../../comment/view.ts";
-  import { boxToPercent, type Size } from "../embed.ts";
+  import { boxToPercent } from "../embed.ts";
   import { quoteAt, segments } from "../../../../comment/quote.ts";
-  import type { ArticleSlide } from "../load.server.ts";
+  import type { ArticleSlide, QuoteSelection, Size } from "../type.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import SlideZoom from "./slide-zoom.svelte";

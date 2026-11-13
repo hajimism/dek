@@ -6,7 +6,7 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
-  import type { GrantView } from "../../talk/load.server.ts";
+  import type { GrantView } from "../../../grant/type.ts";
 
   let { deckId, initial }: { deckId: string; initial: GrantView[] } = $props();
   const { t } = useApp();

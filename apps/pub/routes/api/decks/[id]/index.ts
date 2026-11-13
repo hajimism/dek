@@ -1,33 +1,20 @@
-import { decks } from "@schema";
 import { defineHandler } from "void";
-import { db, eq, sql } from "void/db";
 import { ShareRequest } from "../../../../../../src/pub/protocol.ts";
-import { requirePerson } from "../../../../src/model/person/feature/auth/actor.server.ts";
-import { deckById, deckStatus, ownedDeck, writeAccess } from "../../../../src/model/deck/store.server.ts";
 import { api, jsonBody } from "../../../../src/common/http.server.ts";
+import { deckStatus, ownedDeck, updateDeck } from "../../../../src/model/deck/store.server.ts";
+import { requirePerson } from "../../../../src/model/person/actor.server.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {
-    const person = await requirePerson(c);
-    return deckStatus(c, await ownedDeck(c.req.param("id") ?? "", person));
+    const deck = await ownedDeck(c.req.param("id") ?? "", await requirePerson(c));
+    return deckStatus(c, deck);
   }, c.req.raw),
 );
 
 /** Change who may see the deck, its script, embedding, and comments. */
 export const PATCH = defineHandler((c) =>
   api(async () => {
-    const person = await requirePerson(c);
-    const deck = await ownedDeck(c.req.param("id") ?? "", person);
-    const body = await jsonBody(c, ShareRequest);
-    await db
-      .update(decks)
-      .set({ ...body, updatedAt: sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))` })
-      .where(eq(decks.id, deck.id));
-    const updated = await deckById(deck.id);
-    if (!updated) {
-      throw new Error("the deck just updated is not there");
-    }
-    await writeAccess(updated.id);
-    return deckStatus(c, updated);
+    const deck = await ownedDeck(c.req.param("id") ?? "", await requirePerson(c));
+    return deckStatus(c, await updateDeck(deck, await jsonBody(c, ShareRequest)));
   }, c.req.raw),
 );

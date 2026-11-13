@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { talkPath } from "../src/model/deck/deck.ts";
+  import { profilePath } from "../src/model/person/profile-path.ts";
   import { useApp } from "../src/shell/use-app.ts";
   import Button from "../src/common/ui/button.svelte";
   import CopyField from "../src/common/ui/copy-field.svelte";
@@ -22,18 +24,18 @@
     </div>
     <div class="ctas">
       {#if shared.viewer}
-        <Button variant="primary" size="lg" href="/@{shared.viewer.handle}" iconAfter="chevron-right">{t("landing.ctaProfile")}</Button>
+        <Button variant="primary" size="lg" href={profilePath(shared.viewer.handle)} iconAfter="chevron-right">{t("landing.ctaProfile")}</Button>
       {:else}
         <Button variant="neutral" size="lg" icon="github" href="/signin">{t("landing.ctaSignin")}</Button>
       {/if}
       {#if sample}
-        <Button variant="secondary" size="lg" href="/@{sample.owner.handle}/{sample.slug}">{t("landing.ctaSample")}</Button>
+        <Button variant="secondary" size="lg" href={talkPath(sample.owner.handle, sample.slug)}>{t("landing.ctaSample")}</Button>
       {/if}
     </div>
   </section>
 
   {#if sample?.picture}
-    <a class="showcase" href="/@{sample.owner.handle}/{sample.slug}" aria-label={sample.title}>
+    <a class="showcase" href={talkPath(sample.owner.handle, sample.slug)} aria-label={sample.title}>
       <span class="chrome" aria-hidden="true"><span></span><span></span><span></span></span>
       <img src={sample.picture} alt="" width="1280" height="720" />
       <span class="showcase-caption">

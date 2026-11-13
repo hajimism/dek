@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { useApp } from "../../shell/use-app.ts";
+  
   import Icon from "./icon.svelte";
   import { dismiss, pause, resume, toasts } from "./toast.svelte.ts";
+import { useI18n } from "./use-i18n.ts";
 
-  const { t } = useApp();
+  const { t } = useI18n();
 </script>
 
 <div class="region" aria-live="polite">

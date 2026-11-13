@@ -1,4 +1,5 @@
 <script lang="ts">
+  
   import { untrack } from "svelte";
   import type { CommentPolicy, DeckStatus, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
   import { guessLang } from "../../../../../common/i18n.ts";
@@ -11,8 +12,9 @@
   import Switch from "../../../../../common/ui/switch.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
+import { talkPath } from "../../../deck.ts";
+  import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
-  import type { GrantView } from "../../talk/load.server.ts";
   import Sharing from "./sharing.svelte";
   import Versions from "./versions.svelte";
 
@@ -24,7 +26,7 @@
   let confirmPublic = $state(false);
   let visibilityControl: ReturnType<typeof SegmentedControl> | undefined = $state();
   let active = $state("overview");
-  const talkPath = $derived(`/@${status.owner}/${status.slug}`);
+  const path = $derived(talkPath(status.owner, status.slug));
 
   const sections = [
     { id: "overview", label: "manage.overview" },
@@ -101,7 +103,7 @@
 
 <div class="page">
   <header class="top">
-    <a class="back" href={talkPath}><Icon name="arrow-left" size={14} />{t("manage.back")}</a>
+    <a class="back" href={path}><Icon name="arrow-left" size={14} />{t("manage.back")}</a>
     <h1 lang={guessLang([status.title], lang) ?? undefined}>{status.title}</h1>
   </header>
 
@@ -127,7 +129,7 @@
           <p class="label" id="url-label">{t("manage.url")}</p>
           <div class="url-row">
             <CopyField value={status.url} label={t("manage.url")} />
-            <Button variant="secondary" href={talkPath} iconAfter="arrow-up-right">{t("manage.openTalk")}</Button>
+            <Button variant="secondary" href={path} iconAfter="arrow-up-right">{t("manage.openTalk")}</Button>
           </div>
         </div>
       </section>

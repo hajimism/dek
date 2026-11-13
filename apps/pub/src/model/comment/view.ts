@@ -3,8 +3,7 @@
 
 import type { CommentRow, CommentTarget } from "../../../../../src/pub/protocol.ts";
 import { locateQuote, type Mark } from "./quote.ts";
-
-export type Filter = "open" | "resolved" | "all";
+import type { Filter } from "./type.ts";
 
 type QuoteTarget = Extract<CommentTarget, { kind: "quote" }>;
 type ElementTarget = Extract<CommentTarget, { kind: "element" }>;
@@ -87,18 +86,6 @@ export function paragraphMarks(
     }
   }
   return marks;
-}
-
-/** Whether `viewer` may resolve or reopen a comment: the talk's owner, or whoever wrote it. */
-export function mayResolve(
-  comment: Pick<CommentRow, "author">,
-  viewer: { handle: string } | null,
-  isOwner: boolean,
-): boolean {
-  if (!viewer) {
-    return false;
-  }
-  return isOwner || (!comment.author.guest && comment.author.handle === viewer.handle);
 }
 
 /**

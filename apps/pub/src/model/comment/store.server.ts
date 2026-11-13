@@ -1,43 +1,42 @@
 // Comment threads: stored on the version they were opened on, shown on the one asked for, placed
-// again through the renames and the slide map of that version.
+// again through the renames and the slide map of that version. Opening a thread takes its number
+// from the deck's own counter, the one write a comment makes to the deck.
 
-import { decks, renames, replies, threads } from "@schema";
+import { decks, replies, threads } from "@schema";
 import type { Context } from "hono";
 import { and, asc, db, eq, inArray, sql } from "void/db";
-import type {
-  CommentRow,
-  CommentTarget,
-  NewComment,
-  SlideMap,
-} from "../../../../../src/pub/protocol.ts";
-import { ApiError } from "../../common/http.server.ts";
+import type { CommentRow, NewComment } from "../../../../../src/pub/protocol.ts";
+import { ApiError, notFound } from "../../common/api-error.ts";
+import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
-import type { Person } from "../deck/access.ts";
-import { type DeckRow, talkUrl, versionRow } from "../deck/store.server.ts";
-import { type Account, userById, usersById } from "../person/store.server.ts";
+import { readJson } from "../../common/json.ts";
+import { canSeeScript } from "../deck/access.ts";
+import { talkUrl } from "../deck/store.server.ts";
+import type { Deck } from "../deck/type.ts";
+import { findVersion, renamesOf } from "../deck/version/store.server.ts";
+import { peopleById } from "../person/store.server.ts";
+import type { Person } from "../person/type.ts";
 import { placeComment, saysQuote } from "./anchor.ts";
+import { CommentTargets, type ThreadRow } from "./type.ts";
+import { hideQuotes } from "./view.ts";
 
-export type ThreadRow = typeof threads.$inferSelect;
+type Status = "open" | "resolved" | "all";
 
-async function slideMapOf(deck: DeckRow, n: number | null): Promise<SlideMap | null> {
-  if (n === null) {
-    return null;
-  }
-  const row = await versionRow(deck.id, n);
-  return row ? (JSON.parse(row.slideMap) as SlideMap) : null;
-}
-
-export async function listComments(
+async function listComments(
   c: Context,
-  deck: DeckRow,
-  options: { status: "open" | "resolved" | "all"; version?: number | null },
+  deck: Deck,
+  options: { status: Status; version?: number | null; id?: string },
 ): Promise<CommentRow[]> {
   const n = options.version ?? deck.currentVersion;
-  const map = await slideMapOf(deck, n);
+  const version = n === null ? null : await findVersion(deck.id, n);
   const rows = await db
     .select()
     .from(threads)
-    .where(eq(threads.deckId, deck.id))
+    .where(
+      options.id
+        ? and(eq(threads.deckId, deck.id), eq(threads.id, options.id))
+        : eq(threads.deckId, deck.id),
+    )
     .orderBy(asc(threads.number))
     .all();
   const wanted = rows.filter((row) =>
@@ -61,27 +60,21 @@ export async function listComments(
     )
     .orderBy(asc(replies.createdAt))
     .all();
-  const renameRows = await db
-    .select()
-    .from(renames)
-    .where(eq(renames.deckId, deck.id))
-    .orderBy(asc(renames.n), asc(renames.at))
-    .all();
-  const owner = await userById(c, deck.ownerId);
-  const people = await usersById(c, [
+  const renameRows = await renamesOf(deck.id);
+  const people = await peopleById(c, [
     ...wanted.flatMap((row) => (row.authorId ? [row.authorId] : [])),
     ...replyRows.flatMap((row) => (row.authorId ? [row.authorId] : [])),
   ]);
-  const url = talkUrl(owner?.handle ?? deck.ownerId, deck.slug);
+  const url = await talkUrl(c, deck);
 
   return wanted.map((row) => {
-    const targets = JSON.parse(row.targets) as CommentTarget[];
+    const targets = readJson(CommentTargets, row.targets);
     // A thread opened on a version newer than the one shown stays as it was written.
     const placed =
-      map && n !== null && row.n <= n
+      version && n !== null && row.n <= n
         ? placeComment(
             { slug: row.slug, targets, n: row.n, resolved: row.resolvedAt !== null },
-            map,
+            version.slideMap,
             renameRows,
             n,
           )
@@ -113,7 +106,7 @@ export async function listComments(
 
 function author(
   row: { authorId: string | null; guestName: string | null },
-  people: Map<string, Account>,
+  people: Map<string, Person>,
 ) {
   if (row.authorId) {
     const person = people.get(row.authorId);
@@ -126,22 +119,51 @@ function author(
   return { name: row.guestName ?? "guest", guest: true };
 }
 
+/**
+ * A deck's comments as `person` reads them, placed on `version` (the current one when absent).
+ * A quoted passage is part of the script, so someone the script is hidden from gets each comment
+ * without it.
+ */
+export async function commentsFor(
+  c: Context,
+  deck: Deck,
+  person: Person | null,
+  options: { status: Status; version?: number | null },
+): Promise<CommentRow[]> {
+  const rows = await listComments(c, deck, options);
+  return canSeeScript(deck, person) ? rows : rows.map(hideQuotes);
+}
+
+/** One comment as `person` reads it, after they changed it or replied to it. */
+export async function commentFor(
+  c: Context,
+  deck: Deck,
+  person: Person | null,
+  id: string,
+): Promise<CommentRow> {
+  const [row] = await listComments(c, deck, { status: "all", id });
+  if (!row) {
+    throw notFound("comment");
+  }
+  return canSeeScript(deck, person) ? row : hideQuotes(row);
+}
+
 export async function openThread(
-  deck: DeckRow,
+  deck: Deck,
   person: Person | null,
   comment: NewComment,
-): Promise<ThreadRow> {
+): Promise<string> {
   // The version the commenter was reading, which may be older than the current one by now;
   // the thread is kept on it, so the renames since are followed when it is shown.
   const n = comment.version ?? deck.currentVersion;
   if (n !== null && n > (deck.latestVersion ?? 0)) {
     throw new ApiError(422, "unknown_version", `the deck has no version ${n}`);
   }
-  const map = await slideMapOf(deck, n);
-  if (n === null || !map) {
+  const version = n === null ? null : await findVersion(deck.id, n);
+  if (n === null || !version) {
     throw new ApiError(409, "no_version", "the deck has no version to comment on yet");
   }
-  const slide = map.slides.find((candidate) => candidate.slug === comment.anchor.slug);
+  const slide = version.slideMap.slides.find((candidate) => candidate.slug === comment.anchor.slug);
   if (!slide) {
     throw new ApiError(422, "unknown_slide", `the deck has no slide ${comment.anchor.slug}`);
   }
@@ -179,14 +201,10 @@ export async function openThread(
     authorId: person?.id ?? null,
     guestName: person ? null : (comment.guestName ?? null),
   });
-  const row = await threadById(deck, id);
-  if (!row) {
-    throw new Error("the thread just opened is not there");
-  }
-  return row;
+  return id;
 }
 
-export async function threadById(deck: DeckRow, id: string): Promise<ThreadRow | null> {
+export async function threadById(deck: Deck, id: string): Promise<ThreadRow | null> {
   return (
     (await db
       .select()
@@ -213,11 +231,6 @@ export async function addReply(
   return id;
 }
 
-/** The deck's owner, and whoever opened the thread, may resolve it or open it again. */
-export function canResolve(deck: DeckRow, thread: ThreadRow, person: Person | null): boolean {
-  return person !== null && (person.id === deck.ownerId || person.id === thread.authorId);
-}
-
 export async function setResolved(
   thread: ThreadRow,
   person: Person,
@@ -227,7 +240,7 @@ export async function setResolved(
     .update(threads)
     .set(
       resolved
-        ? { resolvedBy: person.id, resolvedAt: sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))` }
+        ? { resolvedBy: person.id, resolvedAt: now }
         : { resolvedBy: null, resolvedAt: null },
     )
     .where(eq(threads.id, thread.id));

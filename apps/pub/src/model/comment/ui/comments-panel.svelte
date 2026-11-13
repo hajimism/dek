@@ -1,15 +1,12 @@
-<script lang="ts" module>
-  import type { CommentAnchor } from "../../../../../../src/pub/protocol.ts";
-
-  /** A comment being written: what it will point at. */
-  export type Draft = { anchor: CommentAnchor; slideNumber: number | null };
-</script>
 
 <script lang="ts">
-  import { type Filter, matchesFilter, mayResolve } from "../view.ts";
-  import { useApp } from "../../../shell/use-app.ts";
+  
   import Icon from "../../../common/ui/icon.svelte";
-  import CommentCard, { type CardComment, type ReplyInput } from "./comment-card.svelte";
+  import { useApp } from "../../../shell/use-app.ts";
+import { mayResolve } from "../access.ts";
+  import type { CardComment, Draft, Filter, ReplyInput } from "../type.ts";
+  import { matchesFilter } from "../view.ts";
+  import CommentCard from "./comment-card.svelte";
   import Composer from "./composer.svelte";
 
   let {

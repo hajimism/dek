@@ -4,18 +4,8 @@
 // author's code, so what it says is believed only as far as the page asked for it: a pick only
 // while picking, on a slide the talk has; a mark only for a comment the page shows.
 
-import {
-  DEFAULT_SIZE,
-  EARLY_KEY,
-  type EarlyMessage,
-  type Mark,
-  type PageMessage,
-  type PickedElement,
-  type Position,
-  type ReadySlide,
-  readDeckMessage,
-  type Size,
-} from "./embed.ts";
+import { DEFAULT_SIZE, EARLY_KEY, type EarlyMessage, readDeckMessage } from "./embed.ts";
+import type { Mark, PageMessage, PickedElement, Position, ReadySlide, Size } from "./type.ts";
 
 export type DeckEvents = {
   onpicked?: (picked: { slug: string; step: string; target: PickedElement }) => void;

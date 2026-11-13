@@ -8,3 +8,7 @@ export function handleOf(segment: string | undefined): string | null {
   const handle = value.startsWith("@") ? value.slice(1).toLowerCase() : "";
   return isHandle(handle) ? handle : null;
 }
+
+export function profilePath(handle: string): string {
+  return `/@${handle}`;
+}

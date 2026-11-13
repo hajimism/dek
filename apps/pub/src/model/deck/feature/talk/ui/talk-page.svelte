@@ -1,22 +1,25 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { CommentRow, CommentTarget, NewComment } from "../../../../../../../../src/pub/protocol.ts";
+  import type { NewComment } from "../../../../../../../../src/pub/protocol.ts";
   import { formatDate } from "../../../../../common/i18n.ts";
-  import { ApiFailure, api } from "../../../../../common/ui/api.ts";
+  import { ApiFailure } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
-  import type { CardComment, ReplyInput } from "../../../../comment/ui/comment-card.svelte";
-  import CommentsPanel, { type Draft } from "../../../../comment/ui/comments-panel.svelte";
-  import { byPosition, elementOf, type Filter, hideQuotes } from "../../../../comment/view.ts";
+  import { CommentList } from "../../../../comment/client.svelte.ts";
+  import type { CardComment, Draft, Filter, ReplyInput } from "../../../../comment/type.ts";
+  import CommentsPanel from "../../../../comment/ui/comments-panel.svelte";
+  import { byPosition, elementOf } from "../../../../comment/view.ts";
+  import { profilePath } from "../../../../person/profile-path.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
+  import { talkPath } from "../../../deck.ts";
   import TalkCardView from "../../../ui/talk-card.svelte";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import { DeckLink } from "../deck-link.svelte.ts";
   import { withSlide } from "../embed.ts";
-  import type { Talk } from "../load.server.ts";
-  import Article, { type QuoteSelection } from "./article.svelte";
+  import type { QuoteSelection, Talk } from "../type.ts";
+  import Article from "./article.svelte";
   import Viewer from "./viewer.svelte";
 
   let { talk }: { talk: Talk } = $props();
@@ -29,7 +32,12 @@
   const contentLang = $derived(talk.lang ?? lang);
 
   // The page is keyed by the talk, so what it starts from is read once.
-  let comments: CardComment[] = $state(untrack(() => talk.comments ?? []));
+  const list = new CommentList(
+    untrack(() => talk.id),
+    untrack(() => talk.comments ?? []),
+    (error) => toast(failure(error), { tone: "error" }),
+  );
+  const comments = $derived(list.rows);
   let filter: Filter = $state("open");
   let selectedId: string | null = $state(null);
   let draft: Draft | null = $state(null);
@@ -40,8 +48,6 @@
   let frame: HTMLIFrameElement | undefined = $state();
   let viewer: Viewer | undefined = $state();
   let initialSlug: string | null = null;
-  const unsent = new Map<string, NewComment>();
-  let tempCount = 0;
 
   const link = new DeckLink({
     origin: untrack(() => talk.viewer.origin),
@@ -330,16 +336,6 @@
     }
   }
 
-  function replace(given: CommentRow, oldId = given.id) {
-    const row = talk.script === "hidden" ? hideQuotes(given) : given;
-    const at = comments.findIndex((comment) => comment.id === oldId);
-    if (at === -1) {
-      comments.push(row);
-    } else {
-      comments[at] = row;
-    }
-  }
-
   function failure(error: unknown): string {
     if (error instanceof ApiFailure) {
       return error.code === "offline" ? t("common.offline") : t("common.error", { message: error.message });
@@ -347,97 +343,32 @@
     return t("common.error", { message: "" });
   }
 
-  async function send(id: string, body: NewComment) {
-    try {
-      const row = await api<CommentRow>(`/api/decks/${talk.id}/comments`, { method: "POST", body });
-      unsent.delete(id);
-      replace(row, id);
-      select(row.id);
-    } catch (error) {
-      const at = comments.findIndex((comment) => comment.id === id);
-      const card = comments[at];
-      if (card) {
-        comments[at] = { ...card, pending: false, failed: true };
-      }
-      toast(failure(error), { tone: "error" });
-    }
-  }
-
   async function create(input: ReplyInput): Promise<boolean> {
     if (!draft) {
       return false;
     }
-    const body: NewComment & { version: number } = {
+    const body: NewComment = {
       anchor: $state.snapshot(draft.anchor),
       text: input.text,
       version: talk.version,
       ...(input.guestName ? { guestName: input.guestName } : {}),
       ...(input.turnstile ? { turnstile: input.turnstile } : {}),
     };
-    const id = `tmp_${++tempCount}`;
-    const highest = comments.reduce((max, comment) => Math.max(max, comment.number), 0);
-    comments.push({
-      number: highest + 1,
-      id,
-      slug: draft.anchor.slug,
-      step: draft.anchor.step,
-      status: "open",
-      text: input.text,
-      targets: draft.anchor.targets as CommentTarget[],
-      author: shared.viewer
-        ? { name: shared.viewer.name, handle: shared.viewer.handle, guest: false }
-        : { name: input.guestName ?? "", guest: true },
-      version: talk.version,
-      url: "",
-      thread: [],
-      createdAt: new Date().toISOString(),
-      resolvedAt: null,
-      pending: true,
-    });
-    unsent.set(id, body);
+    const author = shared.viewer
+      ? { name: shared.viewer.name, handle: shared.viewer.handle, guest: false }
+      : { name: input.guestName ?? "", guest: true };
     draft = null;
-    await send(id, body);
+    const row = await list.create(body, author);
+    if (row) {
+      select(row.id);
+    }
     return true;
   }
 
-  function retry(comment: CardComment) {
-    const body = unsent.get(comment.id);
-    if (!body) {
-      return;
-    }
-    replace({ ...comment, pending: true, failed: false } as CardComment, comment.id);
-    send(comment.id, body);
-  }
-
-  async function reply(comment: CardComment, input: ReplyInput): Promise<boolean> {
-    try {
-      // The API answers with the reply alone; it joins the end of its thread.
-      const answer = await api<CommentRow | CommentRow["thread"][number]>(
-        `/api/decks/${talk.id}/comments/${comment.id}/replies`,
-        { method: "POST", body: input },
-      );
-      if ("thread" in answer) {
-        replace(answer);
-      } else {
-        const current = comments.find((candidate) => candidate.id === comment.id) ?? comment;
-        replace({ ...current, thread: [...current.thread, answer] });
-      }
-      return true;
-    } catch (error) {
-      toast(failure(error), { tone: "error" });
-      return false;
-    }
-  }
-
-  async function setResolved(comment: CardComment, resolved: boolean) {
-    try {
-      replace(
-        await api<CommentRow>(`/api/decks/${talk.id}/comments/${comment.id}/${resolved ? "resolve" : "reopen"}`, {
-          method: "POST",
-        }),
-      );
-    } catch (error) {
-      toast(failure(error), { tone: "error" });
+  async function retry(comment: CardComment) {
+    const row = await list.retry(comment);
+    if (row) {
+      select(row.id);
     }
   }
 
@@ -451,7 +382,7 @@
   }
 
   function signinHref(): string {
-    return `/signin?next=${encodeURIComponent(`/@${talk.owner.handle}/${talk.slug}`)}`;
+    return `/signin?next=${encodeURIComponent(talkPath(talk.owner.handle, talk.slug))}`;
   }
 </script>
 
@@ -488,7 +419,7 @@
     <h1>{talk.title}</h1>
     {#if talk.description}<p class="lead">{talk.description}</p>{/if}
     <div class="byline">
-      <a class="author" href="/@{talk.owner.handle}">
+      <a class="author" href={profilePath(talk.owner.handle)}>
         <Avatar name={talk.owner.name} image={talk.owner.image} size={32} />
         <span class="author-text">
           <span class="author-name">{talk.owner.name}</span>
@@ -521,7 +452,7 @@
           <Button variant="ghost" icon="message" href={signinHref()}>{t("comment.signinToComment")}</Button>
         {/if}
         {#if talk.isOwner}
-          <Button variant="secondary" size="sm" href="/@{talk.owner.handle}/{talk.slug}/manage">{t("talk.manage")}</Button>
+          <Button variant="secondary" size="sm" href="{talkPath(talk.owner.handle, talk.slug)}/manage">{t("talk.manage")}</Button>
         {/if}
       </div>
     </div>
@@ -584,9 +515,9 @@
           select(comment.id);
           revealAnchor(comment);
         }}
-        onresolve={(comment) => setResolved(comment, true)}
-        onreopen={(comment) => setResolved(comment, false)}
-        onreply={reply}
+        onresolve={(comment) => list.setResolved(comment, true)}
+        onreopen={(comment) => list.setResolved(comment, false)}
+        onreply={(comment, input) => list.reply(comment, input)}
         oncreate={create}
         oncanceldraft={() => (draft = null)}
         onretry={retry}

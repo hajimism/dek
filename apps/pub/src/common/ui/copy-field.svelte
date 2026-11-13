@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { useApp } from "../../shell/use-app.ts";
+  
   import Icon from "./icon.svelte";
+import { useI18n } from "./use-i18n.ts";
 
   let {
     value,
@@ -8,7 +9,7 @@
     kind = "url",
     prompt = false,
   }: { value: string; label: string; kind?: "url" | "command"; prompt?: boolean } = $props();
-  const { t } = useApp();
+  const { t } = useI18n();
   let copied = $state(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
 

@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { talkPath } from "../../src/model/deck/deck.ts";
+  import { profilePath } from "../../src/model/person/profile-path.ts";
   import { formatDate, guessLang, slideCount } from "../../src/common/i18n.ts";
-  import type { TalkCard } from "../../src/model/deck/feature/talk/load.server.ts";
+  import type { TalkCard } from "../../src/model/deck/type.ts";
   import { useApp } from "../../src/shell/use-app.ts";
   import Avatar from "../../src/model/person/ui/avatar.svelte";
   import CopyField from "../../src/common/ui/copy-field.svelte";
@@ -32,7 +34,7 @@
       <p class="handle">@{profile.handle}</p>
       <p class="links">
         <a href="https://github.com/{profile.handle}" rel="me noopener"><Icon name="github" size={14} />GitHub</a>
-        <a href="/@{profile.handle}/rss" type="application/rss+xml"><Icon name="rss" size={14} />{t("profile.rss")}</a>
+        <a href="{profilePath(profile.handle)}/rss" type="application/rss+xml"><Icon name="rss" size={14} />{t("profile.rss")}</a>
       </p>
     </header>
 
@@ -55,7 +57,7 @@
           <ul class="list">
             {#each talks as talk (talk.slug)}
               <li>
-                <a class="row" href="/@{profile.handle}/{talk.slug}">
+                <a class="row" href={talkPath(profile.handle, talk.slug)}>
                   <span class="thumb">
                     {#if talk.picture}
                       <img src={talk.picture} alt="" loading="lazy" decoding="async" width="1280" height="720" />

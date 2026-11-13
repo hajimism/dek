@@ -1,20 +1,13 @@
-<script lang="ts" module>
-  import type { CommentRow } from "../../../../../../src/pub/protocol.ts";
-
-  /** A row from the API, or one being sent: shown at once, faded until the server has it. */
-  export type CardComment = CommentRow & { pending?: boolean; failed?: boolean };
-
-  export type ReplyInput = { text: string; guestName?: string; turnstile?: string };
-</script>
 
 <script lang="ts">
   import { absoluteTime, relativeTime } from "../../../common/i18n.ts";
-  import { elementOf, quoteOf } from "../view.ts";
-  import { useApp } from "../../../shell/use-app.ts";
-  import { now as currentTime } from "../../../common/ui/clock.svelte.ts";
-  import Avatar from "../../person/ui/avatar.svelte";
   import Badge from "../../../common/ui/badge.svelte";
+  import { now as currentTime } from "../../../common/ui/clock.svelte.ts";
   import Icon from "../../../common/ui/icon.svelte";
+  import { useApp } from "../../../shell/use-app.ts";
+  import Avatar from "../../person/ui/avatar.svelte";
+  import type { CardComment, ReplyInput } from "../type.ts";
+  import { elementOf, quoteOf } from "../view.ts";
   import Composer from "./composer.svelte";
 
   let {

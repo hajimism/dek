@@ -3,44 +3,24 @@
 
 import type { Context } from "hono";
 import { authOf } from "../../common/void-auth.server.ts";
-import type { Person } from "../deck/access.ts";
+import { Account, type Person } from "./type.ts";
 
-type UserRecord = {
-  id: string;
-  name: string;
-  email: string;
-  image?: string | null;
-  handle?: string | null;
-};
-
-export type Account = Person & { email: string; image: string | null };
-
-function account(user: UserRecord): Account {
-  return {
-    id: user.id,
-    name: user.name,
-    handle: user.handle ?? user.id,
-    email: user.email,
-    image: user.image ?? null,
-  };
-}
-
-export async function userByHandle(c: Context, handle: string): Promise<Account | null> {
+export async function personByHandle(c: Context, handle: string): Promise<Person | null> {
   const context = await authOf(c).$context;
-  const user = (await context.adapter.findOne({
+  const user = await context.adapter.findOne({
     model: "user",
     where: [{ field: "handle", value: handle }],
-  })) as UserRecord | null;
-  return user ? account(user) : null;
+  });
+  return user ? Account.parse(user) : null;
 }
 
-export async function userById(c: Context, id: string): Promise<Account | null> {
+export async function personById(c: Context, id: string): Promise<Person | null> {
   const context = await authOf(c).$context;
-  const user = (await context.internalAdapter.findUserById(id)) as UserRecord | null;
-  return user ? account(user) : null;
+  const user = await context.internalAdapter.findUserById(id);
+  return user ? Account.parse(user) : null;
 }
 
-export async function usersById(c: Context, ids: readonly string[]): Promise<Map<string, Account>> {
+export async function peopleById(c: Context, ids: readonly string[]): Promise<Map<string, Person>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) {
     return new Map();
@@ -49,6 +29,7 @@ export async function usersById(c: Context, ids: readonly string[]): Promise<Map
   const users = (await context.adapter.findMany({
     model: "user",
     where: [{ field: "id", operator: "in", value: unique }],
-  })) as UserRecord[];
-  return new Map(users.map((user) => [user.id, account(user)]));
+  })) as unknown[];
+  const people = users.map((user) => Account.parse(user));
+  return new Map(people.map((person) => [person.id, person]));
 }
