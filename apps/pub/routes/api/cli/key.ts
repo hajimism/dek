@@ -3,9 +3,9 @@
 
 import { defineHandler } from "void";
 import { API_KEY_HEADER, type CliKey } from "../../../../../src/pub/protocol.ts";
-import { requirePerson } from "../../../src/server/actor.ts";
-import { ApiError, api } from "../../../src/server/http.ts";
-import { authOf } from "../../../src/server/void-auth.ts";
+import { requirePerson } from "../../../src/model/person/feature/auth/actor.server.ts";
+import { ApiError, api } from "../../../src/common/http.server.ts";
+import { authOf } from "../../../src/common/void-auth.server.ts";
 
 /** A key lasts a year; `dekc pub login` makes a new one. */
 const KEY_SECONDS = 365 * 24 * 60 * 60;

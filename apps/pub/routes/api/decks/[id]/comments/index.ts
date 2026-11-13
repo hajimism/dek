@@ -1,12 +1,12 @@
 import { defineHandler } from "void";
 import { NewComment } from "../../../../../../../src/pub/protocol.ts";
-import { canComment, canManage } from "../../../../../src/lib/access.ts";
-import { hideQuotes } from "../../../../../src/lib/comment-view.ts";
-import { currentPerson } from "../../../../../src/server/actor.ts";
-import { listComments, openThread } from "../../../../../src/server/comments.ts";
-import { visibleDeck } from "../../../../../src/server/decks.ts";
-import { ApiError, api, jsonBody, notFound } from "../../../../../src/server/http.ts";
-import { checkGuest } from "../../../../../src/server/turnstile.ts";
+import { canComment, canManage } from "../../../../../src/model/deck/access.ts";
+import { hideQuotes } from "../../../../../src/model/comment/view.ts";
+import { currentPerson } from "../../../../../src/model/person/feature/auth/actor.server.ts";
+import { listComments, openThread } from "../../../../../src/model/comment/store.server.ts";
+import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
+import { ApiError, api, jsonBody, notFound } from "../../../../../src/common/http.server.ts";
+import { checkGuest } from "../../../../../src/model/comment/turnstile.server.ts";
 
 const STATUSES = ["open", "resolved", "all"] as const;
 

@@ -1,6 +1,6 @@
 import { defineHandler, defineHead, type InferProps } from "void";
-import { translate } from "../src/lib/i18n.ts";
-import { safeNext } from "../src/lib/next-path.ts";
+import { translate } from "../src/common/i18n.ts";
+import { safeNext } from "../src/model/person/feature/auth/next-path.ts";
 
 export type Props = InferProps<typeof loader>;
 

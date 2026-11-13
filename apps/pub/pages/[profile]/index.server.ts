@@ -1,10 +1,10 @@
 import { defineHandler, defineHead, type InferProps } from "void";
 import { env } from "void/env";
-import { translate } from "../../src/lib/i18n.ts";
-import { currentPerson } from "../../src/server/actor.ts";
-import { handleOf } from "../../src/lib/profile-path.ts";
-import { talkCards } from "../../src/server/pages.ts";
-import { userByHandle } from "../../src/server/users.ts";
+import { translate } from "../../src/common/i18n.ts";
+import { currentPerson } from "../../src/model/person/feature/auth/actor.server.ts";
+import { handleOf } from "../../src/model/person/profile-path.ts";
+import { talkCards } from "../../src/model/deck/feature/talk/load.server.ts";
+import { userByHandle } from "../../src/model/person/store.server.ts";
 
 export type Props = InferProps<typeof loader>;
 

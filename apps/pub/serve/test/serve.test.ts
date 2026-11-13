@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { accessKey, type DeckAccess, versionKey } from "../../src/lib/deck-origin.ts";
-import { signServeToken } from "../../src/lib/serve-token.ts";
+import { accessKey, type DeckAccess, versionKey } from "../../src/model/deck/serving/origin.ts";
+import { signServeToken } from "../../src/model/deck/serving/serve-token.ts";
 import { handleServe, type ServeEnv } from "../src/index.ts";
 
 const DECK = "d_7x2kq9m4ab";

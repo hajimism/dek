@@ -7,7 +7,7 @@
 import { defineMiddleware } from "void";
 import { env } from "void/env";
 import { storage } from "void/storage";
-import { deckIdFromHost } from "../src/lib/deck-origin.ts";
+import { deckIdFromHost } from "../src/model/deck/serving/origin.ts";
 import { handleServe } from "../serve/src/index.ts";
 
 export default defineMiddleware(async (c, next) => {

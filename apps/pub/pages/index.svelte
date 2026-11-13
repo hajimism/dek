@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { useApp } from "../src/ui/app.ts";
-  import Button from "../src/ui/Button.svelte";
-  import CopyField from "../src/ui/CopyField.svelte";
-  import Icon from "../src/ui/Icon.svelte";
-  import TalkCard from "../src/ui/TalkCard.svelte";
+  import { useApp } from "../src/shell/use-app.ts";
+  import Button from "../src/common/ui/button.svelte";
+  import CopyField from "../src/common/ui/copy-field.svelte";
+  import Icon from "../src/common/ui/icon.svelte";
+  import TalkCard from "../src/model/deck/ui/talk-card.svelte";
   import type { Props } from "./index.server";
 
   let { talks, featured }: Props = $props();

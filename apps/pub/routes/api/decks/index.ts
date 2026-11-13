@@ -2,10 +2,10 @@ import { decks } from "@schema";
 import { defineHandler } from "void";
 import { db, desc, eq } from "void/db";
 import { CreateDeckRequest } from "../../../../../src/pub/protocol.ts";
-import { requirePerson } from "../../../src/server/actor.ts";
-import { deckBySlug, deckById, deckStatus, writeAccess } from "../../../src/server/decks.ts";
-import { ApiError, api, jsonBody } from "../../../src/server/http.ts";
-import { newDeckId } from "../../../src/lib/ids.ts";
+import { requirePerson } from "../../../src/model/person/feature/auth/actor.server.ts";
+import { deckBySlug, deckById, deckStatus, writeAccess } from "../../../src/model/deck/store.server.ts";
+import { ApiError, api, jsonBody } from "../../../src/common/http.server.ts";
+import { newDeckId } from "../../../src/common/ids.ts";
 
 /** Create a deck, private, before its first version is uploaded. */
 export const POST = defineHandler((c) =>

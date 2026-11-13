@@ -2,9 +2,9 @@ import { decks } from "@schema";
 import { defineHandler } from "void";
 import { db, eq, sql } from "void/db";
 import { PromoteRequest } from "../../../../../../src/pub/protocol.ts";
-import { requirePerson } from "../../../../src/server/actor.ts";
-import { deckById, deckStatus, ownedDeck, versionRow, writeAccess } from "../../../../src/server/decks.ts";
-import { api, jsonBody, notFound } from "../../../../src/server/http.ts";
+import { requirePerson } from "../../../../src/model/person/feature/auth/actor.server.ts";
+import { deckById, deckStatus, ownedDeck, versionRow, writeAccess } from "../../../../src/model/deck/store.server.ts";
+import { api, jsonBody, notFound } from "../../../../src/common/http.server.ts";
 
 /** Point readers at another version: a rollback, or showing one uploaded with --no-promote. */
 export const POST = defineHandler((c) =>

@@ -1,11 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { hideQuotes } from "../../src/lib/comment-view.ts";
-import {
-  formatUserCode,
-  isCompleteUserCode,
-  normalizeUserCode,
-} from "../../src/lib/device-code.ts";
-import { boxToPercent, readDeckMessage, withSlide } from "../../src/lib/embed.ts";
 import {
   formatDate,
   guessLang,
@@ -13,12 +6,23 @@ import {
   relativeTime,
   slideCount,
   translate,
-} from "../../src/lib/i18n.ts";
-import { safeNext } from "../../src/lib/next-path.ts";
-import { handleOf } from "../../src/lib/profile-path.ts";
-import { locateQuote, quoteAt, segments } from "../../src/lib/quote.ts";
-import { rssDate, xmlText } from "../../src/lib/rss.ts";
-import { langHref } from "../../src/ui/lang-link.ts";
+} from "../../src/common/i18n.ts";
+import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
+import { hideQuotes } from "../../src/model/comment/view.ts";
+import {
+  boxToPercent,
+  readDeckMessage,
+  withSlide,
+} from "../../src/model/deck/feature/talk/embed.ts";
+import { safeNext } from "../../src/model/person/feature/auth/next-path.ts";
+import {
+  formatUserCode,
+  isCompleteUserCode,
+  normalizeUserCode,
+} from "../../src/model/person/feature/connect-cli/device-code.ts";
+import { rssDate, xmlText } from "../../src/model/person/feature/profile/rss.ts";
+import { handleOf } from "../../src/model/person/profile-path.ts";
+import { langHref } from "../../src/shell/lang-link.ts";
 
 describe("quoteAt", () => {
   const text = "今日は、dek というスライドの道具を紹介します。dek は台本を先に書く道具です。";

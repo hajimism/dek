@@ -1,5 +1,5 @@
 import { defineHandler, defineHead } from "void";
-import { translate } from "../src/lib/i18n.ts";
+import { translate } from "../src/common/i18n.ts";
 
 export const loader = defineHandler((c) => {
   c.set("pageStatus", 404);

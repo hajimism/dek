@@ -2,12 +2,12 @@ import { grants } from "@schema";
 import { defineHandler } from "void";
 import { and, asc, db, eq } from "void/db";
 import { NewGrant } from "../../../../../../../src/pub/protocol.ts";
-import { isHandle } from "../../../../../src/lib/handle.ts";
-import { newGrantId } from "../../../../../src/lib/ids.ts";
-import { requirePerson } from "../../../../../src/server/actor.ts";
-import { ownedDeck } from "../../../../../src/server/decks.ts";
-import { ApiError, api, jsonBody } from "../../../../../src/server/http.ts";
-import { userByHandle, usersById } from "../../../../../src/server/users.ts";
+import { isHandle } from "../../../../../src/model/person/handle.ts";
+import { newGrantId } from "../../../../../src/common/ids.ts";
+import { requirePerson } from "../../../../../src/model/person/feature/auth/actor.server.ts";
+import { ownedDeck } from "../../../../../src/model/deck/store.server.ts";
+import { ApiError, api, jsonBody } from "../../../../../src/common/http.server.ts";
+import { userByHandle, usersById } from "../../../../../src/model/person/store.server.ts";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 

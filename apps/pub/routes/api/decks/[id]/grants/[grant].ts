@@ -1,9 +1,9 @@
 import { grants } from "@schema";
 import { defineHandler } from "void";
 import { and, db, eq } from "void/db";
-import { requirePerson } from "../../../../../src/server/actor.ts";
-import { ownedDeck } from "../../../../../src/server/decks.ts";
-import { api } from "../../../../../src/server/http.ts";
+import { requirePerson } from "../../../../../src/model/person/feature/auth/actor.server.ts";
+import { ownedDeck } from "../../../../../src/model/deck/store.server.ts";
+import { api } from "../../../../../src/common/http.server.ts";
 
 export const DELETE = defineHandler((c) =>
   api(async () => {

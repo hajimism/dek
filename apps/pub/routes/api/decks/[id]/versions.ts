@@ -14,9 +14,9 @@ import {
   type VersionFile,
   VersionManifest,
 } from "../../../../../../src/pub/protocol.ts";
-import { versionKey } from "../../../../src/lib/deck-origin.ts";
-import { slideChanges } from "../../../../src/lib/slide-diff.ts";
-import { requirePerson } from "../../../../src/server/actor.ts";
+import { versionKey } from "../../../../src/model/deck/serving/origin.ts";
+import { slideChanges } from "../../../../src/model/deck/feature/publish/slide-diff.ts";
+import { requirePerson } from "../../../../src/model/person/feature/auth/actor.server.ts";
 import {
   deckById,
   ownedDeck,
@@ -25,8 +25,8 @@ import {
   versionRows,
   versionSummary,
   writeAccess,
-} from "../../../../src/server/decks.ts";
-import { ApiError, api } from "../../../../src/server/http.ts";
+} from "../../../../src/model/deck/store.server.ts";
+import { ApiError, api } from "../../../../src/common/http.server.ts";
 
 /** The most one version may hold, all files together. */
 const VERSION_BYTES = 50 * 1024 * 1024;

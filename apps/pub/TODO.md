@@ -16,7 +16,7 @@ What it does not do:
 - **Moderation.** The owner can resolve any thread but cannot hide or delete one. A guest cannot resolve or reopen their own thread, because resolving needs a signed-in account.
 - **Guest identity.** A guest's name is remembered in the browser (`dek-pub:guest-name`). Nothing ties a guest to their earlier comments.
 - **Anchoring to beats.** An element comment keeps the beat it was picked at. A comment on a quote, and one on a slide made before the deck reported ready, are saved at step `"0"`. Pins are drawn at every beat of their slide (ADR 45).
-- **Re-anchoring after a publish** (`src/lib/anchors.ts`).
+- **Re-anchoring after a publish** (`src/model/comment/anchor.ts`).
   - Quotes are searched for again, and renames are followed.
   - An element comment's path and box are never checked again. When its slide's HTML changes, the comment stays `open`, still pointing at the old box. It becomes `moved` only through a rename, and never `detached`.
   - So the "Moved" and "Changed" badges appear only for quotes and renames.

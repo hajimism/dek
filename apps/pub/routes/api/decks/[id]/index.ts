@@ -2,9 +2,9 @@ import { decks } from "@schema";
 import { defineHandler } from "void";
 import { db, eq, sql } from "void/db";
 import { ShareRequest } from "../../../../../../src/pub/protocol.ts";
-import { requirePerson } from "../../../../src/server/actor.ts";
-import { deckById, deckStatus, ownedDeck, writeAccess } from "../../../../src/server/decks.ts";
-import { api, jsonBody } from "../../../../src/server/http.ts";
+import { requirePerson } from "../../../../src/model/person/feature/auth/actor.server.ts";
+import { deckById, deckStatus, ownedDeck, writeAccess } from "../../../../src/model/deck/store.server.ts";
+import { api, jsonBody } from "../../../../src/common/http.server.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {

@@ -2,10 +2,10 @@
 
 import { defineHandler } from "void";
 import { env } from "void/env";
-import { rssDate, xmlText as escape } from "../../src/lib/rss.ts";
-import { handleOf } from "../../src/lib/profile-path.ts";
-import { talkCards } from "../../src/server/pages.ts";
-import { userByHandle } from "../../src/server/users.ts";
+import { rssDate, xmlText as escape } from "../../src/model/person/feature/profile/rss.ts";
+import { handleOf } from "../../src/model/person/profile-path.ts";
+import { talkCards } from "../../src/model/deck/feature/talk/load.server.ts";
+import { userByHandle } from "../../src/model/person/store.server.ts";
 
 export const GET = defineHandler(async (c) => {
   const handle = handleOf(c.req.param("profile"));

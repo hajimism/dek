@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { formatDate, guessLang, slideCount } from "../../src/lib/i18n.ts";
-  import type { TalkCard } from "../../src/server/pages.ts";
-  import { useApp } from "../../src/ui/app.ts";
-  import Avatar from "../../src/ui/Avatar.svelte";
-  import CopyField from "../../src/ui/CopyField.svelte";
-  import Icon from "../../src/ui/Icon.svelte";
-  import NotFound from "../../src/ui/NotFound.svelte";
-  import VisibilityBadge from "../../src/ui/VisibilityBadge.svelte";
+  import { formatDate, guessLang, slideCount } from "../../src/common/i18n.ts";
+  import type { TalkCard } from "../../src/model/deck/feature/talk/load.server.ts";
+  import { useApp } from "../../src/shell/use-app.ts";
+  import Avatar from "../../src/model/person/ui/avatar.svelte";
+  import CopyField from "../../src/common/ui/copy-field.svelte";
+  import Icon from "../../src/common/ui/icon.svelte";
+  import NotFound from "../../src/shell/ui/not-found.svelte";
+  import VisibilityBadge from "../../src/model/deck/ui/visibility-badge.svelte";
   import type { Props } from "./index.server";
 
   let { profile }: Props = $props();

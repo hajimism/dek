@@ -6,9 +6,9 @@ The dek.pub server: a Void app (Svelte 5, on Cloudflare Workers) and, in `serve/
 
 - `pages/`: server-rendered pages, `.server.ts` beside each for its loader.
 - `routes/api/`: the JSON API `dekc pub` and the pages call. Its shapes are `../../src/pub/protocol.ts`, shared with the CLI.
-- `src/lib/`: domain logic in plain TypeScript, with no Void import. Test it in `tests/unit/`.
-- `src/server/`: the thin layer that calls Void (D1, R2, auth). `src/server/void-auth.ts` is the only file that reaches into Void's internals.
-- `src/ui/`: Svelte components and the design tokens.
+- `src/model/<name>/`: one folder for each thing a person deals with on dek.pub: `person`, `deck` (with `grant/`, `version/` and `serving/` inside), `comment`. A model holds its types, rules, storage (`*.server.ts`) and the components that show it (`ui/`). A task that goes beyond one model has a folder of its own under `feature/`, such as `deck/feature/publish/`.
+- `src/shell/`: what every page shares: the data the middleware hands each page, the header and the footer.
+- `src/common/`: what knows no model: the HTTP helpers, IDs, words in each language, and generic components with the design tokens. `src/common/void-auth.server.ts` is the only file that reaches into Void's internals.
 - `db/schema.ts`: dek.pub's tables. After a change, run `bun run db:generate` and commit the SQL in `db/migrations/`.
 - `serve/`: the serve Worker, a plain Worker deployed with wrangler.
 

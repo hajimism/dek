@@ -1,7 +1,7 @@
 import { defineHandler, defineHead, type InferProps } from "void";
 import { env } from "void/env";
-import { translate } from "../src/lib/i18n.ts";
-import { featuredTalk, recentPublicTalks } from "../src/server/pages.ts";
+import { translate } from "../src/common/i18n.ts";
+import { featuredTalk, recentPublicTalks } from "../src/model/deck/feature/talk/load.server.ts";
 
 export type Props = InferProps<typeof loader>;
 

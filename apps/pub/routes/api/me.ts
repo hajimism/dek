@@ -1,7 +1,7 @@
 import { defineHandler } from "void";
 import type { Me } from "../../../../src/pub/protocol.ts";
-import { requirePerson } from "../../src/server/actor.ts";
-import { api } from "../../src/server/http.ts";
+import { requirePerson } from "../../src/model/person/feature/auth/actor.server.ts";
+import { api } from "../../src/common/http.server.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {

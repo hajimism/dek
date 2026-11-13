@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SlideMap } from "../../../../src/pub/protocol.ts";
 import { DeckId } from "../../../../src/pub/protocol.ts";
-import { canComment, canManage, canView, type DeckRules } from "../../src/lib/access.ts";
-import { placeComment } from "../../src/lib/anchors.ts";
-import { deckIdFromHost, deckOrigin } from "../../src/lib/deck-origin.ts";
-import { handleFromEmail, isHandle } from "../../src/lib/handle.ts";
-import { newDeckId } from "../../src/lib/ids.ts";
-import { signServeToken, verifyServeToken } from "../../src/lib/serve-token.ts";
-import { slideChanges } from "../../src/lib/slide-diff.ts";
+import { newDeckId } from "../../src/common/ids.ts";
+import { placeComment } from "../../src/model/comment/anchor.ts";
+import { canComment, canManage, canView, type DeckRules } from "../../src/model/deck/access.ts";
+import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
+import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
+import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
+import { handleFromEmail, isHandle } from "../../src/model/person/handle.ts";
 
 const owner = { id: "u1", handle: "hajimism", name: "Hajime" };
 const other = { id: "u2", handle: "sato", name: "Sato" };

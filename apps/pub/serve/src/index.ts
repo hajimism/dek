@@ -7,8 +7,8 @@ import {
   type DeckAccess,
   deckIdFromHost,
   versionKey,
-} from "../../src/lib/deck-origin.ts";
-import { type Variant, verifyServeToken } from "../../src/lib/serve-token.ts";
+} from "../../src/model/deck/serving/origin.ts";
+import { type Variant, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
 
 export type ServeEnv = {
   STORAGE: R2Bucket;

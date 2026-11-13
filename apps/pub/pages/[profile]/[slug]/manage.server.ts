@@ -1,7 +1,7 @@
 import { defineHandler, defineHead, type InferProps } from "void";
-import { translate } from "../../../src/lib/i18n.ts";
-import { deckStatus } from "../../../src/server/decks.ts";
-import { grantList, loadOwnedDeck } from "../../../src/server/pages.ts";
+import { translate } from "../../../src/common/i18n.ts";
+import { deckStatus } from "../../../src/model/deck/store.server.ts";
+import { grantList, loadOwnedDeck } from "../../../src/model/deck/feature/talk/load.server.ts";
 
 export type Props = InferProps<typeof loader>;
 

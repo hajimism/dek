@@ -1,11 +1,11 @@
 import { defineHandler } from "void";
 import { NewReply } from "../../../../../../../../src/pub/protocol.ts";
-import { canComment } from "../../../../../../src/lib/access.ts";
-import { currentPerson } from "../../../../../../src/server/actor.ts";
-import { addReply, listComments, threadById } from "../../../../../../src/server/comments.ts";
-import { visibleDeck } from "../../../../../../src/server/decks.ts";
-import { ApiError, api, jsonBody, notFound } from "../../../../../../src/server/http.ts";
-import { checkGuest } from "../../../../../../src/server/turnstile.ts";
+import { canComment } from "../../../../../../src/model/deck/access.ts";
+import { currentPerson } from "../../../../../../src/model/person/feature/auth/actor.server.ts";
+import { addReply, listComments, threadById } from "../../../../../../src/model/comment/store.server.ts";
+import { visibleDeck } from "../../../../../../src/model/deck/store.server.ts";
+import { ApiError, api, jsonBody, notFound } from "../../../../../../src/common/http.server.ts";
+import { checkGuest } from "../../../../../../src/model/comment/turnstile.server.ts";
 
 export const POST = defineHandler((c) =>
   api(async () => {

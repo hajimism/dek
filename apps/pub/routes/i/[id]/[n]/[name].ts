@@ -4,11 +4,11 @@
 
 import { defineHandler } from "void";
 import { storage } from "void/storage";
-import { canManage } from "../../../../src/lib/access.ts";
-import { versionKey } from "../../../../src/lib/deck-origin.ts";
-import { currentPerson } from "../../../../src/server/actor.ts";
-import { visibleDeck } from "../../../../src/server/decks.ts";
-import { api, notFound } from "../../../../src/server/http.ts";
+import { canManage } from "../../../../src/model/deck/access.ts";
+import { versionKey } from "../../../../src/model/deck/serving/origin.ts";
+import { currentPerson } from "../../../../src/model/person/feature/auth/actor.server.ts";
+import { visibleDeck } from "../../../../src/model/deck/store.server.ts";
+import { api, notFound } from "../../../../src/common/http.server.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {

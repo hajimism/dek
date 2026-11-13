@@ -6,7 +6,7 @@ import { defineMiddleware } from "void";
 import { getUser } from "void/auth";
 import { env } from "void/env";
 import { getCookie, setCookie } from "hono/cookie";
-import { type Lang, pickLang } from "../src/lib/i18n.ts";
+import { type Lang, pickLang } from "../src/common/i18n.ts";
 
 export type Theme = "system" | "light" | "dark";
 

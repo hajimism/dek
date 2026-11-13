@@ -1,8 +1,8 @@
 import { defineHandler } from "void";
-import { requirePerson } from "../../../../../../src/server/actor.ts";
-import { canResolve, listComments, setResolved, threadById } from "../../../../../../src/server/comments.ts";
-import { visibleDeck } from "../../../../../../src/server/decks.ts";
-import { ApiError, api, notFound } from "../../../../../../src/server/http.ts";
+import { requirePerson } from "../../../../../../src/model/person/feature/auth/actor.server.ts";
+import { canResolve, listComments, setResolved, threadById } from "../../../../../../src/model/comment/store.server.ts";
+import { visibleDeck } from "../../../../../../src/model/deck/store.server.ts";
+import { ApiError, api, notFound } from "../../../../../../src/common/http.server.ts";
 
 export const POST = defineHandler((c) =>
   api(async () => {
