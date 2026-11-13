@@ -1,5 +1,4 @@
 <script lang="ts">
-  
   import { untrack } from "svelte";
   import type { CommentPolicy, DeckStatus, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
   import { guessLang } from "../../../../../common/i18n.ts";
@@ -12,7 +11,7 @@
   import Switch from "../../../../../common/ui/switch.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
-import { talkPath } from "../../../deck.ts";
+  import { talkPath } from "../../../deck.ts";
   import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import Sharing from "./sharing.svelte";

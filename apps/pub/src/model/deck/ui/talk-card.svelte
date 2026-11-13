@@ -1,10 +1,9 @@
 <script lang="ts">
-  
   import { formatDate, guessLang, slideCount } from "../../../common/i18n.ts";
   import Icon from "../../../common/ui/icon.svelte";
   import { useApp } from "../../../shell/use-app.ts";
   import Avatar from "../../person/ui/avatar.svelte";
-import { talkPath } from "../deck.ts";
+  import { talkPath } from "../deck.ts";
   import type { TalkCard } from "../type.ts";
 
   let { card, showOwner = true }: { card: TalkCard; showOwner?: boolean } = $props();

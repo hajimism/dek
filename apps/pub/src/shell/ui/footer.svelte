@@ -1,7 +1,6 @@
 <script lang="ts">
-  
   import { followLang } from "../lang-link.ts";
-import { useApp } from "../use-app.ts";
+  import { useApp } from "../use-app.ts";
 
   const { lang, t } = useApp();
 </script>

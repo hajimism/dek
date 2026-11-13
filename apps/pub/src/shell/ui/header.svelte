@@ -1,9 +1,8 @@
 <script lang="ts">
-  
   import { auth } from "void/client";
   import Icon from "../../common/ui/icon.svelte";
   import Menu from "../../common/ui/menu.svelte";
-import { profilePath } from "../../model/person/profile-path.ts";
+  import { profilePath } from "../../model/person/profile-path.ts";
   import Avatar from "../../model/person/ui/avatar.svelte";
   import { followLang } from "../lang-link.ts";
   import { applyTheme } from "../theme.ts";

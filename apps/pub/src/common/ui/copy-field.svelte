@@ -1,7 +1,6 @@
 <script lang="ts">
-  
   import Icon from "./icon.svelte";
-import { useI18n } from "./use-i18n.ts";
+  import { useI18n } from "./use-i18n.ts";
 
   let {
     value,

@@ -1,9 +1,9 @@
 <script lang="ts">
   // A slide's picture at the size of the window: the article's figures stay at the width of the
   // text, and a click on one opens it here. A click anywhere, or Esc, closes it.
-  
+
   import Icon from "../../../../../common/ui/icon.svelte";
-import { useApp } from "../../../../../shell/use-app.ts";
+  import { useApp } from "../../../../../shell/use-app.ts";
 
   type Shown = { src: string; title: string; n: number; total: number; lang: string };
 

@@ -1,8 +1,7 @@
 <script lang="ts">
-  
   import Icon from "./icon.svelte";
   import { dismiss, pause, resume, toasts } from "./toast.svelte.ts";
-import { useI18n } from "./use-i18n.ts";
+  import { useI18n } from "./use-i18n.ts";
 
   const { t } = useI18n();
 </script>

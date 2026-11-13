@@ -1,7 +1,6 @@
 <script lang="ts">
-  
   import Button from "../../common/ui/button.svelte";
-import { useApp } from "../use-app.ts";
+  import { useApp } from "../use-app.ts";
 
   const { shared, t } = useApp();
 </script>

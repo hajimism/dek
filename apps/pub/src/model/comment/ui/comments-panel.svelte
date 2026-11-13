@@ -1,9 +1,8 @@
 
 <script lang="ts">
-  
   import Icon from "../../../common/ui/icon.svelte";
   import { useApp } from "../../../shell/use-app.ts";
-import { mayResolve } from "../access.ts";
+  import { mayResolve } from "../access.ts";
   import type { CardComment, Draft, Filter, ReplyInput } from "../type.ts";
   import { matchesFilter } from "../view.ts";
   import CommentCard from "./comment-card.svelte";
