@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { SlideMap } from "../../../../src/pub/protocol.ts";
 import { DeckId } from "../../../../src/pub/protocol.ts";
 import { canComment, canManage, canView, type DeckRules } from "../../src/lib/access.ts";
@@ -211,6 +211,30 @@ describe("deck origins and IDs", () => {
     expect(deckIdFromHost(new URL(origin).host)).toBe(id);
     expect(deckIdFromHost("dek.pub")).toBeNull();
     expect(deckIdFromHost("d-x.dekusercontent.com")).toBeNull();
+  });
+
+  it("draws every character of an ID as often as every other", () => {
+    // Each byte once, in order: 252 to 255 must be drawn again, the rest give each character 7 times.
+    let next = 0;
+    const draw = vi.spyOn(crypto, "getRandomValues").mockImplementation((array) => {
+      const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = next++ % 256;
+      }
+      return array;
+    });
+    try {
+      const ids = Array.from({ length: 16 }, () => newDeckId().slice(2)).join("");
+      const counts = new Map<string, number>();
+      for (const char of ids.slice(0, 252)) {
+        counts.set(char, (counts.get(char) ?? 0) + 1);
+      }
+      expect(counts.size).toBe(36);
+      expect(new Set(counts.values())).toEqual(new Set([7]));
+      expect(ids.slice(252, 256)).toBe("0000");
+    } finally {
+      draw.mockRestore();
+    }
   });
 
   it("makes handles that fit a URL", () => {

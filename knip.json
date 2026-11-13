@@ -27,6 +27,7 @@
     "apps/pub": {
       "entry": [
         "void.config.ts",
+        "vitest.config.ts",
         "pages/**/*.{ts,svelte}",
         "routes/**/*.ts",
         "middleware/**/*.ts",
@@ -40,6 +41,7 @@
         "**/*.{ts,svelte}"
       ],
       "vite": false,
+      "vitest": false,
       "paths": {
         "@schema": [
           "db/schema.ts"

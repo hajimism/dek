@@ -2,11 +2,17 @@
 
 const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 
+// A byte below 252 (7 × 36), divided by 7, picks each character as often as every other; a byte
+// at or above it is drawn again.
+const LIMIT = 7 * ALPHABET.length;
+
 function randomId(prefix: string, length: number): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(length));
   let id = prefix;
-  for (const byte of bytes) {
-    id += ALPHABET[byte % 36];
+  while (id.length < prefix.length + length) {
+    const [byte = LIMIT] = crypto.getRandomValues(new Uint8Array(1));
+    if (byte < LIMIT) {
+      id += ALPHABET[Math.floor(byte / 7)];
+    }
   }
   return id;
 }
