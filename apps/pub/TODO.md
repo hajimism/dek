@@ -29,10 +29,13 @@ What it does not do:
   - The pins the deck draws show a team thread's bare number, so on the team's side `T3` and `3` both show as 3 there (the embed API takes a number).
 - **Text.** Comments are plain text: no Markdown, no mentions.
 - **Editing.** A review thread or reply cannot be changed or removed by its author, as public comments can (ADR 56).
+- **Full screen** (ADR 58).
+  - On a touch screen the header comes back only from a tap on the top strip; a tap on the slide is the deck's, and moves it.
+  - The theater is checked in a browser test as it fills the page; nothing checks a real full screen, which a headless browser does not grant.
 - **Public comments** (ADR 56).
   - `dekc pub comments` lists the review threads only, and no mail tells the owner of a public comment.
   - Nothing reports or hides a public comment but its removal; there is no rate limit on posting.
-  - The like appears beside the title only; the full-screen header that is to carry it is not built.
+  - The like appears beside the title and in the full-screen header (ADR 58).
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.
 - **Drafts.** A draft is lost on reload.
 - **Turnstile setup.**
@@ -42,13 +45,12 @@ What it does not do:
 
 ## Comments for client work
 
-The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), and the team's side reads drafts (ADR 55). Still to come, each with its own ADR:
+The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), the team's side reads drafts (ADR 55), and the talk goes full screen with a header and a review mode (ADR 57, 58). Still to come, each with its own ADR:
 
 - **Mail, beyond what is built.** Sign-in links, invitations and notices of threads, replies and resolves are built (ADR 53, 54). Still to come:
   - a digest of a person's notices, once a day or an hour, which needs a cron job and a record of what was sent
   - muting a project's mail, with projects
   - mail in the reader's language
-- **The full-screen viewer.** A header that shows on demand with the title, the author, the page and a comments button, and a comments mode with the panel to the right of a smaller slide. The `c` key reaches the page only from a deck built with a dek that passes it on.
 - **The side column** of the talk page: the slides' titles as a table of contents, and the deck's details.
 - **Projects.** A `dek.toml` key naming a project on dek.pub, which holds its decks, members and settings; grants to a project; `/projects/<id>/<deck>` URLs.
 

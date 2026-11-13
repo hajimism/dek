@@ -11,6 +11,8 @@ export type DeckEvents = {
   onpicked?: (picked: { slug: string; step: string; target: PickedElement }) => void;
   onpickcancel?: () => void;
   onmark?: (id: string) => void;
+  /** A key the deck passed on, pressed while it had the focus (ADR 57). */
+  onkey?: (key: "c") => void;
 };
 
 export type DeckLinkOptions = {
@@ -117,6 +119,9 @@ export class DeckLink {
         if (this.#canRead && this.#hasComment(message.id)) {
           this.#events.onmark?.(message.id);
         }
+        break;
+      case "dek:key":
+        this.#events.onkey?.(message.key);
         break;
     }
   }

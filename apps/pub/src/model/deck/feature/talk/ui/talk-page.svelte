@@ -10,6 +10,7 @@
   import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import Icon from "../../../../../common/ui/icon.svelte";
+  import SegmentedControl from "../../../../../common/ui/segmented-control.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import { CommentList } from "../../../../comment/client.svelte.ts";
@@ -27,6 +28,7 @@
   import { withSlide } from "../embed.ts";
   import type { QuoteSelection, Talk } from "../type.ts";
   import Article from "./article.svelte";
+  import Theater from "./theater.svelte";
   import VersionPicker from "./version-picker.svelte";
   import Viewer from "./viewer.svelte";
 
@@ -80,6 +82,10 @@
     events: {
     onpicked: ({ slug, step, target }) => {
       draft = { anchor: { slug, step, targets: [target] }, slideNumber: slideNumbers.get(slug) ?? null };
+      if (immersive) {
+        reviewing = true;
+        return;
+      }
       openPanel();
       if (mode === "column") {
         // The new card sits beside the slide's picture in the article; bring the two into view.
@@ -89,10 +95,21 @@
       }
     },
     onmark: (id) => select(id, { reveal: "card" }),
+    onkey: () => theater?.toggleReview(),
     },
   });
 
+  // Full screen: the theater holds the viewer, and in review mode the panel beside it, showing the
+  // slide on screen's threads or all of them.
+  let theater: Theater | undefined = $state();
+  let immersive = $state(false);
+  let reviewing = $state(false);
+  let reviewScope = $state<"slide" | "all">("slide");
+
   const sorted = $derived(byPosition(comments, talk.slides));
+  const theaterComments = $derived(
+    reviewScope === "all" ? sorted : sorted.filter((comment) => comment.slug === link.current?.slug),
+  );
   let aside: HTMLElement | undefined = $state();
   let articleCol: HTMLElement | undefined = $state();
   let anchorTops: Map<string, number> | null = $state(null);
@@ -445,6 +462,46 @@
   }
 </script>
 
+{#snippet review(inTheater: boolean)}
+  <CommentsPanel
+    comments={inTheater ? theaterComments : sorted}
+    {slideNumbers}
+    bind:filter
+    {selectedId}
+    {draft}
+    isOwner={talk.isOwner}
+    canComment={talk.canComment}
+    scopes={talk.side === "team"}
+    {guest}
+    closable={inTheater || mode !== "column"}
+    {muted}
+    onmute={setMuted}
+    anchorTops={!inTheater && mode === "column" ? anchorTops : null}
+    onclose={() => (inTheater ? (reviewing = false) : closePanel())}
+    onselect={(comment) => select(comment.id)}
+    onanchor={(comment) => {
+      select(comment.id);
+      if (inTheater) {
+        link.goto(comment.slug, comment.step);
+      } else {
+        revealAnchor(comment);
+      }
+    }}
+    onresolve={(comment) => list.setResolved(comment, true)}
+    onreopen={(comment) => list.setResolved(comment, false)}
+    onwiden={async (comment) => {
+      if (await list.widen(comment)) {
+        toast(t("comment.widened"));
+      }
+    }}
+    onreply={(comment, input) => list.reply(comment, input)}
+    oncreate={create}
+    oncanceldraft={() => (draft = null)}
+    onretry={retry}
+    oncopylink={(comment) => copy(`${talk.url}#${comment.id}`, t("comment.linkCopied"))}
+  />
+{/snippet}
+
 <svelte:window
   onkeydown={(event) => {
     if (event.key === "Escape" && !event.defaultPrevented && panelOpen && mode !== "column") {
@@ -474,17 +531,59 @@
   </div>
 {/if}
 
-<Viewer
-  bind:this={viewer}
-  src={src}
+<div class="theater-slot">
+<Theater
+  bind:this={theater}
+  bind:immersive
+  bind:reviewing
   title={talk.title}
-  url={talk.url}
-  {slugs}
-  {link}
-  bind:frame
-  canComment={talk.canComment}
-  oncommentslide={commentOnSlide}
-/>
+  author={talk.owner.name}
+  position={link.ready && link.current ? `${link.current.index + 1} / ${link.slides.length}` : null}
+  reviewCount={commentsOn ? openCount : null}
+>
+  {#snippet stage()}
+    <Viewer
+      bind:this={viewer}
+      {immersive}
+      onfullscreen={() => theater?.enter()}
+      src={src}
+      title={talk.title}
+      url={talk.url}
+      {slugs}
+      {link}
+      bind:frame
+      canComment={talk.canComment}
+      oncommentslide={commentOnSlide}
+    />
+  {/snippet}
+  {#snippet extra()}
+    {#if likes}
+      <LikeButton {likes} canLike={shared.viewer !== null} signinHref={signinHref()} onlike={like} />
+    {/if}
+  {/snippet}
+  {#snippet panel()}
+    <div class="theater-review" lang={lang}>
+      <div class="theater-tools">
+        <SegmentedControl
+          label={t("talk.comments")}
+          options={[
+            { value: "slide", label: t("talk.thisSlide") },
+            { value: "all", label: t("talk.allSlides") },
+          ]}
+          value={reviewScope}
+          onselect={(next: "slide" | "all") => (reviewScope = next)}
+        />
+        {#if talk.canComment && link.ready && link.current}
+          <Button variant="ghost" size="sm" icon="crosshair" onclick={() => link.current && commentOnSlide(link.current.slug)}>
+            {t("comment.onSlide")}
+          </Button>
+        {/if}
+      </div>
+      {@render review(true)}
+    </div>
+  {/snippet}
+</Theater>
+</div>
 
 <div class="body" class:with-comments={commentsOn}>
   <header class="title-block" lang={contentLang}>
@@ -604,39 +703,7 @@
           onclick={() => (sheetTall = !sheetTall)}
         ><span></span></button>
       {/if}
-      <CommentsPanel
-        comments={sorted}
-        {slideNumbers}
-        bind:filter
-        {selectedId}
-        {draft}
-        isOwner={talk.isOwner}
-        canComment={talk.canComment}
-        scopes={talk.side === "team"}
-        {guest}
-        closable={mode !== "column"}
-        {muted}
-        onmute={setMuted}
-        anchorTops={mode === "column" ? anchorTops : null}
-        onclose={() => closePanel()}
-        onselect={(comment) => select(comment.id)}
-        onanchor={(comment) => {
-          select(comment.id);
-          revealAnchor(comment);
-        }}
-        onresolve={(comment) => list.setResolved(comment, true)}
-        onreopen={(comment) => list.setResolved(comment, false)}
-        onwiden={async (comment) => {
-          if (await list.widen(comment)) {
-            toast(t("comment.widened"));
-          }
-        }}
-        onreply={(comment, input) => list.reply(comment, input)}
-        oncreate={create}
-        oncanceldraft={() => (draft = null)}
-        onretry={retry}
-        oncopylink={(comment) => copy(`${talk.url}#${comment.id}`, t("comment.linkCopied"))}
-      />
+      {@render review(false)}
     </aside>
     {#if mode !== "column" && !panelOpen}
       <button type="button" class="pill" aria-controls="dek-comments" aria-expanded="false" onclick={openPanel}>
@@ -660,6 +727,19 @@
 <style>
   /* One left edge from the header down: the viewer's, the title's and the article's. Beside a
      column of comments, the comments end where the viewer does. */
+  .theater-review {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    height: 100%;
+  }
+  .theater-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
   .public-col {
     margin-top: var(--space-12);
   }
