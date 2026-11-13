@@ -3,7 +3,6 @@ import { NewReply } from "../../../../../../../../src/pub/protocol.ts";
 import { notFound } from "../../../../../../src/common/api-error.ts";
 import { afterAnswer, api, jsonBody } from "../../../../../../src/common/http.server.ts";
 import { mustComment } from "../../../../../../src/model/comment/access.ts";
-import { admitGuest } from "../../../../../../src/model/comment/guest.server.ts";
 import { sendNotices } from "../../../../../../src/model/comment/notice.server.ts";
 import {
   addReply,
@@ -21,11 +20,10 @@ export const POST = defineHandler((c) =>
     mustComment(canComment(deck, person, grant), person);
     const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
     const body = await jsonBody(c, NewReply);
-    await admitGuest(c, person, body, "reply");
-    const replyId = await addReply(thread, person, body.text, body.guestName);
+    const replyId = await addReply(thread, person, body.text);
     afterAnswer(
       c,
-      sendNotices(c, deck, thread, "reply", { person, guestName: body.guestName }, body.text),
+      sendNotices(c, deck, thread, "reply", { person }, body.text),
     );
     // The answer is the reply made, as protocol Reply; the thread it joined is a GET away.
     const reply = (await commentFor(c, deck, person, side, thread.id)).thread.find(

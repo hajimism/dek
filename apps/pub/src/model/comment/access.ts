@@ -4,18 +4,18 @@
 
 import type { CommentRow, ThreadScope } from "../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../common/api-error.ts";
-import { canComment, canManage, type DeckRules } from "../deck/access.ts";
+import { canManage, type DeckRules } from "../deck/access.ts";
 import type { GrantRole, GrantSide } from "../deck/grant/type.ts";
 import type { Person } from "../person/type.ts";
 import type { ThreadRow } from "./type.ts";
 
-/** The owner, those who may comment, and anyone the deck is shared with read its comments. */
+/** The owner and anyone the deck is shared with read its review threads. */
 export function canReadComments(
   deck: DeckRules,
   person: Pick<Person, "id"> | null,
   grant: GrantRole | null,
 ): boolean {
-  return canManage(deck, person) || grant !== null || canComment(deck, person, grant);
+  return canManage(deck, person) || (person !== null && grant !== null);
 }
 
 /**

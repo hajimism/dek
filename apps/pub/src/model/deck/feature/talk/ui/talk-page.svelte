@@ -1,6 +1,11 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { NewComment } from "../../../../../../../../src/pub/protocol.ts";
+  import type {
+    LikeState,
+    NewComment,
+    NewPublicComment,
+    PublicComment,
+  } from "../../../../../../../../src/pub/protocol.ts";
   import { formatDate } from "../../../../../common/i18n.ts";
   import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
@@ -8,12 +13,14 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import { CommentList } from "../../../../comment/client.svelte.ts";
+  import PublicComments from "../../../../comment/public/ui/public-comments.svelte";
   import type { CardComment, Draft, Filter, ReplyInput } from "../../../../comment/type.ts";
   import CommentsPanel from "../../../../comment/ui/comments-panel.svelte";
   import { byPosition, elementOf } from "../../../../comment/view.ts";
   import { profilePath } from "../../../../person/profile-path.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
   import { talkPath } from "../../../deck.ts";
+  import LikeButton from "../../../like/ui/like-button.svelte";
   import TalkCardView from "../../../ui/talk-card.svelte";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import { DeckLink } from "../deck-link.svelte.ts";
@@ -401,6 +408,41 @@
   function signinHref(): string {
     return `/signin?next=${encodeURIComponent(talkPath(talk.owner.handle, talk.slug))}`;
   }
+
+  // The public comments and the likes, below the article: the page asks the server again after
+  // each change, as they are few and anyone's.
+  let publicList: PublicComment[] | null = $state(untrack(() => talk.publicComments));
+  let likes: LikeState | null = $state(untrack(() => talk.likes));
+  const publicPath = $derived(`/api/decks/${encodeURIComponent(talk.id)}/public-comments`);
+
+  async function reloadPublic() {
+    publicList = (await api<{ comments: PublicComment[] }>(publicPath)).comments;
+  }
+
+  async function publicChange(change: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await change();
+      await reloadPublic();
+      return true;
+    } catch (error) {
+      toast(failure(error), { tone: "error" });
+      return false;
+    }
+  }
+
+  async function like(next: boolean) {
+    if (!likes) {
+      return;
+    }
+    const before = likes;
+    likes = { count: likes.count + (next ? 1 : -1), liked: next };
+    try {
+      likes = await api<LikeState>(`/api/decks/${encodeURIComponent(talk.id)}/like`, { method: next ? "PUT" : "DELETE" });
+    } catch (error) {
+      likes = before;
+      toast(failure(error), { tone: "error" });
+    }
+  }
 </script>
 
 <svelte:window
@@ -466,6 +508,9 @@
       <div class="actions" lang={lang}>
         {#if talk.isOwner}<VisibilityBadge visibility={talk.visibility} />{/if}
         <Button variant="ghost" icon="link" onclick={() => copy(talk.url, t("talk.shareCopied"))}>{t("talk.share")}</Button>
+        {#if likes}
+          <LikeButton {likes} canLike={shared.viewer !== null} signinHref={signinHref()} onlike={like} />
+        {/if}
         {#if commentsOn}
           <Button
             variant="ghost"
@@ -485,8 +530,6 @@
           >
             {t("talk.comments")} <span class="num count">{openCount}</span>
           </Button>
-        {:else if !shared.viewer && talk.commentPolicy !== "off" && talk.visibility !== "private"}
-          <Button variant="ghost" icon="message" href={signinHref()}>{t("comment.signinToComment")}</Button>
         {/if}
         {#if talk.isOwner}
           <Button variant="secondary" size="sm" href="{talkPath(talk.owner.handle, talk.slug)}/manage">{t("talk.manage")}</Button>
@@ -509,6 +552,32 @@
       oncommentslide={commentOnSlide}
       oncommentquote={commentOnQuote}
     />
+    {#if publicList}
+      <div class="public-col" lang={lang}>
+        <PublicComments
+          comments={publicList}
+          canPost={talk.canPostPublic}
+          off={talk.commentPolicy === "off"}
+          isOwner={talk.isOwner}
+          signinHref={signinHref()}
+          onpost={(input, parentId) =>
+            publicChange(() => {
+              const body: NewPublicComment = {
+                text: input.text,
+                ...(parentId ? { parentId } : {}),
+                ...(input.guestName ? { guestName: input.guestName } : {}),
+                ...(input.turnstile ? { turnstile: input.turnstile } : {}),
+              };
+              return api(publicPath, { method: "POST", body });
+            })}
+          onedit={(id, text) =>
+            publicChange(() => api(`${publicPath}/${encodeURIComponent(id)}`, { method: "PATCH", body: { text } }))}
+          ondelete={async (id) => {
+            await publicChange(() => api(`${publicPath}/${encodeURIComponent(id)}`, { method: "DELETE" }));
+          }}
+        />
+      </div>
+    {/if}
   </div>
 
   {#if commentsOn}
@@ -591,6 +660,9 @@
 <style>
   /* One left edge from the header down: the viewer's, the title's and the article's. Beside a
      column of comments, the comments end where the viewer does. */
+  .public-col {
+    margin-top: var(--space-12);
+  }
   .version-row {
     max-width: var(--container);
     margin: 0 auto;

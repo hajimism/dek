@@ -27,20 +27,11 @@ export function canView(deck: DeckRules, person: Caller, grant: GrantRole | null
 }
 
 /**
- * Whether `person` may comment: the owner always; someone granted `comment` always; on a deck
- * they may open, others as the deck's policy says, a guest only under `guests`.
+ * Whether `person` may write review threads: the owner, and anyone granted `comment`. The deck's
+ * comment policy is about its public comments, not these.
  */
 export function canComment(deck: DeckRules, person: Caller, grant: GrantRole | null): boolean {
-  if (person?.id === deck.ownerId || grant === "comment") {
-    return true;
-  }
-  if (!canView(deck, person, grant) || deck.visibility === "private") {
-    return false;
-  }
-  if (deck.comments === "off") {
-    return false;
-  }
-  return person !== null || deck.comments === "guests";
+  return canManage(deck, person) || (person !== null && grant === "comment");
 }
 
 /**

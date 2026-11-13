@@ -10,6 +10,13 @@ import {
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
 import { mayBeNoticed, noticeMail, noticeRecipients } from "../../src/model/comment/notice.ts";
+import {
+  canPostPublic,
+  mayDeletePublic,
+  mayEditPublic,
+  publicCommentsOn,
+} from "../../src/model/comment/public/access.ts";
+import { threadPublic } from "../../src/model/comment/public/view.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
 import { hideQuotes } from "../../src/model/comment/view.ts";
 import { slideMapOf as map } from "./slide-map.ts";
@@ -231,14 +238,62 @@ describe("who may resolve", () => {
     expect(canSeeThread(shown, team, "client")).toBe(false);
   });
 
-  it("reads comments as the owner, as one who may comment, or as anyone granted the deck", () => {
+  it("reads review threads as the owner or as anyone granted the deck, whatever the policy", () => {
     expect(canReadComments(deck, { id: "u1" }, null)).toBe(true);
-    expect(canReadComments(deck, { id: "u2" }, null)).toBe(true);
-    expect(canReadComments({ ...deck, comments: "off" }, { id: "u2" }, null)).toBe(false);
-    expect(canReadComments({ ...deck, comments: "off" }, { id: "u2" }, "comment")).toBe(true);
-    const closed = { ...deck, visibility: "private" as const };
-    expect(canReadComments(closed, { id: "u2" }, "view")).toBe(true);
-    expect(canReadComments(closed, { id: "u2" }, null)).toBe(false);
+    expect(canReadComments(deck, { id: "u2" }, null)).toBe(false);
+    expect(canReadComments(deck, null, null)).toBe(false);
+    expect(canReadComments({ ...deck, comments: "off" }, { id: "u2" }, "view")).toBe(true);
+    expect(
+      canReadComments({ ...deck, visibility: "private" as const }, { id: "u2" }, "comment"),
+    ).toBe(true);
+  });
+});
+
+describe("public comments", () => {
+  const open = { ownerId: "u1", visibility: "link" as const, comments: "signed-in" as const };
+  const mine = { authorId: "u2" };
+
+  it("are on a talk anyone may open, and not on a private one", () => {
+    expect(publicCommentsOn(open)).toBe(true);
+    expect(publicCommentsOn({ ...open, visibility: "public" })).toBe(true);
+    expect(publicCommentsOn({ ...open, visibility: "private" })).toBe(false);
+  });
+
+  it("may be posted as the policy says: by anyone signed in, by guests too, or by no one", () => {
+    expect(canPostPublic(open, { id: "u2" })).toBe(true);
+    expect(canPostPublic(open, null)).toBe(false);
+    expect(canPostPublic({ ...open, comments: "guests" }, null)).toBe(true);
+    expect(canPostPublic({ ...open, comments: "off" }, { id: "u1" })).toBe(false);
+    expect(canPostPublic({ ...open, visibility: "private" }, { id: "u1" })).toBe(false);
+  });
+
+  it("are edited by their author alone, and deleted by their author or the deck's owner", () => {
+    expect(mayEditPublic(mine, { id: "u2" })).toBe(true);
+    expect(mayEditPublic(mine, { id: "u1" })).toBe(false);
+    expect(mayEditPublic({ authorId: null }, null)).toBe(false);
+    expect(mayDeletePublic(open, mine, { id: "u2" })).toBe(true);
+    expect(mayDeletePublic(open, mine, { id: "u1" })).toBe(true);
+    expect(mayDeletePublic(open, mine, { id: "u3" })).toBe(false);
+    expect(mayDeletePublic(open, { authorId: null }, null)).toBe(false);
+  });
+
+  it("are listed oldest first, each with its replies under it", () => {
+    const row = (id: string, parentId: string | null, createdAt: string) => ({
+      id,
+      parentId,
+      createdAt,
+    });
+    const tree = threadPublic([
+      row("p3", "p1", "2026-11-13T03:00:00Z"),
+      row("p2", null, "2026-11-13T02:00:00Z"),
+      row("p1", null, "2026-11-13T01:00:00Z"),
+      row("p4", "p1", "2026-11-13T02:30:00Z"),
+      row("p5", "gone", "2026-11-13T04:00:00Z"),
+    ]);
+    expect(tree.map((top) => [top.id, top.replies.map((reply) => reply.id)])).toEqual([
+      ["p1", ["p4", "p3"]],
+      ["p2", []],
+    ]);
   });
 });
 

@@ -26,6 +26,7 @@ import {
   widestSide,
 } from "../../src/model/deck/grant/grant.ts";
 import { invitationMail } from "../../src/model/deck/grant/invite.ts";
+import { canLike } from "../../src/model/deck/like/like.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
 import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
@@ -62,13 +63,19 @@ describe("access", () => {
     expect(canComment(deck("private"), other, "comment")).toBe(true);
   });
 
-  it("follows the comment policy on a deck anyone with the link may open", () => {
+  it("lets the owner and those granted comment write review threads, whatever the policy", () => {
     expect(canView(deck("link"), null, null)).toBe(true);
-    expect(canComment(deck("link", "signed-in"), null, null)).toBe(false);
-    expect(canComment(deck("link", "signed-in"), other, null)).toBe(true);
-    expect(canComment(deck("link", "guests"), null, null)).toBe(true);
-    expect(canComment(deck("public", "off"), other, null)).toBe(false);
+    expect(canComment(deck("link", "guests"), null, null)).toBe(false);
+    expect(canComment(deck("link", "signed-in"), other, null)).toBe(false);
+    expect(canComment(deck("public", "off"), other, "comment")).toBe(true);
     expect(canComment(deck("public", "off"), owner, null)).toBe(true);
+  });
+
+  it("lets a signed-in account like a talk anyone may open, once", () => {
+    expect(canLike(deck("public"), other)).toBe(true);
+    expect(canLike(deck("link"), owner)).toBe(true);
+    expect(canLike(deck("link"), null)).toBe(false);
+    expect(canLike(deck("private"), owner)).toBe(false);
   });
 
   it("puts the owner on the team's side, a grantee where the grant says, and anyone else with the client", () => {
