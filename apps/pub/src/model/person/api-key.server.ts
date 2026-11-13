@@ -3,18 +3,11 @@
 // accepts it.
 
 import type { Context } from "hono";
-import { z } from "zod";
 import { authOf } from "../../common/void-auth.server.ts";
+import { KeyCheck, MadeKey } from "./type.ts";
 
 /** A key lasts a year; `dekc pub login` makes a new one. */
 const KEY_SECONDS = 365 * 24 * 60 * 60;
-
-const KeyCheck = z.object({
-  valid: z.boolean(),
-  key: z
-    .object({ id: z.string(), referenceId: z.string().nullish(), userId: z.string().nullish() })
-    .nullish(),
-});
 
 /** The key's ID and the account it belongs to, if it is a valid key. */
 export async function checkKey(
@@ -27,10 +20,10 @@ export async function checkKey(
 }
 
 export async function makeKey(c: Context, userId: string, name: string): Promise<string> {
-  const created = z
-    .object({ key: z.string() })
-    .parse(await authOf(c).api.createApiKey({ body: { userId, name, expiresIn: KEY_SECONDS } }));
-  return created.key;
+  const created = await authOf(c).api.createApiKey({
+    body: { userId, name, expiresIn: KEY_SECONDS },
+  });
+  return MadeKey.parse(created).key;
 }
 
 export async function revokeKey(c: Context, id: string): Promise<void> {

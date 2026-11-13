@@ -26,6 +26,17 @@ export const Account = z
 /** The whole account. It holds the email address, so it never leaves the server. */
 export type Person = z.output<typeof Account>;
 
+/** What Better Auth's api-key plugin answers when a key is checked. */
+export const KeyCheck = z.object({
+  valid: z.boolean(),
+  key: z
+    .object({ id: z.string(), referenceId: z.string().nullish(), userId: z.string().nullish() })
+    .nullish(),
+});
+
+/** What it answers when a key is made; the key itself is shown only this once. */
+export const MadeKey = z.object({ key: z.string() });
+
 /** The signed-in person, as every page is told who they are. */
 export type Self = Pick<Person, "id" | "handle" | "name" | "image">;
 
