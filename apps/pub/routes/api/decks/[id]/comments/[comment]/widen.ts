@@ -17,7 +17,7 @@ export const POST = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
     const { deck, side } = await visibleDeck(c.req.param("id") ?? "", person);
-    const thread = await visibleThread(deck, person, side, c.req.param("comment") ?? "");
+    const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
     if (!canResolve(deck, thread, person)) {
       throw new ApiError(
         403,

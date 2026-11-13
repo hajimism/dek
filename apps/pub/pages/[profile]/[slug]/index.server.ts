@@ -35,7 +35,9 @@ export const head = defineHead<Props>((c, { talk }) => {
       { name: "twitter:card", content: talk.image ? "summary_large_image" : "summary" },
       { name: "twitter:title", content: talk.title },
       ...(talk.image ? [{ name: "twitter:image", content: talk.image }] : []),
-      ...(talk.visibility === "public" ? [] : [{ name: "robots", content: "noindex" }]),
+      ...(talk.visibility === "public" && talk.version === talk.current
+        ? []
+        : [{ name: "robots", content: "noindex" }]),
     ],
     link: [{ rel: "canonical", href: talk.url }],
     script: [{ innerHTML: EARLY_LISTENER }],

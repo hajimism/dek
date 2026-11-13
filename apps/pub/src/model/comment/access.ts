@@ -19,17 +19,17 @@ export function canReadComments(
 }
 
 /**
- * Whether `person`, on `side`, may see a thread. By version: the owner any; anyone else one opened
- * on a version no newer than the current one, so a note on a version held back stays the owner's
- * while it is. By scope: the team's side any; the client's a shared one only.
+ * Whether someone on `side` may see a thread. By version: the team's side any; the client's one
+ * opened on a version no newer than the current one, so a thread on a draft stays the team's
+ * until that version or a later one is current. By scope: the team's side any; the client's a
+ * shared one only.
  */
 export function canSeeThread(
-  deck: { ownerId: string; currentVersion: number | null },
+  deck: { currentVersion: number | null },
   thread: Pick<ThreadRow, "n" | "scope">,
-  person: Pick<Person, "id"> | null,
   side: GrantSide,
 ): boolean {
-  const byVersion = canManage(deck, person) || thread.n <= (deck.currentVersion ?? 0);
+  const byVersion = side === "team" || thread.n <= (deck.currentVersion ?? 0);
   const byScope = thread.scope === "shared" || side === "team";
   return byVersion && byScope;
 }

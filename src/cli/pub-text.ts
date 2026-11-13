@@ -33,6 +33,8 @@ export function formatPub(data: PubResult): string {
         ...(data.diagnostics.length > 0 ? [`lint found ${countSummary(data.diagnostics)}`] : []),
         ...data.changed.map((path) => `wrote pub: into ${path}; commit it`),
       ].join("\n");
+    case "promote":
+      return `readers see version ${data.current} of ${data.url}`;
     case "share":
     case "status": {
       const lines = [

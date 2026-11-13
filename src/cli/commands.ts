@@ -946,6 +946,7 @@ export const COMMANDS = {
         "who may open the deck, read its script, embed it, and comment",
       ],
       ["dekc pub status [deck]", "the deck's settings, versions, and whether it is up to date"],
+      ["dekc pub promote [deck] <n>", "make version n the one readers see"],
       ["dekc pub open [deck]", "open the deck on dek.pub"],
       [
         "dekc pub comments [deck] [--status open|resolved|all]",
@@ -959,6 +960,7 @@ export const COMMANDS = {
       "dekc pub publish [--message <text>] [--no-promote] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
       "dekc pub share --visibility private|link|public --script shown|hidden --embed on|off --comments off|signed-in|guests",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
+      "dekc pub promote <n>   make a version uploaded with --no-promote, or an older one, the one readers see",
     ],
     run: async ({ cwd }) => {
       const { usageError } = await import("./usage.ts");
@@ -1023,6 +1025,16 @@ export const COMMANDS = {
         run: async ({ flags, target }) => {
           const { shareCommand } = await import("./pub.ts");
           return shareCommand(target, flags);
+        },
+      },
+      promote: {
+        scope: "deck",
+        args: ["n"],
+        flags: ["server"],
+        usage: ["dekc pub promote [deck] <n> [--server <url>]"],
+        run: async ({ flags, target, args }) => {
+          const { promoteCommand } = await import("./pub.ts");
+          return promoteCommand(target, args.n, flags);
         },
       },
       status: {

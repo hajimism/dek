@@ -50,6 +50,14 @@ Commit that line, so a publish from any checkout updates the same deck. The deck
 
 Each publish is a new version. It becomes the one readers see unless you pass `--no-promote`. Sections renamed with `dekc mv` since the last version take their comments with them.
 
+A version uploaded with `--no-promote` is a draft. You and the team's side of the people the deck is shared with open it on the talk page, which lets them choose the version and says when the one shown is a draft, and comment on it there; the client's side sees the current version only, and a thread opened on a draft reaches them once that version, or a later one, is current. When the draft is ready:
+
+```bash
+dekc pub promote 5
+```
+
+The deck's manage page does the same, and rolls back to an older version.
+
 ## Share
 
 A new deck is private. Choose who may open it, and the rest, with `dekc pub share`:

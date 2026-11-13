@@ -476,6 +476,32 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
 }
 
 /**
+ * `dekc pub promote <n>`: make version `n` the one the client's side reads, as the manage page's
+ * "Make current" does: a draft the team has looked at, or an older version to roll back to.
+ */
+export async function promoteCommand(
+  target: ReadableDeck,
+  asked: string,
+  flags: FlagValues,
+): Promise<PubResult> {
+  const n = /^[1-9]\d*$/.test(asked) ? Number(asked) : Number.NaN;
+  if (!Number.isSafeInteger(n)) {
+    throw new DekError(
+      `no version ${JSON.stringify(asked)}: a version is a whole number, as \`${pubCommand("status", flags)}\` lists them`,
+    );
+  }
+  const origin = serverOrigin(flags.server);
+  const id = requireDeckId(target, flags);
+  const key = await requireKey(origin, flags);
+  const status = await request(
+    origin,
+    { method: "POST", path: paths.promote(id), what: `version ${n}`, key, json: { n } },
+    DeckStatus,
+  );
+  return { action: "promote", server: origin, ...status };
+}
+
+/**
  * `dekc pub open`: the deck's URL, opened in the browser in text mode. `--json` opens nothing: an
  * agent asked for the address, not for a window on someone's screen.
  */

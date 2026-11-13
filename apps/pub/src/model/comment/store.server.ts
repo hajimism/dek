@@ -136,7 +136,7 @@ export async function commentsFor(
   options: { status: Status; version?: number | null },
 ): Promise<CommentRow[]> {
   const rows = (await listComments(c, deck, options)).filter((row) =>
-    canSeeThread(deck, { n: row.version, scope: row.scope }, person, side),
+    canSeeThread(deck, { n: row.version, scope: row.scope }, side),
   );
   return canSeeScript(deck, person) ? rows : rows.map(hideQuotes);
 }
@@ -150,7 +150,7 @@ export async function commentFor(
   id: string,
 ): Promise<CommentRow> {
   const [row] = await listComments(c, deck, { status: "all", id });
-  if (!row || !canSeeThread(deck, { n: row.version, scope: row.scope }, person, side)) {
+  if (!row || !canSeeThread(deck, { n: row.version, scope: row.scope }, side)) {
     throw notFound("comment");
   }
   return canSeeScript(deck, person) ? row : hideQuotes(row);
@@ -166,9 +166,10 @@ export async function openThread(
   // The version the commenter was reading, which may be older than the current one by now;
   // the thread is kept on it, so the renames since are followed when it is shown.
   const n = comment.version ?? deck.currentVersion;
-  // A reader comments on the version readers see. One whose page shows an older version is
-  // told so, whatever that version was: whether it was ever shown is not kept.
-  if (n !== null && !mayReadVersion(deck, person, n)) {
+  // The client's side comments on the version it reads, the current one; the team's on any it
+  // may open. One whose page shows an older version is told so, whatever that version was:
+  // whether it was ever shown is not kept.
+  if (n !== null && !mayReadVersion(deck, side, n)) {
     if (Number.isInteger(n) && n >= 1 && n < (deck.currentVersion ?? 0)) {
       throw new ApiError(
         409,
@@ -244,21 +245,16 @@ async function takeNumber(deckId: string, scope: ThreadScope): Promise<number> {
 }
 
 /**
- * A thread `person`, on `side`, may see, to reply to, resolve or share; any other is as missing as
+ * A thread someone on `side` may see, to reply to, resolve or share; any other is as missing as
  * one that is not.
  */
-export async function visibleThread(
-  deck: Deck,
-  person: Person | null,
-  side: GrantSide,
-  id: string,
-): Promise<ThreadRow> {
+export async function visibleThread(deck: Deck, side: GrantSide, id: string): Promise<ThreadRow> {
   const thread = await db
     .select()
     .from(threads)
     .where(and(eq(threads.deckId, deck.id), eq(threads.id, id)))
     .get();
-  if (!thread || !canSeeThread(deck, thread, person, side)) {
+  if (!thread || !canSeeThread(deck, thread, side)) {
     throw notFound("comment");
   }
   return thread;

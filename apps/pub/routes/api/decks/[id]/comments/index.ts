@@ -31,7 +31,7 @@ export const GET = defineHandler((c) =>
     }
     const askedVersion = c.req.query("version");
     const version = askedVersion ? Number(askedVersion) : null;
-    if (version !== null && !mayReadVersion(deck, person, version)) {
+    if (version !== null && !mayReadVersion(deck, side, version)) {
       throw notFound("version");
     }
     return { comments: await commentsFor(c, deck, person, side, { status, version }) };
@@ -46,7 +46,7 @@ export const POST = defineHandler((c) =>
     const body = await jsonBody(c, NewComment);
     await admitGuest(c, person, body, "comment");
     const id = await openThread(deck, person, side, body);
-    const thread = await visibleThread(deck, person, side, id);
+    const thread = await visibleThread(deck, side, id);
     afterAnswer(
       c,
       sendNotices(c, deck, thread, "thread", { person, guestName: body.guestName }, body.text),

@@ -20,6 +20,7 @@
   import { withSlide } from "../embed.ts";
   import type { QuoteSelection, Talk } from "../type.ts";
   import Article from "./article.svelte";
+  import VersionPicker from "./version-picker.svelte";
   import Viewer from "./viewer.svelte";
 
   let { talk }: { talk: Talk } = $props();
@@ -411,6 +412,26 @@
   }}
 />
 
+{#if talk.versions && (talk.versions.length > 1 || talk.version !== talk.current)}
+  <div class="version-row" lang={lang}>
+    <VersionPicker
+      versions={talk.versions}
+      version={talk.version}
+      current={talk.current}
+      onpick={(n) => {
+        const url = new URL(window.location.href);
+        if (n === talk.current) {
+          url.searchParams.delete("v");
+        } else {
+          url.searchParams.set("v", String(n));
+        }
+        url.hash = "";
+        window.location.assign(url);
+      }}
+    />
+  </div>
+{/if}
+
 <Viewer
   bind:this={viewer}
   src={src}
@@ -570,6 +591,20 @@
 <style>
   /* One left edge from the header down: the viewer's, the title's and the article's. Beside a
      column of comments, the comments end where the viewer does. */
+  .version-row {
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: var(--space-4) var(--page-gutter) 0;
+  }
+  .version-row :global(.versions) {
+    margin-bottom: 0;
+  }
+  @media (max-width: 767px) {
+    /* The viewer is edge to edge here, with no space above it of its own. */
+    .version-row {
+      padding: var(--space-3) var(--page-gutter);
+    }
+  }
   .body {
     display: grid;
     grid-template-columns: minmax(0, var(--measure));

@@ -17,7 +17,7 @@ import { canComment, canManage, canSeeScript, shownVersion } from "../../access.
 import { talksBy } from "../../card.server.ts";
 import { talkPath } from "../../deck.ts";
 import { deckBySlug, visibleDeck } from "../../store.server.ts";
-import { findVersion } from "../../version/store.server.ts";
+import { findVersion, versionsOf } from "../../version/store.server.ts";
 import { coverOf, slidePicture } from "../../version/version.ts";
 import { frameOf } from "./frame.server.ts";
 import type { Talk } from "./type.ts";
@@ -44,7 +44,9 @@ export async function loadTalk(
     return null;
   }
   const { deck, grant, side } = seen;
-  const n = shownVersion(deck, person);
+  // `?v=` picks a version, for the team's side; any version someone may not read is missing.
+  const asked = c.req.query("v");
+  const n = shownVersion(deck, side, asked === undefined ? null : Number(asked));
   const version = n === null ? null : await findVersion(deck.id, n);
   if (n === null || !version) {
     return null;
@@ -74,6 +76,15 @@ export async function loadTalk(
     url: appUrl(talkPath(owner.handle, deck.slug)),
     owner: profileOf(owner),
     version: n,
+    current: deck.currentVersion,
+    versions:
+      side === "team"
+        ? (await versionsOf(deck.id)).map((each) => ({
+            n: each.n,
+            message: each.message,
+            createdAt: each.createdAt,
+          }))
+        : null,
     viewer: await frameOf(deck, n),
     slides: slides.map((slide) => ({
       slug: slide.slug,
