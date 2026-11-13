@@ -45,6 +45,11 @@
           "db/schema.ts"
         ]
       }
+    },
+    "apps/pub/serve": {
+      "ignoreDependencies": [
+        "esbuild"
+      ]
     }
   }
 }
