@@ -40,6 +40,8 @@ export type PageTarget =
       kind: "build";
       /** Built with `--public`, for anyone who has the link rather than the speaker. */
       public?: boolean;
+      /** Built with `--no-script`: the slides alone, with no script and no presenter view. */
+      script?: false;
       /** The built page's absolute URL, for og:url. */
       publicUrl?: string;
       /** The first slide's picture, for og:image. */
@@ -75,7 +77,10 @@ export function renderDeckDocument(
   // hours of rendering would show slides without their motion, so a broken script stops it.
   const standalone = !live;
   const strictScripts = target.kind === "video";
-  const includeNotes = target.kind === "dev" ? target.includeNotes : target.kind === "build";
+  const includeNotes =
+    target.kind === "dev"
+      ? target.includeNotes
+      : target.kind === "build" && target.script !== false;
   const data = presenterSlides(deck, scriptReader(target)).map((slide) =>
     includeNotes ? slide : { ...slide, script: "" },
   );
@@ -124,7 +129,7 @@ export function renderDeckDocument(
     : "";
   const currentLabel = includeNotes ? `<div class="dek-panel-label">Current</div>` : "";
   const rail = target.kind === "video" ? "" : renderRailHtml(data);
-  const hint = target.kind === "build" ? renderKeyHintHtml(deck.deck.lang) : "";
+  const hint = target.kind === "build" ? renderKeyHintHtml(deck.deck.lang, includeNotes) : "";
   const railResize = rail
     ? `<div id="${PAGE_ID.railResize}" role="separator" aria-orientation="vertical" aria-label="Resize slide list" aria-valuemin="${RAIL_WIDTH_MIN}" aria-valuemax="${RAIL_WIDTH_MAX}" aria-valuenow="${RAIL_WIDTH_DEFAULT}" tabindex="0"></div>`
     : "";
@@ -153,6 +158,7 @@ export function renderDeckDocument(
       mode,
       deck: deck.name,
       ...(liveToken ? { liveToken } : {}),
+      size,
     })}`,
     body: `${progress}
   <div id="${PAGE_ID.shell}">
@@ -177,11 +183,15 @@ export function renderDeckDocument(
 
 /**
  * A page built with `--public` is for anyone who has the link, so it carries the script as the
- * audience may read it; any other page is the speaker's own. A URL alone says where the page is
- * served, not who reads it: the speaker may present from that very page.
+ * audience may read it; one built with `--no-script` carries none of it; any other page is the
+ * speaker's own. A URL alone says where the page is served, not who reads it: the speaker may
+ * present from that very page.
  */
 function scriptReader(target: PageTarget): ScriptReader {
-  return target.kind === "build" && target.public === true ? "audience" : "speaker";
+  if (target.kind !== "build") {
+    return "speaker";
+  }
+  return target.script === false ? "nobody" : target.public === true ? "audience" : "speaker";
 }
 
 export function renderRailHtml(slides: Array<{ slug: string; title: string }>): string {
@@ -228,12 +238,15 @@ function laserLabel(lang: string): string {
 }
 
 /**
- * The keys a viewer of a built file cannot discover by looking: `s` and `p`. Shown once as
- * the file opens, it fades on its own and goes away at the first key or move.
+ * The keys a viewer of a built file cannot discover by looking: `s`, and `p` when it has a
+ * presenter view. Shown once as the file opens, it fades on its own and goes away at the first
+ * key or move.
  */
-function renderKeyHintHtml(lang: string): string {
+function renderKeyHintHtml(lang: string, presenter: boolean): string {
   const labels = lang.toLowerCase().startsWith("ja") ? KEY_HINT_LABELS.ja : KEY_HINT_LABELS.en;
-  return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span><span><kbd>p</kbd>${labels.presenter}</span></div>`;
+  // A build with no script has no presenter view to name.
+  const p = presenter ? `<span><kbd>p</kbd>${labels.presenter}</span>` : "";
+  return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span>${p}</div>`;
 }
 
 /**

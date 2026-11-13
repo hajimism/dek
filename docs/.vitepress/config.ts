@@ -28,6 +28,7 @@ function guide(p: string, t: Record<string, string>): DefaultTheme.SidebarItem[]
       text: t.workflows,
       items: [
         { text: t.present, link: `${p}/guide/present` },
+        { text: t.publish, link: `${p}/guide/publish` },
         { text: t.voice, link: `${p}/guide/voice` },
         { text: t.ai, link: `${p}/guide/ai` },
       ],
@@ -52,6 +53,7 @@ function reference(p: string, t: Record<string, string>): DefaultTheme.SidebarIt
         { text: t.lintRules, link: `${p}/reference/lint` },
         { text: t.config, link: `${p}/reference/config` },
         { text: t.plugins, link: `${p}/reference/plugins` },
+        { text: t.embed, link: `${p}/reference/embed` },
       ],
     },
   ];
@@ -71,6 +73,7 @@ const en = {
   lint: "Lint",
   workflows: "Workflows",
   present: "Presenting",
+  publish: "Publish on dek.pub",
   voice: "Voice and Video",
   ai: "Working with AI Agents",
   more: "More",
@@ -82,6 +85,7 @@ const en = {
   lintRules: "Lint Rules",
   config: "Configuration",
   plugins: "Plugins",
+  embed: "Embed API",
 };
 
 const ja = {
@@ -98,6 +102,7 @@ const ja = {
   lint: "Lint",
   workflows: "ワークフロー",
   present: "発表する",
+  publish: "dek.pub で公開する",
   voice: "声と動画",
   ai: "AI エージェントと作る",
   more: "その他",
@@ -109,6 +114,7 @@ const ja = {
   lintRules: "Lint ルール",
   config: "設定",
   plugins: "プラグイン",
+  embed: "埋め込み API",
 };
 
 export default defineConfig({

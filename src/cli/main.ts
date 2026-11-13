@@ -15,6 +15,7 @@ import {
   type CommandName,
   formOf,
   isTypedCommand,
+  scopeOf,
   subcommandAt,
   subcommandsOf,
 } from "./commands.ts";
@@ -129,6 +130,20 @@ export function bindCommandLine(cwd: string, line: CommandLine): Call {
       }
       deck = before[0];
     }
+    // A subcommand with a deck of its own takes it after its words. Before words that run to the
+    // end, as a reply's text, no count tells a deck from the first word: a deck's name is a deck,
+    // wherever dek runs, and any other word is the subcommand's.
+    if (!spec.scope && scopeOf(command, sub.name) && deck === undefined) {
+      const args = formOf(command, sub.name).args;
+      if (!args.some((arg) => arg.endsWith("..."))) {
+        const peeled = peelDeckArg(cwd, words, { max: args.length });
+        deck = peeled.deck;
+        words = peeled.rest;
+      } else if (words[0] !== undefined && namesDeck(cwd, words[0])) {
+        deck = words[0];
+        words = words.slice(1);
+      }
+    }
   } else {
     words = positionals.slice(1);
     if (spec.scope && deck === undefined) {
@@ -160,7 +175,7 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
     const { restoreRef } = await import("./ref.ts");
     await restoreRef(cwd, call.deck);
   }
-  const scope = spec.scope;
+  const scope = scopeOf(call.name, call.subcommand);
   const target = scope
     ? retypedWithDeck(line, cwd, call, () =>
         resolveTarget(cwd, scope, {

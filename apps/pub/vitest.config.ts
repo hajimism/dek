@@ -1,0 +1,39 @@
+import { fileURLToPath } from "node:url";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { playwright } from "@vitest/browser-playwright";
+import { defineConfig } from "vitest/config";
+
+// The app's tests, apart from the Void dev server: pure logic in Node, components in a real
+// browser. The serve Worker has its own, in workerd (serve/vitest.config.ts); the whole app is
+// checked end to end by tests/e2e against `vp dev`.
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        test: {
+          name: "unit",
+          environment: "node",
+          include: ["tests/unit/**/*.test.ts"],
+        },
+      },
+      {
+        plugins: [svelte()],
+        resolve: {
+          conditions: ["browser"],
+          // Components read the page's shared data through @void/svelte; tests give it directly.
+          alias: { "@void/svelte": fileURLToPath(new URL("./tests/browser/void-svelte.ts", import.meta.url)) },
+        },
+        test: {
+          name: "browser",
+          include: ["tests/browser/**/*.test.ts"],
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: "chromium" }],
+          },
+        },
+      },
+    ],
+  },
+});

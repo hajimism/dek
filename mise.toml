@@ -1,3 +1,5 @@
 [tools]
 bun = "1.4"
+# Void and Vite+, which build apps/pub, need Node 24.22 or later.
+node = "24.22"
 "github:joshrotenberg/adrs" = "0.12.1"

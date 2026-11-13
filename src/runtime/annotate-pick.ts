@@ -30,32 +30,36 @@ export function ringPoints(at: Point): Point[] {
   return points;
 }
 
+/** Whether the dev server stamped `el` with where it is written: what annotate mode can name. */
+export const isStamped = (el: Element): boolean => el.hasAttribute(SOURCE_ATTR);
+
 /**
  * The elements of `slide` that can be picked at `at`: what is under the pointer, then what is
  * only near it, each before anything it is inside, and the slide itself last. A line beside the
  * pointer so comes before the drawing it is in, which is under the pointer and easy to hit.
  * `elementsAt` is the document's `elementsFromPoint`, every element at a point, topmost first.
+ * `counts` says which elements may be picked at all: annotate mode takes those stamped with their
+ * source (`isStamped`); a build has no stamps, and the embed API takes any.
  */
 export function candidatesAt(
   at: Point,
   slide: Element,
   elementsAt: (x: number, y: number) => readonly Element[],
+  counts: (el: Element) => boolean,
 ): Element[] {
+  const isCandidate = (el: Element): boolean =>
+    counts(el) && slide.contains(el) && isShown(el, slide);
   const found: Element[] = [];
   for (const point of ringPoints(at)) {
     for (const el of elementsAt(point.x, point.y)) {
-      if (el === slide || found.includes(el) || !isCandidate(el, slide)) {
+      if (el === slide || found.includes(el) || !isCandidate(el)) {
         continue;
       }
       const outer = found.findIndex((other) => other.contains(el));
       found.splice(outer < 0 ? found.length : outer, 0, el);
     }
   }
-  return isCandidate(slide, slide) ? [...found, slide] : found;
-}
-
-function isCandidate(el: Element, slide: Element): boolean {
-  return el.hasAttribute(SOURCE_ATTR) && slide.contains(el) && isShown(el, slide);
+  return isCandidate(slide) ? [...found, slide] : found;
 }
 
 /** Whether `el` shows: neither it nor anything it is in on the slide is transparent or hidden. */
@@ -88,12 +92,54 @@ export function describeElement(
   el: Element,
   slide: Element,
 ): { source: string; name: string; text: string } {
-  const classes = (el.getAttribute(CLASS_ATTR) ?? "").split(" ").filter(Boolean);
   return {
     source: el.getAttribute(SOURCE_ATTR) ?? "",
-    name: [el.tagName.toLowerCase(), ...classes].join("."),
+    name: elementName(el, (el.getAttribute(CLASS_ATTR) ?? "").split(" ").filter(Boolean)),
     text: el === slide ? "" : cutText(el.textContent ?? ""),
   };
+}
+
+/** An element as a note names it: its tag, then each of `classes`, as `div.chevron`. */
+export function elementName(el: Element, classes: readonly string[]): string {
+  return [el.tagName.toLowerCase(), ...classes].join(".");
+}
+
+/** Elements whose text is never on screen. */
+const UNSHOWN_TAGS = new Set(["STYLE", "SCRIPT", "TEMPLATE", "NOSCRIPT"]);
+
+/**
+ * The text of `el` a reader can see on `slide` now: its text nodes, less those in an element that
+ * is hidden, transparent, or not laid out, such as a beat not reached yet, or a `<style>`.
+ */
+export function visibleText(el: Element, slide: Element): string {
+  const view = el.ownerDocument.defaultView;
+  const seen = new Map<Element, boolean>();
+  const shows = (parent: Element): boolean => {
+    const known = seen.get(parent);
+    if (known !== undefined) {
+      return known;
+    }
+    let shown = !UNSHOWN_TAGS.has(parent.tagName) && isShown(parent, slide);
+    for (let node: Element | null = parent; shown && node; node = node.parentElement) {
+      if (UNSHOWN_TAGS.has(node.tagName) || view?.getComputedStyle(node).display === "none") {
+        shown = false;
+      }
+      if (node === el || node === slide) {
+        break;
+      }
+    }
+    seen.set(parent, shown);
+    return shown;
+  };
+  const walker = el.ownerDocument.createTreeWalker(el, 4 /* NodeFilter.SHOW_TEXT */);
+  let text = "";
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = node.parentElement;
+    if (parent && shows(parent)) {
+      text += node.nodeValue ?? "";
+    }
+  }
+  return text;
 }
 
 /** Where `el` is on the slide, in the slide's own pixels, whatever the stage scales it to. */

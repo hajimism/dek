@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1794495341375,
+      "tag": "20261112145541_colossal_nuke",
+      "breakpoints": true
+    }
+  ]
+}

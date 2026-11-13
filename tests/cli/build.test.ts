@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildCommand } from "../../src/cli/build.ts";
 import { COMMANDS } from "../../src/cli/commands.ts";
+import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 import { defaultTheme } from "../../src/cli/files.ts";
 import { parseCommandLine } from "../../src/cli/flags.ts";
 import { formatText } from "../../src/cli/result.ts";
@@ -396,6 +397,77 @@ title: Demo
         const html = await readFile(result.outs[0] ?? "", "utf8");
         expect(html).toContain("今日は三つ話します。");
         expect(html).not.toContain("目次は読み上げない");
+      },
+    );
+  });
+});
+
+describe("dekc build --json slideMaps", () => {
+  const script = `---
+title: Demo
+---
+
+## intro
+
+> 目次は読み上げない。
+
+今日は三つ話します。
+
+### chart {#chart}
+
+速くなりました。
+`;
+
+  test("maps each deck built to its slides, steps, and what is said, as the reader reads it", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "alpha", script, slides: { intro: introHtml } },
+          { name: "beta", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        const full = await buildCommand(resolveDecks(root));
+        // What --json prints for it keeps the contract, the slide maps included.
+        expect(contractIssues(printedBy(["build", "--json"]), { ok: true, ...full })).toEqual([]);
+        expect(full.slideMaps.map((map) => map.deck)).toEqual(["alpha", "beta"]);
+        expect(full.slideMaps.map((map) => map.out)).toEqual(full.outs);
+        const [alpha] = full.slideMaps;
+        expect(alpha?.slides.map((slide) => slide.slug)).toEqual(["intro"]);
+        expect(alpha?.slides[0]?.steps).toEqual([
+          { step: "0", title: "intro" },
+          { step: "chart", id: "chart", title: "chart" },
+        ]);
+        expect(alpha?.slides[0]?.paragraphs).toEqual(["今日は三つ話します。", "速くなりました。"]);
+        expect(alpha?.slides[0]?.script).toContain("目次は読み上げない");
+
+        const shared = await buildCommand(resolveDecks(join(root, "decks", "alpha")), {
+          public: true,
+        });
+        expect(shared.slideMaps.map((map) => map.deck)).toEqual(["alpha"]);
+        expect(shared.slideMaps[0]?.slides[0]?.script).not.toContain("目次は読み上げない");
+        expect(shared.slideMaps[0]?.slides[0]?.script).toContain("今日は三つ話します。");
+      },
+    );
+  });
+});
+
+describe("dekc build --no-script", () => {
+  test("builds the slides alone, with no script in the page", async () => {
+    const script = "---\ntitle: Demo\n---\n\n## intro\n\n今日は三つ話します。\n";
+    await withTempProject(
+      { decks: [{ name: "demo", script, slides: { intro: introHtml } }] },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        const line = parseCommandLine(["build", "--no-script"]);
+        const result = (await COMMANDS.build.run({
+          cwd: deckDir,
+          flags: line.values,
+          args: {},
+          target: resolveDecks(deckDir),
+        })) as { outs: string[] };
+        const html = await readFile(result.outs[0] ?? "", "utf8");
+        expect(html).not.toContain("今日は三つ話します");
       },
     );
   });

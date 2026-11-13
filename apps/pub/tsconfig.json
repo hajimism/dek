@@ -1,0 +1,17 @@
+{
+  "extends": "./.void/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["void/env", "@cloudflare/workers-types"]
+  },
+  "exclude": ["tests/e2e"],
+  "include": ["src", "pages", "routes", "middleware", "db", "tests", "auth.ts", "env.ts", "void.config.ts", "vite.config.ts", "vitest.config.ts", "serve/src"]
+}

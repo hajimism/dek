@@ -29,7 +29,8 @@ my-talks/                       # project (dekc init)
 │       └── .cache/             # screenshots, voice, and video intermediates
 └── .dek/
     ├── schema.json             # frontmatter schema, regenerated on sync
-    └── slide.d.ts              # the DekSlide type, regenerated on sync
+    ├── slide.d.ts              # the DekSlide type, regenerated on sync
+    └── renames.json            # ids dekc mv renamed, committed for dek.pub
 ```
 
 The `decks/` directory always exists, even with one deck. The CLI, the dev server, and any agent resolve paths the same way in every project.

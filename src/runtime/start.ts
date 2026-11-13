@@ -3,9 +3,11 @@
 import { PAGE_ID, readPageConfig } from "../core/page.ts";
 import { deckStops, moveTarget, positionsEqual } from "../core/position.ts";
 import type { PresenterSlide } from "../core/presenter-state.ts";
+import { logicalSize } from "../core/size.ts";
 import type { Position } from "../core/step.ts";
 import { createDeckControl } from "./deck-control.ts";
 import type { CreateDevLine } from "./dev-line.ts";
+import { createEmbed, type Embed } from "./embed.ts";
 import { bindInput } from "./input.ts";
 import { createLaserView, type LaserView } from "./laser-view.ts";
 import { createNavigator } from "./navigator.ts";
@@ -28,6 +30,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
   // Before anything clones a slide, so the rail and the next slide break as the stage does.
   breakPhrases(document);
   const page = readPageConfig(document.body);
+  const framed = window.parent !== window;
   const slides = JSON.parse(dataEl.textContent) as PresenterSlide[];
   const deck = deckStops(slides);
   const stage = createStage({ slides, deck, videoMode: page.mode === "video" });
@@ -37,6 +40,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     stage.fit();
     presenter.fit();
     rail.fit();
+    embed?.layout();
   }
 
   /** Draw every view at `pos`. */
@@ -46,6 +50,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     rail.markCurrent(pos.slideIndex);
     marks?.render(pos);
     plugins.render(pos);
+    embed?.layout();
   }
 
   /**
@@ -86,7 +91,8 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     present: stage.present,
     hurry: stage.hurry,
     beforeMove: dismissKeyHint,
-    onMove: (from, to) => {
+    framed,
+    onMove: (from, to, origin) => {
       render(to);
       if (from.slideIndex !== to.slideIndex) {
         stage.announce(to);
@@ -96,6 +102,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
       if (!positionsEqual(from, to)) {
         stage.showMove(from, to);
       }
+      embed?.moved(from, to, origin === "embed" ? "embed" : "reader");
     },
     afterMove: () => {
       presenter.startClock();
@@ -110,6 +117,18 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
 
   const marks = dev?.marks;
 
+  // A page that frames the deck drives it through the embed API; one standing alone has no parent.
+  const embed: Embed | undefined = framed
+    ? createEmbed({
+        deck: page.deck,
+        size: page.size ?? logicalSize(),
+        slides,
+        parent: window.parent,
+        position: () => nav.position(),
+        go: (next) => control.request(next, "embed"),
+      })
+    : undefined;
+
   // Plugins' pages run after the player and call window.dek.plugin, which this defines.
   const plugins = createPluginHost({
     deck: page.deck,
@@ -122,6 +141,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     stage,
     onPick: (slideIndex) => control.request({ slideIndex, beatIndex: 0 }, "local"),
     onResize: fitAll,
+    framed,
   });
 
   function setPresenterOpen(open: boolean): void {
@@ -167,12 +187,17 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     stage.setPrinting(event.matches, nav.position()),
   );
 
+  // A framing page shows the slide alone; the keys are its to tell of, if it wants them told.
+  if (framed) {
+    dismissKeyHint();
+  }
   rail.fill();
   fitAll();
   render(nav.position());
   // A hash that named a beat past the slide's last now says where the deck opened.
   nav.writeHash("replace");
   stage.showMotion(nav.position(), page.mode === "video" ? "hold" : "final");
+  embed?.ready(nav.position());
   // biome-ignore lint/complexity/useLiteralKeys: video recorder looks up window["dekGo"]
   window["dekGo"] = (next) => nav.go(next, "capture");
   // The video recorder seeks slide scripts the way it seeks Web Animations.

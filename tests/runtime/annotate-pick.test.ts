@@ -4,6 +4,7 @@ import {
   candidatesAt,
   currentStop,
   describeElement,
+  isStamped,
   ringPoints,
   slideBox,
   slidePoint,
@@ -60,6 +61,7 @@ describe("candidatesAt", () => {
       { x: 100, y: 100 },
       el.slide,
       (x, y) => stacks.get(`${x},${y}`) ?? [],
+      isStamped,
     );
     // The arrow is only near, but it is in the lane, so it comes before the lane.
     expect(sources(found)).toEqual(sources([el.bold, el.chevron, el.arrow, el.lane, el.slide]));
@@ -67,19 +69,23 @@ describe("candidatesAt", () => {
 
   test("takes only the slide on screen, and only elements whose source it knows", () => {
     const el = mountDeck();
-    const found = candidatesAt({ x: 0, y: 0 }, el.slide, () => [
-      el.script,
-      el.coverText,
-      el.cover,
-      el.lane,
+    const found = candidatesAt(
+      { x: 0, y: 0 },
       el.slide,
-    ]);
+      () => [el.script, el.coverText, el.cover, el.lane, el.slide],
+      isStamped,
+    );
     expect(sources(found)).toEqual(sources([el.lane, el.slide]));
   });
 
   test("passes over what is not shown yet, and what is inside it", () => {
     const el = mountDeck();
-    const found = candidatesAt({ x: 0, y: 0 }, el.slide, () => [el.laterText, el.later, el.lane]);
+    const found = candidatesAt(
+      { x: 0, y: 0 },
+      el.slide,
+      () => [el.laterText, el.later, el.lane],
+      isStamped,
+    );
     expect(sources(found)).toEqual(sources([el.lane, el.slide]));
   });
 

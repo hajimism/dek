@@ -5,6 +5,7 @@ import { deckPaths } from "./deck-paths.ts";
 import { DekError } from "./error.ts";
 import { escapeRegExp, isPlainWord, shellName } from "./escape.ts";
 import { joinLines, sectionChunks, splitLines } from "./lines.ts";
+import { renameRecord } from "./renames.ts";
 import {
   asResolvedDeck,
   type ResolvedDeck,
@@ -18,9 +19,14 @@ import { deckLayouts, skeletonHtml } from "./skeleton.ts";
 import { skeletonRecord } from "./skeleton-record.ts";
 import { renameTableKeys } from "./toml-keys.ts";
 
-export function renameSection(dir: string, from: string, to: string): void;
-export function renameSection(source: ResolvedDeck, from: string, to: string): void;
-export function renameSection(input: string | ResolvedDeck, from: string, to: string): void {
+export function renameSection(dir: string, from: string, to: string, now?: Date): void;
+export function renameSection(source: ResolvedDeck, from: string, to: string, now?: Date): void;
+export function renameSection(
+  input: string | ResolvedDeck,
+  from: string,
+  to: string,
+  now: Date = new Date(),
+): void {
   if (!Id.safeParse(to).success) {
     throw new DekError(`invalid id "${to}"`, { hint: "use [a-z0-9-] with at least one letter" });
   }
@@ -35,7 +41,8 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
         hint: "run `dekc lint` to see which slides have no section",
       });
     }
-    applySteps(steps);
+    // A rename done wholly by hand moves nothing here, but is recorded, once.
+    applySteps([...steps, recordStep(project.root, deck.name, from, to, now, steps.length === 0)]);
     return;
   }
   const section = requireSection(deck, from);
@@ -60,6 +67,7 @@ export function renameSection(input: string | ResolvedDeck, from: string, to: st
   applySteps([
     writeStep(project.root, deck.scriptPath, source, joinLines(source, lines)),
     ...slideFileSteps(project.root, deck, from, to),
+    recordStep(project.root, deck.name, from, to, now),
   ]);
 }
 
@@ -178,6 +186,23 @@ function writeStep(root: string, path: string, before: string, after: string): F
 
 function removeStep(root: string, path: string, before: string): FileStep {
   return { path, apply: () => unlinkSync(path), undo: () => writeInside(path, before, root) };
+}
+
+/**
+ * The rename added to `.dek/renames.json`, for dek.pub to move comments on `from` to `to`. It is
+ * made before any step runs, so a file that does not read refuses the rename, and it runs last,
+ * so it is written only once every file moved. With `once`, a rename the deck's last entry already
+ * names is not recorded again.
+ */
+function recordStep(
+  root: string,
+  deck: string,
+  from: string,
+  to: string,
+  now: Date,
+  once = false,
+): FileStep {
+  return renameRecord(root, deck, from, to, { now, once });
 }
 
 function renameStep(from: string, to: string): FileStep {

@@ -48,6 +48,8 @@ export type PageConfig = {
   deck: string;
   /** What a presenter page sends as `?token=` on its live channels. */
   liveToken?: string;
+  /** The slide's own size in pixels, from the deck's ratio. */
+  size?: { width: number; height: number };
 };
 
 /** `config` as the attributes of <body>, values escaped. */
@@ -56,15 +58,18 @@ export function pageConfigAttrs(config: PageConfig): string {
     ` data-mode="${config.mode}"`,
     ` data-deck="${escapeAttr(config.deck)}"`,
     config.liveToken ? ` data-live-token="${escapeAttr(config.liveToken)}"` : "",
+    config.size ? ` data-size="${config.size.width}x${config.size.height}"` : "",
   ].join("");
 }
 
 /** The settings `pageConfigAttrs` wrote on `body`. */
 export function readPageConfig(body: HTMLElement): PageConfig {
-  const { mode, deck, liveToken } = body.dataset;
+  const { mode, deck, liveToken, size } = body.dataset;
+  const [, width, height] = /^(\d{1,5})x(\d{1,5})$/.exec(size ?? "") ?? [];
   return {
     mode: mode === "presenter" || mode === "video" ? mode : "player",
     deck: deck ?? "",
     ...(liveToken ? { liveToken } : {}),
+    ...(width && height ? { size: { width: Number(width), height: Number(height) } } : {}),
   };
 }

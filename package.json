@@ -5,6 +5,7 @@
   "license": "MIT",
   "author": "Hajime Nakagawa (https://github.com/hajimism)",
   "type": "module",
+  "workspaces": ["apps/pub", "apps/pub/serve"],
   "bin": {
     "dekc": "src/cli.ts"
   },
@@ -77,9 +78,6 @@
     "playwright": "^1.63.0",
     "publint": "0.3.25",
     "typescript": "^7.0.2",
-    "vitepress": "^1.6.4"
-  },
-  "overrides": {
-    "vite": "^6.4.3"
+    "vitepress": "2.0.0-alpha.21"
   }
 }

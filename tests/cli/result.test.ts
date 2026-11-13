@@ -308,6 +308,7 @@ architecture  architecture      0:11   0:05
           outs: ["/tmp/dist/demo.html"],
           images: ["/tmp/dist/demo.png"],
           diagnostics: [],
+          slideMaps: [],
         },
       }),
     ).toBe("wrote /tmp/dist/demo.html\nwrote /tmp/dist/demo.png");
@@ -318,6 +319,7 @@ architecture  architecture      0:11   0:05
           outs: ["/tmp/dist/a.html", "/tmp/dist/b.html"],
           images: [],
           diagnostics: [],
+          slideMaps: [],
         },
       }),
     ).toBe("wrote /tmp/dist/a.html\nwrote /tmp/dist/b.html");

@@ -29,6 +29,8 @@ license = "CC0-1.0"
 /**
  * What dek keeps for itself under .dek/ while it runs: the dev server's lock, the marks left
  * while rehearsing, and the notes written in annotate mode. None belongs in the repository.
+ * Each is named apart, never `.dek/` whole, since the rest of .dek/ is committed: the schema and
+ * the slide type dek writes, and .dek/renames.json, the renames `dekc mv` keeps for dek.pub.
  */
 const LOCAL_STATE = [".dek/server.json", ".dek/marks.json", ".dek/annotations.json"];
 

@@ -76,4 +76,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the checks a pull request runs, and
 
 ## License
 
-MIT
+MIT. The runtime and the theme, which dek puts into every built deck (`src/runtime/` and `src/theme/`), are MIT No Attribution, so a deck you share carries no notice to keep. The dek.pub server in `apps/pub/` is AGPL-3.0.

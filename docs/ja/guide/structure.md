@@ -29,7 +29,8 @@ my-talks/                       # プロジェクト（dekc init）
 │       └── .cache/             # スクショ、声、動画の中間物
 └── .dek/
     ├── schema.json             # frontmatter スキーマ。sync のたびに再生成
-    └── slide.d.ts              # DekSlide の型。sync のたびに再生成
+    ├── slide.d.ts              # DekSlide の型。sync のたびに再生成
+    └── renames.json            # dekc mv が改名した id。dek.pub のためにコミットする
 ```
 
 デッキが 1 つでも `decks/` は必ずあります。CLI も開発サーバもエージェントも、どのプロジェクトでも同じやり方でパスを解決します。

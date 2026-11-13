@@ -2,6 +2,7 @@ import { spyOn } from "bun:test";
 import { join } from "node:path";
 import { contractIssues, printedBy } from "../../src/cli/contract.ts";
 import { main } from "../../src/cli/main.ts";
+import { withEnv } from "./env.ts";
 
 export const cliPath = join(import.meta.dir, "..", "..", "src", "cli.ts");
 
@@ -181,4 +182,20 @@ export async function runMain(argv: string[], cwd: string): Promise<RunResult> {
     stderr.mockRestore();
   }
   return { stdout: out.join(""), stderr: err.join(""), exitCode };
+}
+
+/**
+ * `runMain` with `env` applied and, with --json, every line held to the contract, as `runDek`
+ * holds a subprocess's: a command's own tests run it in this process, and leave subprocesses to
+ * the wiring checks the spawn budget counts. Its test is test.serial, as runMain's is.
+ */
+export async function runInProcess(
+  argv: string[],
+  options: { cwd: string; env?: Record<string, string | undefined> },
+): Promise<RunResult> {
+  const result = await withEnv(options.env ?? {}, () => runMain(argv, options.cwd));
+  if (argv.includes("--json")) {
+    holdToContract(argv, result.stdout);
+  }
+  return result;
 }

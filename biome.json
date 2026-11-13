@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["src/**", "tests/**", "evals/**"]
+    "includes": [
+      "src/**",
+      "tests/**",
+      "evals/**",
+      "apps/pub/**",
+      "!apps/pub/db/migrations",
+      "!apps/pub/.void"
+    ]
   },
   "formatter": {
     "enabled": true,

@@ -118,6 +118,19 @@ export async function coverShot(
   return shot ? still.screenshotPath : undefined;
 }
 
+/**
+ * Each slide with every beat shown, as `dekc shot` takes it by default: the picture of a slide
+ * that dek.pub puts in its script article. Undefined without Playwright.
+ */
+export async function slideShots(
+  deck: ResolvedDeck["deck"],
+  runner?: PlaywrightRunner,
+): Promise<ShotFile[] | undefined> {
+  const stills = stillPages(deck, deck.deck.sections);
+  const shot = await shootStills(deck, stills, runner, { ifMissing: "skip" });
+  return shot ? stills.map(shotOf) : undefined;
+}
+
 export type Still = {
   html: string;
   slug: string;
