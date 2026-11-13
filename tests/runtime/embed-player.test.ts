@@ -295,6 +295,28 @@ describe("a framed deck's embed API", () => {
   });
 
   test.serial(
+    "passes c to the framing page, unless a field, the browser or a plugin has it",
+    async () => {
+      const page = await mountFramed();
+      const keys = () => page.messages().filter((message) => message.type === "dek:key");
+      pressKey("c");
+      expect(keys()).toEqual([{ type: "dek:key", key: "c" }]);
+      pressKey("C", { shiftKey: true });
+      expect(keys()).toHaveLength(2);
+      pressKey("c", { metaKey: true });
+      pressKey("c", { repeat: true });
+      pressKey("c", {}, document.querySelector("#deck input") as Element);
+      expect(keys()).toHaveLength(2);
+      // A plugin that takes c prevents the key's default, and keeps it.
+      const plugin = (event: KeyboardEvent) => event.preventDefault();
+      document.addEventListener("keydown", plugin);
+      pressKey("c");
+      document.removeEventListener("keydown", plugin);
+      expect(keys()).toHaveLength(2);
+    },
+  );
+
+  test.serial(
     "shows the slide alone: no rail and no key hint, whatever the reader kept",
     async () => {
       await mountFramed({ beforeStart: () => localStorage.setItem("dek.railVisible", "1") });

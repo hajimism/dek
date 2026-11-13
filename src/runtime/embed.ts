@@ -5,6 +5,7 @@
 
 import { cutText } from "../core/annotation-rows.ts";
 import {
+  EMBED_KEYS,
   type EmbedMark,
   type EmbedMessage,
   type EmbedMover,
@@ -22,7 +23,7 @@ import type { BeatRef, Position } from "../core/step.ts";
 import { RUNTIME_CLASSES } from "../core/theme-facts.ts";
 import { candidatesAt, elementName, slideBox, visibleText, windowPoint } from "./annotate-pick.ts";
 import { slideSelector } from "./live.ts";
-import { isTextEntry } from "./step.ts";
+import { isLetterKey, isTextEntry } from "./step.ts";
 
 export type Embed = {
   /** The player has mounted, standing at `pos`. */
@@ -222,6 +223,17 @@ export function createEmbed(options: {
       event.preventDefault();
       setPicking(false);
       post({ type: "dek:pick-cancel" });
+    }
+  });
+  // The keys the page may want, last of all: on the window, after the player's and a plugin's
+  // listeners on the document, so a key one of them took (and prevented) stays theirs.
+  window.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || isTextEntry(event.target)) {
+      return;
+    }
+    const key = EMBED_KEYS.find((letter) => isLetterKey(event, letter));
+    if (key) {
+      post({ type: "dek:key", key });
     }
   });
 

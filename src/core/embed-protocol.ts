@@ -50,7 +50,13 @@ export type EmbedMessage =
   | ({ type: "dek:moved"; by: EmbedMover } & EmbedStop)
   | { type: "dek:picked"; slug: string; step: string; target: EmbedElementTarget }
   | { type: "dek:pick-cancel" }
-  | { type: "dek:mark"; id: string };
+  | { type: "dek:mark"; id: string }
+  /** A key the deck leaves to the framing page; `c` only, for the page's comments. */
+  | { type: "dek:key"; key: EmbedKey };
+
+/** The keys a framed deck passes to the page that frames it. */
+export const EMBED_KEYS = ["c"] as const;
+type EmbedKey = (typeof EMBED_KEYS)[number];
 
 type Slides = ReadonlyArray<{ slug: string; beats: BeatRef[] }>;
 

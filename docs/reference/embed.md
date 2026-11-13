@@ -29,7 +29,7 @@ Listen before you set the frame's `src`, so you hear `dek:ready`:
 
 The sandbox above is the one dek.pub uses: the deck runs its scripts, keeps its own origin (so its URL hash works), and opens links in a new window. The deck may be served from another origin than the page; dek.pub serves each deck from an origin of its own.
 
-A framed deck shows the slide alone: its slide rail starts closed, whatever the reader chose when opening the deck on its own, and the hint naming its keys does not show. The keys still work, and `s` still opens the rail; opening or closing it in a frame leaves the reader's choice for the deck on its own as it was.
+A framed deck shows the slide alone: its slide rail starts closed, whatever the reader chose when opening the deck on its own, and the hint naming its keys does not show. The keys still work, and `s` still opens the rail; opening or closing it in a frame leaves the reader's choice for the deck on its own as it was. While the reader works the deck, the focus is in the frame, so the page hears no key; the deck passes it `c` (below), which is a key of no one's in the player.
 
 ## What the deck sends
 
@@ -42,6 +42,7 @@ The deck posts to `window.parent` with the target origin `"*"`. Nothing it sends
 | `{ type: "dek:picked", slug, step, target: { kind: "element", path, name, text, box } }` | In pick mode, when the reader clicks an element. |
 | `{ type: "dek:pick-cancel" }` | In pick mode, when the reader presses Escape in the frame. Pick mode is then off. |
 | `{ type: "dek:mark", id }` | When the reader clicks a pin; `id` is the mark's. |
+| `{ type: "dek:key", key: "c" }` | When the reader presses `c` while the frame has the focus: outside a field on the slide, with no Alt, Ctrl or Cmd, not held down, and not taken by a plugin of the deck. The deck does nothing else with it; the page decides what it means, as dek.pub opens its comments. A deck built with an earlier dek sends none, so a page offers the same through a button of its own. |
 
 `slug` is the slide's id in `script.md`, `index` its place in the deck from 0, and `step` the stop as `dekc shot --step` takes it: `"0"` as the slide arrives, then each beat's `{#id}`, or its number when it has none.
 
