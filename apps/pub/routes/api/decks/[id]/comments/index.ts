@@ -1,13 +1,15 @@
 import { defineHandler } from "void";
 import { NewComment } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
-import { api, jsonBody } from "../../../../../src/common/http.server.ts";
+import { afterAnswer, api, jsonBody } from "../../../../../src/common/http.server.ts";
 import { canReadComments, mustComment } from "../../../../../src/model/comment/access.ts";
 import { admitGuest } from "../../../../../src/model/comment/guest.server.ts";
+import { sendNotices } from "../../../../../src/model/comment/notice.server.ts";
 import {
   commentFor,
   commentsFor,
   openThread,
+  visibleThread,
 } from "../../../../../src/model/comment/store.server.ts";
 import { canComment, mayReadVersion } from "../../../../../src/model/deck/access.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
@@ -44,6 +46,11 @@ export const POST = defineHandler((c) =>
     const body = await jsonBody(c, NewComment);
     await admitGuest(c, person, body, "comment");
     const id = await openThread(deck, person, side, body);
+    const thread = await visibleThread(deck, person, side, id);
+    afterAnswer(
+      c,
+      sendNotices(c, deck, thread, "thread", { person, guestName: body.guestName }, body.text),
+    );
     return Response.json(await commentFor(c, deck, person, side, id), { status: 201 });
   }, c.req.raw),
 );

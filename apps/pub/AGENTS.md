@@ -40,3 +40,5 @@ bun run test:e2e     # the whole round trip, dekc against vp dev
 `.env` names port 5173 in `APP_ORIGIN` and `DECK_ORIGIN`, so the dev server never moves to another port: decks would load from whatever holds 5173. To run on another port, change both.
 
 Email sign-up works only where `.env` has `DEK_PUB_DEV_LOGIN=1`, as `dev.env` does. GitHub sign-in needs a real OAuth app's ID and secret in `.env`.
+
+Mail is kept, not sent, by the dev server: its inbox is at the URL `vp dev` prints on start, `/__void/inbox` with the token in `.void/dev-trigger-token`. `tests/e2e/server.ts` reads it the same way.

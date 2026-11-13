@@ -392,6 +392,10 @@ export const ErrorBody = z.strictObject({
 });
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
+/** Whether the signed-in person is mailed of a deck's comments; PUT mutes it, DELETE unmutes. */
+export const MuteState = z.strictObject({ muted: z.boolean() });
+export type MuteState = z.infer<typeof MuteState>;
+
 /** The API's paths, relative to the server's origin. */
 export const paths = {
   me: "/api/me",
@@ -410,6 +414,7 @@ export const paths = {
     `/api/decks/${segment(id)}/comments/${segment(comment)}/reopen`,
   widen: (id: string, comment: string) =>
     `/api/decks/${segment(id)}/comments/${segment(comment)}/widen`,
+  mute: (id: string) => `/api/decks/${segment(id)}/mute`,
   grants: (id: string) => `/api/decks/${segment(id)}/grants`,
   grant: (id: string, grant: string) => `/api/decks/${segment(id)}/grants/${segment(grant)}`,
   /** Better Auth's device authorization endpoints, under its base path. */

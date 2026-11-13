@@ -41,6 +41,8 @@ export type Talk = {
   /** What the comments API would answer this person; null when it would not. */
   comments: CommentRow[] | null;
   canComment: boolean;
+  /** Whether the signed-in reader of the comments has muted their mail; null for anyone else. */
+  muted: boolean | null;
   /** The side of the work the reader is on; the team's may open a thread for the team alone. */
   side: GrantSide;
   /** The picture link previews show, as an absolute URL. */

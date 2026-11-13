@@ -4,7 +4,11 @@ import { safeNext } from "../src/model/person/next-path.ts";
 
 export type Props = InferProps<typeof loader>;
 
-export const loader = defineHandler((c) => ({ next: safeNext(c.req.query("next")) }));
+/** Better Auth sends a sign-in link that no longer works back here, with `error` set. */
+export const loader = defineHandler((c) => ({
+  next: safeNext(c.req.query("next")),
+  linkFailed: c.req.query("error") !== undefined,
+}));
 
 export const head = defineHead<Props>((c) => ({
   title: translate(c.get("shared").lang, "signin.title"),

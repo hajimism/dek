@@ -9,6 +9,7 @@ import {
   scopeFor,
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
+import { mayBeNoticed, noticeMail, noticeRecipients } from "../../src/model/comment/notice.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
 import { hideQuotes } from "../../src/model/comment/view.ts";
 import { slideMapOf as map } from "./slide-map.ts";
@@ -265,5 +266,65 @@ describe("thread scope", () => {
     expect(mayWiden(by("sato", "team"), { handle: "kato" }, true)).toBe(true);
     expect(mayWiden(by("sato", "team"), { handle: "kato" }, false)).toBe(false);
     expect(mayWiden(by("sato", "shared"), { handle: "sato" }, true)).toBe(false);
+  });
+});
+
+describe("notices", () => {
+  const deck = {
+    ownerId: "u1",
+    visibility: "private" as const,
+    comments: "signed-in" as const,
+    currentVersion: 2,
+  };
+  const shared = { n: 1, scope: "shared" as const };
+  const team = { n: 1, scope: "team" as const };
+  const reader = { role: "comment" as const, side: "client" as const, muted: false };
+
+  it("go to the owner, the author and those who replied, once each, never to who acted", () => {
+    expect(
+      noticeRecipients({
+        ownerId: "u1",
+        authorId: "u2",
+        replierIds: ["u3", null, "u2", "u4", "u3"],
+        actorId: "u4",
+      }),
+    ).toEqual(["u1", "u2", "u3"]);
+    expect(
+      noticeRecipients({ ownerId: "u1", authorId: null, replierIds: [], actorId: "u1" }),
+    ).toEqual([]);
+  });
+
+  it("reach only someone who may read the thread, on their own side, and has not muted the deck", () => {
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, reader)).toBe(true);
+    expect(mayBeNoticed(deck, team, { id: "u2" }, reader)).toBe(false);
+    expect(mayBeNoticed(deck, team, { id: "u2" }, { ...reader, side: "team" })).toBe(true);
+    expect(mayBeNoticed(deck, team, { id: "u1" }, { role: null, side: null, muted: false })).toBe(
+      true,
+    );
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, { ...reader, muted: true })).toBe(false);
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, { ...reader, role: null, side: null })).toBe(
+      false,
+    );
+    expect(mayBeNoticed(deck, { ...shared, n: 3 }, { id: "u2" }, reader)).toBe(false);
+  });
+
+  it("say who did what on which thread, with the words and the way back", () => {
+    const base = {
+      to: "sato@example.com",
+      title: "Why dek",
+      label: "T3",
+      actor: "Hajime",
+      text: "ここは\n言い換えたい",
+      url: "https://dek.pub/@hajimism/why-dek",
+    };
+    const thread = noticeMail({ ...base, event: "thread" });
+    expect(thread.subject).toBe("Hajime commented on “Why dek” (#T3)");
+    expect(thread.text).toContain("ここは 言い換えたい");
+    expect(thread.text).toContain(base.url);
+    expect(noticeMail({ ...base, event: "reply" }).subject).toBe(
+      "Hajime replied on “Why dek” (#T3)",
+    );
+    const resolved = noticeMail({ ...base, event: "resolve", text: "" });
+    expect(resolved.subject).toBe("Hajime resolved #T3 on “Why dek”");
   });
 });

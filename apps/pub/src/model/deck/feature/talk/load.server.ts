@@ -7,6 +7,7 @@ import { ApiError } from "../../../../common/api-error.ts";
 import { appUrl } from "../../../../common/http.server.ts";
 import { guessLang, type Lang } from "../../../../common/i18n.ts";
 import { canReadComments } from "../../../comment/access.ts";
+import { isMuted } from "../../../comment/mute.server.ts";
 import { commentsFor } from "../../../comment/store.server.ts";
 import { viewerOf } from "../../../person/actor.server.ts";
 import { profileOf } from "../../../person/person.ts";
@@ -53,6 +54,7 @@ export async function loadTalk(
   const script = deck.scriptPublic ? "public" : isOwner ? "owner" : "hidden";
   const picture = coverOf(deck.id, version);
 
+  const readsComments = canReadComments(deck, person, grant);
   return {
     id: deck.id,
     slug: deck.slug,
@@ -82,10 +84,11 @@ export async function loadTalk(
     })),
     script,
     isOwner,
-    comments: canReadComments(deck, person, grant)
+    comments: readsComments
       ? await commentsFor(c, deck, person, side, { status: "all", version: n })
       : null,
     canComment: canComment(deck, person, grant),
+    muted: person && readsComments ? await isMuted(person.id, deck.id) : null,
     side,
     image: picture ? appUrl(picture) : null,
     more: (await talksBy(c, owner, { publicOnly: true, limit: 4 }))

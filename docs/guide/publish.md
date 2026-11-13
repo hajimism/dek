@@ -67,6 +67,8 @@ dekc pub share --visibility link --script shown --comments signed-in
 
 You share a deck with people on its manage page on dek.pub, by handle or email address, each to view or to comment, and each on the team's side or the client's. The team reads every thread; a client reads only those shared with them, and never learns of the others. A thread you or your team open is kept to the team unless you choose to share it, and one kept to the team can be shared later, never taken back.
 
+Each person you share a deck with is mailed a link to it. Someone invited by email address needs no GitHub account: on dek.pub's sign-in page they ask for a link by mail, sent only to an address a deck is shared with or that has signed in before. Whoever is in a thread, as its author, by a reply, or as the deck's owner, is mailed of new replies and of its resolve, and you are mailed of new threads on your decks. The bell beside a talk's comments stops that mail for the talk.
+
 `dekc pub status` prints the settings, the versions, and whether the newest is the source as it is in your project. `dekc pub open` opens the deck in the browser.
 
 ## Answer the comments

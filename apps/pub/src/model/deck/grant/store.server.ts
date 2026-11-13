@@ -3,7 +3,7 @@
 
 import { grants } from "@schema";
 import type { Context } from "hono";
-import { and, asc, db, eq, inArray, or } from "void/db";
+import { and, asc, db, eq, inArray, isNull, or } from "void/db";
 import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
 import { peopleById, personByHandle } from "../../person/store.server.ts";
@@ -73,6 +73,9 @@ export async function grantList(c: Context, deckId: string): Promise<GrantView[]
   }));
 }
 
+/** Whom a new share is to be mailed to, or null when it changed one that was there already. */
+export type Invite = { to: string; byEmail: boolean };
+
 /**
  * Share a deck with one person, or change what an earlier share allows them. A new share is on
  * the client's side unless `side` says otherwise; an earlier one keeps its side unless it does.
@@ -83,10 +86,12 @@ export async function share(
   grantee: Grantee,
   role: GrantRole,
   side?: GrantSide,
-): Promise<GrantView> {
+): Promise<{ grant: GrantView; invite: Invite | null }> {
   let target: { userId: string | null; email: string | null };
+  let address: string;
   if ("email" in grantee) {
     target = { userId: null, email: grantee.email };
+    address = grantee.email;
   } else {
     const person = await personByHandle(c, grantee.handle);
     if (!person) {
@@ -101,7 +106,13 @@ export async function share(
       throw new ApiError(422, "owner", "the deck is already yours");
     }
     target = { userId: person.id, email: null };
+    address = person.email;
   }
+  const match = and(
+    eq(grants.deckId, deck.id),
+    target.userId ? eq(grants.userId, target.userId) : eq(grants.email, target.email ?? ""),
+  );
+  const before = await db.select({ id: grants.id }).from(grants).where(match).get();
   const id = newGrantId();
   await db
     .insert(grants)
@@ -113,20 +124,28 @@ export async function share(
   const row = await db
     .select({ id: grants.id, side: grants.side, createdAt: grants.createdAt })
     .from(grants)
-    .where(
-      and(
-        eq(grants.deckId, deck.id),
-        target.userId ? eq(grants.userId, target.userId) : eq(grants.email, target.email ?? ""),
-      ),
-    )
+    .where(match)
     .get();
   return {
-    id: row?.id ?? id,
-    who: "email" in grantee ? grantee.email : grantee.handle,
-    role,
-    side: row?.side ?? side ?? "client",
-    createdAt: row?.createdAt ?? "",
+    grant: {
+      id: row?.id ?? id,
+      who: "email" in grantee ? grantee.email : grantee.handle,
+      role,
+      side: row?.side ?? side ?? "client",
+      createdAt: row?.createdAt ?? "",
+    },
+    invite: before ? null : { to: address, byEmail: "email" in grantee },
   };
+}
+
+/** Whether a grant on any deck waits for `email`, as one that may sign in by a link. */
+export async function hasWaitingGrant(email: string): Promise<boolean> {
+  const row = await db
+    .select({ id: grants.id })
+    .from(grants)
+    .where(and(eq(grants.email, email.toLowerCase()), isNull(grants.userId)))
+    .get();
+  return row !== undefined;
 }
 
 export async function unshare(deckId: string, grantId: string): Promise<void> {

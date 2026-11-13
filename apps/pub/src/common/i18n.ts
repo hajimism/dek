@@ -79,6 +79,14 @@ const en = {
   "signin.failed": "That didn’t work: {message}",
   "signin.already": "You’re signed in as @{handle}.",
   "signin.continue": "Continue",
+  "signin.or": "or",
+  "signin.linkLabel": "Email address",
+  "signin.linkSubmit": "Email me a sign-in link",
+  "signin.linkNote":
+    "For an address a talk was shared with, or one you have signed in with before.",
+  "signin.linkSent": "If {email} may sign in, a link is on its way. It works once, for 15 minutes.",
+  "signin.linkAgain": "Use another address",
+  "signin.linkFailed": "That link has expired or was used already. Ask for a new one.",
 
   "device.title": "Connect dekc",
   "device.prompt": "Enter the code shown in your terminal.",
@@ -201,6 +209,9 @@ const en = {
   "comment.teamOnly": "Team only",
   "comment.widen": "Show to client",
   "comment.widened": "Shared with the client.",
+  "comment.mail": "Email me about these comments",
+  "comment.muted": "You won’t get email about this talk’s comments.",
+  "comment.unmuted": "You’ll get email about threads you’re in.",
   "comment.selectionKeys": "Press {keys} to comment on the selected words.",
   "device.fromLink": "This code came with the link you opened.",
   "device.fromLinkBody":
@@ -350,6 +361,16 @@ const ja: Record<MessageKey, string> = {
   "signin.failed": "サインインできませんでした: {message}",
   "signin.already": "@{handle} としてサインインしています。",
   "signin.continue": "続ける",
+  "signin.or": "または",
+  "signin.linkLabel": "メールアドレス",
+  "signin.linkSubmit": "サインイン用のリンクをメールで受け取る",
+  "signin.linkNote":
+    "トークを共有されたアドレスか、前にサインインしたことのあるアドレスで使えます。",
+  "signin.linkSent":
+    "{email} でサインインできる場合は、リンクを送りました。15 分の間、一度だけ使えます。",
+  "signin.linkAgain": "別のアドレスにする",
+  "signin.linkFailed":
+    "リンクの期限が切れたか、すでに使われています。新しいリンクを受け取ってください。",
 
   "device.title": "dekc を接続",
   "device.prompt": "ターミナルに表示されたコードを入力してください。",
@@ -473,6 +494,9 @@ const ja: Record<MessageKey, string> = {
   "comment.teamOnly": "チームのみ",
   "comment.widen": "クライアントに見せる",
   "comment.widened": "クライアントと共有しました。",
+  "comment.mail": "このトークのコメントをメールで受け取る",
+  "comment.muted": "このトークのコメントのメールを止めました。",
+  "comment.unmuted": "参加しているスレッドのメールが届きます。",
   "comment.selectionKeys": "{keys} で選んだ文にコメントできます。",
   "device.fromLink": "このコードは、開いたリンクに含まれていたものです。",
   "device.fromLinkBody":

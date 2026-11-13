@@ -7,7 +7,7 @@
 import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Browser, startDevServer } from "./server.ts";
+import { Browser, Inbox, startDevServer } from "./server.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..", "..");
 const CLI = join(REPO, "src", "cli.ts");
@@ -30,6 +30,7 @@ type Json = Record<string, unknown> & { ok: boolean };
 const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
 const server = await startDevServer(PORT);
+const inbox = new Inbox(server.url);
 
 async function dekc(args: string[], cwd = join(work, "decks", "why-dek")): Promise<Json> {
   const server_ = args[0] === "pub" ? ["--server", server.url] : [];
@@ -96,7 +97,7 @@ try {
 
   // A private deck is invisible to others, in the page and on the deck's own origin.
   const stranger = new Browser(server.url);
-  await stranger.signUp("Stranger");
+  const strangerMe = await stranger.signUp("Stranger");
   const talkPath = `/@${me.handle}/why-dek`;
   check((await stranger.fetch(talkPath)).status === 404, "a private talk is a 404 to someone else");
   check(
@@ -166,6 +167,12 @@ try {
     quoted.status === 201,
     "a colleague comments on a quoted sentence",
     await quoted.clone().text(),
+  );
+  const told = await inbox.waitFor(me.email, "commented on");
+  check(
+    told.some((mail) => mail.text.includes("出典がほしい") && mail.text.includes(talkPath)),
+    "the owner is mailed of a new thread, with its words and a link to it",
+    told,
   );
   const element = await stranger.fetch(`/api/decks/${id}/comments`, {
     method: "POST",
@@ -350,6 +357,12 @@ try {
     },
   });
   check(grant.status === 201, "the owner grants the colleague a view", await grant.clone().text());
+  const invited = await inbox.waitFor(strangerMe.email, "shared");
+  check(
+    invited.length === 1 && invited[0]?.text.includes(talkPath),
+    "a new grant mails the colleague a link to the talk",
+    invited,
+  );
   check(
     (await stranger.fetch(talkPath)).status === 200,
     "the granted colleague sees the private talk",
@@ -421,6 +434,108 @@ try {
     ((await teamGrant.json()) as { side?: string }).side === "team" &&
       ((await clientList()).comments ?? []).some((row) => row.scope === "team"),
     "a colleague moved to the team's side reads the team's threads",
+  );
+
+  // A client invited by address signs in by a link mailed to it, with no account made first. An
+  // address nothing waits for gets no link, and the same answer.
+  const clientEmail = `client-${Date.now()}@example.com`;
+  const nobody = `nobody-${Date.now()}@example.com`;
+  await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: clientEmail, role: "comment" },
+  });
+  const invitation = (await inbox.waitFor(clientEmail, "shared"))[0];
+  check(
+    invitation?.text.includes(`/signin?next=${encodeURIComponent(talkPath)}`) &&
+      invitation.text.includes(`sign in with ${clientEmail}`),
+    "a grant by address mails an invitation to sign in with it",
+    invitation,
+  );
+  const client = new Browser(server.url);
+  const askFor = (email: string) =>
+    client.fetch("/api/auth/sign-in/magic-link", {
+      method: "POST",
+      json: { email, callbackURL: talkPath, errorCallbackURL: "/signin" },
+    });
+  const unknown = await askFor(nobody);
+  const known = await askFor(clientEmail);
+  check(
+    unknown.status === 200 &&
+      known.status === 200 &&
+      JSON.stringify(await unknown.json()) === JSON.stringify(await known.json()),
+    "asking for a sign-in link answers the same for any address",
+  );
+  const linkMail = (await inbox.waitFor(clientEmail, "Sign in"))[0];
+  const link = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(linkMail?.text ?? "")?.[0];
+  check(link !== undefined, "an invited address is mailed a sign-in link", linkMail);
+  check((await inbox.to(nobody)).length === 0, "an address nothing waits for is mailed nothing");
+  const verified = await client.fetch(new URL(link).pathname + new URL(link).search);
+  check(
+    verified.status === 302 && verified.headers.get("location")?.endsWith(talkPath),
+    "the link signs the client in and sends them to the talk",
+    { status: verified.status, location: verified.headers.get("location") },
+  );
+  check(
+    (await client.fetch(talkPath)).status === 200,
+    "signed in by the link, the client opens the private talk shared with their address",
+  );
+  const clientMe = (await (await client.fetch("/api/me")).json()) as { name?: string };
+  check(
+    clientMe.name === clientEmail.split("@")[0],
+    "an account made by a sign-in link goes by its address's local part",
+    clientMe,
+  );
+  const again = await new Browser(server.url).fetch(new URL(link).pathname + new URL(link).search);
+  check(again.headers.get("location")?.includes("error=") === true, "a sign-in link works once", {
+    status: again.status,
+    location: again.headers.get("location"),
+  });
+
+  // The people in a thread are mailed of replies, unless they muted the deck.
+  const asked = await client.fetch(`/api/decks/${id}/comments`, {
+    method: "POST",
+    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "この数字の根拠は？" },
+  });
+  const askedRow = (await asked.json()) as { id: string };
+  const replyToClient = (text: string) =>
+    author.fetch(`/api/decks/${id}/comments/${askedRow.id}/replies`, {
+      method: "POST",
+      json: { text },
+    });
+  await replyToClient("社内の調査です");
+  const replied = await inbox.waitFor(clientEmail, "replied on");
+  check(
+    replied.length === 1 && replied[0]?.text.includes("社内の調査です"),
+    "the thread's author is mailed of a reply",
+    replied,
+  );
+  const mute = await client.fetch(`/api/decks/${id}/mute`, { method: "PUT" });
+  check(
+    mute.status === 200 && ((await mute.json()) as { muted?: boolean }).muted === true,
+    "a reader mutes the deck's mail",
+  );
+  await replyToClient("補足です");
+  await client.fetch(`/api/decks/${id}/mute`, { method: "DELETE" });
+  await replyToClient("もう一つ補足です");
+  const afterMute = await inbox.waitFor(clientEmail, "replied on", 2);
+  check(
+    afterMute.length === 2 && !afterMute.some((mail) => mail.text.split("\n")[0] === "補足です"),
+    "nothing is mailed while the deck is muted, and mail comes again once it is not",
+    afterMute.map((mail) => mail.text),
+  );
+
+  const resolvedByClient = await client.fetch(`/api/decks/${id}/comments/${askedRow.id}/resolve`, {
+    method: "POST",
+  });
+  const resolvedMail = await inbox.waitFor(me.email, clientEmail.split("@")[0] ?? "", 2);
+  check(
+    resolvedByClient.status === 200 &&
+      resolvedMail.some((mail) => mail.subject.includes(" resolved #")),
+    "the owner is mailed when the client resolves their thread",
+    {
+      status: resolvedByClient.status,
+      mails: (await inbox.to(me.email)).map((mail) => mail.subject),
+    },
   );
 
   // What changed between the versions.

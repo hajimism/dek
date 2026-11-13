@@ -1,7 +1,8 @@
 import { defineHandler } from "void";
 import { ApiError, notFound } from "../../../../../../src/common/api-error.ts";
-import { api } from "../../../../../../src/common/http.server.ts";
+import { afterAnswer, api } from "../../../../../../src/common/http.server.ts";
 import { canResolve } from "../../../../../../src/model/comment/access.ts";
+import { sendNotices } from "../../../../../../src/model/comment/notice.server.ts";
 import {
   commentFor,
   setResolved,
@@ -23,6 +24,9 @@ export const POST = defineHandler((c) =>
       );
     }
     await setResolved(thread, person, true);
+    if (thread.resolvedAt === null) {
+      afterAnswer(c, sendNotices(c, deck, thread, "resolve", { person }, ""));
+    }
     return commentFor(c, deck, person, side, thread.id);
   }, c.req.raw),
 );

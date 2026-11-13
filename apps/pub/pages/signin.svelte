@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { auth } from "void/client";
+  import { api } from "../src/common/ui/api.ts";
   import { useApp } from "../src/shell/use-app.ts";
   import Button from "../src/common/ui/button.svelte";
   import Icon from "../src/common/ui/icon.svelte";
   import type { Props } from "./signin.server";
 
-  let { next }: Props = $props();
+  let { next, linkFailed }: Props = $props();
   const { shared, t } = useApp();
 
   let github = $state(false);
@@ -14,7 +16,29 @@
   let email = $state("");
   let password = $state("");
   let busy = $state(false);
-  let error = $state("");
+  let error = $state(untrack(() => (linkFailed ? t("signin.linkFailed") : "")));
+  let linkEmail = $state("");
+  let linkBusy = $state(false);
+  let linkSent = $state("");
+
+  /** Ask for a link by mail. The answer is the same whether or not the address may sign in. */
+  async function withLink(event: SubmitEvent) {
+    event.preventDefault();
+    linkBusy = true;
+    error = "";
+    const back = `/signin?next=${encodeURIComponent(next)}`;
+    try {
+      await api("/api/auth/sign-in/magic-link", {
+        method: "POST",
+        body: { email: linkEmail, callbackURL: next, errorCallbackURL: back },
+      });
+      linkSent = linkEmail;
+    } catch (failure) {
+      error = t("signin.failed", { message: failure instanceof Error ? failure.message : "" });
+    } finally {
+      linkBusy = false;
+    }
+  }
 
   async function withGitHub() {
     github = true;
@@ -55,6 +79,21 @@
         {t("signin.github")}
       </Button>
       <p class="note">{t("signin.note")}</p>
+
+      <p class="or"><span>{t("signin.or")}</span></p>
+      {#if linkSent}
+        <p class="sent" role="status"><Icon name="check" size={14} />{t("signin.linkSent", { email: linkSent })}</p>
+        <button type="button" class="switch" onclick={() => (linkSent = "")}>{t("signin.linkAgain")}</button>
+      {:else}
+        <form class="link" onsubmit={withLink}>
+          <div class="field">
+            <label for="link-email">{t("signin.linkLabel")}</label>
+            <input id="link-email" type="email" bind:value={linkEmail} autocomplete="email" required />
+          </div>
+          <Button variant="secondary" size="lg" full type="submit" loading={linkBusy}>{t("signin.linkSubmit")}</Button>
+          <p class="note">{t("signin.linkNote")}</p>
+        </form>
+      {/if}
 
       {#if shared.devLogin}
         <form class="dev" onsubmit={withEmail}>
@@ -121,6 +160,35 @@
     color: var(--text-muted);
     font-size: var(--text-sm);
     line-height: var(--leading-ui);
+  }
+  .or {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: var(--text-faint);
+    font-size: var(--text-sm);
+  }
+  .or::before,
+  .or::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
+  .link {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .sent {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: var(--text-sm);
+    line-height: var(--leading-ui);
+  }
+  .sent :global(svg) {
+    margin-top: 3px;
+    color: var(--success);
   }
   .dev {
     display: flex;

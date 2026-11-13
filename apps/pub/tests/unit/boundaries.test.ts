@@ -4,8 +4,9 @@
 // what keeps the layers apart:
 //
 // - In `src/` and `pages/`, only a `*.server.ts` file calls Void (`void/db`, `void/env`,
-//   `void/storage`, `void/auth`) or imports another `*.server.ts`. Anything else may take row
-//   types from `@schema`, and a page its loader's props, with `import type`, and nothing more.
+//   `void/storage`, `void/auth`, `void/email`) or imports another `*.server.ts`. Anything else
+//   may take row types from `@schema`, and a page its loader's props, with `import type`, and
+//   nothing more.
 //   Routes, middleware and `auth.ts` run on the server only and are not held to it.
 // - `src/common/` knows no model. `src/shell/` knows `common` and the `person` model, and the
 //   person model does not know the shell; deck and comment may use it. So the order is common,
@@ -25,7 +26,7 @@ import { describe, expect, it } from "vitest";
 const APP = resolve(import.meta.dirname, "../..");
 const PROTOCOL = resolve(APP, "../../src/pub/protocol.ts");
 const MODELS = ["person", "deck", "comment"] as const;
-const VOID_SERVER = /^void(\/(db|env|storage|auth|schema-d1))?$/;
+const VOID_SERVER = /^void(\/(db|env|storage|auth|email|schema-d1))?$/;
 
 type Import = { spec: string; typeOnly: boolean; target: string | null };
 

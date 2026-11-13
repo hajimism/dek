@@ -1,7 +1,7 @@
 // Starts `vp dev` on a port of its own with a fresh local state, for the end-to-end run, and
 // stands in for the browser where a person would click: signing up, and approving a device code.
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -93,7 +93,7 @@ export class Browser {
 
   constructor(private readonly base: string) {}
 
-  async signUp(name: string): Promise<{ id: string; handle: string }> {
+  async signUp(name: string): Promise<{ id: string; handle: string; email: string }> {
     const email = `${name.toLowerCase()}-${Date.now()}@example.com`;
     const response = await this.fetch("/api/auth/sign-up/email", {
       method: "POST",
@@ -102,7 +102,8 @@ export class Browser {
     if (!response.ok) {
       throw new Error(`sign-up failed: ${response.status} ${await response.text()}`);
     }
-    return ((await response.json()) as { user: { id: string; handle: string } }).user;
+    return ((await response.json()) as { user: { id: string; handle: string; email: string } })
+      .user;
   }
 
   /** What the /device page does: claim the code while signed in, then approve it. */
@@ -152,4 +153,81 @@ export class Browser {
     }
     return response;
   }
+}
+
+export type Mail = { id: string; to: string; subject: string; text: string };
+
+/**
+ * The mail the dev server has kept instead of sending, read from Void's inbox pages with the
+ * token `vp dev` writes into `.void/`.
+ */
+export class Inbox {
+  private readonly token = readFileSync(join(APP, ".void", "dev-trigger-token"), "utf8").trim();
+
+  constructor(private readonly base: string) {}
+
+  /** Every mail to `to`, oldest first. */
+  async to(to: string): Promise<Mail[]> {
+    const response = await fetch(`${this.base}/__void/inbox/`, {
+      headers: { "x-void-dev-trigger": this.token },
+    });
+    const html = await response.text();
+    const rows = [
+      ...html.matchAll(
+        /<tr>\s*<td><a href="[^"]*\/__void\/inbox\/([^/?"]+)[^"]*">([^<]*)<\/a><\/td>\s*<td>[^<]*<\/td>\s*<td>([^<]*)<\/td>/g,
+      ),
+    ].map((match) => ({
+      id: match[1] ?? "",
+      subject: unescapeHtml(match[2] ?? ""),
+      to: unescapeHtml(match[3] ?? ""),
+    }));
+    const mine = rows.filter((row) => row.to.includes(to)).reverse();
+    return Promise.all(mine.map(async (row) => ({ ...row, text: await this.text(row.id) })));
+  }
+
+  /** Wait until `to` has at least `count` mails whose subject has `subject` in it, and answer them. */
+  async waitFor(to: string, subject: string, count = 1): Promise<Mail[]> {
+    const deadline = Date.now() + 15_000;
+    while (true) {
+      const found = (await this.to(to)).filter((mail) => mail.subject.includes(subject));
+      if (found.length >= count || Date.now() > deadline) {
+        return found;
+      }
+      await Bun.sleep(250);
+    }
+  }
+
+  /** The plain text of one mail, from its MIME source. */
+  private async text(id: string): Promise<string> {
+    const raw = await (
+      await fetch(`${this.base}/__void/inbox/${id}/raw`, {
+        headers: { "x-void-dev-trigger": this.token },
+      })
+    ).text();
+    const part =
+      raw.split(/\r?\n--/).find((each) => /content-type:\s*text\/plain/i.test(each)) ?? raw;
+    const [head = "", ...rest] = part.split(/\r?\n\r?\n/);
+    const body = rest.join("\n\n").replace(/\r?\n--[^\n]*--\s*$/, "");
+    if (/content-transfer-encoding:\s*base64/i.test(head)) {
+      return Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8");
+    }
+    if (/content-transfer-encoding:\s*quoted-printable/i.test(head)) {
+      const bytes = body
+        .replace(/=\r?\n/g, "")
+        .replace(/=([0-9A-F]{2})/gi, (_, hex: string) =>
+          String.fromCharCode(Number.parseInt(hex, 16)),
+        );
+      return Buffer.from(bytes, "latin1").toString("utf8");
+    }
+    return body;
+  }
+}
+
+function unescapeHtml(html: string): string {
+  return html
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
 }

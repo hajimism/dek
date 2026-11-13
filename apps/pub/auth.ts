@@ -1,19 +1,38 @@
-// dek.pub's Better Auth setup, on top of Void's defaults. GitHub is the only way in on the
-// deployed app; email sign-up exists only where DEK_PUB_DEV_LOGIN is 1, for local runs and tests.
+// dek.pub's Better Auth setup, on top of Void's defaults. On the deployed app one signs in with
+// GitHub, or by a link mailed to an address that has an account or a share waiting for it; email
+// sign-up with a password exists only where DEK_PUB_DEV_LOGIN is 1, for local runs and tests.
 // The device flow lets `dekc pub login` sign in, and the CLI then holds an API key.
 
 import { apiKey } from "@better-auth/api-key";
-import { bearer, deviceAuthorization } from "better-auth/plugins";
+import { bearer, deviceAuthorization, magicLink } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
 import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
+import { SIGN_IN_LINK_SECONDS } from "./src/model/person/feature/sign-in/mail.ts";
+import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
 import { handleFromEmail, normalizeHandle } from "./src/model/person/handle.ts";
+
+// The Worker's waitUntil, which keeps it running for mail sent after the answer. Imported lazily:
+// `void db generate` reads this file in Node, which has no such module.
+let keepAlive: ((task: Promise<unknown>) => void) | undefined;
+import("cloudflare:workers").then(
+  (workers) => {
+    keepAlive = workers.waitUntil;
+  },
+  () => undefined,
+);
 
 export default defineAuth(({ defaults, env }) => {
   const devLogin = env.DEK_PUB_DEV_LOGIN === "1";
   return {
     ...defaults,
     emailAndPassword: { enabled: devLogin },
+    // Mail goes out after the answer, so how long a request for a link takes says nothing of
+    // whether the address may have one.
+    advanced: {
+      ...defaults.advanced,
+      backgroundTasks: { handler: (task) => (keepAlive ? keepAlive(task) : undefined) },
+    },
     socialProviders: {
       ...defaults.socialProviders,
       github: {
@@ -31,8 +50,13 @@ export default defineAuth(({ defaults, env }) => {
     databaseHooks: {
       user: {
         create: {
-          before: async (user: { email: string; handle?: string | null }) => ({
-            data: { ...user, handle: user.handle ?? handleFromEmail(user.email) },
+          // An account a sign-in link makes has no name; it goes by its address's local part.
+          before: async (user: { email: string; name?: string; handle?: string | null }) => ({
+            data: {
+              ...user,
+              name: user.name || (user.email.split("@")[0] ?? user.email),
+              handle: user.handle ?? handleFromEmail(user.email),
+            },
           }),
         },
       },
@@ -44,6 +68,17 @@ export default defineAuth(({ defaults, env }) => {
         expiresIn: "15m",
         interval: "5s",
         validateClient: (clientId: string) => clientId === CLI_CLIENT_ID,
+      }),
+      magicLink({
+        expiresIn: SIGN_IN_LINK_SECONDS,
+        sendMagicLink: ({ email, url }, ctx) => {
+          ctx?.context.runInBackground(
+            (async () => {
+              const account = await ctx.context.internalAdapter.findUserByEmail(email);
+              await sendSignInLink(email, url, account !== null);
+            })(),
+          );
+        },
       }),
       apiKey({
         defaultPrefix: API_KEY_PREFIX,

@@ -1,9 +1,10 @@
 import { defineHandler } from "void";
 import { NewReply } from "../../../../../../../../src/pub/protocol.ts";
 import { notFound } from "../../../../../../src/common/api-error.ts";
-import { api, jsonBody } from "../../../../../../src/common/http.server.ts";
+import { afterAnswer, api, jsonBody } from "../../../../../../src/common/http.server.ts";
 import { mustComment } from "../../../../../../src/model/comment/access.ts";
 import { admitGuest } from "../../../../../../src/model/comment/guest.server.ts";
+import { sendNotices } from "../../../../../../src/model/comment/notice.server.ts";
 import {
   addReply,
   commentFor,
@@ -22,6 +23,10 @@ export const POST = defineHandler((c) =>
     const body = await jsonBody(c, NewReply);
     await admitGuest(c, person, body, "reply");
     const replyId = await addReply(thread, person, body.text, body.guestName);
+    afterAnswer(
+      c,
+      sendNotices(c, deck, thread, "reply", { person, guestName: body.guestName }, body.text),
+    );
     // The answer is the reply made, as protocol Reply; the thread it joined is a GET away.
     const reply = (await commentFor(c, deck, person, side, thread.id)).thread.find(
       (each) => each.id === replyId,

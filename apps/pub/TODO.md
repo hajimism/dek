@@ -39,7 +39,10 @@ What it does not do:
 
 The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51) and anyone a deck is shared with reads its threads (ADR 52). Still to come, each with its own ADR:
 
-- **Mail.** A mail provider, sign-in by magic link for invited and existing addresses, invitation mail, and notifications of new threads, replies and resolves. A sending domain and DKIM records are needed first.
+- **Mail, beyond what is built.** Sign-in links, invitations and notices of threads, replies and resolves are built (ADR 53, 54). Still to come:
+  - a digest of a person's notices, once a day or an hour, which needs a cron job and a record of what was sent
+  - muting a project's mail, with projects
+  - mail in the reader's language
 - **Drafts for the team.** The team's side reads versions not yet current and chooses which one the page shows; the client's side reads the current version only. A promote command in `dekc`.
 - **The full-screen viewer.** A header that shows on demand with the title, the author, the page and a comments button, and a comments mode with the panel to the right of a smaller slide. The `c` key reaches the page only from a deck built with a dek that passes it on.
 - **Public comments and likes**, on `public` and `link` decks; the comment policy then governs those only, and review threads are for grantees.
@@ -62,15 +65,20 @@ The comment feature is planned to grow into two: public comments and a like on t
   - Versions cannot be deleted.
 - **Grants.**
   - Grants are made on the manage page only; the CLI has no command for them, though `src/pub/protocol.ts` has their paths.
-  - An email grant sends no invitation, since there is no mail provider.
+  - An invitation is mailed only when a grant is made. Nothing sends one again, and a grant made before the mail domain works was never mailed.
 - **Deleting.** There is no way to delete a talk or an account.
 - **Handles.**
-  - A handle comes from the GitHub login or the email, and must be unique. A second account whose handle normalizes to one already taken fails to sign up.
+  - A handle comes from the GitHub login or the email, and must be unique. A second account whose handle normalizes to one already taken fails to sign up. So does one made by a sign-in link, which then answers as if the link had expired.
   - A link-visibility talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
 - **Profile.** The profile page lists every talk with no pagination; RSS stops at 50.
 
 ## Running it for real
 
+- **Mail.**
+  - The sending domain, `mail.dek.pub` in `void.config.ts`, is set up with `void deploy`, which needs a Cloudflare token with Email Routing Edit and Email Sending Edit.
+  - SPF, DKIM and DMARC records for it, checked in a received mail's headers.
+  - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing.
+  - Asking for sign-in links is held only by Better Auth's default limit, 5 a minute from one client; nothing limits how many addresses are tried.
 - **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, plus `TURNSTILE_SITE_KEY`. `DEK_PUB_DEV_LOGIN` must be unset.
 - **Domains.**
   - `dek.pub` and `dekusercontent.com` are not registered.
