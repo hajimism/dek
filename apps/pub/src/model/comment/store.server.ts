@@ -10,12 +10,13 @@ import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
-import { canSeeScript, mayCommentOnVersion } from "../deck/access.ts";
+import { canSeeScript, mayReadVersion } from "../deck/access.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
 import { findVersion, renamesOf } from "../deck/version/store.server.ts";
 import { peopleById } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
+import { canSeeThread } from "./access.ts";
 import { placeComment, saysQuote } from "./anchor.ts";
 import { CommentTargets, type ThreadRow } from "./type.ts";
 import { hideQuotes } from "./view.ts";
@@ -130,7 +131,9 @@ export async function commentsFor(
   person: Person | null,
   options: { status: Status; version?: number | null },
 ): Promise<CommentRow[]> {
-  const rows = await listComments(c, deck, options);
+  const rows = (await listComments(c, deck, options)).filter((row) =>
+    canSeeThread(deck, { n: row.version }, person),
+  );
   return canSeeScript(deck, person) ? rows : rows.map(hideQuotes);
 }
 
@@ -142,7 +145,7 @@ export async function commentFor(
   id: string,
 ): Promise<CommentRow> {
   const [row] = await listComments(c, deck, { status: "all", id });
-  if (!row) {
+  if (!row || !canSeeThread(deck, { n: row.version }, person)) {
     throw notFound("comment");
   }
   return canSeeScript(deck, person) ? row : hideQuotes(row);
@@ -156,7 +159,17 @@ export async function openThread(
   // The version the commenter was reading, which may be older than the current one by now;
   // the thread is kept on it, so the renames since are followed when it is shown.
   const n = comment.version ?? deck.currentVersion;
-  if (n !== null && !mayCommentOnVersion(deck, person, n)) {
+  // A reader comments on the version readers see. One whose page shows an older version is
+  // told so, whatever that version was: whether it was ever shown is not kept.
+  if (n !== null && !mayReadVersion(deck, person, n)) {
+    if (Number.isInteger(n) && n >= 1 && n < (deck.currentVersion ?? 0)) {
+      throw new ApiError(
+        409,
+        "stale_version",
+        `version ${n} is no longer the one readers see`,
+        "reload the page and comment again",
+      );
+    }
     throw new ApiError(422, "unknown_version", `the deck has no version ${n}`);
   }
   // Whether a passage is in the script is the script's to tell, so one it is hidden from may not
@@ -212,14 +225,21 @@ export async function openThread(
   return id;
 }
 
-export async function threadById(deck: Deck, id: string): Promise<ThreadRow | null> {
-  return (
-    (await db
-      .select()
-      .from(threads)
-      .where(and(eq(threads.deckId, deck.id), eq(threads.id, id)))
-      .get()) ?? null
-  );
+/** A thread `person` may see, to reply to or resolve; any other is as missing as one that is not. */
+export async function visibleThread(
+  deck: Deck,
+  person: Person | null,
+  id: string,
+): Promise<ThreadRow> {
+  const thread = await db
+    .select()
+    .from(threads)
+    .where(and(eq(threads.deckId, deck.id), eq(threads.id, id)))
+    .get();
+  if (!thread || !canSeeThread(deck, thread, person)) {
+    throw notFound("comment");
+  }
+  return thread;
 }
 
 export async function addReply(

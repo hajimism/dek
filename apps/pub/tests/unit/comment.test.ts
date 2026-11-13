@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { canReadComments, canResolve, mayResolve } from "../../src/model/comment/access.ts";
+import {
+  canReadComments,
+  canResolve,
+  canSeeThread,
+  mayResolve,
+} from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
 import { hideQuotes } from "../../src/model/comment/view.ts";
@@ -202,6 +207,15 @@ describe("who may resolve", () => {
     expect(mayResolve(by("sato"), { handle: "kato" }, false)).toBe(false);
     expect(mayResolve(by("sato", true), { handle: "sato" }, false)).toBe(false);
     expect(mayResolve(by("sato"), null, true)).toBe(false);
+  });
+
+  it("shows a thread on a version held back to the owner only", () => {
+    const shown = { ownerId: "u1", currentVersion: 2 };
+    expect(canSeeThread(shown, { n: 2 }, { id: "u2" })).toBe(true);
+    expect(canSeeThread(shown, { n: 1 }, null)).toBe(true);
+    expect(canSeeThread(shown, { n: 3 }, { id: "u2" })).toBe(false);
+    expect(canSeeThread(shown, { n: 3 }, { id: "u1" })).toBe(true);
+    expect(canSeeThread({ ...shown, currentVersion: null }, { n: 1 }, { id: "u2" })).toBe(false);
   });
 
   it("reads comments as the owner, or as one who may comment", () => {

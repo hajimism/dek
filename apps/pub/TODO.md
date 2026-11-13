@@ -20,7 +20,9 @@ What it does not do:
   - Quotes are searched for again, and renames are followed.
   - An element comment's path and box are never checked again. When its slide's HTML changes, the comment stays `open`, still pointing at the old box. It becomes `moved` only through a rename, and never `detached`.
   - So the "Moved" and "Changed" badges appear only for quotes and renames.
-- **Versions.** There is no way to see comments where they sat on an older version. The API's `?version=` filter is used by neither the CLI nor the pages.
+- **Versions.**
+  - There is no way to see comments where they sat on an older version. The API's `?version=` filter is used by neither the CLI nor the pages, and a reader may ask it for the current version only.
+  - Which versions were once current is not kept. So a reader comments on the current version only: a page opened before a promote gets 409 `stale_version` and must be reloaded, and a thread opened on a version newer than the current one is the owner's alone until that version is current.
 - **What changed.** Only the manage page lists the slides a version changed. The talk page does not mark changed slides for someone coming back to review.
 - **Text.** Comments are plain text: no Markdown, no mentions.
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.

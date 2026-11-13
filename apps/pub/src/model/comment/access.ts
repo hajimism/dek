@@ -17,6 +17,18 @@ export function canReadComments(
   return canManage(deck, person) || canComment(deck, person, grant);
 }
 
+/**
+ * Whether `person` may see a thread: the owner any; anyone else one opened on a version no newer
+ * than the current one, so a note on a version held back stays the owner's while it is.
+ */
+export function canSeeThread(
+  deck: { ownerId: string; currentVersion: number | null },
+  thread: Pick<ThreadRow, "n">,
+  person: Pick<Person, "id"> | null,
+): boolean {
+  return canManage(deck, person) || thread.n <= (deck.currentVersion ?? 0);
+}
+
 export function canResolve(
   deck: { ownerId: string },
   thread: Pick<ThreadRow, "authorId">,

@@ -7,7 +7,7 @@ import { admitGuest } from "../../../../../../src/model/comment/guest.server.ts"
 import {
   addReply,
   commentFor,
-  threadById,
+  visibleThread,
 } from "../../../../../../src/model/comment/store.server.ts";
 import { canComment } from "../../../../../../src/model/deck/access.ts";
 import { visibleDeck } from "../../../../../../src/model/deck/store.server.ts";
@@ -18,10 +18,7 @@ export const POST = defineHandler((c) =>
     const person = await currentPerson(c);
     const { deck, grant } = await visibleDeck(c.req.param("id") ?? "", person);
     mustComment(canComment(deck, person, grant), person);
-    const thread = await threadById(deck, c.req.param("comment") ?? "");
-    if (!thread) {
-      throw notFound("comment");
-    }
+    const thread = await visibleThread(deck, person, c.req.param("comment") ?? "");
     const body = await jsonBody(c, NewReply);
     await admitGuest(c, person, body, "reply");
     const replyId = await addReply(thread, person, body.text, body.guestName);

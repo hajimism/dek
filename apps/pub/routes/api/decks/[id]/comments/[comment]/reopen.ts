@@ -5,7 +5,7 @@ import { canResolve } from "../../../../../../src/model/comment/access.ts";
 import {
   commentFor,
   setResolved,
-  threadById,
+  visibleThread,
 } from "../../../../../../src/model/comment/store.server.ts";
 import { visibleDeck } from "../../../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../../../src/model/person/actor.server.ts";
@@ -14,10 +14,7 @@ export const POST = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
     const { deck } = await visibleDeck(c.req.param("id") ?? "", person);
-    const thread = await threadById(deck, c.req.param("comment") ?? "");
-    if (!thread) {
-      throw notFound("comment");
-    }
+    const thread = await visibleThread(deck, person, c.req.param("comment") ?? "");
     if (!canResolve(deck, thread, person)) {
       throw new ApiError(
         403,
