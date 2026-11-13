@@ -214,8 +214,8 @@
       </figure>
       {#if slide.picture}
         <p class="jump">
-          <button type="button" onclick={() => onshowslide?.(slide.slug)} aria-label={t("talk.showSlide", { n: i + 1 })}>
-            {t("talk.jumpToSlide")}<Icon name="arrow-up" size={13} />
+          <button type="button" onclick={() => onshowslide?.(slide.slug)}>
+            {t("talk.jumpToSlide", { n: i + 1 })}<Icon name="arrow-up" size={13} />
           </button>
         </p>
       {/if}
