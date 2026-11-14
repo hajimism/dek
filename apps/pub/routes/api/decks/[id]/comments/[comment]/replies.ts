@@ -23,7 +23,7 @@ export const POST = defineHandler((c) =>
     const replyId = await addReply(thread, person, body.text);
     afterAnswer(
       c,
-      sendNotices(c, deck, thread, "reply", { person }, body.text),
+      sendNotices(c, deck, thread, "reply", person, body.text),
     );
     // The answer is the reply made, as protocol Reply; the thread it joined is a GET away.
     const reply = (await commentFor(c, deck, person, side, thread.id)).thread.find(

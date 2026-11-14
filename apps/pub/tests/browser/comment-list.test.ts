@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CommentRow, NewComment } from "../../../../src/pub/protocol.ts";
 import { CommentList } from "../../src/model/comment/client.svelte.ts";
 
-const author = { name: "Hajime", handle: "demo", guest: false };
+const author = { name: "Hajime", handle: "demo" };
 
 function row(overrides: Partial<CommentRow> = {}): CommentRow {
   return {

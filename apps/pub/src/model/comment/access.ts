@@ -66,7 +66,7 @@ export function mayResolve(
   if (!viewer) {
     return false;
   }
-  return isOwner || (!comment.author.guest && comment.author.handle === viewer.handle);
+  return isOwner || comment.author.handle === viewer.handle;
 }
 
 /** Whether the page offers to share a team thread with the client: to whom may resolve it. */
@@ -78,9 +78,12 @@ export function mayWiden(
   return comment.scope === "team" && mayResolve(comment, viewer, isOwner);
 }
 
-/** Refuse a writer the deck's comments are not open to. */
-export function mustComment(open: boolean, person: Pick<Person, "id"> | null): void {
-  if (!open) {
+/** Refuse a writer the deck's comments are not open to; every writer is signed in. */
+export function mustComment<P extends Pick<Person, "id">>(
+  open: boolean,
+  person: P | null,
+): asserts person is P {
+  if (!open || person === null) {
     throw new ApiError(
       403,
       "no_comments",

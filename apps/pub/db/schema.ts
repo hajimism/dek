@@ -22,7 +22,7 @@ export const decks = sqliteTable(
       .default("private"),
     scriptPublic: integer("script_public", { mode: "boolean" }).notNull().default(false),
     embed: integer("embed", { mode: "boolean" }).notNull().default(false),
-    comments: text("comments", { enum: ["off", "signed-in", "guests"] })
+    comments: text("comments", { enum: ["off", "signed-in"] })
       .notNull()
       .default("signed-in"),
     currentVersion: integer("current_version"),
@@ -92,8 +92,7 @@ export const threads = sqliteTable(
     /** The comment's targets, as protocol CommentTarget[] JSON. */
     targets: text("targets").notNull(),
     text: text("text").notNull(),
-    authorId: text("author_id"),
-    guestName: text("guest_name"),
+    authorId: text("author_id").notNull(),
     resolvedBy: text("resolved_by"),
     resolvedAt: text("resolved_at"),
     createdAt: text("created_at").notNull().default(now),
@@ -110,8 +109,7 @@ export const replies = sqliteTable(
     id: text("id").primaryKey(),
     threadId: text("thread_id").notNull(),
     text: text("text").notNull(),
-    authorId: text("author_id"),
-    guestName: text("guest_name"),
+    authorId: text("author_id").notNull(),
     createdAt: text("created_at").notNull().default(now),
   },
   (table) => [index("replies_thread").on(table.threadId, table.createdAt)],
@@ -158,8 +156,7 @@ export const publicComments = sqliteTable(
     id: text("id").primaryKey(),
     deckId: text("deck_id").notNull(),
     parentId: text("parent_id"),
-    authorId: text("author_id"),
-    guestName: text("guest_name"),
+    authorId: text("author_id").notNull(),
     text: text("text").notNull(),
     createdAt: text("created_at").notNull().default(now),
     editedAt: text("edited_at"),

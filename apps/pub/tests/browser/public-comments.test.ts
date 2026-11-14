@@ -5,7 +5,7 @@ import PublicComments from "../../src/model/comment/public/ui/public-comments.sv
 import LikeButton from "../../src/model/deck/like/ui/like-button.svelte";
 import { renderPage } from "./setup.ts";
 
-const by = (handle: string) => ({ name: handle, handle, guest: false });
+const by = (handle: string) => ({ name: handle, handle });
 const comments: PublicComment[] = [
   {
     id: "p_1",

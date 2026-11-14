@@ -11,7 +11,6 @@ export function shared(overrides: Partial<Shared> = {}): Shared {
     lang: "en",
     theme: "system",
     devLogin: false,
-    turnstileSiteKey: "",
     now: NOW,
     ...overrides,
   };

@@ -3049,8 +3049,7 @@
               "type": "string",
               "enum": [
                 "off",
-                "signed-in",
-                "guests"
+                "signed-in"
               ]
             },
             "current": {
@@ -3229,8 +3228,7 @@
               "type": "string",
               "enum": [
                 "off",
-                "signed-in",
-                "guests"
+                "signed-in"
               ]
             },
             "current": {
@@ -3409,8 +3407,7 @@
               "type": "string",
               "enum": [
                 "off",
-                "signed-in",
-                "guests"
+                "signed-in"
               ]
             },
             "current": {
@@ -3792,14 +3789,11 @@
                       },
                       "handle": {
                         "type": "string"
-                      },
-                      "guest": {
-                        "type": "boolean"
                       }
                     },
                     "required": [
                       "name",
-                      "guest"
+                      "handle"
                     ],
                     "additionalProperties": false
                   },
@@ -3828,14 +3822,11 @@
                             },
                             "handle": {
                               "type": "string"
-                            },
-                            "guest": {
-                              "type": "boolean"
                             }
                           },
                           "required": [
                             "name",
-                            "guest"
+                            "handle"
                           ],
                           "additionalProperties": false
                         },
@@ -3931,14 +3922,11 @@
                     },
                     "handle": {
                       "type": "string"
-                    },
-                    "guest": {
-                      "type": "boolean"
                     }
                   },
                   "required": [
                     "name",
-                    "guest"
+                    "handle"
                   ],
                   "additionalProperties": false
                 },
@@ -4502,8 +4490,7 @@
               "type": "string",
               "enum": [
                 "off",
-                "signed-in",
-                "guests"
+                "signed-in"
               ]
             },
             "current": {
@@ -4686,8 +4673,7 @@
               "type": "string",
               "enum": [
                 "off",
-                "signed-in",
-                "guests"
+                "signed-in"
               ]
             },
             "current": {
@@ -4870,8 +4856,7 @@
               "type": "string",
               "enum": [
                 "off",
-                "signed-in",
-                "guests"
+                "signed-in"
               ]
             },
             "current": {
@@ -5261,14 +5246,11 @@
                       },
                       "handle": {
                         "type": "string"
-                      },
-                      "guest": {
-                        "type": "boolean"
                       }
                     },
                     "required": [
                       "name",
-                      "guest"
+                      "handle"
                     ],
                     "additionalProperties": false
                   },
@@ -5297,14 +5279,11 @@
                             },
                             "handle": {
                               "type": "string"
-                            },
-                            "guest": {
-                              "type": "boolean"
                             }
                           },
                           "required": [
                             "name",
-                            "guest"
+                            "handle"
                           ],
                           "additionalProperties": false
                         },
@@ -5404,14 +5383,11 @@
                     },
                     "handle": {
                       "type": "string"
-                    },
-                    "guest": {
-                      "type": "boolean"
                     }
                   },
                   "required": [
                     "name",
-                    "guest"
+                    "handle"
                   ],
                   "additionalProperties": false
                 },

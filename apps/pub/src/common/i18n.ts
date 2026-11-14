@@ -176,9 +176,6 @@ const en = {
   "comment.replyPlaceholder": "Reply…",
   "comment.empty": "No comments yet.",
   "comment.emptyHint": "Select a sentence or tap a part of a slide to comment.",
-  "comment.guest": "Comment as a guest",
-  "comment.guestName": "Your name",
-  "comment.guestBadge": "Guest",
   "comment.signin": "Sign in",
   "comment.signinToComment": "Sign in to comment",
   "comment.post": "Comment",
@@ -271,13 +268,10 @@ const en = {
   "manage.comments": "Comments",
   "manage.comments.off": "Off",
   "manage.comments.signed-in": "Signed in",
-  "manage.comments.guests": "Guests too",
   "manage.comments.off.hint":
     "No one can comment below the talk. Review threads are for the people you share it with, whatever this says.",
   "manage.comments.signed-in.hint":
     "Anyone who can open the talk and is signed in can comment below it. Review threads are for the people you share it with.",
-  "manage.comments.guests.hint":
-    "Guests can comment below the talk too, with a name, after a human check.",
   "manage.sharing": "Sharing",
   "manage.sharing.hint":
     "Invite people by dek.pub handle, or by email before they have an account.",
@@ -502,9 +496,6 @@ const ja: Record<MessageKey, string> = {
   "comment.replyPlaceholder": "返信…",
   "comment.empty": "まだコメントはありません。",
   "comment.emptyHint": "文を選ぶか、スライドの一部をタップしてコメントできます。",
-  "comment.guest": "ゲストとしてコメント",
-  "comment.guestName": "お名前",
-  "comment.guestBadge": "ゲスト",
   "comment.signin": "サインイン",
   "comment.signinToComment": "サインインしてコメント",
   "comment.post": "コメント",
@@ -596,13 +587,10 @@ const ja: Record<MessageKey, string> = {
   "manage.comments": "コメント",
   "manage.comments.off": "オフ",
   "manage.comments.signed-in": "サインイン済み",
-  "manage.comments.guests": "ゲストも可",
   "manage.comments.off.hint":
     "トークの下のコメントは誰も書けません。レビューのスレッドは、この設定によらず共有した人のためのものです。",
   "manage.comments.signed-in.hint":
     "トークを開けて、サインインしている人がトークの下にコメントできます。レビューのスレッドは共有した人のためのものです。",
-  "manage.comments.guests.hint":
-    "ゲストも名前を入れ、人間かどうかの確認を経て、トークの下にコメントできます。",
   "manage.sharing": "共有",
   "manage.sharing.hint": "dek.pub のハンドルか、アカウント作成前ならメールアドレスで招待します。",
   "manage.sharing.who": "ハンドルまたはメール",

@@ -36,7 +36,7 @@ export function canComment(deck: DeckRules, person: Caller, grant: GrantRole | n
 
 /**
  * Which side of the work `person` is on: the owner the team's; a grantee the one their grants
- * give; anyone else, guests included, the client's.
+ * give; anyone else, signed out included, the client's.
  */
 export function sideOf(
   deck: Pick<DeckRules, "ownerId">,

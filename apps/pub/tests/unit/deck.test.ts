@@ -66,7 +66,7 @@ describe("access", () => {
 
   it("lets the owner and those granted comment write review threads, whatever the policy", () => {
     expect(canView(deck("link"), null, null)).toBe(true);
-    expect(canComment(deck("link", "guests"), null, null)).toBe(false);
+    expect(canComment(deck("link", "signed-in"), null, null)).toBe(false);
     expect(canComment(deck("link", "signed-in"), other, null)).toBe(false);
     expect(canComment(deck("public", "off"), other, "comment")).toBe(true);
     expect(canComment(deck("public", "off"), owner, null)).toBe(true);

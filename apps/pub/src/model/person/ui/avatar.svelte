@@ -3,8 +3,14 @@
     name,
     image = null,
     size = 28,
-    guest = false,
-  }: { name: string; image?: string | null; size?: 20 | 28 | 32 | 72; guest?: boolean } = $props();
+    pending = false,
+  }: {
+    name: string;
+    image?: string | null;
+    size?: 20 | 28 | 32 | 72;
+    /** Someone invited by email who has no account yet: drawn as an outline. */
+    pending?: boolean;
+  } = $props();
 
   const initials = $derived(
     name
@@ -20,7 +26,7 @@
 
 <span
   class="avatar"
-  class:guest
+  class:pending
   style:--size="{size}px"
   style:--font="{Math.round(size * 0.4)}px"
   aria-hidden="true"
@@ -57,10 +63,10 @@
     border-radius: inherit;
     box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
   }
-  .guest {
+  .pending {
     background: transparent;
   }
-  .guest::after {
+  .pending::after {
     box-shadow: none;
     border: 1px dashed var(--border-strong);
   }

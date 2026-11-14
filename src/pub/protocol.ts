@@ -10,7 +10,7 @@
 import { z } from "zod";
 
 /** Bumped when a shape changes in a way an older side cannot read; the server reads one back. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /**
  * `schema` as a reader takes an answer: every object in it, however deep, drops the fields it does
@@ -116,8 +116,8 @@ export const DeckId = z.string().regex(DECK_ID_RE);
 export const Visibility = z.enum(["private", "link", "public"]);
 export type Visibility = z.infer<typeof Visibility>;
 
-/** Who may comment on a deck anyone can open: nobody else, signed-in people, or guests too. */
-export const CommentPolicy = z.enum(["off", "signed-in", "guests"]);
+/** Who may comment on a deck anyone can open: nobody else, or anyone signed in. */
+export const CommentPolicy = z.enum(["off", "signed-in"]);
 export type CommentPolicy = z.infer<typeof CommentPolicy>;
 
 export const Rename = z.strictObject({ from: z.string(), to: z.string(), at: z.string() });
@@ -280,11 +280,10 @@ export type CommentAnchor = z.infer<typeof CommentAnchor>;
 export const CommentStatus = z.enum(["open", "moved", "detached", "resolved"]);
 export type CommentStatus = z.infer<typeof CommentStatus>;
 
+/** Who wrote a comment or a reply: always an account. */
 export const Author = z.strictObject({
   name: z.string(),
-  /** The handle of a signed-in author; absent for a guest. */
-  handle: z.string().optional(),
-  guest: z.boolean(),
+  handle: z.string(),
 });
 
 export const Reply = z.strictObject({
@@ -334,18 +333,10 @@ export const NewComment = z.strictObject({
   text: z.string().min(1).max(4000),
   /** Who reads it; when absent, `team` for one on the team's side and `shared` for anyone else. */
   scope: ThreadScope.optional(),
-  /** A guest's name; ignored when signed in. */
-  guestName: z.string().min(1).max(60).optional(),
-  /** Turnstile's token, for a guest. */
-  turnstile: z.string().optional(),
 });
 export type NewComment = z.infer<typeof NewComment>;
 
-export const NewReply = z.strictObject({
-  text: z.string().min(1).max(4000),
-  guestName: z.string().min(1).max(60).optional(),
-  turnstile: z.string().optional(),
-});
+export const NewReply = z.strictObject({ text: z.string().min(1).max(4000) });
 
 // ---------------------------------------------------------------------------------------------
 // Public comments and likes, at the bottom of a talk anyone may open: on the talk as a whole, by
@@ -366,12 +357,10 @@ export type PublicComment = z.infer<typeof PublicComment>;
 
 export const PublicCommentList = z.strictObject({ comments: z.array(PublicComment) });
 
-/** A comment, or with `parentId` a reply to one; a guest gives a name and passes Turnstile. */
+/** A comment, or with `parentId` a reply to one. */
 export const NewPublicComment = z.strictObject({
   text: z.string().min(1).max(4000),
   parentId: z.string().optional(),
-  guestName: z.string().min(1).max(60).optional(),
-  turnstile: z.string().optional(),
 });
 export type NewPublicComment = z.infer<typeof NewPublicComment>;
 

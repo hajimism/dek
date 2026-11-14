@@ -44,7 +44,6 @@
   const commentOptions = $derived([
     { value: "off" as const, label: t("manage.comments.off") },
     { value: "signed-in" as const, label: t("manage.comments.signed-in") },
-    { value: "guests" as const, label: t("manage.comments.guests") },
   ]);
 
   // The local nav follows the section being read.

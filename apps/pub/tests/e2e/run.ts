@@ -375,10 +375,11 @@ try {
     method: "POST",
     json: { text: "良い発表でした" },
   });
-  const postedRow = (await posted.json()) as { id: string; author: { guest: boolean } };
+  const postedRow = (await posted.json()) as { id: string; author: { handle: string } };
   check(
-    posted.status === 201 && !postedRow.author.guest,
-    "a signed-in reader posts a public comment",
+    posted.status === 201 && postedRow.author.handle !== "",
+    "a signed-in reader posts a public comment, under their handle",
+    postedRow,
   );
   const publicReply = await reader.fetch(publicPath, {
     method: "POST",
@@ -442,18 +443,24 @@ try {
       (await reader.fetch(publicPath)).status === 200,
     "with the policy off, no one posts and anyone still reads",
   );
-  await dekc(["pub", "share", "--comments", "guests"]);
-  const guest = new Browser(server.url);
-  const asGuest = await guest.fetch(publicPath, {
-    method: "POST",
-    json: { text: "ゲストです", guestName: "来場者" },
-  });
-  check(
-    asGuest.status === 201 &&
-      ((await asGuest.json()) as { author: { guest: boolean } }).author.guest,
-    "under guests, a guest posts with a name",
-  );
   await dekc(["pub", "share", "--comments", "signed-in"]);
+  const signedOut = new Browser(server.url);
+  const refused = await signedOut.fetch(publicPath, { method: "POST", json: { text: "x" } });
+  const refusal = (await refused.json()) as { error: { code: string; hint?: string } };
+  check(
+    refused.status === 403 &&
+      refusal.error.code === "no_comments" &&
+      refusal.error.hint === "sign in to comment",
+    "someone signed out posts no public comment, and is told to sign in",
+    refusal,
+  );
+  const noGuests = await dekc(["pub", "share", "--comments", "guests"]);
+  check(
+    noGuests.ok === false &&
+      (noGuests.error as { message: string }).message === 'invalid --comments "guests"',
+    "dekc takes no guests policy",
+    noGuests,
+  );
   const likePath = `/api/decks/${id}/like`;
   const liked = (await (await reader.fetch(likePath, { method: "PUT" })).json()) as {
     count: number;
@@ -470,7 +477,10 @@ try {
     "each account likes a talk once, and may take it back",
     { liked, unliked },
   );
-  check((await guest.fetch(likePath, { method: "PUT" })).status === 401, "a guest cannot like");
+  check(
+    (await signedOut.fetch(likePath, { method: "PUT" })).status === 401,
+    "someone signed out cannot like",
+  );
 
   // Grants: a private deck shared with one person by handle.
   await dekc(["pub", "share", "--visibility", "private"]);

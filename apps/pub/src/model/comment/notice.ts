@@ -11,17 +11,16 @@ import type { ThreadRow } from "./type.ts";
 
 export type NoticeEvent = "thread" | "reply" | "resolve";
 
-/** The accounts in a thread, once each, the owner first; guests have none and get no mail. */
+/** The accounts in a thread, once each, the owner first. */
 export function noticeRecipients(thread: {
   ownerId: string;
-  authorId: string | null;
-  replierIds: readonly (string | null)[];
-  actorId: string | null;
+  authorId: string;
+  replierIds: readonly string[];
+  actorId: string;
 }): string[] {
   const ids = new Set([thread.ownerId, thread.authorId, ...thread.replierIds]);
   ids.delete(thread.actorId);
-  ids.delete(null);
-  return [...ids].filter((id): id is string => id !== null);
+  return [...ids];
 }
 
 /** Whether one of them hears of it: they still see the deck and the thread, and did not mute it. */

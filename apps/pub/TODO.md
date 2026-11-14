@@ -13,8 +13,7 @@ What it does not do:
 - **Notifications.** No one hears that a comment arrived: no email, no unread marker, nothing in the app.
 - **Live updates.** Comments load with the page. Others' comments appear only after a reload; only your own are merged in as you post them.
 - **Editing and deleting.** Nobody can edit or delete a comment or a reply, and the API has no routes for it.
-- **Moderation.** The owner can resolve any thread but cannot hide or delete one. A guest cannot resolve or reopen their own thread, because resolving needs a signed-in account.
-- **Guest identity.** A guest's name is remembered in the browser (`dek-pub:guest-name`). Nothing ties a guest to their earlier comments.
+- **Moderation.** The owner can resolve any thread but cannot hide or delete one.
 - **Anchoring to beats.** An element comment keeps the beat it was picked at. A comment on a quote, and one on a slide made before the deck reported ready, are saved at step `"0"`. Pins are drawn at every beat of their slide (ADR 45).
 - **Re-anchoring after a publish** (`src/model/comment/anchor.ts`).
   - Quotes are searched for again, and renames are followed.
@@ -38,10 +37,6 @@ What it does not do:
   - The like appears beside the title and in the full-screen header (ADR 58).
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.
 - **Drafts.** A draft is lost on reload.
-- **Turnstile setup.**
-  - `TURNSTILE_SITE_KEY` (`env.ts`) is missing from `dev.env` and from ADR 43's list of production settings.
-  - The composer shows the widget only when the site key is set, yet the server asks for a token whenever `TURNSTILE_SECRET` is not `off`. With the secret set and no site key, a guest cannot comment.
-  - The e2e run posts a guest's public comment with the check off; nothing exercises Turnstile itself.
 
 ## Comments for client work
 
@@ -82,7 +77,7 @@ The comment feature is planned to grow into two: public comments and a like on t
   - SPF, DKIM and DMARC records for it, checked in a received mail's headers.
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing.
   - Asking for sign-in links is held only by Better Auth's default limit, 5 a minute from one client; nothing limits how many addresses are tried.
-- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, plus `TURNSTILE_SITE_KEY`. `DEK_PUB_DEV_LOGIN` must be unset.
+- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`. `DEK_PUB_DEV_LOGIN` must be unset.
 - **Domains.**
   - `dek.pub` and `dekusercontent.com` are not registered.
   - `serve/wrangler.jsonc` has no routes for `d-*.dekusercontent.com`, and there is no wildcard DNS.
@@ -111,7 +106,6 @@ The comment feature is planned to grow into two: public comments and a like on t
   - source history and `dekc pub pull`, syncing either to Cloudflare Artifacts or as pull requests to the author's GitHub (not yet decided)
   - changing slides by instruction
 - **Open questions:**
-  - whether guests may comment at all
   - where a live room keeps its state
   - storage limits per plan
   - whether the deck's CSP applies to a local `dekc build` too

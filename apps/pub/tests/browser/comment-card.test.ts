@@ -14,7 +14,7 @@ function row(overrides: Partial<CommentRow> = {}): CommentRow {
     status: "open",
     text: "The number needs a source.",
     targets: [{ kind: "quote", quote: "three times faster", prefix: "it got ", suffix: "." }],
-    author: { name: "Sato Yuki", handle: "sato", guest: false },
+    author: { name: "Sato Yuki", handle: "sato" },
     version: 2,
     url: "http://localhost/@demo/talk#c_abc",
     thread: [],
@@ -140,7 +140,7 @@ describe("CommentCard", () => {
   it("collapses a long thread to its last reply", async () => {
     const reply = (n: number) => ({
       id: `r_${n}`,
-      author: { name: `Reader ${n}`, guest: true },
+      author: { name: `Reader ${n}`, handle: `reader${n}` },
       text: `Reply ${n}`,
       createdAt: new Date(NOW).toISOString(),
     });

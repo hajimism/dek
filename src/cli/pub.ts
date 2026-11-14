@@ -443,7 +443,7 @@ export async function statusCommand(target: ReadableDeck, flags: FlagValues): Pr
 }
 
 const SHARE_FLAGS =
-  "--visibility private|link|public, --script shown|hidden, --embed on|off, or --comments off|signed-in|guests";
+  "--visibility private|link|public, --script shown|hidden, --embed on|off, or --comments off|signed-in";
 
 /** `dekc pub share`: who may open the deck, read its script, embed it, and comment. */
 export async function shareCommand(target: ReadableDeck, flags: FlagValues): Promise<PubResult> {

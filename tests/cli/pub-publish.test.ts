@@ -107,7 +107,7 @@ describe("dekc pub publish", () => {
           expect(upload?.fields?.cover).toMatchObject({ type: "image/png" });
           const [manifest] = fake.manifests.get(deck?.id ?? "") ?? [];
           expect(manifest).toMatchObject({
-            protocol: 1,
+            protocol: 2,
             deck: "Why_Dek",
             title: "Why dek",
             event: "Meetup #42",

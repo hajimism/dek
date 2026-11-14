@@ -47,7 +47,7 @@ export const POST = defineHandler((c) =>
     const thread = await visibleThread(deck, side, id);
     afterAnswer(
       c,
-      sendNotices(c, deck, thread, "thread", { person }, body.text),
+      sendNotices(c, deck, thread, "thread", person, body.text),
     );
     return Response.json(await commentFor(c, deck, person, side, id), { status: 201 });
   }, c.req.raw),

@@ -299,7 +299,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
         }
         const reply = {
           id: id("r_"),
-          author: { name: fake.me.name, handle: fake.me.handle, guest: false },
+          author: { name: fake.me.name, handle: fake.me.handle },
           text: parsed.data.text,
           createdAt: new Date().toISOString(),
         };

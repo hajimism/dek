@@ -17,7 +17,6 @@
     isOwner = false,
     canComment = false,
     scopes = false,
-    guest = false,
     closable = false,
     muted = null,
     onmute,
@@ -43,7 +42,6 @@
     canComment?: boolean;
     /** The reader is on the team's side: a new thread may be kept to the team. */
     scopes?: boolean;
-    guest?: boolean;
     closable?: boolean;
     /** Whether the reader turned off mail of these comments; null for one who gets none. */
     muted?: boolean | null;
@@ -97,7 +95,7 @@
               : t("talk.slideLabel", { n: draft.slideNumber ?? "?" })}
           </p>
         {/if}
-        <Composer {guest} {scopes} autofocus oncancel={oncanceldraft} onsubmit={oncreate} />
+        <Composer {scopes} autofocus oncancel={oncanceldraft} onsubmit={oncreate} />
       </section>
   {/if}
 {/snippet}
@@ -169,7 +167,6 @@
               canResolve={mayResolve(comment, shared.viewer, isOwner)}
               canReply={canComment}
               canWiden={mayWiden(comment, shared.viewer, isOwner)}
-              {guest}
               now={shared.now}
               onselect={() => onselect(comment)}
               onanchor={() => onanchor(comment)}

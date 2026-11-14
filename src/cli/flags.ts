@@ -148,9 +148,9 @@ export const FLAGS = {
   },
   comments: {
     type: "enum",
-    choices: ["off", "signed-in", "guests"],
+    choices: ["off", "signed-in"],
     example: "dekc pub share --comments signed-in",
-    text: "who may comment: nobody else, people signed in to dek.pub, or guests too",
+    text: "who may comment: nobody else, or anyone signed in to dek.pub",
   },
   status: {
     type: "enum",

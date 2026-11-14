@@ -63,7 +63,7 @@ const comment = (overrides: Partial<CommentRow>): CommentRow => ({
   status: "open",
   text: "言い方を変えたい",
   targets: [],
-  author: { name: "Ann", handle: "ann", guest: false },
+  author: { name: "Ann", handle: "ann" },
   version: 1,
   url: "https://dek.pub/@hajime/talk#c_one",
   thread: [],
@@ -129,7 +129,7 @@ describe("dekc pub share", () => {
         "--embed",
         "on",
         "--comments",
-        "guests",
+        "signed-in",
         "--json",
       ]);
       expect(jsonStdout<Json>(result)).toMatchObject({
@@ -139,13 +139,28 @@ describe("dekc pub share", () => {
         visibility: "link",
         scriptPublic: true,
         embed: true,
-        comments: "guests",
+        comments: "signed-in",
       });
       expect(fake.requests.at(-1)).toMatchObject({
         method: "PATCH",
         path: `/api/decks/${id}`,
-        json: { visibility: "link", scriptPublic: true, embed: true, comments: "guests" },
+        json: { visibility: "link", scriptPublic: true, embed: true, comments: "signed-in" },
       });
+    });
+  });
+
+  test.serial("refuses --comments guests: only signed-in accounts comment", async () => {
+    await withPublished(async (fake, root) => {
+      const result = await run(fake, root, ["share", "--comments", "guests", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: false,
+        error: {
+          message: 'invalid --comments "guests"',
+          hint: "--comments takes off or signed-in, e.g. `dekc pub share --comments signed-in`",
+        },
+      });
+      expect(fake.requests).toEqual([]);
     });
   });
 

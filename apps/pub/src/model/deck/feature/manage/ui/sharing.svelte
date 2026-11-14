@@ -121,7 +121,7 @@
   <ul class="list">
     {#each grants as grant (grant.id)}
       <li class="row">
-        <Avatar name={grant.who.replace(/@.*/, "") || grant.who} size={28} guest={isEmail(grant.who)} />
+        <Avatar name={grant.who.replace(/@.*/, "") || grant.who} size={28} pending={isEmail(grant.who)} />
         <span class="name">
           <span class="who-text">{label(grant)}</span>
           {#if isEmail(grant.who)}<span class="pending">{t("manage.sharing.pending")}</span>{/if}

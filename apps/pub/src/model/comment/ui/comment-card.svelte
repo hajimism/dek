@@ -18,7 +18,6 @@
     canResolve = false,
     canReply = false,
     canWiden = false,
-    guest = false,
     now,
     onselect,
     onanchor,
@@ -37,7 +36,6 @@
     canReply?: boolean;
     /** Offer to share a team thread with the client. */
     canWiden?: boolean;
-    guest?: boolean;
     now: number;
     onselect?: () => void;
     onanchor?: () => void;
@@ -112,10 +110,9 @@
   {/if}
 {/snippet}
 
-{#snippet byline(author: { name: string; guest: boolean }, iso: string)}
-  <Avatar name={author.name} size={20} guest={author.guest} />
+{#snippet byline(author: { name: string }, iso: string)}
+  <Avatar name={author.name} size={20} />
   <span class="name">{author.name}</span>
-  {#if author.guest}<Badge tone="outline">{t("comment.guestBadge")}</Badge>{/if}
   <span class="time">{@render when(iso)}</span>
 {/snippet}
 
@@ -236,7 +233,6 @@
         {#if replying && onreply}
           <Composer
             compact
-            {guest}
             placeholder={t("comment.replyPlaceholder")}
             submitLabel={t("comment.reply")}
             autofocus

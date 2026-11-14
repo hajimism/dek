@@ -28,7 +28,7 @@ export async function publicCommentsOf(c: Context, deckId: string): Promise<Publ
     .all();
   const people = await peopleById(
     c,
-    rows.flatMap((row) => (row.authorId ? [row.authorId] : [])),
+    rows.map((row) => row.authorId),
   );
   const shown = (row: PublicCommentRow) => ({
     id: row.id,
@@ -70,7 +70,7 @@ export async function findPublic(deckId: string, id: string): Promise<PublicComm
 /** Post a comment, or a reply to a top-level one on the same deck; answers its ID. */
 export async function postPublic(
   deckId: string,
-  person: Person | null,
+  person: Person,
   body: NewPublicComment,
 ): Promise<string> {
   if (body.parentId !== undefined) {
@@ -84,8 +84,7 @@ export async function postPublic(
     id,
     deckId,
     parentId: body.parentId ?? null,
-    authorId: person?.id ?? null,
-    guestName: person ? null : (body.guestName ?? null),
+    authorId: person.id,
     text: body.text,
   });
   return id;

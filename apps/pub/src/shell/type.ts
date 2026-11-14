@@ -13,7 +13,6 @@ export type Shared = {
   lang: Lang;
   theme: Theme;
   devLogin: boolean;
-  turnstileSiteKey: string;
   /** The time the page was made, so relative times render the same on the server and in the browser. */
   now: number;
 };

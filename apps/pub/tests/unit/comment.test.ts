@@ -208,15 +208,14 @@ describe("who may resolve", () => {
     expect(canResolve(deck, { authorId: "u2" }, { id: "u1" })).toBe(true);
     expect(canResolve(deck, { authorId: "u2" }, { id: "u2" })).toBe(true);
     expect(canResolve(deck, { authorId: "u2" }, { id: "u3" })).toBe(false);
-    expect(canResolve(deck, { authorId: null }, null)).toBe(false);
+    expect(canResolve(deck, { authorId: "u2" }, null)).toBe(false);
   });
 
-  it("is the owner and the author, by handle on the page; never for a guest's namesake", () => {
-    const by = (handle: string, guest = false) => ({ author: { name: handle, handle, guest } });
+  it("is the owner and the author, by handle on the page", () => {
+    const by = (handle: string) => ({ author: { name: handle, handle } });
     expect(mayResolve(by("sato"), { handle: "sato" }, false)).toBe(true);
     expect(mayResolve(by("sato"), { handle: "kato" }, true)).toBe(true);
     expect(mayResolve(by("sato"), { handle: "kato" }, false)).toBe(false);
-    expect(mayResolve(by("sato", true), { handle: "sato" }, false)).toBe(false);
     expect(mayResolve(by("sato"), null, true)).toBe(false);
   });
 
@@ -259,22 +258,27 @@ describe("public comments", () => {
     expect(publicCommentsOn({ ...open, visibility: "private" })).toBe(false);
   });
 
-  it("may be posted as the policy says: by anyone signed in, by guests too, or by no one", () => {
+  it("may be posted as the policy says: by anyone signed in, or by no one", () => {
     expect(canPostPublic(open, { id: "u2" })).toBe(true);
-    expect(canPostPublic(open, null)).toBe(false);
-    expect(canPostPublic({ ...open, comments: "guests" }, null)).toBe(true);
+    expect(canPostPublic({ ...open, visibility: "public" }, { id: "u2" })).toBe(true);
     expect(canPostPublic({ ...open, comments: "off" }, { id: "u1" })).toBe(false);
     expect(canPostPublic({ ...open, visibility: "private" }, { id: "u1" })).toBe(false);
+  });
+
+  it("are never posted by someone signed out, whatever the policy", () => {
+    expect(canPostPublic(open, null)).toBe(false);
+    expect(canPostPublic({ ...open, visibility: "public" }, null)).toBe(false);
+    expect(canPostPublic({ ...open, comments: "off" }, null)).toBe(false);
   });
 
   it("are edited by their author alone, and deleted by their author or the deck's owner", () => {
     expect(mayEditPublic(mine, { id: "u2" })).toBe(true);
     expect(mayEditPublic(mine, { id: "u1" })).toBe(false);
-    expect(mayEditPublic({ authorId: null }, null)).toBe(false);
+    expect(mayEditPublic(mine, null)).toBe(false);
     expect(mayDeletePublic(open, mine, { id: "u2" })).toBe(true);
     expect(mayDeletePublic(open, mine, { id: "u1" })).toBe(true);
     expect(mayDeletePublic(open, mine, { id: "u3" })).toBe(false);
-    expect(mayDeletePublic(open, { authorId: null }, null)).toBe(false);
+    expect(mayDeletePublic(open, mine, null)).toBe(false);
   });
 
   it("are listed oldest first, each with its replies under it", () => {
@@ -312,7 +316,7 @@ describe("thread scope", () => {
   it("lets the owner and the author share a team thread, and nothing narrows a shared one", () => {
     const by = (handle: string, scope: "team" | "shared") => ({
       scope,
-      author: { name: handle, handle, guest: false },
+      author: { name: handle, handle },
     });
     expect(mayWiden(by("sato", "team"), { handle: "sato" }, false)).toBe(true);
     expect(mayWiden(by("sato", "team"), { handle: "kato" }, true)).toBe(true);
@@ -337,12 +341,12 @@ describe("notices", () => {
       noticeRecipients({
         ownerId: "u1",
         authorId: "u2",
-        replierIds: ["u3", null, "u2", "u4", "u3"],
+        replierIds: ["u3", "u2", "u4", "u3"],
         actorId: "u4",
       }),
     ).toEqual(["u1", "u2", "u3"]);
     expect(
-      noticeRecipients({ ownerId: "u1", authorId: null, replierIds: [], actorId: "u1" }),
+      noticeRecipients({ ownerId: "u1", authorId: "u1", replierIds: [], actorId: "u1" }),
     ).toEqual([]);
   });
 

@@ -39,7 +39,6 @@
 
   const { shared, lang, t } = useApp();
   const commentsOn = $derived(talk.comments !== null);
-  const guest = $derived(talk.canComment && !shared.viewer);
   const slideNumbers = $derived(new Map(talk.slides.map((slide, i) => [slide.slug, i + 1])));
   const slugs = $derived(talk.slides.map((slide) => slide.slug));
   const contentLang = $derived(talk.lang ?? lang);
@@ -371,7 +370,7 @@
   }
 
   async function create(input: ReplyInput): Promise<boolean> {
-    if (!draft) {
+    if (!draft || !shared.viewer) {
       return false;
     }
     const body: NewComment = {
@@ -379,12 +378,8 @@
       text: input.text,
       version: talk.version,
       ...(input.scope ? { scope: input.scope } : {}),
-      ...(input.guestName ? { guestName: input.guestName } : {}),
-      ...(input.turnstile ? { turnstile: input.turnstile } : {}),
     };
-    const author = shared.viewer
-      ? { name: shared.viewer.name, handle: shared.viewer.handle, guest: false }
-      : { name: input.guestName ?? "", guest: true };
+    const author = { name: shared.viewer.name, handle: shared.viewer.handle };
     draft = null;
     const row = await list.create(body, author);
     if (row) {
@@ -459,7 +454,6 @@
     isOwner={talk.isOwner}
     canComment={talk.canComment}
     scopes={talk.side === "team"}
-    {guest}
     closable
     {muted}
     onmute={setMuted}
@@ -664,12 +658,7 @@
           signinHref={signinHref()}
           onpost={(input, parentId) =>
             publicChange(() => {
-              const body: NewPublicComment = {
-                text: input.text,
-                ...(parentId ? { parentId } : {}),
-                ...(input.guestName ? { guestName: input.guestName } : {}),
-                ...(input.turnstile ? { turnstile: input.turnstile } : {}),
-              };
+              const body: NewPublicComment = { text: input.text, ...(parentId ? { parentId } : {}) };
               return api(publicPath, { method: "POST", body });
             })}
           onedit={(id, text) =>
