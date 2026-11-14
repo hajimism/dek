@@ -3,13 +3,13 @@
 
 import { ApiError } from "../../../common/api-error.ts";
 import type { Person } from "../../person/type.ts";
-import { canManage, type DeckRules, opensToAnyone } from "../access.ts";
+import { canManage, type DeckRules, opensWithoutGrant } from "../access.ts";
 
 type Caller = Pick<Person, "id"> | null;
 
 /** Anyone signed in under `signed-in`, no one under `off`; never anyone signed out. */
 export function canPostPublic(deck: DeckRules, person: Caller): boolean {
-  return opensToAnyone(deck) && deck.comments !== "off" && person !== null;
+  return opensWithoutGrant(deck) && deck.comments !== "off" && person !== null;
 }
 
 /** Refuse a poster canPostPublic does not let post; one signed out is asked to sign in. */

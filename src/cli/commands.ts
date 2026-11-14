@@ -942,8 +942,8 @@ export const COMMANDS = {
         "lint, build, and upload the version readers see; writes pub: on the first",
       ],
       [
-        "dekc pub share [deck] --visibility|--script|--embed|--comments <value>",
-        "who may open the deck, read its script, embed it, and comment",
+        "dekc pub share [deck] --visibility|--script|--embed|--comments <value> | --new-link",
+        "who may open the deck, read its script, embed it, and comment; a new link URL",
       ],
       ["dekc pub status [deck]", "the deck's settings, its version, and whether it is up to date"],
       ["dekc pub open [deck]", "open the deck on dek.pub"],
@@ -962,7 +962,7 @@ export const COMMANDS = {
       "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
       "dekc pub whoami | logout",
       "dekc pub publish [--message <text>] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
-      "dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in",
+      "dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in --new-link   a link deck's url carries ?key=; --new-link replaces it",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
       "dekc pub grants | grants add <@handle|email> [--role view|comment] [--side team|guest] | grants remove <@handle|email|id>   only a new grant is mailed",
     ],
@@ -1020,9 +1020,9 @@ export const COMMANDS = {
       share: {
         scope: "deck",
         args: [],
-        flags: ["server", "visibility", "script", "embed", "comments"],
+        flags: ["server", "visibility", "script", "embed", "comments", "new-link"],
         usage: [
-          "dekc pub share [deck] [--visibility team|private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in] [--server <url>]",
+          "dekc pub share [deck] [--visibility team|private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in] [--new-link] [--server <url>]",
         ],
         run: async ({ flags, target }) => {
           const { shareCommand } = await import("./pub.ts");

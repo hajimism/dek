@@ -3,7 +3,7 @@
 // while they may read it on their own side, and never to whoever did what the mail is about.
 
 import type { Mail } from "../../common/mail.ts";
-import { type DeckRules, standingOn } from "../deck/access.ts";
+import { type OpeningRules, standingOn } from "../deck/access.ts";
 import type { GrantRow } from "../deck/grant/type.ts";
 import type { Person } from "../person/type.ts";
 import { canReadComments, canSeeThread } from "./access.ts";
@@ -29,14 +29,17 @@ export function noticeRecipients(thread: {
   return [...ids];
 }
 
-/** Whether one of them hears of it: they still see the deck and the thread, and did not mute it. */
+/**
+ * Whether one of them hears of it: they still see the deck and the thread, and did not mute it.
+ * A `link` deck's key counts for nothing here; only grants and ownership reach a review thread.
+ */
 export function mayBeNoticed(
-  deck: DeckRules,
+  deck: OpeningRules,
   thread: Pick<ThreadRow, "scope">,
   person: Pick<Person, "id">,
   held: { grants: readonly Pick<GrantRow, "role" | "side">[]; muted: boolean },
 ): boolean {
-  const standing = standingOn(deck, person, held.grants);
+  const standing = standingOn(deck, person, held.grants, null);
   return (
     !held.muted &&
     standing.opens &&

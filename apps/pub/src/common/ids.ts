@@ -22,3 +22,21 @@ export const newThreadId = (): string => randomId("c_", 16);
 export const newReplyId = (): string => randomId("r_", 16);
 export const newGrantId = (): string => randomId("g_", 16);
 export const newPublicCommentId = (): string => randomId("p_", 16);
+
+/** The secret a `link` deck's URL carries: 26 characters, about 134 bits. */
+export const newLinkKey = (): string => randomId("", 26);
+
+/**
+ * Whether `given` is the deck's `key`, compared in a time that does not tell how much of it
+ * matched. Every key has the same length, so checking that first gives nothing away.
+ */
+export function sameKey(key: string | null, given: string | null | undefined): boolean {
+  if (!key || typeof given !== "string" || given.length !== key.length) {
+    return false;
+  }
+  let difference = 0;
+  for (let i = 0; i < key.length; i++) {
+    difference |= key.charCodeAt(i) ^ given.charCodeAt(i);
+  }
+  return difference === 0;
+}

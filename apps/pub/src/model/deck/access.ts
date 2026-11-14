@@ -2,6 +2,7 @@
 // deck, the person and their grant.
 
 import type { CommentPolicy, Visibility } from "../../../../../src/pub/protocol.ts";
+import { sameKey } from "../../common/ids.ts";
 import type { Person } from "../person/type.ts";
 import { strongestRole, widestSide } from "./grant/grant.ts";
 import type { GrantRole, GrantRow, GrantSide } from "./grant/type.ts";
@@ -15,22 +16,33 @@ export type DeckRules = {
   comments: CommentPolicy;
 };
 
-/** Whether a deck of this visibility opens to anyone, whoever they are: `link` and `public`. */
-export function opensToAnyone(deck: Pick<DeckRules, "visibility">): boolean {
+/** The rules with the key a `link` deck opens by, kept unused while it is any other visibility. */
+export type OpeningRules = DeckRules & { linkKey: string | null };
+
+/**
+ * Whether a deck of this visibility opens to people it has no grant for: a `public` one to anyone,
+ * a `link` one to anyone holding its key. Only these have public comments and likes.
+ */
+export function opensWithoutGrant(deck: Pick<DeckRules, "visibility">): boolean {
   return deck.visibility === "link" || deck.visibility === "public";
 }
 
 /**
- * Whether `person` (null when signed out) may open the deck, with the role and the side their
- * grants give them: a `team` deck the owner and the team's side only, a `private` one any grant.
+ * Whether `person` (null when signed out), holding `key` from the URL, may open the deck, with the
+ * role and the side their grants give them: a `team` deck the owner and the team's side only, a
+ * `private` one any grant, a `link` one any grant or its key, a `public` one anyone.
  */
 export function canView(
-  deck: DeckRules,
+  deck: OpeningRules,
   person: Caller,
   grant: GrantRole | null,
   granted: GrantSide | null,
+  key: string | null,
 ): boolean {
-  if (canManage(deck, person) || opensToAnyone(deck)) {
+  if (canManage(deck, person) || deck.visibility === "public") {
+    return true;
+  }
+  if (deck.visibility === "link" && sameKey(deck.linkKey, key)) {
     return true;
   }
   return deck.visibility === "team" ? granted === "team" : grant !== null;
@@ -56,16 +68,17 @@ export function sideOf(
   return canManage(deck, person) ? "team" : (granted ?? "guest");
 }
 
-/** Where `person` stands with the deck, from the grants that name them on it. */
+/** Where `person` stands with the deck, from the grants that name them on it and the key they hold. */
 export function standingOn(
-  deck: DeckRules,
+  deck: OpeningRules,
   person: Caller,
   grants: readonly Pick<GrantRow, "role" | "side">[],
+  key: string | null,
 ): Standing {
   const role = strongestRole(grants.map((grant) => grant.role));
   const granted = widestSide(grants.map((grant) => grant.side));
   return {
-    opens: canView(deck, person, role, granted),
+    opens: canView(deck, person, role, granted, key),
     role,
     side: sideOf(deck, person, granted),
   };

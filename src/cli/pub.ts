@@ -476,9 +476,12 @@ export async function statusCommand(target: ReadableDeck, flags: FlagValues): Pr
 }
 
 const SHARE_FLAGS =
-  "--visibility team|private|link|public, --script shown|hidden, --embed on|off, or --comments off|signed-in";
+  "--visibility team|private|link|public, --script shown|hidden, --embed on|off, --comments off|signed-in, or --new-link";
 
-/** `dekc pub share`: who may open the deck, read its script, embed it, and comment. */
+/**
+ * `dekc pub share`: who may open the deck, read its script, embed it, and comment; and, with
+ * `--new-link`, a new key in a `link` deck's URL.
+ */
 export async function shareCommand(target: ReadableDeck, flags: FlagValues): Promise<PubResult> {
   const origin = serverOrigin(flags.server);
   const change = {
@@ -486,6 +489,7 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
     ...(flags.script !== undefined ? { scriptPublic: flags.script === "shown" } : {}),
     ...(flags.embed !== undefined ? { embed: flags.embed === "on" } : {}),
     ...(flags.comments !== undefined ? { comments: CommentPolicy.parse(flags.comments) } : {}),
+    ...(flags["new-link"] === true ? { newLink: true as const } : {}),
   };
   if (Object.keys(change).length === 0) {
     throw new DekError("dekc pub share needs a setting to change", {

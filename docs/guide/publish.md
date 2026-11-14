@@ -68,6 +68,9 @@ dekc pub share --visibility link --script shown --comments signed-in
 | `--script` | `shown`: readers see the script beside the slides, without its stage directions and comments; `hidden`: the slides alone |
 | `--embed` | `on` lets other sites embed the deck |
 | `--comments` | who may post comments at the bottom of a `link` or `public` talk: `off`, no one; `signed-in`, anyone signed in to dek.pub |
+| `--new-link` | a new key in a `link` talk's URL; the URL given out before opens it no more |
+
+A `link` talk's URL carries a key that cannot be guessed, as `/@you/talk?key=…`; `dekc pub share` and `dekc pub status` print it, and anyone without the key gets a page that does not exist. The people you share the deck with open it without the key. The key stays when the talk becomes `private` and back, and changes only with `--new-link`, or New link on its manage page.
 
 Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post, and only a reader signed in to dek.pub ever does. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people by handle or email address, each to view or to comment, and each on the team's side or the guests': on its manage page on dek.pub, or with `dekc pub grants add`. The team reads every thread; a guest reads only those shared with them, and never learns of the others. A guest opens the deck only once it is `private` or wider: to a guest, a `team` deck is a page that does not exist. A thread you or your team open is kept to the team unless you check Share with guests, and one kept to the team can be shared later, never taken back.
 

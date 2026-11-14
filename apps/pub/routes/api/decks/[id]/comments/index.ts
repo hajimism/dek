@@ -11,7 +11,7 @@ import {
   visibleThread,
 } from "../../../../../src/model/comment/store.server.ts";
 import { canComment } from "../../../../../src/model/deck/access.ts";
-import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
+import { requestKey, visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { currentAccount, currentPerson } from "../../../../../src/model/person/actor.server.ts";
 
 const STATUSES = ["open", "resolved", "all"] as const;
@@ -19,7 +19,7 @@ const STATUSES = ["open", "resolved", "all"] as const;
 export const GET = defineHandler((c) =>
   api(async () => {
     const person = await currentAccount(c);
-    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person);
+    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
     if (!canReadComments(deck, person, role)) {
       throw notFound("comments");
     }
@@ -35,7 +35,7 @@ export const GET = defineHandler((c) =>
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person);
+    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
     mustComment(canComment(deck, person, role), person);
     const body = await jsonBody(c, NewComment);
     const id = await openThread(deck, person, side, body);

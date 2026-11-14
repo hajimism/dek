@@ -260,7 +260,11 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if (!parsed.success) {
         return error(422, "invalid", parsed.error.message);
       }
-      Object.assign(deck, parsed.data);
+      const { newLink, ...settings } = parsed.data;
+      Object.assign(deck, settings);
+      if (newLink) {
+        deck.url = `${fake.url}/@${deck.owner}/${deck.slug}?key=${id("")}`;
+      }
       return Response.json(status(deck));
     }
     if (method === "POST" && rest === "/versions") {

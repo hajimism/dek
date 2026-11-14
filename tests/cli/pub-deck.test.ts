@@ -115,6 +115,25 @@ describe("dekc pub share", () => {
     });
   });
 
+  test.serial(
+    "gives the deck a new link with --new-link, and prints the URL that opens it now",
+    async () => {
+      await withPublished(async (fake, root, id) => {
+        const before = fake.decks.get(id)?.url;
+        const result = await run(fake, root, ["share", "--new-link", "--json"]);
+        const shared = jsonStdout<Json & { url: string }>(result);
+        expect(shared).toMatchObject({ ok: true, action: "share", id });
+        expect(shared.url).toContain("?key=");
+        expect(shared.url).not.toBe(before);
+        expect(fake.requests.at(-1)).toMatchObject({
+          method: "PATCH",
+          path: `/api/decks/${id}`,
+          json: { newLink: true },
+        });
+      });
+    },
+  );
+
   test.serial("refuses the old --comments guests: only signed-in accounts comment", async () => {
     await withPublished(async (fake, root) => {
       const result = await run(fake, root, ["share", "--comments", "guests", "--json"]);

@@ -2,21 +2,25 @@ import { defineHandler } from "void";
 import { NewPublicComment } from "../../../../../../../src/pub/protocol.ts";
 import { notFound } from "../../../../../src/common/api-error.ts";
 import { api, jsonBody } from "../../../../../src/common/http.server.ts";
-import { opensToAnyone } from "../../../../../src/model/deck/access.ts";
+import { opensWithoutGrant } from "../../../../../src/model/deck/access.ts";
 import { mustPostPublic } from "../../../../../src/model/deck/public-comment/access.ts";
 import {
   postPublic,
   publicCommentFor,
   publicCommentsOf,
 } from "../../../../../src/model/deck/public-comment/store.server.ts";
-import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
+import { requestKey, visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { currentAccount, currentPerson } from "../../../../../src/model/person/actor.server.ts";
 
 /** The talk's public comments; only a talk anyone may open has them. */
 export const GET = defineHandler((c) =>
   api(async () => {
-    const { deck } = await visibleDeck(c.req.param("id") ?? "", await currentAccount(c));
-    if (!opensToAnyone(deck)) {
+    const { deck } = await visibleDeck(
+      c.req.param("id") ?? "",
+      await currentAccount(c),
+      requestKey(c),
+    );
+    if (!opensWithoutGrant(deck)) {
       throw notFound("comments");
     }
     return { comments: await publicCommentsOf(c, deck.id) };
@@ -27,8 +31,8 @@ export const GET = defineHandler((c) =>
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck } = await visibleDeck(c.req.param("id") ?? "", person);
-    if (!opensToAnyone(deck)) {
+    const { deck } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
+    if (!opensWithoutGrant(deck)) {
       throw notFound("comments");
     }
     mustPostPublic(deck, person);

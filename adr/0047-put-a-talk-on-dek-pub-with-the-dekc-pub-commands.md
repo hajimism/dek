@@ -8,6 +8,8 @@ Accepted
 
 Amended by [61. Let only signed-in accounts write dek.pub public comments, and drop guests and Turnstile](0061-let-only-signed-in-accounts-write-dek-pub-public-comments-and-drop-guests-and-turnstile.md)
 
+Amended by [81. Open a dek.pub link talk only with the key its URL carries](0081-open-a-dek-pub-link-talk-only-with-the-key-its-url-carries.md)
+
 ## Context
 
 dek.pub is the service that shows a talk online: the slides, the script beside them for those it is shared with, and comments on a slide or a passage. The server and `dekc` share the shapes and paths in `src/pub/protocol.ts`. What was missing is the CLI that signs in, publishes, sets who may read and comment, and brings the comments back, for a person at a terminal and for an agent alike ([Agent Usability Criteria](../docs/guide/agent-criteria.md): every result in `--json`, no prompt, the exit code by severity).
