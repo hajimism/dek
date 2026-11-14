@@ -2,6 +2,143 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.7.0](https://github.com/hajimism/dek/compare/v0.6.4...v0.7.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **pub:** `dekc pub share --comments` takes `off` or `signed-in`; `guests` is gone. A comment's `author` in `--json` output always has a `handle` and no longer has `guest`.
+* **pub:** a deck already named after a command, such as pub, is no longer served by the bare dekc <name>, which runs the command. Serve it with dekc --deck <name>, which the bare dekc pub names when the project has a deck called pub, or rename the deck's folder.
+
+### Features
+
+* **build:** build the slides alone with --no-script ([ccaf9d0](https://github.com/hajimism/dek/commit/ccaf9d04e8ca2dbe837dc51fe9dbb1883457df8f))
+* **build:** print a slide map of each deck built in --json ([cd4f0dc](https://github.com/hajimism/dek/commit/cd4f0dc076358c61f95bcf45ed8e2d69bf9f843c))
+* **core:** keep a deck's dek.pub ID in script.md as pub ([472bf70](https://github.com/hajimism/dek/commit/472bf70f15e48c9f7b7f1bb773368caf01978cbc))
+* **core:** keep the slugs dekc mv renames, for dek.pub to move comments by ([057f679](https://github.com/hajimism/dek/commit/057f67955edd2244300881c4832da8e0221048bd))
+* **core:** map each slide of a build to its steps and spoken paragraphs ([49497bc](https://github.com/hajimism/dek/commit/49497bc06a077f5a10a040f2968c614012bd5d1e))
+* **core:** write a tar that is the same bytes for the same files ([ca7e8f1](https://github.com/hajimism/dek/commit/ca7e8f1636af18805231b748412ac3c63ea022f8))
+* **embed:** pass the c key from a framed deck to the page that frames it ([bb500c3](https://github.com/hajimism/dek/commit/bb500c347a004425ebdbca2720014f012e3b2379))
+* **mv:** record each rename in .dek/renames.json, for dek.pub ([d613d29](https://github.com/hajimism/dek/commit/d613d292a9c305fcde4ee89634d10984a390a323))
+* **pub:** add profiles with an RSS feed, and a dashboard to manage a talk ([a85a266](https://github.com/hajimism/dek/commit/a85a26681a01e26394dbecbfdb08a69270ef9096))
+* **pub:** add public comments and likes, and keep review threads to grantees ([d0737e1](https://github.com/hajimism/dek/commit/d0737e1a0b24161bf091cdc641902c7fdce3def6))
+* **pub:** add public comments and likes, and keep review threads to grantees ([947b820](https://github.com/hajimism/dek/commit/947b820965c28e7cc8fc9686e8145d590323e388))
+* **pub:** add the design tokens, words in two languages, and component tests in a browser ([5d9ceee](https://github.com/hajimism/dek/commit/5d9ceeeede6140d055ef98208f91052cb7f0b167))
+* **pub:** bound a deck's title, description and version message, and check them before a publish ([f311710](https://github.com/hajimism/dek/commit/f3117100d1d5fe0524ce1b6d4b367d84ba2f940e))
+* **pub:** call the side that is not the team its guests, and share by a checkbox ([f7e927d](https://github.com/hajimism/dek/commit/f7e927dc3bca0ba29ef98a552113b62eb995a896))
+* **pub:** claim a grant by address when its holder signs in or when it is made, not when a deck is read ([#119](https://github.com/hajimism/dek/issues/119)) ([bad4545](https://github.com/hajimism/dek/commit/bad4545fa6e5fb39e124177f54326d2231f53f41))
+* **pub:** comment threads, grants, and a version's pictures ([7d2ca6e](https://github.com/hajimism/dek/commit/7d2ca6e37a8abd6330d02837ef38eb24e1aa14ff))
+* **pub:** declare dek.pub's zones, DNS and edge rules with Alchemy, and leave its Workers to Void and wrangler ([a6707e2](https://github.com/hajimism/dek/commit/a6707e2b95ebf01e4a177bba97aa70c66cb87566))
+* **pub:** enlarge a slide's picture in the article, and jump to it from a link ([0a89371](https://github.com/hajimism/dek/commit/0a893719115c9fe7d3dc884a3073a15bd6a47b1e))
+* **pub:** explain dek.pub on an About page at /about, linked from the footer ([84f75e5](https://github.com/hajimism/dek/commit/84f75e5515846472b95da961ccbc5e93c734c2c9))
+* **pub:** explain dek.pub on an About page at /about, linked from the footer ([7a7ca96](https://github.com/hajimism/dek/commit/7a7ca965b2f4656822f1d84568d627139c5c32d1))
+* **pub:** give comment cards a quieter, thread-like shape ([1316d8a](https://github.com/hajimism/dek/commit/1316d8a7d0f976baeb4360dea5ef54416824b4bc))
+* **pub:** give grants a side and threads a scope, and let every grantee read ([01665d7](https://github.com/hajimism/dek/commit/01665d7ff8fbc1c791e5a23fbf8c501ccbcee2b5))
+* **pub:** give grants a side and threads a scope, and let every grantee read ([b6d2896](https://github.com/hajimism/dek/commit/b6d28961dd0557dec99163b1f8d765d8acba21e9))
+* **pub:** give the talk page a side column of slides and details ([2b67398](https://github.com/hajimism/dek/commit/2b673985bf289c30add5e0c6bca6985324cdd5c6))
+* **pub:** give the talk page a side column of slides and details ([1f9bf17](https://github.com/hajimism/dek/commit/1f9bf17b47032de9d28a80fd4c4b297c714f3d93))
+* **pub:** keep a comment's unsent text across a reload ([ee2c356](https://github.com/hajimism/dek/commit/ee2c356ee1f2d168fd1067d3a4643bbdeabac6c6))
+* **pub:** keep a comment's unsent text across a reload ([4e6882e](https://github.com/hajimism/dek/commit/4e6882ecd71cc735e812a903996bb894ecb81ef9))
+* **pub:** lay out the site, with the landing, sign-in, device and not-found pages ([800d5f5](https://github.com/hajimism/dek/commit/800d5f5784de0957d8f2deba139aa1eebd556535))
+* **pub:** let only signed-in accounts write public comments ([ac4c69c](https://github.com/hajimism/dek/commit/ac4c69c92548fd0e698e4e4d16129c9a4e9cb32a))
+* **pub:** let the team's side read drafts, and add dekc pub promote ([318f763](https://github.com/hajimism/dek/commit/318f7630a18c6b6e121f53e1d03fb8702a99ff88))
+* **pub:** let the team's side read drafts, and add dekc pub promote ([de96278](https://github.com/hajimism/dek/commit/de96278580aa3c878346ed414e1847c41ce2e19e))
+* **pub:** mail invitations, sign-in links and the news of a thread ([4073f7f](https://github.com/hajimism/dek/commit/4073f7f79130ed6cba59033078b9438dd9484751))
+* **pub:** mail invitations, sign-in links and the news of a thread ([709437e](https://github.com/hajimism/dek/commit/709437eda451772c80d306223c1188df286ca71b))
+* **pub:** manage a deck's grants with dekc pub grants, add and remove ([#121](https://github.com/hajimism/dek/issues/121)) ([aeffb8e](https://github.com/hajimism/dek/commit/aeffb8e49221a139deb408c70fe7c01f2d849587))
+* **pub:** name each of a talk's details for what it is, and give its duration ([564c8c4](https://github.com/hajimism/dek/commit/564c8c426a44746939be692ccb0ba9f27b20df3c))
+* **pub:** open dek.pub in Japanese, choose the language in the footer, and show the theme in use ([2f7cc11](https://github.com/hajimism/dek/commit/2f7cc11741aeeb6ad760fb151d108bca742cbe05))
+* **pub:** open dek.pub in Japanese, choose the language in the footer, and show the theme in use ([fdd45bd](https://github.com/hajimism/dek/commit/fdd45bd0d1145474bd47c58dbf20eec9ce9dc410))
+* **pub:** pop the heart and burst when a reader likes a talk ([1233f43](https://github.com/hajimism/dek/commit/1233f43bbf5e6566e8494a5e4479cd316752f12b))
+* **pub:** prepare dek.pub for launch: headers, robots and security.txt, input limits, and its DNS as code ([4a0a7c1](https://github.com/hajimism/dek/commit/4a0a7c1ec389aa0243ecc4d0b29533314f0874f7))
+* **pub:** publish a deck on dek.pub with dekc pub ([9de2db8](https://github.com/hajimism/dek/commit/9de2db894069958ed0edf119d84595981a7ba5c0))
+* **pub:** reserve command names, pub among them, as names no deck takes ([b760bee](https://github.com/hajimism/dek/commit/b760beef069391b74fe9a72f8980295005f6fb1f))
+* **pub:** send HSTS and a permissions policy from every answer, and serve a 500 page of its own ([6baf297](https://github.com/hajimism/dek/commit/6baf29751892030d8302b9b1d67eb79e678e803e))
+* **pub:** serve a sitemap, and give the landing and About pages a canonical URL in each language ([#118](https://github.com/hajimism/dek/issues/118)) ([e7172a1](https://github.com/hajimism/dek/commit/e7172a16f5b3193a0e8d9a4415e1ffbd898e0fd4))
+* **pub:** serve decks from their own origin, and take versions from dekc ([3391e1a](https://github.com/hajimism/dek/commit/3391e1a5ddef5a28048ac576df794aa218c0e228))
+* **pub:** serve robots.txt and security.txt, and name dek.pub in SECURITY.md's scope ([c89e66e](https://github.com/hajimism/dek/commit/c89e66e9846a4a0cb4ddac995390f845678a1c14))
+* **pub:** set comment cards beside what they point at, and make the device form work before scripts load ([32cb8eb](https://github.com/hajimism/dek/commit/32cb8eb7c2b98fe427b5c0e676fe23a6a1949476))
+* **pub:** show a profile's talks 24 at a time with Show more, and keep its feed at the newest 50 ([#120](https://github.com/hajimism/dek/issues/120)) ([6948bb1](https://github.com/hajimism/dek/commit/6948bb1006d8f96d4c4bc2e4ec8407c961c5f3c0))
+* **pub:** show a profile's talks as a gallery or a timeline, in tabs ([761052e](https://github.com/hajimism/dek/commit/761052e7f6a2b1c91cdd775f8018035a3ef47062))
+* **pub:** show a talk as its slides and script, with comments in the margin ([90864eb](https://github.com/hajimism/dek/commit/90864ebad953cbe14cae0d265b7f4edcf087e931))
+* **pub:** show a talk full screen, with a header and a review mode ([eee5eee](https://github.com/hajimism/dek/commit/eee5eeee50ccde8051a648ad076a448c698fbb24))
+* **pub:** take the talk page's table of contents to the article ([6703241](https://github.com/hajimism/dek/commit/6703241163d6ba596fba1a24347809d39d4a326f))
+* **runtime:** let a page that frames a built deck drive it through postMessage ([8a53629](https://github.com/hajimism/dek/commit/8a536294ede0416a8c49f7c95bcea3e85ed321af))
+* **runtime:** show a framed deck's slide alone, without the rail or the key hint ([2f2c852](https://github.com/hajimism/dek/commit/2f2c8526eb663909bafad7bcda4f6e55333da2c8))
+* show a dek.pub talk full screen with a review mode, and pass c from a framed deck ([a828eb9](https://github.com/hajimism/dek/commit/a828eb912e07c3624a895c36a25e9b1b3d82d4da))
+
+
+### Bug Fixes
+
+* **mv:** record a rename made by hand once, and keep records made at once ([f2b4e10](https://github.com/hajimism/dek/commit/f2b4e109472e2fb870177ed2ecd2ff5f14d07585))
+* **pub:** add a reply the API answers with to its thread, and set Japanese titles as Japanese ([aad6366](https://github.com/hajimism/dek/commit/aad636629f8c3644aa4dba7edd2b3845d032a065))
+* **pub:** ask whoever opens /device from a link to check the code against their own terminal ([346ef83](https://github.com/hajimism/dek/commit/346ef839700328412a982884b71c4fe4452c9473))
+* **pub:** believe a framed deck only as far as the page asked, and keep its popups sandboxed ([b62f4db](https://github.com/hajimism/dek/commit/b62f4db8ec69629a9978ec4cf000f6001caeaa59))
+* **pub:** close the holes a review of the server found ([46656e2](https://github.com/hajimism/dek/commit/46656e2fe7e423641e6eea30f6b0d66585121c4a))
+* **pub:** decide once which comments are drawn, and draw no deck mark for a detached one ([e2c5d12](https://github.com/hajimism/dek/commit/e2c5d12f5db499ab93dbb4978ef2dd08537e23a0))
+* **pub:** draw ID characters without bias, and run knip without Void's generated files ([49efd22](https://github.com/hajimism/dek/commit/49efd2284c41dc7e0465cfec2b7cc561eee6f175))
+* **pub:** feature a chosen talk, keep quoted script from readers who cannot see it, and read profile paths and feeds safely ([0c3d1ab](https://github.com/hajimism/dek/commit/0c3d1abd4a747e7dca69631f95760b7fb93c5fcd))
+* **pub:** give the serve Worker's tests one vitest ([272667d](https://github.com/hajimism/dek/commit/272667d9efcd3db257ecfd66231b3531a4745b41))
+* **pub:** hear a deck that is ready before the page's script runs, and open it at the linked slide ([633130a](https://github.com/hajimism/dek/commit/633130a02bc133af0743e96ece761bde10257c9d))
+* **pub:** keep a grant's name and its choices in the row on a phone ([fbf3fe3](https://github.com/hajimism/dek/commit/fbf3fe3e66306df2bde53b336e69358c1354c9ad))
+* **pub:** keep dek.pub's pages unframed and its changes same-origin ([468e31f](https://github.com/hajimism/dek/commit/468e31fd56c54701ccb944e080a9d08947e56343))
+* **pub:** keep the script article's slides to the width of its text ([6eee8b1](https://github.com/hajimism/dek/commit/6eee8b17b1033c963055e30ea71f9d9881e5d71d))
+* **pub:** leave quoted script out of comments for readers it is hidden from ([a9e080d](https://github.com/hajimism/dek/commit/a9e080d316d0001ca7f5d67f1ae3c12982cc7fef))
+* **pub:** leave the wordmark off the sign-in card, which the header already carries ([489680c](https://github.com/hajimism/dek/commit/489680cb708e0881514f70728f924e80b8f349c5))
+* **pub:** let a thread's author resolve, reopen or share it only while the deck is shared with them ([77a3582](https://github.com/hajimism/dek/commit/77a358217d35e4f46a3f9865583c65fb352c5d4c))
+* **pub:** line the talk page up on one left edge, and give the deck the keys after a jump ([9887fcf](https://github.com/hajimism/dek/commit/9887fcf47ed0ee3c50938f21c2ca3c0f26b76bae))
+* **pub:** link a profile to GitHub only when its account signs in with GitHub ([ef1f56e](https://github.com/hajimism/dek/commit/ef1f56e275f2e22f38de657efa364f14b62f9d85))
+* **pub:** make the comment drawer and sheet proper dialogs, name the pins, and keep times and language links current ([5a1f2dd](https://github.com/hajimism/dek/commit/5a1f2dd2ce5cde918b2f53c466dcaf2218d352f7))
+* **pub:** move focus with the arrows in a segmented control and choose with Enter or Space ([822e860](https://github.com/hajimism/dek/commit/822e860d3ab806aab46a4e7bed70fa4edb83dd0a))
+* **pub:** name the R2 bucket in void.config.ts so the app and the serve Worker share it ([8a8a2b4](https://github.com/hajimism/dek/commit/8a8a2b4c726a589429d153950fe6d25742e62b32))
+* **pub:** name the R2 bucket in void.config.ts so the app and the serve Worker share it ([34f44f8](https://github.com/hajimism/dek/commit/34f44f8ef459de4161ba9e390022018bfc65f4d8))
+* **pub:** name the slide in its jump link ([22a47a5](https://github.com/hajimism/dek/commit/22a47a59989a164e8171c24990d100a93e544b01))
+* **pub:** open the publish guide from the owner's empty profile, in a new tab ([425a92e](https://github.com/hajimism/dek/commit/425a92ec40cb595bbb0b32200001137877453997))
+* **pub:** picture each slide at its last beat for the script article ([d476b62](https://github.com/hajimism/dek/commit/d476b626ea3e6dde05f2a9d86d7215e2c750df1f))
+* **pub:** publish under a slug of its own, within the size dek.pub takes ([647faa6](https://github.com/hajimism/dek/commit/647faa64d9014ab90891538e53b1cfc0c0fa4507))
+* **pub:** read answers that grow, and keep the key and the sign-in safe ([ba7cbac](https://github.com/hajimism/dek/commit/ba7cbac972b4b72b599b87e998f622fde2b55e8f))
+* **pub:** run the serve Worker's tests with its own Vitest ([db1d29e](https://github.com/hajimism/dek/commit/db1d29ec8b37f3c2f578705b650a95b8eb40ba5c))
+* **pub:** say stage directions never reach readers, not that they never leave the machine ([cebc93f](https://github.com/hajimism/dek/commit/cebc93f945aefccc2e16101f44b32e28581e00d3))
+* **pub:** share a team thread under one number when it is shared twice at once ([0eec363](https://github.com/hajimism/dek/commit/0eec363a9cd3b3a872e055de4ffe087809f3f284))
+* **pub:** show the owner a talk whose versions are all unpromoted ([cc15d81](https://github.com/hajimism/dek/commit/cc15d81a1df3093fb3c0dc452f4416413f84bae7))
+* **pub:** stop the dev server when port 5173 is taken ([d675a08](https://github.com/hajimism/dek/commit/d675a084d513a8b952a9e1f667ddcd929032d491))
+* **pub:** three small bugs found in a review of apps/pub ([568faeb](https://github.com/hajimism/dek/commit/568faebb703e56b3101fe62086150f58e4fe3a97))
+* **pub:** widen the text beside the comments, stick the panel's head as one piece, and show the jump link on hover ([8f75ef2](https://github.com/hajimism/dek/commit/8f75ef28b1c137a795477f3c3d10a2210977cf24))
+* **runtime:** keep a framed deck's moves out of the framing page's history ([b7322da](https://github.com/hajimism/dek/commit/b7322da13bfbc35ff4399aa2a9e442cbf332e52a))
+* **runtime:** move on when a slide transition is never drawn ([1274ee4](https://github.com/hajimism/dek/commit/1274ee4e90806471dabe20f24b29598113570b5c))
+
+
+### Refactoring
+
+* **annotate:** replace the history entry without location.replace ([a19b1f5](https://github.com/hajimism/dek/commit/a19b1f551da61ba3d5230793cd49f9b93c2f4e9b))
+* **annotate:** replace the history entry without location.replace ([4d3191c](https://github.com/hajimism/dek/commit/4d3191ce02daeeff8028ec6a766265a046a91593))
+* **pub:** build the way to sign in, read the session and call the API in one place each ([2d9e70f](https://github.com/hajimism/dek/commit/2d9e70f391835c03ca7d29dff7c0603e6c4aebb1))
+* **pub:** build the way to sign in, read the session and call the API in one place each ([2203b8d](https://github.com/hajimism/dek/commit/2203b8d42366c76ce12262ab94f0fa6773aeca66))
+* **pub:** decide where a person stands with a deck in one pure function ([67884dd](https://github.com/hajimism/dek/commit/67884ddb9a2fab90076f04b261c4f3cb558c5dda))
+* **pub:** decide where a person stands with a deck in one pure function ([356d6ea](https://github.com/hajimism/dek/commit/356d6ea68227fa1ac8763e0c2cb6e3a7c73039f6))
+* **pub:** drop the review panel's dead sign-in link, and say a link's lifetime from one constant ([79cdaba](https://github.com/hajimism/dek/commit/79cdaba36f440e64b414083a273988ec822012de))
+* **pub:** drop the review panel's dead sign-in link, and say a link's lifetime from one constant ([e80eaa0](https://github.com/hajimism/dek/commit/e80eaa0793678562a0e602f8970b6d0c271c50fa))
+* **pub:** export only what other modules use, and share who may resolve a comment ([f5979b8](https://github.com/hajimism/dek/commit/f5979b8bdeff982403976836816e99cff5d20d04))
+* **pub:** keep public comments in the deck model beside its likes ([13a8635](https://github.com/hajimism/dek/commit/13a8635f8eb27341f61240f5fe35ea0460d92112))
+* **pub:** keep public comments in the deck model beside its likes (ADR 76) ([a384f51](https://github.com/hajimism/dek/commit/a384f511d06a99227dab7f30167605a4fe9be1ea))
+* **pub:** name a comment's author in the person model ([f792bb5](https://github.com/hajimism/dek/commit/f792bb56c693ec1f15ca25922c07961782d47399))
+* **pub:** organise dek.pub by the model a person deals with ([#92](https://github.com/hajimism/dek/issues/92)) ([68ba35d](https://github.com/hajimism/dek/commit/68ba35d0ab2a97e248938331942421d0e4912839))
+* **pub:** refuse a thread change and a public comment in one place each ([79a48cc](https://github.com/hajimism/dek/commit/79a48cc2750cb76cc0aff86050de29c68fc8c965))
+* **pub:** refuse a thread change and a public comment in one place each, and hold two more model rules in the boundaries test ([0246513](https://github.com/hajimism/dek/commit/02465137971b394ab2c83820cbd331dc73c7d45a))
+* **runtime:** keep the dev server's stamps out of a build's player ([9c2cb47](https://github.com/hajimism/dek/commit/9c2cb4766aea8453075df2e155d2863d8ebab24b))
+
+
+### Documentation
+
+* document dekc pub, the pub key, and where the dek.pub key is kept ([aeb2ebf](https://github.com/hajimism/dek/commit/aeb2ebfb8b423900899cb8f2d74a740cdc5a4e72))
+* **pub:** document --slug, DEK_TOKEN_SERVER, and answers that grow ([6fc971b](https://github.com/hajimism/dek/commit/6fc971bef47ea747939011da34bb7935b7b4ddab))
+* **pub:** list what dek.pub does not do yet ([b3c22e9](https://github.com/hajimism/dek/commit/b3c22e9e207f9189698ca13eac3a2bdbfbe87fa7))
+* **pub:** list what dek.pub still lacks before it runs for real ([d44147b](https://github.com/hajimism/dek/commit/d44147b9ffbbd299e1300fa728ff0b28e3230b8d))
+* **pub:** list what the comments for client work still lack ([8ed43db](https://github.com/hajimism/dek/commit/8ed43db27003d60da6ee988722fd37cfb5a679a6))
+* **pub:** order dek.pub's TODO by what its invitation-only opening needs ([d17d02d](https://github.com/hajimism/dek/commit/d17d02d238237dc8447d4a7189893005baaae730))
+* **pub:** record how dek.pub is built and licensed ([a12fff9](https://github.com/hajimism/dek/commit/a12fff9d4f9d17517f37d1476dbda3080bf019b9))
+* **pub:** record where public comments live and what a feature is (ADR 76) ([9e96b03](https://github.com/hajimism/dek/commit/9e96b03f97e6a333ddabe85637d5476c82328b5d))
+
 ## [0.6.4](https://github.com/hajimism/dek/compare/v0.6.3...v0.6.4) (2026-11-12)
 
 

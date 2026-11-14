@@ -1,11 +1,15 @@
 {
   "name": "@hajimism/dek",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "A build system for talks.",
   "license": "MIT",
   "author": "Hajime Nakagawa (https://github.com/hajimism)",
   "type": "module",
-  "workspaces": ["apps/pub", "apps/pub/serve", "apps/pub/infra"],
+  "workspaces": [
+    "apps/pub",
+    "apps/pub/serve",
+    "apps/pub/infra"
+  ],
   "bin": {
     "dekc": "src/cli.ts"
   },
