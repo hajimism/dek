@@ -26,9 +26,7 @@ async function token(variant: "full" | "public" | "bare", n = 1, exp = NOW + 60)
 }
 
 describe("a public deck", () => {
-  beforeEach(() =>
-    putDeck({ visibility: "public", scriptPublic: true, embed: false, current: 1 }),
-  );
+  beforeEach(() => putDeck({ visibility: "public", scriptPublic: true, embed: false, current: 1 }));
 
   it("serves its current version's public build to anyone, cacheable", async () => {
     const response = await get("/v/1/");
@@ -45,7 +43,9 @@ describe("a public deck", () => {
 
   it("lets only the app frame it unless embedding is on", async () => {
     const closed = await get("/v/1/");
-    expect(closed.headers.get("content-security-policy")).toContain("frame-ancestors https://dek.pub");
+    expect(closed.headers.get("content-security-policy")).toContain(
+      "frame-ancestors https://dek.pub",
+    );
     await putDeck({ visibility: "public", scriptPublic: true, embed: true, current: 1 });
     const open = await get("/v/1/");
     expect(open.headers.get("content-security-policy")).toContain("frame-ancestors *");
@@ -71,7 +71,9 @@ describe("a deck that is not public", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("<p>full</p>");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(response.headers.get("content-security-policy")).toContain("frame-ancestors https://dek.pub");
+    expect(response.headers.get("content-security-policy")).toContain(
+      "frame-ancestors https://dek.pub",
+    );
   });
 
   it("refuses an expired token, or one for another version", async () => {
@@ -80,7 +82,12 @@ describe("a deck that is not public", () => {
   });
 
   it("refuses a token signed with another secret", async () => {
-    const forged = await signServeToken("other", { deck: DECK, n: 1, variant: "full", exp: NOW + 60 });
+    const forged = await signServeToken("other", {
+      deck: DECK,
+      n: 1,
+      variant: "full",
+      exp: NOW + 60,
+    });
     expect((await get(`/v/1/?t=${forged}`)).status).toBe(403);
   });
 });
@@ -101,7 +108,11 @@ describe("anything else", () => {
   });
 
   it("answers only GET and HEAD", async () => {
-    const response = await handleServe(new Request(`${HOST}/v/1/`, { method: "POST" }), testEnv, NOW);
+    const response = await handleServe(
+      new Request(`${HOST}/v/1/`, { method: "POST" }),
+      testEnv,
+      NOW,
+    );
     expect(response.status).toBe(405);
   });
 
@@ -110,7 +121,11 @@ describe("anything else", () => {
     const hsts = "max-age=31536000; includeSubDomains";
     expect((await get("/v/1/")).headers.get("strict-transport-security")).toBe(hsts);
     expect((await get("/v/9/")).headers.get("strict-transport-security")).toBe(hsts);
-    const local = await handleServe(new Request("http://d-7x2kq9m4ab.localhost:5173/v/1/"), testEnv, NOW);
+    const local = await handleServe(
+      new Request("http://d-7x2kq9m4ab.localhost:5173/v/1/"),
+      testEnv,
+      NOW,
+    );
     expect(local.headers.has("strict-transport-security")).toBe(false);
   });
 });

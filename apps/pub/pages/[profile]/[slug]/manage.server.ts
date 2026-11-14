@@ -15,7 +15,9 @@ export const loader = defineHandler(async (c) => {
 export const head = defineHead<Props>((c, { manage }) => {
   const lang = c.get("shared").lang;
   return {
-    title: manage ? translate(lang, "manage.title", { title: manage.status.title }) : translate(lang, "404.title"),
+    title: manage
+      ? translate(lang, "manage.title", { title: manage.status.title })
+      : translate(lang, "404.title"),
     meta: [{ name: "robots", content: "noindex" }],
   };
 });

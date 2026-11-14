@@ -1,6 +1,6 @@
 import { defineHandler, defineHead, type InferProps } from "void";
-import { formatUserCode } from "../src/model/person/feature/connect-cli/device-code.ts";
 import { translate } from "../src/common/i18n.ts";
+import { formatUserCode } from "../src/model/person/feature/connect-cli/device-code.ts";
 
 export type Props = InferProps<typeof loader>;
 
