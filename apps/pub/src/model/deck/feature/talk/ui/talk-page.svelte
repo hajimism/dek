@@ -14,7 +14,6 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import { CommentList } from "../../../../comment/client.svelte.ts";
-  import PublicComments from "../../../../comment/public/ui/public-comments.svelte";
   import type { CardComment, Draft, Filter, ReplyInput } from "../../../../comment/type.ts";
   import CommentsPanel from "../../../../comment/ui/comments-panel.svelte";
   import { byPosition, elementOf } from "../../../../comment/view.ts";
@@ -22,6 +21,7 @@
   import Avatar from "../../../../person/ui/avatar.svelte";
   import { talkPath } from "../../../deck.ts";
   import LikeButton from "../../../like/ui/like-button.svelte";
+  import PublicComments from "../../../public-comment/ui/public-comments.svelte";
   import TalkCardView from "../../../ui/talk-card.svelte";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import { DeckLink } from "../deck-link.svelte.ts";
@@ -638,9 +638,9 @@
           off={talk.commentPolicy === "off"}
           isOwner={talk.isOwner}
           signinHref={signinHref()}
-          onpost={(input, parentId) =>
+          onpost={(text, parentId) =>
             publicChange(() => {
-              const body: NewPublicComment = { text: input.text, ...(parentId ? { parentId } : {}) };
+              const body: NewPublicComment = { text, ...(parentId ? { parentId } : {}) };
               return api(publicPath, { method: "POST", body });
             })}
           onedit={(id, text) =>

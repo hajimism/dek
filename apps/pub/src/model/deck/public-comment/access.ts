@@ -2,8 +2,8 @@
 // anyone may open, `link` or `public`; the deck's comment policy says who may post them.
 
 import { ApiError } from "../../../common/api-error.ts";
-import { canManage, type DeckRules, opensToAnyone } from "../../deck/access.ts";
 import type { Person } from "../../person/type.ts";
+import { canManage, type DeckRules, opensToAnyone } from "../access.ts";
 
 type Caller = Pick<Person, "id"> | null;
 
