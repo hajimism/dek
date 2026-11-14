@@ -214,6 +214,25 @@ try {
     "share opens the deck to the link",
     shared,
   );
+  const sharedUrl = new URL(String((shared as { url?: string }).url));
+  let linkKey = sharedUrl.searchParams.get("key") ?? "";
+  check(
+    sharedUrl.pathname === talkPath && /^[0-9a-z]{26}$/.test(linkKey),
+    "a link deck's URL is its path with a key that cannot be guessed",
+    shared,
+  );
+  /** `path` with the link key, as the URL and the talk page's own requests carry it. */
+  const keyedPath = (path: string) => `${path}${path.includes("?") ? "&" : "?"}key=${linkKey}`;
+  check(
+    (await stranger.fetch(talkPath)).status === 404 &&
+      (await stranger.fetch(`${talkPath}?key=${"0".repeat(26)}`)).status === 404 &&
+      (await stranger.fetch(`${talkPath}?key=${linkKey.slice(1)}`)).status === 404,
+    "a link talk is a 404 to someone with no grant, without its key or with a wrong one",
+  );
+  check(
+    (await author.fetch(talkPath)).status === 200,
+    "the owner opens a link talk without its key",
+  );
   const profile = `/@${me.handle}`;
   check(
     (await stranger.fetch(profile)).status === 200 &&
@@ -248,9 +267,30 @@ try {
     "the sitemap lists the About page, and not a talk shared by link",
     sitemapXml,
   );
-  const page = await stranger.fetch(talkPath);
+  const page = await stranger.fetch(keyedPath(talkPath));
   const html = await page.text();
   check(page.status === 200, "the talk page answers anyone with the link");
+  check(
+    html.includes(`<link rel="canonical" href="${server.url}${talkPath}"`) &&
+      html.includes(`<meta property="og:url" content="${server.url}${talkPath}"`),
+    "a link talk names its URL without the key as canonical and in its preview",
+  );
+  const preview = /<meta property="og:image" content="([^"]+)"/
+    .exec(html)?.[1]
+    ?.replace(/&amp;/g, "&");
+  const picture = preview ? new URL(preview) : null;
+  const bareImage = picture?.pathname ?? "";
+  check(
+    picture?.searchParams.get("key") === linkKey && bareImage.startsWith(`/i/${id}/`),
+    "a link talk's preview picture carries its key",
+    preview,
+  );
+  check(
+    (await new Browser(server.url).fetch(bareImage)).status === 404 &&
+      (await stranger.fetch(bareImage)).status === 404 &&
+      (await new Browser(server.url).fetch(keyedPath(bareImage))).status === 200,
+    "a link talk's pictures, found by its deck ID, need its key too",
+  );
   const frame = /<iframe[^>]+src="([^"]+)"/.exec(html)?.[1]?.replace(/&amp;/g, "&");
   check(
     frame?.startsWith(server.deckOrigin(id)),
@@ -277,9 +317,13 @@ try {
   check(commentGrant.status === 201, "the owner grants the colleague comment");
   const invited = await inbox.waitFor(strangerMe.email, "shared");
   check(
-    invited.length === 1 && invited[0]?.text.includes(talkPath),
-    "a new grant mails the colleague a link to the talk",
+    invited.length === 1 && invited[0]?.text.includes(keyedPath(talkPath)),
+    "a new grant mails the colleague a link to the talk, with its key",
     invited,
+  );
+  check(
+    (await stranger.fetch(talkPath)).status === 200,
+    "a colleague granted a link talk opens it without its key",
   );
 
   // The colleague comments on a sentence of the script and on an element of a slide.
@@ -445,8 +489,15 @@ try {
   // comment policy lets, by people who read no review threads, and a like from each account.
   const reader = new Browser(server.url);
   await reader.signUp("Reader");
-  const publicPath = `/api/decks/${id}/public-comments`;
-  const review = await reader.fetch(`/api/decks/${id}/comments`, {
+  const publicBare = `/api/decks/${id}/public-comments`;
+  check(
+    (await reader.fetch(publicBare)).status === 404 &&
+      (await reader.fetch(publicBare, { method: "POST", json: { text: "x" } })).status === 404 &&
+      (await reader.fetch(`/api/decks/${id}/like`, { method: "PUT" })).status === 404,
+    "the public comments and likes of a link talk, found by its deck ID, need its key",
+  );
+  const publicPath = keyedPath(publicBare);
+  const review = await reader.fetch(keyedPath(`/api/decks/${id}/comments`), {
     method: "POST",
     json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "レビュー" },
   });
@@ -494,7 +545,7 @@ try {
     ).status === 422,
     "a reply answers a comment, not another reply",
   );
-  const edited = await reader.fetch(`${publicPath}/${postedRow.id}`, {
+  const edited = await reader.fetch(keyedPath(`${publicBare}/${postedRow.id}`), {
     method: "PATCH",
     json: { text: "とても良い発表でした" },
   });
@@ -505,7 +556,7 @@ try {
   );
   check(
     (
-      await stranger.fetch(`${publicPath}/${postedRow.id}`, {
+      await stranger.fetch(keyedPath(`${publicBare}/${postedRow.id}`), {
         method: "PATCH",
         json: { text: "x" },
       })
@@ -513,8 +564,8 @@ try {
     "no one else changes it",
   );
   check(
-    (await author.fetch(`${publicPath}/${postedRow.id}`, { method: "DELETE" })).status === 200 &&
-      (await publicList(reader)).length === 0,
+    (await author.fetch(keyedPath(`${publicBare}/${postedRow.id}`), { method: "DELETE" }))
+      .status === 200 && (await publicList(reader)).length === 0,
     "the owner removes a public comment, and its replies go with it",
   );
   await dekc(["pub", "share", "--comments", "off"]);
@@ -541,7 +592,7 @@ try {
     "dekc takes no --comments guests, the old policy for signed-out writers",
     noSignedOut,
   );
-  const likePath = `/api/decks/${id}/like`;
+  const likePath = keyedPath(`/api/decks/${id}/like`);
   const liked = (await (await reader.fetch(likePath, { method: "PUT" })).json()) as {
     count: number;
     liked: boolean;
@@ -562,12 +613,38 @@ try {
     "someone signed out cannot like",
   );
 
+  // A new link: the URL given out before opens the talk no more.
+  const oldLink = keyedPath(talkPath);
+  const renewed = await dekc(["pub", "share", "--new-link"]);
+  const newKey = new URL(String((renewed as { url?: string }).url)).searchParams.get("key") ?? "";
+  check(
+    renewed.ok && /^[0-9a-z]{26}$/.test(newKey) && newKey !== linkKey,
+    "share --new-link gives the deck a new key",
+    renewed,
+  );
+  linkKey = newKey;
+  check(
+    (await reader.fetch(oldLink)).status === 404 &&
+      (await reader.fetch(keyedPath(talkPath))).status === 200 &&
+      (await reader.fetch(publicPath)).status === 404 &&
+      (await reader.fetch(keyedPath(publicBare))).status === 200,
+    "the new link opens the talk and its comments, and the old one no more",
+  );
+
   // Grants: a private deck shared with one person by handle.
   await dekc(["pub", "share", "--visibility", "private"]);
   check(
-    (await reader.fetch(talkPath)).status === 404,
-    "back to private, the talk is a 404 again to anyone not granted it",
+    (await reader.fetch(talkPath)).status === 404 &&
+      (await reader.fetch(keyedPath(talkPath))).status === 404,
+    "back to private, the talk is a 404 again to anyone not granted it, its key included",
   );
+  const relinked = await dekc(["pub", "share", "--visibility", "link"]);
+  check(
+    (relinked as { url?: string }).url === `${server.url}${keyedPath(talkPath)}`,
+    "back to link, the talk opens at the URL it had",
+    relinked,
+  );
+  await dekc(["pub", "share", "--visibility", "private"]);
   check((await author.fetch(publicPath)).status === 404, "a private talk has no public comments");
   const grant = await author.fetch(`/api/decks/${id}/grants`, {
     method: "POST",

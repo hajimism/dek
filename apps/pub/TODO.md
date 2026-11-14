@@ -10,7 +10,6 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 
 ### The app
 
-- **Link visibility.** A `link` talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
 - **Deleting.** Nobody can delete a talk, its owner and the operator included. Deleting an account is done by hand on request.
 - **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.

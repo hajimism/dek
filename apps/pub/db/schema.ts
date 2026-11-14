@@ -27,6 +27,11 @@ export const decks = sqliteTable(
     comments: text("comments", { enum: ["off", "signed-in"] })
       .notNull()
       .default("signed-in"),
+    /**
+     * The secret a `link` deck's URL carries as `?key=`; made the first time the deck becomes
+     * `link`, kept through other visibilities, and replaced only when its owner asks.
+     */
+    linkKey: text("link_key"),
     currentVersion: integer("current_version"),
     latestVersion: integer("latest_version"),
     /** The next number a shared thread takes; a team thread's come from `nextTeamThread`. */

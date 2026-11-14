@@ -219,6 +219,8 @@ export const ShareRequest = z.strictObject({
   scriptPublic: z.boolean().optional(),
   embed: z.boolean().optional(),
   comments: CommentPolicy.optional(),
+  /** Replace the key a `link` deck's URL carries, so the URL given out before opens no more. */
+  newLink: z.literal(true).optional(),
 });
 export type ShareRequest = z.infer<typeof ShareRequest>;
 

@@ -31,7 +31,7 @@ export const head = defineHead<Props>((c, { talk }) => {
       { property: "og:type", content: "article" },
       { property: "og:title", content: talk.title },
       { property: "og:description", content: description },
-      { property: "og:url", content: talk.url },
+      { property: "og:url", content: talk.canonical },
       { property: "og:site_name", content: "dek.pub" },
       ...(talk.image ? [{ property: "og:image", content: talk.image }] : []),
       { name: "twitter:card", content: talk.image ? "summary_large_image" : "summary" },
@@ -39,7 +39,7 @@ export const head = defineHead<Props>((c, { talk }) => {
       ...(talk.image ? [{ name: "twitter:image", content: talk.image }] : []),
       ...(talk.visibility === "public" ? [] : [{ name: "robots", content: "noindex" }]),
     ],
-    link: [{ rel: "canonical", href: talk.url }],
+    link: [{ rel: "canonical", href: talk.canonical }],
     script: [{ innerHTML: EARLY_LISTENER }],
   };
 });
