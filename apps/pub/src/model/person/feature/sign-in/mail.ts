@@ -2,7 +2,7 @@
 
 import type { Mail } from "../../../../common/mail.ts";
 
-/** How long a sign-in link works, in seconds; auth.ts gives Better Auth the same. */
+/** How long a sign-in link works, in seconds; auth.ts gives Better Auth the same, and the page says it. */
 export const SIGN_IN_LINK_SECONDS = 15 * 60;
 
 export function signInMail(to: string, url: string): Mail {

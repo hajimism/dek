@@ -22,7 +22,6 @@
     closable = false,
     muted = null,
     onmute,
-    signinHref,
     onselect,
     onanchor,
     onresolve,
@@ -50,7 +49,6 @@
     /** Whether the reader turned off mail of these comments; null for one who gets none. */
     muted?: boolean | null;
     onmute?: (muted: boolean) => void;
-    signinHref?: string;
     onselect: (comment: CardComment) => void;
     onanchor: (comment: CardComment) => void;
     onresolve: (comment: CardComment) => Promise<void>;
@@ -189,9 +187,6 @@
           </li>
         {/each}
       </ol>
-    {/if}
-    {#if !canComment && !shared.viewer && signinHref}
-      <p class="signin"><a href={signinHref}>{t("comment.signinToComment")}</a></p>
     {/if}
   </div>
 </div>
@@ -360,11 +355,6 @@
     max-width: 24em;
     color: var(--text-muted);
     font-size: var(--text-sm);
-  }
-  .signin {
-    margin-top: var(--space-4);
-    font-size: var(--text-sm);
-    text-align: center;
   }
   @keyframes enter {
     from {

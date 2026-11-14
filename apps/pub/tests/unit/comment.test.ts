@@ -10,7 +10,12 @@ import {
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
 import { draftKeys, keepDraft, readDraft } from "../../src/model/comment/drafts.ts";
-import { mayBeNoticed, noticeMail, noticeRecipients } from "../../src/model/comment/notice.ts";
+import {
+  excerpt,
+  mayBeNoticed,
+  noticeMail,
+  noticeRecipients,
+} from "../../src/model/comment/notice.ts";
 import {
   canPostPublic,
   mayDeletePublic,
@@ -404,6 +409,12 @@ describe("notices", () => {
     const teamDeck = { ...deck, visibility: "team" as const };
     expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, reader)).toBe(false);
     expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, { ...reader, side: "team" })).toBe(true);
+  });
+
+  it("quote a comment on one line, cut where it runs long", () => {
+    expect(excerpt("  一行目\n\n二行目  ")).toBe("一行目 二行目");
+    expect(excerpt("a".repeat(300), 10)).toBe(`${"a".repeat(9)}…`);
+    expect(excerpt("short", 10)).toBe("short");
   });
 
   it("say who did what on which thread, with the words and the way back", () => {

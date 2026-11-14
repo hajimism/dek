@@ -163,7 +163,8 @@ const en = {
   "signin.linkSubmit": "Email me a sign-in link",
   "signin.linkNote":
     "For an address a talk was shared with, or one you have signed in with before.",
-  "signin.linkSent": "If {email} may sign in, a link is on its way. It works once, for 15 minutes.",
+  "signin.linkSent":
+    "If {email} may sign in, a link is on its way. It works once, for {minutes} minutes.",
   "signin.linkAgain": "Use another address",
   "signin.linkFailed": "That link has expired or was used already. Ask for a new one.",
 
@@ -264,7 +265,6 @@ const en = {
   "comment.empty": "No comments yet.",
   "comment.emptyHint": "Select a sentence or tap a part of a slide to comment.",
   "comment.signin": "Sign in",
-  "comment.signinToComment": "Sign in to comment",
   "comment.post": "Comment",
   "comment.reply": "Reply",
   "comment.resolve": "Resolve",
@@ -546,7 +546,7 @@ const ja: Record<MessageKey, string> = {
   "signin.linkNote":
     "トークを共有されたアドレスか、前にサインインしたことのあるアドレスで使えます。",
   "signin.linkSent":
-    "{email} でサインインできる場合は、リンクを送りました。15 分の間、一度だけ使えます。",
+    "{email} でサインインできる場合は、リンクを送りました。{minutes} 分の間、一度だけ使えます。",
   "signin.linkAgain": "別のアドレスにする",
   "signin.linkFailed":
     "リンクの期限が切れたか、すでに使われています。新しいリンクを受け取ってください。",
@@ -650,7 +650,6 @@ const ja: Record<MessageKey, string> = {
   "comment.empty": "まだコメントはありません。",
   "comment.emptyHint": "文を選ぶか、スライドの一部をタップしてコメントできます。",
   "comment.signin": "サインイン",
-  "comment.signinToComment": "サインインしてコメント",
   "comment.post": "コメント",
   "comment.reply": "返信",
   "comment.resolve": "解決にする",
