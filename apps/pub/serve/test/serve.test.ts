@@ -104,4 +104,13 @@ describe("anything else", () => {
     const response = await handleServe(new Request(`${HOST}/v/1/`, { method: "POST" }), testEnv, NOW);
     expect(response.status).toBe(405);
   });
+
+  it("asks the browser to keep to HTTPS on every answer over HTTPS, and only there", async () => {
+    await putDeck({ visibility: "public", scriptPublic: true, embed: false, current: 1 });
+    const hsts = "max-age=31536000; includeSubDomains";
+    expect((await get("/v/1/")).headers.get("strict-transport-security")).toBe(hsts);
+    expect((await get("/v/9/")).headers.get("strict-transport-security")).toBe(hsts);
+    const local = await handleServe(new Request("http://d-7x2kq9m4ab.localhost:5173/v/1/"), testEnv, NOW);
+    expect(local.headers.has("strict-transport-security")).toBe(false);
+  });
 });
