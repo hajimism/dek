@@ -465,9 +465,37 @@ export type ProfileLinks = z.infer<typeof ProfileLinks>;
 export const UpdateMe = z.strictObject({ name: z.string().max(200) });
 export type UpdateMe = z.infer<typeof UpdateMe>;
 
+/**
+ * What the CLI may send, as JSON, to trade the device flow's session for a key: the name the key
+ * is listed by, its machine's. An older dekc sends no body, and its key is called dekc.
+ */
+export const NewCliKey = z.strictObject({ name: z.string().max(255).optional() });
+export type NewCliKey = z.infer<typeof NewCliKey>;
+
 /** What the server gives the CLI for the session the device flow made. */
 export const CliKey = z.strictObject({ key: z.string(), me: Me });
 export type CliKey = z.infer<typeof CliKey>;
+
+/**
+ * One of a person's API keys as they see it: what it is called, and when it was made, last used
+ * and runs out. Never the key, nor its hash or its first characters.
+ */
+export const CliKeyInfo = z.strictObject({
+  id: z.string(),
+  name: z.string().nullable(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+});
+export type CliKeyInfo = z.infer<typeof CliKeyInfo>;
+
+/** GET on `paths.myKeys`, from a browser's session only: the person's keys, newest first. */
+export const CliKeys = z.strictObject({ keys: z.array(CliKeyInfo) });
+export type CliKeys = z.infer<typeof CliKeys>;
+
+/** What revoking keys answers: DELETE on `paths.myKeys` revokes them all, on `paths.myKey` one. */
+export const KeysRevoked = z.strictObject({ revoked: z.number().int() });
+export type KeysRevoked = z.infer<typeof KeysRevoked>;
 
 /** Every error answer. `code` is stable; `message` is for people. */
 export const ErrorBody = z.strictObject({
@@ -486,6 +514,12 @@ export type ErrorBody = z.infer<typeof ErrorBody>;
  */
 export const HANDLE_NEEDED = "handle_needed";
 
+/**
+ * The code of the 403 an API key is answered with when it asks for what only a browser's session
+ * may do: change the settings, list the keys, or revoke one other than itself.
+ */
+export const SESSION_NEEDED = "session_needed";
+
 /** Whether the signed-in person is mailed of a deck's comments; PUT mutes it, DELETE unmutes. */
 export const MuteState = z.strictObject({ muted: z.boolean() });
 export type MuteState = z.infer<typeof MuteState>;
@@ -495,6 +529,8 @@ export const paths = {
   me: "/api/me",
   myHandle: "/api/me/handle",
   myLinks: "/api/me/links",
+  myKeys: "/api/me/keys",
+  myKey: (id: string) => `/api/me/keys/${segment(id)}`,
   handle: (handle: string) => `/api/handles/${segment(handle)}`,
   talksOf: (handle: string) => `/api/people/${segment(handle)}/talks`,
   /** One talk by its URL's handle and slug, as its owner or an operator manages it. */

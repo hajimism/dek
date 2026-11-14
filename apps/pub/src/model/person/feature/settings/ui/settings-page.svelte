@@ -1,7 +1,8 @@
 <script lang="ts">
-  // A person's settings, one section to each thing they set: who they are on dek.pub, and the
-  // links their profile shows. Each section saves on its own.
+  // A person's settings, one section to each thing they set: who they are on dek.pub, the links
+  // their profile shows, and the CLI keys they hold. Each section saves on its own.
   import { untrack } from "svelte";
+  import type { CliKeyInfo } from "../../../../../../../../src/pub/protocol.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -11,9 +12,15 @@
   import { profilePath } from "../../../profile-path.ts";
   import { saveName } from "../settings-api.ts";
   import type { SaveFailure } from "../type.ts";
+  import CliKeys from "./cli-keys.svelte";
   import LinksEditor from "./links-editor.svelte";
 
-  let { handle, name: initial, links }: { handle: string; name: string; links: string[] } = $props();
+  let {
+    handle,
+    name: initial,
+    links,
+    keys,
+  }: { handle: string; name: string; links: string[]; keys: CliKeyInfo[] } = $props();
   const { t } = useI18n();
 
   let name = $state(untrack(() => initial));
@@ -90,6 +97,11 @@
     <h2 id="links-title">{t("settings.links")}</h2>
     <p class="hint">{t("settings.links.hint", { n: MAX_LINKS })}</p>
     <LinksEditor {links} />
+  </section>
+
+  <section id="keys" class="section" aria-labelledby="keys-title">
+    <h2 id="keys-title">{t("settings.keys")}</h2>
+    <CliKeys {keys} />
   </section>
 </div>
 

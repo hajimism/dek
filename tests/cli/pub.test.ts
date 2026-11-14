@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { hostLabel } from "../../src/core/pub/login.ts";
 import { jsonStdout, runInProcess } from "../helpers/cli.ts";
 import { type FakePub, withFakePub } from "../helpers/fake-pub.ts";
 
@@ -65,6 +66,8 @@ describe("dekc pub login", () => {
           "/api/cli/key",
         ]);
         expect(fake.requests[3]?.headers.authorization).toMatch(/^Bearer at_/);
+        // The key is named after this machine, by its host name's first label alone.
+        expect(fake.requests[3]?.json).toEqual({ name: hostLabel(hostname()) });
       });
     },
   );
@@ -272,6 +275,87 @@ describe("dekc pub whoami and logout", () => {
       const json = jsonStdout<Json>(result);
       expect(json).toMatchObject({ ok: true, revoked: false, forgotten: true });
       expect(String(json.reason)).toContain("the key still works until it is revoked on dek.pub");
+    });
+  });
+
+  test.serial(
+    "logout --all revokes every key of the account, this one included, and forgets it",
+    async () => {
+      await withFakePub(async (fake) => {
+        const key = signIn(fake);
+        const elsewhere = [fake.issueKey(), fake.issueKey()];
+        const result = await pub(fake, ["logout", "--all", "--json"]);
+        expect(result.exitCode).toBe(0);
+        expect(jsonStdout<Json>(result)).toEqual({
+          ok: true,
+          action: "logout",
+          server: fake.url,
+          revoked: true,
+          forgotten: true,
+          revokedKeys: 3,
+        });
+        for (const each of [key, ...elsewhere]) {
+          expect(fake.keys.has(each)).toBe(false);
+        }
+        expect(fake.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+          "DELETE /api/me/keys",
+        ]);
+        expect(existsSync(fake.credentials)).toBe(false);
+      });
+    },
+  );
+
+  test.serial("logout --all says, as text, how many keys went", async () => {
+    await withFakePub(async (fake) => {
+      signIn(fake);
+      fake.issueKey();
+      const result = await pub(fake, ["logout", "--all"]);
+      expect(result.stdout).toBe(
+        `revoked 2 keys of the account on ${fake.url}, this one included\nforgot the key\n`,
+      );
+    });
+  });
+
+  test.serial("logout --all sends DEK_TOKEN when it is the key there is", async () => {
+    await withFakePub(async (fake) => {
+      const token = fake.issueKey();
+      const result = await runInProcess(["pub", "logout", "--all", "--json"], {
+        cwd: tmpdir(),
+        env: { ...fake.env, DEK_TOKEN: token, DEK_TOKEN_SERVER: fake.url },
+      });
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: true,
+        revoked: true,
+        revokedKeys: 1,
+        forgotten: false,
+      });
+      expect(fake.keys.size).toBe(0);
+    });
+  });
+
+  test.serial("logout --all with no key says how to sign in, and sends nothing", async () => {
+    await withFakePub(async (fake) => {
+      const result = await pub(fake, ["logout", "--all", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toEqual({
+        ok: false,
+        error: {
+          message: `not signed in to ${fake.url}`,
+          hint: `run \`dekc pub login\`, then \`dekc pub logout --all\`; or revoke the keys on ${fake.url}/settings`,
+        },
+      });
+      expect(fake.requests).toEqual([]);
+    });
+  });
+
+  test.serial("logout --all that the server refuses keeps the key, to run again", async () => {
+    await withFakePub(async (fake) => {
+      const key = signIn(fake);
+      fake.respond = () => new Response("down", { status: 503 });
+      const result = await pub(fake, ["logout", "--all", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({ ok: false });
+      expect(JSON.parse(readFileSync(fake.credentials, "utf8")).keys[fake.url]).toBe(key);
     });
   });
 

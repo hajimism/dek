@@ -28,6 +28,8 @@ The agent shows you the URL and the code, then runs `next`, which waits until yo
 
 In CI, set `DEK_TOKEN` to an API key instead; no sign-in is needed. dek sends it only to `https://dek.pub`, or to the server `DEK_TOKEN_SERVER` names.
 
+Each `dekc pub login` makes a key of its own, named after the machine, that lasts a year. The CLI keys section of `/settings` lists your keys, with when each was made and last used, and revokes one, or all of them. If a key may have leaked, from CI above all, run `dekc pub logout --all` on any machine still signed in: it revokes every key of the account, the one in `DEK_TOKEN` included, and forgets the one kept here. Then sign in again with `dekc pub login` where you need to, and give CI a new key. An API key cannot list your keys, revoke another one alone, or change your settings; those take the browser.
+
 ## Publish a version
 
 ```bash

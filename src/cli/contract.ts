@@ -231,6 +231,13 @@ const PUB_FIELDS = z.union([
     revoked: z.boolean().describe("The server took the key back."),
     forgotten: z.boolean().describe("dek held a key for the server and no longer does."),
     reason: z.string().optional().describe("Why the key was not revoked, when it was not."),
+    revokedKeys: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        "Set with --all: how many keys of the account the server revoked, the one sent included.",
+      ),
   }),
   z.strictObject({
     action: z.literal("whoami"),

@@ -12,7 +12,6 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 
 - **Deleting an account** is done by hand on request, its decks with `deleteDeck` (ADR 82).
 - **Deleting a talk.** A grant added while its deck is being deleted can be left as a row with no deck, and `hasWaitingGrant` does not join `decks`, so that address can still make an account (ADR 79, 82).
-- **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
 - **Logs.** A failed query's error carries the values it was bound to: an address, a comment's text. `src/common/log.ts` leaves them out, but two handlers log errors whole: Void's error handler (`createErrorRenderer`'s `onError`), for a page's loader, a route not wrapped in `api()` such as `routes/[profile]/rss.ts` and `routes/sitemap.xml.ts`, and middleware; and Better Auth's adapter when a fallback join fails (`handleFallbackJoin`), which logs the join's conditions and its error, whose value is a user id.
 
@@ -57,7 +56,7 @@ Each of these is needed on staging and on production.
 - **Abuse.**
   - Nobody can report a talk or a public comment, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
-- **Account deletion** by the person themselves, and their keys listed, both as sections of `/settings`.
+- **Account deletion** by the person themselves, as a section of `/settings`.
 
 ## Later
 
@@ -66,6 +65,7 @@ Each of these is needed on staging and on production.
   - Revoking a grant on a `link` deck does not lock its grantee out without a new link: they keep the key from the address bar or a URL shared with them.
   - A key survives `link` → `private` → `link`, so a URL handed out before opens again (ADR 81).
   - `og:url` carries no key, so a link preview that follows it may open the bare path, a 404.
+- **`dekc pub logout --all` with another account's `DEK_TOKEN`**, a CI bot's, revokes that account's keys, then forgets the key `login` kept here without revoking it, since it is another account's (ADR 83).
 - **A publish racing a delete** of its deck answers 500, not the 404 of a deck that is gone.
 - **Changing a handle.** A handle is chosen once, after the first sign-in, and cannot be changed (ADR 77). Changing one needs redirects from the old `/@handle` URLs, and a rule for when someone else may take the old one.
 - **Comments** work from end to end, but their look, their behaviour and their API are expected to change. Do not build on their current details.

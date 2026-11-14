@@ -935,7 +935,10 @@ export const COMMANDS = {
         "dekc pub login [--server <url>]",
         "sign in through the browser; --json prints the code, then waits",
       ],
-      ["dekc pub logout", "revoke the key and forget it"],
+      [
+        "dekc pub logout [--all]",
+        "revoke the key and forget it; --all revokes every key of the account",
+      ],
       ["dekc pub whoami", "who the key signs in as"],
       [
         "dekc pub publish [deck] [--message <text>] [--slug <slug>]",
@@ -965,7 +968,7 @@ export const COMMANDS = {
     ],
     agent: [
       "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
-      "dekc pub whoami | logout",
+      "dekc pub whoami | logout [--all]   --all revokes every key of the account, DEK_TOKEN's too, as after a leak",
       "dekc pub publish [--message <text>] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
       "dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in --new-link   a link deck's url carries ?key=; --new-link replaces it",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
@@ -998,8 +1001,8 @@ export const COMMANDS = {
       },
       logout: {
         args: [],
-        flags: ["server"],
-        usage: ["dekc pub logout [--server <url>]"],
+        flags: ["server", "all"],
+        usage: ["dekc pub logout [--all] [--server <url>]"],
         run: async ({ flags }) => {
           const { logoutCommand } = await import("./pub.ts");
           return logoutCommand(flags);

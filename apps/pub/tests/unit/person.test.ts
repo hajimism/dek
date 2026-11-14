@@ -1,7 +1,16 @@
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
+import type { Context } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import authConfig from "../../auth.ts";
+import {
+  checkKey,
+  keysOf,
+  makeKey,
+  revokeKeyOf,
+  revokeKeysOf,
+} from "../../src/model/person/api-key.server.ts";
+import { keyName, MAX_KEY_NAME_LENGTH } from "../../src/model/person/api-key.ts";
 import {
   formatUserCode,
   isCompleteUserCode,
@@ -944,5 +953,143 @@ describe("auth.ts, through Better Auth", () => {
       expect.objectContaining({ message: "D1_ERROR: the database is not there" }),
     );
     error.mockRestore();
+  });
+
+  describe("CLI keys", () => {
+    /** A request's context as Void hands it to dek.pub's code: Better Auth under its name. */
+    function contextOf(auth: ReturnType<typeof makeAuth>["auth"]): Context {
+      return { get: (name: string) => (name === "__voidAuth" ? auth : undefined) } as Context;
+    }
+
+    async function setUp() {
+      const { auth, db } = makeAuth();
+      const c = contextOf(auth);
+      const signUp = async (email: string) => {
+        const made = await auth.api.signUpEmail({
+          body: { email, password: "a-long-password", name: email },
+        });
+        return made.user.id;
+      };
+      return {
+        auth,
+        db,
+        c,
+        mine: await signUp("me@example.com"),
+        theirs: await signUp("them@example.com"),
+      };
+    }
+
+    it("lists a person's own keys, newest first, by name and dates, and never the key", async () => {
+      const { c, mine, theirs } = await setUp();
+      const laptop = await makeKey(c, mine, "laptop");
+      await makeKey(c, theirs, "theirs");
+      await new Promise((done) => setTimeout(done, 5));
+      await makeKey(c, mine, "ci");
+      const keys = await keysOf(c, mine);
+      expect(keys.map((key) => key.name)).toEqual(["ci", "laptop"]);
+      for (const key of keys) {
+        expect(Object.keys(key).sort()).toEqual(
+          ["createdAt", "expiresAt", "id", "lastUsedAt", "name"].sort(),
+        );
+        expect(JSON.stringify(key)).not.toContain(laptop.slice(0, 12));
+        expect(key.lastUsedAt).toBeNull();
+        expect(Date.parse(String(key.expiresAt)) - Date.parse(key.createdAt)).toBeGreaterThan(
+          364 * 24 * 60 * 60 * 1000,
+        );
+      }
+    });
+
+    it("says when a key was last used", async () => {
+      const { c, mine } = await setUp();
+      const key = await makeKey(c, mine, "laptop");
+      expect(await checkKey(c, key)).toMatchObject({ userId: mine });
+      const [listed] = await keysOf(c, mine);
+      expect(listed?.lastUsedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it("leaves out a key past its expiry", async () => {
+      const { c, db, mine } = await setUp();
+      await makeKey(c, mine, "old");
+      for (const row of db.apikey) {
+        row.expiresAt = new Date(Date.now() - 1000);
+      }
+      expect(await keysOf(c, mine)).toEqual([]);
+    });
+
+    it("revokes one key of the person's own, and none of anyone else's", async () => {
+      const { c, mine, theirs } = await setUp();
+      const kept = await makeKey(c, mine, "laptop");
+      const revoked = await makeKey(c, mine, "ci");
+      const other = await makeKey(c, theirs, "theirs");
+      const ids = Object.fromEntries((await keysOf(c, mine)).map((key) => [key.name, key.id]));
+      const [theirKey] = await keysOf(c, theirs);
+      expect(await revokeKeyOf(c, mine, String(theirKey?.id))).toBe(false);
+      expect(await checkKey(c, other)).not.toBeNull();
+      expect(await revokeKeyOf(c, mine, String(ids.ci))).toBe(true);
+      expect(await checkKey(c, revoked)).toBeNull();
+      expect(await checkKey(c, kept)).not.toBeNull();
+      expect(await revokeKeyOf(c, mine, String(ids.ci))).toBe(false);
+    });
+
+    it("revokes every key of the person's, counting those that worked, and no one else's", async () => {
+      const { c, db, mine, theirs } = await setUp();
+      const keys = [await makeKey(c, mine, "laptop"), await makeKey(c, mine, "ci")];
+      await makeKey(c, mine, "old");
+      const old = db.apikey.find((row) => row.name === "old");
+      if (old) {
+        old.expiresAt = new Date(Date.now() - 1000);
+      }
+      const other = await makeKey(c, theirs, "theirs");
+      expect(await revokeKeysOf(c, mine)).toBe(2);
+      for (const key of keys) {
+        expect(await checkKey(c, key)).toBeNull();
+      }
+      expect(db.apikey.map((row) => row.name)).toEqual(["theirs"]);
+      expect(await checkKey(c, other)).not.toBeNull();
+      expect(await revokeKeysOf(c, mine)).toBe(0);
+    });
+
+    // Better Auth reads 100 rows when a query names no limit.
+    it("lists and revokes every key however many there are", async () => {
+      const { c, db, mine, theirs } = await setUp();
+      const many = 105;
+      for (let i = 0; i < many; i++) {
+        await makeKey(c, mine, `box-${i}`);
+      }
+      const other = await makeKey(c, theirs, "theirs");
+      const keys = await keysOf(c, mine);
+      expect(keys).toHaveLength(many);
+      const made = keys.map((key) => Date.parse(key.createdAt));
+      expect(made).toEqual([...made].sort((a, b) => b - a));
+      expect(await revokeKeysOf(c, mine)).toBe(many);
+      expect(db.apikey.map((row) => row.name)).toEqual(["theirs"]);
+      expect(await checkKey(c, other)).not.toBeNull();
+    });
+
+    it("keeps a key made after revoking them all began", async () => {
+      const { c, db, mine } = await setUp();
+      await makeKey(c, mine, "leaked");
+      const later = await makeKey(c, mine, "later");
+      const row = db.apikey.find((key) => key.name === "later");
+      if (row) {
+        row.createdAt = new Date(Date.now() + 60_000);
+      }
+      expect(await revokeKeysOf(c, mine)).toBe(1);
+      expect(db.apikey.map((key) => key.name)).toEqual(["later"]);
+      expect(await checkKey(c, later)).not.toBeNull();
+    });
+  });
+});
+
+describe("keyName", () => {
+  it("keeps the name the CLI sends, with its spaces made one and no control characters", () => {
+    expect(keyName("hajime-mbp")).toBe("hajime-mbp");
+    expect(keyName("  build\u0000 \n  box\u202e ")).toBe("build box");
+  });
+
+  it("cuts a long name, and calls a key with no name dekc", () => {
+    expect(keyName("a".repeat(MAX_KEY_NAME_LENGTH + 10))).toBe("a".repeat(MAX_KEY_NAME_LENGTH));
+    expect(keyName(undefined)).toBe("dekc");
+    expect(keyName(" \u0007 ")).toBe("dekc");
   });
 });

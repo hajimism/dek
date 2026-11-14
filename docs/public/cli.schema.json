@@ -2714,6 +2714,12 @@
               "description": "Why the key was not revoked, when it was not.",
               "type": "string"
             },
+            "revokedKeys": {
+              "description": "Set with --all: how many keys of the account the server revoked, the one sent included.",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -4081,6 +4087,12 @@
             "reason": {
               "description": "Why the key was not revoked, when it was not.",
               "type": "string"
+            },
+            "revokedKeys": {
+              "description": "Set with --all: how many keys of the account the server revoked, the one sent included.",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "ok": {
               "type": "boolean",
