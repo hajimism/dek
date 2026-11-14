@@ -1048,6 +1048,36 @@ describe("auth.ts, through Better Auth", () => {
       expect(await checkKey(c, other)).not.toBeNull();
       expect(await revokeKeysOf(c, mine)).toBe(0);
     });
+
+    // Better Auth reads 100 rows when a query names no limit.
+    it("lists and revokes every key however many there are", async () => {
+      const { c, db, mine, theirs } = await setUp();
+      const many = 105;
+      for (let i = 0; i < many; i++) {
+        await makeKey(c, mine, `box-${i}`);
+      }
+      const other = await makeKey(c, theirs, "theirs");
+      const keys = await keysOf(c, mine);
+      expect(keys).toHaveLength(many);
+      const made = keys.map((key) => Date.parse(key.createdAt));
+      expect(made).toEqual([...made].sort((a, b) => b - a));
+      expect(await revokeKeysOf(c, mine)).toBe(many);
+      expect(db.apikey.map((row) => row.name)).toEqual(["theirs"]);
+      expect(await checkKey(c, other)).not.toBeNull();
+    });
+
+    it("keeps a key made after revoking them all began", async () => {
+      const { c, db, mine } = await setUp();
+      await makeKey(c, mine, "leaked");
+      const later = await makeKey(c, mine, "later");
+      const row = db.apikey.find((key) => key.name === "later");
+      if (row) {
+        row.createdAt = new Date(Date.now() + 60_000);
+      }
+      expect(await revokeKeysOf(c, mine)).toBe(1);
+      expect(db.apikey.map((key) => key.name)).toEqual(["later"]);
+      expect(await checkKey(c, later)).not.toBeNull();
+    });
   });
 });
 

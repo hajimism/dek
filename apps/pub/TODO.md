@@ -65,6 +65,7 @@ Each of these is needed on staging and on production.
   - Revoking a grant on a `link` deck does not lock its grantee out without a new link: they keep the key from the address bar or a URL shared with them.
   - A key survives `link` → `private` → `link`, so a URL handed out before opens again (ADR 81).
   - `og:url` carries no key, so a link preview that follows it may open the bare path, a 404.
+- **`dekc pub logout --all` with another account's `DEK_TOKEN`**, a CI bot's, revokes that account's keys, then forgets the key `login` kept here without revoking it, since it is another account's (ADR 83).
 - **A publish racing a delete** of its deck answers 500, not the 404 of a deck that is gone.
 - **Changing a handle.** A handle is chosen once, after the first sign-in, and cannot be changed (ADR 77). Changing one needs redirects from the old `/@handle` URLs, and a rule for when someone else may take the old one.
 - **Comments** work from end to end, but their look, their behaviour and their API are expected to change. Do not build on their current details.

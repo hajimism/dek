@@ -34,12 +34,30 @@ export async function makeKey(c: Context, userId: string, name: string): Promise
 // Better Auth's own routes to list and delete keys take a session alone, and a key revokes its
 // account's keys too, so both go through its adapter, by the account the key belongs to.
 
-/** The account's keys `rows` reads, newest first, leaving out those past their expiry. */
-function liveKeys(rows: unknown, now: number): CliKeyInfo[] {
+/** Better Auth reads 100 rows of a query that names no limit, so the list reads a page at a time. */
+const PAGE = 100;
+
+/** The keys of the account `userId` that still work, newest first. */
+export async function keysOf(c: Context, userId: string): Promise<CliKeyInfo[]> {
+  const { adapter } = await authOf(c).$context;
+  const rows: unknown[] = [];
+  for (;;) {
+    const page = await adapter.findMany({
+      model: "apikey",
+      where: [{ field: "referenceId", value: userId }],
+      sortBy: { field: "createdAt", direction: "desc" },
+      limit: PAGE,
+      offset: rows.length,
+    });
+    rows.push(...page);
+    if (page.length < PAGE) {
+      break;
+    }
+  }
+  const now = Date.now();
   return KeyRow.array()
     .parse(rows)
     .filter((row) => row.expiresAt == null || row.expiresAt.getTime() > now)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .map((row) => ({
       id: row.id,
       name: row.name ?? null,
@@ -47,19 +65,6 @@ function liveKeys(rows: unknown, now: number): CliKeyInfo[] {
       lastUsedAt: row.lastRequest?.toISOString() ?? null,
       expiresAt: row.expiresAt?.toISOString() ?? null,
     }));
-}
-
-async function rowsOf(c: Context, userId: string): Promise<unknown> {
-  const context = await authOf(c).$context;
-  return context.adapter.findMany({
-    model: "apikey",
-    where: [{ field: "referenceId", value: userId }],
-  });
-}
-
-/** The keys of the account `userId` that still work, newest first. */
-export async function keysOf(c: Context, userId: string): Promise<CliKeyInfo[]> {
-  return liveKeys(await rowsOf(c, userId), Date.now());
 }
 
 /** Revoke the key `id` if it is the account's; whether there was one to revoke. */
@@ -77,25 +82,19 @@ export async function revokeKeyOf(c: Context, userId: string, id: string): Promi
 }
 
 /**
- * Revoke every key of the account, past their expiry too; how many of them still worked. A key
- * made while this runs is not among them, and stays.
+ * Revoke every key of the account, past their expiry too; how many of them still worked. Only keys
+ * made before the call are revoked, so a key made while it runs stays.
  */
 export async function revokeKeysOf(c: Context, userId: string): Promise<number> {
-  const rows = await rowsOf(c, userId);
-  const ids = KeyRow.pick({ id: true })
-    .array()
-    .parse(rows)
-    .map((row) => row.id);
-  if (ids.length === 0) {
-    return 0;
-  }
-  const context = await authOf(c).$context;
-  await context.adapter.deleteMany({
+  const now = new Date();
+  const { adapter } = await authOf(c).$context;
+  const before = [
+    { field: "referenceId", value: userId },
+    { field: "createdAt", operator: "lte", value: now },
+  ] as const;
+  await adapter.deleteMany({
     model: "apikey",
-    where: [
-      { field: "id", operator: "in", value: ids },
-      { field: "referenceId", value: userId },
-    ],
+    where: [...before, { field: "expiresAt", operator: "lte", value: now }],
   });
-  return liveKeys(rows, Date.now()).length;
+  return adapter.deleteMany({ model: "apikey", where: [...before] });
 }
