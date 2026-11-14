@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type { PublicComment } from "../../../../src/pub/protocol.ts";
-import PublicComments from "../../src/model/comment/public/ui/public-comments.svelte";
 import LikeButton from "../../src/model/deck/like/ui/like-button.svelte";
+import PublicComments from "../../src/model/deck/public-comment/ui/public-comments.svelte";
 import { renderPage } from "./setup.ts";
 
 const by = (handle: string) => ({ name: handle, handle });
@@ -76,7 +76,7 @@ describe("PublicComments", () => {
     await renderPage(PublicComments, { ...base, onpost });
     await page.getByPlaceholder("Add a comment…").fill("Thanks!");
     await page.getByRole("button", { name: "Comment", exact: true }).click();
-    expect(onpost).toHaveBeenLastCalledWith({ text: "Thanks!" }, null);
+    expect(onpost).toHaveBeenLastCalledWith("Thanks!", null);
     await page
       .getByRole("article")
       .filter({ hasText: "Great talk" })
@@ -84,7 +84,7 @@ describe("PublicComments", () => {
       .click();
     await page.getByPlaceholder("Reply…").fill("Me too");
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
-    expect(onpost).toHaveBeenLastCalledWith({ text: "Me too" }, "p_1");
+    expect(onpost).toHaveBeenLastCalledWith("Me too", "p_1");
   });
 
   it("says how to comment when one may not yet, and when no one may", async () => {

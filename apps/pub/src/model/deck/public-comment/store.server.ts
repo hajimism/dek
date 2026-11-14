@@ -12,9 +12,9 @@ import type {
 import { ApiError, notFound } from "../../../common/api-error.ts";
 import { now } from "../../../common/db.server.ts";
 import { newPublicCommentId } from "../../../common/ids.ts";
+import { authorOf } from "../../person/person.ts";
 import { peopleById } from "../../person/store.server.ts";
 import type { Person } from "../../person/type.ts";
-import { authorOf } from "../store.server.ts";
 import { threadPublic } from "./view.ts";
 
 export type PublicCommentRow = typeof publicComments.$inferSelect;

@@ -11,13 +11,13 @@ import { appUrl } from "../../common/http.server.ts";
 import { newDeckId } from "../../common/ids.ts";
 import { personById } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
-import { canManage, canView, sideOf } from "./access.ts";
+import { canManage, standingOn } from "./access.ts";
 import { talkPath } from "./deck.ts";
-import { grantedSide, grantsOf, roleOf } from "./grant/store.server.ts";
-import type { GrantRole, GrantSide } from "./grant/type.ts";
+import { grantsOf } from "./grant/store.server.ts";
 import { syncAccess } from "./sync-access.server.ts";
-import type { Deck, DeckPatch } from "./type.ts";
-import { findVersion } from "./version/store.server.ts";
+import type { Deck, DeckPatch, Standing } from "./type.ts";
+import { currentVersionOf } from "./version/store.server.ts";
+import type { Version } from "./version/type.ts";
 
 /** The columns of the access file an owner may change; a change to any of them writes it again. */
 const ACCESS_COLUMNS = ["visibility", "scriptPublic", "embed"] as const;
@@ -151,25 +151,29 @@ async function mustFind(id: string): Promise<Deck> {
 }
 
 /**
- * The deck, if `person` may see it, with the role their grants give them and the side of the work
- * they are on; a deck they may not see is as missing as one that is not. A grant by an address they
- * have verified counts whether or not it is claimed yet, so reading writes nothing.
+ * Where `person` stands with the deck, or null when it does not open to them. A grant by an
+ * address they have verified counts whether or not it is claimed yet, so reading writes nothing.
+ */
+export async function standingWith(deck: Deck, person: Person | null): Promise<Standing | null> {
+  const grants = await grantsOf(deck.id, person);
+  const standing = standingOn(deck, person, grants);
+  return standing.opens ? standing : null;
+}
+
+/**
+ * The deck, if `person` may see it, with where they stand; a deck they may not see is as missing
+ * as one that is not.
  */
 export async function visibleDeck(
   id: string,
   person: Person | null,
-): Promise<{ deck: Deck; grant: GrantRole | null; side: GrantSide }> {
+): Promise<Standing & { deck: Deck }> {
   const deck = await deckById(id);
-  if (!deck) {
+  const standing = deck && (await standingWith(deck, person));
+  if (!deck || !standing) {
     throw notFound();
   }
-  const grants = await grantsOf(deck.id, person);
-  const grant = roleOf(grants);
-  const granted = grantedSide(grants);
-  if (!canView(deck, person, grant, granted)) {
-    throw notFound();
-  }
-  return { deck, grant, side: sideOf(deck, person, granted) };
+  return { deck, ...standing };
 }
 
 export async function ownedDeck(id: string, person: Person): Promise<Deck> {
@@ -189,10 +193,14 @@ export async function talkUrl(c: Context, deck: Deck): Promise<string> {
   return appUrl(talkPath(await ownerHandle(c, deck), deck.slug));
 }
 
-export async function deckStatus(c: Context, deck: Deck): Promise<DeckStatus> {
+/** The deck as the CLI is told of it; `version` is its current one, when the caller has it. */
+export async function deckStatus(
+  c: Context,
+  deck: Deck,
+  version?: Version | null,
+): Promise<DeckStatus> {
   const handle = await ownerHandle(c, deck);
-  const version =
-    deck.currentVersion === null ? null : await findVersion(deck.id, deck.currentVersion);
+  const current = version === undefined ? await currentVersionOf(deck) : version;
   return {
     id: deck.id,
     slug: deck.slug,
@@ -204,6 +212,6 @@ export async function deckStatus(c: Context, deck: Deck): Promise<DeckStatus> {
     embed: deck.embed,
     comments: deck.comments,
     current: deck.currentVersion,
-    files: version?.files ?? {},
+    files: current?.files ?? {},
   };
 }

@@ -3,7 +3,9 @@
 
 import type { CommentPolicy, Visibility } from "../../../../../src/pub/protocol.ts";
 import type { Person } from "../person/type.ts";
-import type { GrantRole, GrantSide } from "./grant/type.ts";
+import { strongestRole, widestSide } from "./grant/grant.ts";
+import type { GrantRole, GrantRow, GrantSide } from "./grant/type.ts";
+import type { Standing } from "./type.ts";
 
 type Caller = Pick<Person, "id"> | null;
 
@@ -54,6 +56,21 @@ export function sideOf(
   return canManage(deck, person) ? "team" : (granted ?? "guest");
 }
 
+/** Where `person` stands with the deck, from the grants that name them on it. */
+export function standingOn(
+  deck: DeckRules,
+  person: Caller,
+  grants: readonly Pick<GrantRow, "role" | "side">[],
+): Standing {
+  const role = strongestRole(grants.map((grant) => grant.role));
+  const granted = widestSide(grants.map((grant) => grant.side));
+  return {
+    opens: canView(deck, person, role, granted),
+    role,
+    side: sideOf(deck, person, granted),
+  };
+}
+
 export function canManage(deck: Pick<DeckRules, "ownerId">, person: Caller): boolean {
   return person?.id === deck.ownerId;
 }
@@ -67,9 +84,16 @@ export function canSeeScript(
 }
 
 /**
- * Whether someone who may see the deck may read version `n`, its pictures and the comments placed
- * on it: the current version only, on either side of the work.
+ * What version `n` is to the deck: the current one, the only one anyone who may see the deck reads,
+ * with its pictures and the comments placed on it; one gone before it, which a page left open may
+ * still show; or one it never had.
  */
-export function mayReadVersion(deck: { currentVersion: number | null }, n: number): boolean {
-  return n === deck.currentVersion;
+export function versionStanding(
+  deck: { currentVersion: number | null },
+  n: number,
+): "current" | "gone" | "unknown" {
+  if (n === deck.currentVersion) {
+    return "current";
+  }
+  return Number.isInteger(n) && n >= 1 && n < (deck.currentVersion ?? 0) ? "gone" : "unknown";
 }

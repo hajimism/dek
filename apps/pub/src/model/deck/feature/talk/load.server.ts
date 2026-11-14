@@ -3,24 +3,23 @@
 // cannot tell the two apart.
 
 import type { Context } from "hono";
-import { ApiError } from "../../../../common/api-error.ts";
 import { appUrl } from "../../../../common/http.server.ts";
 import { guessLang, type Lang } from "../../../../common/i18n.ts";
 import { canReadComments } from "../../../comment/access.ts";
 import { isMuted } from "../../../comment/mute.server.ts";
-import { canPostPublic, publicCommentsOn } from "../../../comment/public/access.ts";
-import { publicCommentsOf } from "../../../comment/public/store.server.ts";
 import { commentsFor } from "../../../comment/store.server.ts";
 import { viewerOf } from "../../../person/actor.server.ts";
 import { profileOf } from "../../../person/person.ts";
 import { handleOf } from "../../../person/profile-path.ts";
 import { personByHandle } from "../../../person/store.server.ts";
-import { canComment, canManage, canSeeScript } from "../../access.ts";
+import { canComment, canManage, canSeeScript, opensToAnyone } from "../../access.ts";
 import { talksBy } from "../../card.server.ts";
 import { talkPath } from "../../deck.ts";
 import { likeState } from "../../like/store.server.ts";
-import { deckBySlug, visibleDeck } from "../../store.server.ts";
-import { findVersion } from "../../version/store.server.ts";
+import { canPostPublic } from "../../public-comment/access.ts";
+import { publicCommentsOf } from "../../public-comment/store.server.ts";
+import { deckBySlug, standingWith } from "../../store.server.ts";
+import { currentVersionOf } from "../../version/store.server.ts";
 import { coverOf, slidePicture } from "../../version/version.ts";
 import { frameOf } from "./frame.server.ts";
 import type { Talk } from "./type.ts";
@@ -32,32 +31,33 @@ export async function loadTalk(
 ): Promise<Talk | null> {
   const handle = handleOf(segment);
   const owner = handle ? await personByHandle(c, handle) : null;
-  const row = owner && slug ? await deckBySlug(owner.id, slug) : null;
-  if (!owner || !row || row.currentVersion === null) {
+  const deck = owner && slug ? await deckBySlug(owner.id, slug) : null;
+  if (!owner || !deck || deck.currentVersion === null) {
     return null;
   }
   const person = await viewerOf(c);
-  const seen = await visibleDeck(row.id, person).catch((error: unknown) => {
-    if (error instanceof ApiError) {
-      return null;
-    }
-    throw error;
-  });
-  if (!seen) {
+  const standing = await standingWith(deck, person);
+  const version = standing && (await currentVersionOf(deck));
+  if (!standing || !version) {
     return null;
   }
-  const { deck, grant, side } = seen;
-  const n = deck.currentVersion;
-  const version = n === null ? null : await findVersion(deck.id, n);
-  if (n === null || !version) {
-    return null;
-  }
+  const { role, side } = standing;
+  const { n } = version;
   const slides = version.slideMap.slides;
   const isOwner = canManage(deck, person);
-  const script = deck.scriptPublic ? "public" : isOwner ? "owner" : "hidden";
+  const seesScript = canSeeScript(deck, person);
+  const readsComments = canReadComments(deck, person, role);
+  const open = opensToAnyone(deck);
   const picture = coverOf(deck.id, version);
 
-  const readsComments = canReadComments(deck, person, grant);
+  const [viewer, comments, muted, publicComments, likes, more] = await Promise.all([
+    frameOf(deck, n),
+    readsComments ? commentsFor(c, deck, person, side, "all") : null,
+    person && readsComments ? isMuted(person.id, deck.id) : null,
+    open ? publicCommentsOf(c, deck.id) : null,
+    open ? likeState(deck.id, person?.id ?? null) : null,
+    talksBy(c, owner, { publicOnly: true, limit: 4 }),
+  ]);
   return {
     id: deck.id,
     slug: deck.slug,
@@ -78,26 +78,24 @@ export async function loadTalk(
     url: appUrl(talkPath(owner.handle, deck.slug)),
     owner: profileOf(owner),
     version: n,
-    viewer: await frameOf(deck, n),
+    viewer,
     slides: slides.map((slide) => ({
       slug: slide.slug,
       title: slide.title,
       steps: slide.steps.map((step) => step.step),
-      paragraphs: canSeeScript(deck, person) ? slide.paragraphs : null,
+      paragraphs: seesScript ? slide.paragraphs : null,
       picture: version.shots[slide.slug] ? slidePicture(deck.id, n, slide.slug) : null,
     })),
-    script,
+    script: deck.scriptPublic ? "public" : seesScript ? "owner" : "hidden",
     isOwner,
-    comments: readsComments ? await commentsFor(c, deck, person, side, "all") : null,
-    canComment: canComment(deck, person, grant),
-    muted: person && readsComments ? await isMuted(person.id, deck.id) : null,
-    publicComments: publicCommentsOn(deck) ? await publicCommentsOf(c, deck.id) : null,
+    comments,
+    canComment: canComment(deck, person, role),
+    muted,
+    publicComments,
     canPostPublic: canPostPublic(deck, person),
-    likes: publicCommentsOn(deck) ? await likeState(deck.id, person?.id ?? null) : null,
+    likes,
     side,
     image: picture ? appUrl(picture) : null,
-    more: (await talksBy(c, owner, { publicOnly: true, limit: 4 }))
-      .filter((card) => card.slug !== deck.slug)
-      .slice(0, 3),
+    more: more.filter((card) => card.slug !== deck.slug).slice(0, 3),
   };
 }

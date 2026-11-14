@@ -19,8 +19,8 @@ const STATUSES = ["open", "resolved", "all"] as const;
 export const GET = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
-    if (!canReadComments(deck, person, grant)) {
+    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person);
+    if (!canReadComments(deck, person, role)) {
       throw notFound("comments");
     }
     const asked = c.req.query("status") ?? "open";
@@ -35,8 +35,8 @@ export const GET = defineHandler((c) =>
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
-    mustComment(canComment(deck, person, grant), person);
+    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person);
+    mustComment(canComment(deck, person, role), person);
     const body = await jsonBody(c, NewComment);
     const id = await openThread(deck, person, side, body);
     const thread = await visibleThread(deck, side, id);

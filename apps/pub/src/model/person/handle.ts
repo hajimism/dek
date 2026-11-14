@@ -11,7 +11,7 @@ export function normalizeHandle(login: string): string {
   return login.toLowerCase();
 }
 
-/** A handle for an account made with an email address, in development only. */
+/** A handle for an account made with an email address, by a sign-in link. */
 export function handleFromEmail(email: string): string {
   const local = (email.split("@")[0] ?? "")
     .toLowerCase()

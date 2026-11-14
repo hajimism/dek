@@ -4,7 +4,7 @@ import { api, jsonBody } from "../../../src/common/http.server.ts";
 import { createDeck, deckStatus, ownDecks } from "../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../src/model/person/actor.server.ts";
 
-/** Create a deck, private, before its first version is uploaded. */
+/** Create a deck, kept to its team, before its first version is uploaded. */
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
