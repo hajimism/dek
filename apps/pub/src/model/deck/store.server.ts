@@ -20,13 +20,12 @@ import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { appUrl } from "../../common/http.server.ts";
 import { newDeckId } from "../../common/ids.ts";
-import { log } from "../../common/log.ts";
 import { isOperator } from "../person/operator.server.ts";
 import { personById } from "../person/store.server.ts";
 import type { Account, Person } from "../person/type.ts";
 import { canDelete, canManage, standingOn } from "./access.ts";
 import { talkHref, talkPath } from "./deck.ts";
-import { DECK_ROWS, type DeckTable } from "./deletion.ts";
+import { DECK_ROWS, type DeckTable, deleteInOrder } from "./deletion.ts";
 import { grantsOf } from "./grant/store.server.ts";
 import { deckPrefix } from "./serving/origin.ts";
 import { removeAccess, syncAccess } from "./sync-access.server.ts";
@@ -171,31 +170,30 @@ const DECK_TABLES = {
 } satisfies Record<DeckTable, unknown>;
 
 /**
- * Delete the deck for good: its rows, as DECK_ROWS lists them, and its files, under deckPrefix. The access file goes first, so the
- * serve Worker hands out nothing of it whatever fails after; a failure there leaves the deck as
- * it was. Then every row of it, in one batch, after which nothing of it opens and its slug is
- * free. Then every file left under its prefix: one that fails to go is logged, and stays where
- * nothing reaches it, since the app finds a file only through the deck's rows and the serve
- * Worker only through its access file.
+ * Delete the deck for good, in the order `deleteInOrder` keeps: its access file, so the serve
+ * Worker hands out nothing of it; every row, as DECK_ROWS lists them, in one batch, after which
+ * nothing of it opens and its slug is free; the access file again; then every file under
+ * deckPrefix. A file left there is reached by nothing: the app finds a file only through the
+ * deck's rows, and the serve Worker only through its access file.
  */
-export async function deleteDeck(deck: Deck): Promise<void> {
-  await removeAccess(deck.id);
-  const statements = DECK_ROWS.map((rows) =>
-    db
-      .delete(DECK_TABLES[rows.table])
-      .where(
-        "through" in rows
-          ? sql`${sql.identifier(rows.column)} in (select id from ${sql.identifier(rows.through)} where deck_id = ${deck.id})`
-          : sql`${sql.identifier(rows.column)} = ${deck.id}`,
-      ),
-  );
-  // A batch takes at least one statement, and DECK_ROWS is never empty.
-  await db.batch(statements as [(typeof statements)[number], ...typeof statements]);
-  try {
-    await deleteFilesUnder(deckPrefix(deck.id));
-  } catch (error) {
-    log("error", `the files of the deleted deck ${deck.id} were not all deleted`, error);
-  }
+export function deleteDeck(deck: Deck): Promise<void> {
+  return deleteInOrder(deck.id, {
+    removeAccess: () => removeAccess(deck.id),
+    deleteRows: async () => {
+      const statements = DECK_ROWS.map((rows) =>
+        db
+          .delete(DECK_TABLES[rows.table])
+          .where(
+            "through" in rows
+              ? sql`${sql.identifier(rows.column)} in (select id from ${sql.identifier(rows.through)} where deck_id = ${deck.id})`
+              : sql`${sql.identifier(rows.column)} = ${deck.id}`,
+          ),
+      );
+      // A batch takes at least one statement, and DECK_ROWS is never empty.
+      await db.batch(statements as [(typeof statements)[number], ...typeof statements]);
+    },
+    deleteFiles: () => deleteFilesUnder(deckPrefix(deck.id)),
+  });
 }
 
 async function mustFind(id: string): Promise<Deck> {
@@ -267,8 +265,20 @@ export async function ownerHandle(c: Context, deck: Deck): Promise<string> {
   return (await personById(c, deck.ownerId))?.handle ?? deck.ownerId;
 }
 
-/** The deck's absolute URL to share, with the key a `link` deck opens by: for the CLI and mail. */
+/**
+ * The deck's absolute URL with no key, for those it is shared with, who open it by their grant or
+ * as its owner: review threads' links and the mail about them, and invitations. A key in these
+ * would open nothing more to them, and would go wherever they are pasted.
+ */
 export async function talkUrl(c: Context, deck: Deck): Promise<string> {
+  return appUrl(talkPath(await ownerHandle(c, deck), deck.slug));
+}
+
+/**
+ * The deck's absolute URL to hand out, with the key a `link` deck opens by, as `DeckStatus.url`
+ * gives it too: for `PublishResult.url`.
+ */
+export async function shareUrl(c: Context, deck: Deck): Promise<string> {
   return appUrl(talkHref(await ownerHandle(c, deck), deck));
 }
 

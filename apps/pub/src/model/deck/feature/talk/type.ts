@@ -37,7 +37,10 @@ export type Talk = {
   commentPolicy: CommentPolicy;
   /** Where the talk is shared from: a `link` one's URL carries its key. */
   url: string;
-  /** The talk's URL with no key, for search engines and link previews to name it by. */
+  /**
+   * The talk's URL with no key, for search engines and link previews to name it by, and for the
+   * links to review threads, whose readers open the talk by their grant.
+   */
   canonical: string;
   /**
    * The key a `link` talk opens by, which the page's own requests for its pictures, likes and

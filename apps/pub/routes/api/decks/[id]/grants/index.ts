@@ -34,8 +34,7 @@ export const POST = defineHandler((c) =>
     const { grant, invite } = await share(c, deck, grantee, role, side);
     if (invite) {
       const talk = await talkUrl(c, deck);
-      const { pathname, search } = new URL(talk);
-      const url = invite.byEmail ? appUrl(signInHref(pathname + search)) : talk;
+      const url = invite.byEmail ? appUrl(signInHref(new URL(talk).pathname)) : talk;
       afterAnswer(
         c,
         sendMail(

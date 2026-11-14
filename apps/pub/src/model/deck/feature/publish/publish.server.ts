@@ -13,7 +13,7 @@ import {
 import { ApiError } from "../../../../common/api-error.ts";
 import { afterAnswer } from "../../../../common/http.server.ts";
 import { log } from "../../../../common/log.ts";
-import { deckById, talkUrl } from "../../store.server.ts";
+import { deckById, shareUrl } from "../../store.server.ts";
 import type { Deck } from "../../type.ts";
 import {
   claimVersion,
@@ -123,7 +123,7 @@ export async function publish(c: Context, deck: Deck): Promise<PublishResult> {
     id: deck.id,
     n,
     current: updated.currentVersion,
-    url: await talkUrl(c, updated),
+    url: await shareUrl(c, updated),
     visibility: updated.visibility,
   };
 }

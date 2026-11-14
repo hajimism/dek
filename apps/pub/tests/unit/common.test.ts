@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDb, sql } from "void/db";
+import { sendEmail } from "void/email";
 import { docsUrl } from "../../src/common/docs.ts";
 import {
   formatDate,
@@ -10,7 +11,10 @@ import {
   translate,
 } from "../../src/common/i18n.ts";
 import { log } from "../../src/common/log.ts";
+import { sendMail } from "../../src/common/mail.server.ts";
 import { xmlText } from "../../src/common/xml.ts";
+
+vi.mock("void/email", () => ({ sendEmail: vi.fn() }));
 
 describe("i18n", () => {
   it("picks ?lang=, then the cookie, and Japanese for anyone who has not chosen", () => {
@@ -84,25 +88,23 @@ describe("log", () => {
     return { withSession: () => ({ prepare: () => statement }) };
   }
 
-  function logged(error: unknown): string {
-    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    try {
-      log("error", "an API request failed", error);
-      return JSON.stringify(spy.mock.calls);
-    } finally {
-      spy.mockRestore();
-    }
+  function logged(error: unknown): Promise<string> {
+    return loggedBy(() => log("error", "an API request failed", error));
+  }
+
+  function failedQuery(value: string): Promise<unknown> {
+    const d1 = new Error("D1_ERROR: UNIQUE constraint failed: user.email: SQLITE_CONSTRAINT");
+    return createDb(failingD1(d1) as never)
+      .run(sql`insert into user (email) values (${value})`)
+      .catch((thrown: unknown) => thrown);
   }
 
   it("logs a failed query without the values it was bound to", async () => {
-    const d1 = new Error("D1_ERROR: UNIQUE constraint failed: user.email: SQLITE_CONSTRAINT");
-    const error: unknown = await createDb(failingD1(d1) as never)
-      .run(sql`insert into user (email) values (${"ada@example.com"})`)
-      .catch((thrown: unknown) => thrown);
+    const error = await failedQuery("ada@example.com");
     // Drizzle's own message, and the stack it heads, carry the address.
     expect(String((error as Error).stack)).toContain("ada@example.com");
 
-    const line = logged(error);
+    const line = await logged(error);
     expect(line).not.toContain("ada@example.com");
     expect(line).toContain("an API request failed");
     expect(line).toContain("DrizzleQueryError");
@@ -111,11 +113,74 @@ describe("log", () => {
     expect(line).toContain("at D1PreparedQuery.queryWithCache");
   });
 
-  it("logs any other error by its name, message, stack and cause", () => {
-    const line = logged(new TypeError("no deck", { cause: new RangeError("version 0") }));
+  it("leaves out a bound value's line even when it reads as a stack frame", async () => {
+    const error = await failedQuery("hello\n    at the meetup, ada@example.com said");
+    expect(String((error as Error).stack)).toContain("    at the meetup, ada@example.com said");
+
+    const line = await logged(error);
+    expect(line).not.toContain("ada@example.com");
+    expect(line).toContain("at D1PreparedQuery.queryWithCache");
+  });
+
+  it("logs a failed query's message, passed as a string, without its params", async () => {
+    const error = (await failedQuery("ada@example.com")) as Error;
+    // Better Auth logs such a message by itself when it names a column or a table.
+    const line = await loggedBy(() => log("error", `Better Auth: ${error.message}`, error.message));
+    expect(line).not.toContain("ada@example.com");
+    expect(line).toContain("Better Auth: Failed query: insert into user (email) values (?)");
+  });
+
+  it("logs any other error by its name, message, stack and cause", async () => {
+    const line = await logged(new TypeError("no deck", { cause: new RangeError("version 0") }));
     for (const part of ["TypeError", "no deck", "RangeError", "version 0", "common.test.ts"]) {
       expect(line).toContain(part);
     }
-    expect(logged("a string")).toContain("a string");
+    expect(await logged("a string")).toContain("a string");
+  });
+
+  it("keeps the frames of a stack its message does not head", async () => {
+    const error = new Error("renamed");
+    error.stack = "Error: thrown\n    at render (page.ts:1:1)";
+    expect(await logged(error)).toContain("at render (page.ts:1:1)");
   });
 });
+
+describe("mail", () => {
+  const mail = { to: "ada@example.com", subject: "Sign in to dek.pub", text: "A link." };
+  const unverified = {
+    code: "UNVERIFIED_DESTINATION",
+    message: "the destination address ada@example.com is not verified",
+  };
+
+  it("logs a mail the provider refused by its code, not by its message", async () => {
+    vi.mocked(sendEmail).mockResolvedValue({ ok: false, error: unverified } as never);
+    let sent: boolean | undefined;
+    const line = await loggedBy(async () => {
+      sent = await sendMail(mail);
+    });
+    expect(sent).toBe(false);
+    expect(line).toContain("UNVERIFIED_DESTINATION");
+    expect(line).not.toContain("ada@example.com");
+  });
+
+  it("logs each delivery the provider refused by its code, not by its message", async () => {
+    vi.mocked(sendEmail).mockResolvedValue({
+      ok: false,
+      deliveries: [{ ok: false, error: unverified }],
+    } as never);
+    const line = await loggedBy(() => sendMail(mail));
+    expect(line).toContain("UNVERIFIED_DESTINATION");
+    expect(line).not.toContain("ada@example.com");
+  });
+});
+
+/** What `act` writes to console.error, as one string. */
+async function loggedBy(act: () => unknown): Promise<string> {
+  const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  try {
+    await act();
+    return JSON.stringify(spy.mock.calls);
+  } finally {
+    spy.mockRestore();
+  }
+}

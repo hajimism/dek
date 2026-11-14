@@ -11,8 +11,9 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 ### The app
 
 - **Deleting an account** is done by hand on request, its decks with `deleteDeck` (ADR 82).
+- **Deleting a talk.** A grant added while its deck is being deleted can be left as a row with no deck, and `hasWaitingGrant` does not join `decks`, so that address can still make an account (ADR 79, 82).
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
-- **Logs.** An error a page's loader throws is logged whole by Void's error handler, and a failed query's error carries the values it was bound to: an address, a comment's text. Void has no hook to log it otherwise; `src/common/log.ts` does so for the API, the tasks after an answer, mail and Better Auth.
+- **Logs.** A failed query's error carries the values it was bound to: an address, a comment's text. `src/common/log.ts` leaves them out, but two handlers log errors whole: Void's error handler (`createErrorRenderer`'s `onError`), for a page's loader, a route not wrapped in `api()` such as `routes/[profile]/rss.ts` and `routes/sitemap.xml.ts`, and middleware; and Better Auth's adapter when a fallback join fails (`handleFallbackJoin`), which logs the join's conditions and its error, whose value is a user id.
 
 ### Terms and the law
 
@@ -37,7 +38,7 @@ Each of these is needed on staging and on production.
 
 - **Domains.** `dek.pub` and `dekusercontent.com` are not registered. The Public Suffix List request for `dekusercontent.com` is not sent; it takes weeks.
 - **Infrastructure.** The zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) and the serve Worker's route are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
-- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset. `DEK_PUB_INVITED` lists the people invited, and holds `*` only once every item under "Before anyone can sign up" is done (ADR 79). `DEK_PUB_OPERATORS` names the handles of those who run dek.pub, who may take any talk down (ADR 82).
+- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset. `DEK_PUB_INVITED` lists the people invited, and holds `*` only once every item under "Before anyone can sign up" is done (ADR 79). `DEK_PUB_OPERATORS` lists the addresses of those who run dek.pub, who may take any talk down (ADR 82).
 - **Deploying.** No script deploys the app and the serve Worker together, and nothing applies `db/migrations/` to the remote D1. There is no way back from a deploy but deploying again.
 - **Mail.**
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing. The token `void deploy` uses needs Email Routing Edit and Email Sending Edit.
@@ -59,6 +60,12 @@ Each of these is needed on staging and on production.
 
 ## Later
 
+- **Bidi and format characters in names and link labels.** `readName` and a link's label keep U+200B–200F, U+202A–202E and U+2066–2069, so a name or a label can be drawn reversed or hide part of itself.
+- **Link keys.**
+  - Revoking a grant on a `link` deck does not lock its grantee out without a new link: they keep the key from the address bar or a URL shared with them.
+  - A key survives `link` → `private` → `link`, so a URL handed out before opens again (ADR 81).
+  - `og:url` carries no key, so a link preview that follows it may open the bare path, a 404.
+- **A publish racing a delete** of its deck answers 500, not the 404 of a deck that is gone.
 - **Changing a handle.** A handle is chosen once, after the first sign-in, and cannot be changed (ADR 77). Changing one needs redirects from the old `/@handle` URLs, and a rule for when someone else may take the old one.
 - **Comments** work from end to end, but their look, their behaviour and their API are expected to change. Do not build on their current details.
   - No notices but mail: no unread marker, nothing in the app. `dekc pub comments` lists review threads only, and no mail tells the owner of a public comment.

@@ -16,8 +16,9 @@ export default defineEnv({
    */
   DEK_PUB_INVITED: string().default(""),
   /**
-   * The people who run dek.pub, by handle, split by commas or whitespace: each may delete anyone's
-   * talk, for a takedown, and each such deletion is logged (ADR 82).
+   * The people who run dek.pub, by email address, split by commas or whitespace: the account whose
+   * verified address is listed may delete anyone's talk, for a takedown, and each such deletion is
+   * logged. A listed address may make an account though `DEK_PUB_INVITED` leaves it out (ADR 82).
    */
   DEK_PUB_OPERATORS: string().default(""),
   /** The talk the landing page shows as its sample, as `@handle/slug`; empty shows none. */
