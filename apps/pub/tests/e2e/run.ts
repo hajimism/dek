@@ -672,6 +672,10 @@ try {
     "the owner's profile lists the team deck with its badge",
   );
   check(
+    !ownProfile.includes(`href="https://github.com/${me.handle}"`),
+    "a profile made by a sign-in link links to no GitHub account",
+  );
+  check(
     !(await (await stranger.fetch(profilePath)).text()).includes(`href="${talkPath}"`),
     "nobody else's view of the profile lists it",
   );

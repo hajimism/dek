@@ -60,6 +60,7 @@ The comment feature is planned to grow into two: public comments and a like on t
 - **Deleting.** There is no way to delete a talk or an account.
 - **Handles.**
   - A handle comes from the GitHub login or the email, and must be unique. A second account whose handle normalizes to one already taken fails to sign up. So does one made by a sign-in link, which then answers as if the link had expired.
+  - The profile links to GitHub when the account signs in with GitHub, by its handle. An account made by a sign-in link and later joined to a GitHub account keeps the handle its address gave it, so the link names someone else.
   - A link-visibility talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
 - **Profile.** The profile page lists every talk with no pagination; RSS stops at 50.
 
