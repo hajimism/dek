@@ -3,6 +3,7 @@
 // with by address gets in too, so a reviewer needs no invitation of their own (ADR 79). Signing
 // in to an account that exists is never held to it.
 
+import { listSetting } from "../../common/list-setting.ts";
 import { type Invited, Newcomer } from "./type.ts";
 
 /**
@@ -10,10 +11,7 @@ import { type Invited, Newcomer } from "./type.ts";
  * `@<GitHub login>`; `*`, as the whole list, lets anyone in. Any other entry counts for nothing.
  */
 export function readInvited(setting: string): Invited {
-  const entries = setting
-    .split(/[\s,]+/)
-    .map((entry) => entry.toLowerCase())
-    .filter(Boolean);
+  const entries = listSetting(setting);
   const logins = entries.filter((entry) => /^@[^@]+$/.test(entry)).map((entry) => entry.slice(1));
   const emails = entries.filter((entry) => /^[^@*]+@[^@*]+$/.test(entry));
   return {

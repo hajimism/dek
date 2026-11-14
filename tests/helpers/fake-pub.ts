@@ -116,7 +116,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
         latest: deck.current ?? null,
         grants: [],
       };
-      made.url = `${fake.url}/@${ME.handle}/${made.slug}`;
+      made.url = `${fake.url}/@${made.owner}/${made.slug}`;
       fake.decks.set(made.id, made);
       return made;
     },
@@ -246,6 +246,13 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       }
       return Response.json(status(fake.addDeck(parsed.data)), { status: 201 });
     }
+    const talk = path.match(/^\/api\/people\/([^/]+)\/talks\/([^/]+)$/);
+    if (method === "GET" && talk) {
+      const found = [...fake.decks.values()].find(
+        (deck) => deck.owner === talk[1] && deck.slug === talk[2],
+      );
+      return found ? Response.json(status(found)) : error(404, "not_found", "no such deck");
+    }
     const match = path.match(/^\/api\/decks\/([^/]+)(\/.*)?$/);
     const deck = match ? fake.decks.get(match[1] ?? "") : undefined;
     if (!match || !deck) {
@@ -254,6 +261,10 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     const rest = match[2] ?? "";
     if (method === "GET" && rest === "") {
       return Response.json(status(deck));
+    }
+    if (method === "DELETE" && rest === "") {
+      fake.decks.delete(deck.id);
+      return Response.json({ deleted: true, id: deck.id, owner: deck.owner, slug: deck.slug });
     }
     if (method === "PATCH" && rest === "") {
       const parsed = ShareRequest.safeParse(body);

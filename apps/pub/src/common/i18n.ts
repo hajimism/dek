@@ -430,6 +430,15 @@ const en = {
   "manage.version.changed": "{n} slides changed",
   "manage.version.changedOne": "1 slide changed",
   "manage.version.noMessage": "No message",
+  "manage.delete": "Delete talk",
+  "manage.delete.hint":
+    "Deletes the talk with its versions, comments, likes, and shares. Its URL stops working, and this can’t be undone.",
+  "manage.delete.open": "Delete this talk",
+  "manage.delete.title": "Delete “{title}”?",
+  "manage.delete.body":
+    "The talk, its versions, every comment and like on it, and who it is shared with are deleted for good. This can’t be undone.",
+  "manage.delete.type": "To confirm, type {slug}",
+  "manage.delete.confirm": "Delete for good",
   saved: "Saved.",
   undo: "Undo",
 
@@ -865,6 +874,15 @@ const ja: Record<MessageKey, string> = {
   "manage.version.changed": "{n} 枚が変更",
   "manage.version.changedOne": "1 枚が変更",
   "manage.version.noMessage": "メッセージなし",
+  "manage.delete": "トークの削除",
+  "manage.delete.hint":
+    "トークを、バージョン・コメント・いいね・共有ごと削除します。URL は開けなくなり、元には戻せません。",
+  "manage.delete.open": "このトークを削除",
+  "manage.delete.title": "「{title}」を削除しますか？",
+  "manage.delete.body":
+    "トークとそのバージョン、トークへのコメントといいね、共有の相手がすべて消えます。元には戻せません。",
+  "manage.delete.type": "確認のため {slug} と入力してください",
+  "manage.delete.confirm": "削除する",
   saved: "保存しました。",
   undo: "元に戻す",
 

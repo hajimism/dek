@@ -146,6 +146,7 @@ export const FLAGS = {
     type: "boolean",
     text: "replace the key in a link deck's URL, so the URL given out before opens it no more",
   },
+  yes: { type: "boolean", text: "delete the talk on dek.pub, which cannot be undone" },
   comments: {
     type: "enum",
     choices: ["off", "signed-in"],

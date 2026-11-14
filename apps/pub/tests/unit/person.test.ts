@@ -32,6 +32,7 @@ import {
   readLinks,
 } from "../../src/model/person/link.ts";
 import { MAX_NAME_LENGTH, readName } from "../../src/model/person/name.ts";
+import { readOperators } from "../../src/model/person/operator.ts";
 import {
   authorOf,
   hasHandle,
@@ -310,6 +311,22 @@ describe("readInvited", () => {
       const invited = readInvited(setting);
       expect(invited.anyone).toBe(false);
       expect(invited.emails.size + invited.logins.size).toBe(0);
+    }
+  });
+});
+
+describe("readOperators", () => {
+  it("reads handles, with or without @, split by commas or whitespace, in lowercase", () => {
+    expect([...readOperators(" Hajimism,@Sato\n  kato-2 ,, ")]).toEqual([
+      "hajimism",
+      "sato",
+      "kato-2",
+    ]);
+  });
+
+  it("names no operator from an empty setting, nor from what is no handle", () => {
+    for (const setting of ["", "   ", "@, *, sato@example.com, -x"]) {
+      expect(readOperators(setting).size).toBe(0);
     }
   });
 });
