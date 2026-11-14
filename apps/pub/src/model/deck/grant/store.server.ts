@@ -8,12 +8,15 @@ import type { Context } from "hono";
 import { and, asc, db, eq, isNull, notInArray, or } from "void/db";
 import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
-import { peopleById, personByEmail, personByHandle } from "../../person/store.server.ts";
-import type { Person } from "../../person/type.ts";
+import { accountByEmail, peopleById, personByHandle } from "../../person/store.server.ts";
+import type { Account } from "../../person/type.ts";
 import type { Grantee, GrantRole, GrantRow, GrantSide, GrantView } from "./type.ts";
 
 /** The grants that name `person` on a deck: by account, or by an address they have verified. */
-export async function grantsOf(deckId: string, person: Person | null): Promise<GrantRow[]> {
+export async function grantsOf(
+  deckId: string,
+  person: Pick<Account, "id" | "email" | "emailVerified"> | null,
+): Promise<GrantRow[]> {
   if (!person) {
     return [];
   }
@@ -34,7 +37,10 @@ export async function grantsOf(deckId: string, person: Person | null): Promise<G
  * handle keeps that one tied, as one account can hold only one: the grant by address beside it
  * keeps waiting, and still counts while the address is theirs.
  */
-export async function claimGrants(person: Person, deckId?: string): Promise<void> {
+export async function claimGrants(
+  person: Pick<Account, "id" | "email" | "emailVerified">,
+  deckId?: string,
+): Promise<void> {
   if (!person.emailVerified) {
     return;
   }
@@ -55,7 +61,10 @@ export async function claimGrants(person: Person, deckId?: string): Promise<void
     );
 }
 
-/** The people a deck is shared with, oldest grant first. */
+/**
+ * The people a deck is shared with, oldest grant first: by handle, or by the address a grant
+ * waits on, or was claimed by an account that has no handle yet.
+ */
 export async function grantList(c: Context, deckId: string): Promise<GrantView[]> {
   const rows = await db
     .select()
@@ -69,7 +78,7 @@ export async function grantList(c: Context, deckId: string): Promise<GrantView[]
   );
   return rows.map((row) => ({
     id: row.id,
-    who: row.userId ? (people.get(row.userId)?.handle ?? row.userId) : (row.email ?? ""),
+    who: (row.userId ? people.get(row.userId)?.handle : undefined) ?? row.email ?? row.userId ?? "",
     role: row.role,
     side: row.side,
     createdAt: row.createdAt,
@@ -132,7 +141,7 @@ export async function share(
         target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
         set: change,
       }));
-  const holder = "email" in grantee ? await personByEmail(c, grantee.email) : null;
+  const holder = "email" in grantee ? await accountByEmail(c, grantee.email) : null;
   if (holder && holder.id !== deck.ownerId) {
     await claimGrants(holder, deck.id);
   }
@@ -150,7 +159,7 @@ export async function share(
   return {
     grant: {
       id: row?.id ?? id,
-      who: holder && row?.userId === holder.id ? holder.handle : granteeName(grantee),
+      who: (holder && row?.userId === holder.id ? holder.handle : null) ?? granteeName(grantee),
       role: row?.role ?? role ?? "view",
       side: row?.side ?? side ?? "guest",
       createdAt: row?.createdAt ?? "",

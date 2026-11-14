@@ -9,11 +9,11 @@ import { accessOf, isOpen } from "../../../../src/model/deck/serving/access-file
 import { visibleDeck } from "../../../../src/model/deck/store.server.ts";
 import { versionFile } from "../../../../src/model/deck/version/store.server.ts";
 import { pictureFile } from "../../../../src/model/deck/version/version.ts";
-import { currentPerson } from "../../../../src/model/person/actor.server.ts";
+import { currentAccount } from "../../../../src/model/person/actor.server.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {
-    const person = await currentPerson(c);
+    const person = await currentAccount(c);
     const { deck } = await visibleDeck(c.req.param("id") ?? "", person);
     const n = Number(c.req.param("n"));
     const file = pictureFile(c.req.param("name") ?? "");

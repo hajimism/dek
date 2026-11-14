@@ -71,13 +71,61 @@ try {
   });
 
   // The author signs in: the CLI asks for a code, the browser approves it, the CLI gets a key.
+  // A new account chooses its handle first, on the way to /device and back.
   const author = new Browser(server.url);
-  const me = await author.signUp("Author");
+  const registered = await author.register("Author");
   const pending = await dekc(["pub", "login"]);
   check(
     pending.ok && pending.status === "pending" && typeof pending.code === "string",
     "login --json gives a code to show",
     pending,
+  );
+  const deviceUrl = new URL(String(pending.url));
+  const devicePath = deviceUrl.pathname + deviceUrl.search;
+  const toWelcome = await author.fetch(devicePath);
+  check(
+    toWelcome.status === 302 &&
+      toWelcome.headers.get("location") === `/welcome?next=${encodeURIComponent(devicePath)}`,
+    "a new account opening /device is sent to choose a handle first, with the way back",
+    { status: toWelcome.status, location: toWelcome.headers.get("location") },
+  );
+  const welcomePage = await author.fetch(toWelcome.headers.get("location") ?? "");
+  check(
+    welcomePage.status === 200 &&
+      (await welcomePage.text()).includes(`value="${registered.email.split("@")[0]}"`),
+    "the page to choose a handle offers the address's local part",
+  );
+  const keyless = await author.fetch("/api/cli/key", { method: "POST" });
+  check(
+    keyless.status === 409 &&
+      ((await keyless.json()) as { error: { code: string } }).error.code === "handle_needed",
+    "an account with no handle gets no API key: handle_needed",
+  );
+  const reserved = await author.fetch("/api/handles/Admin");
+  const reservedChoice = await author.chooseHandle("admin");
+  check(
+    ((await reserved.json()) as { status: string }).status === "reserved" &&
+      reservedChoice.status === 422 &&
+      ((await reservedChoice.json()) as { error: { code: string } }).error.code ===
+        "handle_reserved",
+    "a reserved handle is refused",
+  );
+  const chosen = await author.chooseHandle("Author");
+  const me = { ...registered, ...((await chosen.json()) as { handle: string }) };
+  check(chosen.status === 200 && me.handle === "author", "the author chooses @author", me);
+  const twice = await author.chooseHandle("author-2");
+  check(
+    twice.status === 409 &&
+      ((await twice.json()) as { error: { code: string } }).error.code === "handle_chosen",
+    "a handle is chosen once, and cannot be changed",
+  );
+  const onward = await author.fetch(toWelcome.headers.get("location") ?? "");
+  check(
+    onward.status === 302 &&
+      onward.headers.get("location") === devicePath &&
+      (await author.fetch(devicePath)).status === 200,
+    "with a handle chosen, the welcome page goes back to /device, which now opens",
+    { status: onward.status, location: onward.headers.get("location") },
   );
   await author.approveDevice(String(pending.code));
   const signedIn = await dekc(["pub", "login"]);
@@ -103,7 +151,20 @@ try {
   // A new deck is the team's alone, invisible to others, in the page and on its own origin.
   check(first.visibility === "team", "a new deck starts with the team alone", first);
   const stranger = new Browser(server.url);
-  const strangerMe = await stranger.signUp("Stranger");
+  const strangerAccount = await stranger.register("Stranger");
+  const takenStatus = await stranger.fetch("/api/handles/author");
+  const takenChoice = await stranger.chooseHandle("Author");
+  check(
+    ((await takenStatus.json()) as { status: string }).status === "taken" &&
+      takenChoice.status === 409 &&
+      ((await takenChoice.json()) as { error: { code: string } }).error.code === "handle_taken",
+    "a handle someone holds is refused, in any case",
+  );
+  const strangerChoice = await stranger.chooseHandle("stranger");
+  const strangerMe = {
+    ...strangerAccount,
+    ...((await strangerChoice.json()) as { handle: string }),
+  };
   const talkPath = `/@${me.handle}/why-dek`;
   check((await stranger.fetch(talkPath)).status === 404, "a team talk is a 404 to someone else");
   const about = await fetch(`${server.url}/about?lang=en`);
@@ -652,26 +713,42 @@ try {
     "the link signs the guest in and sends them to the talk",
     { status: verified.status, location: verified.headers.get("location") },
   );
-  const guestMe = (await (await guest.fetch("/api/me")).json()) as {
-    name?: string;
-    handle?: string;
-  };
-  check(
-    guestMe.name === guestEmail.split("@")[0],
-    "an account made by a sign-in link goes by its address's local part",
-    guestMe,
-  );
+  const guestLocal = guestEmail.split("@")[0] ?? "";
   const grantees = async () =>
     (
       (await (await author.fetch(`/api/decks/${id}/grants`)).json()) as {
         grants: Array<{ id: string; who: string }>;
       }
     ).grants;
+  const [claimedRow] = await server.store.sql("SELECT user_id FROM grants WHERE email = ?", [
+    guestEmail,
+  ]);
+  const listedBefore = await grantees();
+  check(
+    typeof claimedRow?.[0] === "string" && listedBefore.some((row) => row.who === guestEmail),
+    "signing in by the link claims the grant waiting on the address, listed by it until a handle is chosen",
+    { claimedRow, listedBefore },
+  );
+  const guestAsked = await guest.fetch(talkPath);
+  check(
+    guestAsked.status === 302 &&
+      guestAsked.headers.get("location") === `/welcome?next=${encodeURIComponent(talkPath)}` &&
+      (await guest.fetch("/api/me")).status === 409,
+    "a guest new to dek.pub chooses a handle before the talk opens",
+    { status: guestAsked.status, location: guestAsked.headers.get("location") },
+  );
+  const guestChosen = await guest.chooseHandle(guestLocal);
+  const guestMe = (await guestChosen.json()) as { name?: string; handle?: string };
+  check(
+    guestChosen.status === 200 && guestMe.name === guestLocal && guestMe.handle === guestLocal,
+    "an account made by a sign-in link goes by its address's local part, and may take it as its handle",
+    guestMe,
+  );
   const claimedGrants = await grantees();
   check(
     claimedGrants.some((row) => row.who === guestMe.handle) &&
       !claimedGrants.some((row) => row.who === guestEmail),
-    "signing in by the link claims the grant waiting on the address, before any deck is read",
+    "once the guest has a handle, the grant they claimed is listed by it",
     claimedGrants,
   );
   check(
@@ -747,9 +824,17 @@ try {
     ownProfile.includes(`href="${talkPath}"`) && ownProfile.includes("Team only"),
     "the owner's profile lists the team deck with its badge",
   );
+  // The footer links to dek's repository; the profile's own link says it is the person's, rel="me".
   check(
-    !ownProfile.includes(`href="https://github.com/${me.handle}"`),
-    "a profile made by a sign-in link links to no GitHub account",
+    !/href="https:\/\/github\.com\/[^"]*" rel="me/.test(ownProfile),
+    "a profile of an account made without GitHub links to no GitHub account",
+  );
+  await server.store.sql("UPDATE user SET githubLogin = ? WHERE id = ?", ["Octo-Author", me.id]);
+  check(
+    (await (await author.fetch(`${profilePath}?lang=en`)).text()).includes(
+      'href="https://github.com/Octo-Author" rel="me',
+    ),
+    "a profile links to the GitHub login its account was made with, not to its handle",
   );
   check(
     !(await (await stranger.fetch(profilePath)).text()).includes(`href="${talkPath}"`),

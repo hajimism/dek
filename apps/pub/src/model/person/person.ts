@@ -4,10 +4,10 @@ import type { Me } from "../../../../../src/pub/protocol.ts";
 import { Account, type Person, type Profile, type Self } from "./type.ts";
 
 /**
- * An account Better Auth handed out, as a Person; null, with the reason logged, for a record that
- * is not one, so one odd account cannot fail every page it shows on.
+ * An account Better Auth handed out; null, with the reason logged, for a record that is not one,
+ * so one odd account cannot fail every page it shows on.
  */
-export function readAccount(user: unknown): Person | null {
+export function readAccount(user: unknown): Account | null {
   const read = Account.safeParse(user);
   if (!read.success) {
     console.error("dek.pub cannot read an account:", read.error.message);
@@ -16,8 +16,13 @@ export function readAccount(user: unknown): Person | null {
   return read.data;
 }
 
-export function selfOf(person: Person): Self {
-  return { id: person.id, handle: person.handle, name: person.name, image: person.image };
+/** Whether the account's holder has chosen their handle. */
+export function hasHandle(account: Account): account is Person {
+  return account.handle !== null;
+}
+
+export function selfOf(account: Account): Self {
+  return { id: account.id, handle: account.handle, name: account.name, image: account.image };
 }
 
 export function profileOf(person: Person): Profile {

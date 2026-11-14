@@ -370,7 +370,7 @@
   }
 
   async function create(input: ReplyInput): Promise<boolean> {
-    if (!draft || !shared.viewer) {
+    if (!draft || !shared.viewer?.handle) {
       return false;
     }
     const body: NewComment = {
