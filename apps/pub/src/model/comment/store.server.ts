@@ -5,7 +5,7 @@
 
 import { decks, replies, threads } from "@schema";
 import type { Context } from "hono";
-import { and, asc, db, eq, inArray, sql } from "void/db";
+import { and, asc, db, eq, exists, inArray, sql } from "void/db";
 import type { CommentRow, NewComment, ThreadScope } from "../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
@@ -259,10 +259,27 @@ export async function widenThread(thread: ThreadRow): Promise<void> {
   if (thread.scope === "shared") {
     return;
   }
-  await db
-    .update(threads)
-    .set({ scope: "shared", number: await takeNumber(thread.deckId, "shared") })
-    .where(eq(threads.id, thread.id));
+  // One batch, each statement only while the thread is still the team's, so two requests to
+  // share it at once take one number between them.
+  const stillTeam = and(eq(threads.id, thread.id), eq(threads.scope, "team"));
+  await db.batch([
+    db
+      .update(decks)
+      .set({ nextThread: sql`${decks.nextThread} + 1` })
+      .where(
+        and(
+          eq(decks.id, thread.deckId),
+          exists(db.select({ id: threads.id }).from(threads).where(stillTeam)),
+        ),
+      ),
+    db
+      .update(threads)
+      .set({
+        scope: "shared",
+        number: sql`(select ${decks.nextThread} - 1 from ${decks} where ${decks.id} = ${thread.deckId})`,
+      })
+      .where(stillTeam),
+  ]);
 }
 
 export async function setResolved(

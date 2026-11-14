@@ -25,6 +25,14 @@ export function matchesFilter(comment: Pick<CommentRow, "status">, filter: Filte
   return filter === "resolved" ? comment.status === "resolved" : comment.status !== "resolved";
 }
 
+/**
+ * Whether a comment is drawn where it points, as a mark in the deck, a pin on a picture or a
+ * highlight in the article: not once it is resolved, nor once what it points at is gone.
+ */
+export function isDrawn(comment: Pick<CommentRow, "status">): boolean {
+  return comment.status !== "resolved" && comment.status !== "detached";
+}
+
 type SlideText = { slug: string; paragraphs: readonly string[] | null };
 
 /** Where in the article a comment points: slide, then paragraph, then offset; the slide itself first. */
@@ -70,7 +78,7 @@ export function paragraphMarks(
 ): Mark[][] {
   const marks: Mark[][] = paragraphs.map(() => []);
   for (const comment of comments) {
-    if (comment.slug !== slug || comment.status === "resolved" || comment.status === "detached") {
+    if (comment.slug !== slug || !isDrawn(comment)) {
       continue;
     }
     const quote = quoteOf(comment);
