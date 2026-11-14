@@ -7,9 +7,9 @@ import {
 import { rssDate, talkFeed, xmlText } from "../../src/model/person/feature/profile/rss.ts";
 import { profileView } from "../../src/model/person/feature/profile/view.ts";
 import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
-import { safeNext } from "../../src/model/person/next-path.ts";
 import { meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
+import { safeNext, signInHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
 describe("device code", () => {
@@ -29,6 +29,20 @@ describe("device code", () => {
   it("is complete at 8 characters", () => {
     expect(isCompleteUserCode("KQWF-XRT")).toBe(false);
     expect(isCompleteUserCode("kqwf-xrtm")).toBe(true);
+  });
+});
+
+describe("signInHref", () => {
+  it("names the page to come back to, unless that is the front page or the sign-in page", () => {
+    expect(signInHref("/@demo/why-dek?x=1#intro")).toBe(
+      "/signin?next=%2F%40demo%2Fwhy-dek%3Fx%3D1%23intro",
+    );
+    expect(signInHref("/device?user_code=ABCD-EFGH")).toBe(
+      "/signin?next=%2Fdevice%3Fuser_code%3DABCD-EFGH",
+    );
+    expect(signInHref("/")).toBe("/signin");
+    expect(signInHref("/signin?next=%2Fx")).toBe("/signin");
+    expect(signInHref()).toBe("/signin");
   });
 });
 

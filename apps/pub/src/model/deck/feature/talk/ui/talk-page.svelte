@@ -19,6 +19,7 @@
   import CommentsPanel from "../../../../comment/ui/comments-panel.svelte";
   import { byPosition, elementOf } from "../../../../comment/view.ts";
   import { profilePath } from "../../../../person/profile-path.ts";
+  import { signInHref } from "../../../../person/sign-in-path.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
   import { talkPath } from "../../../deck.ts";
   import LikeButton from "../../../like/ui/like-button.svelte";
@@ -403,9 +404,8 @@
     }
   }
 
-  function signinHref(): string {
-    return `/signin?next=${encodeURIComponent(talkPath(talk.owner.handle, talk.slug))}`;
-  }
+  /** The sign-in page, coming back to this talk. */
+  const signIn = $derived(signInHref(talkPath(talk.owner.handle, talk.slug)));
 
   // The public comments and the likes, below the article: the page asks the server again after
   // each change, as they are few and anyone's.
@@ -518,7 +518,7 @@
   {/snippet}
   {#snippet extra()}
     {#if likes}
-      <LikeButton {likes} canLike={shared.viewer !== null} signinHref={signinHref()} onlike={like} />
+      <LikeButton {likes} canLike={shared.viewer !== null} signinHref={signIn} onlike={like} />
     {/if}
   {/snippet}
   {#snippet panel()}
@@ -588,7 +588,7 @@
         {#if talk.isOwner}<VisibilityBadge visibility={talk.visibility} />{/if}
         <Button variant="ghost" icon="link" onclick={() => copy(talk.url, t("talk.shareCopied"))}>{t("talk.share")}</Button>
         {#if likes}
-          <LikeButton {likes} canLike={shared.viewer !== null} signinHref={signinHref()} onlike={like} />
+          <LikeButton {likes} canLike={shared.viewer !== null} signinHref={signIn} onlike={like} />
         {/if}
         {#if commentsOn}
           <Button
@@ -637,7 +637,7 @@
           canPost={talk.canPostPublic}
           off={talk.commentPolicy === "off"}
           isOwner={talk.isOwner}
-          signinHref={signinHref()}
+          signinHref={signIn}
           onpost={(input, parentId) =>
             publicChange(() => {
               const body: NewPublicComment = { text: input.text, ...(parentId ? { parentId } : {}) };

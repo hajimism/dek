@@ -1,27 +1,17 @@
 // The device flow's three calls, from the /device page, to Better Auth's endpoints. Looking a code
 // up while signed in claims it for this account, which approving or denying it then requires.
 
+import { fetchJson } from "../../../../common/ui/api.ts";
 import type { DeviceLookup, DeviceProblem } from "./type.ts";
 
-const DEADLINE_MS = 15_000;
-
+/** A call to Better Auth, its body as an object; one that is not, or has none, as {}. */
 async function call(
   path: string,
-  init: RequestInit = {},
+  init: { method?: string; body?: unknown } = {},
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  // biome-ignore lint/style/noRestrictedGlobals: same-origin calls to Better Auth, cut off after DEADLINE_MS.
-  const response = await fetch(path, {
-    ...init,
-    credentials: "same-origin",
-    signal: AbortSignal.timeout(DEADLINE_MS),
-  });
-  let body: Record<string, unknown> = {};
-  try {
-    body = (await response.json()) as Record<string, unknown>;
-  } catch {
-    body = {};
-  }
-  return { status: response.status, body };
+  const { status, data } = await fetchJson(path, init);
+  const body = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  return { status, body };
 }
 
 function problemOf(body: Record<string, unknown>): DeviceProblem {
@@ -57,8 +47,7 @@ export async function decide(
   try {
     const { status, body } = await call(`/api/auth/device/${allow ? "approve" : "deny"}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userCode: code }),
+      body: { userCode: code },
     });
     return status >= 400 ? { ok: false, problem: problemOf(body) } : { ok: true };
   } catch {

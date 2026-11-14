@@ -6,6 +6,7 @@
   import { isCompleteUserCode, normalizeUserCode } from "../src/model/person/feature/connect-cli/device-code.ts";
   import type { DeviceProblem } from "../src/model/person/feature/connect-cli/type.ts";
   import DeviceCodeInput from "../src/model/person/feature/connect-cli/ui/device-code-input.svelte";
+  import { signInHref } from "../src/model/person/sign-in-path.ts";
   import Avatar from "../src/model/person/ui/avatar.svelte";
   import { useApp } from "../src/shell/use-app.ts";
   import type { Props } from "./device.server";
@@ -35,7 +36,7 @@
 
   function next(): string {
     const query = code ? `?user_code=${encodeURIComponent(normalizeUserCode(code))}` : "";
-    return `/signin?next=${encodeURIComponent(`/device${query}`)}`;
+    return signInHref(`/device${query}`);
   }
 
   async function submit(event: SubmitEvent) {
