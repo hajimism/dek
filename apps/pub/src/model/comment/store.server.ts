@@ -16,6 +16,7 @@ import type { GrantSide } from "../deck/grant/type.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
 import { currentVersionOf, renamesOf } from "../deck/version/store.server.ts";
+import { authorOf } from "../person/person.ts";
 import { peopleById } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
 import { canSeeThread, scopeFor } from "./access.ts";
@@ -103,12 +104,6 @@ async function listComments(
       resolvedAt: row.resolvedAt,
     };
   });
-}
-
-/** Who wrote a comment, as anyone who reads it is told: its author's name and handle. */
-export function authorOf(row: { authorId: string }, people: Map<string, Person>) {
-  const person = people.get(row.authorId);
-  return { name: person?.name ?? "someone", handle: person?.handle ?? row.authorId };
 }
 
 /**
