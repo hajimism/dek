@@ -1,0 +1,22 @@
+{
+  "name": "@dek/pub-infra",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "check": "tsc -p .",
+    "test": "bun test ./site.test.ts",
+    "plan": "DO_NOT_TRACK=1 alchemy plan",
+    "deploy": "DO_NOT_TRACK=1 alchemy deploy",
+    "drift": "DO_NOT_TRACK=1 alchemy drift"
+  },
+  "devDependencies": {
+    "@alchemy.run/cloudflare": "2.0.0-beta.85",
+    "@effect/platform-bun": "4.1.2",
+    "@effect/platform-node": "4.1.2",
+    "@types/bun": "^1.4.2",
+    "alchemy": "2.0.0-beta.85",
+    "effect": "4.1.2",
+    "typescript": "^7.0.2"
+  }
+}

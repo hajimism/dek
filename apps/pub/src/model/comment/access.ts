@@ -50,12 +50,20 @@ export function scopeFor(asked: ThreadScope | undefined, side: GrantSide): Threa
   return asked ?? (side === "team" ? "team" : "shared");
 }
 
+/**
+ * The owner, and the thread's author while the deck is still shared with them: an author whose
+ * grant is gone reads the threads no more (ADR 52), so they change none either.
+ */
 export function canResolve(
   deck: { ownerId: string },
   thread: Pick<ThreadRow, "authorId">,
   person: Pick<Person, "id"> | null,
+  grant: GrantRole | null,
 ): boolean {
-  return person !== null && (person.id === deck.ownerId || person.id === thread.authorId);
+  if (person === null) {
+    return false;
+  }
+  return person.id === deck.ownerId || (person.id === thread.authorId && grant !== null);
 }
 
 export function mayResolve(
