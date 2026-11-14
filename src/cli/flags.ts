@@ -117,22 +117,18 @@ export const FLAGS = {
     type: "string",
     value: "<text>",
     short: "m",
-    text: "what changed in this version, shown in its history",
+    text: "what changed in this version, shown on the deck's manage page",
   },
   slug: {
     type: "string",
     value: "<slug>",
     text: "the slug in a new deck's URL, over the folder's name; only for the first publish",
   },
-  "no-promote": {
-    type: "boolean",
-    text: "upload the version without making it the one readers see",
-  },
   visibility: {
     type: "enum",
-    choices: ["private", "link", "public"],
+    choices: ["team", "private", "link", "public"],
     example: "dekc pub share --visibility link",
-    text: "who may open the deck: its owner and grants, anyone with the link, or everyone",
+    text: "who may open the deck: its owner and the team's side of its grants, every grant, anyone with the link, or everyone",
   },
   script: {
     type: "enum",

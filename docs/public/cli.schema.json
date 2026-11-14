@@ -2826,6 +2826,7 @@
             "visibility": {
               "type": "string",
               "enum": [
+                "team",
                 "private",
                 "link",
                 "public"
@@ -3034,6 +3035,7 @@
             "visibility": {
               "type": "string",
               "enum": [
+                "team",
                 "private",
                 "link",
                 "public"
@@ -3064,18 +3066,6 @@
                 }
               ]
             },
-            "latest": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "files": {
               "type": "object",
               "propertyNames": {
@@ -3090,71 +3080,6 @@
               },
               "additionalProperties": {
                 "type": "string"
-              }
-            },
-            "versions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "n": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "dekVersion": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "lint": {
-                    "type": "object",
-                    "properties": {
-                      "errors": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "warnings": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "errors",
-                      "warnings"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "createdAt": {
-                    "type": "string"
-                  },
-                  "changed": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "n",
-                  "dekVersion",
-                  "message",
-                  "bytes",
-                  "lint",
-                  "createdAt"
-                ],
-                "additionalProperties": false
               }
             },
             "action": {
@@ -3181,9 +3106,7 @@
             "embed",
             "comments",
             "current",
-            "latest",
             "files",
-            "versions",
             "action",
             "server",
             "ok"
@@ -3213,6 +3136,7 @@
             "visibility": {
               "type": "string",
               "enum": [
+                "team",
                 "private",
                 "link",
                 "public"
@@ -3243,18 +3167,6 @@
                 }
               ]
             },
-            "latest": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "files": {
               "type": "object",
               "propertyNames": {
@@ -3269,250 +3181,6 @@
               },
               "additionalProperties": {
                 "type": "string"
-              }
-            },
-            "versions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "n": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "dekVersion": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "lint": {
-                    "type": "object",
-                    "properties": {
-                      "errors": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "warnings": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "errors",
-                      "warnings"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "createdAt": {
-                    "type": "string"
-                  },
-                  "changed": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "n",
-                  "dekVersion",
-                  "message",
-                  "bytes",
-                  "lint",
-                  "createdAt"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "action": {
-              "type": "string",
-              "const": "promote"
-            },
-            "server": {
-              "type": "string",
-              "description": "The origin of the dek.pub the command talked to."
-            },
-            "ok": {
-              "type": "boolean",
-              "const": true
-            }
-          },
-          "required": [
-            "id",
-            "slug",
-            "owner",
-            "title",
-            "url",
-            "visibility",
-            "scriptPublic",
-            "embed",
-            "comments",
-            "current",
-            "latest",
-            "files",
-            "versions",
-            "action",
-            "server",
-            "ok"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "pattern": "^d_[0-9a-z]{10,32}$"
-            },
-            "slug": {
-              "type": "string"
-            },
-            "owner": {
-              "type": "string",
-              "description": "The owner's handle."
-            },
-            "title": {
-              "type": "string"
-            },
-            "url": {
-              "type": "string"
-            },
-            "visibility": {
-              "type": "string",
-              "enum": [
-                "private",
-                "link",
-                "public"
-              ]
-            },
-            "scriptPublic": {
-              "type": "boolean"
-            },
-            "embed": {
-              "type": "boolean"
-            },
-            "comments": {
-              "type": "string",
-              "enum": [
-                "off",
-                "signed-in"
-              ]
-            },
-            "current": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "latest": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "files": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string",
-                "enum": [
-                  "full",
-                  "public",
-                  "bare",
-                  "source",
-                  "cover"
-                ]
-              },
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "versions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "n": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "dekVersion": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "lint": {
-                    "type": "object",
-                    "properties": {
-                      "errors": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "warnings": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "errors",
-                      "warnings"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "createdAt": {
-                    "type": "string"
-                  },
-                  "changed": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "n",
-                  "dekVersion",
-                  "message",
-                  "bytes",
-                  "lint",
-                  "createdAt"
-                ],
-                "additionalProperties": false
               }
             },
             "action": {
@@ -3533,7 +3201,7 @@
                 },
                 "published": {
                   "type": "boolean",
-                  "description": "The newest version was made from this very source."
+                  "description": "The current version was made from this very source."
                 }
               },
               "required": [
@@ -3558,9 +3226,7 @@
             "embed",
             "comments",
             "current",
-            "latest",
             "files",
-            "versions",
             "action",
             "server",
             "local",
@@ -4259,6 +3925,7 @@
             "visibility": {
               "type": "string",
               "enum": [
+                "team",
                 "private",
                 "link",
                 "public"
@@ -4475,6 +4142,7 @@
             "visibility": {
               "type": "string",
               "enum": [
+                "team",
                 "private",
                 "link",
                 "public"
@@ -4505,18 +4173,6 @@
                 }
               ]
             },
-            "latest": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "files": {
               "type": "object",
               "propertyNames": {
@@ -4531,71 +4187,6 @@
               },
               "additionalProperties": {
                 "type": "string"
-              }
-            },
-            "versions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "n": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "dekVersion": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "lint": {
-                    "type": "object",
-                    "properties": {
-                      "errors": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "warnings": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "errors",
-                      "warnings"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "createdAt": {
-                    "type": "string"
-                  },
-                  "changed": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "n",
-                  "dekVersion",
-                  "message",
-                  "bytes",
-                  "lint",
-                  "createdAt"
-                ],
-                "additionalProperties": false
               }
             },
             "action": {
@@ -4625,9 +4216,7 @@
             "embed",
             "comments",
             "current",
-            "latest",
             "files",
-            "versions",
             "action",
             "server",
             "ok",
@@ -4658,6 +4247,7 @@
             "visibility": {
               "type": "string",
               "enum": [
+                "team",
                 "private",
                 "link",
                 "public"
@@ -4688,18 +4278,6 @@
                 }
               ]
             },
-            "latest": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "files": {
               "type": "object",
               "propertyNames": {
@@ -4714,254 +4292,6 @@
               },
               "additionalProperties": {
                 "type": "string"
-              }
-            },
-            "versions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "n": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "dekVersion": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "lint": {
-                    "type": "object",
-                    "properties": {
-                      "errors": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "warnings": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "errors",
-                      "warnings"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "createdAt": {
-                    "type": "string"
-                  },
-                  "changed": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "n",
-                  "dekVersion",
-                  "message",
-                  "bytes",
-                  "lint",
-                  "createdAt"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "action": {
-              "type": "string",
-              "const": "promote"
-            },
-            "server": {
-              "type": "string",
-              "description": "The origin of the dek.pub the command talked to."
-            },
-            "ok": {
-              "type": "boolean",
-              "const": false
-            },
-            "error": {
-              "$ref": "#/$defs/Error"
-            }
-          },
-          "required": [
-            "id",
-            "slug",
-            "owner",
-            "title",
-            "url",
-            "visibility",
-            "scriptPublic",
-            "embed",
-            "comments",
-            "current",
-            "latest",
-            "files",
-            "versions",
-            "action",
-            "server",
-            "ok",
-            "error"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "pattern": "^d_[0-9a-z]{10,32}$"
-            },
-            "slug": {
-              "type": "string"
-            },
-            "owner": {
-              "type": "string",
-              "description": "The owner's handle."
-            },
-            "title": {
-              "type": "string"
-            },
-            "url": {
-              "type": "string"
-            },
-            "visibility": {
-              "type": "string",
-              "enum": [
-                "private",
-                "link",
-                "public"
-              ]
-            },
-            "scriptPublic": {
-              "type": "boolean"
-            },
-            "embed": {
-              "type": "boolean"
-            },
-            "comments": {
-              "type": "string",
-              "enum": [
-                "off",
-                "signed-in"
-              ]
-            },
-            "current": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "latest": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "files": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string",
-                "enum": [
-                  "full",
-                  "public",
-                  "bare",
-                  "source",
-                  "cover"
-                ]
-              },
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "versions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "n": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "dekVersion": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
-                  "lint": {
-                    "type": "object",
-                    "properties": {
-                      "errors": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "warnings": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "errors",
-                      "warnings"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "createdAt": {
-                    "type": "string"
-                  },
-                  "changed": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "n",
-                  "dekVersion",
-                  "message",
-                  "bytes",
-                  "lint",
-                  "createdAt"
-                ],
-                "additionalProperties": false
               }
             },
             "action": {
@@ -4982,7 +4312,7 @@
                 },
                 "published": {
                   "type": "boolean",
-                  "description": "The newest version was made from this very source."
+                  "description": "The current version was made from this very source."
                 }
               },
               "required": [
@@ -5010,9 +4340,7 @@
             "embed",
             "comments",
             "current",
-            "latest",
             "files",
-            "versions",
             "action",
             "server",
             "local",

@@ -70,7 +70,7 @@ describe("dekc pub publish", () => {
             id: deck?.id,
             n: 1,
             current: 1,
-            visibility: "private",
+            visibility: "team",
             shots: 2,
             frontmatterWritten: true,
             changed: ["decks/Why_Dek/script.md"],
@@ -144,14 +144,14 @@ describe("dekc pub publish", () => {
   );
 
   test.serial(
-    "puts the next version on the newest, with every rename recorded, and --no-promote",
+    "puts the next version on the current one, makes it current, and records every rename",
     async () => {
       await withFakePub(async (fake) => {
         signIn(fake);
         await withTempProject(spec(), async (root) => {
           expect((await publish(fake, root)).exitCode).toBe(0);
           const [deck] = [...fake.decks.values()];
-          const since = deck?.versions[0]?.createdAt ?? "";
+          const since = new Date().toISOString();
           mkdirSync(join(root, ".dek"), { recursive: true });
           writeFileSync(
             join(root, ".dek", "renames.json"),
@@ -169,11 +169,11 @@ describe("dekc pub publish", () => {
               },
             }),
           );
-          const result = await publish(fake, root, ["--no-promote"]);
+          const result = await publish(fake, root);
           expect(jsonStdout<Json>(result)).toMatchObject({
             ok: true,
             n: 2,
-            current: 1,
+            current: 2,
             frontmatterWritten: false,
             changed: [],
           });
@@ -181,7 +181,7 @@ describe("dekc pub publish", () => {
           expect(second?.base).toBe(1);
           // Every rename goes; the server takes each once.
           expect(second?.renames.map((rename) => rename.to)).toEqual(["older", "pace"]);
-          expect(fake.requests.at(-1)?.query).toEqual({ promote: "0" });
+          expect(fake.requests.at(-1)?.query).toEqual({});
           expect(fake.decks.size).toBe(1);
         });
       });
@@ -244,7 +244,7 @@ describe("dekc pub publish", () => {
           ok: false,
           error: {
             message: "another version of the deck was published since this run looked",
-            hint: "run `dekc pub status` to see the versions, then `dekc pub publish` again",
+            hint: "run `dekc pub status` to see the current version, then `dekc pub publish` again",
           },
         });
       });
@@ -268,7 +268,7 @@ describe("dekc pub publish", () => {
           ok: true,
           action: "status",
           slug: "why-dek",
-          latest: 1,
+          current: 1,
           local: { published: true },
         });
         writeFileSync(join(root, "decks", "Why_Dek", "slides", "speed.html"), slide("faster"));

@@ -8,7 +8,6 @@ import {
   canView,
   type DeckRules,
   mayReadVersion,
-  shownVersion,
   sideOf,
 } from "../../src/model/deck/access.ts";
 import { talkNamed, talkPath } from "../../src/model/deck/deck.ts";
@@ -37,7 +36,6 @@ import {
   minutesOf,
   pictureFile,
   slidePicture,
-  summaryOf,
   versionOf,
 } from "../../src/model/deck/version/version.ts";
 import { handleFromEmail, isHandle } from "../../src/model/person/handle.ts";
@@ -56,17 +54,27 @@ describe("access", () => {
     comments,
   });
 
-  it("keeps a private deck to its owner and grants", () => {
-    expect(canView(deck("private"), owner, null)).toBe(true);
-    expect(canView(deck("private"), other, null)).toBe(false);
-    expect(canView(deck("private"), null, null)).toBe(false);
-    expect(canView(deck("private"), other, "view")).toBe(true);
+  it("keeps a team deck to its owner and the team's side of its grants", () => {
+    expect(canView(deck("team"), owner, null, null)).toBe(true);
+    expect(canView(deck("team"), other, "view", "team")).toBe(true);
+    expect(canView(deck("team"), other, "comment", "guest")).toBe(false);
+    expect(canView(deck("team"), other, null, null)).toBe(false);
+    expect(canView(deck("team"), null, null, null)).toBe(false);
+  });
+
+  it("keeps a private deck to its owner and grants, on either side", () => {
+    expect(canView(deck("private"), owner, null, null)).toBe(true);
+    expect(canView(deck("private"), other, null, null)).toBe(false);
+    expect(canView(deck("private"), null, null, null)).toBe(false);
+    expect(canView(deck("private"), other, "view", "guest")).toBe(true);
+    expect(canView(deck("private"), other, "view", "team")).toBe(true);
     expect(canComment(deck("private"), other, "view")).toBe(false);
     expect(canComment(deck("private"), other, "comment")).toBe(true);
   });
 
   it("lets the owner and those granted comment write review threads, whatever the policy", () => {
-    expect(canView(deck("link"), null, null)).toBe(true);
+    expect(canView(deck("link"), null, null, null)).toBe(true);
+    expect(canView(deck("public"), other, null, null)).toBe(true);
     expect(canComment(deck("link", "signed-in"), null, null)).toBe(false);
     expect(canComment(deck("link", "signed-in"), other, null)).toBe(false);
     expect(canComment(deck("public", "off"), other, "comment")).toBe(true);
@@ -78,6 +86,7 @@ describe("access", () => {
     expect(canLike(deck("link"), owner)).toBe(true);
     expect(canLike(deck("link"), null)).toBe(false);
     expect(canLike(deck("private"), owner)).toBe(false);
+    expect(canLike(deck("team"), owner)).toBe(false);
   });
 
   it("puts the owner on the team's side, a grantee where the grant says, and anyone else with the guests", () => {
@@ -261,41 +270,21 @@ describe("the slide being read", () => {
   });
 });
 
-describe("versions and the script, by who asks", () => {
+describe("the version and the script, by who asks", () => {
   const deck = {
     ownerId: "u1",
     visibility: "public" as const,
     comments: "signed-in" as const,
     scriptPublic: false,
     currentVersion: 2,
-    latestVersion: 3,
   };
 
-  it("shows the guests' side the current version, and the team's any it asks for", () => {
-    expect(shownVersion(deck, "guest", null)).toBe(2);
-    expect(shownVersion(deck, "team", null)).toBe(2);
-    expect(shownVersion(deck, "team", 3)).toBe(3);
-    expect(shownVersion(deck, "team", 1)).toBe(1);
-    expect(shownVersion(deck, "guest", 2)).toBe(2);
-    expect(shownVersion(deck, "guest", 3)).toBeNull();
-    expect(shownVersion(deck, "guest", 1)).toBeNull();
-    expect(shownVersion(deck, "team", 4)).toBeNull();
-  });
-
-  it("shows the team's side the newest version when none is current, and the guests' none", () => {
-    expect(shownVersion({ ...deck, currentVersion: null }, "team", null)).toBe(3);
-    expect(shownVersion({ ...deck, currentVersion: null }, "guest", null)).toBeNull();
-  });
-
-  it("lets the guests' side read the current version only, and the team's any uploaded", () => {
-    expect(mayReadVersion(deck, "guest", 2)).toBe(true);
-    expect(mayReadVersion(deck, "guest", 1)).toBe(false);
-    expect(mayReadVersion(deck, "guest", 3)).toBe(false);
-    expect(mayReadVersion(deck, "team", 3)).toBe(true);
-    expect(mayReadVersion(deck, "team", 1)).toBe(true);
-    expect(mayReadVersion(deck, "team", 4)).toBe(false);
-    expect(mayReadVersion(deck, "team", 0)).toBe(false);
-    expect(mayReadVersion(deck, "team", Number.NaN)).toBe(false);
+  it("lets anyone who may see the deck read its current version alone", () => {
+    expect(mayReadVersion(deck, 2)).toBe(true);
+    expect(mayReadVersion(deck, 1)).toBe(false);
+    expect(mayReadVersion(deck, 3)).toBe(false);
+    expect(mayReadVersion(deck, Number.NaN)).toBe(false);
+    expect(mayReadVersion({ currentVersion: null }, 1)).toBe(false);
   });
 
   it("shows the script to anyone once it is public, else to its owner", () => {
@@ -408,11 +397,6 @@ describe("version pictures", () => {
     const read = version({ full: "a" }, { end: "b" });
     expect(read.slideMap.slides.map((slide) => slide.slug)).toEqual(["intro", "end"]);
     expect(read.changed).toEqual(["intro"]);
-    expect(summaryOf(read)).toMatchObject({
-      n: 4,
-      lint: { errors: 0, warnings: 0 },
-      changed: ["intro"],
-    });
   });
 
   it("stands the cover for the version, else the first slide that has a picture", () => {

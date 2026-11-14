@@ -53,11 +53,18 @@ describe("About", () => {
         .getByRole("cell")
         .elements()
         .map((cell) => cell.textContent);
-    expect(cells("Private")).toEqual([
-      "You, and the people you share it with",
+    expect(table.getByRole("row").elements()).toHaveLength(5);
+    expect(cells("Team only")).toEqual([
+      "You, and your team among the people you share it with",
       "Not listed",
       "Not indexed",
     ]);
+    expect(cells("Team and guests")).toEqual([
+      "You, and everyone you share it with",
+      "Not listed",
+      "Not indexed",
+    ]);
+    expect(cells("Link only")).toEqual(["Anyone with the link", "Not listed", "Not indexed"]);
     expect(cells("Public")).toEqual(["Anyone", "Listed", "Indexed"]);
   });
 

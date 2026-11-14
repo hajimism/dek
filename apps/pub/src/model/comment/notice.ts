@@ -25,16 +25,16 @@ export function noticeRecipients(thread: {
 
 /** Whether one of them hears of it: they still see the deck and the thread, and did not mute it. */
 export function mayBeNoticed(
-  deck: DeckRules & { currentVersion: number | null },
-  thread: Pick<ThreadRow, "n" | "scope">,
+  deck: DeckRules,
+  thread: Pick<ThreadRow, "scope">,
   person: Pick<Person, "id">,
   held: { role: GrantRole | null; side: GrantSide | null; muted: boolean },
 ): boolean {
   return (
     !held.muted &&
-    canView(deck, person, held.role) &&
+    canView(deck, person, held.role, held.side) &&
     canReadComments(deck, person, held.role) &&
-    canSeeThread(deck, thread, sideOf(deck, person, held.side))
+    canSeeThread(thread, sideOf(deck, person, held.side))
   );
 }
 

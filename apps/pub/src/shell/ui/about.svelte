@@ -9,8 +9,8 @@
   let { sample }: { sample: Sample | null } = $props();
   const { shared, lang, t } = useApp();
 
-  const visibilities = ["private", "link", "public"] as const;
-  const listed = { private: "no", link: "no", public: "yes" } as const;
+  const visibilities = ["team", "private", "link", "public"] as const;
+  const listed = { team: "no", private: "no", link: "no", public: "yes" } as const;
   const people = ["reader", "speaker", "review"] as const;
   const refusals = [1, 2, 3, 4] as const;
   const commands = ["dekc pub login", "dekc pub publish", "dekc pub share --visibility link"];

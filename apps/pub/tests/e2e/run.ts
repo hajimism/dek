@@ -32,8 +32,12 @@ const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
 const server = await startDevServer(PORT);
 const inbox = new Inbox(server.url);
 
-async function dekc(args: string[], cwd = join(work, "decks", "why-dek")): Promise<Json> {
-  const server_ = args[0] === "pub" ? ["--server", server.url] : [];
+async function dekc(
+  args: string[],
+  cwd = join(work, "decks", "why-dek"),
+  options: { server?: string; env?: Record<string, string> } = {},
+): Promise<Json> {
+  const server_ = args[0] === "pub" ? ["--server", options.server ?? server.url] : [];
   const child = Bun.spawn(["bun", CLI, ...args, ...server_, "--json"], {
     cwd,
     env: {
@@ -42,6 +46,7 @@ async function dekc(args: string[], cwd = join(work, "decks", "why-dek")): Promi
       XDG_CONFIG_HOME: config,
       DEK_TOKEN: "",
       NO_COLOR: "1",
+      ...options.env,
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -95,11 +100,12 @@ try {
   check(/^pub: d_[0-9a-z]+$/m.test(script), "publish writes pub: into script.md");
   const id = String(first.id);
 
-  // A private deck is invisible to others, in the page and on the deck's own origin.
+  // A new deck is the team's alone, invisible to others, in the page and on its own origin.
+  check(first.visibility === "team", "a new deck starts with the team alone", first);
   const stranger = new Browser(server.url);
   const strangerMe = await stranger.signUp("Stranger");
   const talkPath = `/@${me.handle}/why-dek`;
-  check((await stranger.fetch(talkPath)).status === 404, "a private talk is a 404 to someone else");
+  check((await stranger.fetch(talkPath)).status === 404, "a team talk is a 404 to someone else");
   const about = await fetch(`${server.url}/about?lang=en`);
   check(
     about.status === 200 && /<h1[^>]*>A talk keeps reaching people/.test(await about.text()),
@@ -149,8 +155,7 @@ try {
     "the framed deck is served with the token the page signed",
   );
   const status = await dekc(["pub", "status"]);
-  const versions = (status as { versions?: Array<{ n: number }> }).versions ?? [];
-  check(status.ok && versions.length === 1, "status lists the version", status);
+  check(status.ok && status.current === 1, "status names the current version", status);
 
   // Review threads are for the people a deck is shared with: a signed-in reader with the link
   // reads none until the owner grants them the deck, which mails them a link to it.
@@ -175,10 +180,8 @@ try {
     comments?: unknown[];
   };
   check(Array.isArray(map.comments), "a colleague granted the deck reads the review threads", map);
-  const deck = (await (await author.fetch(`/api/decks/${id}`)).json()) as {
-    versions: Array<{ n: number }>;
-  };
-  check(deck.versions.length === 1, "the owner reads the deck's status in the browser too");
+  const deck = (await (await author.fetch(`/api/decks/${id}`)).json()) as { current: number };
+  check(deck.current === 1, "the owner reads the deck's status in the browser too");
   const slides = await slideMapOf(author, id);
   const target = slides.find((slide) => slide.paragraphs.length > 0);
   check(target !== undefined, "the slide map carries paragraphs said aloud");
@@ -269,66 +272,22 @@ try {
     after,
   );
 
-  // A version held back with --no-promote is the owner's: a reader can neither read the comments
-  // placed on it nor open a thread on it, and so learns nothing of its slides.
-  const held = await dekc(["pub", "publish", "--no-promote", "-m", "held back"]);
+  // The version before is deleted: a page still open on it gets 404 for its frame, and is told
+  // to reload when it comments.
   check(
-    held.ok && held.n === 3 && held.current === 2,
-    "publish --no-promote holds version 3 back",
-    held,
+    second.current === 2 &&
+      (await eventually(async () => (await fetch(frame ?? "")).status === 404)),
+    "a publish makes its version current and deletes the one before",
+    { second, frame },
   );
-  const onHeld = await stranger.fetch(`/api/decks/${id}/comments`, {
+  const onOld = await stranger.fetch(`/api/decks/${id}/comments`, {
     method: "POST",
-    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "早見え", version: 3 },
+    json: { anchor: { slug: target.slug, step: "0", targets: [] }, text: "古い版", version: 1 },
   });
   check(
-    onHeld.status === 422 && (await onHeld.json()).error?.code === "unknown_version",
-    "a reader cannot open a thread on a version held back",
+    onOld.status === 409 && (await onOld.json()).error?.code === "stale_version",
+    "a comment from a page on the deleted version is told to reload",
   );
-  check(
-    (await stranger.fetch(`/api/decks/${id}/comments?status=all&version=3`)).status === 404,
-    "a reader cannot read comments placed on a version held back",
-  );
-  check(
-    (await author.fetch(`/api/decks/${id}/comments?status=all&version=3`)).status === 200,
-    "the owner reads comments placed on a version held back",
-  );
-  const ownerHeld = await author.fetch(`/api/decks/${id}/comments`, {
-    method: "POST",
-    json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "保留版のメモ", version: 3 },
-  });
-  check(ownerHeld.status === 201, "the owner opens a thread on the version held back");
-  const ownerThread = ((await ownerHeld.json()) as { id: string }).id;
-  const readerSees = (await (
-    await stranger.fetch(`/api/decks/${id}/comments?status=all`)
-  ).json()) as { comments: Array<{ id: string }> };
-  check(
-    !readerSees.comments.some((row) => row.id === ownerThread),
-    "a reader does not see a thread on a version held back",
-  );
-  check(
-    (
-      await stranger.fetch(`/api/decks/${id}/comments/${ownerThread}/replies`, {
-        method: "POST",
-        json: { text: "見えた" },
-      })
-    ).status === 404,
-    "a reader cannot reply to a thread on a version held back",
-  );
-
-  // Older than the current version is not the same as once current: version 3 was never shown,
-  // so with version 4 current a reader still learns nothing of it.
-  const fourth = await dekc(["pub", "publish", "-m", "after the held one"]);
-  check(fourth.ok && fourth.n === 4 && fourth.current === 4, "publish uploads version 4", fourth);
-  const probe = await stranger.fetch(`/api/decks/${id}/comments`, {
-    method: "POST",
-    json: { anchor: { slug: "no-such-slide", step: "0", targets: [] }, text: "探り", version: 3 },
-  });
-  check(
-    probe.status === 409 && (await probe.json()).error?.code === "stale_version",
-    "a reader cannot probe a held-back version below the current one",
-  );
-  await author.fetch(`/api/decks/${id}/comments/${ownerThread}/resolve`, { method: "POST" });
 
   // A hidden script cannot be quoted, so a reader cannot test a guess at its words.
   await dekc(["pub", "share", "--script", "hidden"]);
@@ -578,13 +537,19 @@ try {
     "a shared team thread reaches the guest under the next shared number",
     { widenedRow, shownToGuest },
   );
+  const teamOnly = (await (
+    await author.fetch(`/api/decks/${id}/comments`, {
+      method: "POST",
+      json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "チームだけの続き" },
+    })
+  ).json()) as { id: string };
   const teamGrant = await author.fetch(`/api/decks/${id}/grants`, {
     method: "POST",
     json: { who: `@${strangerHandle}`, role: "comment", side: "team" },
   });
   check(
     ((await teamGrant.json()) as { side?: string }).side === "team" &&
-      ((await guestList()).comments ?? []).some((row) => row.scope === "team"),
+      ((await guestList()).comments ?? []).some((row) => row.id === teamOnly.id),
     "a colleague moved to the team's side reads the team's threads",
   );
 
@@ -690,69 +655,134 @@ try {
     },
   );
 
-  // Drafts: a version uploaded with --no-promote is the team's to read and comment on, and reaches
-  // the guests' side only once it is current.
-  const draft = await dekc(["pub", "publish", "-m", "draft", "--no-promote"]);
-  check(draft.ok && draft.current !== draft.n, "publish --no-promote uploads a draft", draft);
-  const frameOn = async (who: Browser, path: string) => {
-    const response = await who.fetch(path);
-    return {
-      status: response.status,
-      frame: /<iframe[^>]+src="([^"]+)"/.exec(await response.text())?.[1] ?? "",
-    };
-  };
-  const teamDraft = await frameOn(stranger, `${talkPath}?v=${draft.n}`);
+  // Back to the team alone: a guest's grant opens the deck no more, the team's side's still does,
+  // and only the owner's profile lists it.
+  const toTeam = await dekc(["pub", "share", "--visibility", "team"]);
+  check(toTeam.ok && toTeam.visibility === "team", "share keeps the deck to the team", toTeam);
   check(
-    teamDraft.status === 200 && teamDraft.frame.includes(`/v/${draft.n}/`),
-    "the team's side opens the draft on the talk page",
-    teamDraft,
+    (await guest.fetch(talkPath)).status === 404 &&
+      (await guest.fetch(`/api/decks/${id}/comments?status=all`)).status === 404,
+    "a team deck is a 404 to a guest it is shared with, its threads too",
+  );
+  check((await stranger.fetch(talkPath)).status === 200, "the team's side opens a team deck");
+  const profilePath = `/@${me.handle}`;
+  const ownProfile = await (await author.fetch(`${profilePath}?lang=en`)).text();
+  check(
+    ownProfile.includes(`href="${talkPath}"`) && ownProfile.includes("Team only"),
+    "the owner's profile lists the team deck with its badge",
   );
   check(
-    (await guest.fetch(`${talkPath}?v=${draft.n}`)).status === 404,
-    "a draft is missing to the guests' side",
-  );
-  check(
-    (await frameOn(guest, talkPath)).frame.includes(`/v/${draft.current}/`),
-    "the guests' side reads the current version meanwhile",
-  );
-  const onDraft = await stranger.fetch(`/api/decks/${id}/comments`, {
-    method: "POST",
-    json: {
-      anchor: { slug: renamed, step: "0", targets: [] },
-      text: "この版でよさそうです",
-      scope: "shared",
-      version: draft.n,
-    },
-  });
-  const onDraftRow = (await onDraft.json()) as { id: string; version: number };
-  const guestSees = async () =>
-    (
-      (await (await guest.fetch(`/api/decks/${id}/comments?status=all`)).json()) as {
-        comments: Array<{ id: string }>;
-      }
-    ).comments.some((row) => row.id === onDraftRow.id);
-  check(
-    onDraft.status === 201 && onDraftRow.version === draft.n && !(await guestSees()),
-    "a shared thread on a draft stays with the team while the draft is one",
-    onDraftRow,
-  );
-  const promoted = await dekc(["pub", "promote", String(draft.n)]);
-  check(
-    promoted.ok && promoted.action === "promote" && promoted.current === draft.n,
-    "dekc pub promote makes the draft current",
-    promoted,
-  );
-  check(
-    (await guestSees()) && (await frameOn(guest, talkPath)).frame.includes(`/v/${draft.n}/`),
-    "once it is current, the guests' side reads the version and the thread on it",
+    !(await (await stranger.fetch(profilePath)).text()).includes(`href="${talkPath}"`),
+    "nobody else's view of the profile lists it",
   );
 
-  // What changed between the versions.
-  const status2 = await dekc(["pub", "status"]);
-  const v2 = (
-    (status2 as { versions?: Array<{ n: number; changed?: string[] }> }).versions ?? []
-  ).find((v) => v.n === 2);
-  check(Array.isArray(v2?.changed), "the version lists the slides it changed", v2);
+  // The manage page shows the current version alone.
+  const manage = await (await author.fetch(`${talkPath}/manage?lang=en`)).text();
+  check(
+    manage.includes("Current version") &&
+      manage.includes("v2") &&
+      manage.includes("renamed") &&
+      !manage.includes("Make current"),
+    "the manage page shows the current version, and no other to make current",
+  );
+
+  // A publish cut short after it took its number holds nothing: the next one skips that number,
+  // and sweeps what it left with every other version below the new one.
+  const { store } = server;
+  const versionKeys = async () =>
+    (await store.keys(`decks/${id}/v/`)).map((key) => Number(key.split("/")[3]));
+  const versionRows = async () =>
+    (await store.sql("select n from versions where deck_id = ? order by n", [id])).map(([n]) => n);
+  const onlyVersion = async (n: number) => {
+    const keys = await versionKeys();
+    return keys.length > 0 && keys.every((m) => m === n) && (await versionRows()).join() === `${n}`;
+  };
+  check(await onlyVersion(2), "R2 and D1 hold the current version alone", {
+    keys: await versionKeys(),
+    rows: await versionRows(),
+  });
+  const [claimed] = await store.sql(
+    "update decks set latest_version = latest_version + 1 where id = ? returning latest_version",
+    [id],
+  );
+  const cutShort = Number(claimed?.[0]);
+  await store.put(`decks/${id}/v/${cutShort}/full.html`, "cut short");
+  await store.put(`decks/${id}/v/1/full.html`, "left behind");
+  const afterCut = await dekc(["pub", "publish", "-m", "after a publish cut short"]);
+  check(
+    afterCut.ok && afterCut.n === cutShort + 1 && afterCut.current === cutShort + 1,
+    "a publish cut short after its claim only skips a number",
+    { afterCut, cutShort },
+  );
+  check(
+    await eventually(() => onlyVersion(cutShort + 1)),
+    "the next publish sweeps every version below it, a cut-short one's files too",
+    { keys: await versionKeys(), rows: await versionRows() },
+  );
+
+  // Two publishes on the same version: both pass the first check, and the one that records second
+  // is refused at the record, leaving no row, rename or file of its own.
+  const twin = mkdtempSync(join(tmpdir(), "dek-pub-e2e-twin-"));
+  try {
+    const moving = (await slideMapOf(author, id)).find((slide) => slide.slug !== renamed)?.slug;
+    check(moving !== undefined, "the deck has another slide to rename");
+    const moved = await dekc(["mv", moving, `${moving}-raced`]);
+    check(moved.ok, "dekc mv renames a slide before the race", moved);
+    cpSync(work, twin, {
+      recursive: true,
+      filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
+    });
+    const credentials = (await Bun.file(join(config, "credentials.json")).json()) as {
+      keys: Record<string, string>;
+    };
+    const proxy = startRace(server.url);
+    try {
+      const asTwin = {
+        server: proxy.url,
+        env: { DEK_TOKEN: credentials.keys[server.url] ?? "", DEK_TOKEN_SERVER: proxy.url },
+      };
+      const raced = await Promise.all([
+        dekc(["pub", "publish", "-m", "one"], join(work, "decks", "why-dek"), asTwin),
+        dekc(["pub", "publish", "-m", "two"], join(twin, "decks", "why-dek"), asTwin),
+      ]);
+      const won = raced.filter((result) => result.ok);
+      const lost = proxy.answers.find((answer) => answer.status === 409);
+      const winner = Number(won[0]?.n);
+      const [[latest]] = (await store.sql("select latest_version from decks where id = ?", [
+        id,
+      ])) as [[number]];
+      check(
+        won.length === 1 &&
+          lost?.code === "stale_base" &&
+          lost.message === "another version was published at the same moment",
+        "of two publishes on one base, the second to record is refused",
+        { raced, answers: proxy.answers },
+      );
+      check(
+        latest === afterCut.n + 2 && winner > Number(afterCut.n),
+        "each of the two had claimed a number of its own",
+        { latest, winner },
+      );
+      const renameRows = await store.sql(
+        "select n from renames where deck_id = ? and to_slug = ?",
+        [id, `${moving}-raced`],
+      );
+      check(
+        renameRows.length === 1 && renameRows[0]?.[0] === winner,
+        "the rename is recorded once, with the version that won",
+        renameRows,
+      );
+      check(
+        await eventually(() => onlyVersion(winner)),
+        "the refused publish leaves no row or file, and the winner sweeps the rest",
+        { keys: await versionKeys(), rows: await versionRows(), winner },
+      );
+    } finally {
+      proxy.stop();
+    }
+  } finally {
+    rmSync(twin, { recursive: true, force: true });
+  }
 
   const logout = await dekc(["pub", "logout"]);
   check(logout.ok, "logout revokes the key", logout);
@@ -766,6 +796,73 @@ try {
   rmSync(config, { recursive: true, force: true });
 }
 process.exit(passed ? 0 : 1);
+
+/** Whether `condition` comes true within a few seconds, as work done after an answer does. */
+async function eventually(condition: () => Promise<boolean>): Promise<boolean> {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    if (await condition()) {
+      return true;
+    }
+    await Bun.sleep(100);
+  }
+  return false;
+}
+
+/**
+ * A server in front of dek.pub that holds each version upload until a second one arrives, then
+ * sends both on at once, so two publishes made on the same version race to record. It keeps what
+ * the server answered each upload, with the number the upload was given in its error.
+ */
+function startRace(target: string): {
+  url: string;
+  answers: Array<{ status: number; code?: string; message?: string }>;
+  stop(): void;
+} {
+  const waiting: Array<() => void> = [];
+  const answers: Array<{ status: number; code?: string; message?: string }> = [];
+  const proxy = Bun.serve({
+    port: 0,
+    async fetch(request) {
+      const url = new URL(request.url);
+      const upload = request.method === "POST" && url.pathname.endsWith("/versions");
+      const body = request.method === "GET" ? undefined : await request.arrayBuffer();
+      if (upload) {
+        await new Promise<void>((go) => {
+          waiting.push(go);
+          if (waiting.length === 2) {
+            for (const each of waiting) {
+              each();
+            }
+          }
+        });
+      }
+      const headers = new Headers(request.headers);
+      headers.delete("host");
+      const response = await fetch(`${target}${url.pathname}${url.search}`, {
+        method: request.method,
+        headers,
+        body,
+        redirect: "manual",
+      });
+      const bytes = await response.arrayBuffer();
+      if (upload) {
+        const answer = JSON.parse(new TextDecoder().decode(bytes)) as {
+          error?: { code: string; message: string };
+        };
+        answers.push({
+          status: response.status,
+          code: answer.error?.code,
+          message: answer.error?.message,
+        });
+      }
+      const back = new Headers(response.headers);
+      back.delete("content-encoding");
+      back.delete("content-length");
+      return new Response(bytes, { status: response.status, headers: back });
+    },
+  });
+  return { url: `http://localhost:${proxy.port}`, answers, stop: () => proxy.stop(true) };
+}
 
 async function slideMapOf(
   browser: Browser,

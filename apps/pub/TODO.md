@@ -19,9 +19,6 @@ What it does not do:
   - Quotes are searched for again, and renames are followed.
   - An element comment's path and box are never checked again. When its slide's HTML changes, the comment stays `open`, still pointing at the old box. It becomes `moved` only through a rename, and never `detached`.
   - So the "Moved" and "Changed" badges appear only for quotes and renames.
-- **Versions.**
-  - There is no way to see comments where they sat on an older version. The API's `?version=` filter is used by neither the CLI nor the pages, and a reader may ask it for the current version only.
-  - Which versions were once current is not kept. So the guests' side comments on the current version only: a page opened before a promote gets 409 `stale_version` and must be reloaded. A thread opened on a draft is the team's alone until that version is current (ADR 55).
 - **What changed.** Only the manage page lists the slides a version changed. The talk page does not mark changed slides for someone coming back to review.
 - **Team and guests** (ADR 51, 52).
   - A thread's scope is set only on the page and by the API: `dekc pub comments` has no command to share a team thread, and no flag to open one, since the CLI opens no threads.
@@ -39,7 +36,7 @@ What it does not do:
 
 ## Comments for reviews with guests
 
-The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), the team's side reads drafts (ADR 55), the talk goes full screen with a header and a review mode (ADR 57, 58), and a side column holds the slides, the details and the way into the review (ADR 59). Still to come, each with its own ADR:
+The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), a new deck is the team's alone until its visibility reaches the guests (ADR 71), the talk goes full screen with a header and a review mode (ADR 57, 58), and a side column holds the slides, the details and the way into the review (ADR 59). Still to come, each with its own ADR:
 
 - **Mail, beyond what is built.** Sign-in links, invitations and notices of threads, replies and resolves are built (ADR 53, 54). Still to come:
   - a digest of a person's notices, once a day or an hour, which needs a cron job and a record of what was sent
@@ -57,9 +54,6 @@ The comment feature is planned to grow into two: public comments and a like on t
 - **Embedding.**
   - The only embeddable URL, `d-<id>.dekusercontent.com/v/<n>/`, names one version, and it returns 404 once a new version is current, so an embed breaks on every publish.
   - There is no snippet to copy and no oEmbed endpoint.
-- **Versions.**
-  - `dekc pub status` lists the versions and `dekc pub promote` makes one current; nothing in the CLI opens one on the talk page.
-  - Versions cannot be deleted.
 - **Grants.**
   - Grants are made on the manage page only; the CLI has no command for them, though `src/pub/protocol.ts` has their paths.
   - An invitation is mailed only when a grant is made. Nothing sends one again, and a grant made before the mail domain works was never mailed.

@@ -1,4 +1,4 @@
-// Comment threads: stored on the version they were opened on, shown on the one asked for, placed
+// Comment threads: stored on the version they were opened on, shown on the current one, placed
 // again through the renames and the slide map of that version, to the side of the work that may
 // read them. Opening a thread takes its number from the deck's own counter for its scope, the one
 // write a comment makes to the deck; sharing a team thread takes the next shared number.
@@ -28,9 +28,9 @@ type Status = "open" | "resolved" | "all";
 async function listComments(
   c: Context,
   deck: Deck,
-  options: { status: Status; version?: number | null; id?: string },
+  options: { status: Status; id?: string },
 ): Promise<CommentRow[]> {
-  const n = options.version ?? deck.currentVersion;
+  const n = deck.currentVersion;
   const version = n === null ? null : await findVersion(deck.id, n);
   const rows = await db
     .select()
@@ -72,16 +72,14 @@ async function listComments(
 
   return wanted.map((row) => {
     const targets = readJson(CommentTargets, row.targets);
-    // A thread opened on a version newer than the one shown stays as it was written.
-    const placed =
-      version && n !== null && row.n <= n
-        ? placeComment(
-            { slug: row.slug, targets, n: row.n, resolved: row.resolvedAt !== null },
-            version.slideMap,
-            renameRows,
-            n,
-          )
-        : { slug: row.slug, status: row.resolvedAt ? ("resolved" as const) : ("open" as const) };
+    const placed = version
+      ? placeComment(
+          { slug: row.slug, targets, n: row.n, resolved: row.resolvedAt !== null },
+          version.slideMap,
+          renameRows,
+          version.n,
+        )
+      : { slug: row.slug, status: row.resolvedAt ? ("resolved" as const) : ("open" as const) };
     return {
       number: row.number,
       id: row.id,
@@ -115,20 +113,18 @@ export function authorOf(row: { authorId: string }, people: Map<string, Person>)
 }
 
 /**
- * A deck's comments as `person`, on `side`, reads them, placed on `version` (the current one when
- * absent). A quoted passage is part of the script, so someone the script is hidden from gets each
- * comment without it.
+ * A deck's comments as `person`, on `side`, reads them, placed on the current version. A quoted
+ * passage is part of the script, so someone the script is hidden from gets each comment without
+ * it.
  */
 export async function commentsFor(
   c: Context,
   deck: Deck,
   person: Person | null,
   side: GrantSide,
-  options: { status: Status; version?: number | null },
+  status: Status,
 ): Promise<CommentRow[]> {
-  const rows = (await listComments(c, deck, options)).filter((row) =>
-    canSeeThread(deck, { n: row.version, scope: row.scope }, side),
-  );
+  const rows = (await listComments(c, deck, { status })).filter((row) => canSeeThread(row, side));
   return canSeeScript(deck, person) ? rows : rows.map(hideQuotes);
 }
 
@@ -141,7 +137,7 @@ export async function commentFor(
   id: string,
 ): Promise<CommentRow> {
   const [row] = await listComments(c, deck, { status: "all", id });
-  if (!row || !canSeeThread(deck, { n: row.version, scope: row.scope }, side)) {
+  if (!row || !canSeeThread(row, side)) {
     throw notFound("comment");
   }
   return canSeeScript(deck, person) ? row : hideQuotes(row);
@@ -154,13 +150,12 @@ export async function openThread(
   comment: NewComment,
 ): Promise<string> {
   const scope = scopeFor(comment.scope, side);
-  // The version the commenter was reading, which may be older than the current one by now;
-  // the thread is kept on it, so the renames since are followed when it is shown.
+  // The version the commenter was reading; the thread is kept on it, so the renames since are
+  // followed when it is shown on a later one.
   const n = comment.version ?? deck.currentVersion;
-  // The guests' side comments on the version it reads, the current one; the team's on any it
-  // may open. One whose page shows an older version is told so, whatever that version was:
-  // whether it was ever shown is not kept.
-  if (n !== null && !mayReadVersion(deck, side, n)) {
+  // Every side comments on the current version. One whose page still shows an older version is
+  // told so: the deck no longer holds it.
+  if (n !== null && !mayReadVersion(deck, n)) {
     if (Number.isInteger(n) && n >= 1 && n < (deck.currentVersion ?? 0)) {
       throw new ApiError(
         409,
@@ -244,7 +239,7 @@ export async function visibleThread(deck: Deck, side: GrantSide, id: string): Pr
     .from(threads)
     .where(and(eq(threads.deckId, deck.id), eq(threads.id, id)))
     .get();
-  if (!thread || !canSeeThread(deck, thread, side)) {
+  if (!thread || !canSeeThread(thread, side)) {
     throw notFound("comment");
   }
   return thread;

@@ -19,9 +19,9 @@ export const decks = sqliteTable(
     /** The talk's length in minutes, from the frontmatter's `duration`. */
     minutes: integer("minutes"),
     lang: text("lang"),
-    visibility: text("visibility", { enum: ["private", "link", "public"] })
+    visibility: text("visibility", { enum: ["team", "private", "link", "public"] })
       .notNull()
-      .default("private"),
+      .default("team"),
     scriptPublic: integer("script_public", { mode: "boolean" }).notNull().default(false),
     embed: integer("embed", { mode: "boolean" }).notNull().default(false),
     comments: text("comments", { enum: ["off", "signed-in"] })

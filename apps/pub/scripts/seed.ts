@@ -1,8 +1,10 @@
 // Fills a running dek.pub dev server with demo data, the way `dekc pub` would: it builds the
 // sample decks in ../../sample with dek's own core, takes one picture per slide with Playwright,
-// signs up a demo author and a reviewer, publishes the decks with their versions, shares them,
-// and leaves comments and replies on them. It can run again: the accounts sign in, each deck gets
-// new versions on top of its newest, and comments already there are kept.
+// signs up a demo author and a reviewer, publishes the decks, why-dek twice so its manage page
+// shows a slide the second version changed, shares two of them and leaves the third with the
+// team, and leaves comments and replies on the current versions. It can run again: the accounts
+// sign in, each deck gets new versions on top of its current one, which replace it, and comments
+// already there are kept.
 //
 // Run from apps/pub, with the dev server up: `bun scripts/seed.ts`; BASE picks another server.
 
@@ -330,14 +332,14 @@ type Version = {
   message: string;
 };
 
-type RemoteDeck = { id: string; latest: number | null };
+type RemoteDeck = { id: string; current: number | null };
 
 /** Creates the deck, or finds the one an earlier run made at the same slug. */
 async function ensureDeck(owner: Session, slug: string, title: string): Promise<RemoteDeck> {
   const created = await owner.send("POST", paths.decks, { slug, title });
   if (created.status === 201) {
     const deck = created.body as DeckStatus;
-    return { id: deck.id, latest: deck.latest };
+    return { id: deck.id, current: deck.current };
   }
   if (created.status !== 409 || errorCode(created) !== "slug_taken") {
     throw new Error(
@@ -349,7 +351,7 @@ async function ensureDeck(owner: Session, slug: string, title: string): Promise<
   if (!deck) {
     throw new Error(`the server says ${slug} is taken, but lists no such deck`);
   }
-  return { id: deck.id, latest: deck.latest };
+  return { id: deck.id, current: deck.current };
 }
 
 async function upload(owner: Session, deck: RemoteDeck, version: Version): Promise<PublishResult> {
@@ -374,7 +376,7 @@ async function upload(owner: Session, deck: RemoteDeck, version: Version): Promi
     ...(meta.event ? { event: meta.event } : {}),
     ...(meta.date ? { date: meta.date } : {}),
     lang: meta.lang,
-    base: deck.latest,
+    base: deck.current,
     slideMap: version.map,
     lint: version.build.lint,
     renames: [],
@@ -397,7 +399,7 @@ async function upload(owner: Session, deck: RemoteDeck, version: Version): Promi
     form.set(shotField(slug), new File([png], `${slug}.png`, { type: "image/png" }));
   }
   const result = await owner.call<PublishResult>("POST", paths.versions(deck.id), form);
-  deck.latest = result.n;
+  deck.current = result.n;
   return result;
 }
 
@@ -469,13 +471,14 @@ async function hasComments(owner: Session, deck: RemoteDeck): Promise<boolean> {
 
 /**
  * The review the seed leaves: on why-dek, the reviewer's quote with the author's reply, the
- * author's own note resolved, and an element comment on a heading; on with-agents, one quote by
- * the reviewer, who may comment there by a grant.
+ * author's own note resolved, and an element comment on a heading; on with-agents, whose script
+ * is hidden and so cannot be quoted, one note by the reviewer on a slide. The reviewer comments on
+ * both by a grant.
  */
 async function leaveComments(
   people: { demo: Session; reviewer: Session },
   whyDek: { id: string; map: SlideMap; heading: ElementTarget },
-  withAgents: { id: string; map: SlideMap },
+  withAgents: { id: string },
 ): Promise<void> {
   const { demo, reviewer } = people;
   const onTime = await comment(reviewer, whyDek.id, {
@@ -495,7 +498,7 @@ async function leaveComments(
     text: "見出しが長くて一息で読めません。「三つが後回しになる」くらいまで縮めたい。",
   });
   await comment(reviewer, withAgents.id, {
-    anchor: anchor("why", [quote(withAgents.map, "why", "自分が書いた画面が見えません")]),
+    anchor: anchor("why", []),
     text: "ここで実際のはみ出しのスクリーンショットを一枚見せたい。",
   });
 }
@@ -568,17 +571,19 @@ async function main(): Promise<void> {
     demo.session.call("PATCH", paths.deck(deck.id), request);
   await share(whyDek, { visibility: "public", scriptPublic: true, comments: "signed-in" });
   await share(withAgents, { visibility: "link", scriptPublic: false, comments: "signed-in" });
-  await demo.session.call("POST", paths.grants(withAgents.id), {
-    who: reviewer.handle,
-    role: "comment",
-  });
+  // Review threads are for the people a deck is shared with, so the reviewer is granted both.
+  for (const deck of [whyDek, withAgents]) {
+    await demo.session.call("POST", paths.grants(deck.id), {
+      who: reviewer.handle,
+      role: "comment",
+    });
+  }
   await demo.session.call("POST", paths.grants(withAgents.id), {
     who: "friend@example.com",
     role: "view",
   });
 
   const whyMap = published.get("why-dek")?.map ?? first("why-dek").map;
-  const agentsMap = published.get("with-agents")?.map ?? first("with-agents").map;
   const heading = first("why-dek").shots.headings.get("later");
   if (!heading) {
     throw new Error("why-dek's later slide has no heading to point a comment at");
@@ -589,7 +594,7 @@ async function main(): Promise<void> {
     await leaveComments(
       { demo: demo.session, reviewer: reviewer.session },
       { id: whyDek.id, map: whyMap, heading },
-      { id: withAgents.id, map: agentsMap },
+      { id: withAgents.id },
     );
   }
 
@@ -599,7 +604,7 @@ async function main(): Promise<void> {
 
 /** The public deck's slide picture must reach someone signed out. */
 async function requirePublicShot(deck: RemoteDeck, slug: string): Promise<void> {
-  const response = await fetch(`${BASE}/i/${deck.id}/${deck.latest}/s-${slug}`, {
+  const response = await fetch(`${BASE}/i/${deck.id}/${deck.current}/s-${slug}`, {
     headers: { origin: BASE },
   });
   const bytes = new Uint8Array(await response.arrayBuffer());
@@ -628,7 +633,7 @@ dek.pub at ${BASE} is seeded.
   for (const [name, { deck, versions }] of published) {
     console.log(`  ${BASE}/@${demo}/${name}`);
     console.log(
-      `    id ${deck.id}, versions uploaded now: ${versions.join(", ")}, newest ${deck.latest}`,
+      `    id ${deck.id}, versions uploaded now: ${versions.join(", ")}, current ${deck.current}`,
     );
   }
 }

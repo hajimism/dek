@@ -1,5 +1,5 @@
-// Who may do what with a deck, and which of its versions. Pure: the caller loads the deck, the
-// person and their grant.
+// Who may do what with a deck, and which of its versions they read. Pure: the caller loads the
+// deck, the person and their grant.
 
 import type { CommentPolicy, Visibility } from "../../../../../src/pub/protocol.ts";
 import type { Person } from "../person/type.ts";
@@ -13,17 +13,25 @@ export type DeckRules = {
   comments: CommentPolicy;
 };
 
-type Versions = { currentVersion: number | null; latestVersion: number | null };
+/** Whether a deck of this visibility opens to anyone, whoever they are: `link` and `public`. */
+export function opensToAnyone(deck: Pick<DeckRules, "visibility">): boolean {
+  return deck.visibility === "link" || deck.visibility === "public";
+}
 
-/** Whether `person` (null when signed out) may open the deck. */
-export function canView(deck: DeckRules, person: Caller, grant: GrantRole | null): boolean {
-  if (person?.id === deck.ownerId) {
+/**
+ * Whether `person` (null when signed out) may open the deck, with the role and the side their
+ * grants give them: a `team` deck the owner and the team's side only, a `private` one any grant.
+ */
+export function canView(
+  deck: DeckRules,
+  person: Caller,
+  grant: GrantRole | null,
+  granted: GrantSide | null,
+): boolean {
+  if (canManage(deck, person) || opensToAnyone(deck)) {
     return true;
   }
-  if (deck.visibility !== "private") {
-    return true;
-  }
-  return grant !== null;
+  return deck.visibility === "team" ? granted === "team" : grant !== null;
 }
 
 /**
@@ -59,25 +67,9 @@ export function canSeeScript(
 }
 
 /**
- * The version the talk page shows. The guests' side reads the current one, and asking for any
- * other finds nothing. The team's side reads the one it asks for, of those uploaded; by default
- * the current one, or the newest while none is current, so a deck whose versions were all
- * uploaded with --no-promote is never missing to the team that made it.
+ * Whether someone who may see the deck may read version `n`, its pictures and the comments placed
+ * on it: the current version only, on either side of the work.
  */
-export function shownVersion(deck: Versions, side: GrantSide, asked: number | null): number | null {
-  if (asked !== null) {
-    return mayReadVersion(deck, side, asked) ? asked : null;
-  }
-  return side === "team" ? (deck.currentVersion ?? deck.latestVersion) : deck.currentVersion;
-}
-
-/**
- * Whether someone on `side` may read version `n`, its pictures and the comments placed on it: the
- * guests' side the current version only; the team's any version uploaded, the drafts included.
- */
-export function mayReadVersion(deck: Versions, side: GrantSide, n: number): boolean {
-  if (side === "team") {
-    return Number.isInteger(n) && n >= 1 && n <= (deck.latestVersion ?? 0);
-  }
+export function mayReadVersion(deck: { currentVersion: number | null }, n: number): boolean {
   return n === deck.currentVersion;
 }

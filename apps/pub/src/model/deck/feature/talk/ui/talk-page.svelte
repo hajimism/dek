@@ -32,7 +32,6 @@
   import SideColumn from "./side-column.svelte";
   import SlideToc from "./slide-toc.svelte";
   import Theater from "./theater.svelte";
-  import VersionPicker from "./version-picker.svelte";
   import Viewer from "./viewer.svelte";
 
   let { talk }: { talk: Talk } = $props();
@@ -492,26 +491,6 @@
   }}
 />
 
-{#if talk.versions && (talk.versions.length > 1 || talk.version !== talk.current)}
-  <div class="version-row" lang={lang}>
-    <VersionPicker
-      versions={talk.versions}
-      version={talk.version}
-      current={talk.current}
-      onpick={(n) => {
-        const url = new URL(window.location.href);
-        if (n === talk.current) {
-          url.searchParams.delete("v");
-        } else {
-          url.searchParams.set("v", String(n));
-        }
-        url.hash = "";
-        window.location.assign(url);
-      }}
-    />
-  </div>
-{/if}
-
 <div class="theater-slot">
 <Theater
   bind:this={theater}
@@ -737,20 +716,6 @@
   }
   .public-col {
     margin-top: var(--space-12);
-  }
-  .version-row {
-    max-width: var(--container);
-    margin: 0 auto;
-    padding: var(--space-4) var(--page-gutter) 0;
-  }
-  .version-row :global(.versions) {
-    margin-bottom: 0;
-  }
-  @media (max-width: 767px) {
-    /* The viewer is edge to edge here, with no space above it of its own. */
-    .version-row {
-      padding: var(--space-3) var(--page-gutter);
-    }
   }
   .body {
     display: grid;

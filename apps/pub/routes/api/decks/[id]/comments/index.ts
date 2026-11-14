@@ -10,7 +10,7 @@ import {
   openThread,
   visibleThread,
 } from "../../../../../src/model/comment/store.server.ts";
-import { canComment, mayReadVersion } from "../../../../../src/model/deck/access.ts";
+import { canComment } from "../../../../../src/model/deck/access.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { currentPerson } from "../../../../../src/model/person/actor.server.ts";
 
@@ -28,12 +28,7 @@ export const GET = defineHandler((c) =>
     if (!status) {
       throw new ApiError(422, "invalid", "status is open, resolved, or all");
     }
-    const askedVersion = c.req.query("version");
-    const version = askedVersion ? Number(askedVersion) : null;
-    if (version !== null && !mayReadVersion(deck, side, version)) {
-      throw notFound("version");
-    }
-    return { comments: await commentsFor(c, deck, person, side, { status, version }) };
+    return { comments: await commentsFor(c, deck, person, side, status) };
   }, c.req.raw),
 );
 

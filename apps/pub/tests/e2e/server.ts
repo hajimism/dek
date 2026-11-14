@@ -7,7 +7,20 @@ import { join } from "node:path";
 
 const APP = join(import.meta.dir, "..", "..");
 
-export type DevServer = { url: string; deckOrigin: (id: string) => string; stop(): Promise<void> };
+export type DevServer = {
+  url: string;
+  deckOrigin: (id: string) => string;
+  /** Miniflare's own view of the app's storage, to set up or see what no API reaches. */
+  store: Store;
+  stop(): Promise<void>;
+};
+
+/** The D1 database and R2 bucket under the dev server, through Miniflare's local explorer. */
+export type Store = {
+  sql(query: string, params?: unknown[]): Promise<unknown[][]>;
+  keys(prefix: string): Promise<string[]>;
+  put(key: string, body: string): Promise<void>;
+};
 
 export async function startDevServer(port: number): Promise<DevServer> {
   const state = mkdtempSync(join(tmpdir(), "dek-pub-e2e-"));
@@ -54,6 +67,7 @@ export async function startDevServer(port: number): Promise<DevServer> {
   return {
     url,
     deckOrigin: (id) => `http://d-${id.replace(/^d_/, "")}.localhost:${port}`,
+    store: explorer(`${url}/cdn-cgi/local/explorer/api`),
     async stop() {
       // vp runs Vite in a child of its own, which outlives vp when only vp is stopped.
       const tree = descendants(child.pid);
@@ -73,6 +87,39 @@ export async function startDevServer(port: number): Promise<DevServer> {
         }
       }
       rmSync(state, { recursive: true, force: true });
+    },
+  };
+}
+
+function explorer(api: string): Store {
+  const call = async (path: string, init?: RequestInit) => {
+    const response = await fetch(`${api}${path}`, init);
+    const body = (await response.json()) as { success: boolean; result: unknown };
+    if (!body.success) {
+      throw new Error(`${path} answered ${response.status}: ${JSON.stringify(body)}`);
+    }
+    return body.result;
+  };
+  return {
+    async sql(query, params = []) {
+      const [result] = (await call("/d1/database/local/raw", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sql: query, params }),
+      })) as Array<{ results: { rows: unknown[][] } }>;
+      return result?.results.rows ?? [];
+    },
+    async keys(prefix) {
+      const objects = (await call(
+        `/r2/buckets/default/objects?prefix=${encodeURIComponent(prefix)}`,
+      )) as Array<{ key: string }>;
+      return objects.map((object) => object.key);
+    },
+    async put(key, body) {
+      await call(`/r2/buckets/default/objects/${encodeURIComponent(key)}`, {
+        method: "PUT",
+        body,
+      });
     },
   };
 }

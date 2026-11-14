@@ -225,22 +225,11 @@ describe("who may resolve", () => {
     expect(mayResolve(by("sato"), null, true)).toBe(false);
   });
 
-  it("shows a thread on a version not yet current to the team's side only", () => {
-    const shown = { currentVersion: 2 };
-    const at = (n: number) => ({ n, scope: "shared" as const });
-    expect(canSeeThread(shown, at(2), "guest")).toBe(true);
-    expect(canSeeThread(shown, at(1), "guest")).toBe(true);
-    expect(canSeeThread(shown, at(3), "guest")).toBe(false);
-    expect(canSeeThread(shown, at(3), "team")).toBe(true);
-    expect(canSeeThread({ currentVersion: null }, at(1), "guest")).toBe(false);
-    expect(canSeeThread({ currentVersion: null }, at(1), "team")).toBe(true);
-  });
-
-  it("shows a team thread to the team's side only", () => {
-    const shown = { currentVersion: 2 };
-    const team = { n: 1, scope: "team" as const };
-    expect(canSeeThread(shown, team, "team")).toBe(true);
-    expect(canSeeThread(shown, team, "guest")).toBe(false);
+  it("shows a team thread to the team's side only, whatever version it was opened on", () => {
+    expect(canSeeThread({ scope: "team" }, "team")).toBe(true);
+    expect(canSeeThread({ scope: "team" }, "guest")).toBe(false);
+    expect(canSeeThread({ scope: "shared" }, "guest")).toBe(true);
+    expect(canSeeThread({ scope: "shared" }, "team")).toBe(true);
   });
 
   it("reads review threads as the owner or as anyone granted the deck, whatever the policy", () => {
@@ -262,6 +251,7 @@ describe("public comments", () => {
     expect(publicCommentsOn(open)).toBe(true);
     expect(publicCommentsOn({ ...open, visibility: "public" })).toBe(true);
     expect(publicCommentsOn({ ...open, visibility: "private" })).toBe(false);
+    expect(publicCommentsOn({ ...open, visibility: "team" })).toBe(false);
   });
 
   it("may be posted as the policy says: by anyone signed in, or by no one", () => {
@@ -381,10 +371,9 @@ describe("notices", () => {
     ownerId: "u1",
     visibility: "private" as const,
     comments: "signed-in" as const,
-    currentVersion: 2,
   };
-  const shared = { n: 1, scope: "shared" as const };
-  const team = { n: 1, scope: "team" as const };
+  const shared = { scope: "shared" as const };
+  const team = { scope: "team" as const };
   const reader = { role: "comment" as const, side: "guest" as const, muted: false };
 
   it("go to the owner, the author and those who replied, once each, never to who acted", () => {
@@ -412,7 +401,9 @@ describe("notices", () => {
     expect(mayBeNoticed(deck, shared, { id: "u2" }, { ...reader, role: null, side: null })).toBe(
       false,
     );
-    expect(mayBeNoticed(deck, { ...shared, n: 3 }, { id: "u2" }, reader)).toBe(false);
+    const teamDeck = { ...deck, visibility: "team" as const };
+    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, reader)).toBe(false);
+    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, { ...reader, side: "team" })).toBe(true);
   });
 
   it("say who did what on which thread, with the words and the way back", () => {

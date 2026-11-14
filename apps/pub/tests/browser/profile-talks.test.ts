@@ -25,6 +25,7 @@ const talks = [
   talk("why-dek", "Why dek", "2026-09-25", "public"),
   talk("agents", "With agents", "2025-12-04", "link"),
   talk("lt", "A lightning talk", "2024-11-08", "private"),
+  talk("draft", "A talk in the making", "2024-06-01", "team"),
 ];
 
 describe("ProfileTalks", () => {
@@ -43,7 +44,7 @@ describe("ProfileTalks", () => {
     await expect
       .element(gallery.getByRole("link", { name: /Why dek/ }))
       .toHaveAttribute("href", "/@demo/why-dek");
-    expect(gallery.getByRole("listitem").elements()).toHaveLength(3);
+    expect(gallery.getByRole("listitem").elements()).toHaveLength(4);
     // A gallery has no years; the timeline does.
     expect(page.getByRole("heading", { name: "2025" }).query()).toBeNull();
   });
@@ -57,7 +58,8 @@ describe("ProfileTalks", () => {
       onview: () => {},
     });
     await expect.element(page.getByText("Link only")).toBeInTheDocument();
-    await expect.element(page.getByText("Private")).toBeInTheDocument();
+    await expect.element(page.getByText("Team and guests")).toBeInTheDocument();
+    await expect.element(page.getByText("Team only")).toBeInTheDocument();
   });
 
   it("switches to a timeline by year, by click or by arrow key", async () => {

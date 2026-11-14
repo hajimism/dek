@@ -9,7 +9,7 @@ import NotFound from "../../../src/shell/ui/not-found.svelte";
 
 {#if manage}
   {#key manage.status.id}
-    <ManagePage status={manage.status} grants={manage.grants} />
+    <ManagePage status={manage.status} grants={manage.grants} version={manage.version} />
   {/key}
 {:else}
   <NotFound />
