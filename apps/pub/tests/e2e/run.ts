@@ -877,6 +877,36 @@ try {
     { besideRow, both },
   );
 
+  // The CLI shares the deck as the manage page does, and stops.
+  const cliGuest = `cli-${Date.now()}@example.com`;
+  type GrantRow = { id: string; who: string; role: string; side: string };
+  const added = (await dekc(["pub", "grants", "add", cliGuest, "--side", "team"])) as {
+    ok: boolean;
+    grant?: GrantRow;
+    invited?: boolean;
+  };
+  check(
+    added.ok &&
+      added.invited === true &&
+      added.grant?.role === "view" &&
+      added.grant.side === "team" &&
+      (await inbox.waitFor(cliGuest, "shared")).length === 1,
+    "dekc pub grants add shares the deck, a viewer unless --role says otherwise, and mails them",
+    added,
+  );
+  const cliGrants = async () =>
+    ((await dekc(["pub", "grants"])) as { grants?: GrantRow[] }).grants ?? [];
+  check(
+    (await cliGrants()).some((row) => row.who === cliGuest && row.side === "team"),
+    "dekc pub grants lists the grant",
+  );
+  const removed = await dekc(["pub", "grants", "remove", cliGuest]);
+  check(
+    removed.ok && !(await cliGrants()).some((row) => row.who === cliGuest),
+    "dekc pub grants remove stops sharing the deck",
+    removed,
+  );
+
   const logout = await dekc(["pub", "logout"]);
   check(logout.ok, "logout revokes the key", logout);
   const gone = await dekc(["pub", "whoami"]);

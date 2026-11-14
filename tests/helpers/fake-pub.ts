@@ -6,8 +6,10 @@ import {
   type CommentRow,
   CreateDeckRequest,
   type DeckStatus,
+  type Grant,
   MAX_VERSION_BYTES,
   type Me,
+  NewGrant,
   NewReply,
   PROTOCOL_HEADER,
   PROTOCOL_VERSION,
@@ -32,10 +34,10 @@ export type FakeRequest = {
 type Device = { userCode: string; polls: number; denied?: boolean };
 
 /**
- * A deck as the fake keeps it: what status answers, the comment threads on it, and the last
- * number a publish took, which counts on from there.
+ * A deck as the fake keeps it: what status answers, the comment threads on it, the last
+ * number a publish took, which counts on from there, and its grants.
  */
-type FakeDeck = DeckStatus & { rows: CommentRow[]; latest: number | null };
+type FakeDeck = DeckStatus & { rows: CommentRow[]; latest: number | null; grants: Grant[] };
 
 export type FakePub = {
   url: string;
@@ -112,13 +114,19 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
         ...deck,
         rows: [],
         latest: deck.current ?? null,
+        grants: [],
       };
       made.url = `${fake.url}/@${ME.handle}/${made.slug}`;
       fake.decks.set(made.id, made);
       return made;
     },
   };
-  const status = ({ rows: _rows, latest: _latest, ...deck }: FakeDeck): DeckStatus => deck;
+  const status = ({
+    rows: _rows,
+    latest: _latest,
+    grants: _grants,
+    ...deck
+  }: FakeDeck): DeckStatus => deck;
 
   const server = Bun.serve({
     port: 0,
@@ -275,6 +283,40 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
             : row.status !== "resolved",
       );
       return Response.json({ comments: rows });
+    }
+    if (method === "GET" && rest === "/grants") {
+      return Response.json({ grants: deck.grants });
+    }
+    if (method === "POST" && rest === "/grants") {
+      const parsed = NewGrant.safeParse(body);
+      if (!parsed.success) {
+        return error(422, "invalid", parsed.error.message);
+      }
+      // As the server does: one grant for each person, a new one a guest who may view unless the
+      // request says otherwise, and one already made keeping what the request leaves out.
+      const who = parsed.data.who.replace(/^@/, "").toLowerCase();
+      if (who === fake.me.handle) {
+        return error(422, "owner", "the deck is already yours");
+      }
+      const before = deck.grants.find((grant) => grant.who === who);
+      const grant: Grant = before ?? {
+        id: id("g_"),
+        who,
+        role: "view",
+        side: "guest",
+        createdAt: new Date().toISOString(),
+      };
+      grant.role = parsed.data.role ?? grant.role;
+      grant.side = parsed.data.side ?? grant.side;
+      if (!before) {
+        deck.grants.push(grant);
+      }
+      return Response.json(grant, { status: 201 });
+    }
+    const grantPath = rest.match(/^\/grants\/([^/]+)$/);
+    if (method === "DELETE" && grantPath) {
+      deck.grants = deck.grants.filter((grant) => grant.id !== grantPath[1]);
+      return Response.json({ removed: true });
     }
     const comment = rest.match(/^\/comments\/([^/]+)\/(replies|resolve|reopen)$/);
     const row = comment ? deck.rows.find((entry) => entry.id === comment[1]) : undefined;

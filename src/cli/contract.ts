@@ -7,6 +7,7 @@ import {
   DeckId,
   DeckStatus,
   ElementTarget,
+  Grant,
   Me,
   QuoteTarget,
   Reply,
@@ -277,6 +278,22 @@ const PUB_FIELDS = z.union([
     }),
   }),
   z.strictObject({ action: z.literal("open"), server, url: z.string() }),
+  z.strictObject({
+    action: z.literal("grants"),
+    server,
+    grants: z.array(Grant).describe("Who the deck is shared with, oldest grant first."),
+  }),
+  z.strictObject({
+    action: z.literal("grant"),
+    server,
+    grant: Grant.describe("The grant as dek.pub keeps it now."),
+    invited: z.boolean().describe("The grant is new, so dek.pub mailed the person an invitation."),
+  }),
+  z.strictObject({
+    action: z.literal("revoke"),
+    server,
+    grant: Grant.describe("The grant removed."),
+  }),
   z.strictObject({ action: z.literal("comments"), server, comments: z.array(PubComment) }),
   z.strictObject({ action: z.literal("reply"), server, comment: z.string(), reply: Reply }),
   z.strictObject({

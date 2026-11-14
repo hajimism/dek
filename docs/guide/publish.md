@@ -65,7 +65,16 @@ dekc pub share --visibility link --script shown --comments signed-in
 | `--embed` | `on` lets other sites embed the deck |
 | `--comments` | who may post comments at the bottom of a `link` or `public` talk: `off`, no one; `signed-in`, anyone signed in to dek.pub |
 
-Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post, and only a reader signed in to dek.pub ever does. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people on its manage page on dek.pub, by handle or email address, each to view or to comment, and each on the team's side or the guests'. The team reads every thread; a guest reads only those shared with them, and never learns of the others. A guest opens the deck only once it is `private` or wider: to a guest, a `team` deck is a page that does not exist. A thread you or your team open is kept to the team unless you check Share with guests, and one kept to the team can be shared later, never taken back.
+Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post, and only a reader signed in to dek.pub ever does. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people by handle or email address, each to view or to comment, and each on the team's side or the guests': on its manage page on dek.pub, or with `dekc pub grants add`. The team reads every thread; a guest reads only those shared with them, and never learns of the others. A guest opens the deck only once it is `private` or wider: to a guest, a `team` deck is a page that does not exist. A thread you or your team open is kept to the team unless you check Share with guests, and one kept to the team can be shared later, never taken back.
+
+```bash
+dekc pub grants add @sato --role comment --side team
+dekc pub grants add client@example.com
+dekc pub grants
+dekc pub grants remove client@example.com
+```
+
+A new grant lets the person view, on the guests' side, unless `--role` and `--side` say otherwise; run `grants add` again to change one, and what you leave out stays as it was.
 
 Each person you share a deck with is mailed a link to it. Someone invited by email address needs no GitHub account: on dek.pub's sign-in page they ask for a link by mail, sent only to an address a deck is shared with or that has signed in before. Whoever is in a thread, as its author, by a reply, or as the deck's owner, is mailed of new replies and of its resolve, and you are mailed of new threads on your decks. The bell beside a talk's comments stops that mail for the talk. The talk page's Fullscreen button shows the deck with a header naming the talk and the page; its Review button, or `c`, opens the review beside the slide.
 
