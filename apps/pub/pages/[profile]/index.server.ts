@@ -1,6 +1,7 @@
 import { defineHandler, defineHead, type InferProps } from "void";
 import { translate } from "../../src/common/i18n.ts";
 import { loadProfile } from "../../src/model/person/feature/profile/load.server.ts";
+import { profileView } from "../../src/model/person/feature/profile/view.ts";
 
 export type Props = InferProps<typeof loader>;
 
@@ -9,7 +10,7 @@ export const loader = defineHandler(async (c) => {
   if (!profile) {
     c.set("pageStatus", 404);
   }
-  return { profile };
+  return { profile, view: profileView(c.req.query("view")) };
 });
 
 export const head = defineHead<Props>((c, { profile }) => {

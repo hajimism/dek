@@ -1,28 +1,33 @@
 <script lang="ts">
-  import { talkPath } from "../../src/model/deck/deck.ts";
+  import { untrack } from "svelte";
   import { profilePath } from "../../src/model/person/profile-path.ts";
   import { docsUrl } from "../../src/common/docs.ts";
-  import { formatDate, guessLang, slideCount } from "../../src/common/i18n.ts";
-  import type { TalkCard } from "../../src/model/deck/type.ts";
   import { useApp } from "../../src/shell/use-app.ts";
   import Avatar from "../../src/model/person/ui/avatar.svelte";
   import CopyField from "../../src/common/ui/copy-field.svelte";
   import Icon from "../../src/common/ui/icon.svelte";
   import NotFound from "../../src/shell/ui/not-found.svelte";
-  import VisibilityBadge from "../../src/model/deck/ui/visibility-badge.svelte";
+  import ProfileTalks from "../../src/model/person/feature/profile/ui/profile-talks.svelte";
+  import type { ProfileView } from "../../src/model/person/feature/profile/view.ts";
   import type { Props } from "./index.server";
 
-  let { profile }: Props = $props();
+  let { profile, view: asked }: Props = $props();
   const { lang, t } = useApp();
 
-  const years = $derived.by(() => {
-    const groups = new Map<string, TalkCard[]>();
-    for (const talk of profile?.talks ?? []) {
-      const year = (talk.date ?? talk.updatedAt).slice(0, 4);
-      groups.set(year, [...(groups.get(year) ?? []), talk]);
+  // The view is kept in the address, so a reload or a shared link opens the same one; switching
+  // it replaces the entry rather than adding one.
+  let view: ProfileView = $state(untrack(() => asked));
+
+  function choose(next: ProfileView) {
+    view = next;
+    const url = new URL(location.href);
+    if (next === "gallery") {
+      url.searchParams.delete("view");
+    } else {
+      url.searchParams.set("view", next);
     }
-    return [...groups].sort(([a], [b]) => b.localeCompare(a));
-  });
+    history.replaceState(history.state, "", url);
+  }
 </script>
 
 {#if !profile}
@@ -53,35 +58,7 @@
           {/if}
         </div>
       {:else}
-        {#each years as [year, talks] (year)}
-          <h3 class="year num">{year}</h3>
-          <ul class="list">
-            {#each talks as talk (talk.slug)}
-              <li>
-                <a class="row" href={talkPath(profile.handle, talk.slug)}>
-                  <span class="thumb">
-                    {#if talk.picture}
-                      <img src={talk.picture} alt="" loading="lazy" decoding="async" width="1280" height="720" />
-                    {:else}
-                      <Icon name="image" />
-                    {/if}
-                  </span>
-                  <span class="text">
-                    <span class="title" lang={guessLang([talk.title], lang) ?? undefined}>{talk.title}</span>
-                    <span class="meta">
-                      {#if talk.event}<span>{talk.event}</span><span aria-hidden="true">·</span>{/if}
-                      {#if talk.date}<time datetime={talk.date}>{formatDate(lang, talk.date)}</time><span aria-hidden="true">·</span>{/if}
-                      <span class="num">{slideCount(lang, talk.slides)}</span>
-                    </span>
-                    {#if profile.isOwner}
-                      <span class="badge"><VisibilityBadge visibility={talk.visibility} /></span>
-                    {/if}
-                  </span>
-                </a>
-              </li>
-            {/each}
-          </ul>
-        {/each}
+        <ProfileTalks talks={profile.talks} handle={profile.handle} isOwner={profile.isOwner} {view} onview={choose} />
       {/if}
     </section>
   </div>
@@ -89,7 +66,7 @@
 
 <style>
   .page {
-    max-width: calc(var(--measure) + 2 * var(--page-gutter));
+    max-width: var(--container);
     margin: 0 auto;
     padding: var(--space-16) var(--page-gutter) 0;
   }
@@ -131,79 +108,6 @@
     color: var(--text-muted);
     font-size: var(--text-sm);
   }
-  .year {
-    margin: var(--space-8) 0 var(--space-2);
-    padding-bottom: var(--space-2);
-    border-bottom: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    letter-spacing: 0;
-  }
-  .list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .row {
-    display: flex;
-    gap: var(--space-4);
-    margin: 0 calc(-1 * var(--space-3));
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    color: var(--text);
-    text-decoration: none;
-    transition: background-color var(--dur-instant) var(--ease-out);
-  }
-  .row:hover {
-    background: var(--bg-subtle);
-    color: var(--text);
-  }
-  .thumb {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    align-self: flex-start;
-    width: 144px;
-    aspect-ratio: 16 / 9;
-    border-radius: 6px;
-    background: var(--bg-active);
-    box-shadow: 0 0 0 1px var(--border);
-    color: var(--text-faint);
-    overflow: hidden;
-  }
-  .thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .text {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    padding-top: 2px;
-  }
-  .title {
-    font-size: var(--text-lg);
-    font-weight: var(--weight-semibold);
-    line-height: var(--leading-snug);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-  }
-  .badge {
-    margin-top: 2px;
-  }
   .empty {
     display: flex;
     flex-direction: column;
@@ -225,12 +129,6 @@
   @media (max-width: 639px) {
     .page {
       padding-top: var(--space-10);
-    }
-    .thumb {
-      width: 96px;
-    }
-    .title {
-      font-size: var(--text-base);
     }
   }
 </style>

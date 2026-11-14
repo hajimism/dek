@@ -5,6 +5,7 @@ import {
   normalizeUserCode,
 } from "../../src/model/person/feature/connect-cli/device-code.ts";
 import { rssDate, talkFeed, xmlText } from "../../src/model/person/feature/profile/rss.ts";
+import { profileView } from "../../src/model/person/feature/profile/view.ts";
 import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
 import { safeNext } from "../../src/model/person/next-path.ts";
 import { meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
@@ -160,5 +161,14 @@ describe("signInMail", () => {
     expect(mail.subject).toBe("Sign in to dek.pub");
     expect(mail.text).toContain("https://dek.pub/api/auth/magic-link/verify?token=t");
     expect(mail.text).toContain("15 minutes");
+  });
+});
+
+describe("profileView", () => {
+  it("is the timeline only when the address asks for it, else the gallery", () => {
+    expect(profileView("timeline")).toBe("timeline");
+    expect(profileView("gallery")).toBe("gallery");
+    expect(profileView(undefined)).toBe("gallery");
+    expect(profileView("grid")).toBe("gallery");
   });
 });

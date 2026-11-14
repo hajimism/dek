@@ -112,6 +112,9 @@ const en = {
   "device.startOver": "Enter another code",
 
   "profile.talks": "Talks",
+  "profile.view": "Show talks as",
+  "profile.gallery": "Gallery",
+  "profile.timeline": "Timeline",
   "profile.rss": "RSS",
   "profile.empty": "No public talks yet.",
   "profile.emptyOwner": "No talks yet. Publish one from a dek project:",
@@ -433,6 +436,9 @@ const ja: Record<MessageKey, string> = {
   "device.startOver": "別のコードを入力",
 
   "profile.talks": "トーク",
+  "profile.view": "トークの表示",
+  "profile.gallery": "ギャラリー",
+  "profile.timeline": "タイムライン",
   "profile.rss": "RSS",
   "profile.empty": "公開されたトークはまだありません。",
   "profile.emptyOwner": "トークはまだありません。dek のプロジェクトから公開できます。",

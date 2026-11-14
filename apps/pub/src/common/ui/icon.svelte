@@ -28,6 +28,8 @@
     alert: "M8 5v3.5M8 11h.01M8 1.75 14.5 13.5h-13z",
     crosshair: "M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
     image: "M2.5 3h11v10h-11zM2.5 10.5 6 7l3.5 3.5L11 9l2.5 2.5",
+    grid: "M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z",
+    timeline: "M4 2.5v11M4 4.5h.01M4 11.5h.01M7 4.5h6.5M7 11.5h6.5M7 8h4",
     plus: "M8 3v10M3 8h10",
     terminal: "M2 3h12v10H2zM4.5 6l2 2-2 2M8 10h3.5",
     "external": "M9.5 2.5h4v4M13.5 2.5 7.5 8.5M11.5 9.5v4h-9v-9h4",
