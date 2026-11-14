@@ -61,7 +61,6 @@ The comment feature is planned to grow into two: public comments and a like on t
 - **Handles.**
   - A handle comes from the GitHub login or the email, and must be unique. A second account whose handle normalizes to one already taken fails to sign up. So does one made by a sign-in link, which then answers as if the link had expired.
   - A link-visibility talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
-- **Profile.** The profile page lists every talk with no pagination; RSS stops at 50.
 
 ## Running it for real
 

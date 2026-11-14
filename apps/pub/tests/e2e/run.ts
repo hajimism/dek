@@ -147,6 +147,31 @@ try {
     "share opens the deck to the link",
     shared,
   );
+  const profile = `/@${me.handle}`;
+  check(
+    (await stranger.fetch(profile)).status === 200 &&
+      (await stranger.fetch(`${profile}?page=2`)).status === 404 &&
+      (await stranger.fetch(`${profile}?page=two`)).status === 200,
+    "a profile's first page answers, a page past its last is a 404, and a page that is no number is the first",
+  );
+  type TalkPage = { talks: Array<{ slug: string }>; total: number };
+  const talksOf = async (who: Browser, page: number) => {
+    const response = await who.fetch(`/api/people/${me.handle}/talks?page=${page}`);
+    return {
+      status: response.status,
+      body: response.ok ? ((await response.json()) as TalkPage) : null,
+    };
+  };
+  const ownTalks = await talksOf(author, 1);
+  const strangersTalks = await talksOf(stranger, 1);
+  check(
+    ownTalks.body?.total === 1 &&
+      ownTalks.body.talks[0]?.slug === "why-dek" &&
+      strangersTalks.body?.total === 0 &&
+      (await talksOf(stranger, 2)).status === 404,
+    "the talks a profile loads for more are the owner's all, anyone else's public, and none past the last page",
+    { ownTalks, strangersTalks },
+  );
   const sitemap = await fetch(`${server.url}/sitemap.xml`);
   const sitemapXml = await sitemap.text();
   check(

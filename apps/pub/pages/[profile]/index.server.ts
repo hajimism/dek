@@ -1,12 +1,15 @@
 import { defineHandler, defineHead, type InferProps } from "void";
+import { appUrl } from "../../src/common/http.server.ts";
 import { translate } from "../../src/common/i18n.ts";
 import { loadProfile } from "../../src/model/person/feature/profile/load.server.ts";
+import { profilePage } from "../../src/model/person/feature/profile/paging.ts";
 import { profileView } from "../../src/model/person/feature/profile/view.ts";
+import { profilePath } from "../../src/model/person/profile-path.ts";
 
 export type Props = InferProps<typeof loader>;
 
 export const loader = defineHandler(async (c) => {
-  const profile = await loadProfile(c, c.req.param("profile"));
+  const profile = await loadProfile(c, c.req.param("profile"), profilePage(c.req.query("page")));
   if (!profile) {
     c.set("pageStatus", 404);
   }
@@ -32,7 +35,7 @@ export const head = defineHead<Props>((c, { profile }) => {
         rel: "alternate",
         type: "application/rss+xml",
         title: `${profile.name} · dek.pub`,
-        href: `${profile.url}/rss`,
+        href: appUrl(`${profilePath(profile.handle)}/rss`),
       },
       { rel: "canonical", href: profile.url },
     ],

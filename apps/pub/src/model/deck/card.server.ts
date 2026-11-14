@@ -6,7 +6,7 @@ import { handleOf } from "../person/profile-path.ts";
 import { peopleById, personByHandle } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
 import { talkNamed } from "./deck.ts";
-import { decksOf, recentPublicDecks } from "./store.server.ts";
+import { deckCount, decksOf, recentPublicDecks } from "./store.server.ts";
 import type { Deck, TalkCard } from "./type.ts";
 import { findVersion } from "./version/store.server.ts";
 import { coverOf } from "./version/version.ts";
@@ -49,9 +49,14 @@ async function cardsOf(
 export async function talksBy(
   c: Context,
   person: Person,
-  options: { publicOnly: boolean; limit?: number },
+  options: { publicOnly: boolean; limit?: number; offset?: number },
 ): Promise<TalkCard[]> {
   return cardsOf(c, await decksOf(person.id, options), new Map([[person.id, person]]));
+}
+
+/** How many talks talksBy has for a person, all pages together. */
+export async function talkCount(person: Person, options: { publicOnly: boolean }): Promise<number> {
+  return deckCount(person.id, options);
 }
 
 export async function recentPublicTalks(c: Context, limit: number): Promise<TalkCard[]> {
