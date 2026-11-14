@@ -16,6 +16,7 @@
   let side: GrantSide = $state("guest");
   let adding = $state(false);
   let error = $state("");
+  let errorHint = $state("");
 
   function failure(err: unknown): string {
     if (err instanceof ApiFailure) {
@@ -31,6 +32,7 @@
   async function add(event: SubmitEvent) {
     event.preventDefault();
     error = "";
+    errorHint = "";
     const name = who.trim();
     if (!name) {
       document.getElementById("grant-who")?.focus();
@@ -44,6 +46,7 @@
       who = "";
     } catch (err) {
       error = failure(err);
+      errorHint = err instanceof ApiFailure ? err.hint : "";
     } finally {
       adding = false;
     }
@@ -112,7 +115,15 @@
   </div>
   <Button variant="primary" type="submit" icon="plus" loading={adding}>{t("manage.sharing.add")}</Button>
 </form>
-{#if error}<p class="error" id="grant-error" role="alert"><Icon name="alert" size={14} />{error}</p>{/if}
+{#if error}
+  <div class="error" id="grant-error" role="alert">
+    <Icon name="alert" size={14} />
+    <div>
+      <p>{error}</p>
+      {#if errorHint}<p class="error-hint">{errorHint}</p>{/if}
+    </div>
+  </div>
+{/if}
 <p class="side-hint" id="grant-side-hint">{t("manage.sharing.sideHint")}</p>
 
 {#if grants.length === 0}
@@ -221,10 +232,20 @@
   }
   .error {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
     color: var(--danger);
     font-size: var(--text-sm);
+  }
+  .error :global(svg) {
+    flex: none;
+    margin-top: 0.15em;
+  }
+  .error p {
+    margin: 0;
+  }
+  .error-hint {
+    color: var(--text-muted);
   }
   .side-hint {
     margin-top: var(--space-2);
