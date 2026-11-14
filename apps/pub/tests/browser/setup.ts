@@ -16,8 +16,11 @@ export function shared(overrides: Partial<Shared> = {}): Shared {
   };
 }
 
-/** What a rendered page component gives a test: its props can be set again. */
-export type Rendered = { rerender: (props: Record<string, unknown>) => Promise<void> };
+/** What a rendered page component gives a test: its props can be set again, and it can go. */
+export type Rendered = {
+  rerender: (props: Record<string, unknown>) => Promise<void>;
+  unmount: () => Promise<void>;
+};
 
 /**
  * Render a component with the shared data a Void page has. Props are checked by the component at
@@ -35,5 +38,5 @@ export async function renderPage(
       context: new Map([["__void_shared", { value: shared(overrides) }]]),
     } as never,
   );
-  return { rerender: (next) => result.rerender(next as never) };
+  return { rerender: (next) => result.rerender(next as never), unmount: () => result.unmount() };
 }

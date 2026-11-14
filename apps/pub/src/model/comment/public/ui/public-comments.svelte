@@ -7,11 +7,13 @@
   import { now as currentTime } from "../../../../common/ui/clock.svelte.ts";
   import { useApp } from "../../../../shell/use-app.ts";
   import Avatar from "../../../person/ui/avatar.svelte";
+  import { draftKeys, dropDraft, keepDraft, readDraft } from "../../drafts.ts";
   import type { ReplyInput } from "../../type.ts";
   import Composer from "../../ui/composer.svelte";
 
   let {
     comments,
+    deckId,
     canPost,
     off = false,
     isOwner = false,
@@ -21,6 +23,8 @@
     ondelete,
   }: {
     comments: PublicComment[];
+    /** The deck whose unsent comments are kept across a reload; with none, they are not kept. */
+    deckId?: string;
     canPost: boolean;
     /** The deck's policy lets no one post. */
     off?: boolean;
@@ -41,9 +45,34 @@
   const mine = (comment: PublicReply) =>
     shared.viewer !== null && comment.author.handle === shared.viewer.handle;
 
+  const editKey = (id: string) => (deckId ? draftKeys.edit(deckId, id) : undefined);
+
+  /** Open a comment to change it, from the change left unsaved if there is one. */
+  function edit(comment: PublicReply) {
+    const key = editKey(comment.id);
+    editing = comment.id;
+    draft = (key && readDraft(key)) || comment.text;
+  }
+
+  /** Keep the change unless it is no change at all. */
+  function keepEdit(comment: PublicReply) {
+    const key = editKey(comment.id);
+    if (key) {
+      keepDraft(key, draft === comment.text ? "" : draft);
+    }
+  }
+
+  function stopEditing(id: string) {
+    const key = editKey(id);
+    if (key) {
+      dropDraft(key);
+    }
+    editing = null;
+  }
+
   async function save(id: string) {
     if (draft.trim() && (await onedit(id, draft.trim()))) {
-      editing = null;
+      stopEditing(id);
     }
   }
 </script>
@@ -67,9 +96,15 @@
         }}
       >
         <label class="visually-hidden" for="edit-{comment.id}">{t("public.edit")}</label>
-        <textarea id="edit-{comment.id}" bind:value={draft} rows="2" maxlength="4000"></textarea>
+        <textarea
+          id="edit-{comment.id}"
+          bind:value={draft}
+          rows="2"
+          maxlength="4000"
+          oninput={() => keepEdit(comment)}
+        ></textarea>
         <div class="row">
-          <Button variant="ghost" size="sm" onclick={() => (editing = null)}>{t("common.cancel")}</Button>
+          <Button variant="ghost" size="sm" onclick={() => stopEditing(comment.id)}>{t("common.cancel")}</Button>
           <Button variant="primary" size="sm" type="submit">{t("public.save")}</Button>
         </div>
       </form>
@@ -86,10 +121,7 @@
         <button
           type="button"
           class="link-btn"
-          onclick={() => {
-            editing = comment.id;
-            draft = comment.text;
-          }}>{t("public.edit")}</button
+          onclick={() => edit(comment)}>{t("public.edit")}</button
         >
       {/if}
       {#if mine(comment) || isOwner}
@@ -125,6 +157,7 @@
                     autofocus
                     placeholder={t("public.replyPlaceholder")}
                     submitLabel={t("public.reply")}
+                    draftKey={deckId && draftKeys.public(deckId, top.id)}
                     oncancel={() => (replying = null)}
                     onsubmit={async (input) => {
                       const ok = await onpost(input, top.id);
@@ -144,7 +177,11 @@
   {/if}
   {#if canPost}
     <div class="new">
-      <Composer placeholder={t("public.placeholder")} onsubmit={(input) => onpost(input, null)} />
+      <Composer
+        placeholder={t("public.placeholder")}
+        draftKey={deckId && draftKeys.public(deckId, null)}
+        onsubmit={(input) => onpost(input, null)}
+      />
     </div>
   {:else if off}
     <p class="empty">{t("public.off")}</p>

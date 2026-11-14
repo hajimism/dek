@@ -36,7 +36,6 @@ What it does not do:
   - Nothing reports or hides a public comment but its removal; there is no rate limit on posting.
   - The like appears beside the title and in the full-screen header (ADR 58).
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.
-- **Drafts.** A draft is lost on reload.
 
 ## Comments for reviews with guests
 

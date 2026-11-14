@@ -447,6 +447,7 @@
 {#snippet review(inTheater: boolean)}
   <CommentsPanel
     comments={inTheater ? theaterComments : sorted}
+    deckId={talk.id}
     {slideNumbers}
     bind:filter
     {selectedId}
@@ -653,6 +654,7 @@
       <div class="public-col" lang={lang}>
         <PublicComments
           comments={publicList}
+          deckId={talk.id}
           canPost={talk.canPostPublic}
           off={talk.commentPolicy === "off"}
           isOwner={talk.isOwner}

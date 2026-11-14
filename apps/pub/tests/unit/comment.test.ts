@@ -9,6 +9,7 @@ import {
   scopeFor,
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
+import { draftKeys, keepDraft, readDraft } from "../../src/model/comment/drafts.ts";
 import { mayBeNoticed, noticeMail, noticeRecipients } from "../../src/model/comment/notice.ts";
 import {
   canPostPublic,
@@ -327,6 +328,51 @@ describe("thread scope", () => {
     expect(mayWiden(by("sato", "team"), { handle: "kato" }, true)).toBe(true);
     expect(mayWiden(by("sato", "team"), { handle: "kato" }, false)).toBe(false);
     expect(mayWiden(by("sato", "shared"), { handle: "sato" }, true)).toBe(false);
+  });
+});
+
+describe("drafts", () => {
+  const quote = { kind: "quote" as const, quote: "three times", prefix: "", suffix: "" };
+  const element = {
+    kind: "element" as const,
+    path: "slides/intro.html",
+    name: "div.chevron",
+    text: "Fast",
+    box: { x: 0, y: 0, width: 10, height: 10 },
+  };
+  const on = (targets: (typeof quote | typeof element)[], step = "0") => ({
+    slug: "intro",
+    step,
+    targets,
+  });
+
+  it("keys each draft by its deck, its kind and what it answers to", () => {
+    const keys = [
+      draftKeys.thread("d_1", on([quote])),
+      draftKeys.thread("d_2", on([quote])),
+      draftKeys.thread("d_1", on([{ ...quote, quote: "faster" }])),
+      draftKeys.thread("d_1", on([quote], "1")),
+      draftKeys.thread("d_1", on([element])),
+      draftKeys.thread("d_1", on([])),
+      draftKeys.reply("d_1", "c_1"),
+      draftKeys.reply("d_1", "c_2"),
+      draftKeys.reply("d_2", "c_1"),
+      draftKeys.public("d_1", null),
+      draftKeys.public("d_1", "c_1"),
+      draftKeys.edit("d_1", "c_1"),
+    ];
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("keys an element by what it is, not by where it was drawn", () => {
+    const moved = { ...element, box: { x: 4, y: 2, width: 10, height: 10 } };
+    expect(draftKeys.thread("d_1", on([moved]))).toBe(draftKeys.thread("d_1", on([element])));
+  });
+
+  it("keeps nothing, and throws nothing, where there is no storage", () => {
+    const key = draftKeys.public("d_1", null);
+    expect(() => keepDraft(key, "Thanks!")).not.toThrow();
+    expect(readDraft(key)).toBe("");
   });
 });
 

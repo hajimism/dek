@@ -3,6 +3,7 @@
   import Icon from "../../../common/ui/icon.svelte";
   import { useApp } from "../../../shell/use-app.ts";
   import { mayResolve, mayWiden } from "../access.ts";
+  import { draftKeys } from "../drafts.ts";
   import type { CardComment, Draft, Filter, ReplyInput } from "../type.ts";
   import { matchesFilter } from "../view.ts";
   import CommentCard from "./comment-card.svelte";
@@ -11,6 +12,7 @@
   let {
     comments,
     slideNumbers,
+    deckId,
     filter = $bindable("open"),
     selectedId = null,
     draft = null,
@@ -35,6 +37,8 @@
   }: {
     comments: CardComment[];
     slideNumbers: Map<string, number>;
+    /** The deck whose unsent comments are kept across a reload; with none, they are not kept. */
+    deckId?: string;
     filter?: Filter;
     selectedId?: string | null;
     draft?: Draft | null;
@@ -74,6 +78,7 @@
       | { kind: "quote"; quote: string }
       | undefined,
   );
+  const draftKey = $derived(deckId && draft ? draftKeys.thread(deckId, draft.anchor) : undefined);
   const draftElement = $derived(
     draft?.anchor.targets.find((target) => target.kind === "element") as
       | { kind: "element"; name: string; text: string }
@@ -95,7 +100,10 @@
               : t("talk.slideLabel", { n: draft.slideNumber ?? "?" })}
           </p>
         {/if}
-        <Composer {scopes} autofocus oncancel={oncanceldraft} onsubmit={oncreate} />
+        <!-- Picking another passage or element starts its own composer, with its own draft. -->
+        {#key draftKey}
+          <Composer {scopes} autofocus {draftKey} oncancel={oncanceldraft} onsubmit={oncreate} />
+        {/key}
       </section>
   {/if}
 {/snippet}
@@ -162,6 +170,7 @@
           <li>
             <CommentCard
               {comment}
+              {deckId}
               slideNumber={slideNumbers.get(comment.slug) ?? null}
               selected={comment.id === selectedId}
               canResolve={mayResolve(comment, shared.viewer, isOwner)}
