@@ -13,6 +13,7 @@ const SCRIPT = `---
 # yaml-language-server: $schema=../../.dek/schema.json
 title: Why dek
 event: Meetup #42
+duration: 10m
 ---
 
 ## intro
@@ -84,7 +85,7 @@ describe("dekc pub publish", () => {
           ]);
           // Only the pub: line is new.
           expect(readFileSync(scriptPath, "utf8")).toBe(
-            SCRIPT.replace("event: Meetup #42\n", `event: Meetup #42\npub: ${deck?.id}\n`),
+            SCRIPT.replace("duration: 10m\n", `duration: 10m\npub: ${deck?.id}\n`),
           );
 
           const upload = fake.requests.find((request) => request.path.endsWith("/versions"));
@@ -111,6 +112,7 @@ describe("dekc pub publish", () => {
             deck: "Why_Dek",
             title: "Why dek",
             event: "Meetup #42",
+            duration: "10m",
             lang: "ja",
             base: null,
             renames: [],

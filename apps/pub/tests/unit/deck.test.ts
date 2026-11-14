@@ -34,6 +34,7 @@ import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/s
 import { DeckAccess } from "../../src/model/deck/serving/type.ts";
 import {
   coverOf,
+  minutesOf,
   pictureFile,
   slidePicture,
   summaryOf,
@@ -232,6 +233,13 @@ describe("embed messages", () => {
       "http://d-x.localhost/v/1/?t=abc#intro",
     );
     expect(withSlide("http://d-x.localhost/v/1/#old", "new")).toBe("http://d-x.localhost/v/1/#new");
+  });
+});
+
+describe("a talk's length", () => {
+  it("is the minutes the frontmatter's duration gives, or none", () => {
+    expect(minutesOf("12m")).toBe(12);
+    expect(minutesOf(undefined)).toBeNull();
   });
 });
 

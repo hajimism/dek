@@ -580,6 +580,7 @@
       author={talk.owner.name}
       date={talk.date}
       version={talk.version}
+      minutes={talk.minutes}
       review={commentsOn ? { open: openCount } : null}
       onslide={readSlide}
       onreview={() => theater?.enter(true)}

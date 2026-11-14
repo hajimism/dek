@@ -154,6 +154,11 @@ export const VersionManifest = z.strictObject({
   event: z.string().max(500).optional(),
   /** The talk's date, as the frontmatter writes it: YYYY-MM-DD. */
   date: z.iso.date().optional(),
+  /** The talk's length, as the frontmatter writes it: minutes, like `12m`. */
+  duration: z
+    .string()
+    .regex(/^\d+m$/)
+    .optional(),
   /** A BCP 47 language tag. */
   lang: z
     .string()

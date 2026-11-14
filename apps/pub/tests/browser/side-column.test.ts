@@ -14,6 +14,7 @@ const base = {
   author: "Hajime",
   date: "2026-09-25",
   version: 3,
+  minutes: 12,
   onslide: () => {},
   onreview: () => {},
 };
@@ -37,11 +38,25 @@ describe("SideColumn", () => {
     expect(location.hash).toBe("");
   });
 
-  it("gives the talk's details", async () => {
+  it("gives the talk's details, each named for what it is", async () => {
     await renderPage(SideColumn, { ...base, review: null });
-    await expect.element(page.getByText("Hajime")).toBeInTheDocument();
-    await expect.element(page.getByText("v3")).toBeInTheDocument();
-    await expect.element(page.getByText("3 slides")).toBeInTheDocument();
+    const details = page.getByRole("region", { name: "About this talk" });
+    const row = (term: string) => details.getByRole("term").filter({ hasText: term });
+    await expect.element(row("Author")).toBeInTheDocument();
+    await expect.element(details.getByText("Hajime")).toBeInTheDocument();
+    await expect.element(row("Talk date")).toBeInTheDocument();
+    await expect.element(row("Version")).toBeInTheDocument();
+    await expect.element(details.getByText("v3")).toBeInTheDocument();
+    await expect.element(row("Duration")).toBeInTheDocument();
+    await expect.element(details.getByText("12 min")).toBeInTheDocument();
+    await expect.element(row("Slides")).toBeInTheDocument();
+    await expect.element(details.getByText("3", { exact: true })).toBeInTheDocument();
+  });
+
+  it("leaves out the duration of a talk whose frontmatter has none", async () => {
+    await renderPage(SideColumn, { ...base, minutes: null, review: null });
+    await expect.element(page.getByRole("term").filter({ hasText: "Slides" })).toBeInTheDocument();
+    expect(page.getByRole("term").filter({ hasText: "Duration" }).query()).toBeNull();
   });
 
   it("opens the review full screen, for a reader of it", async () => {

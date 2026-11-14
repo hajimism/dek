@@ -67,6 +67,7 @@ export async function loadTalk(
     description: deck.description,
     event: deck.event,
     date: deck.talkDate,
+    minutes: deck.minutes,
     lang:
       deck.lang ??
       guessLang(

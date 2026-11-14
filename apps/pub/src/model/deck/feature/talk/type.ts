@@ -32,6 +32,8 @@ export type Talk = {
   description: string | null;
   event: string | null;
   date: string | null;
+  /** The talk's length in minutes, from its frontmatter. */
+  minutes: number | null;
   lang: string | null;
   visibility: Visibility;
   scriptPublic: boolean;

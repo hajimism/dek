@@ -290,7 +290,7 @@ export async function publishCommand(
     },
   );
 
-  const { description, event, date, lang } = deck.deck;
+  const { description, event, date, duration, lang } = deck.deck;
   const manifest: VersionManifest = {
     protocol: PROTOCOL_VERSION,
     dekVersion: pkg.version,
@@ -299,6 +299,7 @@ export async function publishCommand(
     ...(description !== undefined ? { description } : {}),
     ...(event !== undefined ? { event } : {}),
     ...(date !== undefined ? { date } : {}),
+    ...(duration !== undefined ? { duration } : {}),
     lang,
     base,
     slideMap: version.slideMap,

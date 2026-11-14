@@ -37,6 +37,7 @@ const en = {
   "common.loading": "Loading…",
   "common.slides": "{n} slides",
   "common.slide": "1 slide",
+  "common.minutes": "{n} min",
   "common.error": "Something went wrong. {message}",
   "common.offline": "Couldn’t reach dek.pub. Check your connection and try again.",
 
@@ -143,10 +144,11 @@ const en = {
   "talk.thisSlide": "This slide",
   "side.slides": "Slides",
   "side.details": "About this talk",
-  "side.author": "Speaker",
-  "side.date": "Date",
+  "side.author": "Author",
+  "side.date": "Talk date",
   "side.version": "Version",
-  "side.length": "Length",
+  "side.duration": "Duration",
+  "side.slideCount": "Slides",
   "side.review": "Review",
   "side.openThreads": "{n} open threads",
   "side.openThread": "1 open thread",
@@ -356,6 +358,7 @@ const ja: Record<MessageKey, string> = {
   "common.loading": "読み込み中…",
   "common.slides": "{n} 枚",
   "common.slide": "1 枚",
+  "common.minutes": "{n} 分",
   "common.error": "うまくいきませんでした。{message}",
   "common.offline": "dek.pub に接続できませんでした。接続を確かめて、もう一度お試しください。",
 
@@ -466,10 +469,11 @@ const ja: Record<MessageKey, string> = {
   "talk.thisSlide": "このスライド",
   "side.slides": "スライド",
   "side.details": "このトークについて",
-  "side.author": "話す人",
-  "side.date": "日付",
+  "side.author": "作成者",
+  "side.date": "発表日",
   "side.version": "版",
-  "side.length": "長さ",
+  "side.duration": "時間",
+  "side.slideCount": "スライド数",
   "side.review": "レビュー",
   "side.openThreads": "未解決のスレッド {n} 件",
   "side.openThread": "未解決のスレッド 1 件",
@@ -699,6 +703,11 @@ export function translate(lang: Lang, key: MessageKey, vars?: Vars): string {
 /** "12 slides" / "1 slide", in the page's language. */
 export function slideCount(lang: Lang, n: number): string {
   return n === 1 ? translate(lang, "common.slide") : translate(lang, "common.slides", { n });
+}
+
+/** A talk's length: "12 min" or "12 分". */
+export function formatMinutes(lang: Lang, n: number): string {
+  return translate(lang, "common.minutes", { n });
 }
 
 /** A date as the page's language writes it: "Sep 25, 2026" or "2026年9月25日". */

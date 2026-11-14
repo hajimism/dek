@@ -16,6 +16,8 @@ export const decks = sqliteTable(
     description: text("description"),
     event: text("event"),
     talkDate: text("talk_date"),
+    /** The talk's length in minutes, from the frontmatter's `duration`. */
+    minutes: integer("minutes"),
     lang: text("lang"),
     visibility: text("visibility", { enum: ["private", "link", "public"] })
       .notNull()
