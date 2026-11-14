@@ -198,3 +198,28 @@ describe("ManagePage's delete", () => {
     expect(ondeleted).not.toHaveBeenCalled();
   });
 });
+
+describe("ManagePage's sharing", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("says why a share was refused and what to do, as the server put both", async () => {
+    const error = {
+      code: "invitations_exhausted",
+      message: "your shares mailed 20 invitations in the last 24 hours",
+      hint: "share with someone new after 2026-11-15 09:13 UTC",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error }), { status: 429 })),
+    );
+    await renderPage(ManagePage, props);
+    const who = page.getByLabelText("Handle or email");
+    await who.fill("new@example.com");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const alert = page.getByRole("alert");
+    await expect.element(alert.getByText(error.message)).toBeVisible();
+    await expect.element(alert.getByText(error.hint)).toBeVisible();
+    await expect.element(who).toHaveAccessibleDescription(`${error.message} ${error.hint}`);
+    await expect.element(who).toHaveValue("new@example.com");
+  });
+});

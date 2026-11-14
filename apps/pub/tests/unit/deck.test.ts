@@ -34,7 +34,16 @@ import {
   withSlide,
 } from "../../src/model/deck/feature/talk/embed.ts";
 import { readingSlug } from "../../src/model/deck/feature/talk/reading.ts";
-import { granteeOf, strongestRole, widestSide } from "../../src/model/deck/grant/grant.ts";
+import {
+  granteeOf,
+  INVITATION_WINDOW_MS,
+  INVITATIONS_PER_WINDOW,
+  invitationsFreeAt,
+  invitationWindowStart,
+  strongestRole,
+  utcMinute,
+  widestSide,
+} from "../../src/model/deck/grant/grant.ts";
 import { invitationMail } from "../../src/model/deck/grant/invite.ts";
 import { canLike } from "../../src/model/deck/like/like.ts";
 import {
@@ -523,6 +532,53 @@ describe("grants", () => {
     expect(widestSide(["guest", "team"])).toBe("team");
     expect(widestSide(["guest"])).toBe("guest");
     expect(widestSide([])).toBeNull();
+  });
+});
+
+describe("the limit on invitations", () => {
+  const now = new Date("2026-11-15T12:00:00.000Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+  const hour = 60 * 60 * 1000;
+
+  it("counts the invitations of the last 24 hours, written as the tables write times", () => {
+    expect(INVITATION_WINDOW_MS).toBe(24 * hour);
+    expect(invitationWindowStart(now)).toBe("2026-11-14T12:00:00.000Z");
+  });
+
+  it("leaves room while fewer than the limit fall in the window", () => {
+    const sent = Array.from({ length: INVITATIONS_PER_WINDOW - 1 }, (_, i) => ago(i * hour));
+    expect(invitationsFreeAt(sent, now)).toBeNull();
+    expect(invitationsFreeAt([], now)).toBeNull();
+  });
+
+  it("frees the next one when the oldest that still counts leaves the window", () => {
+    const sent = Array.from({ length: INVITATIONS_PER_WINDOW }, (_, i) => ago(i * 60_000));
+    const oldest = INVITATIONS_PER_WINDOW - 1;
+    expect(invitationsFreeAt(sent, now)?.toISOString()).toBe(
+      new Date(now.getTime() - oldest * 60_000 + INVITATION_WINDOW_MS).toISOString(),
+    );
+  });
+
+  it("does not count an invitation older than the window", () => {
+    const sent = [
+      ago(25 * hour),
+      ...Array.from({ length: INVITATIONS_PER_WINDOW - 1 }, (_, i) => ago(i * hour)),
+    ];
+    expect(invitationsFreeAt(sent, now)).toBeNull();
+  });
+
+  it("waits for as many to leave as went over, when more than the limit were sent at once", () => {
+    const sent = Array.from({ length: INVITATIONS_PER_WINDOW + 2 }, (_, i) => ago(i * hour));
+    // Of 22 in the window, the 3 oldest must leave; the third oldest was sent 19 hours ago.
+    expect(invitationsFreeAt(sent, now)?.toISOString()).toBe(
+      new Date(now.getTime() - 19 * hour + INVITATION_WINDOW_MS).toISOString(),
+    );
+  });
+
+  it("writes a time to the minute in UTC, rounded up so that it is never too early", () => {
+    expect(utcMinute(new Date("2026-11-15T09:12:00.000Z"))).toBe("2026-11-15 09:12 UTC");
+    expect(utcMinute(new Date("2026-11-15T09:12:00.001Z"))).toBe("2026-11-15 09:13 UTC");
+    expect(utcMinute(new Date("2026-11-15T23:59:30.000Z"))).toBe("2026-11-16 00:00 UTC");
   });
 });
 

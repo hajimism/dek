@@ -142,6 +142,20 @@ export const grants = sqliteTable(
   ],
 );
 
+/**
+ * An invitation a new grant mailed, by the person who made it: what the limit on invitations counts
+ * (ADR 84). It names no deck and no address, so it outlasts the deck and the grant, and keeps
+ * nothing of the person mailed; rows older than the window are deleted as new ones come.
+ */
+export const invitations = sqliteTable(
+  "invitations",
+  {
+    inviterId: text("inviter_id").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+  },
+  (table) => [index("invitations_inviter").on(table.inviterId, table.createdAt)],
+);
+
 /** A deck whose comments one person hears nothing of by mail. */
 export const mutes = sqliteTable(
   "mutes",

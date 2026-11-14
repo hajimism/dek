@@ -6,7 +6,7 @@
 // author lists and revokes their CLI keys, and `dekc pub logout --all` revokes the rest.
 // Run from apps/pub: `bun run test:e2e`.
 
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { translate } from "../../src/common/i18n.ts";
@@ -35,10 +35,11 @@ const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
 // dek.pub opens by invitation: the server lets sign up the people the run signs up, by address,
 // and anyone a deck is shared with. "Form" is on the list for the development form to be refused.
 // Keeper runs the server, as an operator who may take any talk down: named by address, and on no
-// invitation list, as the first operator of a new database is.
+// invitation list, as the first operator of a new database is. "Host" shares a deck with as many
+// as dek.pub mails invitations for, and one more.
 const server = await startDevServer(
   PORT,
-  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form"].map(addressOf),
+  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form", "Host"].map(addressOf),
   [addressOf("Keeper")],
 );
 const inbox = new Inbox(server.url);
@@ -1273,6 +1274,121 @@ try {
     removed.ok && !(await cliGrants()).some((row) => row.who === cliGuest),
     "dekc pub grants remove stops sharing the deck",
     removed,
+  );
+
+  // An owner's new shares mail at most 20 invitations a day, by handle or by address, and a share
+  // removed and made again mails again, so it counts again. Past the limit a new share is
+  // refused with when the next may go, from the page's API and from the CLI alike; a change to a
+  // share still works, and deleting the deck frees nothing.
+  const inviter = new Browser(server.url);
+  const hostMe = await inviter.signUp("Host");
+  const newDeck = async (slug: string) =>
+    (
+      (await (
+        await inviter.fetch("/api/decks", {
+          method: "POST",
+          json: { slug, title: `Limits ${slug}` },
+        })
+      ).json()) as { id: string }
+    ).id;
+  const hostDeck = await newDeck("limits");
+  const shareWith = (deckId: string, who: string, role?: string) =>
+    inviter.fetch(`/api/decks/${deckId}/grants`, {
+      method: "POST",
+      json: { who, ...(role ? { role } : {}) },
+    });
+  const stamp = Date.now();
+  const byAddress = Array.from({ length: 19 }, (_, i) => `limit-${i}-${stamp}@example.com`);
+  const statuses: number[] = [];
+  for (const who of ["@reader", ...byAddress.slice(0, 18)]) {
+    statuses.push((await shareWith(hostDeck, who)).status);
+  }
+  check(
+    statuses.every((status) => status === 201) &&
+      (await inbox.waitFor(addressOf("Reader"), "Limits limits")).length === 1 &&
+      (await inbox.waitFor(byAddress[17] ?? "", "Limits limits")).length === 1,
+    "an owner shares a deck with 19 people, one by handle, and each is mailed",
+    statuses,
+  );
+  const reshared = byAddress[0] ?? "";
+  const hostGrants = async (deckId: string) =>
+    (
+      (await (await inviter.fetch(`/api/decks/${deckId}/grants`)).json()) as {
+        grants: { id: string; who: string }[];
+      }
+    ).grants;
+  const toRemove = (await hostGrants(hostDeck)).find((row) => row.who === reshared);
+  await inviter.fetch(`/api/decks/${hostDeck}/grants/${toRemove?.id}`, { method: "DELETE" });
+  const readded = await shareWith(hostDeck, reshared);
+  check(
+    readded.status === 201 && (await inbox.waitFor(reshared, "Limits limits", 2)).length === 2,
+    "a share removed and made again mails again: the twentieth invitation",
+  );
+  const over = byAddress[18] ?? "";
+  const overLimit = await shareWith(hostDeck, over);
+  const overBody = (await overLimit.json()) as {
+    error?: { code: string; message: string; hint?: string };
+  };
+  check(
+    overLimit.status === 429 &&
+      overBody.error?.code === "invitations_exhausted" &&
+      overBody.error.message.includes("20 invitations in the last 24 hours") &&
+      /after \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/.test(overBody.error.hint ?? "") &&
+      !(await hostGrants(hostDeck)).some((row) => row.who === over) &&
+      (await inbox.to(over)).length === 0,
+    "the twenty-first is refused with a 429 that says when the next may go, and is not made",
+    overBody,
+  );
+  check(
+    (await shareWith(hostDeck, `@${speakerMe.handle}`)).status === 429,
+    "a share by handle mails too, so it is refused as well",
+  );
+  const changed = await shareWith(hostDeck, reshared, "comment");
+  check(
+    changed.status === 201 && ((await changed.json()) as { role: string }).role === "comment",
+    "a change to a share mails nothing, so it still works",
+  );
+  const hostKey = (
+    (await (await inviter.fetch("/api/cli/key", { method: "POST" })).json()) as { key: string }
+  ).key;
+  const hostWork = mkdtempSync(join(tmpdir(), "dek-pub-e2e-host-"));
+  try {
+    cpSync(join(REPO, "sample"), hostWork, {
+      recursive: true,
+      filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
+    });
+    const hostScript = join(hostWork, "decks", "why-dek", "script.md");
+    writeFileSync(
+      hostScript,
+      readFileSync(hostScript, "utf8").replace(/^---\n/, `---\npub: ${hostDeck}\n`),
+    );
+    const cliRefused = await dekc(
+      ["pub", "grants", "add", over],
+      join(hostWork, "decks", "why-dek"),
+      {
+        env: { DEK_TOKEN: hostKey, DEK_TOKEN_SERVER: server.url },
+      },
+    );
+    const cliError = cliRefused.error as { message?: string; hint?: string } | undefined;
+    check(
+      cliRefused.ok === false &&
+        String(cliError?.message).includes("20 invitations") &&
+        /after .* UTC/.test(String(cliError?.hint)),
+      "dekc pub grants add prints the refusal and, as its hint, when the next may go",
+      cliRefused,
+    );
+  } finally {
+    rmSync(hostWork, { recursive: true, force: true });
+  }
+  await inviter.fetch(`/api/decks/${hostDeck}`, { method: "DELETE" });
+  const [[counted]] = (await server.store.sql(
+    "select count(*) from invitations where inviter_id = ?",
+    [hostMe.id],
+  )) as [[number]];
+  check(
+    counted === 20 && (await shareWith(await newDeck("limits-reshared"), over)).status === 429,
+    "deleting the deck keeps the invitations it mailed counted",
+    { counted },
   );
 
   // The author deletes the talk: every row and file of it goes, nothing of it opens, and its slug
