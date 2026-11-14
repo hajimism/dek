@@ -432,6 +432,17 @@ export type HandleStatus = z.infer<typeof HandleStatus>;
 export const ChooseHandle = z.strictObject({ handle: z.string().min(1).max(64) });
 export type ChooseHandle = z.infer<typeof ChooseHandle>;
 
+/**
+ * The links a person's profile shows, in their order. PUT replaces them all, and both it and GET
+ * answer them as saved; what a link may be, and how many, the server says by a code of its own.
+ */
+export const ProfileLinks = z.strictObject({ links: z.array(z.string().max(2048)).max(20) });
+export type ProfileLinks = z.infer<typeof ProfileLinks>;
+
+/** What a person changes of themself with PATCH on `paths.me`: their name; the answer is Me. */
+export const UpdateMe = z.strictObject({ name: z.string().max(200) });
+export type UpdateMe = z.infer<typeof UpdateMe>;
+
 /** What the server gives the CLI for the session the device flow made. */
 export const CliKey = z.strictObject({ key: z.string(), me: Me });
 export type CliKey = z.infer<typeof CliKey>;
@@ -461,6 +472,7 @@ export type MuteState = z.infer<typeof MuteState>;
 export const paths = {
   me: "/api/me",
   myHandle: "/api/me/handle",
+  myLinks: "/api/me/links",
   handle: (handle: string) => `/api/handles/${segment(handle)}`,
   talksOf: (handle: string) => `/api/people/${segment(handle)}/talks`,
   cliKey: "/api/cli/key",

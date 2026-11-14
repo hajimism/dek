@@ -179,3 +179,18 @@ export const likes = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.deckId, table.userId] })],
 );
+
+/**
+ * The links a person's profile shows, `position` from 0 in the order they put them. Setting them
+ * replaces them all; an account made with GitHub starts with its GitHub profile (ADR 78).
+ */
+export const profileLinks = sqliteTable(
+  "profile_links",
+  {
+    userId: text("user_id").notNull(),
+    position: integer("position").notNull(),
+    url: text("url").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.position] })],
+);

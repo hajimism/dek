@@ -10,9 +10,6 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 
 ### The app
 
-- **Profile links.**
-  - The only link a profile shows is to GitHub, made from the login an account made with GitHub keeps. An account made by a sign-in link and later joined to a GitHub account has none, so its profile links to no GitHub page.
-  - Nobody can add a link of their own: X, a website, or any other.
 - **Link visibility.** A `link` talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
 - **Deleting.** Nobody can delete a talk, its owner and the operator included. Deleting an account is done by hand on request.
 - **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
@@ -61,10 +58,11 @@ Each of these is needed on staging and on production.
 - **Abuse.**
   - Nobody can report a talk or a public comment, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
-- **Account deletion** by the person themselves, and an account or settings page to hold it with their keys.
+- **Account deletion** by the person themselves, and their keys listed, both as sections of `/settings`.
 
 ## Later
 
+- **Bidi and format characters in names and link labels.** `readName` and a link's label keep U+200B–200F, U+202A–202E and U+2066–2069, so a name or a label can be drawn reversed or hide part of itself.
 - **Changing a handle.** A handle is chosen once, after the first sign-in, and cannot be changed (ADR 77). Changing one needs redirects from the old `/@handle` URLs, and a rule for when someone else may take the old one.
 - **Comments** work from end to end, but their look, their behaviour and their API are expected to change. Do not build on their current details.
   - No notices but mail: no unread marker, nothing in the app. `dekc pub comments` lists review threads only, and no mail tells the owner of a public comment.
