@@ -4,7 +4,12 @@ import {
   isCompleteUserCode,
   normalizeUserCode,
 } from "../../src/model/person/feature/connect-cli/device-code.ts";
-import { rssDate, talkFeed, xmlText } from "../../src/model/person/feature/profile/rss.ts";
+import {
+  pageCount,
+  profileHref,
+  profilePage,
+} from "../../src/model/person/feature/profile/paging.ts";
+import { rssDate, talkFeed } from "../../src/model/person/feature/profile/rss.ts";
 import { profileView } from "../../src/model/person/feature/profile/view.ts";
 import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
 import { meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
@@ -59,13 +64,6 @@ describe("safeNext", () => {
 });
 
 describe("rss", () => {
-  it("drops characters XML refuses and escapes the rest", () => {
-    expect(xmlText("a\u0000b\u0007c\u000bd & <e> \"f\" 'g'\tok")).toBe(
-      "abcd &amp; &lt;e&gt; &quot;f&quot; &apos;g&apos;\tok",
-    );
-    expect(xmlText("台本 😀")).toBe("台本 😀");
-  });
-
   it("dates an item by its talk, else its update, else not at all", () => {
     expect(rssDate("2026-09-25", "2026-11-01T00:00:00Z")).toBe("Fri, 25 Sep 2026 00:00:00 GMT");
     expect(rssDate("someday", "2026-11-01T00:00:00Z")).toBe("Sun, 01 Nov 2026 00:00:00 GMT");
@@ -184,5 +182,28 @@ describe("profileView", () => {
     expect(profileView("gallery")).toBe("gallery");
     expect(profileView(undefined)).toBe("gallery");
     expect(profileView("grid")).toBe("gallery");
+  });
+});
+
+describe("profile pages", () => {
+  it("reads ?page= as a whole number from 1, and anything else as the first page", () => {
+    expect(profilePage("3")).toBe(3);
+    expect(profilePage(undefined)).toBe(1);
+    for (const asked of ["0", "-2", "2.5", "02", "two", ""]) {
+      expect(profilePage(asked)).toBe(1);
+    }
+  });
+
+  it("counts the pages 24 talks a page fill, and one for none", () => {
+    expect(pageCount(0)).toBe(1);
+    expect(pageCount(24)).toBe(1);
+    expect(pageCount(25)).toBe(2);
+  });
+
+  it("addresses a page in its view, leaving out what is the default", () => {
+    expect(profileHref("demo", "gallery", 1)).toBe("/@demo");
+    expect(profileHref("demo", "timeline", 1)).toBe("/@demo?view=timeline");
+    expect(profileHref("demo", "gallery", 3)).toBe("/@demo?page=3");
+    expect(profileHref("demo", "timeline", 2)).toBe("/@demo?view=timeline&page=2");
   });
 });

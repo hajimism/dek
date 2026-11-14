@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { CommentRow } from "../../src/pub/protocol.ts";
+import type { CommentRow, Grant } from "../../src/pub/protocol.ts";
 import { jsonStdout, runInProcess } from "../helpers/cli.ts";
 import { type FakePub, withFakePub } from "../helpers/fake-pub.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -156,6 +156,137 @@ describe("dekc pub share", () => {
           },
         });
       });
+    });
+  });
+});
+
+describe("dekc pub grants", () => {
+  const ann: Grant = {
+    id: "g_ann",
+    who: "ann",
+    role: "comment",
+    side: "team",
+    createdAt: "2026-11-12T00:00:00.000Z",
+  };
+  const sato: Grant = {
+    id: "g_sato",
+    who: "sato@example.com",
+    role: "view",
+    side: "guest",
+    createdAt: "2026-11-13T00:00:00.000Z",
+  };
+  const grantsOf = (fake: FakePub, id: string) => fake.decks.get(id)?.grants ?? [];
+
+  test.serial("lists who the deck is shared with, by handle or by a waiting address", async () => {
+    await withPublished(async (fake, root, id) => {
+      grantsOf(fake, id).push(ann, sato);
+      const json = await run(fake, root, ["grants", "--json"]);
+      expect(jsonStdout<Json>(json)).toMatchObject({
+        ok: true,
+        action: "grants",
+        grants: [ann, sato],
+      });
+      const text = await run(fake, root, ["grants"]);
+      expect(text.stdout).toContain("@ann  comment  team");
+      expect(text.stdout).toContain("sato@example.com  view  guest  (no account yet)");
+    });
+  });
+
+  test.serial("shares the deck with one person, and says an invitation was mailed", async () => {
+    await withPublished(async (fake, root, id) => {
+      const result = await run(fake, root, [
+        "grants",
+        "add",
+        "@Ann",
+        "--role",
+        "comment",
+        "--side",
+        "team",
+        "--json",
+      ]);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: true,
+        action: "grant",
+        grant: { who: "ann", role: "comment", side: "team" },
+        invited: true,
+      });
+      expect(fake.requests.at(-1)).toMatchObject({
+        method: "POST",
+        path: `/api/decks/${id}/grants`,
+        json: { who: "@Ann", role: "comment", side: "team" },
+      });
+    });
+  });
+
+  test.serial(
+    "changes only what it is given of a grant already made, and mails no one",
+    async () => {
+      await withPublished(async (fake, root, id) => {
+        grantsOf(fake, id).push({ ...ann });
+        const result = await run(fake, root, ["grants", "add", "ann", "--side", "guest", "--json"]);
+        expect(jsonStdout<Json>(result)).toMatchObject({
+          ok: true,
+          grant: { who: "ann", role: "comment", side: "guest" },
+          invited: false,
+        });
+        // The role is left out, so the grant keeps the one it has.
+        expect(fake.requests.at(-1)?.json).toEqual({ who: "ann", side: "guest" });
+        expect(
+          (await run(fake, root, ["grants", "add", "ann", "--role", "view"])).stdout,
+        ).toContain("changed the grant to @ann: view, on the guests' side");
+      });
+    },
+  );
+
+  test.serial("stops sharing with one person, named by handle, address, or grant ID", async () => {
+    await withPublished(async (fake, root, id) => {
+      grantsOf(fake, id).push({ ...ann }, { ...sato });
+      const result = await run(fake, root, ["grants", "remove", "@ann", "--json"]);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: true,
+        action: "revoke",
+        grant: { id: "g_ann", who: "ann" },
+      });
+      expect(fake.requests.at(-1)).toMatchObject({
+        method: "DELETE",
+        path: `/api/decks/${id}/grants/g_ann`,
+      });
+      expect((await run(fake, root, ["grants", "remove", "Sato@Example.com"])).stdout).toContain(
+        "stopped sharing the deck with sato@example.com",
+      );
+      expect(grantsOf(fake, id)).toEqual([]);
+      grantsOf(fake, id).push({ ...ann });
+      await run(fake, root, ["grants", "remove", "g_ann"]);
+      expect(grantsOf(fake, id)).toEqual([]);
+    });
+  });
+
+  test.serial("refuses to remove a grant the deck does not have, and sends no DELETE", async () => {
+    await withPublished(async (fake, root, id) => {
+      grantsOf(fake, id).push({ ...ann });
+      const result = await run(fake, root, ["grants", "remove", "bob", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: false,
+        error: {
+          message: 'deck "talk" is not shared with bob',
+          hint: "`dekc pub grants` lists who it is shared with; a grant by address an account has claimed is listed by its handle",
+        },
+      });
+      expect(fake.requests.some((request) => request.method === "DELETE")).toBe(false);
+    });
+  });
+
+  test.serial("refuses a role or side it does not know before anything is sent", async () => {
+    await withPublished(async (fake, root) => {
+      const sent = fake.requests.length;
+      const result = await run(fake, root, ["grants", "add", "ann", "--side", "client", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: false,
+        error: { message: 'invalid --side "client"' },
+      });
+      expect(fake.requests.length).toBe(sent);
     });
   });
 });

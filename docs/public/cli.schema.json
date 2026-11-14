@@ -3266,6 +3266,197 @@
           "properties": {
             "action": {
               "type": "string",
+              "const": "grants"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "grants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "who": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "view",
+                      "comment"
+                    ]
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "team",
+                      "guest"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "who",
+                  "role",
+                  "side",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Who the deck is shared with, oldest grant first."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "grants",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "grant"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "grant": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "who": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "view",
+                    "comment"
+                  ]
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "team",
+                    "guest"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "who",
+                "role",
+                "side",
+                "createdAt"
+              ],
+              "additionalProperties": false,
+              "description": "The grant as dek.pub keeps it now."
+            },
+            "invited": {
+              "type": "boolean",
+              "description": "The grant is new, so dek.pub mailed the person an invitation."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "grant",
+            "invited",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "revoke"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "grant": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "who": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "view",
+                    "comment"
+                  ]
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "team",
+                    "guest"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "who",
+                "role",
+                "side",
+                "createdAt"
+              ],
+              "additionalProperties": false,
+              "description": "The grant removed."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "grant",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
               "const": "comments"
             },
             "server": {
@@ -4375,6 +4566,209 @@
             "action",
             "server",
             "url",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "grants"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "grants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "who": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "view",
+                      "comment"
+                    ]
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "team",
+                      "guest"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "who",
+                  "role",
+                  "side",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Who the deck is shared with, oldest grant first."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "grants",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "grant"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "grant": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "who": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "view",
+                    "comment"
+                  ]
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "team",
+                    "guest"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "who",
+                "role",
+                "side",
+                "createdAt"
+              ],
+              "additionalProperties": false,
+              "description": "The grant as dek.pub keeps it now."
+            },
+            "invited": {
+              "type": "boolean",
+              "description": "The grant is new, so dek.pub mailed the person an invitation."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "grant",
+            "invited",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "revoke"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "grant": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "who": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "view",
+                    "comment"
+                  ]
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "team",
+                    "guest"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "who",
+                "role",
+                "side",
+                "createdAt"
+              ],
+              "additionalProperties": false,
+              "description": "The grant removed."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "grant",
             "ok",
             "error"
           ],
