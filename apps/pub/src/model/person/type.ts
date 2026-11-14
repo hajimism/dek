@@ -95,6 +95,15 @@ export const KeyCheck = z.object({
 /** What it answers when a key is made; the key itself is shown only this once. */
 export const MadeKey = z.object({ key: z.string() });
 
+/** A row of Better Auth's `apikey` table, as much of it as a person is shown of their keys. */
+export const KeyRow = z.object({
+  id: z.string(),
+  name: z.string().nullish(),
+  createdAt: z.coerce.date(),
+  lastRequest: z.coerce.date().nullish(),
+  expiresAt: z.coerce.date().nullish(),
+});
+
 /**
  * The signed-in account, as every page is told who they are; its handle is null until they have
  * chosen one, which every page but the one to choose it on sends them to do first.

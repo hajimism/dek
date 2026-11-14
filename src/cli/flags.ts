@@ -147,6 +147,10 @@ export const FLAGS = {
     text: "replace the key in a link deck's URL, so the URL given out before opens it no more",
   },
   yes: { type: "boolean", text: "delete the talk on dek.pub, which cannot be undone" },
+  all: {
+    type: "boolean",
+    text: "revoke every key of the account, in CI and on other machines too, not only this one",
+  },
   comments: {
     type: "enum",
     choices: ["off", "signed-in"],

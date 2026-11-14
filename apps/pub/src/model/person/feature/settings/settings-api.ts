@@ -1,7 +1,8 @@
-// The settings page's calls: saving the links and the name. The paths are protocol
-// `paths.myLinks` and `paths.me`, written out, as the protocol module brings zod with it.
+// The settings page's calls: saving the links and the name, and revoking CLI keys. The paths are
+// protocol `paths.myLinks`, `paths.me`, `paths.myKey` and `paths.myKeys`, written out, as the
+// protocol module brings zod with it.
 
-import type { Me, ProfileLinks } from "../../../../../../../src/pub/protocol.ts";
+import type { KeysRevoked, Me, ProfileLinks } from "../../../../../../../src/pub/protocol.ts";
 import { ApiFailure, api } from "../../../../common/ui/api.ts";
 import type { LinksProblem } from "../../link.ts";
 import type { NameProblem } from "../../name.ts";
@@ -37,5 +38,21 @@ export async function saveName(name: string): Promise<Saved<string, NameProblem>
     return { ok: true, value: me.name };
   } catch (error) {
     return failure(NAME_CODES, error);
+  }
+}
+
+/** Why a revoke did not happen: dek.pub was not reached, or it said why. */
+export type RevokeFailure = { problem: "offline" | "failed"; message: string };
+
+/** Revoke one key, or with no `id` every key; how many went, or why none did. */
+export async function revokeKeys(
+  id?: string,
+): Promise<{ ok: true; revoked: number } | ({ ok: false } & RevokeFailure)> {
+  const path = id === undefined ? "/api/me/keys" : `/api/me/keys/${encodeURIComponent(id)}`;
+  try {
+    const answer = await api<KeysRevoked>(path, { method: "DELETE" });
+    return { ok: true, revoked: answer.revoked };
+  } catch (error) {
+    return failure({}, error);
   }
 }

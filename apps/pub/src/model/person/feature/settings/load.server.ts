@@ -3,6 +3,7 @@
 
 import type { Context } from "hono";
 import { sessionAccount } from "../../actor.server.ts";
+import { keysOf } from "../../api-key.server.ts";
 import { linksOf } from "../../link.server.ts";
 import { hasHandle } from "../../person.ts";
 import { signInHref, welcomeHref } from "../../sign-in-path.ts";
@@ -18,5 +19,6 @@ export async function loadSettings(c: Context): Promise<Settings> {
   if (!hasHandle(account)) {
     return { redirect: welcomeHref(SETTINGS_PATH) };
   }
-  return { handle: account.handle, name: account.name, links: await linksOf(account.id) };
+  const [links, keys] = await Promise.all([linksOf(account.id), keysOf(c, account.id)]);
+  return { handle: account.handle, name: account.name, links, keys };
 }

@@ -12,6 +12,8 @@ Amended by [81. Open a dek.pub link talk only with the key its URL carries](0081
 
 Amended by [82. Let a dek.pub talk be deleted for good by its owner, and taken down by an operator](0082-let-a-dek-pub-talk-be-deleted-for-good-by-its-owner-and-taken-down-by-an-operator.md)
 
+Amended by [83. Let a dek.pub person list and revoke their CLI keys, and revoke them all with dekc pub logout --all](0083-let-a-dek-pub-person-list-and-revoke-their-cli-keys-and-revoke-them-all-with-dekc-pub-logout-all.md)
+
 ## Context
 
 dek.pub is the service that shows a talk online: the slides, the script beside them for those it is shared with, and comments on a slide or a passage. The server and `dekc` share the shapes and paths in `src/pub/protocol.ts`. What was missing is the CLI that signs in, publishes, sets who may read and comment, and brings the comments back, for a person at a terminal and for an agent alike ([Agent Usability Criteria](../docs/guide/agent-criteria.md): every result in `--json`, no prompt, the exit code by severity).

@@ -1,11 +1,11 @@
 // What a person changes of themself on the settings page: the links their profile shows, all of
 // them at once, and their name. Each is read by the rules the page checks it by, and refused with
-// a code of its own.
+// a code of its own. Only the person signed in may, not an API key (ADR 83).
 
 import type { Context } from "hono";
 import type { Me, ProfileLinks } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../../common/api-error.ts";
-import { requirePerson } from "../../actor.server.ts";
+import { requireSessionPerson } from "../../actor.server.ts";
 import { linksOf, setLinks } from "../../link.server.ts";
 import { type LinksProblem, MAX_LINK_LENGTH, MAX_LINKS, readLinks } from "../../link.ts";
 import { MAX_NAME_LENGTH, readName } from "../../name.ts";
@@ -14,7 +14,7 @@ import { setName } from "../../store.server.ts";
 import { LINK_CODES, NAME_CODES } from "./type.ts";
 
 export async function myLinks(c: Context): Promise<ProfileLinks> {
-  const person = await requirePerson(c);
+  const person = await requireSessionPerson(c);
   return { links: await linksOf(person.id) };
 }
 
@@ -29,7 +29,7 @@ const LINK_MESSAGES: Record<LinksProblem, string> = {
 
 /** Make `inputs` the links the calling person's profile shows, in their order. */
 export async function saveLinks(c: Context, inputs: readonly string[]): Promise<ProfileLinks> {
-  const person = await requirePerson(c);
+  const person = await requireSessionPerson(c);
   const read = readLinks(inputs);
   if (!read.ok) {
     const what = LINK_MESSAGES[read.problem];
@@ -45,7 +45,7 @@ export async function saveLinks(c: Context, inputs: readonly string[]): Promise<
 
 /** Give the calling person the name `input` reads as. */
 export async function saveName(c: Context, input: string): Promise<Me> {
-  const person = await requirePerson(c);
+  const person = await requireSessionPerson(c);
   const read = readName(input);
   if (!read.ok) {
     throw new ApiError(

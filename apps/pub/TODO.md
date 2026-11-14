@@ -11,7 +11,6 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 ### The app
 
 - **Deleting an account** is done by hand on request, its decks with `deleteDeck` (ADR 82).
-- **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
 - **Logs.** An error a page's loader throws is logged whole by Void's error handler, and a failed query's error carries the values it was bound to: an address, a comment's text. Void has no hook to log it otherwise; `src/common/log.ts` does so for the API, the tasks after an answer, mail and Better Auth.
 
@@ -56,7 +55,7 @@ Each of these is needed on staging and on production.
 - **Abuse.**
   - Nobody can report a talk or a public comment, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
-- **Account deletion** by the person themselves, and their keys listed, both as sections of `/settings`.
+- **Account deletion** by the person themselves, as a section of `/settings`.
 
 ## Later
 
