@@ -35,9 +35,9 @@ export async function syncAccess(deckId: string): Promise<void> {
 
 /**
  * Take the access file away, so the serve Worker hands out no build of the deck, with a token or
- * without, before the deck itself is deleted. A `syncAccess` under way may write it again until
- * the deck's row is gone, and none writes it after; `deleteDeck` then sweeps the deck's files,
- * which takes such a file too.
+ * without, while the deck is deleted. A `syncAccess` that read the deck's row before it went may
+ * write the file again, so `deleteDeck` takes it away once more after the rows, and its sweep of
+ * the deck's files after that takes it too.
  */
 export async function removeAccess(deckId: string): Promise<void> {
   await storage.delete(accessKey(deckId));

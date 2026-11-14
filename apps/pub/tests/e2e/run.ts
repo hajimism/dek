@@ -33,11 +33,12 @@ const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
 // dek.pub opens by invitation: the server lets sign up the people the run signs up, by address,
 // and anyone a deck is shared with. "Form" is on the list for the development form to be refused.
-// @keeper runs the server, as an operator who may take any talk down.
+// Keeper runs the server, as an operator who may take any talk down: named by address, and on no
+// invitation list, as the first operator of a new database is.
 const server = await startDevServer(
   PORT,
-  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form", "Keeper"].map(addressOf),
-  ["keeper"],
+  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form"].map(addressOf),
+  [addressOf("Keeper")],
 );
 const inbox = new Inbox(server.url);
 
@@ -1389,7 +1390,8 @@ try {
     republished,
   );
 
-  // An operator takes down someone else's talk, named by its URL, from any directory.
+  // An operator, whom only DEK_PUB_OPERATORS lets sign up, takes down someone else's talk, named
+  // by its URL, from any directory.
   const keeper = new Browser(server.url);
   await keeper.signUp("Keeper");
   const keeperKey = (

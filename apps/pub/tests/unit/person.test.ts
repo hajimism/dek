@@ -32,7 +32,7 @@ import {
   readLinks,
 } from "../../src/model/person/link.ts";
 import { MAX_NAME_LENGTH, readName } from "../../src/model/person/name.ts";
-import { readOperators } from "../../src/model/person/operator.ts";
+import { namesOperator, readOperators } from "../../src/model/person/operator.ts";
 import {
   authorOf,
   hasHandle,
@@ -328,65 +328,95 @@ describe("readInvited", () => {
 });
 
 describe("readOperators", () => {
-  it("reads handles, with or without @, split by commas or whitespace, in lowercase", () => {
-    expect([...readOperators(" Hajimism,@Sato\n  kato-2 ,, ")]).toEqual([
-      "hajimism",
-      "sato",
-      "kato-2",
+  it("reads addresses, split by commas or whitespace, in lowercase", () => {
+    expect([...readOperators(" Hajime@Example.com,sato@example.com\n  ,, ")]).toEqual([
+      "hajime@example.com",
+      "sato@example.com",
     ]);
   });
 
-  it("names no operator from an empty setting, nor from what is no handle", () => {
-    for (const setting of ["", "   ", "@, *, sato@example.com, -x"]) {
+  it("names no operator from an empty setting, nor by handle, GitHub login, or `*`", () => {
+    for (const setting of ["", "   ", "hajimism, @sato, *, *@example.com, @octo-cat"]) {
       expect(readOperators(setting).size).toBe(0);
     }
+  });
+});
+
+describe("namesOperator", () => {
+  const operators = readOperators("hajime@example.com");
+  const account = { email: "Hajime@example.com", emailVerified: true };
+
+  it("names the account whose verified address is listed, whatever its case", () => {
+    expect(namesOperator(operators, account)).toBe(true);
+    expect(namesOperator(operators, { ...account, email: "sato@example.com" })).toBe(false);
+  });
+
+  it("never names an account whose address is not verified", () => {
+    expect(namesOperator(operators, { ...account, emailVerified: false })).toBe(false);
   });
 });
 
 describe("mayJoin", () => {
   const nobodyWaits = vi.fn(async () => false);
   const newcomer = { email: "sato@example.com", emailVerified: true, githubLogin: null };
+  const none = readOperators("");
 
   it("lets anyone in when the list is `*`, a verified address or not", async () => {
     const anyone = readInvited("*");
-    expect(await mayJoin(anyone, { ...newcomer, emailVerified: false }, nobodyWaits)).toBe(true);
+    expect(await mayJoin(anyone, none, { ...newcomer, emailVerified: false }, nobodyWaits)).toBe(
+      true,
+    );
   });
 
   it("lets in a verified address on the list, whatever its case", async () => {
     const invited = readInvited("Sato@Example.com");
-    expect(await mayJoin(invited, { ...newcomer, email: "SATO@example.com" }, nobodyWaits)).toBe(
-      true,
-    );
-    expect(await mayJoin(invited, { ...newcomer, email: "kato@example.com" }, nobodyWaits)).toBe(
-      false,
-    );
+    expect(
+      await mayJoin(invited, none, { ...newcomer, email: "SATO@example.com" }, nobodyWaits),
+    ).toBe(true);
+    expect(
+      await mayJoin(invited, none, { ...newcomer, email: "kato@example.com" }, nobodyWaits),
+    ).toBe(false);
   });
 
   it("never counts an address that is not verified, on the list or with a share waiting", async () => {
     const waits = vi.fn(async () => true);
     const unverified = { ...newcomer, emailVerified: false };
-    expect(await mayJoin(readInvited("sato@example.com"), unverified, waits)).toBe(false);
-    expect(await mayJoin(readInvited(""), unverified, waits)).toBe(false);
+    expect(await mayJoin(readInvited("sato@example.com"), none, unverified, waits)).toBe(false);
+    expect(await mayJoin(readInvited(""), none, unverified, waits)).toBe(false);
     expect(waits).not.toHaveBeenCalled();
   });
 
   it("lets in a GitHub account on the list as `@login`, whatever its address", async () => {
     const invited = readInvited("@octo-cat");
     const github = { email: "o@example.com", emailVerified: false, githubLogin: "Octo-Cat" };
-    expect(await mayJoin(invited, github, nobodyWaits)).toBe(true);
-    expect(await mayJoin(invited, { ...github, githubLogin: "octo-dog" }, nobodyWaits)).toBe(false);
-    expect(await mayJoin(readInvited("octo-cat@example.com"), github, nobodyWaits)).toBe(false);
+    expect(await mayJoin(invited, none, github, nobodyWaits)).toBe(true);
+    expect(await mayJoin(invited, none, { ...github, githubLogin: "octo-dog" }, nobodyWaits)).toBe(
+      false,
+    );
+    expect(await mayJoin(readInvited("octo-cat@example.com"), none, github, nobodyWaits)).toBe(
+      false,
+    );
   });
 
   it("lets in a verified address a share waits for, asking by the address in lowercase", async () => {
     const waits = vi.fn(async (email: string) => email === "sato@example.com");
-    expect(await mayJoin(readInvited(""), { ...newcomer, email: "Sato@example.com" }, waits)).toBe(
-      true,
-    );
+    expect(
+      await mayJoin(readInvited(""), none, { ...newcomer, email: "Sato@example.com" }, waits),
+    ).toBe(true);
     expect(waits).toHaveBeenCalledWith("sato@example.com");
-    expect(await mayJoin(readInvited(""), { ...newcomer, email: "kato@example.com" }, waits)).toBe(
-      false,
-    );
+    expect(
+      await mayJoin(readInvited(""), none, { ...newcomer, email: "kato@example.com" }, waits),
+    ).toBe(false);
+  });
+
+  it("lets in a verified address DEK_PUB_OPERATORS lists, though nobody invited it", async () => {
+    const operators = readOperators("Sato@example.com");
+    expect(await mayJoin(readInvited(""), operators, newcomer, nobodyWaits)).toBe(true);
+    expect(
+      await mayJoin(readInvited(""), operators, { ...newcomer, emailVerified: false }, nobodyWaits),
+    ).toBe(false);
+    const github = { email: "o@example.com", emailVerified: true, githubLogin: "sato" };
+    expect(await mayJoin(readInvited(""), readOperators("@sato"), github, nobodyWaits)).toBe(false);
   });
 });
 

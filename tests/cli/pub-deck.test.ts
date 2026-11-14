@@ -322,7 +322,7 @@ describe("dekc pub delete", () => {
           ok: false,
           error: {
             message: `deleting deck "talk" (${id}) from dek.pub cannot be undone`,
-            hint: "run `dekc pub delete --yes` to delete the talk, its versions, and every comment, like, and share on it",
+            hint: "run `dekc pub delete talk --yes` to delete the talk, its versions, and every comment, like, and share on it",
           },
         });
         expect(fake.requests.length).toBe(sent);
@@ -330,6 +330,48 @@ describe("dekc pub delete", () => {
       });
     },
   );
+
+  test.serial(
+    "names the deck in its hints, so they act on it from another deck's folder",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        const a = fake.addDeck({ slug: "a" });
+        const b = fake.addDeck({ slug: "b" });
+        const decks = [a, b].map((deck) => ({
+          name: deck.slug,
+          script: script(deck.id),
+          slides: { intro: '<section class="slide"><h2>intro</h2></section>\n' },
+        }));
+        await withTempProject({ decks }, async (root) => {
+          const inA = join(root, "decks", "a");
+          const hintOf = async (args: string[]) => {
+            const result = await run(fake, inA, [...args, "--json"]);
+            expect(result.exitCode).toBe(1);
+            return String((jsonStdout<Json>(result).error as { hint?: string }).hint);
+          };
+          const commandIn = (hint: string) => /`dekc pub ([^`]+)`/.exec(hint)?.[1] ?? "";
+
+          const shareHint = await hintOf(["share", "b"]);
+          expect(commandIn(shareHint)).toBe("status b");
+
+          const deleteHint = await hintOf(["delete", "b"]);
+          expect(commandIn(deleteHint)).toBe("delete b --yes");
+          const deleted = await run(fake, inA, [...commandIn(deleteHint).split(" "), "--json"]);
+          expect(jsonStdout<Json>(deleted)).toMatchObject({ ok: true, id: b.id, slug: "b" });
+          expect(fake.decks.has(a.id)).toBe(true);
+          expect(fake.decks.has(b.id)).toBe(false);
+        });
+      });
+    },
+  );
+
+  test.serial("runs the hint's command as written in the deck's own folder", async () => {
+    await withPublished(async (fake, root, id) => {
+      const result = await run(fake, root, ["delete", "talk", "--yes", "--json"]);
+      expect(jsonStdout<Json>(result)).toMatchObject({ ok: true, id });
+    });
+  });
 
   test.serial("deletes the deck on dek.pub and takes pub: out of script.md", async () => {
     await withPublished(async (fake, root, id) => {
@@ -417,6 +459,27 @@ describe("dekc pub takedown", () => {
       expect(fake.requests.map((request) => request.method)).toEqual(["DELETE"]);
     });
   });
+
+  test.serial(
+    "answers the lookup with the talk's ID alone, and says whose a talk not found is",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        const refused = async (word: string) => {
+          const result = await runInProcess(["pub", "takedown", word, "--yes", "--json"], {
+            cwd: outside(),
+            env: fake.env,
+          });
+          expect(result.exitCode).toBe(1);
+          return jsonStdout<Json>(result).error as { message: string; hint?: string };
+        };
+        const hint =
+          "only the talk's owner or an operator of this dek.pub can take it down: check the talk's URL or deck ID, and that `dekc pub whoami` names one of them";
+        expect(await refused(`${fake.url}/@sato/gone`)).toMatchObject({ hint });
+        expect(await refused("d_0123456789ab")).toMatchObject({ hint });
+      });
+    },
+  );
 
   test.serial(
     "refuses, before anything is sent, a talk it cannot name or --yes left out",

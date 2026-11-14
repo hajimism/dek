@@ -24,7 +24,7 @@ import {
   talkPath,
   withLinkKey,
 } from "../../src/model/deck/deck.ts";
-import { DECK_ROWS } from "../../src/model/deck/deletion.ts";
+import { DECK_ROWS, deleteInOrder } from "../../src/model/deck/deletion.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
 import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
 import { sitemapOf } from "../../src/model/deck/feature/sitemap/sitemap.ts";
@@ -774,6 +774,70 @@ describe("deleting a deck", () => {
     });
     expect(replies).toBeLessThan(DECK_ROWS.findIndex((rows) => rows.table === "threads"));
     expect(DECK_ROWS.at(-1)).toEqual({ table: "decks", column: "id" });
+  });
+
+  /**
+   * A deck in two stores, as `deleteInOrder` deletes it: its rows, and the files the serve Worker
+   * reads, among them the access file. `racing` writes the access file while the rows are deleted,
+   * as a `syncAccess` that read the row just before does; `sweepFails` makes the files' sweep throw.
+   */
+  function storedDeck({ racing = false, sweepFails = false } = {}) {
+    const stored = { rows: true, access: true, files: true };
+    const steps = {
+      removeAccess: vi.fn(async () => {
+        stored.access = false;
+      }),
+      deleteRows: vi.fn(async () => {
+        if (racing) {
+          stored.access = true;
+        }
+        stored.rows = false;
+      }),
+      deleteFiles: vi.fn(async () => {
+        if (sweepFails) {
+          throw new Error("R2 is down");
+        }
+        stored.access = false;
+        stored.files = false;
+      }),
+    };
+    return { stored, steps };
+  }
+
+  it("takes the access file away before the rows go, and again after", async () => {
+    const { stored, steps } = storedDeck({ racing: true, sweepFails: true });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await deleteInOrder("d_0123456789", steps);
+    expect(stored).toEqual({ rows: false, access: false, files: true });
+    expect(steps.removeAccess).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0]?.[0]).toBe(
+      "the files of the deleted deck d_0123456789 were not all deleted",
+    );
+    logged.mockRestore();
+  });
+
+  it("leaves the deck as it was when the access file cannot be taken away first", async () => {
+    const { stored, steps } = storedDeck();
+    steps.removeAccess.mockRejectedValueOnce(new Error("R2 is down"));
+    await expect(deleteInOrder("d_0123456789", steps)).rejects.toThrow("R2 is down");
+    expect(stored).toEqual({ rows: true, access: true, files: true });
+    expect(steps.deleteRows).not.toHaveBeenCalled();
+  });
+
+  it("logs the access file left after the rows went on its own line, and still sweeps", async () => {
+    const { stored, steps } = storedDeck({ racing: true });
+    steps.removeAccess.mockImplementationOnce(async () => {
+      stored.access = false;
+    });
+    steps.removeAccess.mockRejectedValueOnce(new Error("R2 is down"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await deleteInOrder("d_0123456789", steps);
+    expect(logged.mock.calls.map(([message]) => message)).toEqual([
+      "the access file of the deleted deck d_0123456789 was not deleted",
+    ]);
+    expect(stored).toEqual({ rows: false, access: false, files: false });
+    logged.mockRestore();
   });
 
   it("finds every file of the deck under its own prefix, the access file too, and no other's", () => {

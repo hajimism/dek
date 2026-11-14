@@ -44,6 +44,6 @@ Email sign-up works only where `.env` has `DEK_PUB_DEV_LOGIN=1`, as `dev.env` do
 
 `DEK_PUB_INVITED` says who may make an account: addresses and `@<GitHub login>`s, split by commas or whitespace, or `*` for anyone; whoever a deck is shared with by address may too (ADR 79). `dev.env` sets `*`; a `.env` written before it has none, which lets only the people decks are shared with sign up, so add `DEK_PUB_INVITED=*` to it. The email form verifies no address, so it makes an account only under `*`. `tests/e2e/server.ts` sets the list to the addresses the run signs up.
 
-`DEK_PUB_OPERATORS` names, by handle, the people who run dek.pub: each may delete anyone's talk with `dekc pub takedown`, and each such deletion is logged (ADR 82). It is empty in `dev.env`; `tests/e2e/server.ts` names the run's operator.
+`DEK_PUB_OPERATORS` names, by email address, the people who run dek.pub: the account whose verified address is listed may delete anyone's talk with `dekc pub takedown`, and each such deletion is logged. A listed address may make an account though `DEK_PUB_INVITED` leaves it out, and the email form, which verifies no address, never makes an operator (ADR 82). It is empty in `dev.env`; `tests/e2e/server.ts` names the run's operator by address.
 
 Mail is kept, not sent, by the dev server: its inbox is at the URL `vp dev` prints on start, `/__void/inbox` with the token in `.void/dev-trigger-token`. `tests/e2e/server.ts` reads it the same way.
