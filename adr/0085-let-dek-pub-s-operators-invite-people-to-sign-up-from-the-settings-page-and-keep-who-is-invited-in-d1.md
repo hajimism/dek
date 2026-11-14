@@ -8,6 +8,8 @@ Accepted
 
 Amends [79. Open dek.pub by invitation, to the people it lists and those a deck is shared with](0079-open-dek-pub-by-invitation-to-the-people-it-lists-and-those-a-deck-is-shared-with.md)
 
+Amends [82. Let a dek.pub talk be deleted for good by its owner, and taken down by an operator](0082-let-a-dek-pub-talk-be-deleted-for-good-by-its-owner-and-taken-down-by-an-operator.md)
+
 ## Context
 
 ADR 79 kept who may sign up in a setting, `DEK_PUB_INVITED`, a secret in production. Inviting one more person meant `void secret put`, which deploys a new version of the Worker, by whoever holds the Cloudflare token. It passed over a table: "Nobody but the operator invites yet, and a setting needs no page to manage it."
