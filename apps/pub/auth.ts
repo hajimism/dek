@@ -13,6 +13,7 @@ import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
 import { claimOnSignIn } from "./src/model/person/feature/sign-in/claim.server.ts";
 import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
 import { SIGN_IN_LINK_SECONDS } from "./src/model/person/feature/sign-in/mail.ts";
+import { seedLinks } from "./src/model/person/link.server.ts";
 
 // The Worker's waitUntil, which keeps it running for mail sent after the answer. Imported lazily:
 // `void db generate` reads this file in Node, which has no such module.
@@ -51,7 +52,7 @@ export default defineAuth(({ defaults, env }) => {
         ...defaults.socialProviders?.github,
         clientId: String(env.AUTH_GITHUB_CLIENT_ID),
         clientSecret: String(env.AUTH_GITHUB_CLIENT_SECRET),
-        // The login is kept as GitHub spells it, for the profile's link and to suggest a handle;
+        // The login is kept as GitHub spells it, for the profile's first link and to suggest a handle;
         // the handle itself the person chooses after (ADR 77).
         mapProfileToUser: (profile: { login: string }) => ({ githubLogin: profile.login }),
       },
@@ -71,6 +72,8 @@ export default defineAuth(({ defaults, env }) => {
           before: async (user: { email: string; name?: string }) => ({
             data: { ...user, name: user.name || (user.email.split("@")[0] ?? user.email) },
           }),
+          // One made with GitHub starts its profile's links with its GitHub profile (ADR 78).
+          after: (user: unknown) => seedLinks(user),
         },
       },
       session: {

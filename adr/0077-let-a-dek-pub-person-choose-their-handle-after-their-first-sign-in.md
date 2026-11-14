@@ -8,6 +8,8 @@ Accepted
 
 Amends [53. Send dek.pub's mail through Void and sign in by a mailed link](0053-send-dek-pub-s-mail-through-void-and-sign-in-by-a-mailed-link.md)
 
+Amended by [78. Let a dek.pub person put up to five links on their profile and set them on a settings page](0078-let-a-dek-pub-person-put-up-to-five-links-on-their-profile-and-set-them-on-a-settings-page.md)
+
 ## Context
 
 A handle names a person in every URL of theirs, `/@handle` and `/@handle/<slug>`, and in every thread and grant. dek.pub made it for them: the GitHub login, lowercased, for an account made with GitHub, and, as ADR 53 has it, the address's local part for one made by a sign-in link or the development email form. Nobody chose their own.

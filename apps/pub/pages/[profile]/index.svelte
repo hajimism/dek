@@ -12,6 +12,7 @@
   import type { ProfileView } from "../../src/model/person/feature/profile/view.ts";
   import { profilePath } from "../../src/model/person/profile-path.ts";
   import Avatar from "../../src/model/person/ui/avatar.svelte";
+  import LinkFace from "../../src/model/person/ui/link-face.svelte";
   import NotFound from "../../src/shell/ui/not-found.svelte";
   import { useApp } from "../../src/shell/use-app.ts";
   import type { Props } from "./index.server";
@@ -79,12 +80,13 @@
       <Avatar name={profile.name} image={profile.image} size={72} />
       <h1>{profile.name}</h1>
       <p class="handle">@{profile.handle}</p>
-      <p class="links">
-        {#if profile.github}
-          <a href="https://github.com/{profile.github}" rel="me noopener"><Icon name="github" size={14} />GitHub</a>
-        {/if}
-        <a href="{profilePath(profile.handle)}/rss" type="application/rss+xml"><Icon name="rss" size={14} />{t("profile.rss")}</a>
-      </p>
+      <ul class="links">
+        <!-- Each link is the person's (me), and dek.pub vouches for none of them (nofollow ugc). -->
+        {#each profile.links as url (url)}
+          <li><a href={url} rel="me nofollow ugc noopener"><LinkFace {url} /></a></li>
+        {/each}
+        <li><a href="{profilePath(profile.handle)}/rss" type="application/rss+xml"><Icon name="rss" size={14} />{t("profile.rss")}</a></li>
+      </ul>
     </header>
 
     <section aria-labelledby="talks-title">
@@ -132,8 +134,10 @@
   .links {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-5);
-    margin-top: var(--space-4);
+    gap: var(--space-2) var(--space-5);
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    list-style: none;
   }
   .links a {
     display: inline-flex;

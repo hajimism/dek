@@ -70,6 +70,16 @@ export async function setHandle(
   }
 }
 
+/** Give the account `name`, which `readName` read. */
+export async function setName(c: Context, id: string, name: string): Promise<void> {
+  const context = await authOf(c).$context;
+  await context.adapter.updateMany({
+    model: "user",
+    where: [{ field: "id", value: id }],
+    update: { name, updatedAt: new Date() },
+  });
+}
+
 /** How many IDs one query asks for: D1 binds at most 100 values to a statement. */
 const IDS_PER_QUERY = 90;
 
