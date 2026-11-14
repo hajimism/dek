@@ -12,9 +12,22 @@ import {
 import { rssDate, talkFeed } from "../../src/model/person/feature/profile/rss.ts";
 import { profileView } from "../../src/model/person/feature/profile/view.ts";
 import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
-import { authorOf, meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
+import {
+  handleProblem,
+  isReservedHandle,
+  normalizeHandle,
+  suggestHandle,
+} from "../../src/model/person/handle.ts";
+import {
+  authorOf,
+  hasHandle,
+  meOf,
+  profileOf,
+  readAccount,
+  selfOf,
+} from "../../src/model/person/person.ts";
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
-import { safeNext, signInHref } from "../../src/model/person/sign-in-path.ts";
+import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
 describe("device code", () => {
@@ -48,6 +61,57 @@ describe("signInHref", () => {
     expect(signInHref("/")).toBe("/signin");
     expect(signInHref("/signin?next=%2Fx")).toBe("/signin");
     expect(signInHref()).toBe("/signin");
+  });
+});
+
+describe("welcomeHref", () => {
+  it("names the page to come back to once a handle is chosen, unless that is the front page", () => {
+    expect(welcomeHref("/device?user_code=ABCD-EFGH")).toBe(
+      "/welcome?next=%2Fdevice%3Fuser_code%3DABCD-EFGH",
+    );
+    expect(welcomeHref("/")).toBe("/welcome");
+    expect(welcomeHref("/welcome?next=%2Fx")).toBe("/welcome");
+  });
+});
+
+describe("handles", () => {
+  it("are lowercase letters, digits and single hyphens, up to 39, as GitHub logins are", () => {
+    for (const handle of ["hajimism", "a", "sato-k", "x9", "a".repeat(39)]) {
+      expect(handleProblem(handle)).toBeNull();
+    }
+    for (const handle of ["", "-sato", "sato-", "sa--to", "Sato", "sato.k", "a".repeat(40)]) {
+      expect(handleProblem(handle)).toBe("invalid");
+    }
+  });
+
+  it("keep the names a person could pose as dek.pub with for no one", () => {
+    for (const handle of ["dek", "dekpub", "dek-pub", "admin", "support", "official", "welcome"]) {
+      expect(isReservedHandle(handle)).toBe(true);
+      expect(handleProblem(handle)).toBe("reserved");
+    }
+    expect(isReservedHandle("dek-fan")).toBe(false);
+  });
+
+  it("are read as typed, but for case and the spaces around", () => {
+    expect(normalizeHandle(" Octo-Cat ")).toBe("octo-cat");
+  });
+});
+
+describe("suggestHandle", () => {
+  it("is the GitHub login when the account came from GitHub", () => {
+    expect(suggestHandle({ githubLogin: "Octo-Cat", email: "sato@example.com" })).toBe("octo-cat");
+  });
+
+  it("is the address's local part, made a handle, for any other account", () => {
+    expect(suggestHandle({ githubLogin: null, email: "Sato.K+talks@example.com" })).toBe(
+      "sato-k-talks",
+    );
+    expect(suggestHandle({ githubLogin: null, email: "___@example.com" })).toBeNull();
+  });
+
+  it("is the address's when the login is no handle, and none when neither is", () => {
+    expect(suggestHandle({ githubLogin: "admin", email: "sato@example.com" })).toBe("sato");
+    expect(suggestHandle({ githubLogin: "admin", email: "support@example.com" })).toBeNull();
   });
 });
 
@@ -101,22 +165,27 @@ describe("Account", () => {
     createdAt: new Date(0),
   };
 
-  it("reads a Better Auth user as a Person, leaving out what dek.pub does not use", () => {
-    expect(Account.parse(user)).toEqual({
+  it("reads a Better Auth user, leaving out what dek.pub does not use", () => {
+    expect(Account.parse({ ...user, githubLogin: "Hajimism" })).toEqual({
       id: "u1",
       handle: "hajimism",
       name: "Hajime",
       image: "https://example.com/a.png",
       email: "h@example.com",
       emailVerified: true,
+      githubLogin: "Hajimism",
     });
   });
 
-  it("stands the ID in for a missing handle, and takes an address as unverified unless it says so", () => {
-    const person = Account.parse({ id: "u2", name: "Sato", email: "s@example.com" });
-    expect(person.handle).toBe("u2");
-    expect(person.image).toBeNull();
-    expect(person.emailVerified).toBe(false);
+  it("reads an account with no handle chosen yet as having none, and takes an address as unverified unless it says so", () => {
+    const account = Account.parse({ id: "u2", name: "Sato", email: "s@example.com", handle: null });
+    expect(account.handle).toBeNull();
+    expect(account.githubLogin).toBeNull();
+    expect(account.image).toBeNull();
+    expect(account.emailVerified).toBe(false);
+    expect(hasHandle(account)).toBe(false);
+    expect(selfOf(account).handle).toBeNull();
+    expect(hasHandle(Account.parse(user))).toBe(true);
   });
 
   it("refuses a record that is not an account", () => {
@@ -133,6 +202,9 @@ describe("Account", () => {
 
   it("shows pages and other people no email address", () => {
     const person = Account.parse(user);
+    if (!hasHandle(person)) {
+      throw new Error("the account has a handle");
+    }
     expect(selfOf(person)).toEqual({
       id: "u1",
       handle: "hajimism",

@@ -388,7 +388,10 @@ export const GrantRole = z.enum(["view", "comment"]);
 export const GrantSide = z.enum(["team", "guest"]);
 export const Grant = z.strictObject({
   id: z.string(),
-  /** A signed-in person's handle, or an email address no account has claimed yet. */
+  /**
+   * A person's handle, or an email address: one no account has claimed yet, or one claimed by an
+   * account that has not chosen its handle.
+   */
   who: z.string(),
   role: GrantRole,
   side: GrantSide,
@@ -415,6 +418,20 @@ export const Me = z.strictObject({
 });
 export type Me = z.infer<typeof Me>;
 
+/**
+ * Whether a handle may be chosen: `free`, `taken` by someone, `reserved` for no one, or `invalid`
+ * as a handle. Only the page to choose one asks.
+ */
+export const HandleStatus = z.strictObject({
+  handle: z.string(),
+  status: z.enum(["free", "taken", "reserved", "invalid"]),
+});
+export type HandleStatus = z.infer<typeof HandleStatus>;
+
+/** The handle a person chooses, once; the answer is Me. */
+export const ChooseHandle = z.strictObject({ handle: z.string().min(1).max(64) });
+export type ChooseHandle = z.infer<typeof ChooseHandle>;
+
 /** What the server gives the CLI for the session the device flow made. */
 export const CliKey = z.strictObject({ key: z.string(), me: Me });
 export type CliKey = z.infer<typeof CliKey>;
@@ -429,6 +446,13 @@ export const ErrorBody = z.strictObject({
 });
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
+/**
+ * The code of the 409 an account is answered with when it does what only a person with a handle
+ * may, publish or take an API key among them, before it has chosen one; the hint names the page
+ * to choose it on.
+ */
+export const HANDLE_NEEDED = "handle_needed";
+
 /** Whether the signed-in person is mailed of a deck's comments; PUT mutes it, DELETE unmutes. */
 export const MuteState = z.strictObject({ muted: z.boolean() });
 export type MuteState = z.infer<typeof MuteState>;
@@ -436,6 +460,8 @@ export type MuteState = z.infer<typeof MuteState>;
 /** The API's paths, relative to the server's origin. */
 export const paths = {
   me: "/api/me",
+  myHandle: "/api/me/handle",
+  handle: (handle: string) => `/api/handles/${segment(handle)}`,
   talksOf: (handle: string) => `/api/people/${segment(handle)}/talks`,
   cliKey: "/api/cli/key",
   revokeKey: "/api/cli/key",

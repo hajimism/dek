@@ -1,10 +1,49 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { handleGate } from "../../src/shell/handle-gate.ts";
 import { applyAppHeaders } from "../../src/shell/headers.ts";
 import { langHref } from "../../src/shell/lang-link.ts";
 import { langLinks, langUrl } from "../../src/shell/lang-url.ts";
 import { robotsFor } from "../../src/shell/robots.ts";
 import { Theme } from "../../src/shell/type.ts";
+
+describe("handleGate", () => {
+  const newcomer = { id: "u1", handle: null, name: "Sato", image: null };
+  const page = (path: string, init: { method?: string; accept?: string } = {}) => ({
+    method: init.method ?? "GET",
+    url: new URL(`http://x${path}`),
+    accept: init.accept ?? "text/html,application/xhtml+xml",
+    pageData: false,
+  });
+
+  it("sends an account with no handle from any page to choose one, and back after", () => {
+    expect(handleGate(newcomer, page("/device?user_code=ABCD-EFGH"))).toBe(
+      "/welcome?next=%2Fdevice%3Fuser_code%3DABCD-EFGH",
+    );
+    expect(handleGate(newcomer, page("/"))).toBe("/welcome");
+    expect(handleGate(newcomer, page("/signin?next=%2F%40demo"))).toBe(
+      "/welcome?next=%2Fsignin%3Fnext%3D%252F%2540demo",
+    );
+  });
+
+  it("sends a page Void's router asks for as data the same way", () => {
+    expect(handleGate(newcomer, { ...page("/@demo", { accept: "*/*" }), pageData: true })).toBe(
+      "/welcome?next=%2F%40demo",
+    );
+  });
+
+  it("lets the choosing page through, and what no page asks for: a feed, a script, a form's post", () => {
+    expect(handleGate(newcomer, page("/welcome?next=%2Fdevice"))).toBeNull();
+    expect(handleGate(newcomer, page("/@demo/rss", { accept: "application/rss+xml" }))).toBeNull();
+    expect(handleGate(newcomer, page("/src/app.ts", { accept: "*/*" }))).toBeNull();
+    expect(handleGate(newcomer, page("/", { method: "POST" }))).toBeNull();
+  });
+
+  it("lets anyone with a handle, and anyone signed out, go anywhere", () => {
+    expect(handleGate({ ...newcomer, handle: "sato" }, page("/device"))).toBeNull();
+    expect(handleGate(null, page("/device"))).toBeNull();
+  });
+});
 
 describe("langHref", () => {
   it("keeps the path, the rest of the query and the fragment", () => {

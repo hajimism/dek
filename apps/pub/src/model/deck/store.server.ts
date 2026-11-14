@@ -10,7 +10,7 @@ import { now } from "../../common/db.server.ts";
 import { appUrl } from "../../common/http.server.ts";
 import { newDeckId } from "../../common/ids.ts";
 import { personById } from "../person/store.server.ts";
-import type { Person } from "../person/type.ts";
+import type { Account, Person } from "../person/type.ts";
 import { canManage, standingOn } from "./access.ts";
 import { talkPath } from "./deck.ts";
 import { grantsOf } from "./grant/store.server.ts";
@@ -154,7 +154,7 @@ async function mustFind(id: string): Promise<Deck> {
  * Where `person` stands with the deck, or null when it does not open to them. A grant by an
  * address they have verified counts whether or not it is claimed yet, so reading writes nothing.
  */
-export async function standingWith(deck: Deck, person: Person | null): Promise<Standing | null> {
+export async function standingWith(deck: Deck, person: Account | null): Promise<Standing | null> {
   const grants = await grantsOf(deck.id, person);
   const standing = standingOn(deck, person, grants);
   return standing.opens ? standing : null;
@@ -166,7 +166,7 @@ export async function standingWith(deck: Deck, person: Person | null): Promise<S
  */
 export async function visibleDeck(
   id: string,
-  person: Person | null,
+  person: Account | null,
 ): Promise<Standing & { deck: Deck }> {
   const deck = await deckById(id);
   const standing = deck && (await standingWith(deck, person));

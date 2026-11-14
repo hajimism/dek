@@ -1,23 +1,25 @@
-// Who is calling: the person signed in through the browser's session, or the one an API key
-// belongs to.
+// Who is calling: the account signed in through the browser's session, or the one an API key
+// belongs to. An account may read before its holder has chosen a handle, but nothing it does
+// as a Person, writing or making a key, gets past `currentPerson` until then (ADR 77).
 
 import type { Context } from "hono";
-import { API_KEY_HEADER } from "../../../../../src/pub/protocol.ts";
+import { API_KEY_HEADER, HANDLE_NEEDED } from "../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../common/api-error.ts";
+import { appUrl } from "../../common/http.server.ts";
 import { checkKey } from "./api-key.server.ts";
-import { readAccount } from "./person.ts";
-import { personById } from "./store.server.ts";
-import type { Person } from "./type.ts";
+import { hasHandle, readAccount } from "./person.ts";
+import { accountById } from "./store.server.ts";
+import type { Account, Person } from "./type.ts";
 
-/** The person signed in through the browser's session; an API key is not asked. */
-export function sessionPerson(c: Context): Person | null {
+/** The account signed in through the browser's session; an API key is not asked. */
+export function sessionAccount(c: Context): Account | null {
   const user = c.get("user");
   return user ? readAccount(user) : null;
 }
 
-export async function currentPerson(c: Context): Promise<Person | null> {
+export async function currentAccount(c: Context): Promise<Account | null> {
   if (c.get("user")) {
-    return sessionPerson(c);
+    return sessionAccount(c);
   }
   const key = c.req.header(API_KEY_HEADER);
   if (!key) {
@@ -27,7 +29,7 @@ export async function currentPerson(c: Context): Promise<Person | null> {
   if (!checked) {
     throw new ApiError(401, "bad_key", "the API key is not valid", "run `dekc pub login` again");
   }
-  const found = await personById(c, checked.userId);
+  const found = await accountById(c, checked.userId);
   if (!found) {
     throw new ApiError(
       401,
@@ -39,9 +41,23 @@ export async function currentPerson(c: Context): Promise<Person | null> {
   return found;
 }
 
-/** The person calling, or null for a page that renders for anyone, whatever a bad key says. */
-export async function viewerOf(c: Context): Promise<Person | null> {
-  return currentPerson(c).catch(() => null);
+/** The account calling, or null for a page that renders for anyone, whatever a bad key says. */
+export async function viewerOf(c: Context): Promise<Account | null> {
+  return currentAccount(c).catch(() => null);
+}
+
+/** The person calling, or null when no one is signed in; an account with no handle is refused. */
+export async function currentPerson(c: Context): Promise<Person | null> {
+  const account = await currentAccount(c);
+  if (account === null || hasHandle(account)) {
+    return account;
+  }
+  throw new ApiError(
+    409,
+    HANDLE_NEEDED,
+    "choose a handle on dek.pub first",
+    `open ${appUrl("/welcome")} to choose one`,
+  );
 }
 
 export async function requirePerson(c: Context): Promise<Person> {

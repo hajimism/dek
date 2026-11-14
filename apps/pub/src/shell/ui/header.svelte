@@ -79,10 +79,12 @@
           {#snippet trigger()}<Avatar name={viewer.name} image={viewer.image} size={28} />{/snippet}
           {#snippet children()}
             <div class="menu-meta">
-              {t("nav.signedInAs")}<br /><strong class="who">@{viewer.handle}</strong>
+              {t("nav.signedInAs")}<br /><strong class="who">{viewer.handle ? `@${viewer.handle}` : viewer.name}</strong>
             </div>
             <hr />
-            <a role="menuitem" href={profilePath(viewer.handle)}><Icon name="user" />{t("nav.profile")}</a>
+            {#if viewer.handle}
+              <a role="menuitem" href={profilePath(viewer.handle)}><Icon name="user" />{t("nav.profile")}</a>
+            {/if}
             <button type="button" role="menuitem" onclick={signOut}><Icon name="signout" />{t("nav.signout")}</button>
           {/snippet}
         </Menu>

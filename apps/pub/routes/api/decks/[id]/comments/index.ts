@@ -12,13 +12,13 @@ import {
 } from "../../../../../src/model/comment/store.server.ts";
 import { canComment } from "../../../../../src/model/deck/access.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
-import { currentPerson } from "../../../../../src/model/person/actor.server.ts";
+import { currentAccount, currentPerson } from "../../../../../src/model/person/actor.server.ts";
 
 const STATUSES = ["open", "resolved", "all"] as const;
 
 export const GET = defineHandler((c) =>
   api(async () => {
-    const person = await currentPerson(c);
+    const person = await currentAccount(c);
     const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person);
     if (!canReadComments(deck, person, role)) {
       throw notFound("comments");

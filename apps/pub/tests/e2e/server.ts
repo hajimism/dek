@@ -136,13 +136,28 @@ function descendants(pid: number): number[] {
   return children.flatMap((child) => [...descendants(child), child]);
 }
 
-/** A browser session: signs up with the development email form's endpoint and keeps the cookie. */
+/**
+ * A browser session: signs up with the development email form's endpoint, chooses a handle as
+ * /welcome does, and keeps the cookie. It asks for every page as a browser opens one.
+ */
 export class Browser {
   private cookie = "";
 
   constructor(private readonly base: string) {}
 
+  /** Sign up, and choose the name in lowercase as the handle. */
   async signUp(name: string): Promise<{ id: string; handle: string; email: string }> {
+    const { id, email } = await this.register(name);
+    const chosen = await this.chooseHandle(name.toLowerCase());
+    if (!chosen.ok) {
+      throw new Error(`choosing a handle failed: ${chosen.status} ${await chosen.text()}`);
+    }
+    const { handle } = (await chosen.json()) as { handle: string };
+    return { id, handle, email };
+  }
+
+  /** Sign up, and choose no handle yet. */
+  async register(name: string): Promise<{ id: string; email: string }> {
     const email = `${name.toLowerCase()}-${Date.now()}@example.com`;
     const response = await this.fetch("/api/auth/sign-up/email", {
       method: "POST",
@@ -151,8 +166,12 @@ export class Browser {
     if (!response.ok) {
       throw new Error(`sign-up failed: ${response.status} ${await response.text()}`);
     }
-    return ((await response.json()) as { user: { id: string; handle: string; email: string } })
-      .user;
+    return ((await response.json()) as { user: { id: string; email: string } }).user;
+  }
+
+  /** What /welcome does to save the handle chosen. */
+  chooseHandle(handle: string): Promise<Response> {
+    return this.fetch("/api/me/handle", { method: "PUT", json: { handle } });
   }
 
   /** What the /device page does: claim the code while signed in, then approve it. */
@@ -172,7 +191,7 @@ export class Browser {
   }
 
   async fetch(path: string, init: { method?: string; json?: unknown } = {}): Promise<Response> {
-    const headers = new Headers({ origin: this.base });
+    const headers = new Headers({ origin: this.base, accept: "text/html,*/*" });
     if (this.cookie) {
       headers.set("cookie", this.cookie);
     }
