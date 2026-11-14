@@ -1,10 +1,13 @@
 // The words dek.pub's pages say, in English and Japanese. A page picks its language from
-// `?lang=`, then the `lang` cookie, then Accept-Language; a talk's own text keeps its own language.
+// `?lang=`, then the `lang` cookie, then Japanese; a talk's own text keeps its own language.
 // Labels for values an agent also reads (visibility, role, comment status) keep the `--json` names
 // as their keys, so the UI and `dekc pub … --json` say the same thing.
 
-const LANGS = ["en", "ja"] as const;
+export const LANGS = ["en", "ja"] as const;
 export type Lang = (typeof LANGS)[number];
+
+/** The language of a page asked for with no `?lang=` and no cookie, as a crawler asks for it. */
+export const DEFAULT_LANG: Lang = "ja";
 
 const en = {
   "site.name": "dek.pub",
@@ -196,6 +199,9 @@ const en = {
   "profile.emptyOwner": "No talks yet. Publish one from a dek project:",
   "profile.howPublishing": "How publishing works",
   "profile.ownerNote": "Only you see your talks that aren’t public here.",
+  "profile.more": "Show more ({n} left)",
+  "profile.fromNewest": "From the newest talk",
+  "profile.moreFailed": "Could not load more talks. Try again.",
 
   "visibility.label": "Visibility",
   "visibility.team": "Team only",
@@ -580,6 +586,9 @@ const ja: Record<MessageKey, string> = {
   "profile.emptyOwner": "トークはまだありません。dek のプロジェクトから公開できます。",
   "profile.howPublishing": "公開のしくみ",
   "profile.ownerNote": "公開していないトークは、ここではあなたにだけ表示されます。",
+  "profile.more": "もっと見る（あと {n} 件）",
+  "profile.fromNewest": "新しいトークから見る",
+  "profile.moreFailed": "トークを読み込めませんでした。もう一度お試しください。",
 
   "visibility.label": "公開範囲",
   "visibility.team": "チームのみ",
@@ -777,7 +786,7 @@ export function pickLang(
   if (isLang(query)) {
     return query;
   }
-  return isLang(cookie) ? cookie : "ja";
+  return isLang(cookie) ? cookie : DEFAULT_LANG;
 }
 
 export type Vars = Record<string, string | number>;

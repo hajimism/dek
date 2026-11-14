@@ -28,6 +28,9 @@ import {
   CommentRow,
   CreateDeckRequest,
   DeckStatus,
+  Grant,
+  GrantList,
+  GrantRemoved,
   Me,
   PROTOCOL_VERSION,
   PublishResult,
@@ -543,6 +546,88 @@ function deckUrl(raw: string, origin: string): string {
     });
   }
   return url.href;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Grants: who the deck is shared with, as the manage page lists them.
+
+function grantList(origin: string, id: string, key: Key) {
+  return request(
+    origin,
+    { method: "GET", path: paths.grants(id), what: "who the deck is shared with", key },
+    GrantList,
+  );
+}
+
+/** `dekc pub grants`: the people the deck is shared with, oldest grant first. */
+export async function grantsCommand(target: ReadableDeck, flags: FlagValues): Promise<PubResult> {
+  const origin = serverOrigin(flags.server);
+  const id = requireDeckId(target, flags);
+  const key = await requireKey(origin, flags);
+  const { grants } = await grantList(origin, id, key);
+  return { action: "grants", server: origin, grants };
+}
+
+/**
+ * `dekc pub grants add <who>`: share the deck with a handle or an email address, or change what
+ * an earlier share allows. What `--role` and `--side` leave out, dek.pub fills in: `view` and
+ * `guest` for a new grant, what it had for one already made. Only a new grant is mailed.
+ */
+export async function grantAddCommand(
+  target: ReadableDeck,
+  who: string,
+  flags: FlagValues,
+): Promise<PubResult> {
+  const origin = serverOrigin(flags.server);
+  const id = requireDeckId(target, flags);
+  const key = await requireKey(origin, flags);
+  const before = await grantList(origin, id, key);
+  const grant = await request(
+    origin,
+    {
+      method: "POST",
+      path: paths.grants(id),
+      what: `sharing the deck with ${who}`,
+      key,
+      json: {
+        who,
+        ...(flags.role !== undefined ? { role: flags.role } : {}),
+        ...(flags.side !== undefined ? { side: flags.side } : {}),
+      },
+    },
+    Grant,
+  );
+  const invited = !before.grants.some((row) => row.id === grant.id);
+  return { action: "grant", server: origin, grant, invited };
+}
+
+/**
+ * `dekc pub grants remove <who>`: stop sharing the deck with someone, named by handle, by the
+ * address a grant waits on, or by the grant's ID. One the deck does not have is refused before
+ * anything is removed, since dek.pub answers a DELETE of any ID the same.
+ */
+export async function grantRemoveCommand(
+  target: ReadableDeck,
+  who: string,
+  flags: FlagValues,
+): Promise<PubResult> {
+  const origin = serverOrigin(flags.server);
+  const id = requireDeckId(target, flags);
+  const key = await requireKey(origin, flags);
+  const { grants } = await grantList(origin, id, key);
+  const name = who.replace(/^@/, "").toLowerCase();
+  const grant = grants.find((row) => row.id === who || row.who.toLowerCase() === name);
+  if (grant === undefined) {
+    throw new DekError(`deck "${target.deck.name}" is not shared with ${who}`, {
+      hint: `\`${pubCommand("grants", flags)}\` lists who it is shared with; a grant by address an account has claimed is listed by its handle`,
+    });
+  }
+  await request(
+    origin,
+    { method: "DELETE", path: paths.grant(id, grant.id), what: `the grant to ${who}`, key },
+    GrantRemoved,
+  );
+  return { action: "revoke", server: origin, grant };
 }
 
 // ---------------------------------------------------------------------------------------------

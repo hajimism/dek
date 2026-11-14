@@ -952,6 +952,11 @@ export const COMMANDS = {
         "list comments, each placed in script.md or its slide",
       ],
       ["dekc pub comments reply <id> <text>", "reply; resolve <id> and reopen <id> settle one"],
+      ["dekc pub grants [deck]", "who the deck is shared with"],
+      [
+        "dekc pub grants add <who> [--role view|comment] [--side team|guest]",
+        "share it with a handle or an address; remove <who> stops",
+      ],
     ],
     agent: [
       "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
@@ -959,6 +964,7 @@ export const COMMANDS = {
       "dekc pub publish [--message <text>] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
       "dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
+      "dekc pub grants | grants add <@handle|email> [--role view|comment] [--side team|guest] | grants remove <@handle|email|id>   only a new grant is mailed",
     ],
     run: async ({ cwd }) => {
       const { usageError } = await import("./usage.ts");
@@ -1071,6 +1077,38 @@ export const COMMANDS = {
         run: async ({ flags, target, args }) => {
           const { settleCommand } = await import("./pub.ts");
           return settleCommand(target, "resolve", args.id, flags);
+        },
+      },
+      grants: {
+        scope: "deck",
+        args: [],
+        flags: ["server"],
+        usage: ["dekc pub grants [deck] [--server <url>]"],
+        run: async ({ flags, target }) => {
+          const { grantsCommand } = await import("./pub.ts");
+          return grantsCommand(target, flags);
+        },
+      },
+      "grants add": {
+        scope: "deck",
+        args: ["who"],
+        flags: ["server", "role", "side"],
+        usage: [
+          "dekc pub grants add [deck] <who> [--role view|comment] [--side team|guest] [--server <url>]",
+        ],
+        run: async ({ flags, target, args }) => {
+          const { grantAddCommand } = await import("./pub.ts");
+          return grantAddCommand(target, args.who, flags);
+        },
+      },
+      "grants remove": {
+        scope: "deck",
+        args: ["who"],
+        flags: ["server"],
+        usage: ["dekc pub grants remove [deck] <who> [--server <url>]"],
+        run: async ({ flags, target, args }) => {
+          const { grantRemoveCommand } = await import("./pub.ts");
+          return grantRemoveCommand(target, args.who, flags);
         },
       },
       "comments reopen": {

@@ -148,6 +148,18 @@ export const FLAGS = {
     example: "dekc pub share --comments signed-in",
     text: "who may comment: nobody else, or anyone signed in to dek.pub",
   },
+  role: {
+    type: "enum",
+    choices: ["view", "comment"],
+    example: "dekc pub grants add ann --role comment",
+    text: "what a grant allows: read the deck and the threads shown, or comment too (a new grant: view)",
+  },
+  side: {
+    type: "enum",
+    choices: ["team", "guest"],
+    example: "dekc pub grants add ann --side team",
+    text: "the side of the work a grantee is on: the team reads every thread, a guest those shared (a new grant: guest)",
+  },
   status: {
     type: "enum",
     choices: ["open", "resolved", "all"],

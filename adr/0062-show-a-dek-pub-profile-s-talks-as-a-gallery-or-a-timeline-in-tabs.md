@@ -6,6 +6,8 @@ Date: 2026-11-14
 
 Accepted
 
+Amended by [74. Show a dek.pub profile's talks 24 at a time with Show more, and keep its feed at the newest 50](0074-show-a-dek-pub-profile-s-talks-24-at-a-time-with-show-more-and-keep-its-feed-at-the-newest-50.md)
+
 ## Context
 
 A profile page listed its talks in one narrow column, as wide as the article on a talk page, grouped by year: a small cover, then the title and the meta. That reads well as a record of when someone spoke. But it shows little of each talk, and on a wide screen most of the page stays empty.

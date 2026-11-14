@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { applyAppHeaders } from "../../src/shell/headers.ts";
 import { langHref } from "../../src/shell/lang-link.ts";
+import { langLinks, langUrl } from "../../src/shell/lang-url.ts";
 import { robotsFor } from "../../src/shell/robots.ts";
 import { Theme } from "../../src/shell/type.ts";
 
@@ -10,6 +11,32 @@ describe("langHref", () => {
     expect(langHref(new URL("http://x/@demo/talk?user_code=AB&lang=en#c_1"), "ja")).toBe(
       "/@demo/talk?user_code=AB&lang=ja#c_1",
     );
+  });
+});
+
+describe("langUrl", () => {
+  it("puts Japanese at the bare URL and every other language behind ?lang=", () => {
+    expect(langUrl("https://dek.pub", "/about", "ja")).toBe("https://dek.pub/about");
+    expect(langUrl("https://dek.pub", "/about", "en")).toBe("https://dek.pub/about?lang=en");
+    expect(langUrl("https://dek.pub", "/", "en")).toBe("https://dek.pub/?lang=en");
+  });
+});
+
+describe("langLinks", () => {
+  it("names the language the page was rendered in as canonical, and every language as an alternate", () => {
+    const alternates = [
+      { rel: "alternate", hreflang: "en", href: "https://dek.pub/about?lang=en" },
+      { rel: "alternate", hreflang: "ja", href: "https://dek.pub/about" },
+      { rel: "alternate", hreflang: "x-default", href: "https://dek.pub/about" },
+    ];
+    expect(langLinks("https://dek.pub", "/about", "en")).toEqual([
+      { rel: "canonical", href: "https://dek.pub/about?lang=en" },
+      ...alternates,
+    ]);
+    expect(langLinks("https://dek.pub", "/about", "ja")).toEqual([
+      { rel: "canonical", href: "https://dek.pub/about" },
+      ...alternates,
+    ]);
   });
 });
 
@@ -60,9 +87,10 @@ describe("applyAppHeaders", () => {
 });
 
 describe("robotsFor", () => {
-  it("lets crawlers read dek.pub but its API", () => {
-    expect(robotsFor("https://dek.pub")).toBe("User-agent: *\nDisallow: /api/\n");
-    expect(robotsFor("https://dek.pub/")).toBe("User-agent: *\nDisallow: /api/\n");
+  it("lets crawlers read dek.pub but its API, and names its sitemap", () => {
+    const text = "User-agent: *\nDisallow: /api/\n\nSitemap: https://dek.pub/sitemap.xml\n";
+    expect(robotsFor("https://dek.pub")).toBe(text);
+    expect(robotsFor("https://dek.pub/")).toBe(text);
   });
 
   it("keeps every crawler out of any other origin, such as staging or a machine's", () => {

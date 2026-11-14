@@ -51,7 +51,7 @@
   {#if view === "gallery"}
     <ul class="grid">
       {#each talks as talk (talk.slug)}
-        <li><TalkCardView card={talk} showOwner={false} visibility={isOwner ? talk.visibility : undefined} /></li>
+        <li data-slug={talk.slug}><TalkCardView card={talk} showOwner={false} visibility={isOwner ? talk.visibility : undefined} /></li>
       {/each}
     </ul>
   {:else}
@@ -59,7 +59,7 @@
       <h3 class="year num">{year}</h3>
       <ul class="list">
         {#each inYear as talk (talk.slug)}
-          <li>
+          <li data-slug={talk.slug}>
             <a class="row" href={talkPath(handle, talk.slug)}>
               <span class="thumb">
                 {#if talk.picture}
