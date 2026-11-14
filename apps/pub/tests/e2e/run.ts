@@ -100,6 +100,11 @@ try {
   const strangerMe = await stranger.signUp("Stranger");
   const talkPath = `/@${me.handle}/why-dek`;
   check((await stranger.fetch(talkPath)).status === 404, "a private talk is a 404 to someone else");
+  const about = await fetch(`${server.url}/about?lang=en`);
+  check(
+    about.status === 200 && /<h1[^>]*>A talk keeps reaching people/.test(await about.text()),
+    "the About page answers anyone",
+  );
   check(
     (await fetch(`${server.deckOrigin(id)}/v/1/`)).status === 404,
     "the serve origin hands out nothing without a token",

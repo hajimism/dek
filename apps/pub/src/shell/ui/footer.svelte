@@ -25,6 +25,7 @@
       <a href={docsUrl(lang)} lang="en">{t("footer.builtWith")}</a>
     </p>
     <nav aria-label="Footer">
+      <a href="/about">{t("footer.about")}</a>
       <a href={docsUrl(lang)}>{t("footer.docs")}</a>
       <a href="https://github.com/hajimism/dek">{t("footer.source")}</a>
     </nav>
