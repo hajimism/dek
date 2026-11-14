@@ -29,11 +29,52 @@ import("cloudflare:workers").then(
   () => undefined,
 );
 
+// Better Auth answers over HTTP only what dek.pub's pages, `dekc pub` and the dev login call:
+// signing in and out, the device flow, and its own error page. Every other endpoint is closed
+// here, as it would otherwise write past dek.pub's own API and its rules (ADR 78). The server
+// still calls some of them through `auth.api`, which these paths do not close.
+const CLOSED_PATHS = [
+  // The account: its name and image go through PATCH /api/me, which reads them first; its address,
+  // password and joined accounts no page changes, and deleting it must delete dek.pub's rows too.
+  "/update-user",
+  "/update-session",
+  "/change-email",
+  "/change-password",
+  "/request-password-reset",
+  "/reset-password",
+  "/reset-password/:token",
+  "/verify-password",
+  "/send-verification-email",
+  "/verify-email",
+  "/delete-user",
+  "/delete-user/callback",
+  "/link-social",
+  "/unlink-account",
+  // The GitHub token, which dek.pub never uses after sign-in, and what it reads.
+  "/list-accounts",
+  "/get-access-token",
+  "/refresh-token",
+  "/account-info",
+  // Sessions, which no page lists or revokes.
+  "/list-sessions",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+  // API keys, which dek.pub makes for `dekc pub login` and checks on the server.
+  "/api-key/create",
+  "/api-key/get",
+  "/api-key/list",
+  "/api-key/update",
+  "/api-key/delete",
+  "/ok",
+];
+
 export default defineAuth(({ defaults, env }) => {
   const devLogin = env.DEK_PUB_DEV_LOGIN === "1";
   return {
     ...defaults,
     emailAndPassword: { enabled: devLogin },
+    disabledPaths: CLOSED_PATHS,
     // Better Auth logs the errors its queries throw, which carry the values they were bound to.
     logger: { log: (level, message, ...args) => log(level, `Better Auth: ${message}`, ...args) },
     // Mail goes out after the answer, so how long a request for a link takes says nothing of
@@ -89,7 +130,13 @@ export default defineAuth(({ defaults, env }) => {
             data: { ...user, name: user.name || (user.email.split("@")[0] ?? user.email) },
           }),
           // One made with GitHub starts its profile's links with its GitHub profile (ADR 78).
-          after: (user: unknown) => seedLinks(user),
+          // Better Auth runs this once the account is written and fails the sign-up with what it
+          // throws, and the next try is a sign-in: a link it could not write is logged, and the
+          // person adds it on /settings.
+          after: (user: unknown) =>
+            seedLinks(user).catch((error: unknown) =>
+              log("error", "the links a new account starts with were not written", error),
+            ),
         },
       },
       session: {
