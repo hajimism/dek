@@ -2,8 +2,9 @@
 // An author signs in with the device flow, publishes a sample deck, shares it; a colleague
 // comments on a quoted sentence and on a slide element; the author reads the comments as JSON,
 // renames the slide with `dekc mv`, publishes again, and resolves every comment from the CLI.
-// At the end the author deletes the talk with all on it, and an operator takes one down; the
-// author lists and revokes their CLI keys, and `dekc pub logout --all` revokes the rest.
+// It starts on an empty database, where an operator signs up first and invites the others from
+// /settings. At the end the author deletes the talk with all on it, and the operator takes one
+// down; the author lists and revokes their CLI keys, and `dekc pub logout --all` revokes the rest.
 // Run from apps/pub: `bun run test:e2e`.
 
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -32,17 +33,22 @@ type Json = Record<string, unknown> & { ok: boolean };
 
 const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
-// dek.pub opens by invitation: the server lets sign up the people the run signs up, by address,
-// and anyone a deck is shared with. "Form" is on the list for the development form to be refused.
-// Keeper runs the server, as an operator who may take any talk down: named by address, and on no
-// invitation list, as the first operator of a new database is. "Host" shares a deck with as many
-// as dek.pub mails invitations for, and one more.
-const server = await startDevServer(
-  PORT,
-  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form", "Host"].map(addressOf),
-  [addressOf("Keeper")],
-);
+// dek.pub opens by invitation. Keeper runs the server, as an operator: named by address in
+// DEK_PUB_OPERATORS, which lets them sign up on the empty database, invite the people the run
+// signs up from /settings, and take any talk down. Anyone a deck is shared with gets in besides.
+// "Form" is invited for the development form to be refused. "Host" shares a deck with as many as
+// dek.pub mails invitations for, and one more.
+const INVITED = ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form", "Host"];
+const server = await startDevServer(PORT, [addressOf("Keeper")]);
 const inbox = new Inbox(server.url);
+
+type Invite = {
+  id: string;
+  entry: string;
+  addedBy: string | null;
+  claimedAt: string | null;
+  claimedBy: string | null;
+};
 
 async function dekc(
   args: string[],
@@ -81,6 +87,73 @@ try {
     recursive: true,
     filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
   });
+
+  // The operator signs up on the empty database by DEK_PUB_OPERATORS alone, and invites the people
+  // the run signs up from /settings. Each address is mailed an invitation to sign in; an entry
+  // dek.pub cannot read adds nothing, and one there already is mailed nothing again.
+  const keeper = new Browser(server.url);
+  const keeperMe = await keeper.signUp("Keeper");
+  const keeperSettings = await (await keeper.fetch("/settings")).text();
+  const keeperLang = /<html lang="ja"/.test(keeperSettings) ? "ja" : "en";
+  check(
+    keeperMe.handle === "keeper" &&
+      keeperSettings.includes(`>${translate(keeperLang, "settings.invites")}</h2>`),
+    "an operator signs up on an empty database, and /settings shows them who may sign up",
+    keeperMe,
+  );
+  const invitesAs = async (browser: Browser) => {
+    const response = await browser.fetch("/api/invites");
+    return response.ok ? ((await response.json()) as { invites: Invite[] }).invites : [];
+  };
+  const invite = (browser: Browser, entries: string[]) =>
+    browser.fetch("/api/invites", { method: "POST", json: { entries } });
+  const unreadable = await invite(keeper, [addressOf("Author"), "author"]);
+  check(
+    unreadable.status === 422 &&
+      ((await unreadable.json()) as { error: { code: string } }).error.code === "invite_invalid" &&
+      (await invitesAs(keeper)).length === 0,
+    "an entry that is neither an address nor @ and a login adds none of the list",
+  );
+  const inviting = await invite(
+    keeper,
+    INVITED.map((name) => addressOf(name).toUpperCase()),
+  );
+  const addedList = ((await inviting.json()) as { invites: Invite[] }).invites;
+  check(
+    inviting.status === 200 &&
+      INVITED.every((name) =>
+        addedList.some(
+          (row) =>
+            row.entry === addressOf(name) &&
+            row.addedBy === keeperMe.handle &&
+            row.claimedAt === null,
+        ),
+      ),
+    "the operator invites the run's people by address, kept in lowercase, none signed up yet",
+    addedList,
+  );
+  const inviteMail = (await inbox.waitFor(addressOf("Author"), "invited"))[0];
+  check(
+    inviteMail?.text.split(/\r?\n/).includes(`${server.url}/signin`) &&
+      inviteMail.text.includes(`sign in with this address, ${addressOf("Author")}`) &&
+      !inviteMail.text.includes(keeperMe.handle),
+    "each address invited is mailed the sign-in page, in words no operator wrote",
+    inviteMail,
+  );
+  await invite(keeper, [addressOf("Author")]);
+  const mailsBefore = (await inbox.to("")).length;
+  const byLogin = await invite(keeper, ["@Octo-E2E"]);
+  await Bun.sleep(1000);
+  check(
+    byLogin.ok &&
+      (await invitesAs(keeper)).some(
+        (row) => row.entry === "@octo-e2e" && row.claimedAt === null,
+      ) &&
+      (await inbox.to("")).length === mailsBefore &&
+      (await inbox.to(addressOf("Author"))).filter((mail) => mail.subject.includes("invited"))
+        .length === 1,
+    "a GitHub login is invited without a mail, and an address invited again is not mailed again",
+  );
 
   // The author signs in: the CLI asks for a code, the browser approves it, the CLI gets a key.
   // A new account chooses its handle first, on the way to /device and back.
@@ -125,6 +198,28 @@ try {
   const chosen = await author.chooseHandle("Author");
   const me = { ...registered, ...((await chosen.json()) as { handle: string }) };
   check(chosen.status === 200 && me.handle === "author", "the author chooses @author", me);
+  check(
+    (await invitesAs(keeper)).find((row) => row.entry === me.email)?.claimedBy === me.handle,
+    "the entry the author signed up by is claimed by their account",
+  );
+
+  // Who may sign up is the operators' alone: anyone else is answered as if there were no such
+  // route, and /settings shows them no such section.
+  const notOperator = [
+    await author.fetch("/api/invites"),
+    await invite(author, ["someone@example.com"]),
+    await author.fetch(`/api/invites/${addedList[0]?.id}`, { method: "DELETE" }),
+    await new Browser(server.url).fetch("/api/invites"),
+  ];
+  const authorSettings = await (await author.fetch("/settings")).text();
+  const authorLang = /<html lang="ja"/.test(authorSettings) ? "ja" : "en";
+  check(
+    notOperator.every((response) => response.status === 404) &&
+      !authorSettings.includes(`>${translate(authorLang, "settings.invites")}</h2>`) &&
+      (await invitesAs(keeper)).length === INVITED.length + 1,
+    "someone who does not run dek.pub gets a 404 from every invitation route, and no section",
+    notOperator.map((response) => response.status),
+  );
   const twice = await author.chooseHandle("author-2");
   check(
     twice.status === 409 &&
@@ -876,6 +971,48 @@ try {
     "an address dek.pub invited signs up by a link, with nothing shared with it",
     inviteeAccount,
   );
+  const inviteeEntry = (await invitesAs(keeper)).find((row) => row.entry === inviteeAccount.email);
+  const claimedRemoval = await keeper.fetch(`/api/invites/${inviteeEntry?.id}`, {
+    method: "DELETE",
+  });
+  check(
+    inviteeEntry?.claimedAt !== null &&
+      inviteeEntry?.claimedBy === null &&
+      claimedRemoval.status === 409 &&
+      ((await claimedRemoval.json()) as { error: { code: string } }).error.code ===
+        "invite_claimed",
+    "the entry an account was made from is claimed, with no handle yet, and stays",
+    inviteeEntry,
+  );
+  // An entry removed before its address followed its link lets in no one: the link makes no account.
+  const withdrawn = `withdrawn-${Date.now()}@example.com`;
+  await invite(keeper, [withdrawn]);
+  await inbox.waitFor(withdrawn, "invited");
+  const withdrawnBrowser = new Browser(server.url);
+  await withdrawnBrowser.fetch("/api/auth/sign-in/magic-link", {
+    method: "POST",
+    json: { email: withdrawn, errorCallbackURL: "/signin" },
+  });
+  const withdrawnLink = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(
+    (await inbox.waitFor(withdrawn, "Sign in"))[0]?.text ?? "",
+  )?.[0];
+  const withdrawnEntry = (await invitesAs(keeper)).find((row) => row.entry === withdrawn);
+  const removal = await keeper.fetch(`/api/invites/${withdrawnEntry?.id}`, { method: "DELETE" });
+  const withdrawnFollowed = await withdrawnBrowser.fetch(
+    new URL(withdrawnLink ?? "/", server.url).pathname +
+      new URL(withdrawnLink ?? "/", server.url).search,
+  );
+  check(
+    withdrawnLink !== undefined &&
+      removal.status === 200 &&
+      !(await invitesAs(keeper)).some((row) => row.entry === withdrawn) &&
+      new URL(withdrawnFollowed.headers.get("location") ?? "/", server.url).searchParams.get(
+        "error",
+      ) === "not_invited" &&
+      (await server.store.sql("SELECT id FROM user WHERE email = ?", [withdrawn])).length === 0,
+    "an invited address is mailed a sign-in link, and once its entry is removed the link makes no account",
+    { status: removal.status, location: withdrawnFollowed.headers.get("location") },
+  );
   const late = `late-${Date.now()}@example.com`;
   const lateGrant = (await (
     await author.fetch(`/api/decks/${id}/grants`, {
@@ -909,6 +1046,39 @@ try {
     "a link to an address nothing lets in any more makes no account, and /signin says it is by invitation",
     { status: lateFollowed.status, location: refusedTo.href, lateAccounts, lateMe },
   );
+  // A grant whose deck is gone lets no one in, as one made while its deck was deleted would be.
+  const orphan = `orphan-${Date.now()}@example.com`;
+  const orphanGrant = (await (
+    await author.fetch(`/api/decks/${id}/grants`, {
+      method: "POST",
+      json: { who: orphan, role: "view" },
+    })
+  ).json()) as { id: string };
+  const orphanBrowser = new Browser(server.url);
+  await orphanBrowser.fetch("/api/auth/sign-in/magic-link", {
+    method: "POST",
+    json: { email: orphan, errorCallbackURL: "/signin" },
+  });
+  const orphanLink = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(
+    (await inbox.waitFor(orphan, "Sign in"))[0]?.text ?? "",
+  )?.[0];
+  await server.store.sql("UPDATE grants SET deck_id = ? WHERE id = ?", [
+    "d_deletedmeanwhile",
+    orphanGrant.id,
+  ]);
+  const orphanFollowed = await orphanBrowser.fetch(
+    new URL(orphanLink ?? "/", server.url).pathname + new URL(orphanLink ?? "/", server.url).search,
+  );
+  check(
+    orphanLink !== undefined &&
+      new URL(orphanFollowed.headers.get("location") ?? "/", server.url).searchParams.get(
+        "error",
+      ) === "not_invited" &&
+      (await server.store.sql("SELECT id FROM user WHERE email = ?", [orphan])).length === 0,
+    "a share whose deck is gone lets its address make no account",
+    orphanFollowed.headers.get("location"),
+  );
+  await server.store.sql("DELETE FROM grants WHERE id = ?", [orphanGrant.id]);
   const formed = await new Browser(server.url).fetch("/api/auth/sign-up/email", {
     method: "POST",
     json: { email: addressOf("Form"), password: "password-1234", name: "Form" },
@@ -1507,16 +1677,22 @@ try {
     republished,
   );
 
-  // An operator, whom only DEK_PUB_OPERATORS lets sign up, takes down someone else's talk, named
-  // by its URL, from any directory.
-  const keeper = new Browser(server.url);
-  await keeper.signUp("Keeper");
+  // The operator takes down someone else's talk, named by its URL, from any directory. Their API
+  // key gets the 404 of a route that is not there from the invitations, which take the browser.
   const keeperKey = (
     (await (await keeper.fetch("/api/cli/key", { method: "POST" })).json()) as {
       key: string;
     }
   ).key;
   const asKeeper = { env: { DEK_TOKEN: keeperKey, DEK_TOKEN_SERVER: server.url } };
+  const invitesByKey = await fetch(`${server.url}/api/invites`, {
+    headers: { "x-api-key": keeperKey },
+  });
+  check(
+    invitesByKey.status === 404,
+    "an operator's API key gets a 404 from the invitations, which take the browser's session",
+    invitesByKey.status,
+  );
   const takenDown = await dekc(
     ["pub", "takedown", String(republished.url), "--yes"],
     config,

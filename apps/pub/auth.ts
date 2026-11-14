@@ -1,7 +1,8 @@
 // dek.pub's Better Auth setup, on top of Void's defaults. On the deployed app one signs in with
 // GitHub, or by a link mailed to an address that has an account or may make one; email sign-up
 // with a password exists only where DEK_PUB_DEV_LOGIN is 1, for local runs and tests. An account
-// is made only for someone DEK_PUB_INVITED names or a deck is shared with (ADR 79).
+// is made only for someone an operator invited, an operator, or someone a deck is shared with
+// (ADR 79, 85).
 // The device flow lets `dekc pub login` sign in, and the CLI then holds an API key. A new account
 // has no handle until its holder chooses one.
 
@@ -12,7 +13,10 @@ import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
 import { log } from "./src/common/log.ts";
 import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
-import { claimOnSignIn } from "./src/model/person/feature/sign-in/claim.server.ts";
+import {
+  claimInvitesOnSignUp,
+  claimOnSignIn,
+} from "./src/model/person/feature/sign-in/claim.server.ts";
 import { NOT_INVITED } from "./src/model/person/feature/sign-in/failure.ts";
 import { mayMakeAccount } from "./src/model/person/feature/sign-in/invitation.server.ts";
 import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
@@ -134,14 +138,21 @@ export default defineAuth(({ defaults, env }) => {
           before: async (user: { email: string; name?: string }) => ({
             data: { ...user, name: user.name || (user.email.split("@")[0] ?? user.email) },
           }),
-          // One made with GitHub starts its profile's links with its GitHub profile (ADR 78).
-          // Better Auth runs this once the account is written and fails the sign-up with what it
-          // throws, and the next try is a sign-in: a link it could not write is logged, and the
-          // person adds it on /settings.
-          after: (user: unknown) =>
-            seedLinks(user).catch((error: unknown) =>
-              log("error", "the links a new account starts with were not written", error),
-            ),
+          // One made with GitHub starts its profile's links with its GitHub profile (ADR 78), and
+          // the entries that let the account in are claimed (ADR 85). Better Auth runs this once
+          // the account is written and fails the sign-up with what it throws, and the next try is
+          // a sign-in: what could not be written is logged. The person adds a link on /settings;
+          // an entry left unclaimed lets in no one but the account it names, which has signed up.
+          after: async (user: unknown) => {
+            await Promise.all([
+              seedLinks(user).catch((error: unknown) =>
+                log("error", "the links a new account starts with were not written", error),
+              ),
+              claimInvitesOnSignUp(user).catch((error: unknown) =>
+                log("error", "the invitations a new account came in by were not claimed", error),
+              ),
+            ]);
+          },
         },
         update: {
           // No update through Better Auth writes the GitHub login: update-user, which would take one

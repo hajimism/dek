@@ -10,8 +10,7 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 
 ### The app
 
-- **Deleting an account** is done by hand on request. The schema has no foreign keys, so each row of the account's is deleted by name: its decks with `deleteDeck` (ADR 82); its keys with `revokeKeysOf` (ADR 83); its `invitations` by `inviter_id` (ADR 84); its `profile_links`, `likes` and `mutes`, and the grants it holds, by `user_id`; the review threads, replies and public comments it wrote, by `author_id`; and last the account, with its sessions, through Better Auth's adapter.
-- **Deleting a talk.** A grant added while its deck is being deleted can be left as a row with no deck, and `hasWaitingGrant` does not join `decks`, so that address can still make an account (ADR 79, 82).
+- **Deleting an account** is done by hand on request. The schema has no foreign keys, so each row of the account's is deleted by name: its decks with `deleteDeck` (ADR 82); its keys with `revokeKeysOf` (ADR 83); its `invitations` by `inviter_id` (ADR 84); the `sign_up_invites` it added stay, by `added_by`, as does the one it claimed, which then lets no one in again (ADR 85); its `profile_links`, `likes` and `mutes`, and the grants it holds, by `user_id`; the review threads, replies and public comments it wrote, by `author_id`; and last the account, with its sessions, through Better Auth's adapter.
 - **Logs.** A failed query's error carries the values it was bound to: an address, a comment's text. `src/common/log.ts` leaves them out, but two handlers log errors whole: Void's error handler (`createErrorRenderer`'s `onError`), for a page's loader, a route not wrapped in `api()` such as `routes/[profile]/rss.ts` and `routes/sitemap.xml.ts`, and middleware; and Better Auth's adapter when a fallback join fails (`handleFallbackJoin`), which logs the join's conditions and its error, whose value is a user id.
 
 ### Terms and the law
@@ -37,7 +36,7 @@ Each of these is needed on staging and on production.
 
 - **Domains.** `dek.pub` and `dekusercontent.com` are not registered. The Public Suffix List request for `dekusercontent.com` is not sent; it takes weeks.
 - **Infrastructure.** The zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) and the serve Worker's route are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
-- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset. `DEK_PUB_INVITED` lists the people invited, and holds `*` only once every item under "Before anyone can sign up" is done (ADR 79). `DEK_PUB_OPERATORS` lists the addresses of those who run dek.pub, who may take any talk down (ADR 82).
+- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` and `DEK_PUB_OPEN_SIGN_UP` must be unset (ADR 85). `DEK_PUB_OPERATORS` lists the addresses of those who run dek.pub, who may take any talk down and invite people on `/settings` (ADR 82, 85).
 - **Deploying.** No script deploys the app and the serve Worker together, and nothing applies `db/migrations/` to the remote D1. There is no way back from a deploy but deploying again.
 - **Mail.**
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing. The token `void deploy` uses needs Email Routing Edit and Email Sending Edit.
@@ -53,7 +52,7 @@ Each of these is needed on staging and on production.
   - Better Auth's own limits on sign-in, links and the device flow keep their counts in memory, so on Workers each isolate counts alone. Asking for sign-in links is held only by its default, 5 a minute from one client; nothing limits how many addresses are tried.
 - **Quotas.**
   - No storage quota per user; the only limit is 50 MiB per version.
-  - No limit on new accounts. Invitation alone does not bound them: a grant by address lets that address make an account (ADR 79), which has 20 invitations a day of its own (ADR 84). The accounts grow as a tree from those `DEK_PUB_INVITED` lists, and one person can grow it through addresses of their own.
+  - No limit on new accounts. Invitation alone does not bound them: a grant by address lets that address make an account (ADR 79), which has 20 invitations a day of its own (ADR 84). The accounts grow as a tree from those the operators invite on `/settings` (ADR 85), and one person can grow it through addresses of their own.
 - **Abuse.**
   - Nobody can report a talk or a public comment, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.

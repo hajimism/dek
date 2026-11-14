@@ -10,7 +10,7 @@
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
-  import { type RevokeFailure, revokeKeys } from "../settings-api.ts";
+  import { type CallFailure, revokeKeys } from "../settings-api.ts";
 
   let { keys: initial }: { keys: CliKeyInfo[] } = $props();
   const { shared, lang, t } = useApp();
@@ -21,7 +21,7 @@
   let problem: string | null = $state(null);
   let confirmAll = $state(false);
 
-  function failureText(failure: RevokeFailure): string {
+  function failureText(failure: CallFailure): string {
     return failure.problem === "offline"
       ? t("common.offline")
       : t("common.error", { message: failure.message });

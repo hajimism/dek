@@ -156,6 +156,26 @@ export const invitations = sqliteTable(
   (table) => [index("invitations_inviter").on(table.inviterId, table.createdAt)],
 );
 
+/**
+ * Who an operator has invited to sign up, from /settings: an email address, or `@` and a GitHub
+ * login, in lowercase (ADR 85). An entry lets one account in: the first made for it claims it, and
+ * a claimed entry lets no one else in. It is no invitation a grant mails, which `invitations` counts.
+ */
+export const signUpInvites = sqliteTable(
+  "sign_up_invites",
+  {
+    id: text("id").primaryKey(),
+    entry: text("entry").notNull(),
+    /** The operator who added it. */
+    addedBy: text("added_by").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+    /** The account made from it, and when; null until then. */
+    claimedBy: text("claimed_by"),
+    claimedAt: text("claimed_at"),
+  },
+  (table) => [uniqueIndex("sign_up_invites_entry").on(table.entry)],
+);
+
 /** A deck whose comments one person hears nothing of by mail. */
 export const mutes = sqliteTable(
   "mutes",

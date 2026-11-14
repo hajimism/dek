@@ -31,7 +31,7 @@ import {
   normalizeHandle,
   suggestHandle,
 } from "../../src/model/person/handle.ts";
-import { mayJoin, readInvited, readNewcomer } from "../../src/model/person/invited.ts";
+import { mayJoin, readNewcomer, signUpIsOpen } from "../../src/model/person/invited.ts";
 import {
   firstLinks,
   linkFace,
@@ -52,7 +52,15 @@ import {
 } from "../../src/model/person/person.ts";
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
-import { Account } from "../../src/model/person/type.ts";
+import {
+  inviteEntriesOf,
+  MAX_ADDRESS_LENGTH,
+  MAX_INVITES_PER_ADD,
+  readInviteEntries,
+  readInviteEntry,
+  splitInviteInput,
+} from "../../src/model/person/sign-up-invite.ts";
+import { Account, type JoinRule } from "../../src/model/person/type.ts";
 
 // auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: who may join is
 // asked of a stand-in that notes the question, no grants are claimed, no mail goes out, and the
@@ -67,8 +75,16 @@ vi.mock("../../src/model/person/feature/sign-in/invitation.server.ts", () => ({
     return invitation.invited;
   },
 }));
+const claiming = vi.hoisted(() => ({
+  claimed: [] as unknown[],
+  claim: async (_user: unknown): Promise<void> => {},
+}));
 vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
   claimOnSignIn: async () => {},
+  claimInvitesOnSignUp: (user: unknown) => {
+    claiming.claimed.push(user);
+    return claiming.claim(user);
+  },
 }));
 vi.mock("../../src/model/person/feature/sign-in/link.server.ts", () => ({
   sendSignInLink: async () => {},
@@ -312,27 +328,97 @@ describe("signInMail", () => {
   });
 });
 
-describe("readInvited", () => {
-  it("reads addresses and GitHub logins, split by commas or whitespace, trimmed and in lowercase", () => {
-    const invited = readInvited(" Sato@Example.com,@Octo-Cat\n  kato@example.com ,, @hajimism\t");
-    expect(invited.anyone).toBe(false);
-    expect([...invited.emails]).toEqual(["sato@example.com", "kato@example.com"]);
-    expect([...invited.logins]).toEqual(["octo-cat", "hajimism"]);
+describe("readInviteEntry", () => {
+  it("reads an address or `@` and a GitHub login, trimmed and in lowercase", () => {
+    expect(readInviteEntry(" Sato@Example.com ")).toBe("sato@example.com");
+    expect(readInviteEntry("kato+talks@mail.example.co.jp")).toBe("kato+talks@mail.example.co.jp");
+    expect(readInviteEntry("@Octo-Cat")).toBe("@octo-cat");
+    expect(readInviteEntry("@a")).toBe("@a");
+    expect(readInviteEntry(`@${"a".repeat(39)}`)).toBe(`@${"a".repeat(39)}`);
   });
 
-  it("opens sign-up to anyone only when `*` is the whole list", () => {
-    expect(readInvited(" * ").anyone).toBe(true);
-    const mixed = readInvited("*, sato@example.com");
-    expect(mixed.anyone).toBe(false);
-    expect([...mixed.emails]).toEqual(["sato@example.com"]);
-  });
-
-  it("invites nobody from an empty setting, and leaves out what is neither an address nor a login", () => {
-    for (const setting of ["", "   ", "@, sato, *@*x"]) {
-      const invited = readInvited(setting);
-      expect(invited.anyone).toBe(false);
-      expect(invited.emails.size + invited.logins.size).toBe(0);
+  it("reads nothing else: no wildcard, no handle alone, no login GitHub would not give", () => {
+    for (const input of [
+      "",
+      "*",
+      "sato",
+      "@",
+      "sato@",
+      "@example.com",
+      "sato@example",
+      "sato@example..com",
+      "sato@@example.com",
+      "*@example.com",
+      "sato@exa mple.com",
+      "sato@example.com\nBcc: x@example.com",
+      "<sato@example.com>",
+      "@-octo",
+      "@octo-",
+      "@octo--cat",
+      "@octo_cat",
+      `@${"a".repeat(40)}`,
+      `${"a".repeat(MAX_ADDRESS_LENGTH)}@example.com`,
+    ]) {
+      expect(readInviteEntry(input), input).toBeNull();
     }
+  });
+});
+
+describe("splitInviteInput", () => {
+  it("splits what is typed at commas, spaces and new lines, keeping each as typed", () => {
+    expect(splitInviteInput(" Sato@example.com,@Octo-Cat\n\n kato@example.com ,, ")).toEqual([
+      "Sato@example.com",
+      "@Octo-Cat",
+      "kato@example.com",
+    ]);
+    expect(splitInviteInput(" ,\n")).toEqual([]);
+  });
+});
+
+describe("readInviteEntries", () => {
+  it("reads each entry, once, in the order given", () => {
+    expect(readInviteEntries(["Sato@example.com", "@octo-cat", "sato@EXAMPLE.com"])).toEqual({
+      ok: true,
+      entries: ["sato@example.com", "@octo-cat"],
+    });
+  });
+
+  it("refuses the whole list for one entry it cannot read, and names it as typed", () => {
+    expect(readInviteEntries(["sato@example.com", "Sato"])).toEqual({
+      ok: false,
+      problem: "invalid",
+      entry: "Sato",
+    });
+  });
+
+  it("refuses an empty list, and one longer than one add takes", () => {
+    expect(readInviteEntries([])).toEqual({ ok: false, problem: "empty" });
+    const many = Array.from({ length: MAX_INVITES_PER_ADD + 1 }, (_, n) => `p${n}@example.com`);
+    expect(readInviteEntries(many)).toEqual({ ok: false, problem: "too_many" });
+    expect(readInviteEntries(many.slice(1))).toMatchObject({ ok: true });
+  });
+});
+
+describe("inviteEntriesOf", () => {
+  it("names an account by its address once verified, and by its GitHub login", () => {
+    expect(
+      inviteEntriesOf({ email: "Sato@example.com", emailVerified: true, githubLogin: "Octo-Cat" }),
+    ).toEqual(["sato@example.com", "@octo-cat"]);
+    expect(
+      inviteEntriesOf({ email: "sato@example.com", emailVerified: false, githubLogin: "Octo-Cat" }),
+    ).toEqual(["@octo-cat"]);
+    expect(
+      inviteEntriesOf({ email: "sato@example.com", emailVerified: false, githubLogin: null }),
+    ).toEqual([]);
+  });
+});
+
+describe("signUpIsOpen", () => {
+  it("opens sign-up to anyone only where the switch and the development login are both on", () => {
+    expect(signUpIsOpen({ DEK_PUB_OPEN_SIGN_UP: "1", DEK_PUB_DEV_LOGIN: "1" })).toBe(true);
+    expect(signUpIsOpen({ DEK_PUB_OPEN_SIGN_UP: "1", DEK_PUB_DEV_LOGIN: "0" })).toBe(false);
+    expect(signUpIsOpen({ DEK_PUB_OPEN_SIGN_UP: "0", DEK_PUB_DEV_LOGIN: "1" })).toBe(false);
+    expect(signUpIsOpen({ DEK_PUB_OPEN_SIGN_UP: "true", DEK_PUB_DEV_LOGIN: "1" })).toBe(false);
   });
 });
 
@@ -366,66 +452,83 @@ describe("namesOperator", () => {
 });
 
 describe("mayJoin", () => {
-  const nobodyWaits = vi.fn(async () => false);
   const newcomer = { email: "sato@example.com", emailVerified: true, githubLogin: null };
-  const none = readOperators("");
+  /** Nothing lets anyone in: sign-up is not open, no operator, no entry, no share waiting. */
+  function closed(overrides: Partial<JoinRule> = {}): JoinRule {
+    return {
+      open: false,
+      operators: readOperators(""),
+      invited: vi.fn(async () => false),
+      grantWaits: vi.fn(async () => false),
+      ...overrides,
+    };
+  }
 
-  it("lets anyone in when the list is `*`, a verified address or not", async () => {
-    const anyone = readInvited("*");
-    expect(await mayJoin(anyone, none, { ...newcomer, emailVerified: false }, nobodyWaits)).toBe(
+  it("lets anyone in where sign-up is open, a verified address or not", async () => {
+    const unverified = { ...newcomer, emailVerified: false };
+    expect(await mayJoin(unverified, closed({ open: true }))).toBe(true);
+  });
+
+  it("lets nobody in when nothing does", async () => {
+    expect(await mayJoin(newcomer, closed())).toBe(false);
+  });
+
+  it("lets in a verified address an entry no account has claimed names, asked in lowercase", async () => {
+    const invited = vi.fn(async (entries: readonly string[]) =>
+      entries.includes("sato@example.com"),
+    );
+    expect(await mayJoin({ ...newcomer, email: "SATO@example.com" }, closed({ invited }))).toBe(
       true,
     );
+    expect(invited).toHaveBeenCalledWith(["sato@example.com"]);
+    expect(await mayJoin({ ...newcomer, email: "kato@example.com" }, closed({ invited }))).toBe(
+      false,
+    );
   });
 
-  it("lets in a verified address on the list, whatever its case", async () => {
-    const invited = readInvited("Sato@Example.com");
-    expect(
-      await mayJoin(invited, none, { ...newcomer, email: "SATO@example.com" }, nobodyWaits),
-    ).toBe(true);
-    expect(
-      await mayJoin(invited, none, { ...newcomer, email: "kato@example.com" }, nobodyWaits),
-    ).toBe(false);
-  });
-
-  it("never counts an address that is not verified, on the list or with a share waiting", async () => {
-    const waits = vi.fn(async () => true);
+  it("never counts an address that is not verified, by an entry or a share waiting", async () => {
+    const invited = vi.fn(async () => true);
+    const grantWaits = vi.fn(async () => true);
     const unverified = { ...newcomer, emailVerified: false };
-    expect(await mayJoin(readInvited("sato@example.com"), none, unverified, waits)).toBe(false);
-    expect(await mayJoin(readInvited(""), none, unverified, waits)).toBe(false);
-    expect(waits).not.toHaveBeenCalled();
+    expect(await mayJoin(unverified, closed({ invited, grantWaits }))).toBe(false);
+    expect(invited).not.toHaveBeenCalled();
+    expect(grantWaits).not.toHaveBeenCalled();
   });
 
-  it("lets in a GitHub account on the list as `@login`, whatever its address", async () => {
-    const invited = readInvited("@octo-cat");
+  it("lets in a GitHub account an entry names as `@login`, whatever its address", async () => {
+    const invited = vi.fn(async (entries: readonly string[]) => entries.includes("@octo-cat"));
     const github = { email: "o@example.com", emailVerified: false, githubLogin: "Octo-Cat" };
-    expect(await mayJoin(invited, none, github, nobodyWaits)).toBe(true);
-    expect(await mayJoin(invited, none, { ...github, githubLogin: "octo-dog" }, nobodyWaits)).toBe(
-      false,
-    );
-    expect(await mayJoin(readInvited("octo-cat@example.com"), none, github, nobodyWaits)).toBe(
-      false,
-    );
+    expect(await mayJoin(github, closed({ invited }))).toBe(true);
+    expect(invited).toHaveBeenCalledWith(["@octo-cat"]);
+    expect(await mayJoin({ ...github, githubLogin: "octo-dog" }, closed({ invited }))).toBe(false);
+  });
+
+  it("asks the entries by the verified address and the login together", async () => {
+    const invited = vi.fn(async () => false);
+    const github = { email: "O@example.com", emailVerified: true, githubLogin: "Octo-Cat" };
+    await mayJoin(github, closed({ invited }));
+    expect(invited).toHaveBeenCalledWith(["o@example.com", "@octo-cat"]);
   });
 
   it("lets in a verified address a share waits for, asking by the address in lowercase", async () => {
-    const waits = vi.fn(async (email: string) => email === "sato@example.com");
-    expect(
-      await mayJoin(readInvited(""), none, { ...newcomer, email: "Sato@example.com" }, waits),
-    ).toBe(true);
-    expect(waits).toHaveBeenCalledWith("sato@example.com");
-    expect(
-      await mayJoin(readInvited(""), none, { ...newcomer, email: "kato@example.com" }, waits),
-    ).toBe(false);
+    const grantWaits = vi.fn(async (email: string) => email === "sato@example.com");
+    expect(await mayJoin({ ...newcomer, email: "Sato@example.com" }, closed({ grantWaits }))).toBe(
+      true,
+    );
+    expect(grantWaits).toHaveBeenCalledWith("sato@example.com");
+    expect(await mayJoin({ ...newcomer, email: "kato@example.com" }, closed({ grantWaits }))).toBe(
+      false,
+    );
   });
 
-  it("lets in a verified address DEK_PUB_OPERATORS lists, though nobody invited it", async () => {
+  it("lets in a verified address DEK_PUB_OPERATORS lists, with no entry and on an empty table", async () => {
     const operators = readOperators("Sato@example.com");
-    expect(await mayJoin(readInvited(""), operators, newcomer, nobodyWaits)).toBe(true);
-    expect(
-      await mayJoin(readInvited(""), operators, { ...newcomer, emailVerified: false }, nobodyWaits),
-    ).toBe(false);
+    const invited = vi.fn(async () => false);
+    expect(await mayJoin(newcomer, closed({ operators, invited }))).toBe(true);
+    expect(invited).not.toHaveBeenCalled();
+    expect(await mayJoin({ ...newcomer, emailVerified: false }, closed({ operators }))).toBe(false);
     const github = { email: "o@example.com", emailVerified: true, githubLogin: "sato" };
-    expect(await mayJoin(readInvited(""), readOperators("@sato"), github, nobodyWaits)).toBe(false);
+    expect(await mayJoin(github, closed({ operators: readOperators("@sato") }))).toBe(false);
   });
 });
 
@@ -803,6 +906,8 @@ describe("auth.ts, through Better Auth", () => {
     seeding.seed = async () => {};
     invitation.asked.length = 0;
     invitation.invited = true;
+    claiming.claimed.length = 0;
+    claiming.claim = async () => {};
   });
 
   it("sends a GitHub sign-up the invitation list refuses back to /signin, and makes nothing", async () => {
@@ -822,6 +927,41 @@ describe("auth.ts, through Better Auth", () => {
     expect(db.account).toEqual([]);
     expect(db.session).toEqual([]);
     expect(seeding.seeded).toEqual([]);
+    expect(claiming.claimed).toEqual([]);
+  });
+
+  it("claims the entries that let an account in once it is made, and not when it signs in again", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    await signInWithGitHub(auth);
+    expect(claiming.claimed).toMatchObject([
+      {
+        id: db.user[0]?.id,
+        email: "octo@example.com",
+        emailVerified: true,
+        githubLogin: "Octo-Cat",
+      },
+    ]);
+    await signInWithGitHub(auth);
+    expect(claiming.claimed).toHaveLength(1);
+  });
+
+  it("makes the account although its entries could not be claimed", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    claiming.claim = async () => {
+      throw new Error("D1_ERROR: the database is not there");
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const callback = await signInWithGitHub(auth);
+    expect(callback.headers.get("location")).toBe("/");
+    expect(db.user).toHaveLength(1);
+    expect(seeding.seeded).toHaveLength(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("claimed"),
+      expect.objectContaining({ message: "D1_ERROR: the database is not there" }),
+    );
+    error.mockRestore();
   });
 
   it("keeps the login of an account made with GitHub, and starts its links from it", async () => {

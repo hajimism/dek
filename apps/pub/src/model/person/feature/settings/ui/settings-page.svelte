@@ -1,8 +1,9 @@
 <script lang="ts">
   // A person's settings, one section to each thing they set: who they are on dek.pub, the links
-  // their profile shows, and the CLI keys they hold. Each section saves on its own.
+  // their profile shows, the CLI keys they hold, and, for an operator alone, who may sign up. Each
+  // section saves on its own.
   import { untrack } from "svelte";
-  import type { CliKeyInfo } from "../../../../../../../../src/pub/protocol.ts";
+  import type { CliKeyInfo, SignUpInvite } from "../../../../../../../../src/pub/protocol.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -14,13 +15,21 @@
   import type { SaveFailure } from "../type.ts";
   import CliKeys from "./cli-keys.svelte";
   import LinksEditor from "./links-editor.svelte";
+  import SignUpInvites from "./sign-up-invites.svelte";
 
   let {
     handle,
     name: initial,
     links,
     keys,
-  }: { handle: string; name: string; links: string[]; keys: CliKeyInfo[] } = $props();
+    invites,
+  }: {
+    handle: string;
+    name: string;
+    links: string[];
+    keys: CliKeyInfo[];
+    invites: SignUpInvite[] | null;
+  } = $props();
   const { t } = useI18n();
 
   let name = $state(untrack(() => initial));
@@ -103,6 +112,13 @@
     <h2 id="keys-title">{t("settings.keys")}</h2>
     <CliKeys {keys} />
   </section>
+
+  {#if invites}
+    <section id="invites" class="section" aria-labelledby="invites-title">
+      <h2 id="invites-title">{t("settings.invites")}</h2>
+      <SignUpInvites {invites} />
+    </section>
+  {/if}
 </div>
 
 <style>

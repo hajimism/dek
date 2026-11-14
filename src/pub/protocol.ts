@@ -497,6 +497,34 @@ export type CliKeys = z.infer<typeof CliKeys>;
 export const KeysRevoked = z.strictObject({ revoked: z.number().int() });
 export type KeysRevoked = z.infer<typeof KeysRevoked>;
 
+/**
+ * One entry of who may sign up, as an operator sees it on /settings: an address, or `@` and a
+ * GitHub login, in lowercase; the operator who added it and when; and the account made from it
+ * and when, once one has been. A handle is null for an account that has none, or none any more.
+ */
+export const SignUpInvite = z.strictObject({
+  id: z.string(),
+  entry: z.string(),
+  addedAt: z.string(),
+  addedBy: z.string().nullable(),
+  claimedAt: z.string().nullable(),
+  claimedBy: z.string().nullable(),
+});
+export type SignUpInvite = z.infer<typeof SignUpInvite>;
+
+/**
+ * Every entry, the newest first: what GET on `paths.invites` answers, from an operator's browser
+ * session alone, and what adding or removing one answers, as the list stands after it.
+ */
+export const SignUpInvites = z.strictObject({ invites: z.array(SignUpInvite) });
+export type SignUpInvites = z.infer<typeof SignUpInvites>;
+
+/** What POST on `paths.invites` adds: addresses and `@<GitHub login>`s; the server reads each. */
+export const NewSignUpInvites = z.strictObject({
+  entries: z.array(z.string().max(320)).max(200),
+});
+export type NewSignUpInvites = z.infer<typeof NewSignUpInvites>;
+
 /** Every error answer. `code` is stable; `message` is for people. */
 export const ErrorBody = z.strictObject({
   error: z.strictObject({
@@ -531,6 +559,9 @@ export const paths = {
   myLinks: "/api/me/links",
   myKeys: "/api/me/keys",
   myKey: (id: string) => `/api/me/keys/${segment(id)}`,
+  /** Who may sign up, as an operator lists, adds and removes them; a 404 to anyone else. */
+  invites: "/api/invites",
+  invite: (id: string) => `/api/invites/${segment(id)}`,
   handle: (handle: string) => `/api/handles/${segment(handle)}`,
   talksOf: (handle: string) => `/api/people/${segment(handle)}/talks`,
   /** One talk by its URL's handle and slug, as its owner or an operator manages it. */
