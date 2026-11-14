@@ -20,7 +20,7 @@
   import { profilePath } from "../../../../person/profile-path.ts";
   import { signInHref } from "../../../../person/sign-in-path.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
-  import { talkPath } from "../../../deck.ts";
+  import { keyed, talkPath, withLinkKey } from "../../../deck.ts";
   import LikeButton from "../../../like/ui/like-button.svelte";
   import PublicComments from "../../../public-comment/ui/public-comments.svelte";
   import TalkCardView from "../../../ui/talk-card.svelte";
@@ -404,17 +404,28 @@
     }
   }
 
-  /** The sign-in page, coming back to this talk. */
-  const signIn = $derived(signInHref(talkPath(talk.owner.handle, talk.slug)));
+  // A `link` talk opened by its owner or a grant, without its key or with an old one, shows the
+  // address it is shared at, so the one copied from the address bar opens it for others too.
+  $effect(() => {
+    const address = withLinkKey(window.location.href, talk.key);
+    if (address !== window.location.href) {
+      history.replaceState(history.state, "", address);
+    }
+  });
+
+  /** The sign-in page, coming back to this talk with the key it was opened by. */
+  const signIn = $derived(signInHref(keyed(talkPath(talk.owner.handle, talk.slug), talk.key)));
 
   // The public comments and the likes, below the article: the page asks the server again after
-  // each change, as they are few and anyone's.
+  // each change, as they are few and anyone's. On a `link` talk each request carries its key,
+  // which opens them to a reader the talk is not shared with.
   let publicList: PublicComment[] | null = $state(untrack(() => talk.publicComments));
   let likes: LikeState | null = $state(untrack(() => talk.likes));
-  const publicPath = $derived(`/api/decks/${encodeURIComponent(talk.id)}/public-comments`);
+  const publicPath = (rest = "") =>
+    keyed(`/api/decks/${encodeURIComponent(talk.id)}/public-comments${rest}`, talk.key);
 
   async function reloadPublic() {
-    publicList = (await api<{ comments: PublicComment[] }>(publicPath)).comments;
+    publicList = (await api<{ comments: PublicComment[] }>(publicPath())).comments;
   }
 
   async function publicChange(change: () => Promise<unknown>): Promise<boolean> {
@@ -435,7 +446,7 @@
     const before = likes;
     likes = { count: likes.count + (next ? 1 : -1), liked: next };
     try {
-      likes = await api<LikeState>(`/api/decks/${encodeURIComponent(talk.id)}/like`, { method: next ? "PUT" : "DELETE" });
+      likes = await api<LikeState>(keyed(`/api/decks/${encodeURIComponent(talk.id)}/like`, talk.key), { method: next ? "PUT" : "DELETE" });
     } catch (error) {
       likes = before;
       toast(failure(error), { tone: "error" });
@@ -478,7 +489,7 @@
     oncreate={create}
     oncanceldraft={() => (draft = null)}
     onretry={retry}
-    oncopylink={(comment) => copy(`${talk.url}#${comment.id}`, t("comment.linkCopied"))}
+    oncopylink={(comment) => copy(`${talk.canonical}#${comment.id}`, t("comment.linkCopied"))}
   />
 {/snippet}
 
@@ -641,12 +652,12 @@
           onpost={(text, parentId) =>
             publicChange(() => {
               const body: NewPublicComment = { text, ...(parentId ? { parentId } : {}) };
-              return api(publicPath, { method: "POST", body });
+              return api(publicPath(), { method: "POST", body });
             })}
           onedit={(id, text) =>
-            publicChange(() => api(`${publicPath}/${encodeURIComponent(id)}`, { method: "PATCH", body: { text } }))}
+            publicChange(() => api(publicPath(`/${encodeURIComponent(id)}`), { method: "PATCH", body: { text } }))}
           ondelete={async (id) => {
-            await publicChange(() => api(`${publicPath}/${encodeURIComponent(id)}`, { method: "DELETE" }));
+            await publicChange(() => api(publicPath(`/${encodeURIComponent(id)}`), { method: "DELETE" }));
           }}
         />
       </div>

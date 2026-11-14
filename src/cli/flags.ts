@@ -142,6 +142,10 @@ export const FLAGS = {
     example: "dekc pub share --embed on",
     text: "whether other sites may embed the deck",
   },
+  "new-link": {
+    type: "boolean",
+    text: "replace the key in a link deck's URL, so the URL given out before opens it no more",
+  },
   comments: {
     type: "enum",
     choices: ["off", "signed-in"],

@@ -12,7 +12,7 @@ import { newDeckId } from "../../common/ids.ts";
 import { personById } from "../person/store.server.ts";
 import type { Account, Person } from "../person/type.ts";
 import { canManage, standingOn } from "./access.ts";
-import { talkPath } from "./deck.ts";
+import { talkHref, talkPath } from "./deck.ts";
 import { grantsOf } from "./grant/store.server.ts";
 import { syncAccess } from "./sync-access.server.ts";
 import type { Deck, DeckPatch, Standing } from "./type.ts";
@@ -150,26 +150,38 @@ async function mustFind(id: string): Promise<Deck> {
   return deck;
 }
 
+/** The link key a request carries as `?key=`, which opens a `link` deck to whoever holds it. */
+export function requestKey(c: Context): string | null {
+  return c.req.query("key") ?? null;
+}
+
 /**
- * Where `person` stands with the deck, or null when it does not open to them. A grant by an
- * address they have verified counts whether or not it is claimed yet, so reading writes nothing.
+ * Where `person`, holding `key`, stands with the deck, or null when it does not open to them. A
+ * grant by an address they have verified counts whether or not it is claimed yet, so reading
+ * writes nothing.
  */
-export async function standingWith(deck: Deck, person: Account | null): Promise<Standing | null> {
+export async function standingWith(
+  deck: Deck,
+  person: Account | null,
+  key: string | null,
+): Promise<Standing | null> {
   const grants = await grantsOf(deck.id, person);
-  const standing = standingOn(deck, person, grants);
+  const standing = standingOn(deck, person, grants, key);
   return standing.opens ? standing : null;
 }
 
 /**
- * The deck, if `person` may see it, with where they stand; a deck they may not see is as missing
- * as one that is not.
+ * The deck, if `person`, holding `key`, may see it, with where they stand; a deck they may not see
+ * is as missing as one that is not. The deck's ID opens nothing by itself: a script.md committed
+ * with its `pub:` gives it away.
  */
 export async function visibleDeck(
   id: string,
   person: Account | null,
+  key: string | null,
 ): Promise<Standing & { deck: Deck }> {
   const deck = await deckById(id);
-  const standing = deck && (await standingWith(deck, person));
+  const standing = deck && (await standingWith(deck, person, key));
   if (!deck || !standing) {
     throw notFound();
   }
@@ -188,9 +200,21 @@ async function ownerHandle(c: Context, deck: Deck): Promise<string> {
   return (await personById(c, deck.ownerId))?.handle ?? deck.ownerId;
 }
 
-/** The deck's absolute URL, for the CLI, feeds and comments. */
+/**
+ * The deck's absolute URL with no key, for those it is shared with, who open it by their grant or
+ * as its owner: review threads' links and the mail about them, and invitations. A key in these
+ * would open nothing more to them, and would go wherever they are pasted.
+ */
 export async function talkUrl(c: Context, deck: Deck): Promise<string> {
   return appUrl(talkPath(await ownerHandle(c, deck), deck.slug));
+}
+
+/**
+ * The deck's absolute URL to hand out, with the key a `link` deck opens by, as `DeckStatus.url`
+ * gives it too: for `PublishResult.url`.
+ */
+export async function shareUrl(c: Context, deck: Deck): Promise<string> {
+  return appUrl(talkHref(await ownerHandle(c, deck), deck));
 }
 
 /** The deck as the CLI is told of it; `version` is its current one, when the caller has it. */
@@ -206,7 +230,7 @@ export async function deckStatus(
     slug: deck.slug,
     owner: handle,
     title: deck.title,
-    url: appUrl(talkPath(handle, deck.slug)),
+    url: appUrl(talkHref(handle, deck)),
     visibility: deck.visibility,
     scriptPublic: deck.scriptPublic,
     embed: deck.embed,

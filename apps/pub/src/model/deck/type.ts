@@ -13,7 +13,9 @@ export type Deck = typeof decks.$inferSelect;
 export type Standing = { opens: boolean; role: GrantRole | null; side: GrantSide };
 
 /** What may change on a deck after it is made. */
-export type DeckPatch = Partial<Pick<Deck, "visibility" | "scriptPublic" | "embed" | "comments">>;
+export type DeckPatch = Partial<
+  Pick<Deck, "visibility" | "scriptPublic" | "embed" | "comments" | "linkKey">
+>;
 
 /** A talk as a list shows it: on the landing page, a profile, under "more by". */
 export type { TalkCard };

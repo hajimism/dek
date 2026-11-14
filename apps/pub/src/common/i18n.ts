@@ -258,7 +258,8 @@ const en = {
   "visibility.public": "Public",
   "visibility.team.hint": "Only you and your team can open it.",
   "visibility.private.hint": "The guests you share it with can open it too.",
-  "visibility.link.hint": "Anyone with the link. It isn’t listed or indexed.",
+  "visibility.link.hint":
+    "Anyone with the link, whose key can’t be guessed. It isn’t listed or indexed.",
   "visibility.public.hint": "Listed on your profile and in RSS, and may be indexed.",
   "visibility.confirmTitle": "Make “{title}” public?",
   "visibility.confirmBody":
@@ -407,6 +408,12 @@ const en = {
   "manage.sharing.removed": "Removed {who}.",
   "manage.sharing.added": "Shared with {who}.",
   "manage.sharing.anyone": "Anyone with the link can view.",
+  "manage.sharing.newLink": "New link",
+  "manage.sharing.newLinkTitle": "Make a new link?",
+  "manage.sharing.newLinkBody":
+    "The link given out so far stops working. The people the talk is shared with still open it.",
+  "manage.sharing.newLinkConfirm": "Make a new link",
+  "manage.sharing.newLinkDone": "Made a new link.",
   "manage.sharing.pending": "Invited by email",
   "role.label": "Role",
   "role.view": "Can view",
@@ -690,7 +697,8 @@ const ja: Record<MessageKey, string> = {
   "visibility.public": "公開",
   "visibility.team.hint": "あなたと、チームの人だけが開けます。",
   "visibility.private.hint": "共有したゲストも開けます。",
-  "visibility.link.hint": "リンクを知っている人は誰でも開けます。一覧や検索には出ません。",
+  "visibility.link.hint":
+    "リンクを知っている人は誰でも開けます。リンクには推測できない鍵が付き、一覧や検索には出ません。",
   "visibility.public.hint": "プロフィールと RSS に載り、検索エンジンに載ることもあります。",
   "visibility.confirmTitle": "「{title}」を公開しますか？",
   "visibility.confirmBody": "プロフィールと RSS に載り、検索エンジンに登録されることがあります。",
@@ -836,6 +844,12 @@ const ja: Record<MessageKey, string> = {
   "manage.sharing.removed": "{who} を削除しました。",
   "manage.sharing.added": "{who} と共有しました。",
   "manage.sharing.anyone": "リンクを知っている人は誰でも見られます。",
+  "manage.sharing.newLink": "リンクを作り直す",
+  "manage.sharing.newLinkTitle": "リンクを作り直しますか？",
+  "manage.sharing.newLinkBody":
+    "これまでに渡したリンクでは開けなくなります。共有している人はこれまでどおり開けます。",
+  "manage.sharing.newLinkConfirm": "作り直す",
+  "manage.sharing.newLinkDone": "新しいリンクを作りました。",
   "manage.sharing.pending": "メールで招待済み",
   "role.label": "権限",
   "role.view": "閲覧のみ",

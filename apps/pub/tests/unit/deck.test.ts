@@ -1,18 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import { CreateDeckRequest, DeckId, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
-import { newDeckId } from "../../src/common/ids.ts";
+import { newDeckId, newLinkKey, sameKey } from "../../src/common/ids.ts";
 import {
   canComment,
   canManage,
   canSeeScript,
   canView,
   type DeckRules,
-  opensToAnyone,
+  type OpeningRules,
+  opensWithoutGrant,
   sideOf,
   standingOn,
   versionStanding,
 } from "../../src/model/deck/access.ts";
-import { talkNamed, talkPath } from "../../src/model/deck/deck.ts";
+import {
+  keyed,
+  sharePatch,
+  talkHref,
+  talkNamed,
+  talkPath,
+  withLinkKey,
+} from "../../src/model/deck/deck.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
 import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
 import { sitemapOf } from "../../src/model/deck/feature/sitemap/sitemap.ts";
@@ -47,42 +55,60 @@ import { slideMapOf as map } from "./slide-map.ts";
 
 const owner = { id: "u1", handle: "hajimism", name: "Hajime" };
 const other = { id: "u2", handle: "sato", name: "Sato" };
+const KEY = "0123456789abcdefghijklmnop";
 
 describe("access", () => {
   const deck = (
     visibility: DeckRules["visibility"],
     comments: DeckRules["comments"] = "signed-in",
-  ) => ({
+  ): OpeningRules => ({
     ownerId: "u1",
     visibility,
     comments,
+    linkKey: KEY,
   });
 
   it("keeps a team deck to its owner and the team's side of its grants", () => {
-    expect(canView(deck("team"), owner, null, null)).toBe(true);
-    expect(canView(deck("team"), other, "view", "team")).toBe(true);
-    expect(canView(deck("team"), other, "comment", "guest")).toBe(false);
-    expect(canView(deck("team"), other, null, null)).toBe(false);
-    expect(canView(deck("team"), null, null, null)).toBe(false);
+    expect(canView(deck("team"), owner, null, null, null)).toBe(true);
+    expect(canView(deck("team"), other, "view", "team", null)).toBe(true);
+    expect(canView(deck("team"), other, "comment", "guest", null)).toBe(false);
+    expect(canView(deck("team"), other, null, null, null)).toBe(false);
+    expect(canView(deck("team"), null, null, null, null)).toBe(false);
   });
 
   it("keeps a private deck to its owner and grants, on either side", () => {
-    expect(canView(deck("private"), owner, null, null)).toBe(true);
-    expect(canView(deck("private"), other, null, null)).toBe(false);
-    expect(canView(deck("private"), null, null, null)).toBe(false);
-    expect(canView(deck("private"), other, "view", "guest")).toBe(true);
-    expect(canView(deck("private"), other, "view", "team")).toBe(true);
+    expect(canView(deck("private"), owner, null, null, null)).toBe(true);
+    expect(canView(deck("private"), other, null, null, null)).toBe(false);
+    expect(canView(deck("private"), null, null, null, null)).toBe(false);
+    expect(canView(deck("private"), other, "view", "guest", null)).toBe(true);
+    expect(canView(deck("private"), other, "view", "team", null)).toBe(true);
     expect(canComment(deck("private"), other, "view")).toBe(false);
     expect(canComment(deck("private"), other, "comment")).toBe(true);
   });
 
   it("lets the owner and those granted comment write review threads, whatever the policy", () => {
-    expect(canView(deck("link"), null, null, null)).toBe(true);
-    expect(canView(deck("public"), other, null, null)).toBe(true);
+    expect(canView(deck("public"), other, null, null, null)).toBe(true);
     expect(canComment(deck("link", "signed-in"), null, null)).toBe(false);
     expect(canComment(deck("link", "signed-in"), other, null)).toBe(false);
     expect(canComment(deck("public", "off"), other, "comment")).toBe(true);
     expect(canComment(deck("public", "off"), owner, null)).toBe(true);
+  });
+
+  it("opens a link deck to anyone holding its key, and to its grants without it", () => {
+    expect(canView(deck("link"), null, null, null, KEY)).toBe(true);
+    expect(canView(deck("link"), other, null, null, KEY)).toBe(true);
+    expect(canView(deck("link"), null, null, null, null)).toBe(false);
+    expect(canView(deck("link"), null, null, null, `${KEY.slice(1)}x`)).toBe(false);
+    expect(canView(deck("link"), null, null, null, KEY.slice(1))).toBe(false);
+    expect(canView({ ...deck("link"), linkKey: null }, null, null, null, "")).toBe(false);
+    expect(canView(deck("link"), owner, null, null, null)).toBe(true);
+    expect(canView(deck("link"), other, "view", "guest", null)).toBe(true);
+  });
+
+  it("opens no other visibility by the key a deck kept from being link", () => {
+    expect(canView(deck("private"), null, null, null, KEY)).toBe(false);
+    expect(canView(deck("team"), other, "view", "guest", KEY)).toBe(false);
+    expect(standingOn(deck("private"), other, [], KEY).opens).toBe(false);
   });
 
   it("lets a signed-in account like a talk anyone may open, once", () => {
@@ -102,29 +128,44 @@ describe("access", () => {
   });
 
   it("sums up a person's grants as whether the deck opens, their role, and their side", () => {
-    expect(standingOn(deck("team"), owner, [])).toEqual({ opens: true, role: null, side: "team" });
+    expect(standingOn(deck("team"), owner, [], null)).toEqual({
+      opens: true,
+      role: null,
+      side: "team",
+    });
     expect(
-      standingOn(deck("team"), other, [
-        { role: "view", side: "guest" },
-        { role: "comment", side: "team" },
-      ]),
+      standingOn(
+        deck("team"),
+        other,
+        [
+          { role: "view", side: "guest" },
+          { role: "comment", side: "team" },
+        ],
+        null,
+      ),
     ).toEqual({ opens: true, role: "comment", side: "team" });
-    expect(standingOn(deck("team"), other, [{ role: "comment", side: "guest" }])).toEqual({
+    expect(standingOn(deck("team"), other, [{ role: "comment", side: "guest" }], null)).toEqual({
       opens: false,
       role: "comment",
       side: "guest",
     });
-    expect(standingOn(deck("private"), other, [{ role: "view", side: "guest" }])).toEqual({
+    expect(standingOn(deck("private"), other, [{ role: "view", side: "guest" }], null)).toEqual({
       opens: true,
       role: "view",
       side: "guest",
     });
-    expect(standingOn(deck("public"), null, [])).toEqual({
+    expect(standingOn(deck("public"), null, [], null)).toEqual({
       opens: true,
       role: null,
       side: "guest",
     });
-    expect(standingOn(deck("private"), null, []).opens).toBe(false);
+    expect(standingOn(deck("private"), null, [], null).opens).toBe(false);
+    expect(standingOn(deck("link"), null, [], KEY)).toEqual({
+      opens: true,
+      role: null,
+      side: "guest",
+    });
+    expect(standingOn(deck("link"), null, [], null).opens).toBe(false);
   });
 
   it("lets only the owner manage", () => {
@@ -352,6 +393,37 @@ describe("talk paths", () => {
     expect(talkPath("hajimism", "intro")).toBe("/@hajimism/intro");
   });
 
+  it("shares a link talk at its path with its key, and any other at its path alone", () => {
+    const talk = { slug: "intro", visibility: "link" as const, linkKey: KEY };
+    expect(talkHref("hajimism", talk)).toBe(`/@hajimism/intro?key=${KEY}`);
+    expect(talkHref("hajimism", { ...talk, visibility: "public" })).toBe("/@hajimism/intro");
+    expect(talkHref("hajimism", { ...talk, visibility: "private" })).toBe("/@hajimism/intro");
+    expect(talkHref("hajimism", { ...talk, linkKey: null })).toBe("/@hajimism/intro");
+  });
+
+  it("puts a key on a path, after any query it has", () => {
+    expect(keyed("/i/d_1/2/cover", KEY)).toBe(`/i/d_1/2/cover?key=${KEY}`);
+    expect(keyed("/api/decks/d_1/comments?status=all", KEY)).toBe(
+      `/api/decks/d_1/comments?status=all&key=${KEY}`,
+    );
+    expect(keyed("/i/d_1/2/cover", null)).toBe("/i/d_1/2/cover");
+  });
+
+  it("puts a link talk's key into the address it was opened at, keeping the rest", () => {
+    expect(withLinkKey("https://dek.pub/@hajimism/intro#s-2", KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?key=${KEY}#s-2`,
+    );
+    expect(withLinkKey("https://dek.pub/@hajimism/intro?lang=ja&key=old#c_1", KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?lang=ja&key=${KEY}#c_1`,
+    );
+    expect(withLinkKey(`https://dek.pub/@hajimism/intro?key=${KEY}`, KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?key=${KEY}`,
+    );
+    expect(withLinkKey("https://dek.pub/@hajimism/intro#s-2", null)).toBe(
+      "https://dek.pub/@hajimism/intro#s-2",
+    );
+  });
+
   it("reads a talk named as @handle/slug, and nothing else", () => {
     expect(talkNamed(" @hajimism/intro ")).toEqual({ segment: "@hajimism", slug: "intro" });
     expect(talkNamed("hajimism/intro")).toBeNull();
@@ -545,15 +617,49 @@ describe("invitationMail", () => {
   });
 });
 
+describe("link keys", () => {
+  it("are 26 of the ID alphabet's characters, over 128 bits, and never the same twice", () => {
+    const keys = Array.from({ length: 32 }, newLinkKey);
+    expect(keys.every((key) => /^[0-9a-z]{26}$/.test(key))).toBe(true);
+    expect(26 * Math.log2(36)).toBeGreaterThan(128);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("match only the very key, and never when the deck has none", () => {
+    expect(sameKey(KEY, KEY)).toBe(true);
+    expect(sameKey(KEY, `${KEY.slice(0, -1)}q`)).toBe(false);
+    expect(sameKey(KEY, `${KEY}0`)).toBe(false);
+    expect(sameKey(KEY, null)).toBe(false);
+    expect(sameKey(KEY, undefined)).toBe(false);
+    expect(sameKey(null, "")).toBe(false);
+    expect(sameKey("", "")).toBe(false);
+  });
+
+  it("are made the first time a deck becomes link, kept after, and replaced when asked", () => {
+    const made = sharePatch({ linkKey: null }, { visibility: "link" });
+    expect(made.visibility).toBe("link");
+    expect(made.linkKey).toMatch(/^[0-9a-z]{26}$/);
+    expect(sharePatch({ linkKey: KEY }, { visibility: "link" })).toEqual({ visibility: "link" });
+    expect(sharePatch({ linkKey: null }, { visibility: "private" })).toEqual({
+      visibility: "private",
+    });
+    expect(sharePatch({ linkKey: KEY }, { scriptPublic: true })).toEqual({ scriptPublic: true });
+    const renewed = sharePatch({ linkKey: KEY }, { newLink: true });
+    expect(Object.keys(renewed)).toEqual(["linkKey"]);
+    expect(renewed.linkKey).toMatch(/^[0-9a-z]{26}$/);
+    expect(renewed.linkKey).not.toBe(KEY);
+  });
+});
+
 describe("public comments", () => {
   const open = { ownerId: "u1", visibility: "link" as const, comments: "signed-in" as const };
   const mine = { authorId: "u2" };
 
-  it("are on a talk anyone may open, and not on a private one", () => {
-    expect(opensToAnyone(open)).toBe(true);
-    expect(opensToAnyone({ ...open, visibility: "public" })).toBe(true);
-    expect(opensToAnyone({ ...open, visibility: "private" })).toBe(false);
-    expect(opensToAnyone({ ...open, visibility: "team" })).toBe(false);
+  it("are on a talk that opens without a grant, and not on a private one", () => {
+    expect(opensWithoutGrant(open)).toBe(true);
+    expect(opensWithoutGrant({ ...open, visibility: "public" })).toBe(true);
+    expect(opensWithoutGrant({ ...open, visibility: "private" })).toBe(false);
+    expect(opensWithoutGrant({ ...open, visibility: "team" })).toBe(false);
   });
 
   it("may be posted as the policy says: by anyone signed in, or by no one", () => {
