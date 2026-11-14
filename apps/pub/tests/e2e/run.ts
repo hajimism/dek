@@ -107,9 +107,15 @@ try {
   const talkPath = `/@${me.handle}/why-dek`;
   check((await stranger.fetch(talkPath)).status === 404, "a team talk is a 404 to someone else");
   const about = await fetch(`${server.url}/about?lang=en`);
+  const aboutHtml = await about.text();
   check(
-    about.status === 200 && /<h1[^>]*>A talk keeps reaching people/.test(await about.text()),
+    about.status === 200 && /<h1[^>]*>A talk keeps reaching people/.test(aboutHtml),
     "the About page answers anyone",
+  );
+  check(
+    aboutHtml.includes(`<link rel="canonical" href="${server.url}/about?lang=en"`) &&
+      aboutHtml.includes(`hreflang="ja" href="${server.url}/about"`),
+    "the About page in English names its own URL as canonical, and the Japanese one beside it",
   );
   check(
     (await fetch(`${server.deckOrigin(id)}/v/1/`)).status === 404,
@@ -140,6 +146,40 @@ try {
     shared.ok && (shared as { visibility?: string }).visibility === "link",
     "share opens the deck to the link",
     shared,
+  );
+  const profile = `/@${me.handle}`;
+  check(
+    (await stranger.fetch(profile)).status === 200 &&
+      (await stranger.fetch(`${profile}?page=2`)).status === 404 &&
+      (await stranger.fetch(`${profile}?page=two`)).status === 200,
+    "a profile's first page answers, a page past its last is a 404, and a page that is no number is the first",
+  );
+  type TalkPage = { talks: Array<{ slug: string }>; total: number };
+  const talksOf = async (who: Browser, page: number) => {
+    const response = await who.fetch(`/api/people/${me.handle}/talks?page=${page}`);
+    return {
+      status: response.status,
+      body: response.ok ? ((await response.json()) as TalkPage) : null,
+    };
+  };
+  const ownTalks = await talksOf(author, 1);
+  const strangersTalks = await talksOf(stranger, 1);
+  check(
+    ownTalks.body?.total === 1 &&
+      ownTalks.body.talks[0]?.slug === "why-dek" &&
+      strangersTalks.body?.total === 0 &&
+      (await talksOf(stranger, 2)).status === 404,
+    "the talks a profile loads for more are the owner's all, anyone else's public, and none past the last page",
+    { ownTalks, strangersTalks },
+  );
+  const sitemap = await fetch(`${server.url}/sitemap.xml`);
+  const sitemapXml = await sitemap.text();
+  check(
+    sitemap.ok &&
+      sitemapXml.includes(`<loc>${server.url}/about?lang=en</loc>`) &&
+      !sitemapXml.includes(talkPath),
+    "the sitemap lists the About page, and not a talk shared by link",
+    sitemapXml,
   );
   const page = await stranger.fetch(talkPath);
   const html = await page.text();
@@ -612,15 +652,31 @@ try {
     "the link signs the guest in and sends them to the talk",
     { status: verified.status, location: verified.headers.get("location") },
   );
-  check(
-    (await guest.fetch(talkPath)).status === 200,
-    "signed in by the link, the guest opens the private talk shared with their address",
-  );
-  const guestMe = (await (await guest.fetch("/api/me")).json()) as { name?: string };
+  const guestMe = (await (await guest.fetch("/api/me")).json()) as {
+    name?: string;
+    handle?: string;
+  };
   check(
     guestMe.name === guestEmail.split("@")[0],
     "an account made by a sign-in link goes by its address's local part",
     guestMe,
+  );
+  const grantees = async () =>
+    (
+      (await (await author.fetch(`/api/decks/${id}/grants`)).json()) as {
+        grants: Array<{ id: string; who: string }>;
+      }
+    ).grants;
+  const claimedGrants = await grantees();
+  check(
+    claimedGrants.some((row) => row.who === guestMe.handle) &&
+      !claimedGrants.some((row) => row.who === guestEmail),
+    "signing in by the link claims the grant waiting on the address, before any deck is read",
+    claimedGrants,
+  );
+  check(
+    (await guest.fetch(talkPath)).status === 200,
+    "signed in by the link, the guest opens the private talk shared with their address",
   );
   const again = await new Browser(server.url).fetch(new URL(link).pathname + new URL(link).search);
   check(again.headers.get("location")?.includes("error=") === true, "a sign-in link works once", {
@@ -807,6 +863,73 @@ try {
   } finally {
     rmSync(twin, { recursive: true, force: true });
   }
+
+  // A grant by address to someone whose account has that address verified is theirs at once.
+  const guestGrant = (await grantees()).find((row) => row.who === guestMe.handle);
+  await author.fetch(`/api/decks/${id}/grants/${guestGrant?.id}`, { method: "DELETE" });
+  const regranted = await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: guestEmail, role: "comment" },
+  });
+  const regrantedRow = (await regranted.json()) as { who?: string };
+  check(
+    regranted.status === 201 &&
+      regrantedRow.who === guestMe.handle &&
+      (await grantees()).some((row) => row.who === guestMe.handle),
+    "a grant by an address an account has verified is tied to that account when it is made",
+    regrantedRow,
+  );
+  const tied = (await grantees()).find((row) => row.who === guestMe.handle);
+  await author.fetch(`/api/decks/${id}/grants/${tied?.id}`, { method: "DELETE" });
+  await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: `@${guestMe.handle}`, role: "view", side: "team" },
+  });
+  const beside = await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: guestEmail, role: "comment" },
+  });
+  const besideRow = (await beside.json()) as { who?: string };
+  const both = await grantees();
+  check(
+    beside.status === 201 &&
+      besideRow.who === guestEmail &&
+      both.some((row) => row.who === guestMe.handle) &&
+      both.some((row) => row.who === guestEmail) &&
+      (await guest.fetch(talkPath)).status === 200,
+    "a grant by address beside one by handle on the same deck waits, and the one by handle counts",
+    { besideRow, both },
+  );
+
+  // The CLI shares the deck as the manage page does, and stops.
+  const cliGuest = `cli-${Date.now()}@example.com`;
+  type GrantRow = { id: string; who: string; role: string; side: string };
+  const added = (await dekc(["pub", "grants", "add", cliGuest, "--side", "team"])) as {
+    ok: boolean;
+    grant?: GrantRow;
+    invited?: boolean;
+  };
+  check(
+    added.ok &&
+      added.invited === true &&
+      added.grant?.role === "view" &&
+      added.grant.side === "team" &&
+      (await inbox.waitFor(cliGuest, "shared")).length === 1,
+    "dekc pub grants add shares the deck, a viewer unless --role says otherwise, and mails them",
+    added,
+  );
+  const cliGrants = async () =>
+    ((await dekc(["pub", "grants"])) as { grants?: GrantRow[] }).grants ?? [];
+  check(
+    (await cliGrants()).some((row) => row.who === cliGuest && row.side === "team"),
+    "dekc pub grants lists the grant",
+  );
+  const removed = await dekc(["pub", "grants", "remove", cliGuest]);
+  check(
+    removed.ok && !(await cliGrants()).some((row) => row.who === cliGuest),
+    "dekc pub grants remove stops sharing the deck",
+    removed,
+  );
 
   const logout = await dekc(["pub", "logout"]);
   check(logout.ok, "logout revokes the key", logout);

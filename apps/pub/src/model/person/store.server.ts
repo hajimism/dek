@@ -31,11 +31,23 @@ export async function signsInWithGitHub(c: Context, person: Person): Promise<boo
   return account !== null;
 }
 
+export async function personByEmail(c: Context, email: string): Promise<Person | null> {
+  const context = await authOf(c).$context;
+  const user = await context.adapter.findOne({
+    model: "user",
+    where: [{ field: "email", value: email.toLowerCase() }],
+  });
+  return user ? readAccount(user) : null;
+}
+
 export async function personById(c: Context, id: string): Promise<Person | null> {
   const context = await authOf(c).$context;
   const user = await context.internalAdapter.findUserById(id);
   return user ? readAccount(user) : null;
 }
+
+/** How many IDs one query asks for: D1 binds at most 100 values to a statement. */
+const IDS_PER_QUERY = 90;
 
 export async function peopleById(c: Context, ids: readonly string[]): Promise<Map<string, Person>> {
   const unique = [...new Set(ids)];
@@ -43,10 +55,19 @@ export async function peopleById(c: Context, ids: readonly string[]): Promise<Ma
     return new Map();
   }
   const context = await authOf(c).$context;
-  const users = (await context.adapter.findMany({
-    model: "user",
-    where: [{ field: "id", operator: "in", value: unique }],
-  })) as unknown[];
-  const people = users.flatMap((user) => readAccount(user) ?? []);
+  const batches: string[][] = [];
+  for (let at = 0; at < unique.length; at += IDS_PER_QUERY) {
+    batches.push(unique.slice(at, at + IDS_PER_QUERY));
+  }
+  const found = await Promise.all(
+    batches.map(
+      (batch) =>
+        context.adapter.findMany({
+          model: "user",
+          where: [{ field: "id", operator: "in", value: batch }],
+        }) as Promise<unknown[]>,
+    ),
+  );
+  const people = found.flat().flatMap((user) => readAccount(user) ?? []);
   return new Map(people.map((person) => [person.id, person]));
 }

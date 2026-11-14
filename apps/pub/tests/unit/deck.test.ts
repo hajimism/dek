@@ -13,18 +13,14 @@ import {
 import { talkNamed, talkPath } from "../../src/model/deck/deck.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
 import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
+import { sitemapOf } from "../../src/model/deck/feature/sitemap/sitemap.ts";
 import {
   boxToPercent,
   readDeckMessage,
   withSlide,
 } from "../../src/model/deck/feature/talk/embed.ts";
 import { readingSlug } from "../../src/model/deck/feature/talk/reading.ts";
-import {
-  granteeOf,
-  strongestRole,
-  waitingGrants,
-  widestSide,
-} from "../../src/model/deck/grant/grant.ts";
+import { granteeOf, strongestRole, widestSide } from "../../src/model/deck/grant/grant.ts";
 import { invitationMail } from "../../src/model/deck/grant/invite.ts";
 import { canLike } from "../../src/model/deck/like/like.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
@@ -335,27 +331,68 @@ describe("talk paths", () => {
   });
 });
 
+describe("sitemapOf", () => {
+  const talks = [
+    { handle: "ann", slug: "new", updatedAt: "2026-11-02T09:00:00.000Z" },
+    { handle: "bob", slug: "only", updatedAt: "2026-10-01T09:00:00.000Z" },
+    { handle: "ann", slug: "old", updatedAt: "2026-09-01T09:00:00.000Z" },
+  ];
+  const urls = (xml: string) => [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
+
+  it("lists the landing and About pages in each language, each with both and x-default", () => {
+    const xml = sitemapOf("https://dek.pub", []);
+    expect(urls(xml)).toEqual([
+      "https://dek.pub/",
+      "https://dek.pub/?lang=en",
+      "https://dek.pub/about",
+      "https://dek.pub/about?lang=en",
+    ]);
+    const about = xml
+      .split("<url>")
+      .find((entry) => entry.includes("<loc>https://dek.pub/about?lang=en<"));
+    expect(about).toContain(
+      '<xhtml:link rel="alternate" hreflang="ja" href="https://dek.pub/about" />',
+    );
+    expect(about).toContain(
+      '<xhtml:link rel="alternate" hreflang="en" href="https://dek.pub/about?lang=en" />',
+    );
+    expect(about).toContain(
+      '<xhtml:link rel="alternate" hreflang="x-default" href="https://dek.pub/about" />',
+    );
+    expect(xml).toMatch(/^<\?xml version="1\.0" encoding="UTF-8"\?>\n<urlset /);
+  });
+
+  it("lists each talk, and each profile once, dated by its newest talk", () => {
+    const xml = sitemapOf("https://dek.pub", talks);
+    expect(urls(xml).slice(4)).toEqual([
+      "https://dek.pub/@ann/new",
+      "https://dek.pub/@bob/only",
+      "https://dek.pub/@ann/old",
+      "https://dek.pub/@ann",
+      "https://dek.pub/@bob",
+    ]);
+    expect(xml).toContain(
+      "<loc>https://dek.pub/@ann/old</loc>\n    <lastmod>2026-09-01T09:00:00.000Z</lastmod>",
+    );
+    expect(xml).toContain(
+      "<loc>https://dek.pub/@ann</loc>\n    <lastmod>2026-11-02T09:00:00.000Z</lastmod>",
+    );
+  });
+
+  it("stops at the bound, keeping the newest talks and the profiles they need", () => {
+    expect(urls(sitemapOf("https://dek.pub", talks, 7)).slice(4)).toEqual([
+      "https://dek.pub/@ann/new",
+      "https://dek.pub/@ann",
+    ]);
+  });
+});
+
 describe("grants", () => {
   it("names a person by handle, with or without @, or by email address", () => {
     expect(granteeOf("@Sato")).toEqual({ handle: "sato" });
     expect(granteeOf("sato")).toEqual({ handle: "sato" });
     expect(granteeOf("Sato@Example.com")).toEqual({ email: "sato@example.com" });
     expect(granteeOf("not a name")).toBeNull();
-  });
-
-  it("claims a grant by address for the account, unless it holds one by handle on that deck", () => {
-    const row = (id: string, deckId: string, userId: string | null) => ({ id, deckId, userId });
-    expect(
-      waitingGrants(
-        [
-          row("g1", "d_a", null),
-          row("g2", "d_b", null),
-          row("g3", "d_b", "u1"),
-          row("g4", "d_c", "u1"),
-        ],
-        "u1",
-      ).map((grant) => grant.id),
-    ).toEqual(["g1"]);
   });
 
   it("counts the grant that allows more", () => {
