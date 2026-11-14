@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="light dark" />
+    <title>エラーが起きました · dek.pub</title>
+    <style>
+      :root {
+        --paper: #fbfaf7;
+        --ink: #1d1f24;
+        --muted: #5b606b;
+        --accent: #3451d1;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --paper: #15171c;
+          --ink: #eceef2;
+          --muted: #a3a8b3;
+          --accent: #8ea2ff;
+        }
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--paper);
+        color: var(--ink);
+        font: 16px/1.7 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      }
+      main {
+        max-width: 32rem;
+        padding: 2rem 1rem;
+      }
+      h1 {
+        font-size: 1.375rem;
+        margin: 0 0 0.5rem;
+      }
+      p {
+        margin: 0 0 1rem;
+        color: var(--muted);
+      }
+      section + section {
+        margin-top: 2rem;
+      }
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section lang="ja">
+        <h1>dek.pub でエラーが起きました</h1>
+        <p>こちら側の問題です。少し待ってから、もう一度開いてください。</p>
+        <p><a href="/">dek.pub へ</a></p>
+      </section>
+      <section lang="en">
+        <h1>Something went wrong on dek.pub</h1>
+        <p>The fault is on our side. Wait a moment, then open the page again.</p>
+        <p><a href="/?lang=en">Go to dek.pub</a></p>
+      </section>
+    </main>
+  </body>
+</html>
