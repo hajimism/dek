@@ -21,7 +21,11 @@ export default defineConfig({
         resolve: {
           conditions: ["browser"],
           // Components read the page's shared data through @void/svelte; tests give it directly.
-          alias: { "@void/svelte": fileURLToPath(new URL("./tests/browser/void-svelte.ts", import.meta.url)) },
+          alias: {
+            "@void/svelte": fileURLToPath(
+              new URL("./tests/browser/void-svelte.ts", import.meta.url),
+            ),
+          },
         },
         test: {
           name: "browser",

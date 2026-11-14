@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { talkPath } from "../src/model/deck/deck.ts";
-  import { profilePath } from "../src/model/person/profile-path.ts";
-  import { useApp } from "../src/shell/use-app.ts";
+  
   import Button from "../src/common/ui/button.svelte";
   import CopyField from "../src/common/ui/copy-field.svelte";
   import Icon from "../src/common/ui/icon.svelte";
+import { talkPath } from "../src/model/deck/deck.ts";
   import TalkCard from "../src/model/deck/ui/talk-card.svelte";
+  import { profilePath } from "../src/model/person/profile-path.ts";
+  import { useApp } from "../src/shell/use-app.ts";
   import type { Props } from "./index.server";
 
   let { talks, featured }: Props = $props();

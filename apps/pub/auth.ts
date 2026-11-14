@@ -8,8 +8,8 @@ import { bearer, deviceAuthorization, magicLink } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
 import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
-import { SIGN_IN_LINK_SECONDS } from "./src/model/person/feature/sign-in/mail.ts";
 import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
+import { SIGN_IN_LINK_SECONDS } from "./src/model/person/feature/sign-in/mail.ts";
 import { handleFromEmail, normalizeHandle } from "./src/model/person/handle.ts";
 
 // The Worker's waitUntil, which keeps it running for mail sent after the answer. Imported lazily:
@@ -39,7 +39,9 @@ export default defineAuth(({ defaults, env }) => {
         ...defaults.socialProviders?.github,
         clientId: String(env.AUTH_GITHUB_CLIENT_ID),
         clientSecret: String(env.AUTH_GITHUB_CLIENT_SECRET),
-        mapProfileToUser: (profile: { login: string }) => ({ handle: normalizeHandle(profile.login) }),
+        mapProfileToUser: (profile: { login: string }) => ({
+          handle: normalizeHandle(profile.login),
+        }),
       },
     },
     user: {

@@ -1,3 +1,4 @@
+import type { Context } from "hono";
 import { defineHandler } from "void";
 import { EditPublicComment } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
@@ -15,7 +16,6 @@ import {
 } from "../../../../../src/model/comment/public/store.server.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../../src/model/person/actor.server.ts";
-import type { Context } from "hono";
 
 async function target(c: Context) {
   const person = await requirePerson(c);
@@ -43,7 +43,11 @@ export const DELETE = defineHandler((c) =>
   api(async () => {
     const { person, deck, row } = await target(c);
     if (!mayDeletePublic(deck, row, person)) {
-      throw new ApiError(403, "not_yours", "only its author and the deck's owner may remove a comment");
+      throw new ApiError(
+        403,
+        "not_yours",
+        "only its author and the deck's owner may remove a comment",
+      );
     }
     await deletePublic(row);
     return { removed: true };

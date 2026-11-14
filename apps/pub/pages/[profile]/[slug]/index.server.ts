@@ -1,7 +1,7 @@
 import { defineHandler, defineHead, type InferProps } from "void";
 import { translate } from "../../../src/common/i18n.ts";
-import { loadTalk } from "../../../src/model/deck/feature/talk/load.server.ts";
 import { EARLY_LISTENER } from "../../../src/model/deck/feature/talk/embed.ts";
+import { loadTalk } from "../../../src/model/deck/feature/talk/load.server.ts";
 
 export type Props = InferProps<typeof loader>;
 
@@ -21,7 +21,9 @@ export const head = defineHead<Props>((c, { talk }) => {
     };
   }
   const description =
-    talk.description ?? talk.slides.find((slide) => slide.paragraphs?.length)?.paragraphs?.[0]?.slice(0, 200) ?? "";
+    talk.description ??
+    talk.slides.find((slide) => slide.paragraphs?.length)?.paragraphs?.[0]?.slice(0, 200) ??
+    "";
   return {
     title: talk.title,
     meta: [

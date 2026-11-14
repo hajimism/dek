@@ -28,7 +28,12 @@ export const head = defineHead<Props>((c, { profile }) => {
       { name: "twitter:card", content: "summary" },
     ],
     link: [
-      { rel: "alternate", type: "application/rss+xml", title: `${profile.name} · dek.pub`, href: `${profile.url}/rss` },
+      {
+        rel: "alternate",
+        type: "application/rss+xml",
+        title: `${profile.name} · dek.pub`,
+        href: `${profile.url}/rss`,
+      },
       { rel: "canonical", href: profile.url },
     ],
   };

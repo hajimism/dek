@@ -265,9 +265,12 @@ async function requireFullStage(page: Page): Promise<void> {
 
 /** Goes to `slug` by its hash and waits until that slide is the current one and has settled. */
 async function showSlide(page: Page, slug: string, beat = 0): Promise<void> {
-  await page.evaluate((hash) => {
-    location.hash = hash;
-  }, beat > 0 ? `#${slug}/${beat}` : `#${slug}`);
+  await page.evaluate(
+    (hash) => {
+      location.hash = hash;
+    },
+    beat > 0 ? `#${slug}/${beat}` : `#${slug}`,
+  );
   try {
     await page.waitForFunction(
       ({ selector, want }) => document.querySelector<HTMLElement>(selector)?.dataset.slug === want,
@@ -605,7 +608,9 @@ async function requirePublicShot(deck: RemoteDeck, slug: string): Promise<void> 
     response.headers.get("content-type") !== "image/png" ||
     bytes[0] !== 0x89
   ) {
-    throw new Error(`someone signed out could not fetch why-dek's ${slug} picture: ${response.status}`);
+    throw new Error(
+      `someone signed out could not fetch why-dek's ${slug} picture: ${response.status}`,
+    );
   }
 }
 

@@ -7,8 +7,8 @@
 import { defineMiddleware } from "void";
 import { env } from "void/env";
 import { storage } from "void/storage";
-import { deckIdFromHost } from "../src/model/deck/serving/origin.ts";
 import { handleServe } from "../serve/src/index.ts";
+import { deckIdFromHost } from "../src/model/deck/serving/origin.ts";
 
 export default defineMiddleware(async (c, next) => {
   if (!import.meta.env.DEV || !deckIdFromHost(new URL(c.req.url).host)) {

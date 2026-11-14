@@ -1,14 +1,14 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { profilePath } from "../../src/model/person/profile-path.ts";
   import { docsUrl } from "../../src/common/docs.ts";
-  import { useApp } from "../../src/shell/use-app.ts";
-  import Avatar from "../../src/model/person/ui/avatar.svelte";
   import CopyField from "../../src/common/ui/copy-field.svelte";
   import Icon from "../../src/common/ui/icon.svelte";
-  import NotFound from "../../src/shell/ui/not-found.svelte";
   import ProfileTalks from "../../src/model/person/feature/profile/ui/profile-talks.svelte";
   import type { ProfileView } from "../../src/model/person/feature/profile/view.ts";
+  import { profilePath } from "../../src/model/person/profile-path.ts";
+  import Avatar from "../../src/model/person/ui/avatar.svelte";
+  import NotFound from "../../src/shell/ui/not-found.svelte";
+  import { useApp } from "../../src/shell/use-app.ts";
   import type { Props } from "./index.server";
 
   let { profile, view: asked }: Props = $props();

@@ -3,7 +3,11 @@ import { NewPublicComment } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
 import { api, jsonBody } from "../../../../../src/common/http.server.ts";
 import { canPostPublic, publicCommentsOn } from "../../../../../src/model/comment/public/access.ts";
-import { postPublic, publicCommentFor, publicCommentsOf } from "../../../../../src/model/comment/public/store.server.ts";
+import {
+  postPublic,
+  publicCommentFor,
+  publicCommentsOf,
+} from "../../../../../src/model/comment/public/store.server.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { currentPerson } from "../../../../../src/model/person/actor.server.ts";
 

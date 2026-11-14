@@ -1,5 +1,5 @@
 import { defineHandler } from "void";
-import { ApiError, notFound } from "../../../../../../src/common/api-error.ts";
+import { ApiError } from "../../../../../../src/common/api-error.ts";
 import { api } from "../../../../../../src/common/http.server.ts";
 import { canResolve } from "../../../../../../src/model/comment/access.ts";
 import {

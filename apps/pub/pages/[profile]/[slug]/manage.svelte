@@ -1,6 +1,7 @@
 <script lang="ts">
-  import NotFound from "../../../src/shell/ui/not-found.svelte";
+  
   import ManagePage from "../../../src/model/deck/feature/manage/ui/manage-page.svelte";
+import NotFound from "../../../src/shell/ui/not-found.svelte";
   import type { Props } from "./manage.server";
 
   let { manage }: Props = $props();

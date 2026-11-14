@@ -1,13 +1,13 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { isCompleteUserCode, normalizeUserCode } from "../src/model/person/feature/connect-cli/device-code.ts";
-  import { useApp } from "../src/shell/use-app.ts";
-  import Avatar from "../src/model/person/ui/avatar.svelte";
   import Button from "../src/common/ui/button.svelte";
+  import Icon from "../src/common/ui/icon.svelte";
   import { decide, lookUp } from "../src/model/person/feature/connect-cli/device-api.ts";
+  import { isCompleteUserCode, normalizeUserCode } from "../src/model/person/feature/connect-cli/device-code.ts";
   import type { DeviceProblem } from "../src/model/person/feature/connect-cli/type.ts";
   import DeviceCodeInput from "../src/model/person/feature/connect-cli/ui/device-code-input.svelte";
-  import Icon from "../src/common/ui/icon.svelte";
+  import Avatar from "../src/model/person/ui/avatar.svelte";
+  import { useApp } from "../src/shell/use-app.ts";
   import type { Props } from "./device.server";
 
   let { code: initial }: Props = $props();
