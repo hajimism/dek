@@ -44,10 +44,18 @@ import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
-// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: anyone may join,
-// no grants are claimed, no mail goes out, and the links an account starts with are only noted.
+// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: who may join is
+// asked of a stand-in that notes the question, no grants are claimed, no mail goes out, and the
+// links an account starts with are only noted.
+const invitation = vi.hoisted(() => ({
+  asked: [] as unknown[],
+  invited: true,
+}));
 vi.mock("../../src/model/person/feature/sign-in/invitation.server.ts", () => ({
-  mayMakeAccount: async () => true,
+  mayMakeAccount: async (newcomer: unknown) => {
+    invitation.asked.push(newcomer);
+    return invitation.invited;
+  },
 }));
 vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
   claimOnSignIn: async () => {},
@@ -708,13 +716,20 @@ describe("auth.ts, through Better Auth", () => {
       .join("; ");
   }
 
-  /** The GitHub callback's answer, after the sign-in it ends was started. */
-  async function signInWithGitHub(auth: ReturnType<typeof makeAuth>["auth"]): Promise<Response> {
+  /** The GitHub callback's answer, after the sign-in it ends was started as `/signin` starts it. */
+  async function signInWithGitHub(
+    auth: ReturnType<typeof makeAuth>["auth"],
+    next = "/",
+  ): Promise<Response> {
     const start = await auth.handler(
       new Request(`${origin}/api/auth/sign-in/social`, {
         method: "POST",
         headers: { "content-type": "application/json", origin },
-        body: JSON.stringify({ provider: "github", callbackURL: "/" }),
+        body: JSON.stringify({
+          provider: "github",
+          callbackURL: next,
+          errorCallbackURL: signInHref(next),
+        }),
       }),
     );
     const { url } = (await start.json()) as { url: string };
@@ -730,6 +745,27 @@ describe("auth.ts, through Better Auth", () => {
     vi.unstubAllGlobals();
     seeding.seeded.length = 0;
     seeding.seed = async () => {};
+    invitation.asked.length = 0;
+    invitation.invited = true;
+  });
+
+  it("sends a GitHub sign-up the invitation list refuses back to /signin, and makes nothing", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    invitation.invited = false;
+    const callback = await signInWithGitHub(auth, "/@sato/talk");
+    expect(callback.status).toBe(302);
+    const location = new URL(String(callback.headers.get("location")), origin);
+    expect(location.pathname).toBe("/signin");
+    expect(location.searchParams.get("next")).toBe("/@sato/talk");
+    expect(location.searchParams.get("error")).toBe(NOT_INVITED);
+    expect(invitation.asked).toEqual([
+      { email: "octo@example.com", emailVerified: true, githubLogin: "Octo-Cat" },
+    ]);
+    expect(db.user).toEqual([]);
+    expect(db.account).toEqual([]);
+    expect(db.session).toEqual([]);
+    expect(seeding.seeded).toEqual([]);
   });
 
   it("keeps the login of an account made with GitHub, and starts its links from it", async () => {

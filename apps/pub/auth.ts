@@ -144,7 +144,8 @@ export default defineAuth(({ defaults, env }) => {
             ),
         },
         update: {
-          // No update through Better Auth, update-user's above all, writes the GitHub login.
+          // No update through Better Auth writes the GitHub login: update-user, which would take one
+          // from a request, answers none, and what the server updates through `auth.api` passes here.
           before: async (user: Record<string, unknown>) => {
             if (user.githubLogin !== undefined) {
               throw new APIError("FORBIDDEN", {
