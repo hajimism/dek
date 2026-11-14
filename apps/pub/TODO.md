@@ -22,7 +22,6 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 - **Sign-up by invitation.** Anyone with a GitHub account or an email address can sign up. Nothing holds sign-up to a list of people and to the addresses decks are shared with.
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
 - **Logs.** Unexpected errors go to `console.error` whole, and a D1 error may carry the values it was bound to: an address, a comment's text.
-- **The bucket.** The serve Worker reads the R2 bucket `dek-pub` (`serve/wrangler.jsonc`); `void deploy` makes the app's as `dek-pub-storage`, since `void.config.ts` names none.
 
 ### Terms and the law
 
