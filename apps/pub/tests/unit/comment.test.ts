@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../src/common/api-error.ts";
+import { keepDraft, readDraft } from "../../src/common/ui/drafts.ts";
 import {
   canReadComments,
   canResolve,
@@ -10,18 +11,11 @@ import {
   scopeFor,
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
-import { draftKeys, keepDraft, readDraft } from "../../src/model/comment/drafts.ts";
+import { draftKeys } from "../../src/model/comment/drafts.ts";
 import { mayBeNoticed, noticeMail, noticeRecipients } from "../../src/model/comment/notice.ts";
-import {
-  canPostPublic,
-  mayDeletePublic,
-  mayEditPublic,
-  mustPostPublic,
-} from "../../src/model/comment/public/access.ts";
-import { threadPublic } from "../../src/model/comment/public/view.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
 import { hideQuotes, isDrawn } from "../../src/model/comment/view.ts";
-import { type DeckRules, opensToAnyone } from "../../src/model/deck/access.ts";
+import { draftKeys as publicDraftKeys } from "../../src/model/deck/public-comment/drafts.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
 describe("placeComment", () => {
@@ -273,81 +267,6 @@ describe("who may resolve", () => {
   });
 });
 
-describe("public comments", () => {
-  const open = { ownerId: "u1", visibility: "link" as const, comments: "signed-in" as const };
-  const mine = { authorId: "u2" };
-
-  it("are on a talk anyone may open, and not on a private one", () => {
-    expect(opensToAnyone(open)).toBe(true);
-    expect(opensToAnyone({ ...open, visibility: "public" })).toBe(true);
-    expect(opensToAnyone({ ...open, visibility: "private" })).toBe(false);
-    expect(opensToAnyone({ ...open, visibility: "team" })).toBe(false);
-  });
-
-  it("may be posted as the policy says: by anyone signed in, or by no one", () => {
-    expect(canPostPublic(open, { id: "u2" })).toBe(true);
-    expect(canPostPublic({ ...open, visibility: "public" }, { id: "u2" })).toBe(true);
-    expect(canPostPublic({ ...open, comments: "off" }, { id: "u1" })).toBe(false);
-    expect(canPostPublic({ ...open, visibility: "private" }, { id: "u1" })).toBe(false);
-  });
-
-  it("refuse a poster with no_comments, asking someone signed out to sign in", () => {
-    const refusal = (deck: DeckRules, person: { id: string } | null) => {
-      try {
-        mustPostPublic(deck, person);
-      } catch (error) {
-        return error;
-      }
-    };
-    expect(refusal(open, { id: "u2" })).toBeUndefined();
-    expect(refusal(open, null)).toMatchObject({
-      status: 403,
-      code: "no_comments",
-      hint: "sign in to comment",
-    });
-    expect(refusal({ ...open, comments: "off" }, null)).toMatchObject({ hint: undefined });
-    expect(refusal({ ...open, comments: "off" }, { id: "u2" })).toMatchObject({
-      code: "no_comments",
-      hint: undefined,
-    });
-  });
-
-  it("are never posted by someone signed out, whatever the policy", () => {
-    expect(canPostPublic(open, null)).toBe(false);
-    expect(canPostPublic({ ...open, visibility: "public" }, null)).toBe(false);
-    expect(canPostPublic({ ...open, comments: "off" }, null)).toBe(false);
-  });
-
-  it("are edited by their author alone, and deleted by their author or the deck's owner", () => {
-    expect(mayEditPublic(mine, { id: "u2" })).toBe(true);
-    expect(mayEditPublic(mine, { id: "u1" })).toBe(false);
-    expect(mayEditPublic(mine, null)).toBe(false);
-    expect(mayDeletePublic(open, mine, { id: "u2" })).toBe(true);
-    expect(mayDeletePublic(open, mine, { id: "u1" })).toBe(true);
-    expect(mayDeletePublic(open, mine, { id: "u3" })).toBe(false);
-    expect(mayDeletePublic(open, mine, null)).toBe(false);
-  });
-
-  it("are listed oldest first, each with its replies under it", () => {
-    const row = (id: string, parentId: string | null, createdAt: string) => ({
-      id,
-      parentId,
-      createdAt,
-    });
-    const tree = threadPublic([
-      row("p3", "p1", "2026-11-13T03:00:00Z"),
-      row("p2", null, "2026-11-13T02:00:00Z"),
-      row("p1", null, "2026-11-13T01:00:00Z"),
-      row("p4", "p1", "2026-11-13T02:30:00Z"),
-      row("p5", "gone", "2026-11-13T04:00:00Z"),
-    ]);
-    expect(tree.map((top) => [top.id, top.replies.map((reply) => reply.id)])).toEqual([
-      ["p1", ["p4", "p3"]],
-      ["p2", []],
-    ]);
-  });
-});
-
 describe("thread scope", () => {
   it("opens a team thread for the team's side unless asked, and a shared one for anyone else", () => {
     expect(scopeFor(undefined, "team")).toBe("team");
@@ -398,11 +317,19 @@ describe("drafts", () => {
       draftKeys.reply("d_1", "c_1"),
       draftKeys.reply("d_1", "c_2"),
       draftKeys.reply("d_2", "c_1"),
-      draftKeys.public("d_1", null),
-      draftKeys.public("d_1", "c_1"),
-      draftKeys.edit("d_1", "c_1"),
+      publicDraftKeys.comment("d_1", null),
+      publicDraftKeys.comment("d_1", "c_1"),
+      publicDraftKeys.edit("d_1", "c_1"),
     ];
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("keep the keys drafts were kept under before", () => {
+    expect(draftKeys.reply("d_1", "c_1")).toBe("dek.pub:draft:d_1:reply:c_1");
+    expect(draftKeys.thread("d_1", on([]))).toBe('dek.pub:draft:d_1:thread:["intro","0",[]]');
+    expect(publicDraftKeys.comment("d_1", null)).toBe("dek.pub:draft:d_1:public");
+    expect(publicDraftKeys.comment("d_1", "c_1")).toBe("dek.pub:draft:d_1:public-reply:c_1");
+    expect(publicDraftKeys.edit("d_1", "c_1")).toBe("dek.pub:draft:d_1:public-edit:c_1");
   });
 
   it("keys an element by what it is, not by where it was drawn", () => {
@@ -411,7 +338,7 @@ describe("drafts", () => {
   });
 
   it("keeps nothing, and throws nothing, where there is no storage", () => {
-    const key = draftKeys.public("d_1", null);
+    const key = publicDraftKeys.comment("d_1", null);
     expect(() => keepDraft(key, "Thanks!")).not.toThrow();
     expect(readDraft(key)).toBe("");
   });

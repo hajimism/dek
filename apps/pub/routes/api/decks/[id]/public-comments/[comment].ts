@@ -3,14 +3,17 @@ import { defineHandler } from "void";
 import { EditPublicComment } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
 import { api, jsonBody } from "../../../../../src/common/http.server.ts";
-import { mayDeletePublic, mayEditPublic } from "../../../../../src/model/comment/public/access.ts";
+import { opensToAnyone } from "../../../../../src/model/deck/access.ts";
+import {
+  mayDeletePublic,
+  mayEditPublic,
+} from "../../../../../src/model/deck/public-comment/access.ts";
 import {
   deletePublic,
   editPublic,
   findPublic,
   publicCommentFor,
-} from "../../../../../src/model/comment/public/store.server.ts";
-import { opensToAnyone } from "../../../../../src/model/deck/access.ts";
+} from "../../../../../src/model/deck/public-comment/store.server.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../../src/model/person/actor.server.ts";
 

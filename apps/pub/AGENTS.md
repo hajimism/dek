@@ -6,8 +6,8 @@ The dek.pub server: a Void app (Svelte 5, on Cloudflare Workers) and, in `serve/
 
 - `pages/`: server-rendered pages, `.server.ts` beside each for its loader.
 - `routes/api/`: the JSON API `dekc pub` and the pages call. Its shapes are `../../src/pub/protocol.ts`, shared with the CLI.
-- `src/model/<name>/`: one folder for each thing a person deals with on dek.pub: `person`, `deck` (with `grant/`, `version/` and `serving/` inside), `comment`. A model holds its types in `type.ts`, its rules in plain files, its storage in `*.server.ts` files, and the components that show it in `ui/`.
-- `src/model/<name>/feature/<task>/`: a task that spans models or reaches outside, with its own loader and components, and its `type.ts` when it has types of its own: `deck/feature/publish`, `talk`, `manage` and `sitemap`; `person/feature/connect-cli` and `profile`.
+- `src/model/<name>/`: one folder for each thing a person deals with on dek.pub: `person`, `deck` (with `grant/`, `version/`, `serving/`, `like/` and `public-comment/` inside), `comment` (review threads). A model holds its types in `type.ts`, its rules in plain files, its storage in `*.server.ts` files, and the components that show it in `ui/`.
+- `src/model/<name>/feature/<task>/`: a task a page or a route carries out that takes more than one store function, with its own loader and components, and its `type.ts` when it has types of its own: `deck/feature/publish`, `talk`, `manage` and `sitemap`; `person/feature/connect-cli`, `profile` and `sign-in` (ADR 76).
 - `src/shell/`: what every page shares: the data the middleware hands each page, the header and the footer.
 - `src/common/`: what knows no model: the HTTP helpers, IDs, words in each language, and generic components with the design tokens. `src/common/void-auth.server.ts` is the only file that reaches into Void's internals.
 - `tests/unit/`: one file for each model and for `common` and `shell`, plus `boundaries.test.ts`; `tests/browser/`: components and the browser-side classes.

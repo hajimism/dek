@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { ThreadScope } from "../../../../../../src/pub/protocol.ts";
-  import Button from "../../../common/ui/button.svelte";
+  import Composer from "../../../common/ui/composer.svelte";
   import { useApp } from "../../../shell/use-app.ts";
-  import { dropDraft, keepDraft, readDraft } from "../drafts.ts";
   import type { ReplyInput } from "../type.ts";
 
   let {
@@ -28,119 +27,50 @@
   } = $props();
 
   const { t } = useApp();
-  let text = $state("");
   let shared = $state(false);
   const scope: ThreadScope = $derived(shared ? "shared" : "team");
-  let sending = $state(false);
-  let field: HTMLTextAreaElement | undefined = $state();
-  const uid = $props.id();
-
-  // Read after mounting: the server has no storage, and the page it rendered has an empty field.
-  $effect(() => {
-    const kept = draftKey ? readDraft(draftKey) : "";
-    if (kept) {
-      text = kept;
-    }
-  });
-
-  $effect(() => {
-    if (autofocus && field) {
-      field.focus({ preventScroll: true });
-    }
-  });
+  let composer: Composer | undefined = $state();
 
   export function focus() {
-    field?.focus();
+    composer?.focus();
   }
 
-  async function submit() {
-    if (!text.trim()) {
-      field?.focus();
-      return;
-    }
-    sending = true;
-    const ok = await onsubmit({ text: text.trim(), ...(scopes ? { scope } : {}) });
-    sending = false;
+  async function submit(text: string): Promise<boolean> {
+    const ok = await onsubmit({ text, ...(scopes ? { scope } : {}) });
     if (ok) {
-      // Cleared here, not by watching the text: a new thread's composer is gone by now.
-      if (draftKey) {
-        dropDraft(draftKey);
-      }
-      text = "";
       shared = false;
     }
-  }
-
-  function cancel() {
-    if (draftKey) {
-      dropDraft(draftKey);
-    }
-    oncancel?.();
-  }
-
-  function onkeydown(event: KeyboardEvent) {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      submit();
-    } else if (event.key === "Escape" && !text) {
-      event.preventDefault();
-      cancel();
-    }
+    return ok;
   }
 </script>
 
-<form
-  class="composer"
-  class:compact
-  onsubmit={(event) => {
-    event.preventDefault();
-    submit();
-  }}
+<Composer
+  bind:this={composer}
+  placeholder={placeholder ?? t("comment.placeholder")}
+  submitLabel={submitLabel ?? t("comment.post")}
+  {compact}
+  {autofocus}
+  {draftKey}
+  {oncancel}
+  onsubmit={submit}
 >
-  <label class="visually-hidden" for="dek-text-{uid}">{placeholder ?? t("comment.placeholder")}</label>
-  <textarea
-    id="dek-text-{uid}"
-    bind:this={field}
-    bind:value={text}
-    placeholder={placeholder ?? t("comment.placeholder")}
-    rows="1"
-    maxlength="4000"
-    {onkeydown}
-    oninput={(event) => draftKey && keepDraft(draftKey, event.currentTarget.value)}
-  ></textarea>
   {#if scopes}
     <label class="share">
       <input type="checkbox" bind:checked={shared} />
       <span>{t("comment.share")}</span>
     </label>
   {/if}
-  <div class="row">
-    <span class="hint" aria-hidden="true">{t("comment.shortcut")}</span>
-    {#if oncancel}
-      <Button variant="ghost" size="sm" onclick={cancel}>{t("common.cancel")}</Button>
-    {/if}
-    <Button variant="primary" size="sm" type="submit" loading={sending}>
-      {submitLabel ?? t("comment.post")}
-    </Button>
-  </div>
-</form>
+</Composer>
 
 <style>
-  .composer {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  label {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--text);
-  }
   .share {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     align-self: flex-start;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text);
     cursor: pointer;
   }
   .share input {
@@ -150,53 +80,5 @@
     accent-color: var(--accent);
     flex-shrink: 0;
     cursor: pointer;
-  }
-  textarea {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font-size: var(--text-base);
-    line-height: var(--leading-ui);
-    transition: border-color var(--dur-instant) var(--ease-out);
-  }
-  textarea {
-    min-height: 40px;
-    max-height: calc(8lh + 16px);
-    resize: none;
-    field-sizing: content;
-  }
-  textarea:hover {
-    border-color: var(--text-faint);
-  }
-  textarea:focus-visible {
-    border-color: var(--accent);
-    outline-offset: 0;
-  }
-  @media (min-width: 768px) {
-    textarea {
-      font-size: var(--text-md);
-    }
-  }
-  .compact textarea {
-    min-height: 36px;
-  }
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2);
-  }
-  .hint {
-    margin-right: auto;
-    color: var(--text-faint);
-    font-size: var(--text-xs);
-  }
-  @media (pointer: coarse) {
-    .hint {
-      visibility: hidden;
-    }
   }
 </style>

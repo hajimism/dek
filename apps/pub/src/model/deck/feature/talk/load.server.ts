@@ -7,8 +7,6 @@ import { appUrl } from "../../../../common/http.server.ts";
 import { guessLang, type Lang } from "../../../../common/i18n.ts";
 import { canReadComments } from "../../../comment/access.ts";
 import { isMuted } from "../../../comment/mute.server.ts";
-import { canPostPublic } from "../../../comment/public/access.ts";
-import { publicCommentsOf } from "../../../comment/public/store.server.ts";
 import { commentsFor } from "../../../comment/store.server.ts";
 import { viewerOf } from "../../../person/actor.server.ts";
 import { profileOf } from "../../../person/person.ts";
@@ -18,6 +16,8 @@ import { canComment, canManage, canSeeScript, opensToAnyone } from "../../access
 import { talksBy } from "../../card.server.ts";
 import { talkPath } from "../../deck.ts";
 import { likeState } from "../../like/store.server.ts";
+import { canPostPublic } from "../../public-comment/access.ts";
+import { publicCommentsOf } from "../../public-comment/store.server.ts";
 import { deckBySlug, standingWith } from "../../store.server.ts";
 import { currentVersionOf } from "../../version/store.server.ts";
 import { coverOf, slidePicture } from "../../version/version.ts";

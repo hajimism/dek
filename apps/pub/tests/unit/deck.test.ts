@@ -7,6 +7,7 @@ import {
   canSeeScript,
   canView,
   type DeckRules,
+  opensToAnyone,
   sideOf,
   standingOn,
   versionStanding,
@@ -24,6 +25,13 @@ import { readingSlug } from "../../src/model/deck/feature/talk/reading.ts";
 import { granteeOf, strongestRole, widestSide } from "../../src/model/deck/grant/grant.ts";
 import { invitationMail } from "../../src/model/deck/grant/invite.ts";
 import { canLike } from "../../src/model/deck/like/like.ts";
+import {
+  canPostPublic,
+  mayDeletePublic,
+  mayEditPublic,
+  mustPostPublic,
+} from "../../src/model/deck/public-comment/access.ts";
+import { threadPublic } from "../../src/model/deck/public-comment/view.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
 import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
@@ -542,5 +550,80 @@ describe("invitationMail", () => {
     expect(invitationMail({ ...base, role: "view", byEmail: false }).text).not.toContain(
       "sign in with",
     );
+  });
+});
+
+describe("public comments", () => {
+  const open = { ownerId: "u1", visibility: "link" as const, comments: "signed-in" as const };
+  const mine = { authorId: "u2" };
+
+  it("are on a talk anyone may open, and not on a private one", () => {
+    expect(opensToAnyone(open)).toBe(true);
+    expect(opensToAnyone({ ...open, visibility: "public" })).toBe(true);
+    expect(opensToAnyone({ ...open, visibility: "private" })).toBe(false);
+    expect(opensToAnyone({ ...open, visibility: "team" })).toBe(false);
+  });
+
+  it("may be posted as the policy says: by anyone signed in, or by no one", () => {
+    expect(canPostPublic(open, { id: "u2" })).toBe(true);
+    expect(canPostPublic({ ...open, visibility: "public" }, { id: "u2" })).toBe(true);
+    expect(canPostPublic({ ...open, comments: "off" }, { id: "u1" })).toBe(false);
+    expect(canPostPublic({ ...open, visibility: "private" }, { id: "u1" })).toBe(false);
+  });
+
+  it("refuse a poster with no_comments, asking someone signed out to sign in", () => {
+    const refusal = (deck: DeckRules, person: { id: string } | null) => {
+      try {
+        mustPostPublic(deck, person);
+      } catch (error) {
+        return error;
+      }
+    };
+    expect(refusal(open, { id: "u2" })).toBeUndefined();
+    expect(refusal(open, null)).toMatchObject({
+      status: 403,
+      code: "no_comments",
+      hint: "sign in to comment",
+    });
+    expect(refusal({ ...open, comments: "off" }, null)).toMatchObject({ hint: undefined });
+    expect(refusal({ ...open, comments: "off" }, { id: "u2" })).toMatchObject({
+      code: "no_comments",
+      hint: undefined,
+    });
+  });
+
+  it("are never posted by someone signed out, whatever the policy", () => {
+    expect(canPostPublic(open, null)).toBe(false);
+    expect(canPostPublic({ ...open, visibility: "public" }, null)).toBe(false);
+    expect(canPostPublic({ ...open, comments: "off" }, null)).toBe(false);
+  });
+
+  it("are edited by their author alone, and deleted by their author or the deck's owner", () => {
+    expect(mayEditPublic(mine, { id: "u2" })).toBe(true);
+    expect(mayEditPublic(mine, { id: "u1" })).toBe(false);
+    expect(mayEditPublic(mine, null)).toBe(false);
+    expect(mayDeletePublic(open, mine, { id: "u2" })).toBe(true);
+    expect(mayDeletePublic(open, mine, { id: "u1" })).toBe(true);
+    expect(mayDeletePublic(open, mine, { id: "u3" })).toBe(false);
+    expect(mayDeletePublic(open, mine, null)).toBe(false);
+  });
+
+  it("are listed oldest first, each with its replies under it", () => {
+    const row = (id: string, parentId: string | null, createdAt: string) => ({
+      id,
+      parentId,
+      createdAt,
+    });
+    const tree = threadPublic([
+      row("p3", "p1", "2026-11-13T03:00:00Z"),
+      row("p2", null, "2026-11-13T02:00:00Z"),
+      row("p1", null, "2026-11-13T01:00:00Z"),
+      row("p4", "p1", "2026-11-13T02:30:00Z"),
+      row("p5", "gone", "2026-11-13T04:00:00Z"),
+    ]);
+    expect(tree.map((top) => [top.id, top.replies.map((reply) => reply.id)])).toEqual([
+      ["p1", ["p4", "p3"]],
+      ["p2", []],
+    ]);
   });
 });
