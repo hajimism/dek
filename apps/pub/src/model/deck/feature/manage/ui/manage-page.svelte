@@ -7,6 +7,7 @@
   import CopyField from "../../../../../common/ui/copy-field.svelte";
   import Dialog from "../../../../../common/ui/dialog.svelte";
   import Icon from "../../../../../common/ui/icon.svelte";
+  import RadioList from "../../../../../common/ui/radio-list.svelte";
   import SegmentedControl from "../../../../../common/ui/segmented-control.svelte";
   import Switch from "../../../../../common/ui/switch.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -14,16 +15,21 @@
   import { talkPath } from "../../../deck.ts";
   import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
+  import type { CurrentVersion } from "../type.ts";
   import Sharing from "./sharing.svelte";
-  import Versions from "./versions.svelte";
+  import Version from "./version.svelte";
 
-  let { status: initial, grants }: { status: DeckStatus; grants: GrantView[] } = $props();
+  let {
+    status: initial,
+    grants,
+    version,
+  }: { status: DeckStatus; grants: GrantView[]; version: CurrentVersion | null } = $props();
 
   const { lang, t } = useApp();
   let status: DeckStatus = $state(untrack(() => initial));
   let saving: keyof ShareRequest | null = $state(null);
   let confirmPublic = $state(false);
-  let visibilityControl: ReturnType<typeof SegmentedControl> | undefined = $state();
+  let visibilityControl: ReturnType<typeof RadioList> | undefined = $state();
   let active = $state("overview");
   const path = $derived(talkPath(status.owner, status.slug));
 
@@ -33,14 +39,18 @@
     { id: "script", label: "manage.script" },
     { id: "comments", label: "manage.comments" },
     { id: "sharing", label: "manage.sharing" },
-    { id: "versions", label: "manage.versions" },
+    { id: "version", label: "manage.version" },
   ] as const;
 
-  const visibilityOptions = $derived([
-    { value: "private" as const, label: t("visibility.private"), icon: "lock" as const },
-    { value: "link" as const, label: t("visibility.link"), icon: "link" as const },
-    { value: "public" as const, label: t("visibility.public"), icon: "globe" as const },
-  ]);
+  const visibilityIcons = { team: "lock", private: "users", link: "link", public: "globe" } as const;
+  const visibilityOptions = $derived(
+    (["team", "private", "link", "public"] as const).map((value) => ({
+      value,
+      label: t(`visibility.${value}`),
+      hint: t(`visibility.${value}.hint`),
+      icon: visibilityIcons[value],
+    })),
+  );
   const commentOptions = $derived([
     { value: "off" as const, label: t("manage.comments.off") },
     { value: "signed-in" as const, label: t("manage.comments.signed-in") },
@@ -134,15 +144,13 @@
 
       <section id="visibility" class="section" aria-labelledby="visibility-title">
         <h2 id="visibility-title">{t("visibility.label")}</h2>
-        <SegmentedControl
+        <RadioList
           bind:this={visibilityControl}
           label={t("visibility.label")}
           options={visibilityOptions}
           value={status.visibility}
           onselect={chooseVisibility}
-          describedby="visibility-hint"
         />
-        <p class="hint" id="visibility-hint">{t(`visibility.${status.visibility}.hint`)}</p>
       </section>
 
       <section id="script" class="section" aria-labelledby="script-title">
@@ -190,10 +198,10 @@
         <Sharing deckId={status.id} initial={grants} />
       </section>
 
-      <section id="versions" class="section" aria-labelledby="versions-title">
-        <h2 id="versions-title">{t("manage.versions")}</h2>
-        <p class="hint">{t("manage.versions.hint")}</p>
-        <Versions {status} onchange={(next) => (status = next)} />
+      <section id="version" class="section" aria-labelledby="version-title">
+        <h2 id="version-title">{t("manage.version")}</h2>
+        <p class="hint">{t("manage.version.hint")}</p>
+        <Version {version} />
       </section>
     </div>
   </div>

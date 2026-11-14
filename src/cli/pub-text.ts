@@ -26,27 +26,22 @@ export function formatPub(data: PubResult): string {
         return `nothing was published: lint found ${countSummary(data.diagnostics)}`;
       }
       return [
-        `published version ${data.n} of ${data.url}`,
-        data.current === data.n
-          ? `readers see version ${data.n}`
-          : `readers still see ${data.current === null ? "no version" : `version ${data.current}`}`,
+        `published version ${data.n} of ${data.url}; readers see it`,
         ...(data.diagnostics.length > 0 ? [`lint found ${countSummary(data.diagnostics)}`] : []),
         ...data.changed.map((path) => `wrote pub: into ${path}; commit it`),
       ].join("\n");
-    case "promote":
-      return `readers see version ${data.current} of ${data.url}`;
     case "share":
     case "status": {
       const lines = [
         `${data.url}  ${data.visibility}`,
         `script ${data.scriptPublic ? "shown" : "hidden"}, embed ${data.embed ? "on" : "off"}, comments ${data.comments}`,
-        `readers see ${data.current === null ? "no version" : `version ${data.current}`}; newest is ${data.latest === null ? "none" : data.latest}`,
+        `readers see ${data.current === null ? "no version" : `version ${data.current}`}`,
       ];
       if (data.action === "status") {
         lines.push(
           data.local.published
-            ? "the newest version is the source as it is here"
-            : "the source here differs from the newest version",
+            ? "the current version is the source as it is here"
+            : "the source here differs from the current version",
         );
       }
       return lines.join("\n");

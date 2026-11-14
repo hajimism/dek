@@ -1,11 +1,7 @@
 // A version as the pages and the API read it, and the pictures of it the app serves at
 // /i/<deck>/<n>/<name>: `cover`, or `s-<slug>` for a slide with every beat shown.
 
-import {
-  type LintSummary,
-  SlideMap,
-  type VersionSummary,
-} from "../../../../../../src/pub/protocol.ts";
+import { SlideMap } from "../../../../../../src/pub/protocol.ts";
 import { readJson } from "../../../common/json.ts";
 import { ChangedSlugs, FileHashes, ShotHashes, type Version, type VersionRow } from "./type.ts";
 
@@ -21,19 +17,6 @@ export function versionOf(row: VersionRow): Version {
     files: readJson(FileHashes, row.files),
     shots: readJson(ShotHashes, row.shots),
     changed: readJson(ChangedSlugs, row.changed),
-  };
-}
-
-export function summaryOf(version: Version): VersionSummary {
-  const lint: LintSummary = { errors: version.lintErrors, warnings: version.lintWarnings };
-  return {
-    n: version.n,
-    dekVersion: version.dekVersion,
-    message: version.message,
-    bytes: version.bytes,
-    lint,
-    createdAt: version.createdAt,
-    changed: version.changed,
   };
 }
 

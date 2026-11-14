@@ -938,15 +938,14 @@ export const COMMANDS = {
       ["dekc pub logout", "revoke the key and forget it"],
       ["dekc pub whoami", "who the key signs in as"],
       [
-        "dekc pub publish [deck] [--message <text>] [--no-promote] [--slug <slug>]",
-        "lint, build, and upload the next version; writes pub: on the first",
+        "dekc pub publish [deck] [--message <text>] [--slug <slug>]",
+        "lint, build, and upload the version readers see; writes pub: on the first",
       ],
       [
         "dekc pub share [deck] --visibility|--script|--embed|--comments <value>",
         "who may open the deck, read its script, embed it, and comment",
       ],
-      ["dekc pub status [deck]", "the deck's settings, versions, and whether it is up to date"],
-      ["dekc pub promote [deck] <n>", "make version n the one readers see"],
+      ["dekc pub status [deck]", "the deck's settings, its version, and whether it is up to date"],
       ["dekc pub open [deck]", "open the deck on dek.pub"],
       [
         "dekc pub comments [deck] [--status open|resolved|all]",
@@ -957,10 +956,9 @@ export const COMMANDS = {
     agent: [
       "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
       "dekc pub whoami | logout",
-      "dekc pub publish [--message <text>] [--no-promote] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
-      "dekc pub share --visibility private|link|public --script shown|hidden --embed on|off --comments off|signed-in",
+      "dekc pub publish [--message <text>] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
+      "dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
-      "dekc pub promote <n>   make a version uploaded with --no-promote, or an older one, the one readers see",
     ],
     run: async ({ cwd }) => {
       const { usageError } = await import("./usage.ts");
@@ -1006,10 +1004,8 @@ export const COMMANDS = {
       publish: {
         scope: "deck",
         args: [],
-        flags: ["server", "message", "no-promote", "slug"],
-        usage: [
-          "dekc pub publish [deck] [--message <text>] [--no-promote] [--slug <slug>] [--server <url>]",
-        ],
+        flags: ["server", "message", "slug"],
+        usage: ["dekc pub publish [deck] [--message <text>] [--slug <slug>] [--server <url>]"],
         run: async ({ cwd, flags, target }) => {
           const { publishCommand } = await import("./pub.ts");
           return publishCommand(target, { cwd, flags });
@@ -1020,21 +1016,11 @@ export const COMMANDS = {
         args: [],
         flags: ["server", "visibility", "script", "embed", "comments"],
         usage: [
-          "dekc pub share [deck] [--visibility private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in] [--server <url>]",
+          "dekc pub share [deck] [--visibility team|private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in] [--server <url>]",
         ],
         run: async ({ flags, target }) => {
           const { shareCommand } = await import("./pub.ts");
           return shareCommand(target, flags);
-        },
-      },
-      promote: {
-        scope: "deck",
-        args: ["n"],
-        flags: ["server"],
-        usage: ["dekc pub promote [deck] <n> [--server <url>]"],
-        run: async ({ flags, target, args }) => {
-          const { promoteCommand } = await import("./pub.ts");
-          return promoteCommand(target, args.n, flags);
         },
       },
       status: {

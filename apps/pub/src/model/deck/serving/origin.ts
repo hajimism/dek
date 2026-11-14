@@ -13,9 +13,14 @@ export function deckIdFromHost(host: string): string | null {
   return match?.[1] ? `d_${match[1]}` : null;
 }
 
+/** The R2 prefix every version of a deck is kept under, each in a folder named by its number. */
+export function versionsPrefix(deckId: string): string {
+  return `decks/${deckId}/v/`;
+}
+
 /** The R2 key of one file of a version. */
 export function versionKey(deckId: string, n: number, file: string): string {
-  return `decks/${deckId}/v/${n}/${file}`;
+  return `${versionsPrefix(deckId)}${n}/${file}`;
 }
 
 /** The R2 key of the access file the app writes beside a deck for the serve Worker. */

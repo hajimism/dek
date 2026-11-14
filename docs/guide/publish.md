@@ -35,7 +35,7 @@ Publish does what you would do by hand before sharing a talk, and stops where yo
 1. It lints the deck as `dekc lint` does. An error stops it, with the diagnostics and exit 1, and nothing is sent; warnings go along with the version.
 2. It builds the talk three times: with the whole script, for you; with what is said aloud, as `dekc build --public` does, for readers when the script is shown; and with no script at all, as `dekc build --no-script` does, for readers when it is not. dek.pub serves each reader the build they may read.
 3. It takes a picture of each slide at its last beat, as `dekc shot` does, for the script article, and of the first for the link preview, when Playwright is installed.
-4. It packs the deck's source, without `dist/` and `.cache/`, so `dekc pub status` can tell whether the newest version is what you have.
+4. It packs the deck's source, without `dist/` and `.cache/`, so `dekc pub status` can tell whether the current version is what you have.
 
 The first publish makes the deck on dek.pub and writes its ID into `script.md`:
 
@@ -48,19 +48,11 @@ pub: d_k2m9x4q7w1
 
 Commit that line, so a publish from any checkout updates the same deck. The deck's slug, the end of its URL, is the folder's name in lowercase; pass `--slug <slug>` on the first publish for another. A slug you already have is refused: a deck copied from another, or one whose `pub:` line was deleted, is made anew only with a `--slug` of its own.
 
-Each publish is a new version. It becomes the one readers see unless you pass `--no-promote`. Sections renamed with `dekc mv` since the last version take their comments with them.
-
-A version uploaded with `--no-promote` is a draft. You and the team's side of the people the deck is shared with open it on the talk page, which lets them choose the version and says when the one shown is a draft, and comment on it there; the guests' side sees the current version only, and a thread opened on a draft reaches them once that version, or a later one, is current. When the draft is ready:
-
-```bash
-dekc pub promote 5
-```
-
-The deck's manage page does the same, and rolls back to an older version.
+Each publish is a new version, and readers see it at once. The version before it is deleted from dek.pub: your repository keeps every earlier state of the talk, and to go back you publish that source again. Sections renamed with `dekc mv` since the last version take their comments with them. A page still open on the old version is told to reload when someone comments from it.
 
 ## Share
 
-A new deck is private. Choose who may open it, and the rest, with `dekc pub share`:
+A new deck is for its team alone: you and the team's side of the people you share it with. When it is ready for your guests, or for anyone, widen it with `dekc pub share`, which also sets the rest:
 
 ```bash
 dekc pub share --visibility link --script shown --comments signed-in
@@ -68,16 +60,16 @@ dekc pub share --visibility link --script shown --comments signed-in
 
 | Flag | Values |
 | --- | --- |
-| `--visibility` | `private`: you and those you share it with; `link`: anyone with the link; `public`: everyone |
+| `--visibility` | `team`: you and the team's side of those you share it with; `private`: you and everyone you share it with, team and guests; `link`: anyone with the link; `public`: everyone |
 | `--script` | `shown`: readers see the script beside the slides, without its stage directions and comments; `hidden`: the slides alone |
 | `--embed` | `on` lets other sites embed the deck |
 | `--comments` | who may post comments at the bottom of a `link` or `public` talk: `off`, no one; `signed-in`, anyone signed in to dek.pub |
 
-Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post, and only a reader signed in to dek.pub ever does. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people on its manage page on dek.pub, by handle or email address, each to view or to comment, and each on the team's side or the guests'. The team reads every thread; a guest reads only those shared with them, and never learns of the others. A thread you or your team open is kept to the team unless you check Share with guests, and one kept to the team can be shared later, never taken back.
+Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post, and only a reader signed in to dek.pub ever does. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people on its manage page on dek.pub, by handle or email address, each to view or to comment, and each on the team's side or the guests'. The team reads every thread; a guest reads only those shared with them, and never learns of the others. A guest opens the deck only once it is `private` or wider: to a guest, a `team` deck is a page that does not exist. A thread you or your team open is kept to the team unless you check Share with guests, and one kept to the team can be shared later, never taken back.
 
 Each person you share a deck with is mailed a link to it. Someone invited by email address needs no GitHub account: on dek.pub's sign-in page they ask for a link by mail, sent only to an address a deck is shared with or that has signed in before. Whoever is in a thread, as its author, by a reply, or as the deck's owner, is mailed of new replies and of its resolve, and you are mailed of new threads on your decks. The bell beside a talk's comments stops that mail for the talk. The talk page's Fullscreen button shows the deck with a header naming the talk and the page; its Review button, or `c`, opens the review beside the slide.
 
-`dekc pub status` prints the settings, the versions, and whether the newest is the source as it is in your project. `dekc pub open` opens the deck in the browser.
+`dekc pub status` prints the settings, the version readers see, and whether it is the source as it is in your project. `dekc pub open` opens the deck in the browser.
 
 ## Answer the comments
 

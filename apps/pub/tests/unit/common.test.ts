@@ -25,7 +25,7 @@ describe("i18n", () => {
 
   it("fills in values", () => {
     expect(translate("en", "talk.position", { n: 3, total: 12 })).toBe("Slide 3 of 12");
-    expect(translate("ja", "rollback.title", { n: 3 })).toBe("v3 に戻しますか？");
+    expect(translate("ja", "manage.version.changed", { n: 3 })).toBe("3 枚が変更");
     expect(slideCount("en", 1)).toBe("1 slide");
     expect(slideCount("ja", 12)).toBe("12 枚");
   });

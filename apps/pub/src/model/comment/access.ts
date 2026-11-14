@@ -18,20 +18,9 @@ export function canReadComments(
   return canManage(deck, person) || (person !== null && grant !== null);
 }
 
-/**
- * Whether someone on `side` may see a thread. By version: the team's side any; the guests' side
- * one opened on a version no newer than the current one, so a thread on a draft stays the
- * team's until that version or a later one is current. By scope: the team's side any; the
- * guests' side a shared one only.
- */
-export function canSeeThread(
-  deck: { currentVersion: number | null },
-  thread: Pick<ThreadRow, "n" | "scope">,
-  side: GrantSide,
-): boolean {
-  const byVersion = side === "team" || thread.n <= (deck.currentVersion ?? 0);
-  const byScope = thread.scope === "shared" || side === "team";
-  return byVersion && byScope;
+/** Whether someone on `side` may see a thread: the team's side any, the guests' a shared one. */
+export function canSeeThread(thread: Pick<ThreadRow, "scope">, side: GrantSide): boolean {
+  return thread.scope === "shared" || side === "team";
 }
 
 /**

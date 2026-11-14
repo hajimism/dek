@@ -268,13 +268,12 @@ const PUB_FIELDS = z.union([
     skipped,
   }),
   DeckStatus.extend({ action: z.literal("share"), server }),
-  DeckStatus.extend({ action: z.literal("promote"), server }),
   DeckStatus.extend({
     action: z.literal("status"),
     server,
     local: z.strictObject({
       source: sha256.describe("sha256 of the deck's source as publish would send it now."),
-      published: z.boolean().describe("The newest version was made from this very source."),
+      published: z.boolean().describe("The current version was made from this very source."),
     }),
   }),
   z.strictObject({ action: z.literal("open"), server, url: z.string() }),

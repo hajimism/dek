@@ -306,7 +306,7 @@ export async function publishCommand(
       { method: "GET", path: paths.deck(id), what: "the deck", key },
       DeckStatus,
     );
-    base = status.latest;
+    base = status.current;
   }
 
   // After pub: is written, so the source sent is the one status compares with.
@@ -363,7 +363,6 @@ export async function publishCommand(
         what: "the new version",
         key,
         form,
-        ...(flags["no-promote"] ? { query: { promote: "0" } } : {}),
         timeoutMs: UPLOAD_TIMEOUT_MS,
       },
       PublishResult,
@@ -371,7 +370,7 @@ export async function publishCommand(
   } catch (error) {
     if (error instanceof PubError && error.status === 409 && error.code === "stale_base") {
       throw new DekError("another version of the deck was published since this run looked", {
-        hint: `run \`${pubCommand("status", flags)}\` to see the versions, then \`${pubCommand("publish", flags)}\` again`,
+        hint: `run \`${pubCommand("status", flags)}\` to see the current version, then \`${pubCommand("publish", flags)}\` again`,
         cause: error,
       });
     }
@@ -454,7 +453,7 @@ function writePubId({ project, deck }: ReadableDeck, id: string): void {
 // ---------------------------------------------------------------------------------------------
 // The deck on dek.pub.
 
-/** `dekc pub status`: the deck as dek.pub has it, and whether the newest version is this source. */
+/** `dekc pub status`: the deck as dek.pub has it, and whether its current version is this source. */
 export async function statusCommand(target: ReadableDeck, flags: FlagValues): Promise<PubResult> {
   const origin = serverOrigin(flags.server);
   const id = requireDeckId(target, flags);
@@ -474,7 +473,7 @@ export async function statusCommand(target: ReadableDeck, flags: FlagValues): Pr
 }
 
 const SHARE_FLAGS =
-  "--visibility private|link|public, --script shown|hidden, --embed on|off, or --comments off|signed-in";
+  "--visibility team|private|link|public, --script shown|hidden, --embed on|off, or --comments off|signed-in";
 
 /** `dekc pub share`: who may open the deck, read its script, embed it, and comment. */
 export async function shareCommand(target: ReadableDeck, flags: FlagValues): Promise<PubResult> {
@@ -504,32 +503,6 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
     DeckStatus,
   );
   return { action: "share", server: origin, ...status };
-}
-
-/**
- * `dekc pub promote <n>`: make version `n` the one the guests read, as the manage page's
- * "Make current" does: a draft the team has looked at, or an older version to roll back to.
- */
-export async function promoteCommand(
-  target: ReadableDeck,
-  asked: string,
-  flags: FlagValues,
-): Promise<PubResult> {
-  const n = /^[1-9]\d*$/.test(asked) ? Number(asked) : Number.NaN;
-  if (!Number.isSafeInteger(n)) {
-    throw new DekError(
-      `no version ${JSON.stringify(asked)}: a version is a whole number, as \`${pubCommand("status", flags)}\` lists them`,
-    );
-  }
-  const origin = serverOrigin(flags.server);
-  const id = requireDeckId(target, flags);
-  const key = await requireKey(origin, flags);
-  const status = await request(
-    origin,
-    { method: "POST", path: paths.promote(id), what: `version ${n}`, key, json: { n } },
-    DeckStatus,
-  );
-  return { action: "promote", server: origin, ...status };
 }
 
 /**

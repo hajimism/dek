@@ -1,5 +1,7 @@
-// Publishing a version: the files are checked before anything is written, the number is claimed,
-// the files go to R2 under keys never reused, and the version is recorded with what it changed.
+// Publishing a version: it must be made on the current one; the files are checked before anything
+// is written, a number is taken, the files go to R2 under keys never reused, the version is
+// recorded with what it changed if the deck is still on the version it was made on, and every
+// version below it, which readers no longer see, is deleted after the answer.
 
 import type { Context } from "hono";
 import {
@@ -9,16 +11,18 @@ import {
   type VersionFile,
 } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../../common/api-error.ts";
+import { afterAnswer } from "../../../../common/http.server.ts";
 import { deckById, talkUrl } from "../../store.server.ts";
 import type { Deck } from "../../type.ts";
 import {
   claimVersion,
+  deleteVersionFiles,
+  deleteVersionsBelow,
   findVersion,
+  notOnCurrent,
   putVersionFile,
   recordVersion,
-  releaseVersion,
   renamesOf,
-  staleBase,
 } from "../../version/store.server.ts";
 import { checkContents, fileName, isPng, KINDS, newRenames, readManifest } from "./manifest.ts";
 import { slideChanges } from "./slide-diff.ts";
@@ -28,11 +32,7 @@ const FORM_OVERHEAD = 4 * 1024 * 1024;
 
 const tooLarge = () => new ApiError(413, "too_large", "a version may hold 50 MiB at most");
 
-export async function publish(
-  c: Context,
-  deck: Deck,
-  options: { promote: boolean },
-): Promise<PublishResult> {
+export async function publish(c: Context, deck: Deck): Promise<PublishResult> {
   // The whole form is read into memory to parse it, so its size is refused before that.
   const length = Number(c.req.header("content-length"));
   if (!Number.isFinite(length) || length <= 0) {
@@ -44,8 +44,8 @@ export async function publish(
   const form = await c.req.parseBody({ all: false });
   const manifest = readManifest(form.manifest);
   const base = manifest.base;
-  if (base !== deck.latestVersion) {
-    throw staleBase(deck.latestVersion, base);
+  if (base !== deck.currentVersion) {
+    throw notOnCurrent(deck.currentVersion, base);
   }
   checkContents(manifest);
 
@@ -83,7 +83,7 @@ export async function publish(
     await take(shotField(slug), `shots/${slug}.png`, hash, "image/png", isPng);
   }
 
-  const n = await claimVersion(deck.id, base);
+  const n = await claimVersion(deck.id);
   try {
     for (const { name, file, type } of files) {
       await putVersionFile(deck.id, n, name, file, type);
@@ -102,21 +102,18 @@ export async function publish(
     )
       .filter((change) => change.change !== "removed")
       .map((change) => change.slug);
-    await recordVersion(deck.id, n, {
-      manifest,
-      bytes,
-      changed,
-      renames,
-      promote: options.promote,
-    });
+    await recordVersion(deck.id, n, base, { manifest, bytes, changed, renames });
   } catch (error) {
-    // A version recorded stays, even if writing the access file after it failed; one not recorded
-    // gives its number back.
+    // A version recorded stays, even if writing the access file after it failed. The files of
+    // one not recorded go, as far as they can; its number is skipped.
     if (!(await findVersion(deck.id, n))) {
-      await releaseVersion(deck.id, n, base);
+      await deleteVersionFiles(deck.id, n).catch((cleanup: unknown) => console.error(cleanup));
     }
     throw error;
   }
+  // Every version below this one, and what a publish cut short left, once the answer has gone: a
+  // cleanup that fails is logged, and the next publish sweeps again.
+  afterAnswer(c, deleteVersionsBelow(deck.id, n));
 
   const updated = (await deckById(deck.id)) ?? deck;
   return {

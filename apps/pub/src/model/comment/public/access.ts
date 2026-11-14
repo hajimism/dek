@@ -1,13 +1,13 @@
 // Who may post, change and remove the public comments at the bottom of a talk. They are on a talk
 // anyone may open, `link` or `public`; the deck's comment policy says who may post them.
 
-import { canManage, type DeckRules } from "../../deck/access.ts";
+import { canManage, type DeckRules, opensToAnyone } from "../../deck/access.ts";
 import type { Person } from "../../person/type.ts";
 
 type Caller = Pick<Person, "id"> | null;
 
 export function publicCommentsOn(deck: Pick<DeckRules, "visibility">): boolean {
-  return deck.visibility !== "private";
+  return opensToAnyone(deck);
 }
 
 /** Anyone signed in under `signed-in`, no one under `off`; never anyone signed out. */

@@ -112,8 +112,11 @@ export const DECK_ID_RE = /^d_[0-9a-z]{10,32}$/;
 /** A remote deck's ID, as `pub:` in script.md's frontmatter holds it. */
 export const DeckId = z.string().regex(DECK_ID_RE);
 
-/** Who may open a deck: its owner and grants, anyone with the link, or everyone. */
-export const Visibility = z.enum(["private", "link", "public"]);
+/**
+ * Who may open a deck, from narrowest: its owner and the team's side of its grants, its owner and
+ * every grant, anyone with the link, or everyone.
+ */
+export const Visibility = z.enum(["team", "private", "link", "public"]);
 export type Visibility = z.infer<typeof Visibility>;
 
 /** Who may comment on a deck anyone can open: nobody else, or anyone signed in. */
@@ -164,7 +167,7 @@ export const VersionManifest = z.strictObject({
     .string()
     .regex(/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/)
     .optional(),
-  /** The newest version this one was made on, or null for the first; 409 when it is not. */
+  /** The current version this one was made on, or null for the first; 409 when it is not. */
   base: z.number().int().nullable(),
   /** The public build's map: the article and comment anchors use it. */
   slideMap: SlideMap,
@@ -185,18 +188,6 @@ export const CreateDeckRequest = z.strictObject({
   title: z.string().max(500),
 });
 
-export const VersionSummary = z.strictObject({
-  n: z.number().int(),
-  dekVersion: z.string(),
-  message: z.string().nullable(),
-  bytes: z.number().int(),
-  lint: LintSummary,
-  createdAt: z.string(),
-  /** Slugs whose slide or script differs from the version before. */
-  changed: z.array(z.string()).optional(),
-});
-export type VersionSummary = z.infer<typeof VersionSummary>;
-
 export const DeckStatus = z.strictObject({
   id: DeckId,
   slug: z.string(),
@@ -207,13 +198,10 @@ export const DeckStatus = z.strictObject({
   scriptPublic: z.boolean(),
   embed: z.boolean(),
   comments: CommentPolicy,
-  /** The version readers see; null before the first upload. */
+  /** The version readers see, the newest; null before the first upload. */
   current: z.number().int().nullable(),
-  /** The newest version uploaded. */
-  latest: z.number().int().nullable(),
-  /** sha256 of each file of the newest version, to tell what changed locally. */
+  /** sha256 of each file of the current version, to tell what changed locally. */
   files: z.partialRecord(z.enum(VERSION_FILES), z.string()),
-  versions: z.array(VersionSummary),
 });
 export type DeckStatus = z.infer<typeof DeckStatus>;
 
@@ -233,8 +221,6 @@ export const ShareRequest = z.strictObject({
   comments: CommentPolicy.optional(),
 });
 export type ShareRequest = z.infer<typeof ShareRequest>;
-
-export const PromoteRequest = z.strictObject({ n: z.number().int() });
 
 // ---------------------------------------------------------------------------------------------
 // Comments. Their row has the shape of a `dekc annotations` row where the two mean the same, so an
@@ -432,7 +418,6 @@ export const paths = {
   decks: "/api/decks",
   deck: (id: string) => `/api/decks/${segment(id)}`,
   versions: (id: string) => `/api/decks/${segment(id)}/versions`,
-  promote: (id: string) => `/api/decks/${segment(id)}/promote`,
   comments: (id: string) => `/api/decks/${segment(id)}/comments`,
   replies: (id: string, comment: string) =>
     `/api/decks/${segment(id)}/comments/${segment(comment)}/replies`,

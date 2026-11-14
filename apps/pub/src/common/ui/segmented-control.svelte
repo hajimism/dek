@@ -1,5 +1,6 @@
 <script lang="ts" generics="V extends string">
   import Icon, { type IconName } from "./icon.svelte";
+  import { RadioFocus } from "./radio-focus.svelte.ts";
 
   type Option = { value: V; label: string; icon?: IconName };
 
@@ -24,40 +25,14 @@
   } = $props();
 
   const index = $derived(Math.max(0, options.findIndex((option) => option.value === value)));
-  let buttons: HTMLButtonElement[] = $state([]);
-  // The arrow keys move focus only; Space, Enter or a click commits, since a choice here (going
-  // public) may have consequences the owner of `value` asks about first. The one in the tab
-  // order is the focused one while focus is inside, and the chosen one otherwise.
-  let focused: number | null = $state(null);
-  const tabStop = $derived(focused ?? index);
-
-  function move(event: KeyboardEvent, from: number) {
-    const keys: Record<string, number> = {
-      ArrowRight: 1,
-      ArrowDown: 1,
-      ArrowLeft: -1,
-      ArrowUp: -1,
-    };
-    let to: number | null = null;
-    if (event.key in keys) {
-      to = (from + (keys[event.key] ?? 0) + options.length) % options.length;
-    } else if (event.key === "Home") {
-      to = 0;
-    } else if (event.key === "End") {
-      to = options.length - 1;
-    }
-    if (to === null) {
-      return;
-    }
-    event.preventDefault();
-    focused = to;
-    buttons[to]?.focus();
-  }
+  const radios = new RadioFocus(
+    () => options.length,
+    () => index,
+  );
 
   /** Put focus back on the chosen option, as after a choice was asked about and declined. */
   export function focusChosen() {
-    focused = null;
-    buttons[index]?.focus();
+    radios.focusChosen();
   }
 </script>
 
@@ -70,25 +45,21 @@
   aria-disabled={disabled ? "true" : undefined}
   style:--count={options.length}
   style:--index={index}
-  onfocusout={(event) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      focused = null;
-    }
-  }}
+  onfocusout={(event) => radios.leave(event)}
 >
   <span class="thumb" aria-hidden="true"></span>
   {#each options as option, i (option.value)}
     <button
-      bind:this={buttons[i]}
+      bind:this={radios.radios[i]}
       type="button"
       role="radio"
       class="segment"
       aria-checked={option.value === value}
-      tabindex={i === tabStop ? 0 : -1}
+      tabindex={i === radios.tabStop ? 0 : -1}
       {disabled}
       onclick={() => option.value !== value && onselect(option.value)}
-      onkeydown={(event) => move(event, i)}
-      onfocus={() => (focused = i)}
+      onkeydown={(event) => radios.move(event, i)}
+      onfocus={() => radios.focus(i)}
     >
       {#if option.icon}<Icon name={option.icon} size={14} />{/if}
       <span>{option.label}</span>

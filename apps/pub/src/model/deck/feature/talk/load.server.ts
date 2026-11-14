@@ -15,12 +15,12 @@ import { viewerOf } from "../../../person/actor.server.ts";
 import { profileOf } from "../../../person/person.ts";
 import { handleOf } from "../../../person/profile-path.ts";
 import { personByHandle } from "../../../person/store.server.ts";
-import { canComment, canManage, canSeeScript, shownVersion } from "../../access.ts";
+import { canComment, canManage, canSeeScript } from "../../access.ts";
 import { talksBy } from "../../card.server.ts";
 import { talkPath } from "../../deck.ts";
 import { likeState } from "../../like/store.server.ts";
 import { deckBySlug, visibleDeck } from "../../store.server.ts";
-import { findVersion, versionsOf } from "../../version/store.server.ts";
+import { findVersion } from "../../version/store.server.ts";
 import { coverOf, slidePicture } from "../../version/version.ts";
 import { frameOf } from "./frame.server.ts";
 import type { Talk } from "./type.ts";
@@ -33,7 +33,7 @@ export async function loadTalk(
   const handle = handleOf(segment);
   const owner = handle ? await personByHandle(c, handle) : null;
   const row = owner && slug ? await deckBySlug(owner.id, slug) : null;
-  if (!owner || !row || row.latestVersion === null) {
+  if (!owner || !row || row.currentVersion === null) {
     return null;
   }
   const person = await viewerOf(c);
@@ -47,9 +47,7 @@ export async function loadTalk(
     return null;
   }
   const { deck, grant, side } = seen;
-  // `?v=` picks a version, for the team's side; any version someone may not read is missing.
-  const asked = c.req.query("v");
-  const n = shownVersion(deck, side, asked === undefined ? null : Number(asked));
+  const n = deck.currentVersion;
   const version = n === null ? null : await findVersion(deck.id, n);
   if (n === null || !version) {
     return null;
@@ -80,15 +78,6 @@ export async function loadTalk(
     url: appUrl(talkPath(owner.handle, deck.slug)),
     owner: profileOf(owner),
     version: n,
-    current: deck.currentVersion,
-    versions:
-      side === "team"
-        ? (await versionsOf(deck.id)).map((each) => ({
-            n: each.n,
-            message: each.message,
-            createdAt: each.createdAt,
-          }))
-        : null,
     viewer: await frameOf(deck, n),
     slides: slides.map((slide) => ({
       slug: slide.slug,
@@ -99,9 +88,7 @@ export async function loadTalk(
     })),
     script,
     isOwner,
-    comments: readsComments
-      ? await commentsFor(c, deck, person, side, { status: "all", version: n })
-      : null,
+    comments: readsComments ? await commentsFor(c, deck, person, side, "all") : null,
     canComment: canComment(deck, person, grant),
     muted: person && readsComments ? await isMuted(person.id, deck.id) : null,
     publicComments: publicCommentsOn(deck) ? await publicCommentsOf(c, deck.id) : null,

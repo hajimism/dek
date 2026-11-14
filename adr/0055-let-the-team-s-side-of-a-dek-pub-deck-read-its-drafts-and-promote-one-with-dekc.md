@@ -4,9 +4,11 @@ Date: 2026-11-14
 
 ## Status
 
-Accepted
+Superseded
 
 Amended by [64. Call the side of a dek.pub deck that is not the team its guests, and share a thread with them by a checkbox](0064-call-the-side-of-a-dek-pub-deck-that-is-not-the-team-its-guests-and-share-a-thread-with-them-by-a-checkbox.md)
+
+Superseded by [71. Keep only a dek.pub deck's current version, and show a deck to its team alone until its visibility reaches its guests](0071-keep-only-a-dek-pub-deck-s-current-version-and-show-a-deck-to-its-team-alone-until-its-visibility-reaches-its-guests.md)
 
 ## Context
 

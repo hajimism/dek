@@ -17,11 +17,10 @@ import { claimGrants, grantedSide, grantsOf, roleOf } from "./grant/store.server
 import type { GrantRole, GrantSide } from "./grant/type.ts";
 import { syncAccess } from "./sync-access.server.ts";
 import type { Deck, DeckPatch } from "./type.ts";
-import { versionsOf } from "./version/store.server.ts";
-import { summaryOf } from "./version/version.ts";
+import { findVersion } from "./version/store.server.ts";
 
-/** The columns the access file is made from; a change to any of them writes it again. */
-const ACCESS_COLUMNS = ["visibility", "scriptPublic", "embed", "currentVersion"] as const;
+/** The columns of the access file an owner may change; a change to any of them writes it again. */
+const ACCESS_COLUMNS = ["visibility", "scriptPublic", "embed"] as const;
 
 export async function deckById(id: string): Promise<Deck | null> {
   return (await db.select().from(decks).where(eq(decks.id, id)).get()) ?? null;
@@ -73,7 +72,7 @@ export async function recentPublicDecks(limit: number): Promise<Deck[]> {
     .all();
 }
 
-/** Make a deck, private, before its first version is uploaded. */
+/** Make a deck, kept to its team, before its first version is uploaded. */
 export async function createDeck(owner: Person, slug: string, title: string): Promise<Deck> {
   if (await deckBySlug(owner.id, slug)) {
     throw new ApiError(
@@ -84,7 +83,7 @@ export async function createDeck(owner: Person, slug: string, title: string): Pr
     );
   }
   const id = newDeckId();
-  await db.insert(decks).values({ id, ownerId: owner.id, slug, title });
+  await db.insert(decks).values({ id, ownerId: owner.id, slug, title, visibility: "team" });
   await syncAccess(id);
   return mustFind(id);
 }
@@ -126,10 +125,11 @@ export async function visibleDeck(
     await claimGrants(grants, person);
   }
   const grant = roleOf(grants);
-  if (!canView(deck, person, grant)) {
+  const granted = grantedSide(grants);
+  if (!canView(deck, person, grant, granted)) {
     throw notFound();
   }
-  return { deck, grant, side: sideOf(deck, person, grantedSide(grants)) };
+  return { deck, grant, side: sideOf(deck, person, granted) };
 }
 
 export async function ownedDeck(id: string, person: Person): Promise<Deck> {
@@ -151,7 +151,8 @@ export async function talkUrl(c: Context, deck: Deck): Promise<string> {
 
 export async function deckStatus(c: Context, deck: Deck): Promise<DeckStatus> {
   const handle = await ownerHandle(c, deck);
-  const versions = await versionsOf(deck.id);
+  const version =
+    deck.currentVersion === null ? null : await findVersion(deck.id, deck.currentVersion);
   return {
     id: deck.id,
     slug: deck.slug,
@@ -163,8 +164,6 @@ export async function deckStatus(c: Context, deck: Deck): Promise<DeckStatus> {
     embed: deck.embed,
     comments: deck.comments,
     current: deck.currentVersion,
-    latest: deck.latestVersion,
-    files: versions[0]?.files ?? {},
-    versions: versions.map(summaryOf),
+    files: version?.files ?? {},
   };
 }

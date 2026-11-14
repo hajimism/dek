@@ -7,7 +7,8 @@
   let { visibility }: { visibility: Visibility } = $props();
   const { t } = useApp();
   const look = {
-    private: { tone: "neutral", icon: "lock" },
+    team: { tone: "neutral", icon: "lock" },
+    private: { tone: "neutral", icon: "users" },
     link: { tone: "accent", icon: "link" },
     public: { tone: "success", icon: "globe" },
   } as const;

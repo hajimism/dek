@@ -11,7 +11,6 @@ import {
   NewReply,
   PROTOCOL_HEADER,
   PROTOCOL_VERSION,
-  PromoteRequest,
   ShareRequest,
   shotField,
   VERSION_FILES,
@@ -32,8 +31,11 @@ export type FakeRequest = {
 
 type Device = { userCode: string; polls: number; denied?: boolean };
 
-/** A deck as the fake keeps it: what status answers, and the comment threads on it. */
-type FakeDeck = DeckStatus & { rows: CommentRow[] };
+/**
+ * A deck as the fake keeps it: what status answers, the comment threads on it, and the last
+ * number a publish took, which counts on from there.
+ */
+type FakeDeck = DeckStatus & { rows: CommentRow[]; latest: number | null };
 
 export type FakePub = {
   url: string;
@@ -101,23 +103,22 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
         owner: ME.handle,
         title: "Talk",
         url: "",
-        visibility: "private",
+        visibility: "team",
         scriptPublic: false,
         embed: false,
         comments: "off",
         current: null,
-        latest: null,
         files: {},
-        versions: [],
         ...deck,
         rows: [],
+        latest: deck.current ?? null,
       };
       made.url = `${fake.url}/@${ME.handle}/${made.slug}`;
       fake.decks.set(made.id, made);
       return made;
     },
   };
-  const status = ({ rows: _rows, ...deck }: FakeDeck): DeckStatus => deck;
+  const status = ({ rows: _rows, latest: _latest, ...deck }: FakeDeck): DeckStatus => deck;
 
   const server = Bun.serve({
     port: 0,
@@ -254,17 +255,6 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       Object.assign(deck, parsed.data);
       return Response.json(status(deck));
     }
-    if (method === "POST" && rest === "/promote") {
-      const parsed = PromoteRequest.safeParse(body);
-      if (!parsed.success) {
-        return error(422, "invalid", parsed.error.message);
-      }
-      if (parsed.data.n < 1 || parsed.data.n > (deck.latest ?? 0)) {
-        return error(404, "not_found", "no such version");
-      }
-      deck.current = parsed.data.n;
-      return Response.json(status(deck));
-    }
     if (method === "POST" && rest === "/versions") {
       const length = Number(request.headers["content-length"]);
       if (!Number.isFinite(length) || length <= 0) {
@@ -273,7 +263,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if (length > MAX_VERSION_BYTES + 4 * 1024 * 1024) {
         return error(413, "too_large", "a version may hold 50 MiB at most");
       }
-      return version(deck, request, form);
+      return version(deck, form);
     }
     if (method === "GET" && rest === "/comments") {
       const wanted = request.query.status ?? "open";
@@ -313,18 +303,18 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     return new Response("unexpected request", { status: 500 });
   }
 
-  async function version(deck: FakeDeck, request: FakeRequest, form?: FormData): Promise<Response> {
+  async function version(deck: FakeDeck, form?: FormData): Promise<Response> {
     const raw = form?.get("manifest");
     const parsed = VersionManifest.safeParse(typeof raw === "string" ? JSON.parse(raw) : undefined);
     if (!parsed.success) {
       return error(422, "invalid", `manifest: ${parsed.error.message}`);
     }
     const manifest = parsed.data;
-    if (manifest.base !== deck.latest) {
+    if (manifest.base !== deck.current) {
       return error(
         409,
         "stale_base",
-        `version ${deck.latest} is the newest, not ${manifest.base ?? "none"}`,
+        `version ${deck.current ?? "none"} is the current one, not ${manifest.base ?? "none"}`,
         "someone published since; run `dekc pub status` and publish again",
       );
     }
@@ -349,18 +339,8 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     }
     const n = (deck.latest ?? 0) + 1;
     deck.latest = n;
-    if (request.query.promote !== "0") {
-      deck.current = n;
-    }
+    deck.current = n;
     deck.files = { ...manifest.files };
-    deck.versions.push({
-      n,
-      dekVersion: manifest.dekVersion,
-      message: manifest.message ?? null,
-      bytes: 0,
-      lint: manifest.lint,
-      createdAt: new Date(Date.now() + n).toISOString(),
-    });
     fake.manifests.set(deck.id, [...(fake.manifests.get(deck.id) ?? []), manifest]);
     return Response.json(
       { id: deck.id, n, current: deck.current, url: deck.url, visibility: deck.visibility },
