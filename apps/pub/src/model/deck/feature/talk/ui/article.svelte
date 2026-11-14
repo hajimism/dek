@@ -11,7 +11,7 @@
 <script lang="ts">
   import type { CommentRow } from "../../../../../../../../src/pub/protocol.ts";
   import { threadLabel } from "../../../../../../../../src/pub/thread.ts";
-  import { elementOf, paragraphMarks } from "../../../../comment/view.ts";
+  import { elementOf, isDrawn, paragraphMarks } from "../../../../comment/view.ts";
   import { boxToPercent } from "../embed.ts";
   import { quoteAt, segments } from "../../../../comment/quote.ts";
   import type { ArticleSlide, QuoteSelection, Size } from "../type.ts";
@@ -65,7 +65,7 @@
     const pins = new Map<string, { id: string; label: string; box: ReturnType<typeof boxToPercent> }[]>();
     for (const comment of comments) {
       const element = elementOf(comment);
-      if (!element || comment.status === "resolved" || comment.status === "detached") {
+      if (!element || !isDrawn(comment)) {
         continue;
       }
       const list = pins.get(comment.slug) ?? [];

@@ -17,7 +17,7 @@
   import PublicComments from "../../../../comment/public/ui/public-comments.svelte";
   import type { CardComment, Draft, Filter, ReplyInput } from "../../../../comment/type.ts";
   import CommentsPanel from "../../../../comment/ui/comments-panel.svelte";
-  import { byPosition, elementOf } from "../../../../comment/view.ts";
+  import { byPosition, elementOf, isDrawn } from "../../../../comment/view.ts";
   import { profilePath } from "../../../../person/profile-path.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
   import { talkPath } from "../../../deck.ts";
@@ -171,7 +171,7 @@
     const slug = link.current?.slug;
     const marks = comments.flatMap((comment) => {
       const element = elementOf(comment);
-      return element && comment.slug === slug && comment.status !== "resolved" && !comment.pending
+      return element && comment.slug === slug && isDrawn(comment) && !comment.pending
         ? [{ id: comment.id, number: comment.number, slug: comment.slug, step: comment.step, box: element.box }]
         : [];
     });
