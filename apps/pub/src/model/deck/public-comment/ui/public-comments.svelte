@@ -5,11 +5,11 @@
   import { absoluteTime, relativeTime } from "../../../../common/i18n.ts";
   import Button from "../../../../common/ui/button.svelte";
   import { now as currentTime } from "../../../../common/ui/clock.svelte.ts";
+  import Composer from "../../../../common/ui/composer.svelte";
+  import { dropDraft, keepDraft, readDraft } from "../../../../common/ui/drafts.ts";
   import { useApp } from "../../../../shell/use-app.ts";
   import Avatar from "../../../person/ui/avatar.svelte";
-  import { draftKeys, dropDraft, keepDraft, readDraft } from "../../drafts.ts";
-  import type { ReplyInput } from "../../type.ts";
-  import Composer from "../../ui/composer.svelte";
+  import { draftKeys } from "../drafts.ts";
 
   let {
     comments,
@@ -30,7 +30,7 @@
     off?: boolean;
     isOwner?: boolean;
     signinHref: string;
-    onpost: (input: ReplyInput, parentId: string | null) => Promise<boolean>;
+    onpost: (text: string, parentId: string | null) => Promise<boolean>;
     onedit: (id: string, text: string) => Promise<boolean>;
     ondelete: (id: string) => Promise<void>;
   } = $props();
@@ -157,10 +157,10 @@
                     autofocus
                     placeholder={t("public.replyPlaceholder")}
                     submitLabel={t("public.reply")}
-                    draftKey={deckId && draftKeys.public(deckId, top.id)}
+                    draftKey={deckId && draftKeys.comment(deckId, top.id)}
                     oncancel={() => (replying = null)}
-                    onsubmit={async (input) => {
-                      const ok = await onpost(input, top.id);
+                    onsubmit={async (text) => {
+                      const ok = await onpost(text, top.id);
                       if (ok) {
                         replying = null;
                       }
@@ -179,8 +179,9 @@
     <div class="new">
       <Composer
         placeholder={t("public.placeholder")}
-        draftKey={deckId && draftKeys.public(deckId, null)}
-        onsubmit={(input) => onpost(input, null)}
+        submitLabel={t("comment.post")}
+        draftKey={deckId && draftKeys.comment(deckId, null)}
+        onsubmit={(text) => onpost(text, null)}
       />
     </div>
   {:else if off}

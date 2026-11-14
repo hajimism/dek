@@ -15,8 +15,8 @@ import { currentPerson } from "../../../../../../src/model/person/actor.server.t
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
-    mustComment(canComment(deck, person, grant), person);
+    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person);
+    mustComment(canComment(deck, person, role), person);
     const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
     const body = await jsonBody(c, NewReply);
     const replyId = await addReply(thread, person, body.text);

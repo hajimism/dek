@@ -2,8 +2,15 @@
 
 import type { decks } from "@schema";
 import type { TalkCard } from "../../../../../src/pub/protocol.ts";
+import type { GrantRole, GrantSide } from "./grant/type.ts";
 
 export type Deck = typeof decks.$inferSelect;
+
+/**
+ * Where a person stands with a deck: whether it opens to them, the role their grants give them,
+ * and the side of the work they are on.
+ */
+export type Standing = { opens: boolean; role: GrantRole | null; side: GrantSide };
 
 /** What may change on a deck after it is made. */
 export type DeckPatch = Partial<Pick<Deck, "visibility" | "scriptPublic" | "embed" | "comments">>;

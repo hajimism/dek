@@ -14,15 +14,15 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import { CommentList } from "../../../../comment/client.svelte.ts";
-  import PublicComments from "../../../../comment/public/ui/public-comments.svelte";
   import type { CardComment, Draft, Filter, ReplyInput } from "../../../../comment/type.ts";
   import CommentsPanel from "../../../../comment/ui/comments-panel.svelte";
-  import { byPosition, elementOf } from "../../../../comment/view.ts";
+  import { byPosition, elementOf, isDrawn } from "../../../../comment/view.ts";
   import { profilePath } from "../../../../person/profile-path.ts";
   import { signInHref } from "../../../../person/sign-in-path.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
   import { talkPath } from "../../../deck.ts";
   import LikeButton from "../../../like/ui/like-button.svelte";
+  import PublicComments from "../../../public-comment/ui/public-comments.svelte";
   import TalkCardView from "../../../ui/talk-card.svelte";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import { DeckLink } from "../deck-link.svelte.ts";
@@ -172,7 +172,7 @@
     const slug = link.current?.slug;
     const marks = comments.flatMap((comment) => {
       const element = elementOf(comment);
-      return element && comment.slug === slug && comment.status !== "resolved" && !comment.pending
+      return element && comment.slug === slug && isDrawn(comment) && !comment.pending
         ? [{ id: comment.id, number: comment.number, slug: comment.slug, step: comment.step, box: element.box }]
         : [];
     });
@@ -638,9 +638,9 @@
           off={talk.commentPolicy === "off"}
           isOwner={talk.isOwner}
           signinHref={signIn}
-          onpost={(input, parentId) =>
+          onpost={(text, parentId) =>
             publicChange(() => {
-              const body: NewPublicComment = { text: input.text, ...(parentId ? { parentId } : {}) };
+              const body: NewPublicComment = { text, ...(parentId ? { parentId } : {}) };
               return api(publicPath, { method: "POST", body });
             })}
           onedit={(id, text) =>

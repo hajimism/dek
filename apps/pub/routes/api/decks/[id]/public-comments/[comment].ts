@@ -3,24 +3,24 @@ import { defineHandler } from "void";
 import { EditPublicComment } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
 import { api, jsonBody } from "../../../../../src/common/http.server.ts";
+import { opensToAnyone } from "../../../../../src/model/deck/access.ts";
 import {
   mayDeletePublic,
   mayEditPublic,
-  publicCommentsOn,
-} from "../../../../../src/model/comment/public/access.ts";
+} from "../../../../../src/model/deck/public-comment/access.ts";
 import {
   deletePublic,
   editPublic,
   findPublic,
   publicCommentFor,
-} from "../../../../../src/model/comment/public/store.server.ts";
+} from "../../../../../src/model/deck/public-comment/store.server.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../../src/model/person/actor.server.ts";
 
 async function target(c: Context) {
   const person = await requirePerson(c);
   const { deck } = await visibleDeck(c.req.param("id") ?? "", person);
-  if (!publicCommentsOn(deck)) {
+  if (!opensToAnyone(deck)) {
     throw notFound("comment");
   }
   return { person, deck, row: await findPublic(deck.id, c.req.param("comment") ?? "") };

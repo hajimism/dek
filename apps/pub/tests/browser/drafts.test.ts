@@ -4,11 +4,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type { CommentRow, PublicComment } from "../../../../src/pub/protocol.ts";
-import PublicComments from "../../src/model/comment/public/ui/public-comments.svelte";
 import type { Draft } from "../../src/model/comment/type.ts";
 import CommentCard from "../../src/model/comment/ui/comment-card.svelte";
 import CommentsPanel from "../../src/model/comment/ui/comments-panel.svelte";
 import Composer from "../../src/model/comment/ui/composer.svelte";
+import PublicComments from "../../src/model/deck/public-comment/ui/public-comments.svelte";
 import { NOW, renderPage } from "./setup.ts";
 
 beforeEach(() => localStorage.clear());

@@ -15,6 +15,22 @@ export async function personByHandle(c: Context, handle: string): Promise<Person
   return user ? readAccount(user) : null;
 }
 
+/**
+ * Whether the person signs in with GitHub. An account made that way took its handle from the
+ * GitHub login; one made by a sign-in link took it from the address and links to no GitHub page.
+ */
+export async function signsInWithGitHub(c: Context, person: Person): Promise<boolean> {
+  const context = await authOf(c).$context;
+  const account = await context.adapter.findOne({
+    model: "account",
+    where: [
+      { field: "userId", value: person.id },
+      { field: "providerId", value: "github" },
+    ],
+  });
+  return account !== null;
+}
+
 export async function personByEmail(c: Context, email: string): Promise<Person | null> {
   const context = await authOf(c).$context;
   const user = await context.adapter.findOne({

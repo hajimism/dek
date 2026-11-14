@@ -10,7 +10,6 @@ import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
 import { peopleById, personByEmail, personByHandle } from "../../person/store.server.ts";
 import type { Person } from "../../person/type.ts";
-import { strongestRole, widestSide } from "./grant.ts";
 import type { Grantee, GrantRole, GrantRow, GrantSide, GrantView } from "./type.ts";
 
 /** The grants that name `person` on a deck: by account, or by an address they have verified. */
@@ -27,14 +26,6 @@ export async function grantsOf(deckId: string, person: Person | null): Promise<G
     .from(grants)
     .where(and(eq(grants.deckId, deckId), match))
     .all();
-}
-
-export function roleOf(rows: readonly GrantRow[]): GrantRole | null {
-  return strongestRole(rows.map((row) => row.role));
-}
-
-export function grantedSide(rows: readonly GrantRow[]): GrantSide | null {
-  return widestSide(rows.map((row) => row.side));
 }
 
 /**

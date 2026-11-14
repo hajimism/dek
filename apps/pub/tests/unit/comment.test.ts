@@ -1,25 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../src/common/api-error.ts";
+import { keepDraft, readDraft } from "../../src/common/ui/drafts.ts";
 import {
   canReadComments,
   canResolve,
   canSeeThread,
   mayResolve,
   mayWiden,
+  mustResolve,
   scopeFor,
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
-import { draftKeys, keepDraft, readDraft } from "../../src/model/comment/drafts.ts";
+import { draftKeys } from "../../src/model/comment/drafts.ts";
 import { mayBeNoticed, noticeMail, noticeRecipients } from "../../src/model/comment/notice.ts";
-import {
-  canPostPublic,
-  mayDeletePublic,
-  mayEditPublic,
-  publicCommentsOn,
-} from "../../src/model/comment/public/access.ts";
-import { threadPublic } from "../../src/model/comment/public/view.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
-import { hideQuotes } from "../../src/model/comment/view.ts";
+import { hideQuotes, isDrawn } from "../../src/model/comment/view.ts";
+import { draftKeys as publicDraftKeys } from "../../src/model/deck/public-comment/drafts.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
 describe("placeComment", () => {
@@ -183,6 +179,15 @@ describe("segments", () => {
   });
 });
 
+describe("isDrawn", () => {
+  it("draws a comment that is open or moved, and not one resolved or detached", () => {
+    expect(isDrawn({ status: "open" })).toBe(true);
+    expect(isDrawn({ status: "moved" })).toBe(true);
+    expect(isDrawn({ status: "resolved" })).toBe(false);
+    expect(isDrawn({ status: "detached" })).toBe(false);
+  });
+});
+
 describe("hideQuotes", () => {
   it("keeps a quote's place but not its words", () => {
     const hidden = hideQuotes({
@@ -213,6 +218,25 @@ describe("who may resolve", () => {
     expect(canResolve(deck, { authorId: "u2" }, null, null)).toBe(false);
   });
 
+  it("refuses anyone else with not_yours, naming what they tried", () => {
+    expect(() =>
+      mustResolve(deck, { authorId: "u2" }, { id: "u2" }, "view", "reopen"),
+    ).not.toThrow();
+    const refused = (() => {
+      try {
+        mustResolve(deck, { authorId: "u2" }, { id: "u3" }, "comment", "reopen");
+      } catch (error) {
+        return error;
+      }
+    })();
+    expect(refused).toBeInstanceOf(ApiError);
+    expect(refused).toMatchObject({
+      status: 403,
+      code: "not_yours",
+      message: "only the deck's owner and the comment's author may reopen it",
+    });
+  });
+
   it("is not an author the deck is no longer shared with", () => {
     expect(canResolve(deck, { authorId: "u2" }, { id: "u2" }, null)).toBe(false);
   });
@@ -240,60 +264,6 @@ describe("who may resolve", () => {
     expect(
       canReadComments({ ...deck, visibility: "private" as const }, { id: "u2" }, "comment"),
     ).toBe(true);
-  });
-});
-
-describe("public comments", () => {
-  const open = { ownerId: "u1", visibility: "link" as const, comments: "signed-in" as const };
-  const mine = { authorId: "u2" };
-
-  it("are on a talk anyone may open, and not on a private one", () => {
-    expect(publicCommentsOn(open)).toBe(true);
-    expect(publicCommentsOn({ ...open, visibility: "public" })).toBe(true);
-    expect(publicCommentsOn({ ...open, visibility: "private" })).toBe(false);
-    expect(publicCommentsOn({ ...open, visibility: "team" })).toBe(false);
-  });
-
-  it("may be posted as the policy says: by anyone signed in, or by no one", () => {
-    expect(canPostPublic(open, { id: "u2" })).toBe(true);
-    expect(canPostPublic({ ...open, visibility: "public" }, { id: "u2" })).toBe(true);
-    expect(canPostPublic({ ...open, comments: "off" }, { id: "u1" })).toBe(false);
-    expect(canPostPublic({ ...open, visibility: "private" }, { id: "u1" })).toBe(false);
-  });
-
-  it("are never posted by someone signed out, whatever the policy", () => {
-    expect(canPostPublic(open, null)).toBe(false);
-    expect(canPostPublic({ ...open, visibility: "public" }, null)).toBe(false);
-    expect(canPostPublic({ ...open, comments: "off" }, null)).toBe(false);
-  });
-
-  it("are edited by their author alone, and deleted by their author or the deck's owner", () => {
-    expect(mayEditPublic(mine, { id: "u2" })).toBe(true);
-    expect(mayEditPublic(mine, { id: "u1" })).toBe(false);
-    expect(mayEditPublic(mine, null)).toBe(false);
-    expect(mayDeletePublic(open, mine, { id: "u2" })).toBe(true);
-    expect(mayDeletePublic(open, mine, { id: "u1" })).toBe(true);
-    expect(mayDeletePublic(open, mine, { id: "u3" })).toBe(false);
-    expect(mayDeletePublic(open, mine, null)).toBe(false);
-  });
-
-  it("are listed oldest first, each with its replies under it", () => {
-    const row = (id: string, parentId: string | null, createdAt: string) => ({
-      id,
-      parentId,
-      createdAt,
-    });
-    const tree = threadPublic([
-      row("p3", "p1", "2026-11-13T03:00:00Z"),
-      row("p2", null, "2026-11-13T02:00:00Z"),
-      row("p1", null, "2026-11-13T01:00:00Z"),
-      row("p4", "p1", "2026-11-13T02:30:00Z"),
-      row("p5", "gone", "2026-11-13T04:00:00Z"),
-    ]);
-    expect(tree.map((top) => [top.id, top.replies.map((reply) => reply.id)])).toEqual([
-      ["p1", ["p4", "p3"]],
-      ["p2", []],
-    ]);
   });
 });
 
@@ -347,11 +317,19 @@ describe("drafts", () => {
       draftKeys.reply("d_1", "c_1"),
       draftKeys.reply("d_1", "c_2"),
       draftKeys.reply("d_2", "c_1"),
-      draftKeys.public("d_1", null),
-      draftKeys.public("d_1", "c_1"),
-      draftKeys.edit("d_1", "c_1"),
+      publicDraftKeys.comment("d_1", null),
+      publicDraftKeys.comment("d_1", "c_1"),
+      publicDraftKeys.edit("d_1", "c_1"),
     ];
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("keep the keys drafts were kept under before", () => {
+    expect(draftKeys.reply("d_1", "c_1")).toBe("dek.pub:draft:d_1:reply:c_1");
+    expect(draftKeys.thread("d_1", on([]))).toBe('dek.pub:draft:d_1:thread:["intro","0",[]]');
+    expect(publicDraftKeys.comment("d_1", null)).toBe("dek.pub:draft:d_1:public");
+    expect(publicDraftKeys.comment("d_1", "c_1")).toBe("dek.pub:draft:d_1:public-reply:c_1");
+    expect(publicDraftKeys.edit("d_1", "c_1")).toBe("dek.pub:draft:d_1:public-edit:c_1");
   });
 
   it("keys an element by what it is, not by where it was drawn", () => {
@@ -360,7 +338,7 @@ describe("drafts", () => {
   });
 
   it("keeps nothing, and throws nothing, where there is no storage", () => {
-    const key = draftKeys.public("d_1", null);
+    const key = publicDraftKeys.comment("d_1", null);
     expect(() => keepDraft(key, "Thanks!")).not.toThrow();
     expect(readDraft(key)).toBe("");
   });
@@ -374,8 +352,10 @@ describe("notices", () => {
   };
   const shared = { scope: "shared" as const };
   const team = { scope: "team" as const };
-  const reader = { role: "comment" as const, side: "guest" as const, muted: false };
-
+  const held = (side: "team" | "guest" | null, muted = false) => ({
+    grants: side ? [{ role: "comment" as const, side }] : [],
+    muted,
+  });
   it("go to the owner, the author and those who replied, once each, never to who acted", () => {
     expect(
       noticeRecipients({
@@ -391,19 +371,15 @@ describe("notices", () => {
   });
 
   it("reach only someone who may read the thread, on their own side, and has not muted the deck", () => {
-    expect(mayBeNoticed(deck, shared, { id: "u2" }, reader)).toBe(true);
-    expect(mayBeNoticed(deck, team, { id: "u2" }, reader)).toBe(false);
-    expect(mayBeNoticed(deck, team, { id: "u2" }, { ...reader, side: "team" })).toBe(true);
-    expect(mayBeNoticed(deck, team, { id: "u1" }, { role: null, side: null, muted: false })).toBe(
-      true,
-    );
-    expect(mayBeNoticed(deck, shared, { id: "u2" }, { ...reader, muted: true })).toBe(false);
-    expect(mayBeNoticed(deck, shared, { id: "u2" }, { ...reader, role: null, side: null })).toBe(
-      false,
-    );
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, held("guest"))).toBe(true);
+    expect(mayBeNoticed(deck, team, { id: "u2" }, held("guest"))).toBe(false);
+    expect(mayBeNoticed(deck, team, { id: "u2" }, held("team"))).toBe(true);
+    expect(mayBeNoticed(deck, team, { id: "u1" }, held(null))).toBe(true);
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, held("guest", true))).toBe(false);
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, held(null))).toBe(false);
     const teamDeck = { ...deck, visibility: "team" as const };
-    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, reader)).toBe(false);
-    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, { ...reader, side: "team" })).toBe(true);
+    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, held("guest"))).toBe(false);
+    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, held("team"))).toBe(true);
   });
 
   it("say who did what on which thread, with the words and the way back", () => {

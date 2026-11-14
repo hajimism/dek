@@ -12,7 +12,7 @@ import {
 import { rssDate, talkFeed } from "../../src/model/person/feature/profile/rss.ts";
 import { profileView } from "../../src/model/person/feature/profile/view.ts";
 import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
-import { meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
+import { authorOf, meOf, profileOf, readAccount, selfOf } from "../../src/model/person/person.ts";
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
@@ -48,6 +48,16 @@ describe("signInHref", () => {
     expect(signInHref("/")).toBe("/signin");
     expect(signInHref("/signin?next=%2Fx")).toBe("/signin");
     expect(signInHref()).toBe("/signin");
+  });
+});
+
+describe("authorOf", () => {
+  it("names the author by name and handle, and one whose account is gone as someone", () => {
+    const people = new Map([
+      ["u1", { id: "u1", handle: "demo", name: "Demo", image: null } as never],
+    ]);
+    expect(authorOf({ authorId: "u1" }, people)).toEqual({ name: "Demo", handle: "demo" });
+    expect(authorOf({ authorId: "u9" }, people)).toEqual({ name: "someone", handle: "u9" });
   });
 });
 

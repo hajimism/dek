@@ -28,3 +28,15 @@ export function profileOf(person: Person): Profile {
 export function meOf(person: Person): Me {
   return { id: person.id, handle: person.handle, name: person.name };
 }
+
+/**
+ * Who wrote a comment or a reply, as anyone who reads it is told: its author's name and handle,
+ * among `people`; one whose account is gone is "someone".
+ */
+export function authorOf(
+  row: { authorId: string },
+  people: Map<string, Person>,
+): { name: string; handle: string } {
+  const person = people.get(row.authorId);
+  return { name: person?.name ?? "someone", handle: person?.handle ?? row.authorId };
+}

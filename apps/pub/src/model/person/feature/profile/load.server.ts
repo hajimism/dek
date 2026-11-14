@@ -9,7 +9,7 @@ import { appUrl } from "../../../../common/http.server.ts";
 import { talkCount, talksBy } from "../../../deck/card.server.ts";
 import { viewerOf } from "../../actor.server.ts";
 import { handleOf } from "../../profile-path.ts";
-import { personByHandle } from "../../store.server.ts";
+import { personByHandle, signsInWithGitHub } from "../../store.server.ts";
 import type { Person } from "../../type.ts";
 import { pageCount, profileHref, TALKS_PER_PAGE } from "./paging.ts";
 import { talkFeed } from "./rss.ts";
@@ -54,6 +54,7 @@ export async function loadProfile(
     handle: person.handle,
     name: person.name,
     image: person.image,
+    github: await signsInWithGitHub(c, person),
     ...talks,
     page,
     url: appUrl(profileHref(person.handle, "gallery", page)),
