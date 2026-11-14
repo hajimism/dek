@@ -12,6 +12,8 @@ Amends [53. Send dek.pub's mail through Void and sign in by a mailed link](0053-
 
 Amended by [80. Keep the GitHub login of a dek.pub account made with GitHub, and take it from GitHub's profile alone](0080-keep-the-github-login-of-a-dek-pub-account-made-with-github-and-take-it-from-github-s-profile-alone.md)
 
+Amended by [82. Let a dek.pub talk be deleted for good by its owner, and taken down by an operator](0082-let-a-dek-pub-talk-be-deleted-for-good-by-its-owner-and-taken-down-by-an-operator.md)
+
 ## Context
 
 dek.pub opens first by invitation. What it lacks before anyone may sign up, rate limits, quotas, a way to report a talk, deleting one's own account, is not built, so the first people in have to be people its operator chose.

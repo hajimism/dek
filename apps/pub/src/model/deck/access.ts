@@ -88,6 +88,15 @@ export function canManage(deck: Pick<DeckRules, "ownerId">, person: Caller): boo
   return person?.id === deck.ownerId;
 }
 
+/** Whether `person` may delete the deck: its owner, or an operator of dek.pub, for a takedown. */
+export function canDelete(
+  deck: Pick<DeckRules, "ownerId">,
+  person: Caller,
+  operator: boolean,
+): boolean {
+  return person !== null && (operator || canManage(deck, person));
+}
+
 /** Whether `person` may read the script: anyone once it is public, else its owner. */
 export function canSeeScript(
   deck: Pick<DeckRules, "ownerId"> & { scriptPublic: boolean },

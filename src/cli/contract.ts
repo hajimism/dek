@@ -294,6 +294,21 @@ const PUB_FIELDS = z.union([
     server,
     grant: Grant.describe("The grant removed."),
   }),
+  z.strictObject({
+    action: z.literal("delete"),
+    server,
+    id: DeckId.describe("The deck deleted, with every version, comment, like, and grant on it."),
+    owner: z.string().describe("The owner's handle."),
+    slug: z.string().describe("The slug, free to publish at again."),
+    changed: paths.describe("script.md, with pub: taken out, to commit."),
+  }),
+  z.strictObject({
+    action: z.literal("takedown"),
+    server,
+    id: DeckId.describe("The deck deleted, with every version, comment, like, and grant on it."),
+    owner: z.string().describe("The owner's handle."),
+    slug: z.string().describe("The slug, free for its owner to publish at again."),
+  }),
   z.strictObject({ action: z.literal("comments"), server, comments: z.array(PubComment) }),
   z.strictObject({ action: z.literal("reply"), server, comment: z.string(), reply: Reply }),
   z.strictObject({

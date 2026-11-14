@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { CommentRow, Grant } from "../../src/pub/protocol.ts";
@@ -308,6 +308,145 @@ describe("dekc pub grants", () => {
       expect(fake.requests.length).toBe(sent);
     });
   });
+});
+
+describe("dekc pub delete", () => {
+  test.serial(
+    "refuses without --yes, naming the command that deletes, and sends nothing",
+    async () => {
+      await withPublished(async (fake, root, id) => {
+        const sent = fake.requests.length;
+        const result = await run(fake, root, ["delete", "--json"]);
+        expect(result.exitCode).toBe(1);
+        expect(jsonStdout<Json>(result)).toMatchObject({
+          ok: false,
+          error: {
+            message: `deleting deck "talk" (${id}) from dek.pub cannot be undone`,
+            hint: "run `dekc pub delete --yes` to delete the talk, its versions, and every comment, like, and share on it",
+          },
+        });
+        expect(fake.requests.length).toBe(sent);
+        expect(fake.decks.has(id)).toBe(true);
+      });
+    },
+  );
+
+  test.serial("deletes the deck on dek.pub and takes pub: out of script.md", async () => {
+    await withPublished(async (fake, root, id) => {
+      const result = await run(fake, root, ["delete", "--yes", "--json"]);
+      expect(jsonStdout<Json>(result)).toEqual({
+        ok: true,
+        action: "delete",
+        server: fake.url,
+        id,
+        owner: "hajime",
+        slug: "talk",
+        changed: ["script.md"],
+      });
+      expect(fake.requests.at(-1)).toMatchObject({ method: "DELETE", path: `/api/decks/${id}` });
+      expect(fake.decks.has(id)).toBe(false);
+      expect(readFileSync(join(root, "script.md"), "utf8")).toBe(script());
+      const text = await run(fake, root, ["status"]);
+      expect(text.stderr).toContain("run `dekc pub publish` first");
+    });
+  });
+
+  test.serial("says in text what went, and that script.md is to commit", async () => {
+    await withPublished(async (fake, root) => {
+      const result = await run(fake, root, ["delete", "--yes"]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe(
+        `deleted @hajime/talk from ${fake.url}\ntook pub: out of script.md; commit it`,
+      );
+    });
+  });
+
+  test.serial("leaves pub: where it is when dek.pub has no such deck", async () => {
+    await withPublished(async (fake, root, id) => {
+      fake.decks.delete(id);
+      const result = await run(fake, root, ["delete", "--yes", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: false,
+        error: {
+          message: "no such deck",
+          hint: "check `pub:` in script.md, and that `dekc pub whoami` names the deck's owner; a deck deleted from dek.pub is gone, so take pub: out of script.md to publish it as a new one",
+        },
+      });
+      expect(readFileSync(join(root, "script.md"), "utf8")).toBe(script(id));
+    });
+  });
+});
+
+describe("dekc pub takedown", () => {
+  const outside = () => tmpdir();
+
+  test.serial("deletes a talk named by its URL, wherever dekc runs", async () => {
+    await withFakePub(async (fake) => {
+      signIn(fake);
+      const deck = fake.addDeck({ owner: "sato", slug: "spam", current: 1 });
+      const result = await runInProcess(
+        ["pub", "takedown", `${fake.url}/@sato/spam?key=abc`, "--yes", "--json"],
+        { cwd: outside(), env: fake.env },
+      );
+      expect(jsonStdout<Json>(result)).toEqual({
+        ok: true,
+        action: "takedown",
+        server: fake.url,
+        id: deck.id,
+        owner: "sato",
+        slug: "spam",
+      });
+      expect(fake.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+        "GET /api/people/sato/talks/spam",
+        `DELETE /api/decks/${deck.id}`,
+      ]);
+      expect(fake.decks.has(deck.id)).toBe(false);
+    });
+  });
+
+  test.serial("deletes a talk named by its deck ID with nothing asked first", async () => {
+    await withFakePub(async (fake) => {
+      signIn(fake);
+      const deck = fake.addDeck({ owner: "sato", slug: "spam" });
+      const result = await runInProcess(["pub", "takedown", deck.id, "--yes"], {
+        cwd: outside(),
+        env: fake.env,
+      });
+      expect(result.stdout.trim()).toBe(`took @sato/spam down from ${fake.url}`);
+      expect(fake.requests.map((request) => request.method)).toEqual(["DELETE"]);
+    });
+  });
+
+  test.serial(
+    "refuses, before anything is sent, a talk it cannot name or --yes left out",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        const refused = async (word: string, ...flags: string[]) => {
+          const result = await runInProcess(["pub", "takedown", word, ...flags, "--json"], {
+            cwd: outside(),
+            env: fake.env,
+          });
+          expect(result.exitCode).toBe(1);
+          return jsonStdout<Json>(result).error as { message: string; hint?: string };
+        };
+        expect(await refused("https://elsewhere.example/@sato/spam", "--yes")).toEqual({
+          message: `https://elsewhere.example/@sato/spam is not a talk on ${fake.url}`,
+          hint: "pass the talk's URL as dek.pub shows it, `/@handle/slug`, or its deck ID, `d_…`; --server names another dek.pub",
+        });
+        expect((await refused(`${fake.url}/about`, "--yes")).message).toBe(
+          `${fake.url}/about is not a talk on ${fake.url}`,
+        );
+        expect((await refused("spam", "--yes")).message).toBe(`spam is not a talk on ${fake.url}`);
+        expect(await refused("d_0123456789ab")).toEqual({
+          message: "taking d_0123456789ab down from dek.pub cannot be undone",
+          hint: "run `dekc pub takedown d_0123456789ab --yes` to delete the talk, its versions, and every comment, like, and share on it",
+        });
+        expect(fake.requests).toEqual([]);
+      });
+    },
+  );
 });
 
 describe("dekc pub open", () => {

@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { getTableConfig, type SQLiteTable } from "void/schema-d1";
 import { CreateDeckRequest, DeckId, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
+import * as schema from "../../db/schema.ts";
 import { newDeckId, newLinkKey, sameKey } from "../../src/common/ids.ts";
 import {
   canComment,
+  canDelete,
   canManage,
   canSeeScript,
   canView,
@@ -14,6 +17,7 @@ import {
   versionStanding,
 } from "../../src/model/deck/access.ts";
 import { keyed, sharePatch, talkHref, talkNamed, talkPath } from "../../src/model/deck/deck.ts";
+import { DECK_ROWS } from "../../src/model/deck/deletion.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
 import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
 import { sitemapOf } from "../../src/model/deck/feature/sitemap/sitemap.ts";
@@ -34,7 +38,13 @@ import {
 } from "../../src/model/deck/public-comment/access.ts";
 import { threadPublic } from "../../src/model/deck/public-comment/view.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
-import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
+import {
+  accessKey,
+  deckIdFromHost,
+  deckOrigin,
+  deckPrefix,
+  versionKey,
+} from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
 import { DeckAccess } from "../../src/model/deck/serving/type.ts";
 import {
@@ -165,6 +175,13 @@ describe("access", () => {
     expect(canManage(deck("public"), owner)).toBe(true);
     expect(canManage(deck("public"), other)).toBe(false);
     expect(canManage(deck("public"), null)).toBe(false);
+  });
+
+  it("lets the owner delete a deck, and an operator anyone's", () => {
+    expect(canDelete(deck("team"), owner, false)).toBe(true);
+    expect(canDelete(deck("public"), other, false)).toBe(false);
+    expect(canDelete(deck("team"), other, true)).toBe(true);
+    expect(canDelete(deck("public"), null, false)).toBe(false);
   });
 });
 
@@ -703,3 +720,53 @@ describe("public comments", () => {
     ]);
   });
 });
+
+describe("deleting a deck", () => {
+  const tables = Object.values(schema).map((table) => {
+    const config = getTableConfig(table as SQLiteTable);
+    return { name: config.name, columns: config.columns.map((column) => column.name) };
+  });
+
+  it("takes every row that names the deck, or a thread of it, and no other", () => {
+    const keyed = tables.flatMap(({ name, columns }) =>
+      name === "decks"
+        ? [{ table: name, column: "id" }]
+        : columns.includes("deck_id")
+          ? [{ table: name, column: "deck_id" }]
+          : columns.includes("thread_id")
+            ? [{ table: name, column: "thread_id" }]
+            : [],
+    );
+    expect(DECK_ROWS.map(({ table, column }) => ({ table, column })).sort(byTable)).toEqual(
+      keyed.sort(byTable),
+    );
+    expect(keyed.map(({ table }) => table)).not.toContain("profile_links");
+  });
+
+  it("takes the replies through their threads, while the threads are still there", () => {
+    const replies = DECK_ROWS.findIndex((rows) => rows.table === "replies");
+    expect(DECK_ROWS[replies]).toEqual({
+      table: "replies",
+      column: "thread_id",
+      through: "threads",
+    });
+    expect(replies).toBeLessThan(DECK_ROWS.findIndex((rows) => rows.table === "threads"));
+    expect(DECK_ROWS.at(-1)).toEqual({ table: "decks", column: "id" });
+  });
+
+  it("finds every file of the deck under its own prefix, the access file too, and no other's", () => {
+    const id = "d_0123456789";
+    for (const key of [
+      accessKey(id),
+      versionKey(id, 3, "public.html"),
+      versionKey(id, 3, "cover.png"),
+    ]) {
+      expect(key.startsWith(deckPrefix(id))).toBe(true);
+    }
+    expect(accessKey("d_01234567890").startsWith(deckPrefix(id))).toBe(false);
+  });
+});
+
+function byTable(a: { table: string }, b: { table: string }): number {
+  return a.table.localeCompare(b.table);
+}

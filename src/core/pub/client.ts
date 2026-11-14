@@ -202,7 +202,7 @@ function statusHint(status: number): string {
     return "the account signed in may not do this; `dekc pub whoami` says which it is";
   }
   if (status === 404) {
-    return "check `pub:` in script.md, and that `dekc pub whoami` names the deck's owner";
+    return "check `pub:` in script.md, and that `dekc pub whoami` names the deck's owner; a deck deleted from dek.pub is gone, so take pub: out of script.md to publish it as a new one";
   }
   return status >= 500 ? "dek.pub failed to answer; run the command again in a while" : SERVER_HINT;
 }

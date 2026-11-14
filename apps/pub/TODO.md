@@ -10,7 +10,7 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 
 ### The app
 
-- **Deleting.** Nobody can delete a talk, its owner and the operator included. Deleting an account is done by hand on request.
+- **Deleting an account** is done by hand on request, its decks with `deleteDeck` (ADR 82).
 - **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
 - **Logs.** An error a page's loader throws is logged whole by Void's error handler, and a failed query's error carries the values it was bound to: an address, a comment's text. Void has no hook to log it otherwise; `src/common/log.ts` does so for the API, the tasks after an answer, mail and Better Auth.
@@ -38,7 +38,7 @@ Each of these is needed on staging and on production.
 
 - **Domains.** `dek.pub` and `dekusercontent.com` are not registered. The Public Suffix List request for `dekusercontent.com` is not sent; it takes weeks.
 - **Infrastructure.** The zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) and the serve Worker's route are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
-- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset. `DEK_PUB_INVITED` lists the people invited, and holds `*` only once every item under "Before anyone can sign up" is done (ADR 79).
+- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset. `DEK_PUB_INVITED` lists the people invited, and holds `*` only once every item under "Before anyone can sign up" is done (ADR 79). `DEK_PUB_OPERATORS` names the handles of those who run dek.pub, who may take any talk down (ADR 82).
 - **Deploying.** No script deploys the app and the serve Worker together, and nothing applies `db/migrations/` to the remote D1. There is no way back from a deploy but deploying again.
 - **Mail.**
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing. The token `void deploy` uses needs Email Routing Edit and Email Sending Edit.

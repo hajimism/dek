@@ -70,6 +70,13 @@ export function formatPub(data: PubResult): string {
     }
     case "revoke":
       return `stopped sharing the deck with ${grantee(data.grant.who)}`;
+    case "delete":
+      return [
+        `deleted @${data.owner}/${data.slug} from ${data.server}`,
+        ...data.changed.map((path) => `took pub: out of ${path}; commit it`),
+      ].join("\n");
+    case "takedown":
+      return `took @${data.owner}/${data.slug} down from ${data.server}`;
     case "comments":
       if (data.comments.length === 0) {
         return "no comments";
@@ -143,6 +150,8 @@ export function pubPaths(data: PubResult, display: (path: string) => string): Pu
             changed: data.changed.map(display),
           }
         : { ...data, diagnostics: displayDiagnostics(data.diagnostics, display) };
+    case "delete":
+      return { ...data, changed: data.changed.map(display) };
     case "comments":
       return {
         ...data,

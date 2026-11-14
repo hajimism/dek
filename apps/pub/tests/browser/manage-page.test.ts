@@ -3,6 +3,7 @@ import { page, userEvent } from "vitest/browser";
 // The page's own tokens and base styles, as the layout loads them, so widths are the real ones.
 import "../../src/common/ui/tokens.css";
 import type { DeckStatus } from "../../../../src/pub/protocol.ts";
+import { toasts } from "../../src/common/ui/toast.svelte.ts";
 import ManagePage from "../../src/model/deck/feature/manage/ui/manage-page.svelte";
 import { renderPage } from "./setup.ts";
 
@@ -112,5 +113,74 @@ describe("ManagePage's link", () => {
   it("offers no new link on a talk that is not link only", async () => {
     await renderPage(ManagePage, props);
     await expect.element(page.getByRole("button", { name: "New link" })).not.toBeInTheDocument();
+  });
+});
+
+describe("ManagePage's delete", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("deletes the talk only once its slug is typed, then goes to the owner's profile", async () => {
+    const fetch = vi.fn(
+      async (_path: string, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({ deleted: true, id: status.id, owner: "demo", slug: "why-dek" }),
+        ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const ondeleted = vi.fn();
+    await renderPage(ManagePage, { ...props, ondeleted });
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    const dialog = page.getByRole("dialog", { name: "Delete “Why dek”?" });
+    const confirm = dialog.getByRole("button", { name: "Delete for good" });
+    await expect.element(confirm).toBeDisabled();
+    const field = dialog.getByLabelText("To confirm, type why-dek");
+    await expect.element(field).toHaveFocus();
+    await field.fill("why-de");
+    await expect.element(confirm).toBeDisabled();
+    await field.fill("why-dek");
+    await confirm.click();
+    await expect.poll(() => ondeleted.mock.calls).toEqual([["/@demo"]]);
+    expect(fetch.mock.calls.map(([path, init]) => [path, init?.method])).toEqual([
+      [`/api/decks/${status.id}`, "DELETE"],
+    ]);
+  });
+
+  it("keeps the talk when the dialog is cancelled, and asks for the slug afresh", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    await renderPage(ManagePage, props);
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabelText("To confirm, type why-dek").fill("why-dek");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    await expect.element(dialog.getByLabelText("To confirm, type why-dek")).toHaveValue("");
+    await expect.element(dialog.getByRole("button", { name: "Delete for good" })).toBeDisabled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("says when the talk could not be deleted, and stays", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { code: "internal", message: "down" } }), {
+            status: 500,
+          }),
+      ),
+    );
+    const ondeleted = vi.fn();
+    await renderPage(ManagePage, { ...props, ondeleted });
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabelText("To confirm, type why-dek").fill("why-dek");
+    await dialog.getByRole("button", { name: "Delete for good" }).click();
+    await expect
+      .poll(() => toasts.map((note) => [note.message, note.tone]))
+      .toContainEqual(["Something went wrong. down", "error"]);
+    await expect.element(dialog.getByRole("button", { name: "Delete for good" })).toBeEnabled();
+    expect(ondeleted).not.toHaveBeenCalled();
   });
 });
