@@ -5,6 +5,7 @@ import { env } from "void/env";
 import type { z } from "zod";
 import { type ErrorBody, PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
 import { ApiError } from "./api-error.ts";
+import { log } from "./log.ts";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -52,7 +53,7 @@ export async function api(
     if (error instanceof ApiError) {
       return errorResponse(error);
     }
-    console.error(error);
+    log("error", `${request.method} ${new URL(request.url).pathname} failed`, error);
     const body: ErrorBody = {
       error: { code: "internal", message: "something went wrong on dek.pub's side" },
     };
@@ -88,7 +89,9 @@ export function appUrl(path: string): string {
  * and what it throws is logged. Without a Worker's context, the task simply runs on.
  */
 export function afterAnswer(c: Context, task: Promise<unknown>): void {
-  const settled = task.catch((error: unknown) => console.error(error));
+  const settled = task.catch((error: unknown) =>
+    log("error", "a task after the answer failed", error),
+  );
   try {
     c.executionCtx.waitUntil(settled);
   } catch {
