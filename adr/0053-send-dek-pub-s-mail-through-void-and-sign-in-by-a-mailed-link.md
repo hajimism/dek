@@ -8,6 +8,8 @@ Accepted
 
 Amended by [73. Claim a dek.pub grant by address when its holder signs in or when it is made, not when a deck is read](0073-claim-a-dek-pub-grant-by-address-when-its-holder-signs-in-or-when-it-is-made-not-when-a-deck-is-read.md)
 
+Amended by [77. Let a dek.pub person choose their handle after their first sign-in](0077-let-a-dek-pub-person-choose-their-handle-after-their-first-sign-in.md)
+
 ## Context
 
 dek.pub is meant for client work (ADR 51), and the people at the client are not developers. Three things need mail:

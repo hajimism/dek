@@ -168,6 +168,21 @@ const en = {
   "signin.linkAgain": "Use another address",
   "signin.linkFailed": "That link has expired or was used already. Ask for a new one.",
 
+  "welcome.title": "Choose your handle",
+  "welcome.lead":
+    "Your handle names you on dek.pub: your profile is at /@handle, and your talks are under it. You choose it once; it cannot be changed later.",
+  "welcome.label": "Handle",
+  "welcome.rule":
+    "Lowercase letters, digits and single hyphens, up to 39, with no hyphen at either end.",
+  "welcome.checking": "Checking @{handle}…",
+  "welcome.free": "@{handle} is free.",
+  "welcome.invalid":
+    "A handle is lowercase letters, digits and single hyphens, up to 39, with no hyphen at either end.",
+  "welcome.reserved": "@{handle} is kept for dek.pub.",
+  "welcome.taken": "@{handle} is taken.",
+  "welcome.chosen": "You have chosen your handle already.",
+  "welcome.submit": "Use this handle",
+
   "device.title": "Connect dekc",
   "device.prompt": "Enter the code shown in your terminal.",
   "device.codeLabel": "Device code",
@@ -550,6 +565,21 @@ const ja: Record<MessageKey, string> = {
   "signin.linkAgain": "別のアドレスにする",
   "signin.linkFailed":
     "リンクの期限が切れたか、すでに使われています。新しいリンクを受け取ってください。",
+
+  "welcome.title": "ハンドルを決める",
+  "welcome.lead":
+    "ハンドルは dek.pub でのあなたの名前です。プロフィールは /@ハンドル にあり、トークはその下に並びます。決められるのは一度だけで、あとから変えることはできません。",
+  "welcome.label": "ハンドル",
+  "welcome.rule":
+    "英小文字、数字、ハイフンで 39 文字まで。ハイフンは続けられず、先頭と末尾にも置けません。",
+  "welcome.checking": "@{handle} を確かめています…",
+  "welcome.free": "@{handle} は使えます。",
+  "welcome.invalid":
+    "ハンドルに使えるのは英小文字、数字、ハイフンで 39 文字までです。ハイフンは続けられず、先頭と末尾にも置けません。",
+  "welcome.reserved": "@{handle} は dek.pub のために取ってあります。",
+  "welcome.taken": "@{handle} はもう使われています。",
+  "welcome.chosen": "ハンドルはもう決まっています。",
+  "welcome.submit": "このハンドルにする",
 
   "device.title": "dekc を接続",
   "device.prompt": "ターミナルに表示されたコードを入力してください。",

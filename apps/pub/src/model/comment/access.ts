@@ -80,7 +80,7 @@ export function mustResolve(
 
 export function mayResolve(
   comment: Pick<CommentRow, "author">,
-  viewer: { handle: string } | null,
+  viewer: { handle: string | null } | null,
   isOwner: boolean,
 ): boolean {
   if (!viewer) {
@@ -92,7 +92,7 @@ export function mayResolve(
 /** Whether the page offers to share a team thread with the guests: to whom may resolve it. */
 export function mayWiden(
   comment: Pick<CommentRow, "author" | "scope">,
-  viewer: { handle: string } | null,
+  viewer: { handle: string | null } | null,
   isOwner: boolean,
 ): boolean {
   return comment.scope === "team" && mayResolve(comment, viewer, isOwner);

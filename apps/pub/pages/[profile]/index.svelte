@@ -81,7 +81,7 @@
       <p class="handle">@{profile.handle}</p>
       <p class="links">
         {#if profile.github}
-          <a href="https://github.com/{profile.handle}" rel="me noopener"><Icon name="github" size={14} />GitHub</a>
+          <a href="https://github.com/{profile.github}" rel="me noopener"><Icon name="github" size={14} />GitHub</a>
         {/if}
         <a href="{profilePath(profile.handle)}/rss" type="application/rss+xml"><Icon name="rss" size={14} />{t("profile.rss")}</a>
       </p>

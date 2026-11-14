@@ -73,7 +73,7 @@
   <section class="card" aria-labelledby="signin-title">
     <h1 id="signin-title">{t("signin.title")}</h1>
 
-    {#if shared.viewer}
+    {#if shared.viewer?.handle}
       <p class="already">{t("signin.already", { handle: shared.viewer.handle })}</p>
       <Button variant="primary" size="lg" full href={next}>{t("signin.continue")}</Button>
     {:else}

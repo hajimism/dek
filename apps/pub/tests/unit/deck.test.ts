@@ -43,7 +43,6 @@ import {
   slidePicture,
   versionOf,
 } from "../../src/model/deck/version/version.ts";
-import { handleFromEmail, isHandle } from "../../src/model/person/handle.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
 const owner = { id: "u1", handle: "hajimism", name: "Hajime" };
@@ -219,13 +218,6 @@ describe("deck origins and IDs", () => {
     } finally {
       draw.mockRestore();
     }
-  });
-
-  it("makes handles that fit a URL", () => {
-    expect(handleFromEmail("Sato.Taro+test@example.com")).toBe("sato-taro-test");
-    expect(isHandle("sato-taro")).toBe(true);
-    expect(isHandle("-sato")).toBe(false);
-    expect(isHandle("Sato")).toBe(false);
   });
 });
 
