@@ -132,7 +132,7 @@ const en = {
     "A talk’s source is always the project on your machine. dekc build turns it into one HTML file you can put anywhere, and dek.pub’s own source is open under AGPL-3.0.",
   "about.start.title": "Getting started",
   "about.start.p":
-    "Sign in once from the CLI, publish, then share the talk by its link. Each step is one command.",
+    "Sign in once from the CLI, publish, then share the talk by its link. Each step is one command. For now dek.pub is open by invitation: you can sign up if you were invited, or if a talk was shared with you.",
   "about.start.commands": "Commands",
   "about.start.note": "New to dek? Begin with the guide:",
   "about.start.guide": "Getting started",
@@ -163,11 +163,14 @@ const en = {
   "signin.linkLabel": "Email address",
   "signin.linkSubmit": "Email me a sign-in link",
   "signin.linkNote":
-    "For an address a talk was shared with, or one you have signed in with before.",
+    "For an address dek.pub invited or a talk was shared with, or one you have signed in with before.",
   "signin.linkSent":
     "If {email} may sign in, a link is on its way. It works once, for {minutes} minutes.",
   "signin.linkAgain": "Use another address",
   "signin.linkFailed": "That link has expired or was used already. Ask for a new one.",
+  "signin.notInvited":
+    "dek.pub is open by invitation for now, and this account hasn’t been invited. If a talk was shared with you, sign in with the address it was shared with.",
+  "signin.error": "Signing in didn’t work. Try again.",
 
   "welcome.title": "Choose your handle",
   "welcome.lead":
@@ -558,7 +561,7 @@ const ja: Record<MessageKey, string> = {
     "トークの元はいつも手元のプロジェクトで、dekc build で 1 つの HTML ファイルにすれば、どこにでも置けます。dek.pub 自身のソースも AGPL-3.0 で公開しています。",
   "about.start.title": "はじめかた",
   "about.start.p":
-    "CLI から一度サインインし、公開して、リンクで共有します。どれもコマンド 1 つです。",
+    "CLI から一度サインインし、公開して、リンクで共有します。どれもコマンド 1 つです。dek.pub は今のところ招待制で、アカウントを作れるのは招待された人と、トークを共有された人だけです。",
   "about.start.commands": "コマンド",
   "about.start.note": "dek が初めてなら、先にこちらのガイドをどうぞ。",
   "about.start.guide": "はじめる",
@@ -589,12 +592,15 @@ const ja: Record<MessageKey, string> = {
   "signin.linkLabel": "メールアドレス",
   "signin.linkSubmit": "サインイン用のリンクをメールで受け取る",
   "signin.linkNote":
-    "トークを共有されたアドレスか、前にサインインしたことのあるアドレスで使えます。",
+    "招待されたアドレス、トークを共有されたアドレス、前にサインインしたことのあるアドレスで使えます。",
   "signin.linkSent":
     "{email} でサインインできる場合は、リンクを送りました。{minutes} 分の間、一度だけ使えます。",
   "signin.linkAgain": "別のアドレスにする",
   "signin.linkFailed":
     "リンクの期限が切れたか、すでに使われています。新しいリンクを受け取ってください。",
+  "signin.notInvited":
+    "dek.pub は今のところ招待制で、このアカウントは招待されていません。トークを共有された場合は、共有されたメールアドレスでサインインしてください。",
+  "signin.error": "サインインできませんでした。もう一度お試しください。",
 
   "welcome.title": "ハンドルを決める",
   "welcome.lead":

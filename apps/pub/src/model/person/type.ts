@@ -35,6 +35,40 @@ export type Account = z.output<typeof Account>;
  */
 export type Person = Account & { handle: string };
 
+/**
+ * Who Better Auth is about to make an account for, read from what its `validateUserInfo` is
+ * handed: the address, whether it is verified, and the login of a GitHub profile.
+ */
+export const Newcomer = z
+  .object({
+    user: z.object({ email: z.string(), emailVerified: z.boolean().optional() }),
+    source: z.object({
+      oauth: z
+        .object({
+          providerId: z.string(),
+          profile: z.object({ login: z.string().optional() }).nullish(),
+        })
+        .nullish(),
+    }),
+  })
+  .transform(({ user, source }) => ({
+    email: user.email,
+    emailVerified: user.emailVerified === true,
+    githubLogin: (source.oauth?.providerId === "github" && source.oauth.profile?.login) || null,
+  }));
+
+export type Newcomer = z.output<typeof Newcomer>;
+
+/**
+ * Who dek.pub lets sign up, from `DEK_PUB_INVITED`: anyone, or the addresses and GitHub logins
+ * on the list, in lowercase. A person a deck is shared with by address gets in besides.
+ */
+export type Invited = {
+  anyone: boolean;
+  emails: ReadonlySet<string>;
+  logins: ReadonlySet<string>;
+};
+
 /** What Better Auth's api-key plugin answers when a key is checked. */
 export const KeyCheck = z.object({
   valid: z.boolean(),

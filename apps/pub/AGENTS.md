@@ -42,4 +42,6 @@ bun run test:e2e     # the whole round trip, dekc against vp dev
 
 Email sign-up works only where `.env` has `DEK_PUB_DEV_LOGIN=1`, as `dev.env` does. GitHub sign-in needs a real OAuth app's ID and secret in `.env`.
 
+`DEK_PUB_INVITED` says who may make an account: addresses and `@<GitHub login>`s, split by commas or whitespace, or `*` for anyone; whoever a deck is shared with by address may too (ADR 79). `dev.env` sets `*`; a `.env` written before it has none, which lets only the people decks are shared with sign up, so add `DEK_PUB_INVITED=*` to it. The email form verifies no address, so it makes an account only under `*`. `tests/e2e/server.ts` sets the list to the addresses the run signs up.
+
 Mail is kept, not sent, by the dev server: its inbox is at the URL `vp dev` prints on start, `/__void/inbox` with the token in `.void/dev-trigger-token`. `tests/e2e/server.ts` reads it the same way.
