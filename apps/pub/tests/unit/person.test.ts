@@ -41,7 +41,7 @@ import {
   readLinks,
 } from "../../src/model/person/link.ts";
 import { MAX_NAME_LENGTH, readName } from "../../src/model/person/name.ts";
-import { readOperators } from "../../src/model/person/operator.ts";
+import { namesOperator, readOperators } from "../../src/model/person/operator.ts";
 import {
   authorOf,
   hasHandle,
@@ -54,10 +54,18 @@ import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
-// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: anyone may join,
-// and the links an account starts with are only noted.
+// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: who may join is
+// asked of a stand-in that notes the question, no grants are claimed, no mail goes out, and the
+// links an account starts with are only noted.
+const invitation = vi.hoisted(() => ({
+  asked: [] as unknown[],
+  invited: true,
+}));
 vi.mock("../../src/model/person/feature/sign-in/invitation.server.ts", () => ({
-  mayMakeAccount: async () => true,
+  mayMakeAccount: async (newcomer: unknown) => {
+    invitation.asked.push(newcomer);
+    return invitation.invited;
+  },
 }));
 vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
   claimOnSignIn: async () => {},
@@ -65,10 +73,14 @@ vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
 vi.mock("../../src/model/person/feature/sign-in/link.server.ts", () => ({
   sendSignInLink: async () => {},
 }));
-const seeded = vi.hoisted(() => [] as unknown[]);
+const seeding = vi.hoisted(() => ({
+  seeded: [] as unknown[],
+  seed: async (_user: unknown): Promise<void> => {},
+}));
 vi.mock("../../src/model/person/link.server.ts", () => ({
-  seedLinks: async (user: unknown) => {
-    seeded.push(user);
+  seedLinks: (user: unknown) => {
+    seeding.seeded.push(user);
+    return seeding.seed(user);
   },
 }));
 
@@ -325,65 +337,95 @@ describe("readInvited", () => {
 });
 
 describe("readOperators", () => {
-  it("reads handles, with or without @, split by commas or whitespace, in lowercase", () => {
-    expect([...readOperators(" Hajimism,@Sato\n  kato-2 ,, ")]).toEqual([
-      "hajimism",
-      "sato",
-      "kato-2",
+  it("reads addresses, split by commas or whitespace, in lowercase", () => {
+    expect([...readOperators(" Hajime@Example.com,sato@example.com\n  ,, ")]).toEqual([
+      "hajime@example.com",
+      "sato@example.com",
     ]);
   });
 
-  it("names no operator from an empty setting, nor from what is no handle", () => {
-    for (const setting of ["", "   ", "@, *, sato@example.com, -x"]) {
+  it("names no operator from an empty setting, nor by handle, GitHub login, or `*`", () => {
+    for (const setting of ["", "   ", "hajimism, @sato, *, *@example.com, @octo-cat"]) {
       expect(readOperators(setting).size).toBe(0);
     }
+  });
+});
+
+describe("namesOperator", () => {
+  const operators = readOperators("hajime@example.com");
+  const account = { email: "Hajime@example.com", emailVerified: true };
+
+  it("names the account whose verified address is listed, whatever its case", () => {
+    expect(namesOperator(operators, account)).toBe(true);
+    expect(namesOperator(operators, { ...account, email: "sato@example.com" })).toBe(false);
+  });
+
+  it("never names an account whose address is not verified", () => {
+    expect(namesOperator(operators, { ...account, emailVerified: false })).toBe(false);
   });
 });
 
 describe("mayJoin", () => {
   const nobodyWaits = vi.fn(async () => false);
   const newcomer = { email: "sato@example.com", emailVerified: true, githubLogin: null };
+  const none = readOperators("");
 
   it("lets anyone in when the list is `*`, a verified address or not", async () => {
     const anyone = readInvited("*");
-    expect(await mayJoin(anyone, { ...newcomer, emailVerified: false }, nobodyWaits)).toBe(true);
+    expect(await mayJoin(anyone, none, { ...newcomer, emailVerified: false }, nobodyWaits)).toBe(
+      true,
+    );
   });
 
   it("lets in a verified address on the list, whatever its case", async () => {
     const invited = readInvited("Sato@Example.com");
-    expect(await mayJoin(invited, { ...newcomer, email: "SATO@example.com" }, nobodyWaits)).toBe(
-      true,
-    );
-    expect(await mayJoin(invited, { ...newcomer, email: "kato@example.com" }, nobodyWaits)).toBe(
-      false,
-    );
+    expect(
+      await mayJoin(invited, none, { ...newcomer, email: "SATO@example.com" }, nobodyWaits),
+    ).toBe(true);
+    expect(
+      await mayJoin(invited, none, { ...newcomer, email: "kato@example.com" }, nobodyWaits),
+    ).toBe(false);
   });
 
   it("never counts an address that is not verified, on the list or with a share waiting", async () => {
     const waits = vi.fn(async () => true);
     const unverified = { ...newcomer, emailVerified: false };
-    expect(await mayJoin(readInvited("sato@example.com"), unverified, waits)).toBe(false);
-    expect(await mayJoin(readInvited(""), unverified, waits)).toBe(false);
+    expect(await mayJoin(readInvited("sato@example.com"), none, unverified, waits)).toBe(false);
+    expect(await mayJoin(readInvited(""), none, unverified, waits)).toBe(false);
     expect(waits).not.toHaveBeenCalled();
   });
 
   it("lets in a GitHub account on the list as `@login`, whatever its address", async () => {
     const invited = readInvited("@octo-cat");
     const github = { email: "o@example.com", emailVerified: false, githubLogin: "Octo-Cat" };
-    expect(await mayJoin(invited, github, nobodyWaits)).toBe(true);
-    expect(await mayJoin(invited, { ...github, githubLogin: "octo-dog" }, nobodyWaits)).toBe(false);
-    expect(await mayJoin(readInvited("octo-cat@example.com"), github, nobodyWaits)).toBe(false);
+    expect(await mayJoin(invited, none, github, nobodyWaits)).toBe(true);
+    expect(await mayJoin(invited, none, { ...github, githubLogin: "octo-dog" }, nobodyWaits)).toBe(
+      false,
+    );
+    expect(await mayJoin(readInvited("octo-cat@example.com"), none, github, nobodyWaits)).toBe(
+      false,
+    );
   });
 
   it("lets in a verified address a share waits for, asking by the address in lowercase", async () => {
     const waits = vi.fn(async (email: string) => email === "sato@example.com");
-    expect(await mayJoin(readInvited(""), { ...newcomer, email: "Sato@example.com" }, waits)).toBe(
-      true,
-    );
+    expect(
+      await mayJoin(readInvited(""), none, { ...newcomer, email: "Sato@example.com" }, waits),
+    ).toBe(true);
     expect(waits).toHaveBeenCalledWith("sato@example.com");
-    expect(await mayJoin(readInvited(""), { ...newcomer, email: "kato@example.com" }, waits)).toBe(
-      false,
-    );
+    expect(
+      await mayJoin(readInvited(""), none, { ...newcomer, email: "kato@example.com" }, waits),
+    ).toBe(false);
+  });
+
+  it("lets in a verified address DEK_PUB_OPERATORS lists, though nobody invited it", async () => {
+    const operators = readOperators("Sato@example.com");
+    expect(await mayJoin(readInvited(""), operators, newcomer, nobodyWaits)).toBe(true);
+    expect(
+      await mayJoin(readInvited(""), operators, { ...newcomer, emailVerified: false }, nobodyWaits),
+    ).toBe(false);
+    const github = { email: "o@example.com", emailVerified: true, githubLogin: "sato" };
+    expect(await mayJoin(readInvited(""), readOperators("@sato"), github, nobodyWaits)).toBe(false);
   });
 });
 
@@ -680,6 +722,7 @@ describe("auth.ts, through Better Auth", () => {
       account: [] as Record<string, unknown>[],
       verification: [] as Record<string, unknown>[],
       apikey: [] as Record<string, unknown>[],
+      deviceCode: [] as Record<string, unknown>[],
     };
     const config = authConfig({
       defaults: {},
@@ -694,6 +737,7 @@ describe("auth.ts, through Better Auth", () => {
     const auth = betterAuth({
       ...config,
       baseURL: origin,
+      basePath: "/api/auth",
       secret: "a-secret-only-these-tests-use-0123456789",
       database: memoryAdapter(db),
     });
@@ -712,7 +756,7 @@ describe("auth.ts, through Better Auth", () => {
         });
       }
       if (url === "https://api.github.com/user") {
-        return Response.json({ id: 583231, login, name: "", email: null, avatar_url: "" });
+        return Response.json({ id: 583231, login, name: login, email: null, avatar_url: "" });
       }
       if (url === "https://api.github.com/user/emails") {
         return Response.json([{ email: "octo@example.com", primary: true, verified: true }]);
@@ -728,46 +772,74 @@ describe("auth.ts, through Better Auth", () => {
       .join("; ");
   }
 
-  async function signInWithGitHub(auth: ReturnType<typeof makeAuth>["auth"]): Promise<string> {
+  /** The GitHub callback's answer, after the sign-in it ends was started as `/signin` starts it. */
+  async function signInWithGitHub(
+    auth: ReturnType<typeof makeAuth>["auth"],
+    next = "/",
+  ): Promise<Response> {
     const start = await auth.handler(
       new Request(`${origin}/api/auth/sign-in/social`, {
         method: "POST",
         headers: { "content-type": "application/json", origin },
-        body: JSON.stringify({ provider: "github", callbackURL: "/" }),
+        body: JSON.stringify({
+          provider: "github",
+          callbackURL: next,
+          errorCallbackURL: signInHref(next),
+        }),
       }),
     );
     const { url } = (await start.json()) as { url: string };
     const state = new URL(url).searchParams.get("state");
-    const callback = await auth.handler(
+    return auth.handler(
       new Request(`${origin}/api/auth/callback/github?code=the-code&state=${state}`, {
         headers: { cookie: cookiesOf(start) },
       }),
     );
-    expect(callback.headers.get("location")).toBe("/");
-    return cookiesOf(callback);
   }
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    seeded.length = 0;
+    seeding.seeded.length = 0;
+    seeding.seed = async () => {};
+    invitation.asked.length = 0;
+    invitation.invited = true;
+  });
+
+  it("sends a GitHub sign-up the invitation list refuses back to /signin, and makes nothing", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    invitation.invited = false;
+    const callback = await signInWithGitHub(auth, "/@sato/talk");
+    expect(callback.status).toBe(302);
+    const location = new URL(String(callback.headers.get("location")), origin);
+    expect(location.pathname).toBe("/signin");
+    expect(location.searchParams.get("next")).toBe("/@sato/talk");
+    expect(location.searchParams.get("error")).toBe(NOT_INVITED);
+    expect(invitation.asked).toEqual([
+      { email: "octo@example.com", emailVerified: true, githubLogin: "Octo-Cat" },
+    ]);
+    expect(db.user).toEqual([]);
+    expect(db.account).toEqual([]);
+    expect(db.session).toEqual([]);
+    expect(seeding.seeded).toEqual([]);
   });
 
   it("keeps the login of an account made with GitHub, and starts its links from it", async () => {
     const { auth, db } = makeAuth();
     fakeGitHub("Octo-Cat");
-    await signInWithGitHub(auth);
+    expect((await signInWithGitHub(auth)).headers.get("location")).toBe("/");
     expect(db.user).toMatchObject([{ email: "octo@example.com", githubLogin: "Octo-Cat" }]);
-    expect(seeded).toMatchObject([{ githubLogin: "Octo-Cat" }]);
+    expect(seeding.seeded).toMatchObject([{ githubLogin: "Octo-Cat" }]);
   });
 
   it("signs the same account in with GitHub again", async () => {
     const { auth, db } = makeAuth();
     fakeGitHub("Octo-Cat");
     await signInWithGitHub(auth);
-    await signInWithGitHub(auth);
+    expect((await signInWithGitHub(auth)).headers.get("location")).toBe("/");
     expect(db.user).toMatchObject([{ githubLogin: "Octo-Cat" }]);
     expect(db.session).toHaveLength(2);
-    expect(seeded).toHaveLength(1);
+    expect(seeding.seeded).toHaveLength(1);
   });
 
   it("takes no login from a sign-up's body", async () => {
@@ -795,20 +867,92 @@ describe("auth.ts, through Better Auth", () => {
     expect(db.user.map((user) => user.githubLogin ?? null)).toEqual([null]);
   });
 
-  it("lets no one change the login through Better Auth", async () => {
+  // update-user answers no request (below), but the server may still call Better Auth to update.
+  it("lets no update on the server through Better Auth change the login", async () => {
     const { auth, db } = makeAuth();
     fakeGitHub("Octo-Cat");
-    const cookie = await signInWithGitHub(auth);
-    const response = await auth.handler(
-      new Request(`${origin}/api/auth/update-user`, {
-        method: "POST",
-        headers: { "content-type": "application/json", origin, cookie },
-        body: JSON.stringify({ name: "Octo", githubLogin: "someone-else" }),
-      }),
-    );
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ code: "github_login_fixed" });
+    const headers = new Headers({ cookie: cookiesOf(await signInWithGitHub(auth)) });
+    const fixed = { statusCode: 403, body: { code: "github_login_fixed" } };
+    await expect(
+      auth.api.updateUser({ headers, body: { name: "Octo", githubLogin: "someone-else" } }),
+    ).rejects.toMatchObject(fixed);
+    const { internalAdapter } = await auth.$context;
+    const id = String(db.user[0]?.id);
+    await expect(
+      internalAdapter.updateUser(id, { githubLogin: "someone-else" }),
+    ).rejects.toMatchObject(fixed);
     expect(db.user).toMatchObject([{ name: "Octo-Cat", githubLogin: "Octo-Cat" }]);
+    await auth.api.updateUser({ headers, body: { name: "Octo" } });
+    expect(db.user).toMatchObject([{ name: "Octo", githubLogin: "Octo-Cat" }]);
+  });
+
+  it("has no update-user, so a name and an image go only through dek.pub's own API", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    const cookie = cookiesOf(await signInWithGitHub(auth));
+    const session = await auth.handler(
+      new Request(`${origin}/api/auth/get-session`, { headers: { cookie } }),
+    );
+    expect(session.status).toBe(200);
+    const before = structuredClone(db.user);
+    const update = (path: string) =>
+      auth.handler(
+        new Request(`${origin}${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin, cookie },
+          body: JSON.stringify({ name: "", image: "https://tracker.example/p.gif" }),
+        }),
+      );
+    expect((await update("/api/auth/update-user")).status).toBe(404);
+    expect((await update("/api/auth/update-user/")).status).toBe(404);
+    expect(db.user).toEqual(before);
+    expect(db.user).toMatchObject([{ name: "Octo-Cat" }]);
+  });
+
+  it("answers over HTTP only the endpoints dek.pub's pages, the CLI and the dev login call", () => {
+    const { auth } = makeAuth();
+    const disabled = new Set(auth.options.disabledPaths);
+    const open = Object.values(auth.api as Record<string, { path?: string }>)
+      .map((endpoint) => endpoint.path)
+      .filter((path): path is string => path !== undefined && !disabled.has(path))
+      .sort();
+    expect(open).toEqual(
+      [
+        "/callback/:id",
+        "/device",
+        "/device/approve",
+        "/device/code",
+        "/device/deny",
+        "/device/token",
+        "/error",
+        "/get-session",
+        "/magic-link/verify",
+        "/sign-in/email",
+        "/sign-in/magic-link",
+        "/sign-in/social",
+        "/sign-out",
+        "/sign-up/email",
+      ].sort(),
+    );
+  });
+
+  it("makes the account although the links it starts with could not be written", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    seeding.seed = async () => {
+      throw new Error("D1_ERROR: the database is not there");
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const callback = await signInWithGitHub(auth);
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get("location")).toBe("/");
+    expect(db.user).toHaveLength(1);
+    expect(seeding.seeded).toHaveLength(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("links"),
+      expect.objectContaining({ message: "D1_ERROR: the database is not there" }),
+    );
+    error.mockRestore();
   });
 
   describe("CLI keys", () => {
@@ -903,6 +1047,36 @@ describe("auth.ts, through Better Auth", () => {
       expect(db.apikey.map((row) => row.name)).toEqual(["theirs"]);
       expect(await checkKey(c, other)).not.toBeNull();
       expect(await revokeKeysOf(c, mine)).toBe(0);
+    });
+
+    // Better Auth reads 100 rows when a query names no limit.
+    it("lists and revokes every key however many there are", async () => {
+      const { c, db, mine, theirs } = await setUp();
+      const many = 105;
+      for (let i = 0; i < many; i++) {
+        await makeKey(c, mine, `box-${i}`);
+      }
+      const other = await makeKey(c, theirs, "theirs");
+      const keys = await keysOf(c, mine);
+      expect(keys).toHaveLength(many);
+      const made = keys.map((key) => Date.parse(key.createdAt));
+      expect(made).toEqual([...made].sort((a, b) => b - a));
+      expect(await revokeKeysOf(c, mine)).toBe(many);
+      expect(db.apikey.map((row) => row.name)).toEqual(["theirs"]);
+      expect(await checkKey(c, other)).not.toBeNull();
+    });
+
+    it("keeps a key made after revoking them all began", async () => {
+      const { c, db, mine } = await setUp();
+      await makeKey(c, mine, "leaked");
+      const later = await makeKey(c, mine, "later");
+      const row = db.apikey.find((key) => key.name === "later");
+      if (row) {
+        row.createdAt = new Date(Date.now() + 60_000);
+      }
+      expect(await revokeKeysOf(c, mine)).toBe(1);
+      expect(db.apikey.map((key) => key.name)).toEqual(["later"]);
+      expect(await checkKey(c, later)).not.toBeNull();
     });
   });
 });

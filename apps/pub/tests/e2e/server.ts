@@ -34,7 +34,7 @@ const RUN = Date.now();
 
 /**
  * Start the server, letting sign up only `invited`, as `DEK_PUB_INVITED` lists them, with the
- * handles `operators` as the operators `DEK_PUB_OPERATORS` names.
+ * addresses `operators` as the operators `DEK_PUB_OPERATORS` names.
  */
 export async function startDevServer(
   port: number,

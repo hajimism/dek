@@ -1,9 +1,10 @@
 // Who may make an account on dek.pub. It opens by invitation: `DEK_PUB_INVITED` lists the
 // addresses and GitHub logins it lets in, or is `*` for anyone, and a person a deck is shared
-// with by address gets in too, so a reviewer needs no invitation of their own (ADR 79). Signing
-// in to an account that exists is never held to it.
+// with by address gets in too, so a reviewer needs no invitation of their own (ADR 79), and so does
+// an operator, by the address `DEK_PUB_OPERATORS` lists (ADR 82). Signing in to an account that
+// exists is never held to it.
 
-import { listSetting } from "../../common/list-setting.ts";
+import { isAddressEntry, listSetting } from "../../common/list-setting.ts";
 import { type Invited, Newcomer } from "./type.ts";
 
 /**
@@ -13,7 +14,7 @@ import { type Invited, Newcomer } from "./type.ts";
 export function readInvited(setting: string): Invited {
   const entries = listSetting(setting);
   const logins = entries.filter((entry) => /^@[^@]+$/.test(entry)).map((entry) => entry.slice(1));
-  const emails = entries.filter((entry) => /^[^@*]+@[^@*]+$/.test(entry));
+  const emails = entries.filter(isAddressEntry);
   return {
     anyone: entries.length === 1 && entries[0] === "*",
     emails: new Set(emails),
@@ -33,11 +34,13 @@ export function readNewcomer(data: unknown): Newcomer | null {
 
 /**
  * Whether an account may be made for `newcomer`: anyone may when the list is `*`; otherwise a
- * GitHub login on it, a verified address on it, or a verified address a share waits for, which
- * `grantWaits` is asked of last. An address that is not verified never counts.
+ * GitHub login on it, a verified address on it or among `operators`, or a verified address a
+ * share waits for, which `grantWaits` is asked of last. An address that is not verified never
+ * counts, so the first operator can make an account on an empty database from the settings alone.
  */
 export async function mayJoin(
   invited: Invited,
+  operators: ReadonlySet<string>,
   newcomer: Newcomer,
   grantWaits: (email: string) => Promise<boolean>,
 ): Promise<boolean> {
@@ -51,5 +54,5 @@ export async function mayJoin(
     return false;
   }
   const email = newcomer.email.toLowerCase();
-  return invited.emails.has(email) || grantWaits(email);
+  return invited.emails.has(email) || operators.has(email) || grantWaits(email);
 }

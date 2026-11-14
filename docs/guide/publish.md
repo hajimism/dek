@@ -72,7 +72,7 @@ dekc pub share --visibility link --script shown --comments signed-in
 | `--comments` | who may post comments at the bottom of a `link` or `public` talk: `off`, no one; `signed-in`, anyone signed in to dek.pub |
 | `--new-link` | a new key in a `link` talk's URL; the URL given out before opens it no more |
 
-A `link` talk's URL carries a key that cannot be guessed, as `/@you/talk?key=…`; `dekc pub share` and `dekc pub status` print it, and anyone without the key gets a page that does not exist. The people you share the deck with open it without the key. The key stays when the talk becomes `private` and back, and changes only with `--new-link`, or New link on its manage page.
+A `link` talk's URL carries a key that cannot be guessed, as `/@you/talk?key=…`; `dekc pub share` and `dekc pub status` print it, and anyone without the key gets a page that does not exist. The people you share the deck with open it without the key, so the links to review threads that `dekc pub comments` prints, and those in dek.pub's mail, carry none. The key stays when the talk becomes `private` and back, and changes only with `--new-link`, or New link on its manage page.
 
 Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post, and only a reader signed in to dek.pub ever does. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people by handle or email address, each to view or to comment, and each on the team's side or the guests': on its manage page on dek.pub, or with `dekc pub grants add`. The team reads every thread; a guest reads only those shared with them, and never learns of the others. A guest opens the deck only once it is `private` or wider: to a guest, a `team` deck is a page that does not exist. A thread you or your team open is kept to the team unless you check Share with guests, and one kept to the team can be shared later, never taken back.
 
@@ -112,7 +112,7 @@ dekc pub delete --yes
 
 Deleting a talk removes it from dek.pub for good: every version, the review threads and their replies, the comments and likes at the bottom, and who it is shared with. Nothing of it opens after that, its pictures and its build included, and it cannot be undone. Without `--yes`, `dekc pub delete` deletes nothing and says what it would. It then takes `pub:` out of `script.md`, to commit, so the next `dekc pub publish` makes a new deck at the same URL, with nothing of the old one. The talk's manage page on dek.pub has the same at its bottom, Delete talk, which asks you to type the talk's slug first.
 
-Whoever runs a dek.pub can take down anyone's talk: `dekc pub takedown <talk> --yes`, with the talk's URL or its deck ID, from any directory. A dek.pub names the handles that may in its `DEK_PUB_OPERATORS` setting, and logs each takedown.
+Whoever runs a dek.pub can take down anyone's talk: `dekc pub takedown <talk> --yes`, with the talk's URL or its deck ID, from any directory. A dek.pub names those who may by their verified email address, in its `DEK_PUB_OPERATORS` setting, and logs each takedown. An API key can do whatever its account can: one in `DEK_TOKEN` can delete every talk of its owner, and an operator's can take down anyone's, so never put an operator's key in CI.
 
 ## Another server
 

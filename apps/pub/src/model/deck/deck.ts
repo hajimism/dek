@@ -27,6 +27,21 @@ export function talkHref(handle: string, deck: Keyed & Pick<Deck, "slug">): stri
 }
 
 /**
+ * `href` with `key` as its `key=`, in place of any other it has, its path, query and fragment
+ * kept; `href` itself when there is no key. The talk page shows a `link` talk's key in the
+ * address bar to those who opened it by their standing, so the address they copy opens it for
+ * others too.
+ */
+export function withLinkKey(href: string, key: string | null): string {
+  if (key === null) {
+    return href;
+  }
+  const url = new URL(href);
+  url.searchParams.set("key", key);
+  return url.href;
+}
+
+/**
  * The columns a share request changes: its settings, and a new link key when it asks for one or
  * makes the deck `link` for the first time. A key outlives a change to another visibility, so the
  * URL given out before opens again when the deck is `link` again.

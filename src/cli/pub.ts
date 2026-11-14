@@ -29,6 +29,7 @@ import {
   CreateDeckRequest,
   DECK_ID_RE,
   DeckDeleted,
+  DeckFound,
   DeckStatus,
   Grant,
   GrantList,
@@ -69,6 +70,14 @@ function pubCommand(words: string, flags: Flags): string {
   return flags.server === undefined
     ? `dekc pub ${words}`
     : `dekc pub ${words} --server ${shellQuote(flags.server)}`;
+}
+
+/**
+ * `dekc pub <subcommand> <deck> <rest>` for a hint: the deck named, so the hint acts on the same
+ * deck wherever in the project it is run, not on the deck of the folder it is run in.
+ */
+function deckCommand(subcommand: string, { deck }: ReadableDeck, flags: Flags, rest = ""): string {
+  return pubCommand(`${subcommand} ${shellQuote(deck.name)}${rest && ` ${rest}`}`, flags);
 }
 
 /** The key to send to `origin`, or the error that says how to sign in. */
@@ -526,7 +535,7 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
   };
   if (Object.keys(change).length === 0) {
     throw new DekError("dekc pub share needs a setting to change", {
-      hint: `pass ${SHARE_FLAGS}; \`${pubCommand("status", flags)}\` shows the settings now`,
+      hint: `pass ${SHARE_FLAGS}; \`${deckCommand("status", target, flags)}\` shows the settings now`,
     });
   }
   const id = requireDeckId(target, flags);
@@ -602,7 +611,7 @@ export async function deleteCommand(target: ReadableDeck, flags: FlagValues): Pr
   if (flags.yes !== true) {
     throw new DekError(
       `deleting deck "${target.deck.name}" (${id}) from dek.pub cannot be undone`,
-      { hint: `run \`${pubCommand("delete --yes", flags)}\` to delete ${DELETES}` },
+      { hint: `run \`${deckCommand("delete", target, flags, "--yes")}\` to delete ${DELETES}` },
     );
   }
   const key = await requireKey(origin, flags);
@@ -633,17 +642,25 @@ export async function takedownCommand(talk: string, flags: FlagValues): Promise<
     });
   }
   const key = await requireKey(origin, flags);
+  // A takedown has no project, so a 404 is not about pub: in script.md.
+  const notFound = `only the talk's owner or an operator of this dek.pub can take it down: check the talk's URL or deck ID, and that \`${pubCommand("whoami", flags)}\` names one of them`;
   const id =
     "id" in named
       ? named.id
       : (
           await request(
             origin,
-            { method: "GET", path: paths.talk(named.handle, named.slug), what: "the talk", key },
-            DeckStatus,
+            {
+              method: "GET",
+              path: paths.talk(named.handle, named.slug),
+              what: "the talk",
+              key,
+              notFound,
+            },
+            DeckFound,
           )
         ).id;
-  const deleted = await deleteDeck(origin, id, key);
+  const deleted = await deleteDeck(origin, id, key, notFound);
   return {
     action: "takedown",
     server: origin,
@@ -679,10 +696,16 @@ function talkNamed(
   return { handle: match[1].toLowerCase(), slug: match[2].toLowerCase() };
 }
 
-function deleteDeck(origin: string, id: string, key: Key) {
+function deleteDeck(origin: string, id: string, key: Key, notFound?: string) {
   return request(
     origin,
-    { method: "DELETE", path: paths.deck(id), what: "deleting the deck", key },
+    {
+      method: "DELETE",
+      path: paths.deck(id),
+      what: "deleting the deck",
+      key,
+      ...(notFound !== undefined ? { notFound } : {}),
+    },
     DeckDeleted,
   );
 }

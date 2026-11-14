@@ -34,12 +34,13 @@ const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
 // dek.pub opens by invitation: the server lets sign up the people the run signs up, by address,
 // and anyone a deck is shared with. "Form" is on the list for the development form to be refused.
-// @keeper runs the server, as an operator who may take any talk down. "Host" shares a deck with
-// as many as dek.pub mails invitations for, and one more.
+// Keeper runs the server, as an operator who may take any talk down: named by address, and on no
+// invitation list, as the first operator of a new database is. "Host" shares a deck with as many
+// as dek.pub mails invitations for, and one more.
 const server = await startDevServer(
   PORT,
-  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form", "Keeper", "Host"].map(addressOf),
-  ["keeper"],
+  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form", "Host"].map(addressOf),
+  [addressOf("Keeper")],
 );
 const inbox = new Inbox(server.url);
 
@@ -322,8 +323,10 @@ try {
   check(commentGrant.status === 201, "the owner grants the colleague comment");
   const invited = await inbox.waitFor(strangerMe.email, "shared");
   check(
-    invited.length === 1 && invited[0]?.text.includes(keyedPath(talkPath)),
-    "a new grant mails the colleague a link to the talk, with its key",
+    invited.length === 1 &&
+      invited[0]?.text.split(/\r?\n/).includes(`${server.url}${talkPath}`) &&
+      !invited[0].text.includes("key="),
+    "a new grant mails the colleague a link to the talk without its key, which their grant makes needless",
     invited,
   );
   check(
@@ -361,8 +364,13 @@ try {
   );
   const told = await inbox.waitFor(me.email, "commented on");
   check(
-    told.some((mail) => mail.text.includes("出典がほしい") && mail.text.includes(talkPath)),
-    "the owner is mailed of a new thread, with its words and a link to it",
+    told.some(
+      (mail) =>
+        mail.text.includes("出典がほしい") &&
+        mail.text.includes(`${server.url}${talkPath}#`) &&
+        !mail.text.includes("key="),
+    ),
+    "the owner is mailed of a new thread, with its words and a link to it without the key",
     told,
   );
   const element = await stranger.fetch(`/api/decks/${id}/comments`, {
@@ -401,10 +409,16 @@ try {
           slug: string;
           status: string;
           targets: Array<Record<string, unknown>>;
+          url: string;
         }>;
       }
     ).comments ?? [];
   check(listed.ok && rows.length === 2, "dekc pub comments lists both", listed);
+  check(
+    rows.every((row) => row.url === `${server.url}${talkPath}#${row.id}`),
+    "a review thread's URL is the talk's without its key, so pasting it gives the key away nowhere",
+    rows.map((row) => row.url),
+  );
   const quoteRow = rows.find((row) => row.targets.some((t) => t.kind === "quote"));
   check(
     quoteRow?.targets.some((t) => t.line !== undefined || t.found !== undefined),
@@ -1493,7 +1507,8 @@ try {
     republished,
   );
 
-  // An operator takes down someone else's talk, named by its URL, from any directory.
+  // An operator, whom only DEK_PUB_OPERATORS lets sign up, takes down someone else's talk, named
+  // by its URL, from any directory.
   const keeper = new Browser(server.url);
   await keeper.signUp("Keeper");
   const keeperKey = (

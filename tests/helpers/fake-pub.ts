@@ -261,7 +261,9 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       const found = [...fake.decks.values()].find(
         (deck) => deck.owner === talk[1] && deck.slug === talk[2],
       );
-      return found ? Response.json(status(found)) : error(404, "not_found", "no such deck");
+      return found
+        ? Response.json({ id: found.id, owner: found.owner, slug: found.slug })
+        : error(404, "not_found", "no such deck");
     }
     const match = path.match(/^\/api\/decks\/([^/]+)(\/.*)?$/);
     const deck = match ? fake.decks.get(match[1] ?? "") : undefined;
