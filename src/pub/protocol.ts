@@ -149,8 +149,8 @@ export const VersionManifest = z.strictObject({
   dekVersion: z.string(),
   /** The deck's folder name in the project. */
   deck: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
+  title: z.string().max(500),
+  description: z.string().max(2000).optional(),
   event: z.string().max(500).optional(),
   /** The talk's date, as the frontmatter writes it: YYYY-MM-DD. */
   date: z.iso.date().optional(),
@@ -171,7 +171,7 @@ export const VersionManifest = z.strictObject({
   lint: LintSummary,
   /** Slugs `dekc mv` renamed since the version this one was made on. */
   renames: z.array(Rename),
-  message: z.string().optional(),
+  message: z.string().max(2000).optional(),
   /** sha256 of each file sent, hex. */
   files: z.partialRecord(z.enum(VERSION_FILES), Sha256),
   /** sha256 of each slide's picture with every beat shown, by slug; each is sent as `shot:<slug>`. */
@@ -182,7 +182,7 @@ export type VersionManifest = z.infer<typeof VersionManifest>;
 export const CreateDeckRequest = z.strictObject({
   /** The slug in the deck's URL; the folder name unless the author picks another. */
   slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
-  title: z.string(),
+  title: z.string().max(500),
 });
 
 export const VersionSummary = z.strictObject({

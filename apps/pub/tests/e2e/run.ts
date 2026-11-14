@@ -109,6 +109,15 @@ try {
     (await fetch(`${server.deckOrigin(id)}/v/1/`)).status === 404,
     "the serve origin hands out nothing without a token",
   );
+  check(
+    (await (await fetch(`${server.url}/robots.txt`)).text()) === "User-agent: *\nDisallow: /\n",
+    "robots.txt keeps crawlers out of any origin but dek.pub",
+  );
+  const securityTxt = await fetch(`${server.url}/.well-known/security.txt`);
+  check(
+    securityTxt.ok && (await securityTxt.text()).includes("Contact: "),
+    "security.txt says where to report",
+  );
 
   // Shared by link with the script and comments open, it reads as an article.
   const shared = await dekc([
