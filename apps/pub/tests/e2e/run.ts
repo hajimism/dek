@@ -525,17 +525,37 @@ try {
     asTeam.status === 403 && (await asTeam.json()).error?.code === "team_only",
     "the guests' side cannot open a thread for the team alone",
   );
-  const widened = await author.fetch(`/api/decks/${id}/comments/${teamRow.id}/widen`, {
-    method: "POST",
-  });
+  // Shared twice at once, as by two clicks: it takes one number, not two.
+  const [widened, widenedAgain] = await Promise.all(
+    [0, 1].map(() =>
+      author.fetch(`/api/decks/${id}/comments/${teamRow.id}/widen`, { method: "POST" }),
+    ),
+  );
   const widenedRow = (await widened.json()) as { scope: string; number: number };
   const shownToGuest = (await guestList()).comments?.find((row) => row.id === teamRow.id);
+  const lastShared = Math.max(...rows.map((row) => row.number));
   check(
     widened.status === 200 &&
+      widenedAgain.status === 200 &&
       widenedRow.scope === "shared" &&
-      shownToGuest?.number === Math.max(...rows.map((row) => row.number)) + 1,
+      shownToGuest?.number === lastShared + 1,
     "a shared team thread reaches the guest under the next shared number",
     { widenedRow, shownToGuest },
+  );
+  const nextShared = (await (
+    await author.fetch(`/api/decks/${id}/comments`, {
+      method: "POST",
+      json: {
+        anchor: { slug: renamed, step: "0", targets: [] },
+        text: "ゲストにも",
+        scope: "shared",
+      },
+    })
+  ).json()) as { number: number };
+  check(
+    nextShared.number === lastShared + 2,
+    "sharing a thread twice at once takes one number",
+    nextShared,
   );
   const teamOnly = (await (
     await author.fetch(`/api/decks/${id}/comments`, {
