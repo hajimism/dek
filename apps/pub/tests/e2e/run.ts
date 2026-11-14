@@ -829,12 +829,88 @@ try {
     !/href="https:\/\/github\.com\/[^"]*" rel="me/.test(ownProfile),
     "a profile of an account made without GitHub links to no GitHub account",
   );
-  await server.store.sql("UPDATE user SET githubLogin = ? WHERE id = ?", ["Octo-Author", me.id]);
+
+  // A person sets the links their profile shows, and their name, on /settings.
+  const settingsAway = await new Browser(server.url).fetch("/settings");
   check(
-    (await (await author.fetch(`${profilePath}?lang=en`)).text()).includes(
-      'href="https://github.com/Octo-Author" rel="me',
-    ),
-    "a profile links to the GitHub login its account was made with, not to its handle",
+    settingsAway.status === 302 &&
+      settingsAway.headers.get("location") === `/signin?next=${encodeURIComponent("/settings")}`,
+    "the settings page sends a visitor signed out to sign in, and back",
+    { status: settingsAway.status, location: settingsAway.headers.get("location") },
+  );
+  const speaker = new Browser(server.url);
+  const speakerMe = await speaker.signUp("Speaker");
+  const settingsPage = await speaker.fetch("/settings?lang=en");
+  const settingsHtml = await settingsPage.text();
+  check(
+    settingsPage.status === 200 &&
+      settingsHtml.includes(`@${speakerMe.handle}`) &&
+      settingsHtml.includes("No links yet."),
+    "the settings page shows the handle, and no links for an account made without GitHub",
+  );
+  const refusedLinks = async (links: string[]) => {
+    const response = await speaker.fetch("/api/me/links", { method: "PUT", json: { links } });
+    const body = (await response.json()) as { error?: { code: string } };
+    return `${response.status} ${body.error?.code}`;
+  };
+  const six = ["a", "b", "c", "d", "e", "f"].map((host) => `https://${host}.example/`);
+  check(
+    (await refusedLinks(["http://speaker.example"])) === "422 link_not_https" &&
+      (await refusedLinks(["https://me:pw@speaker.example"])) === "422 link_credentials" &&
+      (await refusedLinks(["javascript:alert(1)"])) === "422 link_not_https" &&
+      (await refusedLinks(six)) === "422 links_too_many",
+    "a link that is not https, carries a password, or one too many is refused with its code",
+  );
+  const setLinks = await speaker.fetch("/api/me/links", {
+    method: "PUT",
+    json: {
+      links: ["zenn.dev/speaker", "https://GitHub.com/speaker-gh", "https://speaker.example/talks"],
+    },
+  });
+  const savedLinks = (await setLinks.json()) as { links: string[] };
+  const ordered = [
+    "https://zenn.dev/speaker",
+    "https://github.com/speaker-gh",
+    "https://speaker.example/talks",
+  ];
+  check(
+    setLinks.status === 200 && savedLinks.links.join() === ordered.join(),
+    "PUT /api/me/links answers the links as saved, written out",
+    savedLinks,
+  );
+  check(
+    ((await (await speaker.fetch("/api/me/links")).json()) as { links: string[] }).links.join() ===
+      ordered.join(),
+    "GET /api/me/links answers them in their order",
+  );
+  const speakerProfile = await (await stranger.fetch(`/@${speakerMe.handle}?lang=en`)).text();
+  const at = ordered.map((url) =>
+    speakerProfile.indexOf(`href="${url}" rel="me nofollow ugc noopener"`),
+  );
+  check(
+    at.every((index, n) => index > 0 && (n === 0 || index > (at[n - 1] ?? 0))) &&
+      speakerProfile.includes("Zenn") &&
+      speakerProfile.includes("speaker.example"),
+    'the profile shows each link in its order, rel="me nofollow ugc noopener", named by its service or site',
+    at,
+  );
+  const newName = await speaker.fetch("/api/me", {
+    method: "PATCH",
+    json: { name: "  Speaker   K " },
+  });
+  const emptyName = await speaker.fetch("/api/me", { method: "PATCH", json: { name: " " } });
+  check(
+    newName.status === 200 &&
+      ((await newName.json()) as { name: string }).name === "Speaker K" &&
+      emptyName.status === 422 &&
+      ((await emptyName.json()) as { error: { code: string } }).error.code === "name_empty" &&
+      (await (await stranger.fetch(`/@${speakerMe.handle}`)).text()).includes("Speaker K"),
+    "a person changes their name with PATCH /api/me, and an empty one is refused",
+  );
+  check(
+    (await speaker.fetch("/api/me/links", { method: "PUT", json: { links: [] } })).status === 200 &&
+      !(await (await stranger.fetch(`/@${speakerMe.handle}`)).text()).includes('rel="me'),
+    "a person may take every link off their profile",
   );
   check(
     !(await (await stranger.fetch(profilePath)).text()).includes(`href="${talkPath}"`),

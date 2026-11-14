@@ -19,6 +19,15 @@ import {
   suggestHandle,
 } from "../../src/model/person/handle.ts";
 import {
+  firstLinks,
+  linkFace,
+  MAX_LINK_LENGTH,
+  MAX_LINKS,
+  readLink,
+  readLinks,
+} from "../../src/model/person/link.ts";
+import { MAX_NAME_LENGTH, readName } from "../../src/model/person/name.ts";
+import {
   authorOf,
   hasHandle,
   meOf,
@@ -287,5 +296,184 @@ describe("profile pages", () => {
     expect(profileHref("demo", "timeline", 1)).toBe("/@demo?view=timeline");
     expect(profileHref("demo", "gallery", 3)).toBe("/@demo?page=3");
     expect(profileHref("demo", "timeline", 2)).toBe("/@demo?view=timeline&page=2");
+  });
+});
+
+describe("readLink", () => {
+  it("reads an https address as the URL parser writes it", () => {
+    expect(readLink(" https://GitHub.com/hajimism ")).toEqual({
+      ok: true,
+      url: "https://github.com/hajimism",
+    });
+    expect(readLink("https://example.com")).toEqual({ ok: true, url: "https://example.com/" });
+    expect(readLink("https://example.com:443/a?b=1#c")).toEqual({
+      ok: true,
+      url: "https://example.com/a?b=1#c",
+    });
+  });
+
+  it("takes an address typed without its scheme as https", () => {
+    expect(readLink("zenn.dev/hajimism")).toEqual({ ok: true, url: "https://zenn.dev/hajimism" });
+    expect(readLink("example.com:8443/me")).toEqual({
+      ok: true,
+      url: "https://example.com:8443/me",
+    });
+  });
+
+  it("refuses http and every scheme but https", () => {
+    for (const input of ["http://example.com", "javascript:alert(1)", "ftp://example.com/x"]) {
+      expect(readLink(input)).toEqual({ ok: false, problem: "not_https" });
+    }
+    expect(readLink("data:text/html,<b>x</b>")).toEqual({ ok: false, problem: "not_https" });
+  });
+
+  it("refuses an address that carries a user name or a password", () => {
+    expect(readLink("https://me:secret@example.com/")).toEqual({
+      ok: false,
+      problem: "credentials",
+    });
+    expect(readLink("https://me@example.com/")).toEqual({ ok: false, problem: "credentials" });
+  });
+
+  it("refuses what is not an address of a named host", () => {
+    for (const input of [
+      "",
+      "   ",
+      "https://",
+      "https://localhost/",
+      "not a url",
+      "https://exa mple.com",
+    ]) {
+      expect(readLink(input)).toEqual({ ok: false, problem: "invalid" });
+    }
+  });
+
+  it("refuses an address longer than the bound, as written out", () => {
+    const path = "a".repeat(MAX_LINK_LENGTH);
+    expect(readLink(`https://example.com/${path}`)).toEqual({ ok: false, problem: "too_long" });
+    const fits = `https://example.com/${"a".repeat(MAX_LINK_LENGTH - "https://example.com/".length)}`;
+    expect(readLink(fits)).toEqual({ ok: true, url: fits });
+  });
+});
+
+describe("readLinks", () => {
+  it("reads each link in order", () => {
+    expect(readLinks(["github.com/hajimism", "https://hajimism.dev"])).toEqual({
+      ok: true,
+      links: ["https://github.com/hajimism", "https://hajimism.dev/"],
+    });
+    expect(readLinks([])).toEqual({ ok: true, links: [] });
+  });
+
+  it("says which link is refused, and why", () => {
+    expect(readLinks(["https://a.example", "http://b.example"])).toEqual({
+      ok: false,
+      problem: "not_https",
+      at: 1,
+    });
+  });
+
+  it("refuses the same link twice, as written out", () => {
+    expect(readLinks(["https://a.example/", "A.example"])).toEqual({
+      ok: false,
+      problem: "duplicate",
+      at: 1,
+    });
+  });
+
+  it("takes at most five", () => {
+    expect(MAX_LINKS).toBe(5);
+    const links = ["a", "b", "c", "d", "e", "f"].map((host) => `https://${host}.example/`);
+    expect(readLinks(links.slice(0, 5))).toEqual({ ok: true, links: links.slice(0, 5) });
+    expect(readLinks(links)).toEqual({ ok: false, problem: "too_many", at: null });
+  });
+});
+
+describe("linkFace", () => {
+  it("names a service and the account a profile's address holds", () => {
+    const faces: [string, string, string | null][] = [
+      ["https://github.com/hajimism", "GitHub", "hajimism"],
+      ["https://x.com/hajimism", "X", "@hajimism"],
+      ["https://twitter.com/hajimism/", "X", "@hajimism"],
+      ["https://mobile.twitter.com/hajimism", "X", "@hajimism"],
+      ["https://bsky.app/profile/hajimism.bsky.social", "Bluesky", "@hajimism.bsky.social"],
+      ["https://www.youtube.com/@hajimism", "YouTube", "@hajimism"],
+      ["https://www.youtube.com/c/hajimism", "YouTube", "hajimism"],
+      ["https://www.linkedin.com/in/hajime-nakagawa/", "LinkedIn", "hajime-nakagawa"],
+      ["https://jp.linkedin.com/in/hajime-nakagawa", "LinkedIn", "hajime-nakagawa"],
+      ["https://zenn.dev/hajimism", "Zenn", "@hajimism"],
+      ["https://qiita.com/hajimism", "Qiita", "@hajimism"],
+      ["https://note.com/hajimism", "note", "hajimism"],
+      ["https://speakerdeck.com/hajimism", "Speaker Deck", "hajimism"],
+      ["https://connpass.com/user/hajimism/", "connpass", "hajimism"],
+    ];
+    for (const [url, name, account] of faces) {
+      expect(linkFace(url), url).toMatchObject({ name, account });
+    }
+  });
+
+  it("names the service alone for one of its pages that is no profile", () => {
+    expect(linkFace("https://github.com/hajimism/dek")).toEqual({
+      service: "github",
+      name: "GitHub",
+      account: null,
+    });
+    expect(linkFace("https://x.com/home")).toMatchObject({ service: "x", account: null });
+    expect(linkFace("https://www.youtube.com/watch?v=abc")).toMatchObject({
+      service: "youtube",
+      account: null,
+    });
+    expect(linkFace("https://zenn.dev/hajimism/articles/abc")).toMatchObject({
+      service: "zenn",
+      account: null,
+    });
+  });
+
+  it("names any other site by its host", () => {
+    expect(linkFace("https://www.hajimism.dev/about")).toEqual({
+      service: "website",
+      name: "hajimism.dev",
+      account: null,
+    });
+    expect(linkFace("https://notgithub.com/hajimism")).toMatchObject({
+      service: "website",
+      name: "notgithub.com",
+    });
+    expect(linkFace("https://github.com.example/hajimism")).toMatchObject({ service: "website" });
+  });
+
+  it("shows an account written in percent-encoding as its letters", () => {
+    expect(linkFace("https://note.com/%E4%B8%AD%E5%B7%9D")).toMatchObject({ account: "中川" });
+  });
+});
+
+describe("firstLinks", () => {
+  it("is the GitHub profile of an account made with GitHub, and none for any other", () => {
+    expect(firstLinks({ githubLogin: "Octo-Cat" })).toEqual(["https://github.com/Octo-Cat"]);
+    expect(firstLinks({ githubLogin: null })).toEqual([]);
+  });
+
+  it("is a list a person could have saved", () => {
+    expect(readLinks(firstLinks({ githubLogin: "Octo-Cat" }))).toEqual({
+      ok: true,
+      links: ["https://github.com/Octo-Cat"],
+    });
+  });
+});
+
+describe("readName", () => {
+  it("reads a name with its spaces made one", () => {
+    expect(readName("  Hajime \t Nakagawa ")).toEqual({ ok: true, name: "Hajime Nakagawa" });
+    expect(readName("中川 元")).toEqual({ ok: true, name: "中川 元" });
+  });
+
+  it("refuses an empty name and one longer than the bound", () => {
+    expect(readName(" \n ")).toEqual({ ok: false, problem: "empty" });
+    expect(readName("\u0000\u0007")).toEqual({ ok: false, problem: "empty" });
+    expect(readName("a".repeat(MAX_NAME_LENGTH))).toEqual({
+      ok: true,
+      name: "a".repeat(MAX_NAME_LENGTH),
+    });
+    expect(readName("a".repeat(MAX_NAME_LENGTH + 1))).toEqual({ ok: false, problem: "too_long" });
   });
 });

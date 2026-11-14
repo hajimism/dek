@@ -84,6 +84,7 @@
             <hr />
             {#if viewer.handle}
               <a role="menuitem" href={profilePath(viewer.handle)}><Icon name="user" />{t("nav.profile")}</a>
+              <a role="menuitem" href="/settings"><Icon name="settings" />{t("nav.settings")}</a>
             {/if}
             <button type="button" role="menuitem" onclick={signOut}><Icon name="signout" />{t("nav.signout")}</button>
           {/snippet}
