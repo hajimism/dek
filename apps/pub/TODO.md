@@ -2,102 +2,94 @@
 
 Phases 1 and 2 of the plan are built: publishing from `dekc pub`, the talk page with its viewer and script article, sharing, and review comments that `dekc pub comments` hands back. All of it runs locally on Miniflare, and `bun run test:e2e` covers the round trip. Nothing is deployed.
 
-This file lists what is missing or only partly there. Remove an item when the change that does it lands.
+dek.pub opens first by invitation: only the people it lets in can sign up. dek 0.7.0, the first release with `dekc pub`, comes out once dek.pub runs on its own domain; until then the release-please pull request stays open, though `docs/guide/publish.md` is already on the docs site.
 
-## Comments are still taking shape
+This file lists what is missing, in the order it is needed. Remove an item when the change that does it lands.
 
-**The comment experience is still taking shape.** It works from end to end, but its look, its behaviour and its API are expected to change. Do not build on its current details.
+## Before dek.pub opens by invitation
 
-What it does not do:
+### The app
 
-- **Notifications.** No one hears that a comment arrived: no email, no unread marker, nothing in the app.
-- **Live updates.** Comments load with the page. Others' comments appear only after a reload; only your own are merged in as you post them.
-- **Editing and deleting.** Nobody can edit or delete a comment or a reply, and the API has no routes for it.
-- **Moderation.** The owner can resolve any thread but cannot hide or delete one.
-- **Anchoring to beats.** An element comment keeps the beat it was picked at. A comment on a quote, and one on a slide made before the deck reported ready, are saved at step `"0"`. Pins are drawn at every beat of their slide (ADR 45).
-- **Re-anchoring after a publish** (`src/model/comment/anchor.ts`).
-  - Quotes are searched for again, and renames are followed.
-  - An element comment's path and box are never checked again. When its slide's HTML changes, the comment stays `open`, still pointing at the old box. It becomes `moved` only through a rename, and never `detached`.
-  - So the "Moved" and "Changed" badges appear only for quotes and renames.
-- **What changed.** Only the manage page lists the slides a version changed. The talk page does not mark changed slides for someone coming back to review.
-- **Team and guests** (ADR 51, 52).
-  - A thread's scope is set only on the page and by the API: `dekc pub comments` has no command to share a team thread, and no flag to open one, since the CLI opens no threads.
-  - The pins the deck draws show a team thread's bare number, so on the team's side `T3` and `3` both show as 3 there (the embed API takes a number).
-- **Text.** Comments are plain text: no Markdown, no mentions.
-- **Editing.** A review thread or reply cannot be changed or removed by its author, as public comments can (ADR 56).
-- **Full screen** (ADR 58).
-  - On a touch screen the header comes back only from a tap on the top strip; a tap on the slide is the deck's, and moves it.
-  - The theater is checked in a browser test as it fills the page; nothing checks a real full screen, which a headless browser does not grant.
-- **Public comments** (ADR 56).
-  - `dekc pub comments` lists the review threads only, and no mail tells the owner of a public comment.
-  - Nothing reports or hides a public comment but its removal; there is no rate limit on posting.
-  - The like appears beside the title and in the full-screen header (ADR 58).
-- **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.
-
-## Comments for reviews with guests
-
-The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), a new deck is the team's alone until its visibility reaches the guests (ADR 71), the talk goes full screen with a header and a review mode (ADR 57, 58), and a side column holds the slides, the details and the way into the review (ADR 59). Still to come, each with its own ADR:
-
-- **Mail, beyond what is built.** Sign-in links, invitations and notices of threads, replies and resolves are built (ADR 53, 54). Still to come:
-  - a digest of a person's notices, once a day or an hour, which needs a cron job and a record of what was sent
-  - muting a project's mail, with projects
-  - mail in the reader's language
-- **Projects.** A `dek.toml` key naming a project on dek.pub, which holds its decks, members and settings; grants to a project; `/projects/<id>/<deck>` URLs.
-
-## Gaps in phases 1 and 2
-
-- **API keys.**
-  - Each `dekc pub login` makes a key that lasts a year.
-  - `logout` revokes only the key it holds. Nothing lists a user's keys or revokes the others.
-  - There is no account or settings page.
-- **The full build** is uploaded but never served. No one, not even the owner, can read the whole script with its directions in the browser (ADR 47). The source tar cannot be downloaded.
-- **Embedding.**
-  - The only embeddable URL, `d-<id>.dekusercontent.com/v/<n>/`, names one version, and it returns 404 once a new version is current, so an embed breaks on every publish.
-  - There is no snippet to copy and no oEmbed endpoint.
-- **Grants.**
-  - An invitation is mailed only when a grant is made. Nothing sends one again, and a grant made before the mail domain works was never mailed.
-- **Deleting.** There is no way to delete a talk or an account.
 - **Handles.**
-  - A handle comes from the GitHub login or the email, and must be unique. A second account whose handle normalizes to one already taken fails to sign up. So does one made by a sign-in link, which then answers as if the link had expired.
-  - The profile links to GitHub when the account signs in with GitHub, by its handle. An account made by a sign-in link and later joined to a GitHub account keeps the handle its address gave it, so the link names someone else.
-  - A link-visibility talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
+  - A handle comes from the GitHub login or the email, and must be unique. Nobody chooses their own.
+  - A second account whose handle normalizes to one already taken fails to sign up. So does one made by a sign-in link, which then answers as if the link had expired.
+- **Profile links.**
+  - The only link a profile shows is to GitHub, made from its handle when the account signs in with GitHub. An account made by a sign-in link and later joined to a GitHub account keeps the handle its address gave it, so the link names someone else.
+  - Nobody can add a link of their own: X, a website, or any other.
+- **Link visibility.** A `link` talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
+- **Deleting.** Nobody can delete a talk, its owner and the operator included. Deleting an account is done by hand on request.
+- **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
+- **Sign-up by invitation.** Anyone with a GitHub account or an email address can sign up. Nothing holds sign-up to a list of people and to the addresses decks are shared with.
+- **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
+- **Logs.** Unexpected errors go to `console.error` whole, and a D1 error may carry the values it was bound to: an address, a comment's text.
 
-## Running it for real
+### Terms and the law
 
-- **Mail.**
-  - The sending domain, `mail.dek.pub` in `void.config.ts`, is set up with `void deploy`, which needs a Cloudflare token with Email Routing Edit and Email Sending Edit.
-  - SPF and DKIM records for it, which `void deploy` writes, checked in a received mail's headers. DMARC is declared in `infra/alchemy.run.ts`; the sending subdomain is quarantined, not rejected, until those headers are checked.
-  - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing.
-  - Asking for sign-in links is held only by Better Auth's default limit, 5 a minute from one client; nothing limits how many addresses are tried.
+- No terms of service, privacy policy, or contact page; the footer has no link to them.
+- The privacy policy has to cover what dek.pub keeps of people who never signed up: a grant holds the address it was made for.
+- Pages load Google Fonts and GitHub's avatars, which Japan's rule on sending a visitor's data to others (電気通信事業法の外部送信規律) may require dek.pub to disclose. Serving the fonts from dek.pub would leave only the avatars.
+- Whether review threads and their mail count as carrying others' messages, which may need a notice to the ministry (電気通信事業の届出), is not checked.
+
+### Staging
+
+Staging runs in the same Cloudflare account as production, deployed with its own tokens: the app on `workers.dev`, and decks and mail on one domain of its own. The steps under "Running it" are taken on staging first, then on production.
+
+- The staging domain is not chosen or registered.
+- `infra/site.ts` refuses any stage but `prod`.
+- Void has no named environments. It reads `void.config.ts`, `void.lock.json` and `.void/project.json` from the project root, so a second target needs its own root or a config that switches on the stage; which works is not tried.
+- `void.config.ts` names the Worker and the mail sender (`mail.dek.pub`) for production alone; `serve/wrangler.jsonc` has no `env.staging`; `infra.yml` passes `--stage prod` in every job.
+- Staging needs its own GitHub OAuth app and its own secrets.
+
+### Running it
+
+Each of these is needed on staging and on production.
+
+- **Domains.** `dek.pub` and `dekusercontent.com` are not registered. The Public Suffix List request for `dekusercontent.com` is not sent; it takes weeks.
+- **Infrastructure.** The zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) and the serve Worker's route are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
 - **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset.
-- **Domains.**
-  - `dek.pub` and `dekusercontent.com` are not registered.
-  - The serve Worker's route (`serve/wrangler.jsonc`) and the zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
-  - Staging has no hostnames, so `infra/site.ts` refuses any stage but `prod`.
-  - The Public Suffix List request is not sent.
-- **Deploying.**
-  - There is no staging configuration (ADR 43), no HTTPS staging server for the CLI to talk to (ADR 48), and no deploy workflow. CI only checks, tests and builds.
-  - Nothing applies `db/migrations/` to the remote D1, and there is no way back from a deploy but deploying again.
-- **Backups.** D1 and R2 have none, and no restore has been tried.
-- **Watching it.** No error tracking, health check, alert or budget alert. Unexpected errors go to `console.error` whole, and a D1 error may carry the values it was bound to: an address, a comment's text.
-- **Limits and abuse.**
-  - No rate limits; the API key plugin's own is off in `auth.ts`.
-  - Better Auth's own limits on sign-in, links and the device flow keep their counts in memory, so on Workers each isolate counts alone. Nothing limits `POST /api/cli/key` or `/api/decks/*`.
-  - An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
-  - No storage quota per user, and no limit on new accounts.
-  - The only limit is 50 MiB per version.
-  - Nobody can report a talk, and there is no block list.
+- **Deploying.** No script deploys the app and the serve Worker together, and nothing applies `db/migrations/` to the remote D1. There is no way back from a deploy but deploying again.
+- **Mail.**
+  - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing. The token `void deploy` uses needs Email Routing Edit and Email Sending Edit.
+  - SPF and DKIM, which `void deploy` writes, checked in a received mail's headers. DMARC is declared in `infra/alchemy.run.ts`; the sending subdomain is quarantined, not rejected, until those headers are checked.
+- **Watching it.** No budget alert, and Workers Logs is not turned on.
+- **Backups.** No restore of D1 (Time Travel) has been tried.
+- **A first run.** `dekc pub login`, `publish`, `share`, an invitation, a review thread and `dekc pub comments`, against the deployed server through `DEK_PUB_SERVER` and `DEK_TOKEN_SERVER`.
+
+## Before anyone can sign up
+
+- **Rate limits.**
+  - None of dek.pub's own; the API key plugin's is off in `auth.ts`. Nothing limits `POST /api/cli/key`, `/api/decks/*` or posting a comment.
+  - Better Auth's own limits on sign-in, links and the device flow keep their counts in memory, so on Workers each isolate counts alone. Asking for sign-in links is held only by its default, 5 a minute from one client; nothing limits how many addresses are tried.
+- **Quotas.** No storage quota per user and no limit on new accounts; the only limit is 50 MiB per version.
+- **Abuse.**
+  - Nobody can report a talk or a public comment, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
-- **Search.** No search; the plan's D1 FTS5 index is not built.
+- **Account deletion** by the person themselves, and an account or settings page to hold it with their keys.
+
+## Later
+
+- **Comments** work from end to end, but their look, their behaviour and their API are expected to change. Do not build on their current details.
+  - No notices but mail: no unread marker, nothing in the app. `dekc pub comments` lists review threads only, and no mail tells the owner of a public comment.
+  - Comments load with the page; others' appear only after a reload.
+  - A review thread or reply cannot be changed or removed by its author, as public comments can (ADR 56). The owner can resolve any thread but cannot hide or delete a review thread.
+  - Anchoring: a comment on a quote, and one on a slide made before the deck reported ready, are saved at step `"0"`, and pins are drawn at every beat of their slide (ADR 45). After a publish an element comment's path and box are never checked again (`src/model/comment/anchor.ts`), so the "Moved" and "Changed" badges appear only for quotes and renames.
+  - Only the manage page lists the slides a version changed.
+  - `dekc pub comments` has no command to share a team thread. The deck's pins show a team thread's bare number, so `T3` and `3` both show as 3.
+  - Plain text only: no Markdown, no mentions.
+  - On a touch screen the full-screen header comes back only from a tap on the top strip, and nothing checks a real full screen (ADR 58).
+  - `listComments` loads every thread and reply at once.
+- **Mail:** a digest of a person's notices, muting a project's mail, mail in the reader's language. An invitation is never sent again.
+- **Projects:** a `dek.toml` key naming a project on dek.pub, which holds its decks, members and settings; grants to a project; `/projects/<id>/<deck>` URLs.
+- **Embedding.** The only embeddable URL, `d-<id>.dekusercontent.com/v/<n>/`, returns 404 once a new version is current, so an embed breaks on every publish. No snippet to copy and no oEmbed endpoint.
+- **The full build** is uploaded but never served (ADR 47), and the source tar cannot be downloaded.
 - **Headers.** The app's CSP holds only `frame-ancestors`, `base-uri` and `object-src`; a full one needs a hash or nonce for the talk page's inline listener (ADR 67).
-- **Terms and the law.**
-  - No terms of service, privacy policy, or contact page; the footer has no link to them.
-  - The privacy policy has to cover what dek.pub keeps of people who never signed up: a grant holds the address it was made for.
-  - Pages load Google Fonts and GitHub's avatars, which Japan's rule on sending a visitor's data to others (電気通信事業法の外部送信規律) may require dek.pub to disclose. Serving the fonts from dek.pub would leave only the avatars.
-  - Whether review threads and their mail count as carrying others' messages, which may need a notice to the ministry (電気通信事業の届出), is not checked.
-  - The footer's Source link goes to the repository's front page, not to the commit that is running.
+- **Watching it, beyond logs:** no error tracking, health check or alert.
+- **Backups of R2.**
+- **Deploying from a workflow:** staging on every push to `main`, production by hand with an approval, as `infra.yml` does for the zones.
+- **Search.** The plan's D1 FTS5 index is not built.
 - **Every request with an API key writes to D1.** Better Auth's API key plugin records each use.
-- **Checks a browser test does not make.** No accessibility check such as axe, no test at a phone's width, and no measure of how fast a page loads.
+- **Checks a browser test does not make:** accessibility (axe), a phone's width, how fast a page loads.
+- **The footer's Source link** goes to the repository's front page, not to the commit that is running.
 - **`.dek/renames.json` only grows.** When `.dek/` is ignored by git, another checkout does not have the renames (ADR 49).
 
 ## Later phases

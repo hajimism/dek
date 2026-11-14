@@ -4,8 +4,11 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import appConfig from "../../void.config.ts";
 
 const APP = join(import.meta.dir, "..", "..");
+// Miniflare names the local bucket as void.config.ts does.
+const [{ bucket_name: BUCKET }] = appConfig.cloudflare.r2_buckets;
 
 export type DevServer = {
   url: string;
@@ -111,12 +114,12 @@ function explorer(api: string): Store {
     },
     async keys(prefix) {
       const objects = (await call(
-        `/r2/buckets/default/objects?prefix=${encodeURIComponent(prefix)}`,
+        `/r2/buckets/${BUCKET}/objects?prefix=${encodeURIComponent(prefix)}`,
       )) as Array<{ key: string }>;
       return objects.map((object) => object.key);
     },
     async put(key, body) {
-      await call(`/r2/buckets/default/objects/${encodeURIComponent(key)}`, {
+      await call(`/r2/buckets/${BUCKET}/objects/${encodeURIComponent(key)}`, {
         method: "PUT",
         body,
       });

@@ -1,7 +1,12 @@
 import { defineConfig } from "void/config";
 
 export default defineConfig({
-  cloudflare: { name: "dek-pub" },
+  cloudflare: {
+    name: "dek-pub",
+    // The bucket the serve Worker reads decks from (serve/wrangler.jsonc). Unnamed, `void deploy`
+    // would make the app one of its own.
+    r2_buckets: [{ binding: "STORAGE", bucket_name: "dek-pub" }],
+  },
   auth: { providers: ["github", "email"] },
   // Sign-in links, invitations and notices. The domain is set up for Cloudflare Email Sending by
   // `void deploy`; until then the dev server keeps every mail in its own inbox.
