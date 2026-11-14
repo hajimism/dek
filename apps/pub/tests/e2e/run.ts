@@ -755,6 +755,20 @@ try {
     !(await (await stranger.fetch(profilePath)).text()).includes(`href="${talkPath}"`),
     "nobody else's view of the profile lists it",
   );
+  const feed = await stranger.fetch(`${profilePath}/rss`);
+  const feedText = await feed.text();
+  check(
+    feed.status === 200 &&
+      feed.headers.get("content-type")?.startsWith("application/rss+xml") &&
+      feedText.includes(`<link>${server.url}${profilePath}</link>`) &&
+      !feedText.includes(talkPath),
+    "the profile's feed is RSS on the app's origin, without the team deck",
+    feedText.slice(0, 400),
+  );
+  check(
+    (await stranger.fetch("/@nobody-here/rss")).status === 404,
+    "a feed for a handle no one has is a 404",
+  );
 
   // The manage page shows the current version alone.
   const manage = await (await author.fetch(`${talkPath}/manage?lang=en`)).text();

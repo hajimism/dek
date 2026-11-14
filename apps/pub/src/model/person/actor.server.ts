@@ -9,10 +9,15 @@ import { readAccount } from "./person.ts";
 import { personById } from "./store.server.ts";
 import type { Person } from "./type.ts";
 
-export async function currentPerson(c: Context): Promise<Person | null> {
+/** The person signed in through the browser's session; an API key is not asked. */
+export function sessionPerson(c: Context): Person | null {
   const user = c.get("user");
-  if (user) {
-    return readAccount(user);
+  return user ? readAccount(user) : null;
+}
+
+export async function currentPerson(c: Context): Promise<Person | null> {
+  if (c.get("user")) {
+    return sessionPerson(c);
   }
   const key = c.req.header(API_KEY_HEADER);
   if (!key) {

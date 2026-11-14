@@ -1,6 +1,7 @@
 // A person's profile: who they are and one page of their talks, all of them for the person
 // themself, the public ones for anyone else. The page asks for the next pages as the reader wants
-// them, through `talkPageOf` too. A page past the last is as missing as a person who is not.
+// them, through `talkPageOf` too. A page past the last is as missing as a person who is not. And
+// the feed of their public talks.
 
 import type { Context } from "hono";
 import type { TalkPage } from "../../../../../../../src/pub/protocol.ts";
@@ -11,7 +12,14 @@ import { handleOf } from "../../profile-path.ts";
 import { personByHandle, signsInWithGitHub } from "../../store.server.ts";
 import type { Person } from "../../type.ts";
 import { pageCount, profileHref, TALKS_PER_PAGE } from "./paging.ts";
+import { talkFeed } from "./rss.ts";
 import type { ProfilePage } from "./type.ts";
+
+/** The person a profile's address names, as `@handle`; null for anything else. */
+async function ownerOf(c: Context, segment: string | undefined): Promise<Person | null> {
+  const handle = handleOf(segment);
+  return handle ? personByHandle(c, handle) : null;
+}
 
 /** Page `page` of `person`'s talks as whoever asks may see them, or null past the last page. */
 export async function talkPageOf(
@@ -37,8 +45,7 @@ export async function loadProfile(
   segment: string | undefined,
   page: number,
 ): Promise<ProfilePage | null> {
-  const handle = handleOf(segment);
-  const person = handle ? await personByHandle(c, handle) : null;
+  const person = await ownerOf(c, segment);
   const talks = person ? await talkPageOf(c, person, page) : null;
   if (!person || !talks) {
     return null;
@@ -52,4 +59,13 @@ export async function loadProfile(
     page,
     url: appUrl(profileHref(person.handle, "gallery", page)),
   };
+}
+
+/** The RSS feed of a person's public talks, the newest 50; null for an address that names no one. */
+export async function loadFeed(c: Context, segment: string | undefined): Promise<string | null> {
+  const person = await ownerOf(c, segment);
+  if (!person) {
+    return null;
+  }
+  return talkFeed(person, await talksBy(c, person, { publicOnly: true, limit: 50 }), appUrl(""));
 }
