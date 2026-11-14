@@ -607,15 +607,31 @@ try {
     "the link signs the guest in and sends them to the talk",
     { status: verified.status, location: verified.headers.get("location") },
   );
-  check(
-    (await guest.fetch(talkPath)).status === 200,
-    "signed in by the link, the guest opens the private talk shared with their address",
-  );
-  const guestMe = (await (await guest.fetch("/api/me")).json()) as { name?: string };
+  const guestMe = (await (await guest.fetch("/api/me")).json()) as {
+    name?: string;
+    handle?: string;
+  };
   check(
     guestMe.name === guestEmail.split("@")[0],
     "an account made by a sign-in link goes by its address's local part",
     guestMe,
+  );
+  const grantees = async () =>
+    (
+      (await (await author.fetch(`/api/decks/${id}/grants`)).json()) as {
+        grants: Array<{ id: string; who: string }>;
+      }
+    ).grants;
+  const claimedGrants = await grantees();
+  check(
+    claimedGrants.some((row) => row.who === guestMe.handle) &&
+      !claimedGrants.some((row) => row.who === guestEmail),
+    "signing in by the link claims the grant waiting on the address, before any deck is read",
+    claimedGrants,
+  );
+  check(
+    (await guest.fetch(talkPath)).status === 200,
+    "signed in by the link, the guest opens the private talk shared with their address",
   );
   const again = await new Browser(server.url).fetch(new URL(link).pathname + new URL(link).search);
   check(again.headers.get("location")?.includes("error=") === true, "a sign-in link works once", {
@@ -798,6 +814,43 @@ try {
   } finally {
     rmSync(twin, { recursive: true, force: true });
   }
+
+  // A grant by address to someone whose account has that address verified is theirs at once.
+  const guestGrant = (await grantees()).find((row) => row.who === guestMe.handle);
+  await author.fetch(`/api/decks/${id}/grants/${guestGrant?.id}`, { method: "DELETE" });
+  const regranted = await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: guestEmail, role: "comment" },
+  });
+  const regrantedRow = (await regranted.json()) as { who?: string };
+  check(
+    regranted.status === 201 &&
+      regrantedRow.who === guestMe.handle &&
+      (await grantees()).some((row) => row.who === guestMe.handle),
+    "a grant by an address an account has verified is tied to that account when it is made",
+    regrantedRow,
+  );
+  const tied = (await grantees()).find((row) => row.who === guestMe.handle);
+  await author.fetch(`/api/decks/${id}/grants/${tied?.id}`, { method: "DELETE" });
+  await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: `@${guestMe.handle}`, role: "view", side: "team" },
+  });
+  const beside = await author.fetch(`/api/decks/${id}/grants`, {
+    method: "POST",
+    json: { who: guestEmail, role: "comment" },
+  });
+  const besideRow = (await beside.json()) as { who?: string };
+  const both = await grantees();
+  check(
+    beside.status === 201 &&
+      besideRow.who === guestEmail &&
+      both.some((row) => row.who === guestMe.handle) &&
+      both.some((row) => row.who === guestEmail) &&
+      (await guest.fetch(talkPath)).status === 200,
+    "a grant by address beside one by handle on the same deck waits, and the one by handle counts",
+    { besideRow, both },
+  );
 
   const logout = await dekc(["pub", "logout"]);
   check(logout.ok, "logout revokes the key", logout);
