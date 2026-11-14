@@ -205,6 +205,26 @@ export const DeckStatus = z.strictObject({
 });
 export type DeckStatus = z.infer<typeof DeckStatus>;
 
+/**
+ * The deck at `/@handle/slug`, as its owner or an operator finds it to take it down: what names
+ * it, and nothing that opens it, so a `link` talk's key stays with those it was handed to.
+ */
+export const DeckFound = z.strictObject({
+  id: DeckId,
+  owner: z.string().describe("The owner's handle."),
+  slug: z.string(),
+});
+export type DeckFound = z.infer<typeof DeckFound>;
+
+/** The talk a `DELETE` of a deck took away: every row and file of it is gone, and its slug free. */
+export const DeckDeleted = z.strictObject({
+  deleted: z.literal(true),
+  id: DeckId,
+  owner: z.string().describe("The owner's handle."),
+  slug: z.string(),
+});
+export type DeckDeleted = z.infer<typeof DeckDeleted>;
+
 export const PublishResult = z.strictObject({
   id: DeckId,
   n: z.number().int(),
@@ -477,6 +497,8 @@ export const paths = {
   myLinks: "/api/me/links",
   handle: (handle: string) => `/api/handles/${segment(handle)}`,
   talksOf: (handle: string) => `/api/people/${segment(handle)}/talks`,
+  /** One talk by its URL's handle and slug, as its owner or an operator manages it. */
+  talk: (handle: string, slug: string) => `/api/people/${segment(handle)}/talks/${segment(slug)}`,
   cliKey: "/api/cli/key",
   revokeKey: "/api/cli/key",
   decks: "/api/decks",

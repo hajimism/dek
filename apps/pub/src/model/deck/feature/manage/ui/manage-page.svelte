@@ -12,6 +12,7 @@
   import Switch from "../../../../../common/ui/switch.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
+  import { profilePath } from "../../../../person/profile-path.ts";
   import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import type { CurrentVersion } from "../type.ts";
@@ -22,13 +23,24 @@
     status: initial,
     grants,
     version,
-  }: { status: DeckStatus; grants: GrantView[]; version: CurrentVersion | null } = $props();
+    ondeleted = (profile: string) => window.location.assign(profile),
+  }: {
+    status: DeckStatus;
+    grants: GrantView[];
+    version: CurrentVersion | null;
+    /** Where the page goes once the talk is deleted: the owner's profile. */
+    ondeleted?: (profile: string) => void;
+  } = $props();
 
   const { lang, t } = useApp();
   let status: DeckStatus = $state(untrack(() => initial));
   let saving: keyof ShareRequest | null = $state(null);
   let confirmPublic = $state(false);
   let confirmNewLink = $state(false);
+  let confirmDelete = $state(false);
+  let deleting = $state(false);
+  /** The slug as typed in the dialog that deletes the talk, which opens only once they match. */
+  let typedSlug = $state("");
   let visibilityControl: ReturnType<typeof RadioList> | undefined = $state();
   let active = $state("overview");
   /** The talk as it is shared: a `link` one's path carries its key, so its address can be passed on. */
@@ -44,6 +56,7 @@
     { id: "comments", label: "manage.comments" },
     { id: "sharing", label: "manage.sharing" },
     { id: "version", label: "manage.version" },
+    { id: "delete", label: "manage.delete" },
   ] as const;
 
   const visibilityIcons = { team: "lock", private: "users", link: "link", public: "globe" } as const;
@@ -117,6 +130,18 @@
       toast(message(error), { tone: "error" });
     } finally {
       saving = null;
+    }
+  }
+
+  /** Delete the talk for good: there is nothing to undo, so the page leaves for the profile. */
+  async function deleteTalk() {
+    deleting = true;
+    try {
+      await api(`/api/decks/${status.id}`, { method: "DELETE" });
+      ondeleted(profilePath(status.owner));
+    } catch (error) {
+      deleting = false;
+      toast(message(error), { tone: "error" });
     }
   }
 
@@ -226,6 +251,14 @@
         <p class="hint">{t("manage.version.hint")}</p>
         <Version {version} />
       </section>
+
+      <section id="delete" class="section" aria-labelledby="delete-title">
+        <h2 id="delete-title">{t("manage.delete")}</h2>
+        <p class="hint">{t("manage.delete.hint")}</p>
+        <div>
+          <Button variant="danger-quiet" icon="trash" onclick={() => (confirmDelete = true)}>{t("manage.delete.open")}</Button>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -262,6 +295,34 @@
         confirmNewLink = false;
         newLink();
       }}>{t("manage.sharing.newLinkConfirm")}</Button
+    >
+  {/snippet}
+</Dialog>
+
+<Dialog
+  bind:open={confirmDelete}
+  title={t("manage.delete.title", { title: status.title })}
+  onclose={() => {
+    confirmDelete = false;
+    typedSlug = "";
+  }}
+>
+  <p>{t("manage.delete.body")}</p>
+  <label class="confirm-label" for="delete-slug">{t("manage.delete.type", { slug: status.slug })}</label>
+  <!-- svelte-ignore a11y_autofocus -->
+  <input
+    id="delete-slug"
+    class="confirm-input"
+    bind:value={typedSlug}
+    autocomplete="off"
+    autocapitalize="off"
+    spellcheck="false"
+    autofocus
+  />
+  {#snippet actions()}
+    <Button variant="secondary" onclick={() => (confirmDelete = false)}>{t("common.cancel")}</Button>
+    <Button variant="danger" icon="trash" disabled={typedSlug !== status.slug || deleting} onclick={deleteTalk}
+      >{t("manage.delete.confirm")}</Button
     >
   {/snippet}
 </Dialog>
@@ -429,5 +490,27 @@
   }
   .anyone-text {
     flex: 1;
+  }
+  .confirm-label {
+    display: block;
+    margin-top: var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+  }
+  .confirm-input {
+    width: 100%;
+    height: 40px;
+    margin-top: var(--space-2);
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+  }
+  .confirm-input:focus-visible {
+    border-color: var(--accent);
+    outline-offset: 0;
   }
 </style>

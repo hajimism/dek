@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { getTableConfig, type SQLiteTable } from "void/schema-d1";
 import { CreateDeckRequest, DeckId, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
+import * as schema from "../../db/schema.ts";
 import { newDeckId, newLinkKey, sameKey } from "../../src/common/ids.ts";
 import {
   canComment,
+  canDelete,
   canManage,
   canSeeScript,
   canView,
@@ -21,6 +24,7 @@ import {
   talkPath,
   withLinkKey,
 } from "../../src/model/deck/deck.ts";
+import { DECK_ROWS, deleteInOrder } from "../../src/model/deck/deletion.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
 import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
 import { sitemapOf } from "../../src/model/deck/feature/sitemap/sitemap.ts";
@@ -41,7 +45,13 @@ import {
 } from "../../src/model/deck/public-comment/access.ts";
 import { threadPublic } from "../../src/model/deck/public-comment/view.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
-import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
+import {
+  accessKey,
+  deckIdFromHost,
+  deckOrigin,
+  deckPrefix,
+  versionKey,
+} from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
 import { DeckAccess } from "../../src/model/deck/serving/type.ts";
 import {
@@ -172,6 +182,13 @@ describe("access", () => {
     expect(canManage(deck("public"), owner)).toBe(true);
     expect(canManage(deck("public"), other)).toBe(false);
     expect(canManage(deck("public"), null)).toBe(false);
+  });
+
+  it("lets the owner delete a deck, and an operator anyone's", () => {
+    expect(canDelete(deck("team"), owner, false)).toBe(true);
+    expect(canDelete(deck("public"), other, false)).toBe(false);
+    expect(canDelete(deck("team"), other, true)).toBe(true);
+    expect(canDelete(deck("public"), null, false)).toBe(false);
   });
 });
 
@@ -725,3 +742,117 @@ describe("public comments", () => {
     ]);
   });
 });
+
+describe("deleting a deck", () => {
+  const tables = Object.values(schema).map((table) => {
+    const config = getTableConfig(table as SQLiteTable);
+    return { name: config.name, columns: config.columns.map((column) => column.name) };
+  });
+
+  it("takes every row that names the deck, or a thread of it, and no other", () => {
+    const keyed = tables.flatMap(({ name, columns }) =>
+      name === "decks"
+        ? [{ table: name, column: "id" }]
+        : columns.includes("deck_id")
+          ? [{ table: name, column: "deck_id" }]
+          : columns.includes("thread_id")
+            ? [{ table: name, column: "thread_id" }]
+            : [],
+    );
+    expect(DECK_ROWS.map(({ table, column }) => ({ table, column })).sort(byTable)).toEqual(
+      keyed.sort(byTable),
+    );
+    expect(keyed.map(({ table }) => table)).not.toContain("profile_links");
+  });
+
+  it("takes the replies through their threads, while the threads are still there", () => {
+    const replies = DECK_ROWS.findIndex((rows) => rows.table === "replies");
+    expect(DECK_ROWS[replies]).toEqual({
+      table: "replies",
+      column: "thread_id",
+      through: "threads",
+    });
+    expect(replies).toBeLessThan(DECK_ROWS.findIndex((rows) => rows.table === "threads"));
+    expect(DECK_ROWS.at(-1)).toEqual({ table: "decks", column: "id" });
+  });
+
+  /**
+   * A deck in two stores, as `deleteInOrder` deletes it: its rows, and the files the serve Worker
+   * reads, among them the access file. `racing` writes the access file while the rows are deleted,
+   * as a `syncAccess` that read the row just before does; `sweepFails` makes the files' sweep throw.
+   */
+  function storedDeck({ racing = false, sweepFails = false } = {}) {
+    const stored = { rows: true, access: true, files: true };
+    const steps = {
+      removeAccess: vi.fn(async () => {
+        stored.access = false;
+      }),
+      deleteRows: vi.fn(async () => {
+        if (racing) {
+          stored.access = true;
+        }
+        stored.rows = false;
+      }),
+      deleteFiles: vi.fn(async () => {
+        if (sweepFails) {
+          throw new Error("R2 is down");
+        }
+        stored.access = false;
+        stored.files = false;
+      }),
+    };
+    return { stored, steps };
+  }
+
+  it("takes the access file away before the rows go, and again after", async () => {
+    const { stored, steps } = storedDeck({ racing: true, sweepFails: true });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await deleteInOrder("d_0123456789", steps);
+    expect(stored).toEqual({ rows: false, access: false, files: true });
+    expect(steps.removeAccess).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0]?.[0]).toBe(
+      "the files of the deleted deck d_0123456789 were not all deleted",
+    );
+    logged.mockRestore();
+  });
+
+  it("leaves the deck as it was when the access file cannot be taken away first", async () => {
+    const { stored, steps } = storedDeck();
+    steps.removeAccess.mockRejectedValueOnce(new Error("R2 is down"));
+    await expect(deleteInOrder("d_0123456789", steps)).rejects.toThrow("R2 is down");
+    expect(stored).toEqual({ rows: true, access: true, files: true });
+    expect(steps.deleteRows).not.toHaveBeenCalled();
+  });
+
+  it("logs the access file left after the rows went on its own line, and still sweeps", async () => {
+    const { stored, steps } = storedDeck({ racing: true });
+    steps.removeAccess.mockImplementationOnce(async () => {
+      stored.access = false;
+    });
+    steps.removeAccess.mockRejectedValueOnce(new Error("R2 is down"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await deleteInOrder("d_0123456789", steps);
+    expect(logged.mock.calls.map(([message]) => message)).toEqual([
+      "the access file of the deleted deck d_0123456789 was not deleted",
+    ]);
+    expect(stored).toEqual({ rows: false, access: false, files: false });
+    logged.mockRestore();
+  });
+
+  it("finds every file of the deck under its own prefix, the access file too, and no other's", () => {
+    const id = "d_0123456789";
+    for (const key of [
+      accessKey(id),
+      versionKey(id, 3, "public.html"),
+      versionKey(id, 3, "cover.png"),
+    ]) {
+      expect(key.startsWith(deckPrefix(id))).toBe(true);
+    }
+    expect(accessKey("d_01234567890").startsWith(deckPrefix(id))).toBe(false);
+  });
+});
+
+function byTable(a: { table: string }, b: { table: string }): number {
+  return a.table.localeCompare(b.table);
+}

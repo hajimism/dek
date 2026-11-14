@@ -95,6 +95,8 @@ dekc pub publish [--message <text>] [--slug <slug>]   lint errors stop it; commi
 dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in --new-link   a link deck's url carries ?key=; --new-link replaces it
 dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>
 dekc pub grants | grants add <@handle|email> [--role view|comment] [--side team|guest] | grants remove <@handle|email|id>   only a new grant is mailed
+dekc pub delete --yes   deletes the talk and all on it for good, takes pub: out of script.md; commit it
+dekc pub takedown <talk-url|deck-id> --yes   an operator deletes anyone's talk, from any directory
 dekc help [command] | dekc <command> --help | dekc --version
 
 Errors include hint with the next command to run.

@@ -2,9 +2,10 @@
 // An author signs in with the device flow, publishes a sample deck, shares it; a colleague
 // comments on a quoted sentence and on a slide element; the author reads the comments as JSON,
 // renames the slide with `dekc mv`, publishes again, and resolves every comment from the CLI.
+// At the end the author deletes the talk with all on it, and an operator takes one down.
 // Run from apps/pub: `bun run test:e2e`.
 
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { translate } from "../../src/common/i18n.ts";
@@ -32,9 +33,12 @@ const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
 // dek.pub opens by invitation: the server lets sign up the people the run signs up, by address,
 // and anyone a deck is shared with. "Form" is on the list for the development form to be refused.
+// Keeper runs the server, as an operator who may take any talk down: named by address, and on no
+// invitation list, as the first operator of a new database is.
 const server = await startDevServer(
   PORT,
   ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form"].map(addressOf),
+  [addressOf("Keeper")],
 );
 const inbox = new Inbox(server.url);
 
@@ -1268,6 +1272,155 @@ try {
     removed.ok && !(await cliGrants()).some((row) => row.who === cliGuest),
     "dekc pub grants remove stops sharing the deck",
     removed,
+  );
+
+  // The author deletes the talk: every row and file of it goes, nothing of it opens, and its slug
+  // is free to publish again, as a new deck.
+  await dekc(["pub", "share", "--visibility", "public"]);
+  const deleting = (await dekc(["pub", "status"])) as Json & { current?: number };
+  const n = Number(deleting.current);
+  await reader.fetch(`/api/decks/${id}/public-comments`, { method: "POST", json: { text: "x" } });
+  await reader.fetch(`/api/decks/${id}/like`, { method: "PUT" });
+  const muted = await guest.fetch(`/api/decks/${id}/mute`, { method: "PUT" });
+  // Every table with a deck_id column, as D1 has them, so a table added later is checked too.
+  const deckTables = async () =>
+    (await store.sql("select name, sql from sqlite_master where type = 'table'"))
+      .filter(([, sql]) => /[`"\s(]deck_id[`"\s]/.test(String(sql)))
+      .map(([name]) => String(name));
+  const tables = await deckTables();
+  const replyIds = (
+    await store.sql(
+      "select id from replies where thread_id in (select id from threads where deck_id = ?)",
+      [id],
+    )
+  ).map(([reply]) => String(reply));
+  const rowsOf = async (deckId: string) => {
+    const counts: Record<string, number> = {};
+    for (const table of tables) {
+      const [[count]] = (await store.sql(`select count(*) from "${table}" where deck_id = ?`, [
+        deckId,
+      ])) as [[number]];
+      counts[table] = count;
+    }
+    const [[deck]] = (await store.sql("select count(*) from decks where id = ?", [deckId])) as [
+      [number],
+    ];
+    const [[replies]] = (await store.sql(
+      `select count(*) from replies where id in (${replyIds.map(() => "?").join(",") || "''"})`,
+      replyIds,
+    )) as [[number]];
+    return { ...counts, decks: deck, replies };
+  };
+  const before = await rowsOf(id);
+  const cover = `/i/${id}/${n}/cover`;
+  const version = `${server.deckOrigin(id)}/v/${n}/`;
+  check(
+    muted.status === 200 &&
+      Object.values(before).every((count) => count > 0) &&
+      tables.length === 7 &&
+      (await author.fetch(cover)).status === 200 &&
+      (await fetch(version)).status === 200,
+    "before it is deleted, the talk has a row in every table keyed by deck, and is served",
+    { before, tables },
+  );
+  for (const [who, name] of [
+    [stranger, "a stranger"],
+    [guest, "someone it is shared with"],
+  ] as const) {
+    check(
+      (await who.fetch(`/api/decks/${id}`, { method: "DELETE" })).status === 404 &&
+        (await author.fetch(talkPath)).status === 200,
+      `${name} deleting the talk gets a 404, and the talk stays`,
+    );
+  }
+  const unasked = await dekc(["pub", "delete"]);
+  check(
+    unasked.ok === false && (await author.fetch(talkPath)).status === 200,
+    "dekc pub delete without --yes deletes nothing",
+    unasked,
+  );
+  const deleted = await dekc(["pub", "delete", "--yes"]);
+  const scriptPath = join(work, "decks", "why-dek", "script.md");
+  check(
+    deleted.ok &&
+      deleted.action === "delete" &&
+      deleted.id === id &&
+      deleted.owner === me.handle &&
+      deleted.slug === "why-dek" &&
+      JSON.stringify(deleted.changed) === JSON.stringify(["script.md"]) &&
+      !/^pub:/m.test(readFileSync(scriptPath, "utf8")),
+    "dekc pub delete --yes deletes the talk and takes pub: out of script.md",
+    deleted,
+  );
+  const left = await rowsOf(id);
+  check(
+    Object.values(left).every((count) => count === 0),
+    "no row of the talk is left in D1",
+    left,
+  );
+  check(
+    (await store.keys(`decks/${id}/`)).length === 0,
+    "no file of the talk is left in R2, its access file included",
+  );
+  const answers = await Promise.all([
+    author.fetch(talkPath),
+    author.fetch(`${talkPath}/manage`),
+    author.fetch(cover),
+    new Browser(server.url).fetch(cover),
+    fetch(version),
+    ...["", "/comments", "/grants", "/public-comments", "/mute"].map((rest) =>
+      author.fetch(`/api/decks/${id}${rest}`),
+    ),
+    reader.fetch(`/api/decks/${id}/like`, { method: "PUT" }),
+    author.fetch(`/api/decks/${id}`, { method: "DELETE" }),
+  ]);
+  check(
+    answers.every((response) => response.status === 404),
+    "the talk page, its pictures, its build on the deck's origin and every API route are 404",
+    answers.map((response) => `${response.status} ${response.url}`),
+  );
+  const republished = await dekc(["pub", "publish", "-m", "again"]);
+  check(
+    republished.ok &&
+      typeof republished.id === "string" &&
+      republished.id !== id &&
+      republished.url === `${server.url}${talkPath}` &&
+      (await author.fetch(talkPath)).status === 200,
+    "the slug is free: publishing again makes a new deck at the same URL",
+    republished,
+  );
+
+  // An operator, whom only DEK_PUB_OPERATORS lets sign up, takes down someone else's talk, named
+  // by its URL, from any directory.
+  const keeper = new Browser(server.url);
+  await keeper.signUp("Keeper");
+  const keeperKey = (
+    (await (await keeper.fetch("/api/cli/key", { method: "POST" })).json()) as {
+      key: string;
+    }
+  ).key;
+  const asKeeper = { env: { DEK_TOKEN: keeperKey, DEK_TOKEN_SERVER: server.url } };
+  const takenDown = await dekc(
+    ["pub", "takedown", String(republished.url), "--yes"],
+    config,
+    asKeeper,
+  );
+  check(
+    takenDown.ok &&
+      takenDown.action === "takedown" &&
+      takenDown.id === republished.id &&
+      takenDown.owner === me.handle &&
+      (await author.fetch(talkPath)).status === 404 &&
+      (await store.keys(`decks/${String(republished.id)}/`)).length === 0,
+    "an operator takes the talk down with dekc pub takedown",
+    takenDown,
+  );
+  const ownerAfter = await dekc(["pub", "status"]);
+  check(
+    ownerAfter.ok === false &&
+      String((ownerAfter.error as { hint?: string }).hint).includes("take pub: out of script.md"),
+    "its owner's next dekc pub status is a 404 that says to take pub: out",
+    ownerAfter,
   );
 
   const logout = await dekc(["pub", "logout"]);

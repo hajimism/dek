@@ -186,6 +186,11 @@ export async function deleteVersionsBelow(deckId: string, n: number): Promise<vo
   await db.delete(versions).where(and(eq(versions.deckId, deckId), lt(versions.n, n)));
 }
 
+/** Delete every file under `prefix`, as for a deck that is deleted. */
+export async function deleteFilesUnder(prefix: string): Promise<void> {
+  await deleteKeys(await keysUnder(prefix));
+}
+
 async function keysUnder(prefix: string): Promise<string[]> {
   const keys: string[] = [];
   let cursor: string | undefined;

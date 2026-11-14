@@ -6,7 +6,7 @@ import { shotCommand } from "../core/annotations.ts";
 import { type Diagnostic, hasErrors, type SkippedCheck } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
 import { shellQuote } from "../core/escape.ts";
-import { withFrontmatterKey } from "../core/frontmatter-key.ts";
+import { withFrontmatterKey, withoutFrontmatterKey } from "../core/frontmatter-key.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "../core/playwright.ts";
 import { PubError, request, serverOrigin, UPLOAD_TIMEOUT_MS } from "../core/pub/client.ts";
 import { asPending, awaitLogin, pendingLogin, startLogin } from "../core/pub/login.ts";
@@ -27,6 +27,9 @@ import {
   CommentPolicy,
   CommentRow,
   CreateDeckRequest,
+  DECK_ID_RE,
+  DeckDeleted,
+  DeckFound,
   DeckStatus,
   Grant,
   GrantList,
@@ -66,6 +69,14 @@ function pubCommand(words: string, flags: Flags): string {
   return flags.server === undefined
     ? `dekc pub ${words}`
     : `dekc pub ${words} --server ${shellQuote(flags.server)}`;
+}
+
+/**
+ * `dekc pub <subcommand> <deck> <rest>` for a hint: the deck named, so the hint acts on the same
+ * deck wherever in the project it is run, not on the deck of the folder it is run in.
+ */
+function deckCommand(subcommand: string, { deck }: ReadableDeck, flags: Flags, rest = ""): string {
+  return pubCommand(`${subcommand} ${shellQuote(deck.name)}${rest && ` ${rest}`}`, flags);
 }
 
 /** The key to send to `origin`, or the error that says how to sign in. */
@@ -493,7 +504,7 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
   };
   if (Object.keys(change).length === 0) {
     throw new DekError("dekc pub share needs a setting to change", {
-      hint: `pass ${SHARE_FLAGS}; \`${pubCommand("status", flags)}\` shows the settings now`,
+      hint: `pass ${SHARE_FLAGS}; \`${deckCommand("status", target, flags)}\` shows the settings now`,
     });
   }
   const id = requireDeckId(target, flags);
@@ -550,6 +561,122 @@ function deckUrl(raw: string, origin: string): string {
     });
   }
   return url.href;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Deleting a talk, for good: dek.pub keeps nothing of it, and its slug is free again.
+
+/** What deleting a talk takes with it, as the hint that asks for `--yes` says. */
+const DELETES = "the talk, its versions, and every comment, like, and share on it";
+
+/**
+ * `dekc pub delete`: delete the deck on dek.pub, then take `pub:` out of script.md, so the next
+ * publish makes a new deck at the slug. Without `--yes`, nothing is sent; a deck dek.pub no longer
+ * has leaves `pub:` as it was.
+ */
+export async function deleteCommand(target: ReadableDeck, flags: FlagValues): Promise<PubResult> {
+  const origin = serverOrigin(flags.server);
+  const id = requireDeckId(target, flags);
+  if (flags.yes !== true) {
+    throw new DekError(
+      `deleting deck "${target.deck.name}" (${id}) from dek.pub cannot be undone`,
+      { hint: `run \`${deckCommand("delete", target, flags, "--yes")}\` to delete ${DELETES}` },
+    );
+  }
+  const key = await requireKey(origin, flags);
+  const deleted = await deleteDeck(origin, id, key);
+  const { project, deck } = target;
+  const source = readSourceIfExists(deck.scriptPath, project.root) ?? "";
+  writeInside(deck.scriptPath, withoutFrontmatterKey(source, "pub"), project.root);
+  return {
+    action: "delete",
+    server: origin,
+    id: deleted.id,
+    owner: deleted.owner,
+    slug: deleted.slug,
+    changed: [deck.scriptPath],
+  };
+}
+
+/**
+ * `dekc pub takedown <talk>`: delete a talk named by its URL or its deck ID, as an operator of
+ * dek.pub deletes another's; no project is needed. Without `--yes`, nothing is sent.
+ */
+export async function takedownCommand(talk: string, flags: FlagValues): Promise<PubResult> {
+  const origin = serverOrigin(flags.server);
+  const named = talkNamed(talk, origin);
+  if (flags.yes !== true) {
+    throw new DekError(`taking ${talk} down from dek.pub cannot be undone`, {
+      hint: `run \`${pubCommand(`takedown ${shellQuote(talk)} --yes`, flags)}\` to delete ${DELETES}`,
+    });
+  }
+  const key = await requireKey(origin, flags);
+  // A takedown has no project, so a 404 is not about pub: in script.md.
+  const notFound = `only the talk's owner or an operator of this dek.pub can take it down: check the talk's URL or deck ID, and that \`${pubCommand("whoami", flags)}\` names one of them`;
+  const id =
+    "id" in named
+      ? named.id
+      : (
+          await request(
+            origin,
+            {
+              method: "GET",
+              path: paths.talk(named.handle, named.slug),
+              what: "the talk",
+              key,
+              notFound,
+            },
+            DeckFound,
+          )
+        ).id;
+  const deleted = await deleteDeck(origin, id, key, notFound);
+  return {
+    action: "takedown",
+    server: origin,
+    id: deleted.id,
+    owner: deleted.owner,
+    slug: deleted.slug,
+  };
+}
+
+/** A talk's URL on `origin`, `/@handle/slug`, as the page has it. */
+const TALK_PATH = /^\/@([a-z0-9-]+)\/([a-z0-9-]+)\/?$/i;
+
+/** The deck a takedown names: by its ID as it is, or by its talk's URL on the server asked. */
+function talkNamed(
+  word: string,
+  origin: string,
+): { id: string } | { handle: string; slug: string } {
+  if (DECK_ID_RE.test(word)) {
+    return { id: word };
+  }
+  let url: URL | undefined;
+  try {
+    url = new URL(word);
+  } catch {
+    url = undefined;
+  }
+  const match = url?.origin === origin ? TALK_PATH.exec(url.pathname) : null;
+  if (!match?.[1] || !match[2]) {
+    throw new DekError(`${word} is not a talk on ${origin}`, {
+      hint: "pass the talk's URL as dek.pub shows it, `/@handle/slug`, or its deck ID, `d_…`; --server names another dek.pub",
+    });
+  }
+  return { handle: match[1].toLowerCase(), slug: match[2].toLowerCase() };
+}
+
+function deleteDeck(origin: string, id: string, key: Key, notFound?: string) {
+  return request(
+    origin,
+    {
+      method: "DELETE",
+      path: paths.deck(id),
+      what: "deleting the deck",
+      key,
+      ...(notFound !== undefined ? { notFound } : {}),
+    },
+    DeckDeleted,
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

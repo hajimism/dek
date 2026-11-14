@@ -24,7 +24,7 @@ The dek.pub server: a Void app (Svelte 5, on Cloudflare Workers) and, in `serve/
 - **A change to the HTTP API changes `src/pub/protocol.ts` and both sides in one pull request.**
 - **In `src/` and `pages/`, only a `*.server.ts` file calls Void or imports another `*.server.ts`.** The order is common, person, shell, deck, comment: each imports only those before it, and a later model only from a feature. A model's own files import no feature, and a feature no other feature. `tests/unit/boundaries.test.ts` says what may import what, and fails on an import that breaks it (ADR 50).
 - **A model's or feature's types go in its `type.ts`;** a type only one file's functions take may stay beside them. Read what comes from outside the code (Better Auth, a JSON column, R2, a cookie) through a zod schema there; take row types from `@schema` with `import type`, and wire shapes from the protocol. Nothing a component imports may import zod; the boundaries test follows the imports to check.
-- **Every change an owner makes to a deck goes through `updateDeck`** in `src/model/deck/store.server.ts`, and every version through `recordVersion`; both write the access file the serve Worker reads (`syncAccess`).
+- **Every change an owner makes to a deck goes through `updateDeck`** in `src/model/deck/store.server.ts`, and every version through `recordVersion`; both write the access file the serve Worker reads (`syncAccess`). A deck is deleted only through `deleteDeck`, which takes the access file away first; a table that holds rows of a deck is listed in `DECK_ROWS` (`src/model/deck/deletion.ts`, ADR 82).
 - **File names are kebab-case**, Svelte components included, except the names Void reads in `pages/` and `middleware/`.
 
 ## Run it
@@ -43,5 +43,7 @@ bun run test:e2e     # the whole round trip, dekc against vp dev
 Email sign-up works only where `.env` has `DEK_PUB_DEV_LOGIN=1`, as `dev.env` does. GitHub sign-in needs a real OAuth app's ID and secret in `.env`.
 
 `DEK_PUB_INVITED` says who may make an account: addresses and `@<GitHub login>`s, split by commas or whitespace, or `*` for anyone; whoever a deck is shared with by address may too (ADR 79). `dev.env` sets `*`; a `.env` written before it has none, which lets only the people decks are shared with sign up, so add `DEK_PUB_INVITED=*` to it. The email form verifies no address, so it makes an account only under `*`. `tests/e2e/server.ts` sets the list to the addresses the run signs up.
+
+`DEK_PUB_OPERATORS` names, by email address, the people who run dek.pub: the account whose verified address is listed may delete anyone's talk with `dekc pub takedown`, and each such deletion is logged. A listed address may make an account though `DEK_PUB_INVITED` leaves it out, and the email form, which verifies no address, never makes an operator (ADR 82). It is empty in `dev.env`; `tests/e2e/server.ts` names the run's operator by address.
 
 Mail is kept, not sent, by the dev server: its inbox is at the URL `vp dev` prints on start, `/__void/inbox` with the token in `.void/dev-trigger-token`. `tests/e2e/server.ts` reads it the same way.

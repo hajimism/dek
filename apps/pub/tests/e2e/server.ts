@@ -32,8 +32,15 @@ export function addressOf(name: string): string {
 }
 const RUN = Date.now();
 
-/** Start the server, letting sign up only `invited`, as `DEK_PUB_INVITED` lists them. */
-export async function startDevServer(port: number, invited: string[]): Promise<DevServer> {
+/**
+ * Start the server, letting sign up only `invited`, as `DEK_PUB_INVITED` lists them, with the
+ * addresses `operators` as the operators `DEK_PUB_OPERATORS` names.
+ */
+export async function startDevServer(
+  port: number,
+  invited: string[],
+  operators: string[] = [],
+): Promise<DevServer> {
   const state = mkdtempSync(join(tmpdir(), "dek-pub-e2e-"));
   const url = `http://localhost:${port}`;
   const child = Bun.spawn(["node_modules/.bin/vp", "dev", "--port", String(port), "--strictPort"], {
@@ -45,6 +52,7 @@ export async function startDevServer(port: number, invited: string[]): Promise<D
       DECK_ORIGIN: `http://d-{id}.localhost:${port}`,
       DEK_PUB_DEV_LOGIN: "1",
       DEK_PUB_INVITED: invited.join(","),
+      DEK_PUB_OPERATORS: operators.join(","),
       SERVE_TOKEN_SECRET: "e2e-serve-token-secret",
       AUTH_GITHUB_CLIENT_ID: "e2e",
       AUTH_GITHUB_CLIENT_SECRET: "e2e",

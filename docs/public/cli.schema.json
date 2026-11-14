@@ -3457,6 +3457,92 @@
           "properties": {
             "action": {
               "type": "string",
+              "const": "delete"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$",
+              "description": "The deck deleted, with every version, comment, like, and grant on it."
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "slug": {
+              "type": "string",
+              "description": "The slug, free to publish at again."
+            },
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "script.md, with pub: taken out, to commit."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "id",
+            "owner",
+            "slug",
+            "changed",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "takedown"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$",
+              "description": "The deck deleted, with every version, comment, like, and grant on it."
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "slug": {
+              "type": "string",
+              "description": "The slug, free for its owner to publish at again."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "id",
+            "owner",
+            "slug",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
               "const": "comments"
             },
             "server": {
@@ -4769,6 +4855,100 @@
             "action",
             "server",
             "grant",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "delete"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$",
+              "description": "The deck deleted, with every version, comment, like, and grant on it."
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "slug": {
+              "type": "string",
+              "description": "The slug, free to publish at again."
+            },
+            "changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "script.md, with pub: taken out, to commit."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "id",
+            "owner",
+            "slug",
+            "changed",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "takedown"
+            },
+            "server": {
+              "type": "string",
+              "description": "The origin of the dek.pub the command talked to."
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^d_[0-9a-z]{10,32}$",
+              "description": "The deck deleted, with every version, comment, like, and grant on it."
+            },
+            "owner": {
+              "type": "string",
+              "description": "The owner's handle."
+            },
+            "slug": {
+              "type": "string",
+              "description": "The slug, free for its owner to publish at again."
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "server",
+            "id",
+            "owner",
+            "slug",
             "ok",
             "error"
           ],

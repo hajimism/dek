@@ -102,6 +102,16 @@ dekc pub comments resolve 3
 
 `--status resolved` or `--status all` lists the others; `dekc pub comments reopen <id>` opens one again.
 
+## Delete a talk
+
+```bash
+dekc pub delete --yes
+```
+
+Deleting a talk removes it from dek.pub for good: every version, the review threads and their replies, the comments and likes at the bottom, and who it is shared with. Nothing of it opens after that, its pictures and its build included, and it cannot be undone. Without `--yes`, `dekc pub delete` deletes nothing and says what it would. It then takes `pub:` out of `script.md`, to commit, so the next `dekc pub publish` makes a new deck at the same URL, with nothing of the old one. The talk's manage page on dek.pub has the same at its bottom, Delete talk, which asks you to type the talk's slug first.
+
+Whoever runs a dek.pub can take down anyone's talk: `dekc pub takedown <talk> --yes`, with the talk's URL or its deck ID, from any directory. A dek.pub names those who may by their verified email address, in its `DEK_PUB_OPERATORS` setting, and logs each takedown. An API key can do whatever its account can: one in `DEK_TOKEN` can delete every talk of its owner, and an operator's can take down anyone's, so never put an operator's key in CI.
+
 ## Another server
 
 Every subcommand takes `--server <url>`, and `DEK_PUB_SERVER` sets the same for a shell, as for a dek.pub running on your machine while it is developed. A key goes only over HTTPS, or plain HTTP to this machine, and each server has a key of its own. See the [CLI reference](/reference/cli#publish) for every flag and field.
