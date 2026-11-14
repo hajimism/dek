@@ -44,8 +44,11 @@ import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
-// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: no grants are
-// claimed, no mail goes out, and the links an account starts with are only noted.
+// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: anyone may join,
+// no grants are claimed, no mail goes out, and the links an account starts with are only noted.
+vi.mock("../../src/model/person/feature/sign-in/invitation.server.ts", () => ({
+  mayMakeAccount: async () => true,
+}));
 vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
   claimOnSignIn: async () => {},
 }));
