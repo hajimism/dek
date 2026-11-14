@@ -19,8 +19,9 @@ export const GET = defineHandler((c) =>
 
 /**
  * Share the deck with one person, by handle, or by an email address no account has yet, on the
- * team's side or the guests'. A new share is mailed to them; a change to one is not, and keeps
- * the role and side the request leaves out.
+ * team's side or the guests'. A new share is mailed to them, within the owner's limit on
+ * invitations, and past it is refused with a 429; a change to one is not mailed, and keeps the
+ * role and side the request leaves out.
  */
 export const POST = defineHandler((c) =>
   api(async () => {

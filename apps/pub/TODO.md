@@ -11,7 +11,6 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 ### The app
 
 - **Deleting an account** is done by hand on request, its decks with `deleteDeck` (ADR 82).
-- **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
 - **Logs.** An error a page's loader throws is logged whole by Void's error handler, and a failed query's error carries the values it was bound to: an address, a comment's text. Void has no hook to log it otherwise; `src/common/log.ts` does so for the API, the tasks after an answer, mail and Better Auth.
 
 ### Terms and the law
@@ -49,7 +48,7 @@ Each of these is needed on staging and on production.
 ## Before anyone can sign up
 
 - **Rate limits.**
-  - None of dek.pub's own; the API key plugin's is off in `auth.ts`. Nothing limits `POST /api/cli/key`, `/api/decks/*` or posting a comment.
+  - dek.pub's only own limit is on the invitations an owner's grants mail (ADR 84); the API key plugin's is off in `auth.ts`. Nothing else limits `POST /api/cli/key`, `/api/decks/*` or posting a comment.
   - Better Auth's own limits on sign-in, links and the device flow keep their counts in memory, so on Workers each isolate counts alone. Asking for sign-in links is held only by its default, 5 a minute from one client; nothing limits how many addresses are tried.
 - **Quotas.** No storage quota per user and no limit on new accounts; the only limit is 50 MiB per version.
 - **Abuse.**

@@ -1,5 +1,5 @@
 // The browser's calls to dek.pub's own JSON API, with the session cookie. An error answer carries
-// protocol ErrorBody; its message is what the page shows.
+// protocol ErrorBody; its message, and its hint when it has one, are what the page shows.
 
 const DEADLINE_MS = 15_000;
 
@@ -8,6 +8,8 @@ export class ApiFailure extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** What to do about it, as the server put it. */
+    readonly hint = "",
   ) {
     super(message);
   }
@@ -51,7 +53,8 @@ export async function api<T>(
   }
   const { data } = answer;
   if (!answer.ok) {
-    const error = (data as { error?: { code?: string; message?: string } } | null)?.error;
+    const error = (data as { error?: { code?: string; message?: string; hint?: string } } | null)
+      ?.error;
     throw new ApiFailure(
       answer.status,
       error?.code ?? String(answer.status),
@@ -59,6 +62,7 @@ export async function api<T>(
         (typeof (data as { message?: string } | null)?.message === "string"
           ? String((data as { message: string }).message)
           : answer.statusText),
+      error?.hint ?? "",
     );
   }
   return data as T;
