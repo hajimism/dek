@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { betterAuth } from "better-auth";
+import { memoryAdapter } from "better-auth/adapters/memory";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import authConfig from "../../auth.ts";
 import {
   formatUserCode,
   isCompleteUserCode,
@@ -40,6 +43,24 @@ import {
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
+
+// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: anyone may join,
+// and the links an account starts with are only noted.
+vi.mock("../../src/model/person/feature/sign-in/invitation.server.ts", () => ({
+  mayMakeAccount: async () => true,
+}));
+vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
+  claimOnSignIn: async () => {},
+}));
+vi.mock("../../src/model/person/feature/sign-in/link.server.ts", () => ({
+  sendSignInLink: async () => {},
+}));
+const seeded = vi.hoisted(() => [] as unknown[]);
+vi.mock("../../src/model/person/link.server.ts", () => ({
+  seedLinks: async (user: unknown) => {
+    seeded.push(user);
+  },
+}));
 
 describe("device code", () => {
   it("takes the code with or without its hyphen, in any case", () => {
@@ -344,7 +365,12 @@ describe("readNewcomer", () => {
   it("reads who Better Auth is about to make an account for, with the login of a GitHub profile", () => {
     expect(
       readNewcomer({
-        user: { email: "o@example.com", emailVerified: true, name: "Octo" },
+        user: {
+          email: "o@example.com",
+          emailVerified: true,
+          name: "Octo",
+          githubLogin: "Octo-Cat",
+        },
         source: {
           method: "oauth",
           action: "create-user",
@@ -378,6 +404,21 @@ describe("readNewcomer", () => {
     expect(readNewcomer({ user: {}, source: { method: "oauth" } })).toBeNull();
     expect(readNewcomer(null)).toBeNull();
     expect(error).toHaveBeenCalledTimes(2);
+    error.mockRestore();
+  });
+
+  it("refuses an account to be made with a login that is not its GitHub profile's", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const github = { providerId: "github", profile: { login: "Octo-Cat" } };
+    const user = { email: "o@example.com", emailVerified: true };
+    const named = (githubLogin: string | null, oauth?: object) =>
+      readNewcomer({ user: { ...user, githubLogin }, source: { method: "oauth", oauth } });
+    expect(named("Octo-Cat", { providerId: "github" })).toBeNull();
+    expect(named("octo-dog", github)).toBeNull();
+    expect(named(null, github)).toBeNull();
+    expect(named("Octo-Cat", { providerId: "google", profile: { login: "Octo-Cat" } })).toBeNull();
+    expect(named("Octo-Cat")).toBeNull();
+    expect(error).toHaveBeenCalledTimes(5);
     error.mockRestore();
   });
 });
@@ -600,5 +641,146 @@ describe("readName", () => {
       name: "a".repeat(MAX_NAME_LENGTH),
     });
     expect(readName("a".repeat(MAX_NAME_LENGTH + 1))).toEqual({ ok: false, problem: "too_long" });
+  });
+});
+
+describe("auth.ts, through Better Auth", () => {
+  const origin = "http://localhost:3000";
+
+  function makeAuth() {
+    const db = {
+      user: [] as Record<string, unknown>[],
+      session: [] as Record<string, unknown>[],
+      account: [] as Record<string, unknown>[],
+      verification: [] as Record<string, unknown>[],
+    };
+    const config = authConfig({
+      defaults: {},
+      env: {
+        DEK_PUB_DEV_LOGIN: "1",
+        AUTH_GITHUB_CLIENT_ID: "client",
+        AUTH_GITHUB_CLIENT_SECRET: "secret",
+      },
+      dialect: "sqlite",
+      request: new Request(origin),
+    });
+    const auth = betterAuth({
+      ...config,
+      baseURL: origin,
+      secret: "a-secret-only-these-tests-use-0123456789",
+      database: memoryAdapter(db),
+    });
+    return { auth, db };
+  }
+
+  // GitHub as Better Auth's provider asks it: the token for the code, then the profile and its addresses.
+  function fakeGitHub(login: string): void {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("https://github.com/login/oauth/access_token")) {
+        return Response.json({
+          access_token: "gho_token",
+          token_type: "bearer",
+          scope: "read:user",
+        });
+      }
+      if (url === "https://api.github.com/user") {
+        return Response.json({ id: 583231, login, name: "", email: null, avatar_url: "" });
+      }
+      if (url === "https://api.github.com/user/emails") {
+        return Response.json([{ email: "octo@example.com", primary: true, verified: true }]);
+      }
+      throw new Error(`nothing fakes ${url}`);
+    });
+  }
+
+  function cookiesOf(response: Response): string {
+    return response.headers
+      .getSetCookie()
+      .map((cookie) => cookie.split(";")[0])
+      .join("; ");
+  }
+
+  async function signInWithGitHub(auth: ReturnType<typeof makeAuth>["auth"]): Promise<string> {
+    const start = await auth.handler(
+      new Request(`${origin}/api/auth/sign-in/social`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin },
+        body: JSON.stringify({ provider: "github", callbackURL: "/" }),
+      }),
+    );
+    const { url } = (await start.json()) as { url: string };
+    const state = new URL(url).searchParams.get("state");
+    const callback = await auth.handler(
+      new Request(`${origin}/api/auth/callback/github?code=the-code&state=${state}`, {
+        headers: { cookie: cookiesOf(start) },
+      }),
+    );
+    expect(callback.headers.get("location")).toBe("/");
+    return cookiesOf(callback);
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    seeded.length = 0;
+  });
+
+  it("keeps the login of an account made with GitHub, and starts its links from it", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    await signInWithGitHub(auth);
+    expect(db.user).toMatchObject([{ email: "octo@example.com", githubLogin: "Octo-Cat" }]);
+    expect(seeded).toMatchObject([{ githubLogin: "Octo-Cat" }]);
+  });
+
+  it("signs the same account in with GitHub again", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    await signInWithGitHub(auth);
+    await signInWithGitHub(auth);
+    expect(db.user).toMatchObject([{ githubLogin: "Octo-Cat" }]);
+    expect(db.session).toHaveLength(2);
+    expect(seeded).toHaveLength(1);
+  });
+
+  it("takes no login from a sign-up's body", async () => {
+    const { auth, db } = makeAuth();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const signUp = (fields: object) =>
+      auth.handler(
+        new Request(`${origin}/api/auth/sign-up/email`, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin },
+          body: JSON.stringify({
+            email: "sato@example.com",
+            password: "a-long-password",
+            ...fields,
+          }),
+        }),
+      );
+    const named = await signUp({ name: "Sato", githubLogin: "Octo-Cat" });
+    expect(named.status).toBe(403);
+    expect(await named.json()).toMatchObject({ code: NOT_INVITED });
+    expect(db.user).toEqual([]);
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
+    expect((await signUp({ name: "Sato" })).ok).toBe(true);
+    expect(db.user.map((user) => user.githubLogin ?? null)).toEqual([null]);
+  });
+
+  it("lets no one change the login through Better Auth", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    const cookie = await signInWithGitHub(auth);
+    const response = await auth.handler(
+      new Request(`${origin}/api/auth/update-user`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin, cookie },
+        body: JSON.stringify({ name: "Octo", githubLogin: "someone-else" }),
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "github_login_fixed" });
+    expect(db.user).toMatchObject([{ name: "Octo-Cat", githubLogin: "Octo-Cat" }]);
   });
 });

@@ -13,7 +13,6 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 - **Link visibility.** A `link` talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
 - **Deleting.** Nobody can delete a talk, its owner and the operator included. Deleting an account is done by hand on request.
 - **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
-- **The GitHub login is not kept.** Better Auth drops the fields `mapProfileToUser` adds that are declared `input: false`, as `githubLogin` is, when it makes an account, so one made with GitHub has no login: no handle is suggested from it and its profile starts with no link (ADR 77, 78). This was found reading Better Auth 1.7's source, not reproduced; the invitation list reads the login from the profile itself (ADR 79).
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
 - **Logs.** An error a page's loader throws is logged whole by Void's error handler, and a failed query's error carries the values it was bound to: an address, a comment's text. Void has no hook to log it otherwise; `src/common/log.ts` does so for the API, the tasks after an answer, mail and Better Auth.
 
