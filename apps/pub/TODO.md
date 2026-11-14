@@ -55,7 +55,6 @@ The comment feature is planned to grow into two: public comments and a like on t
   - The only embeddable URL, `d-<id>.dekusercontent.com/v/<n>/`, names one version, and it returns 404 once a new version is current, so an embed breaks on every publish.
   - There is no snippet to copy and no oEmbed endpoint.
 - **Grants.**
-  - Grants are made on the manage page only; the CLI has no command for them, though `src/pub/protocol.ts` has their paths.
   - An invitation is mailed only when a grant is made. Nothing sends one again, and a grant made before the mail domain works was never mailed.
 - **Deleting.** There is no way to delete a talk or an account.
 - **Handles.**

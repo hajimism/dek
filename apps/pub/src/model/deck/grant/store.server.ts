@@ -93,14 +93,15 @@ function granteeName(grantee: Grantee): string {
 export type Invite = { to: string; byEmail: boolean };
 
 /**
- * Share a deck with one person, or change what an earlier share allows them. A new share is on
- * the guests' side unless `side` says otherwise; an earlier one keeps its side unless it does.
+ * Share a deck with one person, or change what an earlier share allows them. A new share lets them
+ * view, on the guests' side, unless `role` or `side` says otherwise; an earlier one keeps what
+ * they leave out.
  */
 export async function share(
   c: Context,
   deck: { id: string; ownerId: string },
   grantee: Grantee,
-  role: GrantRole,
+  role?: GrantRole,
   side?: GrantSide,
 ): Promise<{ grant: GrantView; invite: Invite | null }> {
   let target: { userId: string | null; email: string | null };
@@ -130,13 +131,16 @@ export async function share(
   );
   const before = await db.select({ id: grants.id }).from(grants).where(match).get();
   const id = newGrantId();
-  await db
+  const change = { ...(role ? { role } : {}), ...(side ? { side } : {}) };
+  const insert = db
     .insert(grants)
-    .values({ id, deckId: deck.id, ...target, role, side: side ?? "guest" })
-    .onConflictDoUpdate({
-      target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
-      set: side ? { role, side } : { role },
-    });
+    .values({ id, deckId: deck.id, ...target, role: role ?? "view", side: side ?? "guest" });
+  await (Object.keys(change).length === 0
+    ? insert.onConflictDoNothing()
+    : insert.onConflictDoUpdate({
+        target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
+        set: change,
+      }));
   const holder = "email" in grantee ? await personByEmail(c, grantee.email) : null;
   if (holder && holder.id !== deck.ownerId) {
     await claimGrants(holder, deck.id);
@@ -145,6 +149,7 @@ export async function share(
     .select({
       id: grants.id,
       userId: grants.userId,
+      role: grants.role,
       side: grants.side,
       createdAt: grants.createdAt,
     })
@@ -155,7 +160,7 @@ export async function share(
     grant: {
       id: row?.id ?? id,
       who: holder && row?.userId === holder.id ? holder.handle : granteeName(grantee),
-      role,
+      role: row?.role ?? role ?? "view",
       side: row?.side ?? side ?? "guest",
       createdAt: row?.createdAt ?? "",
     },

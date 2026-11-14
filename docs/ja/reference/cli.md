@@ -117,6 +117,9 @@ ref の文章は他人のものなので、dek は自分の言葉と分けて扱
 | `dekc pub comments reply [deck] <id> <text> [--server <url>]` | コメントに返信する。ID か番号（`3`、チームのスレッドなら `T2`）で指定する。ID の前にデッキ名があれば、どこで実行してもそれがデッキになる。 |
 | `dekc pub comments resolve [deck] <id> [--server <url>]` | コメントを解決済みにする。 |
 | `dekc pub comments reopen [deck] <id> [--server <url>]` | 解決済みのコメントを開き直す。 |
+| `dekc pub grants [deck] [--server <url>]` | デッキを共有した相手を、管理画面と同じく古い grant から順に出す。grant ごとに `id`、`who`（ハンドルか、まだどのアカウントも引き受けていないメールアドレス）、`role`（`view` か `comment`）、`side`（`team` か `guest`）、`createdAt`。一覧を見られるのはデッキの持ち主だけ。 |
+| `dekc pub grants add [deck] <who> [--role view\|comment] [--side team\|guest] [--server <url>]` | デッキを `who`（`@` の有無を問わないハンドルか、メールアドレス）と共有するか、前に作った grant の中身を変える。新しい grant は、フラグで指定しなければゲストの側で `view`。作ってある grant では、フラグで指定しなかったものは元のまま。`invited` は grant が新しく、dek.pub が招待のメールを送ったとき `true`。変更では誰にもメールを送らない。あるアカウントが確認済みのアドレスへの grant は、作った時点でそのアカウントのものになり、`grant.who` はハンドルで示す。 |
+| `dekc pub grants remove [deck] <who> [--server <url>]` | `who`（ハンドル、grant が待っているアドレス、または grant の `id`）とのデッキの共有をやめる。アカウントが引き受けたアドレスの grant は、ハンドルで一覧に出て、ハンドルで外す。共有していない `who` は何も消さずに断り、hint が `dekc pub grants` を示す。 |
 
 デッキに `pub` やほかのコマンドの名前は付けられません。`dekc pub` はデッキではなくコマンドを動かすので、`dekc new` と `dekc init` が断ります。すでに `pub` という名前のデッキは `dekc --deck pub` で開き、単独の `dekc pub` の hint がそれを示します。
 

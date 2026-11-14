@@ -394,12 +394,16 @@ export const Grant = z.strictObject({
   side: GrantSide,
   createdAt: z.string(),
 });
+export type Grant = z.infer<typeof Grant>;
+export const GrantList = z.strictObject({ grants: z.array(Grant) });
 export const NewGrant = z.strictObject({
   who: z.string().min(1).max(254),
-  role: GrantRole,
+  /** When absent, `view` for a new grant, and unchanged for one already made. */
+  role: GrantRole.optional(),
   /** When absent, `guest` for a new grant, and unchanged for one already made. */
   side: GrantSide.optional(),
 });
+export const GrantRemoved = z.strictObject({ removed: z.literal(true) });
 
 // ---------------------------------------------------------------------------------------------
 // Signing in and who is signed in.
