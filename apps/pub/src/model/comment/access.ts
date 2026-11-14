@@ -47,12 +47,35 @@ export function canResolve(
   deck: { ownerId: string },
   thread: Pick<ThreadRow, "authorId">,
   person: Pick<Person, "id"> | null,
-  grant: GrantRole | null,
+  role: GrantRole | null,
 ): boolean {
   if (person === null) {
     return false;
   }
-  return person.id === deck.ownerId || (person.id === thread.authorId && grant !== null);
+  return person.id === deck.ownerId || (person.id === thread.authorId && role !== null);
+}
+
+const CHANGES = {
+  resolve: "resolve it",
+  reopen: "reopen it",
+  share: "share it with the guests",
+} as const;
+
+/** Refuse a change to a thread from anyone canResolve does not let make it. */
+export function mustResolve(
+  deck: { ownerId: string },
+  thread: Pick<ThreadRow, "authorId">,
+  person: Pick<Person, "id"> | null,
+  role: GrantRole | null,
+  change: keyof typeof CHANGES,
+): void {
+  if (!canResolve(deck, thread, person, role)) {
+    throw new ApiError(
+      403,
+      "not_yours",
+      `only the deck's owner and the comment's author may ${CHANGES[change]}`,
+    );
+  }
 }
 
 export function mayResolve(
