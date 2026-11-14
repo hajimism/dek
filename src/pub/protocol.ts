@@ -362,6 +362,25 @@ export const LikeState = z.strictObject({ count: z.number().int(), liked: z.bool
 export type LikeState = z.infer<typeof LikeState>;
 
 // ---------------------------------------------------------------------------------------------
+// Talks as a profile lists them, 24 at a time; the page asks for more as the reader wants them.
+
+export const TalkCard = z.strictObject({
+  slug: z.string(),
+  title: z.string(),
+  event: z.string().nullable(),
+  date: z.string().nullable(),
+  slides: z.number().int(),
+  visibility: Visibility,
+  picture: z.string().nullable(),
+  owner: z.strictObject({ handle: z.string(), name: z.string(), image: z.string().nullable() }),
+  updatedAt: z.string(),
+});
+export type TalkCard = z.infer<typeof TalkCard>;
+/** One page of a person's talks, and how many there are on every page together. */
+export const TalkPage = z.strictObject({ talks: z.array(TalkCard), total: z.number().int() });
+export type TalkPage = z.infer<typeof TalkPage>;
+
+// ---------------------------------------------------------------------------------------------
 // Grants: people other than the owner who may open, or comment on, a deck that is not public.
 
 export const GrantRole = z.enum(["view", "comment"]);
@@ -375,12 +394,16 @@ export const Grant = z.strictObject({
   side: GrantSide,
   createdAt: z.string(),
 });
+export type Grant = z.infer<typeof Grant>;
+export const GrantList = z.strictObject({ grants: z.array(Grant) });
 export const NewGrant = z.strictObject({
   who: z.string().min(1).max(254),
-  role: GrantRole,
+  /** When absent, `view` for a new grant, and unchanged for one already made. */
+  role: GrantRole.optional(),
   /** When absent, `guest` for a new grant, and unchanged for one already made. */
   side: GrantSide.optional(),
 });
+export const GrantRemoved = z.strictObject({ removed: z.literal(true) });
 
 // ---------------------------------------------------------------------------------------------
 // Signing in and who is signed in.
@@ -413,6 +436,7 @@ export type MuteState = z.infer<typeof MuteState>;
 /** The API's paths, relative to the server's origin. */
 export const paths = {
   me: "/api/me",
+  talksOf: (handle: string) => `/api/people/${segment(handle)}/talks`,
   cliKey: "/api/cli/key",
   revokeKey: "/api/cli/key",
   decks: "/api/decks",

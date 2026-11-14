@@ -3,6 +3,7 @@ import { env } from "void/env";
 import { translate } from "../src/common/i18n.ts";
 import { featuredTalk } from "../src/model/deck/card.server.ts";
 import { talkPath } from "../src/model/deck/deck.ts";
+import { langLinks, langUrl } from "../src/shell/lang-url.ts";
 
 export type Props = InferProps<typeof loader>;
 
@@ -27,9 +28,10 @@ export const head = defineHead<Props>((c) => {
       { name: "description", content: translate(lang, "about.description") },
       { property: "og:title", content: translate(lang, "about.title") },
       { property: "og:description", content: translate(lang, "about.description") },
-      { property: "og:url", content: `${env.APP_ORIGIN}/about` },
+      { property: "og:url", content: langUrl(env.APP_ORIGIN, "/about", lang) },
       { property: "og:site_name", content: "dek.pub" },
       { name: "twitter:card", content: "summary" },
     ],
+    link: langLinks(env.APP_ORIGIN, "/about", lang),
   };
 });

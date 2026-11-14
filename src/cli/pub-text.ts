@@ -48,6 +48,28 @@ export function formatPub(data: PubResult): string {
     }
     case "open":
       return data.url;
+    case "grants":
+      if (data.grants.length === 0) {
+        return "shared with no one";
+      }
+      return data.grants
+        .map((grant) =>
+          [
+            grantee(grant.who),
+            grant.role,
+            grant.side,
+            ...(isAddress(grant.who) ? ["(no account yet)"] : []),
+          ].join("  "),
+        )
+        .join("\n");
+    case "grant": {
+      const what = `${grantee(data.grant.who)}: ${data.grant.role}, on ${data.grant.side === "team" ? "the team's" : "the guests'"} side`;
+      return data.invited
+        ? `shared the deck with ${what}; dek.pub mailed an invitation`
+        : `changed the grant to ${what}`;
+    }
+    case "revoke":
+      return `stopped sharing the deck with ${grantee(data.grant.who)}`;
     case "comments":
       if (data.comments.length === 0) {
         return "no comments";
@@ -88,6 +110,15 @@ export function formatPub(data: PubResult): string {
     case "reopen":
       return `reopened ${data.comment}`;
   }
+}
+
+/** A grant's `who` is a handle, or an address no account has claimed yet. */
+function isAddress(who: string): boolean {
+  return who.includes("@");
+}
+
+function grantee(who: string): string {
+  return isAddress(who) ? who : `@${who}`;
 }
 
 /** A publish that lint stopped is a run that failed, as lint's own. */

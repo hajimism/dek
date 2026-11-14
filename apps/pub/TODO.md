@@ -55,13 +55,11 @@ The comment feature is planned to grow into two: public comments and a like on t
   - The only embeddable URL, `d-<id>.dekusercontent.com/v/<n>/`, names one version, and it returns 404 once a new version is current, so an embed breaks on every publish.
   - There is no snippet to copy and no oEmbed endpoint.
 - **Grants.**
-  - Grants are made on the manage page only; the CLI has no command for them, though `src/pub/protocol.ts` has their paths.
   - An invitation is mailed only when a grant is made. Nothing sends one again, and a grant made before the mail domain works was never mailed.
 - **Deleting.** There is no way to delete a talk or an account.
 - **Handles.**
   - A handle comes from the GitHub login or the email, and must be unique. A second account whose handle normalizes to one already taken fails to sign up. So does one made by a sign-in link, which then answers as if the link had expired.
   - A link-visibility talk's URL is its readable `/@handle/slug`, so anyone who guesses it can open it.
-- **Profile.** The profile page lists every talk with no pagination; RSS stops at 50.
 
 ## Running it for real
 
@@ -90,9 +88,6 @@ The comment feature is planned to grow into two: public comments and a like on t
   - Nobody can report a talk, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
 - **Search.** No search; the plan's D1 FTS5 index is not built.
-- **Search engines.**
-  - No sitemap.
-  - The landing page and the About page have no canonical URL, and each language is the same URL told apart by `?lang=` or a cookie, with no `hreflang`.
 - **Headers.** The app's CSP holds only `frame-ancestors`, `base-uri` and `object-src`; a full one needs a hash or nonce for the talk page's inline listener (ADR 67).
 - **Terms and the law.**
   - No terms of service, privacy policy, or contact page; the footer has no link to them.
@@ -101,7 +96,6 @@ The comment feature is planned to grow into two: public comments and a like on t
   - Whether review threads and their mail count as carrying others' messages, which may need a notice to the ministry (電気通信事業の届出), is not checked.
   - The footer's Source link goes to the repository's front page, not to the commit that is running.
 - **Every request with an API key writes to D1.** Better Auth's API key plugin records each use.
-- **Reading a deck writes.** `visibleDeck` claims the grants waiting on the reader's address on every read, page loads and GETs included.
 - **Checks a browser test does not make.** No accessibility check such as axe, no test at a phone's width, and no measure of how fast a page loads.
 - **`.dek/renames.json` only grows.** When `.dek/` is ignored by git, another checkout does not have the renames (ADR 49).
 

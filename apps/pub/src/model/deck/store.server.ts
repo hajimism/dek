@@ -3,7 +3,7 @@
 
 import { decks } from "@schema";
 import type { Context } from "hono";
-import { and, db, desc, eq } from "void/db";
+import { and, count, db, desc, eq, isNotNull, sql } from "void/db";
 import type { DeckStatus } from "../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
@@ -13,7 +13,7 @@ import { personById } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
 import { canManage, standingOn } from "./access.ts";
 import { talkPath } from "./deck.ts";
-import { claimGrants, grantsOf } from "./grant/store.server.ts";
+import { grantsOf } from "./grant/store.server.ts";
 import { syncAccess } from "./sync-access.server.ts";
 import type { Deck, DeckPatch, Standing } from "./type.ts";
 import { currentVersionOf } from "./version/store.server.ts";
@@ -36,20 +36,50 @@ export async function deckBySlug(ownerId: string, slug: string): Promise<Deck | 
   );
 }
 
-/** A person's decks, newest talk first; only the public ones unless `publicOnly` is false. */
+/**
+ * Which of a person's decks a profile counts: those readers can open, and only the public ones
+ * unless `publicOnly` is false.
+ */
+function profileDecks(ownerId: string, publicOnly: boolean) {
+  return and(
+    eq(decks.ownerId, ownerId),
+    isNotNull(decks.currentVersion),
+    publicOnly ? eq(decks.visibility, "public") : undefined,
+  );
+}
+
+/** The day a talk counts as given: its date, else the day it last changed, as the timeline says. */
+const talkDay = sql`coalesce(${decks.talkDate}, substr(${decks.updatedAt}, 1, 10))`;
+
+/** A person's decks that readers can open, newest talk first, `limit` of them from `offset`. */
 export async function decksOf(
   ownerId: string,
-  options: { publicOnly: boolean; limit?: number },
+  options: { publicOnly: boolean; limit?: number; offset?: number },
 ): Promise<Deck[]> {
-  const where = options.publicOnly
-    ? and(eq(decks.ownerId, ownerId), eq(decks.visibility, "public"))
-    : eq(decks.ownerId, ownerId);
   const query = db
     .select()
     .from(decks)
-    .where(where)
-    .orderBy(desc(decks.talkDate), desc(decks.updatedAt));
-  return options.limit ? query.limit(options.limit).all() : query.all();
+    .where(profileDecks(ownerId, options.publicOnly))
+    .orderBy(desc(talkDay), desc(decks.updatedAt), desc(decks.id));
+  return options.limit
+    ? query
+        .limit(options.limit)
+        .offset(options.offset ?? 0)
+        .all()
+    : query.all();
+}
+
+/** How many decks decksOf has for a person, all pages together. */
+export async function deckCount(
+  ownerId: string,
+  options: { publicOnly: boolean },
+): Promise<number> {
+  const row = await db
+    .select({ n: count() })
+    .from(decks)
+    .where(profileDecks(ownerId, options.publicOnly))
+    .get();
+  return row?.n ?? 0;
 }
 
 /** The decks a person owns, the one changed last first, for the CLI. */
@@ -67,6 +97,19 @@ export async function recentPublicDecks(limit: number): Promise<Deck[]> {
     .select()
     .from(decks)
     .where(eq(decks.visibility, "public"))
+    .orderBy(desc(decks.updatedAt))
+    .limit(limit)
+    .all();
+}
+
+/** The public decks readers can open, the one changed last first, as much as the sitemap needs. */
+export async function indexedDecks(
+  limit: number,
+): Promise<Pick<Deck, "ownerId" | "slug" | "updatedAt">[]> {
+  return db
+    .select({ ownerId: decks.ownerId, slug: decks.slug, updatedAt: decks.updatedAt })
+    .from(decks)
+    .where(and(eq(decks.visibility, "public"), isNotNull(decks.currentVersion)))
     .orderBy(desc(decks.updatedAt))
     .limit(limit)
     .all();
@@ -108,14 +151,11 @@ async function mustFind(id: string): Promise<Deck> {
 }
 
 /**
- * Where `person` stands with the deck, or null when it does not open to them. Grants waiting on an
- * address they have shown is theirs are claimed for their account here.
+ * Where `person` stands with the deck, or null when it does not open to them. A grant by an
+ * address they have verified counts whether or not it is claimed yet, so reading writes nothing.
  */
 export async function standingWith(deck: Deck, person: Person | null): Promise<Standing | null> {
   const grants = await grantsOf(deck.id, person);
-  if (person) {
-    await claimGrants(grants, person);
-  }
   const standing = standingOn(deck, person, grants);
   return standing.opens ? standing : null;
 }

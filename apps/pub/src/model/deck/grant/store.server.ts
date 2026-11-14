@@ -1,14 +1,15 @@
 // Grants in D1. A grant by email address waits for an account to show it owns the address; it is
 // then claimed for that account, by claimGrants, so later it holds even if the address changes.
+// That happens when the account signs in, or when the grant is made to an address an account has
+// verified already; reading a deck never writes (ADR 73).
 
 import { grants } from "@schema";
 import type { Context } from "hono";
-import { and, asc, db, eq, inArray, isNull, or } from "void/db";
+import { and, asc, db, eq, isNull, notInArray, or } from "void/db";
 import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
-import { peopleById, personByHandle } from "../../person/store.server.ts";
+import { peopleById, personByEmail, personByHandle } from "../../person/store.server.ts";
 import type { Person } from "../../person/type.ts";
-import { waitingGrants } from "./grant.ts";
 import type { Grantee, GrantRole, GrantRow, GrantSide, GrantView } from "./type.ts";
 
 /** The grants that name `person` on a deck: by account, or by an address they have verified. */
@@ -27,19 +28,29 @@ export async function grantsOf(deckId: string, person: Person | null): Promise<G
     .all();
 }
 
-/** Tie the grants by address among `rows` to `person`'s account, as waitingGrants picks them. */
-export async function claimGrants(rows: readonly GrantRow[], person: Person): Promise<void> {
-  const waiting = waitingGrants(rows, person.id);
-  if (waiting.length === 0) {
+/**
+ * Tie the grants waiting on `person`'s address to their account, on every deck or on `deckId`'s,
+ * once they have verified the address. A deck on which the account already holds a grant by
+ * handle keeps that one tied, as one account can hold only one: the grant by address beside it
+ * keeps waiting, and still counts while the address is theirs.
+ */
+export async function claimGrants(person: Person, deckId?: string): Promise<void> {
+  if (!person.emailVerified) {
     return;
   }
+  const held = db
+    .select({ deckId: grants.deckId })
+    .from(grants)
+    .where(eq(grants.userId, person.id));
   await db
     .update(grants)
     .set({ userId: person.id })
     .where(
-      inArray(
-        grants.id,
-        waiting.map((row) => row.id),
+      and(
+        eq(grants.email, person.email.toLowerCase()),
+        isNull(grants.userId),
+        notInArray(grants.deckId, held),
+        deckId ? eq(grants.deckId, deckId) : undefined,
       ),
     );
 }
@@ -65,18 +76,23 @@ export async function grantList(c: Context, deckId: string): Promise<GrantView[]
   }));
 }
 
+function granteeName(grantee: Grantee): string {
+  return "email" in grantee ? grantee.email : grantee.handle;
+}
+
 /** Whom a new share is to be mailed to, or null when it changed one that was there already. */
 export type Invite = { to: string; byEmail: boolean };
 
 /**
- * Share a deck with one person, or change what an earlier share allows them. A new share is on
- * the guests' side unless `side` says otherwise; an earlier one keeps its side unless it does.
+ * Share a deck with one person, or change what an earlier share allows them. A new share lets them
+ * view, on the guests' side, unless `role` or `side` says otherwise; an earlier one keeps what
+ * they leave out.
  */
 export async function share(
   c: Context,
   deck: { id: string; ownerId: string },
   grantee: Grantee,
-  role: GrantRole,
+  role?: GrantRole,
   side?: GrantSide,
 ): Promise<{ grant: GrantView; invite: Invite | null }> {
   let target: { userId: string | null; email: string | null };
@@ -106,23 +122,36 @@ export async function share(
   );
   const before = await db.select({ id: grants.id }).from(grants).where(match).get();
   const id = newGrantId();
-  await db
+  const change = { ...(role ? { role } : {}), ...(side ? { side } : {}) };
+  const insert = db
     .insert(grants)
-    .values({ id, deckId: deck.id, ...target, role, side: side ?? "guest" })
-    .onConflictDoUpdate({
-      target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
-      set: side ? { role, side } : { role },
-    });
+    .values({ id, deckId: deck.id, ...target, role: role ?? "view", side: side ?? "guest" });
+  await (Object.keys(change).length === 0
+    ? insert.onConflictDoNothing()
+    : insert.onConflictDoUpdate({
+        target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
+        set: change,
+      }));
+  const holder = "email" in grantee ? await personByEmail(c, grantee.email) : null;
+  if (holder && holder.id !== deck.ownerId) {
+    await claimGrants(holder, deck.id);
+  }
   const row = await db
-    .select({ id: grants.id, side: grants.side, createdAt: grants.createdAt })
+    .select({
+      id: grants.id,
+      userId: grants.userId,
+      role: grants.role,
+      side: grants.side,
+      createdAt: grants.createdAt,
+    })
     .from(grants)
     .where(match)
     .get();
   return {
     grant: {
       id: row?.id ?? id,
-      who: "email" in grantee ? grantee.email : grantee.handle,
-      role,
+      who: holder && row?.userId === holder.id ? holder.handle : granteeName(grantee),
+      role: row?.role ?? role ?? "view",
       side: row?.side ?? side ?? "guest",
       createdAt: row?.createdAt ?? "",
     },

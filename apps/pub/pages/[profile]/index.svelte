@@ -1,8 +1,13 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
+  import type { TalkPage } from "../../../../src/pub/protocol.ts";
   import { docsUrl } from "../../src/common/docs.ts";
+  import { api } from "../../src/common/ui/api.ts";
   import CopyField from "../../src/common/ui/copy-field.svelte";
   import Icon from "../../src/common/ui/icon.svelte";
+  import { toast } from "../../src/common/ui/toast.svelte.ts";
+  import { profileHref, TALKS_PER_PAGE } from "../../src/model/person/feature/profile/paging.ts";
+  import ProfileMore from "../../src/model/person/feature/profile/ui/profile-more.svelte";
   import ProfileTalks from "../../src/model/person/feature/profile/ui/profile-talks.svelte";
   import type { ProfileView } from "../../src/model/person/feature/profile/view.ts";
   import { profilePath } from "../../src/model/person/profile-path.ts";
@@ -28,6 +33,42 @@
     }
     history.replaceState(history.state, "", url);
   }
+
+  // "Show more" adds the next page below the talks there are, and moves focus to the first of
+  // them. The address stays the page the reader came to, so a shared link opens where it did.
+  let talks = $state(untrack(() => profile?.talks ?? []));
+  let loaded = $state(untrack(() => profile?.page ?? 1));
+  let loading = $state(false);
+  const remaining = $derived(
+    profile ? profile.total - (profile.page - 1) * TALKS_PER_PAGE - talks.length : 0,
+  );
+
+  async function more() {
+    if (!profile) {
+      return;
+    }
+    loading = true;
+    try {
+      const next = await api<TalkPage>(
+        `/api/people/${encodeURIComponent(profile.handle)}/talks?page=${loaded + 1}`,
+      );
+      const known = new Set(talks.map((talk) => talk.slug));
+      const added = next.talks.filter((talk) => !known.has(talk.slug));
+      talks = [...talks, ...added];
+      loaded += 1;
+      await tick();
+      const first = added[0];
+      if (first) {
+        document
+          .querySelector<HTMLElement>(`[data-slug="${CSS.escape(first.slug)}"] a`)
+          ?.focus();
+      }
+    } catch {
+      toast(t("profile.moreFailed"), { tone: "error" });
+    } finally {
+      loading = false;
+    }
+  }
 </script>
 
 {#if !profile}
@@ -46,10 +87,13 @@
 
     <section aria-labelledby="talks-title">
       <h2 id="talks-title" class="visually-hidden">{t("profile.talks")}</h2>
-      {#if profile.isOwner && profile.talks.some((talk) => talk.visibility !== "public")}
+      {#if profile.page > 1}
+        <p class="newest"><a href={profileHref(profile.handle, view, 1)}><Icon name="arrow-up" size={14} />{t("profile.fromNewest")}</a></p>
+      {/if}
+      {#if profile.isOwner && talks.some((talk) => talk.visibility !== "public")}
         <p class="owner-note"><Icon name="lock" size={14} />{t("profile.ownerNote")}</p>
       {/if}
-      {#if profile.talks.length === 0}
+      {#if talks.length === 0}
         <div class="empty">
           <p>{profile.isOwner ? t("profile.emptyOwner") : t("profile.empty")}</p>
           {#if profile.isOwner}
@@ -58,7 +102,8 @@
           {/if}
         </div>
       {:else}
-        <ProfileTalks talks={profile.talks} handle={profile.handle} isOwner={profile.isOwner} {view} onview={choose} />
+        <ProfileTalks {talks} handle={profile.handle} isOwner={profile.isOwner} {view} onview={choose} />
+        <ProfileMore href={profileHref(profile.handle, view, loaded + 1)} {remaining} {loading} onmore={more} />
       {/if}
     </section>
   </div>
@@ -99,6 +144,15 @@
   }
   .links a:hover {
     color: var(--text);
+  }
+  .newest {
+    margin-bottom: var(--space-6);
+    font-size: var(--text-sm);
+  }
+  .newest a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
   }
   .owner-note {
     display: flex;

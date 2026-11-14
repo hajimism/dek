@@ -6,6 +6,8 @@ Date: 2026-11-14
 
 Accepted
 
+Amended by [72. Serve a sitemap from dek.pub, and give its landing and About pages a canonical URL in each language](0072-serve-a-sitemap-from-dek-pub-and-give-its-landing-and-about-pages-a-canonical-url-in-each-language.md)
+
 ## Context
 
 dek.pub answered `/robots.txt` and `/.well-known/security.txt` with its 404 page. Pages that should not be found already say `noindex` (sign-in, the device page, a talk that is not public), but a staging configuration (ADR 43) would be the same app on another origin, and nothing would keep crawlers off it.
