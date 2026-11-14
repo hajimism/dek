@@ -2,7 +2,7 @@
 
 The server behind [dek.pub](https://dek.pub): it publishes talks built with [dek](../../README.md) as a deck you can page through, a script you can read, and a place to leave review comments that `dekc pub comments` hands back to the author's agent.
 
-It is a [Void](https://void.cloud) app on Cloudflare Workers, with Svelte 5, D1 and R2, and a second Worker in `serve/` that serves each deck from an origin of its own. Development runs entirely on your machine through Miniflare; no Cloudflare account is needed.
+It is a [Void](https://void.cloud) app on Cloudflare Workers, with Svelte 5, D1 and R2, and a second Worker in `serve/` that serves each deck from an origin of its own. Development runs entirely on your machine through Miniflare; no Cloudflare account is needed. The zones and DNS records around the two Workers are declared in `infra/`, with [Alchemy](https://alchemy.run).
 
 ```bash
 mise install         # Bun, and the Node that Void and Vite+ run on

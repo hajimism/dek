@@ -135,6 +135,10 @@ jobs:
       - run: bun run test:serve
       - run: bun run build
       - run: bun run test:e2e
+      # The Alchemy program for the zones and DNS (ADR 70): its types and the names it declares.
+      # Planning it needs the account, so infra.yml does that.
+      - run: bun run --cwd infra check
+      - run: bun run --cwd infra test
 
   # The decision records, checked by the adrs that mise.toml pins.
   adr:
