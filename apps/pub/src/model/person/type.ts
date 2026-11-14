@@ -35,26 +35,41 @@ export type Account = z.output<typeof Account>;
  */
 export type Person = Account & { handle: string };
 
+const SignUpSource = z.object({
+  oauth: z
+    .object({
+      providerId: z.string(),
+      profile: z.object({ login: z.string().optional() }).nullish(),
+    })
+    .nullish(),
+});
+
+function profileLogin(source: z.output<typeof SignUpSource>): string | null {
+  return (source.oauth?.providerId === "github" && source.oauth.profile?.login) || null;
+}
+
 /**
  * Who Better Auth is about to make an account for, read from what its `validateUserInfo` is
- * handed: the address, whether it is verified, and the login of a GitHub profile.
+ * handed: the address, whether it is verified, and the login of a GitHub profile. An account to
+ * be made with a login that is not its GitHub profile's, as a sign-up's body may name, is not
+ * read (ADR 80).
  */
 export const Newcomer = z
   .object({
-    user: z.object({ email: z.string(), emailVerified: z.boolean().optional() }),
-    source: z.object({
-      oauth: z
-        .object({
-          providerId: z.string(),
-          profile: z.object({ login: z.string().optional() }).nullish(),
-        })
-        .nullish(),
+    user: z.object({
+      email: z.string(),
+      emailVerified: z.boolean().optional(),
+      githubLogin: z.string().nullish(),
     }),
+    source: SignUpSource,
+  })
+  .refine(({ user, source }) => (user.githubLogin ?? null) === profileLogin(source), {
+    message: "its GitHub login is not its GitHub profile's",
   })
   .transform(({ user, source }) => ({
     email: user.email,
     emailVerified: user.emailVerified === true,
-    githubLogin: (source.oauth?.providerId === "github" && source.oauth.profile?.login) || null,
+    githubLogin: profileLogin(source),
   }));
 
 export type Newcomer = z.output<typeof Newcomer>;

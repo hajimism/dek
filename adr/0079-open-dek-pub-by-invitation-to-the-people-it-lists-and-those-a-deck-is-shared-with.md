@@ -10,6 +10,8 @@ Amends [43. Build dek.pub as a Void app and a serve Worker, checked on Miniflare
 
 Amends [53. Send dek.pub's mail through Void and sign in by a mailed link](0053-send-dek-pub-s-mail-through-void-and-sign-in-by-a-mailed-link.md)
 
+Amended by [80. Keep the GitHub login of a dek.pub account made with GitHub, and take it from GitHub's profile alone](0080-keep-the-github-login-of-a-dek-pub-account-made-with-github-and-take-it-from-github-s-profile-alone.md)
+
 ## Context
 
 dek.pub opens first by invitation. What it lacks before anyone may sign up, rate limits, quotas, a way to report a talk, deleting one's own account, is not built, so the first people in have to be people its operator chose.
