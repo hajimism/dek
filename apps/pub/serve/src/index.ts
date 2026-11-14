@@ -16,11 +16,22 @@ export type ServeEnv = {
 
 const VERSION_PATH = /^\/v\/(\d{1,6})\/$/;
 
+/** A year, as the app's own; a deck's origin is never reached over plain HTTP but on this machine. */
+const HSTS = "max-age=31536000; includeSubDomains";
+
 export async function handleServe(
   request: Request,
   env: ServeEnv,
   nowSeconds = Math.floor(Date.now() / 1000),
 ): Promise<Response> {
+  const response = await answer(request, env, nowSeconds);
+  if (new URL(request.url).protocol === "https:") {
+    response.headers.set("strict-transport-security", HSTS);
+  }
+  return response;
+}
+
+async function answer(request: Request, env: ServeEnv, nowSeconds: number): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return plain(405, "method not allowed", { allow: "GET, HEAD" });
   }
