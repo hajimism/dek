@@ -6,7 +6,7 @@ import type { Context } from "hono";
 import { db, eq } from "void/db";
 import { threadLabel } from "../../../../../src/pub/thread.ts";
 import { sendMail } from "../../common/mail.server.ts";
-import { grantedSide, grantsOf, roleOf } from "../deck/grant/store.server.ts";
+import { grantsOf } from "../deck/grant/store.server.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
 import { peopleById } from "../person/store.server.ts";
@@ -48,10 +48,8 @@ export async function sendNotices(
     if (!person) {
       continue;
     }
-    const held = await grantsOf(deck.id, person);
     const may = mayBeNoticed(deck, thread, person, {
-      role: roleOf(held),
-      side: grantedSide(held),
+      grants: await grantsOf(deck.id, person),
       muted: muted.has(id),
     });
     if (may) {

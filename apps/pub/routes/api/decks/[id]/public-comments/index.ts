@@ -2,20 +2,21 @@ import { defineHandler } from "void";
 import { NewPublicComment } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
 import { api, jsonBody } from "../../../../../src/common/http.server.ts";
-import { canPostPublic, publicCommentsOn } from "../../../../../src/model/comment/public/access.ts";
+import { canPostPublic } from "../../../../../src/model/comment/public/access.ts";
 import {
   postPublic,
   publicCommentFor,
   publicCommentsOf,
 } from "../../../../../src/model/comment/public/store.server.ts";
+import { opensToAnyone } from "../../../../../src/model/deck/access.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
 import { currentPerson } from "../../../../../src/model/person/actor.server.ts";
 
-/** The talk's public comments; a private deck has none. */
+/** The talk's public comments; only a talk anyone may open has them. */
 export const GET = defineHandler((c) =>
   api(async () => {
     const { deck } = await visibleDeck(c.req.param("id") ?? "", await currentPerson(c));
-    if (!publicCommentsOn(deck)) {
+    if (!opensToAnyone(deck)) {
       throw notFound("comments");
     }
     return { comments: await publicCommentsOf(c, deck.id) };
@@ -27,7 +28,7 @@ export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
     const { deck } = await visibleDeck(c.req.param("id") ?? "", person);
-    if (!publicCommentsOn(deck)) {
+    if (!opensToAnyone(deck)) {
       throw notFound("comments");
     }
     if (person === null || !canPostPublic(deck, person)) {

@@ -3,8 +3,8 @@
 // while they may read it on their own side, and never to whoever did what the mail is about.
 
 import { excerpt, type Mail } from "../../common/mail.ts";
-import { canView, type DeckRules, sideOf } from "../deck/access.ts";
-import type { GrantRole, GrantSide } from "../deck/grant/type.ts";
+import { type DeckRules, standingOn } from "../deck/access.ts";
+import type { GrantRow } from "../deck/grant/type.ts";
 import type { Person } from "../person/type.ts";
 import { canReadComments, canSeeThread } from "./access.ts";
 import type { ThreadRow } from "./type.ts";
@@ -28,13 +28,14 @@ export function mayBeNoticed(
   deck: DeckRules,
   thread: Pick<ThreadRow, "scope">,
   person: Pick<Person, "id">,
-  held: { role: GrantRole | null; side: GrantSide | null; muted: boolean },
+  held: { grants: readonly Pick<GrantRow, "role" | "side">[]; muted: boolean },
 ): boolean {
+  const standing = standingOn(deck, person, held.grants);
   return (
     !held.muted &&
-    canView(deck, person, held.role, held.side) &&
-    canReadComments(deck, person, held.role) &&
-    canSeeThread(thread, sideOf(deck, person, held.side))
+    standing.opens &&
+    canReadComments(deck, person, standing.role) &&
+    canSeeThread(thread, standing.side)
   );
 }
 

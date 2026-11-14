@@ -7,8 +7,9 @@ import {
   canSeeScript,
   canView,
   type DeckRules,
-  mayReadVersion,
   sideOf,
+  standingOn,
+  versionStanding,
 } from "../../src/model/deck/access.ts";
 import { talkNamed, talkPath } from "../../src/model/deck/deck.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
@@ -91,6 +92,32 @@ describe("access", () => {
     expect(sideOf(deck("private"), other, "guest")).toBe("guest");
     expect(sideOf(deck("public"), other, null)).toBe("guest");
     expect(sideOf(deck("public"), null, null)).toBe("guest");
+  });
+
+  it("sums up a person's grants as whether the deck opens, their role, and their side", () => {
+    expect(standingOn(deck("team"), owner, [])).toEqual({ opens: true, role: null, side: "team" });
+    expect(
+      standingOn(deck("team"), other, [
+        { role: "view", side: "guest" },
+        { role: "comment", side: "team" },
+      ]),
+    ).toEqual({ opens: true, role: "comment", side: "team" });
+    expect(standingOn(deck("team"), other, [{ role: "comment", side: "guest" }])).toEqual({
+      opens: false,
+      role: "comment",
+      side: "guest",
+    });
+    expect(standingOn(deck("private"), other, [{ role: "view", side: "guest" }])).toEqual({
+      opens: true,
+      role: "view",
+      side: "guest",
+    });
+    expect(standingOn(deck("public"), null, [])).toEqual({
+      opens: true,
+      role: null,
+      side: "guest",
+    });
+    expect(standingOn(deck("private"), null, []).opens).toBe(false);
   });
 
   it("lets only the owner manage", () => {
@@ -275,12 +302,14 @@ describe("the version and the script, by who asks", () => {
     currentVersion: 2,
   };
 
-  it("lets anyone who may see the deck read its current version alone", () => {
-    expect(mayReadVersion(deck, 2)).toBe(true);
-    expect(mayReadVersion(deck, 1)).toBe(false);
-    expect(mayReadVersion(deck, 3)).toBe(false);
-    expect(mayReadVersion(deck, Number.NaN)).toBe(false);
-    expect(mayReadVersion({ currentVersion: null }, 1)).toBe(false);
+  it("tells the current version from one gone before it and one the deck never had", () => {
+    expect(versionStanding(deck, 2)).toBe("current");
+    expect(versionStanding(deck, 1)).toBe("gone");
+    expect(versionStanding(deck, 3)).toBe("unknown");
+    expect(versionStanding(deck, 0)).toBe("unknown");
+    expect(versionStanding(deck, 1.5)).toBe("unknown");
+    expect(versionStanding(deck, Number.NaN)).toBe("unknown");
+    expect(versionStanding({ currentVersion: null }, 1)).toBe("unknown");
   });
 
   it("shows the script to anyone once it is public, else to its owner", () => {

@@ -7,7 +7,7 @@ import { handleOf } from "../../../person/profile-path.ts";
 import { grantList } from "../../grant/store.server.ts";
 import type { GrantView } from "../../grant/type.ts";
 import { deckBySlug, deckStatus } from "../../store.server.ts";
-import { findVersion } from "../../version/store.server.ts";
+import { currentVersionOf } from "../../version/store.server.ts";
 import type { CurrentVersion } from "./type.ts";
 
 export async function loadManage(
@@ -24,11 +24,11 @@ export async function loadManage(
   if (!deck) {
     return null;
   }
-  const version =
-    deck.currentVersion === null ? null : await findVersion(deck.id, deck.currentVersion);
+  const version = await currentVersionOf(deck);
+  const [status, grants] = await Promise.all([deckStatus(c, deck, version), grantList(c, deck.id)]);
   return {
-    status: await deckStatus(c, deck),
-    grants: await grantList(c, deck.id),
+    status,
+    grants,
     version: version && {
       n: version.n,
       createdAt: version.createdAt,
