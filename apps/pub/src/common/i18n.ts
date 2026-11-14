@@ -23,6 +23,7 @@ const en = {
   "theme.light": "Light",
   "theme.dark": "Dark",
   "footer.builtWith": "Built with dek",
+  "footer.about": "About",
   "footer.docs": "dek docs",
   "footer.source": "Source",
   "footer.terms": "Terms",
@@ -63,6 +64,79 @@ const en = {
   "landing.step1": "Sign in once from the CLI.",
   "landing.step2": "Publish. A new talk is private until you share it.",
   "landing.step3": "Share a link, or make it public with its script.",
+
+  "about.title": "About dek.pub",
+  "about.description":
+    "Why dek.pub exists, how much of your script reaches readers, who sees a talk, and what dek.pub won’t do.",
+  "about.hero": "A talk keeps reaching people after you give it",
+  "about.lead":
+    "dek.pub is where talks made with dek are published. The slides and the script share one URL, so people who weren’t in the room get the talk as it was given.",
+  "about.sample": "A talk on dek.pub",
+  "about.why.title": "Slides alone don’t keep a talk",
+  "about.why.p1":
+    "When a talk is over, what usually stays behind is its slides. But slides go with what you say. Opened later without the words, they rarely tell anyone what the talk meant, and few people sit through thirty minutes of video to find the one point they came for.",
+  "about.why.p2":
+    "In dek you write the script first, so the words are already text. dek.pub publishes them with the slides: the deck plays as you built it, and the script reads as an article, with a heading and a picture for each slide.",
+  "about.script.title": "How much of your script reaches readers",
+  "about.script.p":
+    "Everything you say aloud does. What you wrote for yourself doesn’t: a line you mark as a stage direction with > in script.md is taken out of the script readers get.",
+  "about.script.mine": "script.md, on your machine",
+  "about.script.theirs": "The article on dek.pub",
+  "about.script.heading": "Why the script comes first",
+  "about.script.direction": "Ask the room who starts from slides.",
+  "about.script.said":
+    "Slides are there to be spoken over. Yet the tools we use all start from an empty slide.",
+  "about.script.note":
+    "The full build and the source, stage directions included, are uploaded as well, and are never handed to readers.",
+  "about.control.title": "You decide who sees it",
+  "about.control.p1":
+    "A new talk is private until you share it. Each talk has one of three visibilities.",
+  "about.table.who": "Who can open it",
+  "about.table.listed": "Profile and RSS",
+  "about.table.search": "Search engines",
+  "about.table.private.who": "You, and the people you share it with",
+  "about.table.link.who": "Anyone with the link",
+  "about.table.public.who": "Anyone",
+  "about.table.listed.no": "Not listed",
+  "about.table.listed.yes": "Listed",
+  "about.table.search.no": "Not indexed",
+  "about.table.search.yes": "Indexed",
+  "about.control.p2":
+    "Whether readers get the script, and whether the talk takes comments, you choose talk by talk. To someone who may not see a talk, it is a page that doesn’t exist; they can’t tell it is there.",
+  "about.people.title": "What you can do here",
+  "about.reader.title": "If you came to read",
+  "about.reader.p":
+    "You need no account. The slides play in the browser as they were built, with their fonts and motion, and the script below them reads as an article whose table of contents follows the slide you’re on. You can link to any one slide, watch full screen, and follow a speaker by the RSS feed on their profile. Sign in, and you can like a talk and, where its author allows, comment on it.",
+  "about.speaker.title": "If you give talks",
+  "about.speaker.p":
+    "You publish from the terminal, and a deck with lint errors doesn’t go up. Every publish keeps a version: put one up as a draft, make it current when you’re ready, or go back to an earlier one. Your profile gathers your talks as a gallery and as a timeline.",
+  "about.review.title": "If you were asked to review",
+  "about.review.p":
+    "Point at a sentence of the script or at a part of a slide, and leave your note right there. A thread can stay within the team or be shared with guests, and a guest sees only the threads shared with them. If you were invited by email, you need no GitHub account. Your notes reach the author as data tied to a line of script.md or a slide’s file, so their agent can read them and fix the deck.",
+  "about.not.title": "What dek.pub won’t do",
+  "about.not.1.title": "It won’t flatten your slides.",
+  "about.not.1.body":
+    "They aren’t turned into images or a PDF. They run as the HTML you built, so text stays text.",
+  "about.not.2.title": "It won’t publish behind your back.",
+  "about.not.2.body": "A new talk is private until you share it.",
+  "about.not.3.title": "It won’t rank your talks.",
+  "about.not.3.body":
+    "There is no ranking and no recommendations. The top page lists talks newest first.",
+  "about.not.4.title": "It won’t keep your talk from you.",
+  "about.not.4.body":
+    "A talk’s source is always the project on your machine. dekc build turns it into one HTML file you can put anywhere, and dek.pub’s own source is open under AGPL-3.0.",
+  "about.start.title": "Getting started",
+  "about.start.p":
+    "Sign in once from the CLI, publish, then share the talk by its link. Each step is one command.",
+  "about.start.commands": "Commands",
+  "about.start.note": "New to dek? Begin with the guide:",
+  "about.start.guide": "Getting started",
+  "about.more.title": "Learn more",
+  "about.more.publish": "Publishing to dek.pub",
+  "about.more.why": "Why dek",
+  "about.more.faq": "FAQ",
+  "about.more.source": "The repository on GitHub",
+  "about.end": "Put your next talk where it can be read.",
 
   "signin.title": "Sign in to dek.pub",
   "signin.github": "Continue with GitHub",
@@ -341,6 +415,7 @@ const ja: Record<MessageKey, string> = {
   "theme.light": "ライト",
   "theme.dark": "ダーク",
   "footer.builtWith": "Built with dek",
+  "footer.about": "dek.pub について",
   "footer.docs": "dek ドキュメント",
   "footer.source": "ソース",
   "footer.terms": "利用規約",
@@ -381,6 +456,79 @@ const ja: Record<MessageKey, string> = {
   "landing.step1": "CLI から一度サインインします。",
   "landing.step2": "公開します。新しいトークは共有するまで非公開です。",
   "landing.step3": "リンクを共有するか、台本ごと全体に公開します。",
+
+  "about.title": "dek.pub について",
+  "about.description":
+    "dek.pub がある理由と、台本のどこまでが読む人に届くか、誰に見せるか、dek.pub がしないことを説明します。",
+  "about.hero": "トークは、話し終えてからも届く",
+  "about.lead":
+    "dek.pub は dek で作ったトークを公開する場所です。スライドと台本を 1 つの URL にまとめ、会場にいなかった人にも、話したとおりに届けます。",
+  "about.sample": "dek.pub のトーク",
+  "about.why.title": "スライドだけでは、トークは残らない",
+  "about.why.p1":
+    "発表が終わると、残るのはたいていスライドだけです。けれどスライドは話す言葉に添えるものです。言葉の抜けたスライドを後から開いても、何を言いたかったのかはほとんど伝わりません。録画は残りますが、ひとつの要点を探して 30 分の動画を見てもらうのは簡単ではありません。",
+  "about.why.p2":
+    "dek では台本を先に書くので、話す言葉ははじめからテキストとしてあります。dek.pub はそれをスライドと一緒に公開します。スライドは作ったとおりに動き、台本は 1 枚ごとの見出しと画像が付いた記事として読めます。",
+  "about.script.title": "台本のどこまでが届くか",
+  "about.script.p":
+    "声に出す言葉はすべて届き、自分のために書いたものは届きません。script.md で > を付けたト書きは、読む人に渡る台本から外されます。",
+  "about.script.mine": "script.md（手元）",
+  "about.script.theirs": "dek.pub の記事",
+  "about.script.heading": "なぜ台本が先か",
+  "about.script.direction": "会場に「スライドから作る人」を挙手で聞く",
+  "about.script.said":
+    "スライドは、喋るためにあります。ところが主流のツールは、どれも空のスライドを埋めるところから始まります。",
+  "about.script.note":
+    "ト書きを含む完全なビルドとソースもアップロードされますが、読む人に渡ることはありません。",
+  "about.control.title": "誰に見せるかは、あなたが決める",
+  "about.control.p1":
+    "新しいトークは共有するまで非公開です。公開範囲はトークごとに 3 つから選びます。",
+  "about.table.who": "開ける人",
+  "about.table.listed": "プロフィールと RSS",
+  "about.table.search": "検索エンジン",
+  "about.table.private.who": "あなたと、共有した相手",
+  "about.table.link.who": "リンクを知っている人",
+  "about.table.public.who": "誰でも",
+  "about.table.listed.no": "載らない",
+  "about.table.listed.yes": "載る",
+  "about.table.search.no": "載らない",
+  "about.table.search.yes": "載る",
+  "about.control.p2":
+    "台本を読ませるかどうかと、コメントを受け付けるかどうかも、トークごとに選べます。見る権限のない人には、トークは存在しないページと同じに見え、そこにあることさえ分かりません。",
+  "about.people.title": "dek.pub でできること",
+  "about.reader.title": "読みに来た人へ",
+  "about.reader.p":
+    "アカウントはいりません。スライドはフォントも動きもそのままにブラウザで再生され、その下の台本は記事として読めます。目次には、いま読んでいるスライドが示されます。スライドには 1 枚ずつリンクでき、全画面でも見られます。話し手のトークは、プロフィールの RSS で追えます。サインインすればいいねを付けられ、作者がコメントを受け付けていればコメントも書けます。",
+  "about.speaker.title": "話す人へ",
+  "about.speaker.p":
+    "ターミナルから公開します。lint のエラーがあるデッキはアップロードされません。公開するたびにバージョンが残るので、下書きとしてアップロードしておき、準備ができたら読む人に見せることも、前のバージョンに戻すこともできます。プロフィールには、あなたのトークがギャラリーとタイムラインで並びます。",
+  "about.review.title": "レビューを頼まれた人へ",
+  "about.review.p":
+    "台本の一文やスライドの一部を指して、その場所にコメントを残せます。スレッドはチームの中だけで続けることも、ゲストに公開することもできます。ゲストに見えるのは、公開されたスレッドだけです。メールで招待されたなら、GitHub のアカウントはいりません。あなたのコメントは script.md の行やスライドのファイルに結び付いたデータとして作者に届き、作者のエージェントがそのまま読んでデッキを直せます。",
+  "about.not.title": "dek.pub がしないこと",
+  "about.not.1.title": "スライドを画像にしません。",
+  "about.not.1.body":
+    "画像や PDF に変換せず、作ったとおりの HTML のまま動かします。文字は文字のままです。",
+  "about.not.2.title": "勝手に公開しません。",
+  "about.not.2.body": "新しいトークは、あなたが共有するまで非公開です。",
+  "about.not.3.title": "順位を付けません。",
+  "about.not.3.body":
+    "ランキングもおすすめ欄もありません。トップページには、新しく公開されたトークから順に並びます。",
+  "about.not.4.title": "トークを囲い込みません。",
+  "about.not.4.body":
+    "トークの元はいつも手元のプロジェクトで、dekc build で 1 つの HTML ファイルにすれば、どこにでも置けます。dek.pub 自身のソースも AGPL-3.0 で公開しています。",
+  "about.start.title": "はじめかた",
+  "about.start.p":
+    "CLI から一度サインインし、公開して、リンクで共有します。どれもコマンド 1 つです。",
+  "about.start.commands": "コマンド",
+  "about.start.note": "dek が初めてなら、先にこちらのガイドをどうぞ。",
+  "about.start.guide": "はじめる",
+  "about.more.title": "もっと知る",
+  "about.more.publish": "dek.pub で公開する",
+  "about.more.why": "dek の設計思想",
+  "about.more.faq": "FAQ",
+  "about.more.source": "GitHub のリポジトリ",
+  "about.end": "次のトークを、読める場所に。",
 
   "signin.title": "dek.pub にサインイン",
   "signin.github": "GitHub で続ける",
