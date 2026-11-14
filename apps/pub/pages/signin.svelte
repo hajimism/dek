@@ -9,7 +9,7 @@
   import { useApp } from "../src/shell/use-app.ts";
   import type { Props } from "./signin.server";
 
-  let { next, linkFailed }: Props = $props();
+  let { next, failure }: Props = $props();
   const { shared, t } = useApp();
 
   let github = $state(false);
@@ -18,7 +18,12 @@
   let email = $state("");
   let password = $state("");
   let busy = $state(false);
-  let error = $state(untrack(() => (linkFailed ? t("signin.linkFailed") : "")));
+  const failed = {
+    "not-invited": "signin.notInvited",
+    "link-failed": "signin.linkFailed",
+    failed: "signin.error",
+  } as const;
+  let error = $state(untrack(() => (failure ? t(failed[failure]) : "")));
   let linkEmail = $state("");
   let linkBusy = $state(false);
   let linkSent = $state("");
@@ -45,7 +50,11 @@
   async function withGitHub() {
     github = true;
     error = "";
-    const result = await auth.signIn.social({ provider: "github", callbackURL: next });
+    const result = await auth.signIn.social({
+      provider: "github",
+      callbackURL: next,
+      errorCallbackURL: signInHref(next),
+    });
     if (result?.error) {
       github = false;
       error = t("signin.failed", { message: result.error.message ?? result.error.statusText ?? "" });

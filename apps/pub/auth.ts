@@ -1,6 +1,7 @@
 // dek.pub's Better Auth setup, on top of Void's defaults. On the deployed app one signs in with
-// GitHub, or by a link mailed to an address that has an account or a share waiting for it; email
-// sign-up with a password exists only where DEK_PUB_DEV_LOGIN is 1, for local runs and tests.
+// GitHub, or by a link mailed to an address that has an account or may make one; email sign-up
+// with a password exists only where DEK_PUB_DEV_LOGIN is 1, for local runs and tests. An account
+// is made only for someone DEK_PUB_INVITED names or a deck is shared with (ADR 79).
 // The device flow lets `dekc pub login` sign in, and the CLI then holds an API key. A new account
 // has no handle until its holder chooses one.
 
@@ -11,8 +12,11 @@ import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
 import { log } from "./src/common/log.ts";
 import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
 import { claimOnSignIn } from "./src/model/person/feature/sign-in/claim.server.ts";
+import { NOT_INVITED } from "./src/model/person/feature/sign-in/failure.ts";
+import { mayMakeAccount } from "./src/model/person/feature/sign-in/invitation.server.ts";
 import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
 import { SIGN_IN_LINK_SECONDS } from "./src/model/person/feature/sign-in/mail.ts";
+import { readNewcomer } from "./src/model/person/invited.ts";
 import { seedLinks } from "./src/model/person/link.server.ts";
 
 // The Worker's waitUntil, which keeps it running for mail sent after the answer. Imported lazily:
@@ -58,6 +62,18 @@ export default defineAuth(({ defaults, env }) => {
       },
     },
     user: {
+      // Every way of making an account passes here first, and GitHub's carries the profile, login
+      // and all, which the user record does not yet hold. Signing in, and joining GitHub to an
+      // account, are never refused. Better Auth sends a browser back with `?error=not_invited`.
+      validateUserInfo: async (data) => {
+        if (data.source.action !== "create-user") {
+          return;
+        }
+        const newcomer = readNewcomer(data);
+        if (!newcomer || !(await mayMakeAccount(newcomer))) {
+          return { error: NOT_INVITED, errorDescription: "dek.pub is open by invitation for now" };
+        }
+      },
       additionalFields: {
         // Null until the person chooses it on /welcome, which writes it once; no API of Better
         // Auth's may set either.
