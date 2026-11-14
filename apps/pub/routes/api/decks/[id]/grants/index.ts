@@ -8,6 +8,7 @@ import { invitationMail } from "../../../../../src/model/deck/grant/invite.ts";
 import { grantList, share } from "../../../../../src/model/deck/grant/store.server.ts";
 import { ownedDeck, talkUrl } from "../../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../../src/model/person/actor.server.ts";
+import { signInHref } from "../../../../../src/model/person/sign-in-path.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {
@@ -33,9 +34,7 @@ export const POST = defineHandler((c) =>
     const { grant, invite } = await share(c, deck, grantee, role, side);
     if (invite) {
       const talk = await talkUrl(c, deck);
-      const url = invite.byEmail
-        ? appUrl(`/signin?next=${encodeURIComponent(new URL(talk).pathname)}`)
-        : talk;
+      const url = invite.byEmail ? appUrl(signInHref(new URL(talk).pathname)) : talk;
       afterAnswer(
         c,
         sendMail(

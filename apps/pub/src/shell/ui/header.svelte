@@ -3,6 +3,7 @@
   import Icon from "../../common/ui/icon.svelte";
   import Menu from "../../common/ui/menu.svelte";
   import { profilePath } from "../../model/person/profile-path.ts";
+  import { signInHref } from "../../model/person/sign-in-path.ts";
   import Avatar from "../../model/person/ui/avatar.svelte";
   import { applyTheme } from "../theme.ts";
   import type { Theme } from "../type.ts";
@@ -33,9 +34,9 @@
     window.location.href = "/";
   }
 
-  function signInHref(): string {
-    const here = window.location.pathname + window.location.search + window.location.hash;
-    return here === "/" || here.startsWith("/signin") ? "/signin" : `/signin?next=${encodeURIComponent(here)}`;
+  /** The sign-in page, coming back to the page as it is now. */
+  function signInHere(): string {
+    return signInHref(window.location.pathname + window.location.search + window.location.hash);
   }
 </script>
 
@@ -86,7 +87,7 @@
           {/snippet}
         </Menu>
       {:else}
-        <a class="signin" href="/signin" onclick={(event) => (event.currentTarget.href = signInHref())}>{t("nav.signin")}</a>
+        <a class="signin" href="/signin" onclick={(event) => (event.currentTarget.href = signInHere())}>{t("nav.signin")}</a>
       {/if}
     </div>
   </div>

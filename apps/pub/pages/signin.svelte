@@ -4,6 +4,7 @@
   import { api } from "../src/common/ui/api.ts";
   import Button from "../src/common/ui/button.svelte";
   import Icon from "../src/common/ui/icon.svelte";
+  import { signInHref } from "../src/model/person/sign-in-path.ts";
   import { useApp } from "../src/shell/use-app.ts";
   import type { Props } from "./signin.server";
 
@@ -26,7 +27,7 @@
     event.preventDefault();
     linkBusy = true;
     error = "";
-    const back = `/signin?next=${encodeURIComponent(next)}`;
+    const back = signInHref(next);
     try {
       await api("/api/auth/sign-in/magic-link", {
         method: "POST",
