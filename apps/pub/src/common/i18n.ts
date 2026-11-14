@@ -54,7 +54,7 @@ const en = {
     "Every slide plays in the browser from its own isolated origin, with your fonts, motion and beats. Link straight to any slide by its slug.",
   "landing.f2.title": "The script, as an article",
   "landing.f2.body":
-    "Below the slides, the talk reads like a well-set essay: one heading and picture per slide, then what you say. Stage directions never leave your machine.",
+    "Below the slides, the talk reads like a well-set essay: one heading and picture per slide, then what you say. Stage directions never reach readers.",
   "landing.f3.title": "Comments your agent reads",
   "landing.f3.body":
     "Reviewers select a sentence or point at part of a slide. The same notes come back to you as data, in the shape dek’s own annotations use.",
@@ -443,13 +443,13 @@ const ja: Record<MessageKey, string> = {
   "landing.ctaProfile": "自分のトークへ",
   "landing.f1.title": "作ったままのスライド",
   "landing.f1.body":
-    "スライドは独立したオリジンからブラウザで再生され、フォントも動きもビートもそのままです。slug で任意のスライドにリンクできます。",
+    "スライドは dek.pub とは別のオリジンからブラウザで再生され、フォントも動きもビートも作ったときのままです。どのスライドにも、slug でリンクできます。",
   "landing.f2.title": "記事として読める台本",
   "landing.f2.body":
-    "スライドの下に、1 枚ごとの見出しと画像、話す言葉が整った記事として並びます。ト書きは手元から出ません。",
+    "スライドの下には、1 枚ごとに見出しと画像と話す言葉が、記事の形で並びます。ト書きは読む人に届きません。",
   "landing.f3.title": "エージェントが読むコメント",
   "landing.f3.body":
-    "レビュアーは文を選ぶか、スライドの一部を指してコメントします。同じメモが、dek の annotations と同じ形のデータで手元に戻ります。",
+    "レビュアーは文を選ぶか、スライドの一部を指してコメントします。そのコメントは、dek の annotations と同じ形のデータで手元に戻ります。",
   "landing.recent": "新着のトーク",
   "landing.recentEmpty": "公開されたトークはまだありません。最初の 1 本をどうぞ。",
   "landing.how": "使い方",
