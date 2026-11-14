@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DeckId } from "../../../../src/pub/protocol.ts";
+import { CreateDeckRequest, DeckId, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
 import { newDeckId } from "../../src/common/ids.ts";
 import {
   canComment,
@@ -442,6 +442,30 @@ describe("publishing", () => {
   it("refuses a form with no manifest, or one that is not JSON", () => {
     expect(() => readManifest("{")).toThrow("not JSON");
     expect(() => readManifest(undefined)).toThrow("no manifest");
+  });
+
+  it("refuses a title, a description or a message longer than a page can show", () => {
+    const manifest = {
+      protocol: PROTOCOL_VERSION,
+      dekVersion: "0.9.0",
+      deck: "why-dek",
+      title: "Why dek",
+      base: null,
+      slideMap: { deck: "why-dek", out: "why-dek.html", slides: [] },
+      lint: { errors: 0, warnings: 0 },
+      renames: [],
+      files: {},
+      shots: {},
+    };
+    const read = (extra: object) => () => readManifest(JSON.stringify({ ...manifest, ...extra }));
+    expect(read({ title: "x".repeat(500), description: "x".repeat(2000) })).not.toThrow();
+    expect(read({ message: "x".repeat(2000) })).not.toThrow();
+    expect(read({ title: "x".repeat(501) })).toThrow("title: ");
+    expect(read({ description: "x".repeat(2001) })).toThrow("description: ");
+    expect(read({ message: "x".repeat(2001) })).toThrow("message: ");
+    expect(CreateDeckRequest.safeParse({ slug: "why-dek", title: "x".repeat(501) }).success).toBe(
+      false,
+    );
   });
 });
 

@@ -34,7 +34,7 @@ import {
   paths,
   Reply,
   shotField,
-  type VersionManifest,
+  VersionManifest,
   Visibility,
 } from "../pub/protocol.ts";
 import { threadLabel, threadOfLabel } from "../pub/thread.ts";
@@ -234,6 +234,35 @@ function newSlug({ deck }: ReadableDeck, flags: FlagValues): string {
 }
 
 /**
+ * Refuse, before anything is built or sent, a title, a description or a message longer than
+ * dek.pub keeps: the bounds are the manifest's own.
+ */
+function requireSendable({ deck }: ReadableDeck, flags: FlagValues): void {
+  const fields: Array<[string, string | undefined, z.ZodString, string]> = [
+    ["title", deck.deck.title, VersionManifest.shape.title, "shorten title: in the frontmatter"],
+    [
+      "description",
+      deck.deck.description,
+      VersionManifest.shape.description.unwrap(),
+      "shorten description: in the frontmatter",
+    ],
+    ["message", flags.message, VersionManifest.shape.message.unwrap(), "shorten --message"],
+  ];
+  for (const [name, value, schema, fix] of fields) {
+    const most = schema.maxLength;
+    if (value !== undefined && most !== null && value.length > most) {
+      throw new DekError(
+        `the ${name} is ${value.length} characters, and dek.pub keeps ${most} at most`,
+        {
+          ...(name === "message" ? {} : { path: deck.scriptPath }),
+          hint: `${fix}, then publish again`,
+        },
+      );
+    }
+  }
+}
+
+/**
  * `dekc pub publish`: lint as `dekc lint` does, and stop on an error; build the talk for each
  * reader, take the slides' pictures, and upload the lot as the deck's next version, making the
  * deck on dek.pub first when script.md names none.
@@ -247,6 +276,7 @@ export async function publishCommand(
   const { flags } = options;
   const origin = serverOrigin(flags.server);
   const slug = newSlug(target, flags);
+  requireSendable(target, flags);
   const key = await requireKey(origin, flags);
   const lint = await lintCommand({ project, decks: [deck], deck }, { cwd: options.cwd });
   const skippedLint = lint.skipped ?? [];
