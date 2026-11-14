@@ -1,11 +1,14 @@
 // A person's settings, on /settings: their handle, which stays, the name everyone sees them by,
-// and the links their profile shows (ADR 78).
+// the links their profile shows (ADR 78), and the CLI keys they hold (ADR 83).
 
+import type { CliKeyInfo } from "../../../../../../../src/pub/protocol.ts";
 import type { LinksProblem } from "../../link.ts";
 import type { NameProblem } from "../../name.ts";
 
 /** The settings page as its person sees it; or where to go instead, signed out or with no handle yet. */
-export type Settings = { handle: string; name: string; links: string[] } | { redirect: string };
+export type Settings =
+  | { handle: string; name: string; links: string[]; keys: CliKeyInfo[] }
+  | { redirect: string };
 
 /** The error code the API answers each problem with a list of links with. */
 export const LINK_CODES = {

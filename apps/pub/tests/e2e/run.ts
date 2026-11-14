@@ -2,11 +2,12 @@
 // An author signs in with the device flow, publishes a sample deck, shares it; a colleague
 // comments on a quoted sentence and on a slide element; the author reads the comments as JSON,
 // renames the slide with `dekc mv`, publishes again, and resolves every comment from the CLI.
-// At the end the author deletes the talk with all on it, and an operator takes one down.
+// At the end the author deletes the talk with all on it, and an operator takes one down; the
+// author lists and revokes their CLI keys, and `dekc pub logout --all` revokes the rest.
 // Run from apps/pub: `bun run test:e2e`.
 
 import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { translate } from "../../src/common/i18n.ts";
 import { addressOf, Browser, Inbox, startDevServer } from "./server.ts";
@@ -1408,10 +1409,153 @@ try {
     ownerAfter,
   );
 
-  const logout = await dekc(["pub", "logout"]);
-  check(logout.ok, "logout revokes the key", logout);
-  const gone = await dekc(["pub", "whoami"]);
-  check(!gone.ok, "after logout the CLI is signed out", gone);
+  // The author's CLI keys: one for each dekc signed in, and one for CI. Each is listed on
+  // /settings and can be revoked there; `dekc pub logout --all` revokes them all from any one.
+  const keyIn = async (folder: string) =>
+    String(
+      (
+        (await Bun.file(join(folder, "credentials.json")).json()) as {
+          keys: Record<string, string>;
+        }
+      ).keys[server.url],
+    );
+  /** A call with an API key alone, as the CLI or a script makes one. */
+  const keyed = (key: string, path: string, init: { method?: string; json?: unknown } = {}) =>
+    fetch(`${server.url}${path}`, {
+      method: init.method ?? "GET",
+      headers: {
+        "x-api-key": key,
+        ...(init.json === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: init.json === undefined ? undefined : JSON.stringify(init.json),
+    });
+  const laptopKey = await keyIn(config);
+  const desk = mkdtempSync(join(tmpdir(), "dek-pub-e2e-desk-"));
+  try {
+    const atDesk = {
+      env: { DEK_PUB_CREDENTIALS: join(desk, "credentials.json"), XDG_CONFIG_HOME: desk },
+    };
+    const deskPending = await dekc(["pub", "login"], config, atDesk);
+    await author.approveDevice(String(deskPending.code));
+    const deskIn = await dekc(["pub", "login"], config, atDesk);
+    check(
+      deskIn.ok && deskIn.status === "signed-in",
+      "a second dekc signs in as the author",
+      deskIn,
+    );
+    const deskKey = await keyIn(desk);
+    const ciKey = (
+      (await (await author.fetch("/api/cli/key", { method: "POST" })).json()) as { key: string }
+    ).key;
+    const asCi = { env: { DEK_TOKEN: ciKey, DEK_TOKEN_SERVER: server.url } };
+    check((await dekc(["pub", "whoami"], config, asCi)).ok, "a key made for CI works as DEK_TOKEN");
+    check(
+      new Set([laptopKey, deskKey, ciKey]).size === 3,
+      "each login, and the key for CI, is a key of its own",
+    );
+
+    type Listed = {
+      id: string;
+      name: string;
+      createdAt: string;
+      lastUsedAt: string | null;
+      expiresAt: string;
+    };
+    const listedAnswer = await author.fetch("/api/me/keys");
+    const listedText = await listedAnswer.text();
+    const listed = (JSON.parse(listedText) as { keys: Listed[] }).keys;
+    const host = hostname().split(".")[0];
+    check(
+      listedAnswer.status === 200 &&
+        listed.map((key) => key.name).join() === ["dekc", host, host].join() &&
+        listed[0]?.lastUsedAt !== null &&
+        listed[1]?.lastUsedAt === null &&
+        listed[2]?.lastUsedAt !== null &&
+        listed.every(
+          (key) =>
+            Date.parse(key.expiresAt) - Date.parse(key.createdAt) > 364 * 24 * 60 * 60 * 1000,
+        ),
+      "GET /api/me/keys lists the three keys, newest first: CI's, then each machine's by its name",
+      listed,
+    );
+    check(
+      [laptopKey, deskKey, ciKey].every((key) => !listedText.includes(key.slice(0, 16))) &&
+        !listedText.includes("dekpub_"),
+      "the list holds no key, nor the start of one",
+    );
+    const settingsKeys = await (await author.fetch("/settings?lang=en")).text();
+    check(
+      settingsKeys.includes("CLI keys") &&
+        settingsKeys.includes(String(host)) &&
+        settingsKeys.includes("Revoke all"),
+      "the settings page lists the CLI keys",
+    );
+
+    const deskListed = listed[1];
+    const refused = await Promise.all([
+      keyed(laptopKey, "/api/me/keys"),
+      keyed(laptopKey, `/api/me/keys/${deskListed?.id}`, { method: "DELETE" }),
+      keyed(laptopKey, "/api/me/links", { method: "PUT", json: { links: [] } }),
+      keyed(laptopKey, "/api/me", { method: "PATCH", json: { name: "Stolen" } }),
+    ]);
+    const codes = await Promise.all(
+      refused.map(async (response) => {
+        const body = (await response.json()) as { error: { code: string } };
+        return `${response.status} ${body.error.code}`;
+      }),
+    );
+    check(
+      codes.every((code) => code === "403 session_needed") &&
+        (await keyed(laptopKey, "/api/me")).status === 200,
+      "an API key may not list the keys, revoke another, or change the settings; it may read who it is",
+      codes,
+    );
+
+    const revokedOne = await author.fetch(`/api/me/keys/${deskListed?.id}`, { method: "DELETE" });
+    check(
+      revokedOne.status === 200 &&
+        ((await revokedOne.json()) as { revoked: number }).revoked === 1 &&
+        (await keyed(deskKey, "/api/me")).status === 401 &&
+        (await keyed(laptopKey, "/api/me")).status === 200 &&
+        (await keyed(ciKey, "/api/me")).status === 200,
+      "revoking one key on the settings page stops it, and leaves the others",
+    );
+    check(
+      (await author.fetch(`/api/me/keys/${deskListed?.id}`, { method: "DELETE" })).status === 404,
+      "a key revoked already is a 404, as one of another person's is",
+    );
+    const deskGone = await dekc(["pub", "whoami"], config, atDesk);
+    check(!deskGone.ok, "the dekc whose key was revoked is refused", deskGone);
+
+    const all = await dekc(["pub", "logout", "--all"]);
+    check(
+      all.ok && all.revoked === true && all.revokedKeys === 2 && all.forgotten === true,
+      "logout --all revokes the account's two keys left, its own included, and forgets it",
+      all,
+    );
+    check(
+      (await keyed(laptopKey, "/api/me")).status === 401 &&
+        (await keyed(ciKey, "/api/me")).status === 401 &&
+        !(await dekc(["pub", "whoami"], config, asCi)).ok,
+      "after logout --all neither the machine's key nor CI's DEK_TOKEN works",
+    );
+    check(
+      ((await (await author.fetch("/api/me/keys")).json()) as { keys: unknown[] }).keys.length ===
+        0 && (await author.fetch("/settings")).status === 200,
+      "the account has no key left, and the browser's session stays signed in",
+    );
+
+    // A plain logout revokes the key it holds, and that one alone.
+    const again = await dekc(["pub", "login"], config, atDesk);
+    await author.approveDevice(String(again.code));
+    check((await dekc(["pub", "login"], config, atDesk)).ok, "the second dekc signs in again");
+    const logout = await dekc(["pub", "logout"], config, atDesk);
+    check(logout.ok && logout.revoked === true, "logout revokes the key", logout);
+    const gone = await dekc(["pub", "whoami"], config, atDesk);
+    check(!gone.ok, "after logout the CLI is signed out", gone);
+  } finally {
+    rmSync(desk, { recursive: true, force: true });
+  }
   console.log(`\nall ${step} checks passed`);
   passed = true;
 } finally {

@@ -8,6 +8,8 @@ Accepted
 
 Amends [77. Let a dek.pub person choose their handle after their first sign-in](0077-let-a-dek-pub-person-choose-their-handle-after-their-first-sign-in.md)
 
+Amended by [83. Let a dek.pub person list and revoke their CLI keys, and revoke them all with dekc pub logout --all](0083-let-a-dek-pub-person-list-and-revoke-their-cli-keys-and-revoke-them-all-with-dekc-pub-logout-all.md)
+
 ## Context
 
 A profile showed one link, to `github.com/<githubLogin>`, and only for an account made with GitHub (ADR 77). Nobody could link to their X account, their site, or the services Japanese speakers publish talks and articles on: Zenn, Qiita, note, Speaker Deck, connpass. An account made by a sign-in link and joined to GitHub later had no link at all.

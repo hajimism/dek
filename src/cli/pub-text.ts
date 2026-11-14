@@ -11,6 +11,12 @@ export function formatPub(data: PubResult): string {
         ? `open ${data.url} and enter ${data.code} to sign in, then run \`${data.next}\``
         : `signed in to ${data.server} as @${data.me.handle} (key kept in the ${data.stored === "keychain" ? "OS keychain" : "credentials file"})`;
     case "logout":
+      if (data.revokedKeys !== undefined) {
+        return [
+          `revoked ${data.revokedKeys} ${data.revokedKeys === 1 ? "key" : "keys"} of the account on ${data.server}, this one included`,
+          data.forgotten ? "forgot the key" : "no key was kept here",
+        ].join("\n");
+      }
       return [
         data.revoked
           ? `revoked the key on ${data.server}`

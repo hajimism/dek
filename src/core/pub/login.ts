@@ -1,5 +1,6 @@
+import { hostname } from "node:os";
 import { z } from "zod";
-import { CLI_CLIENT_ID, CliKey, type Me, paths } from "../../pub/protocol.ts";
+import { CLI_CLIENT_ID, CliKey, type Me, type NewCliKey, paths } from "../../pub/protocol.ts";
 import { DekError } from "../error.ts";
 import { failure, PubError, request, send, unreadable } from "./client.ts";
 import {
@@ -36,6 +37,21 @@ const DeviceCode = z.object({
 const DeviceToken = z.object({ access_token: z.string() });
 
 const DeviceError = z.object({ error: z.string(), error_description: z.string().optional() });
+
+/**
+ * A machine's name as its key is listed by on dek.pub: the host name's first label, which a person
+ * knows the machine by, and none of the domain past it, which may name a network.
+ */
+export function hostLabel(host: string): string | undefined {
+  const label = host.split(".")[0];
+  return label === undefined || label === "" ? undefined : label;
+}
+
+/** What `dekc pub login` asks a key with: this machine's name, when it has one. */
+function newKey(): NewCliKey {
+  const name = hostLabel(hostname());
+  return name === undefined ? {} : { name };
+}
 
 /** A sign-in that waits for its approval, as the CLI prints it. */
 export type Pending = { status: "pending"; url: string; code: string; expiresAt: string };
@@ -113,7 +129,13 @@ export async function awaitLogin(
         () =>
           request(
             origin,
-            { method: "POST", path: paths.cliKey, what: "an API key", bearer: token.accessToken },
+            {
+              method: "POST",
+              path: paths.cliKey,
+              what: "an API key",
+              bearer: token.accessToken,
+              json: newKey(),
+            },
             CliKey,
           ),
         giveUp,

@@ -30,7 +30,38 @@ const props = {
   handle: "demo",
   name: "Hajime Nakagawa",
   links: ["https://github.com/hajimism", "https://hajimism.dev/"],
+  keys: [] as unknown[],
 };
+
+/** Two keys, as the settings page is given them: one used an hour before NOW, one never. */
+const keys = [
+  {
+    id: "k_laptop",
+    name: "hajime-mbp",
+    createdAt: "2026-11-01T09:00:00.000Z",
+    lastUsedAt: "2026-11-13T11:00:00.000Z",
+    expiresAt: "2027-11-01T09:00:00.000Z",
+  },
+  {
+    id: "k_ci",
+    name: "dekc",
+    createdAt: "2026-10-02T09:00:00.000Z",
+    lastUsedAt: null,
+    expiresAt: "2027-10-02T09:00:00.000Z",
+  },
+];
+
+/** Answer each revoke as dek.pub does, with how many keys went; and keep what was asked. */
+function revoker() {
+  const fetch = vi.fn(async (path: string, _init?: RequestInit) =>
+    Response.json({ revoked: path === "/api/me/keys" ? keys.length : 1 }),
+  );
+  vi.stubGlobal("fetch", fetch);
+  return fetch;
+}
+
+const asked = (fetch: ReturnType<typeof revoker>) =>
+  fetch.mock.calls.map(([path, init]) => `${init?.method} ${path}`);
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -138,5 +169,70 @@ describe("SettingsPage", () => {
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(sent(fetch)).toEqual([{ path: "/api/me", method: "PATCH", body: { name: "中川 元" } }]);
     await expect.element(name).toHaveValue("中川 元");
+  });
+
+  describe("CLI keys", () => {
+    it("lists each key by its name, when it was made, last used and expires", async () => {
+      revoker();
+      await renderPage(SettingsPage, { ...props, keys });
+      const section = page.getByRole("region", { name: "CLI keys" });
+      await expect.element(section.getByText("hajime-mbp", { exact: true })).toBeInTheDocument();
+      await expect.element(section.getByText("Made Nov 1, 2026")).toBeInTheDocument();
+      await expect.element(section.getByText("Last used 1 hour ago")).toBeInTheDocument();
+      await expect.element(section.getByText("Expires Nov 1, 2027")).toBeInTheDocument();
+      await expect.element(section.getByText("Never used")).toBeInTheDocument();
+      await expect
+        .element(section.getByRole("button", { name: "Revoke hajime-mbp" }))
+        .toBeInTheDocument();
+    });
+
+    it("says how to make one when there is none, and offers nothing to revoke", async () => {
+      revoker();
+      await renderPage(SettingsPage, props);
+      const section = page.getByRole("region", { name: "CLI keys" });
+      await expect.element(section.getByText("No CLI keys.", { exact: false })).toBeInTheDocument();
+      await expect.element(section.getByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("revokes one key at once, and takes it off the list", async () => {
+      const fetch = revoker();
+      await renderPage(SettingsPage, { ...props, keys });
+      await page.getByRole("button", { name: "Revoke hajime-mbp" }).click();
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+      expect(asked(fetch)).toEqual(["DELETE /api/me/keys/k_laptop"]);
+      await expect.element(page.getByText("hajime-mbp", { exact: true })).not.toBeInTheDocument();
+      await expect.element(page.getByText("dekc", { exact: true })).toBeInTheDocument();
+    });
+
+    it("asks before it revokes them all, and sends nothing when told no", async () => {
+      const fetch = revoker();
+      await renderPage(SettingsPage, { ...props, keys });
+      await page.getByRole("button", { name: "Revoke all" }).click();
+      const dialog = page.getByRole("dialog", { name: "Revoke every CLI key?" });
+      await expect.element(dialog).toBeInTheDocument();
+      await dialog.getByRole("button", { name: "Cancel" }).click();
+      await expect.element(dialog).not.toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+      await page.getByRole("button", { name: "Revoke all" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Revoke all keys" }).click();
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+      expect(asked(fetch)).toEqual(["DELETE /api/me/keys"]);
+      await expect.element(page.getByText("No CLI keys.", { exact: false })).toBeInTheDocument();
+    });
+
+    it("keeps a key on the list when dek.pub could not revoke it, and says why", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new TypeError("offline");
+        }),
+      );
+      await renderPage(SettingsPage, { ...props, keys });
+      await page.getByRole("button", { name: "Revoke hajime-mbp" }).click();
+      await expect
+        .element(page.getByText("Couldn’t reach dek.pub", { exact: false }))
+        .toBeInTheDocument();
+      await expect.element(page.getByText("hajime-mbp", { exact: true })).toBeInTheDocument();
+    });
   });
 });

@@ -9,6 +9,7 @@ import {
   type Grant,
   MAX_VERSION_BYTES,
   type Me,
+  NewCliKey,
   NewGrant,
   NewReply,
   PROTOCOL_HEADER,
@@ -219,6 +220,9 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if (!tokens.has(token)) {
         return error(401, "unauthorized", "no session");
       }
+      if (!NewCliKey.safeParse(body ?? {}).success) {
+        return error(422, "invalid", "not a NewCliKey");
+      }
       return Response.json({ key: fake.issueKey(), me: fake.me });
     }
     // As the server does: revoking needs a key sent, not a valid one.
@@ -227,6 +231,12 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     }
     if (!signedIn(request)) {
       return error(401, "signed_out", "the key is not valid", "run `dekc pub login`");
+    }
+    // Every key the fake holds is the one account's.
+    if (method === "DELETE" && path === "/api/me/keys") {
+      const revoked = fake.keys.size;
+      fake.keys.clear();
+      return Response.json({ revoked });
     }
     if (method === "GET" && path === "/api/me") {
       return Response.json(fake.me);

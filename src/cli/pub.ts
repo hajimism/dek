@@ -33,6 +33,7 @@ import {
   Grant,
   GrantList,
   GrantRemoved,
+  KeysRevoked,
   Me,
   PROTOCOL_VERSION,
   PublishResult,
@@ -155,6 +156,9 @@ const JSON_WAIT_MS = 60 * 1000;
  */
 export async function logoutCommand(flags: FlagValues): Promise<PubResult> {
   const origin = serverOrigin(flags.server);
+  if (flags.all === true) {
+    return logoutEverywhere(origin, flags);
+  }
   const key = await readStoredKey(origin);
   let revoked = false;
   let reason: string | undefined;
@@ -185,6 +189,33 @@ export async function logoutCommand(flags: FlagValues): Promise<PubResult> {
 
 /** What revoking a key answers: whether the server knew it and took it back. */
 const Revoked = z.object({ revoked: z.boolean() });
+
+/**
+ * `dekc pub logout --all`: revoke every key of the account, with the key there is here, DEK_TOKEN
+ * or the one login kept, then forget the one kept. Unlike `logout`, it fails when the server does
+ * not revoke them, and keeps the key, to be run again.
+ */
+async function logoutEverywhere(origin: string, flags: Flags): Promise<PubResult> {
+  const key = await readKey(origin);
+  if (key === undefined) {
+    throw new DekError(`not signed in to ${origin}`, {
+      hint: `run \`${pubCommand("login", flags)}\`, then \`${pubCommand("logout --all", flags)}\`; or revoke the keys on ${origin}/settings`,
+    });
+  }
+  const answer = await request(
+    origin,
+    { method: "DELETE", path: paths.myKeys, what: "the account's API keys", key },
+    KeysRevoked,
+  );
+  const forgotten = await forgetKey(origin);
+  return {
+    action: "logout",
+    server: origin,
+    revoked: true,
+    forgotten,
+    revokedKeys: answer.revoked,
+  };
+}
 
 /** `dekc pub whoami`. */
 export async function whoamiCommand(flags: FlagValues): Promise<PubResult> {

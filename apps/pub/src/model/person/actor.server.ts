@@ -1,9 +1,10 @@
 // Who is calling: the account signed in through the browser's session, or the one an API key
 // belongs to. An account may read before its holder has chosen a handle, but nothing it does
-// as a Person, writing or making a key, gets past `currentPerson` until then (ADR 77).
+// as a Person, writing or making a key, gets past `currentPerson` until then (ADR 77). What only
+// the person themself should do, an API key cannot: `requireSessionPerson` (ADR 83).
 
 import type { Context } from "hono";
-import { API_KEY_HEADER, HANDLE_NEEDED } from "../../../../../src/pub/protocol.ts";
+import { API_KEY_HEADER, HANDLE_NEEDED, SESSION_NEEDED } from "../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../common/api-error.ts";
 import { appUrl } from "../../common/http.server.ts";
 import { checkKey } from "./api-key.server.ts";
@@ -66,4 +67,21 @@ export async function requirePerson(c: Context): Promise<Person> {
     throw new ApiError(401, "signed_out", "sign in first", "run `dekc pub login`");
   }
   return found;
+}
+
+/**
+ * The person signed in through the browser's session, for what an API key may not do: change
+ * their settings, list their keys, or revoke one other than itself. A key that leaks can then
+ * neither see the person's machines nor change who they are on dek.pub.
+ */
+export async function requireSessionPerson(c: Context): Promise<Person> {
+  if (!c.get("user") && c.req.header(API_KEY_HEADER)) {
+    throw new ApiError(
+      403,
+      SESSION_NEEDED,
+      "an API key cannot do this; it is done signed in on dek.pub",
+      `open ${appUrl("/settings")} in a browser`,
+    );
+  }
+  return requirePerson(c);
 }
