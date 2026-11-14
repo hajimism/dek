@@ -320,8 +320,10 @@ try {
   check(commentGrant.status === 201, "the owner grants the colleague comment");
   const invited = await inbox.waitFor(strangerMe.email, "shared");
   check(
-    invited.length === 1 && invited[0]?.text.includes(keyedPath(talkPath)),
-    "a new grant mails the colleague a link to the talk, with its key",
+    invited.length === 1 &&
+      invited[0]?.text.split(/\r?\n/).includes(`${server.url}${talkPath}`) &&
+      !invited[0].text.includes("key="),
+    "a new grant mails the colleague a link to the talk without its key, which their grant makes needless",
     invited,
   );
   check(
@@ -359,8 +361,13 @@ try {
   );
   const told = await inbox.waitFor(me.email, "commented on");
   check(
-    told.some((mail) => mail.text.includes("出典がほしい") && mail.text.includes(talkPath)),
-    "the owner is mailed of a new thread, with its words and a link to it",
+    told.some(
+      (mail) =>
+        mail.text.includes("出典がほしい") &&
+        mail.text.includes(`${server.url}${talkPath}#`) &&
+        !mail.text.includes("key="),
+    ),
+    "the owner is mailed of a new thread, with its words and a link to it without the key",
     told,
   );
   const element = await stranger.fetch(`/api/decks/${id}/comments`, {
@@ -399,10 +406,16 @@ try {
           slug: string;
           status: string;
           targets: Array<Record<string, unknown>>;
+          url: string;
         }>;
       }
     ).comments ?? [];
   check(listed.ok && rows.length === 2, "dekc pub comments lists both", listed);
+  check(
+    rows.every((row) => row.url === `${server.url}${talkPath}#${row.id}`),
+    "a review thread's URL is the talk's without its key, so pasting it gives the key away nowhere",
+    rows.map((row) => row.url),
+  );
   const quoteRow = rows.find((row) => row.targets.some((t) => t.kind === "quote"));
   check(
     quoteRow?.targets.some((t) => t.line !== undefined || t.found !== undefined),

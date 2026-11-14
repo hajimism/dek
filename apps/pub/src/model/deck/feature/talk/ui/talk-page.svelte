@@ -20,7 +20,7 @@
   import { profilePath } from "../../../../person/profile-path.ts";
   import { signInHref } from "../../../../person/sign-in-path.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
-  import { keyed, talkPath } from "../../../deck.ts";
+  import { keyed, talkPath, withLinkKey } from "../../../deck.ts";
   import LikeButton from "../../../like/ui/like-button.svelte";
   import PublicComments from "../../../public-comment/ui/public-comments.svelte";
   import TalkCardView from "../../../ui/talk-card.svelte";
@@ -404,6 +404,15 @@
     }
   }
 
+  // A `link` talk opened by its owner or a grant, without its key or with an old one, shows the
+  // address it is shared at, so the one copied from the address bar opens it for others too.
+  $effect(() => {
+    const address = withLinkKey(window.location.href, talk.key);
+    if (address !== window.location.href) {
+      history.replaceState(history.state, "", address);
+    }
+  });
+
   /** The sign-in page, coming back to this talk with the key it was opened by. */
   const signIn = $derived(signInHref(keyed(talkPath(talk.owner.handle, talk.slug), talk.key)));
 
@@ -480,7 +489,7 @@
     oncreate={create}
     oncanceldraft={() => (draft = null)}
     onretry={retry}
-    oncopylink={(comment) => copy(`${talk.url}#${comment.id}`, t("comment.linkCopied"))}
+    oncopylink={(comment) => copy(`${talk.canonical}#${comment.id}`, t("comment.linkCopied"))}
   />
 {/snippet}
 

@@ -41,13 +41,18 @@ The serve Worker hands out a deck's files without a token only for a `public` de
 - The manage page asks before it makes a new link and offers no Undo, since the old key is gone. The button shows only while the deck is `link`.
 - The flag and the request field are also taken on a deck that is not `link`. The deck gets a new key, which it opens by once it is `link`.
 
-**`talkHref` builds every URL a deck is shared at, and every one of them carries the key.** `talkHref(handle, deck)` is `talkPath` plus `?key=` when the deck is `link`. `talkUrl`, `deckStatus` and the talk loader use it, so these all carry the key:
+**The URLs handed out carry the key; the URLs only the people with standing read do not.** `talkHref(handle, deck)` is `talkPath` plus `?key=` when the deck is `link`. `shareUrl`, `deckStatus` and the talk loader use it, so these carry the key:
 
 - `DeckStatus.url`, which `dekc pub share`, `status` and `open` print, and `PublishResult.url`;
-- the invitation mail, comment notices and `CommentRow.url`;
-- the talk page's Share and copy-link buttons.
+- the talk page's Share button and a slide's copied link;
+- the manage page's Open talk and its link back to the talk.
 
-A comment's link is `?key=…#c_…`, and the page's own `history.replaceState` to a `#slide` keeps the query. The people given these URLs could open the talk without the key, but the URL they are given should be one they can pass on. An invitation by address keeps the key through sign-in, since `signInHref` takes the path with its query, and so does the sign-in link on the talk page.
+`talkUrl` is the bare path, for the URLs whose readers are the owner and the grantees, who open the talk without the key:
+
+- `CommentRow.url`, which `dekc pub comments --json` prints, the talk page's copied link to a review thread, and the reply and thread notice mails. An agent pastes these into commits and pull requests, often in public repositories, and the key would open the talk to whoever reads them, while it opens no review thread to anyone.
+- The invitation mail. An invitation by address leads to sign-in, as `signInHref` of the bare path, and the grant on the address opens the talk once it is verified, before or after an account is made. An invitation by handle goes to an account that already exists. A grantee by handle who is signed out in that browser gets the 404 page, with its Sign in button, as for a `private` deck.
+
+**The talk page shows the key in the address bar to whoever opened a `link` talk by standing.** When the owner or a grantee opens it at the bare path, or at an old key, the page puts the current key in the URL with `history.replaceState` (`withLinkKey`), keeping the fragment and any other query. The address they copy then opens the talk for others too. The page's own `history.replaceState` to a `#slide` keeps the query. The sign-in link on the talk page keeps the key through sign-in, since `signInHref` takes the path with its query.
 
 **The deck ID opens nothing by itself.** Anyone with a clone of the repository has it, so every route keyed by deck ID takes the key from `?key=` and passes it to `visibleDeck`: the pictures, the public comments, the likes, mute and the review-thread routes.
 
@@ -75,12 +80,15 @@ A comment's link is `?key=…#c_…`, and the page's own `history.replaceState` 
 - **A random slug in place of the readable one.** The `/@handle/slug` URL would stop naming the talk, and the owner's own links, profile and manage page would change with it.
 - **Letting the deck ID stand in for the key on the routes keyed by it.** That works only if the ID is secret, and `pub:` in `script.md` is committed by design.
 - **A cookie set when a reader first opens the talk with its key.** The page's later requests could then drop the key. But the cookie would outlive a new link in every browser that had it, and the API would depend on a cookie the CLI never holds.
+- **Putting the key on every link to a `link` talk its owner follows, such as their profile's cards.** Each place would need the key, and one left out would still put a bare path in the address bar. The talk page sets the address wherever it was opened from.
+- **Keys in review threads' links and in mail, so that any URL dek.pub gives is one to pass on.** Their readers need no key, and `dekc pub comments` hands these URLs to agents, which paste them where anyone may read them.
 - **Dropping the key once the talk becomes `private`.** The URLs given out would break every time the talk was closed for a while. A key that opens only a `link` deck gives nothing to whoever holds it while the deck is not `link`.
 
 ## Consequences
 
 - A `link` talk's address cannot be guessed. Its URL is longer, and a reader who cuts the query off gets a 404.
-- A new link breaks every link given out, in comment and invitation mails too. The people with grants still open the talk from their mail's path.
+- A new link breaks every shared URL given out. The links in comments and mail carry no key, so a new link leaves them working for the people they were for.
+- Revoking a grant on a `link` deck does not lock its grantee out: they may still hold the key from the address bar or a shared URL, until the owner makes a new link.
 - A key leaked with its URL opens the talk until the owner makes a new link. Nothing makes a key expire.
 - Whoever reads the Workers Logs, once they are on, can read the keys of the `link` talks opened.
 - `dekc pub share --new-link` is a new flag. Its docs, `llms.txt` and the command's usage name it. The JSON answers are unchanged.

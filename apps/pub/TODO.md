@@ -13,7 +13,7 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 - **Deleting an account** is done by hand on request, its decks with `deleteDeck` (ADR 82).
 - **API keys.** `logout` revokes only the key it holds. Nothing lists a person's keys or revokes the others, so a key leaked from CI works until it expires, a year after it was made.
 - **Invitations.** An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
-- **Logs.** An error a page's loader throws is logged whole by Void's error handler, and a failed query's error carries the values it was bound to: an address, a comment's text. Void has no hook to log it otherwise; `src/common/log.ts` does so for the API, the tasks after an answer, mail and Better Auth.
+- **Logs.** A failed query's error carries the values it was bound to: an address, a comment's text. `src/common/log.ts` leaves them out, but two handlers log errors whole: Void's error handler (`createErrorRenderer`'s `onError`), for a page's loader, a route not wrapped in `api()` such as `routes/[profile]/rss.ts` and `routes/sitemap.xml.ts`, and middleware; and Better Auth's adapter when a fallback join fails (`handleFallbackJoin`), which logs the join's conditions and its error, whose value is a user id.
 
 ### Terms and the law
 
@@ -60,6 +60,11 @@ Each of these is needed on staging and on production.
 
 ## Later
 
+- **Bidi and format characters in names and link labels.** `readName` and a link's label keep U+200B–200F, U+202A–202E and U+2066–2069, so a name or a label can be drawn reversed or hide part of itself.
+- **Link keys.**
+  - Revoking a grant on a `link` deck does not lock its grantee out without a new link: they keep the key from the address bar or a URL shared with them.
+  - A key survives `link` → `private` → `link`, so a URL handed out before opens again (ADR 81).
+  - `og:url` carries no key, so a link preview that follows it may open the bare path, a 404.
 - **Changing a handle.** A handle is chosen once, after the first sign-in, and cannot be changed (ADR 77). Changing one needs redirects from the old `/@handle` URLs, and a rule for when someone else may take the old one.
 - **Comments** work from end to end, but their look, their behaviour and their API are expected to change. Do not build on their current details.
   - No notices but mail: no unread marker, nothing in the app. `dekc pub comments` lists review threads only, and no mail tells the owner of a public comment.

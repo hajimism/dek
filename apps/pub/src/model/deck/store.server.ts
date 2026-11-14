@@ -267,8 +267,20 @@ export async function ownerHandle(c: Context, deck: Deck): Promise<string> {
   return (await personById(c, deck.ownerId))?.handle ?? deck.ownerId;
 }
 
-/** The deck's absolute URL to share, with the key a `link` deck opens by: for the CLI and mail. */
+/**
+ * The deck's absolute URL with no key, for those it is shared with, who open it by their grant or
+ * as its owner: review threads' links and the mail about them, and invitations. A key in these
+ * would open nothing more to them, and would go wherever they are pasted.
+ */
 export async function talkUrl(c: Context, deck: Deck): Promise<string> {
+  return appUrl(talkPath(await ownerHandle(c, deck), deck.slug));
+}
+
+/**
+ * The deck's absolute URL to hand out, with the key a `link` deck opens by, as `DeckStatus.url`
+ * gives it too: for `PublishResult.url`.
+ */
+export async function shareUrl(c: Context, deck: Deck): Promise<string> {
   return appUrl(talkHref(await ownerHandle(c, deck), deck));
 }
 
