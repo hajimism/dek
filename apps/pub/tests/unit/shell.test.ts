@@ -56,4 +56,3 @@ describe("applyAppHeaders", () => {
     expect(policy).not.toContain("fullscreen");
   });
 });
-
