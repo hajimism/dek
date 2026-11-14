@@ -12,7 +12,6 @@
   import Switch from "../../../../../common/ui/switch.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
-  import { talkPath } from "../../../deck.ts";
   import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import type { CurrentVersion } from "../type.ts";
@@ -32,7 +31,11 @@
   let confirmNewLink = $state(false);
   let visibilityControl: ReturnType<typeof RadioList> | undefined = $state();
   let active = $state("overview");
-  const path = $derived(talkPath(status.owner, status.slug));
+  /** The talk as it is shared: a `link` one's path carries its key, so its address can be passed on. */
+  const path = $derived.by(() => {
+    const url = new URL(status.url);
+    return url.pathname + url.search;
+  });
 
   const sections = [
     { id: "overview", label: "manage.overview" },

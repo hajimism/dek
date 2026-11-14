@@ -104,9 +104,23 @@ describe("ManagePage's link", () => {
     await expect
       .element(page.getByLabelText("Talk URL", { exact: true }))
       .toHaveTextContent(renewed);
+    await expect
+      .element(page.getByRole("link", { name: "Open talk" }))
+      .toHaveAttribute("href", "/@demo/why-dek?key=qrstuvwxyz0123456789abcdef");
     expect(fetch.mock.calls.map(([path, init]) => [path, init?.method, init?.body])).toEqual([
       [`/api/decks/${status.id}`, "PATCH", JSON.stringify({ newLink: true })],
     ]);
+  });
+
+  it("opens the talk, and goes back to it, at the URL it is shared at", async () => {
+    await renderPage(ManagePage, { ...props, status: linked });
+    const shared = "/@demo/why-dek?key=0123456789abcdefghijklmnop";
+    await expect
+      .element(page.getByRole("link", { name: "Open talk" }))
+      .toHaveAttribute("href", shared);
+    await expect
+      .element(page.getByRole("link", { name: "Back to the talk" }))
+      .toHaveAttribute("href", shared);
   });
 
   it("offers no new link on a talk that is not link only", async () => {

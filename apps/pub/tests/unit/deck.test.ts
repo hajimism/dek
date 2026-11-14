@@ -13,7 +13,14 @@ import {
   standingOn,
   versionStanding,
 } from "../../src/model/deck/access.ts";
-import { keyed, sharePatch, talkHref, talkNamed, talkPath } from "../../src/model/deck/deck.ts";
+import {
+  keyed,
+  sharePatch,
+  talkHref,
+  talkNamed,
+  talkPath,
+  withLinkKey,
+} from "../../src/model/deck/deck.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
 import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
 import { sitemapOf } from "../../src/model/deck/feature/sitemap/sitemap.ts";
@@ -400,6 +407,21 @@ describe("talk paths", () => {
       `/api/decks/d_1/comments?status=all&key=${KEY}`,
     );
     expect(keyed("/i/d_1/2/cover", null)).toBe("/i/d_1/2/cover");
+  });
+
+  it("puts a link talk's key into the address it was opened at, keeping the rest", () => {
+    expect(withLinkKey("https://dek.pub/@hajimism/intro#s-2", KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?key=${KEY}#s-2`,
+    );
+    expect(withLinkKey("https://dek.pub/@hajimism/intro?lang=ja&key=old#c_1", KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?lang=ja&key=${KEY}#c_1`,
+    );
+    expect(withLinkKey(`https://dek.pub/@hajimism/intro?key=${KEY}`, KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?key=${KEY}`,
+    );
+    expect(withLinkKey("https://dek.pub/@hajimism/intro#s-2", null)).toBe(
+      "https://dek.pub/@hajimism/intro#s-2",
+    );
   });
 
   it("reads a talk named as @handle/slug, and nothing else", () => {

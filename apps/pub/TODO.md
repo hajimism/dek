@@ -61,6 +61,10 @@ Each of these is needed on staging and on production.
 ## Later
 
 - **Bidi and format characters in names and link labels.** `readName` and a link's label keep U+200B–200F, U+202A–202E and U+2066–2069, so a name or a label can be drawn reversed or hide part of itself.
+- **Link keys.**
+  - Revoking a grant on a `link` deck does not lock its grantee out without a new link: they keep the key from the address bar or a URL shared with them.
+  - A key survives `link` → `private` → `link`, so a URL handed out before opens again (ADR 81).
+  - `og:url` carries no key, so a link preview that follows it may open the bare path, a 404.
 - **Changing a handle.** A handle is chosen once, after the first sign-in, and cannot be changed (ADR 77). Changing one needs redirects from the old `/@handle` URLs, and a rule for when someone else may take the old one.
 - **Comments** work from end to end, but their look, their behaviour and their API are expected to change. Do not build on their current details.
   - No notices but mail: no unread marker, nothing in the app. `dekc pub comments` lists review threads only, and no mail tells the owner of a public comment.
