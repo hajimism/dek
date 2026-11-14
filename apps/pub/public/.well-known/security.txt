@@ -1,0 +1,6 @@
+# dek.pub and dek take reports through GitHub's private advisories; SECURITY.md says what is in scope.
+Contact: https://github.com/hajimism/dek/security/advisories/new
+Expires: 2027-11-01T00:00:00Z
+Policy: https://github.com/hajimism/dek/blob/main/SECURITY.md
+Preferred-Languages: en, ja
+Canonical: https://dek.pub/.well-known/security.txt

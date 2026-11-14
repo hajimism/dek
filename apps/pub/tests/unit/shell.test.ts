@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { applyAppHeaders } from "../../src/shell/headers.ts";
 import { langHref } from "../../src/shell/lang-link.ts";
+import { robotsFor } from "../../src/shell/robots.ts";
 import { Theme } from "../../src/shell/type.ts";
 
 describe("langHref", () => {
@@ -57,3 +59,41 @@ describe("applyAppHeaders", () => {
   });
 });
 
+describe("robotsFor", () => {
+  it("lets crawlers read dek.pub but its API", () => {
+    expect(robotsFor("https://dek.pub")).toBe("User-agent: *\nDisallow: /api/\n");
+    expect(robotsFor("https://dek.pub/")).toBe("User-agent: *\nDisallow: /api/\n");
+  });
+
+  it("keeps every crawler out of any other origin, such as staging or a machine's", () => {
+    expect(robotsFor("https://staging.dek.pub")).toBe("User-agent: *\nDisallow: /\n");
+    expect(robotsFor("http://localhost:5173")).toBe("User-agent: *\nDisallow: /\n");
+  });
+});
+
+describe("security.txt", () => {
+  const text = readFileSync(
+    new URL("../../public/.well-known/security.txt", import.meta.url),
+    "utf8",
+  );
+  const field = (name: string) =>
+    text
+      .split("\n")
+      .filter((line) => line.startsWith(`${name}: `))
+      .map((line) => line.slice(name.length + 2));
+
+  it("says where to report, in which languages, and where it lives (RFC 9116)", () => {
+    expect(field("Contact")).toEqual(["https://github.com/hajimism/dek/security/advisories/new"]);
+    expect(field("Policy")).toEqual(["https://github.com/hajimism/dek/blob/main/SECURITY.md"]);
+    expect(field("Canonical")).toEqual(["https://dek.pub/.well-known/security.txt"]);
+    expect(field("Preferred-Languages")).toEqual(["en, ja"]);
+  });
+
+  it("has a month left before it expires, and no more than a year: renew it when this fails", () => {
+    const [expires] = field("Expires");
+    const left = Date.parse(expires ?? "") - Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    expect(left).toBeGreaterThan(30 * day);
+    expect(left).toBeLessThanOrEqual(366 * day);
+  });
+});
