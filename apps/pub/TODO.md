@@ -74,13 +74,14 @@ The comment feature is planned to grow into two: public comments and a like on t
 
 - **Mail.**
   - The sending domain, `mail.dek.pub` in `void.config.ts`, is set up with `void deploy`, which needs a Cloudflare token with Email Routing Edit and Email Sending Edit.
-  - SPF, DKIM and DMARC records for it, checked in a received mail's headers.
+  - SPF and DKIM records for it, which `void deploy` writes, checked in a received mail's headers. DMARC is declared in `infra/alchemy.run.ts`; the sending subdomain is quarantined, not rejected, until those headers are checked.
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing.
   - Asking for sign-in links is held only by Better Auth's default limit, 5 a minute from one client; nothing limits how many addresses are tried.
 - **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset.
 - **Domains.**
   - `dek.pub` and `dekusercontent.com` are not registered.
-  - `serve/wrangler.jsonc` has no routes for `d-*.dekusercontent.com`, and there is no wildcard DNS.
+  - The serve Worker's route (`serve/wrangler.jsonc`) and the zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
+  - Staging has no hostnames, so `infra/site.ts` refuses any stage but `prod`.
   - The Public Suffix List request is not sent.
 - **Deploying.**
   - There is no staging configuration (ADR 43), no HTTPS staging server for the CLI to talk to (ADR 48), and no deploy workflow. CI only checks, tests and builds.

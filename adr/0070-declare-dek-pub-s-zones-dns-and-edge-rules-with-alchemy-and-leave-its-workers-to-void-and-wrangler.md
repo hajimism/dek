@@ -35,23 +35,38 @@ Made by hand in the dashboard, none of this can be reviewed, repeated for stagin
 | The serve Worker, its bucket binding, its routes | `serve/wrangler.jsonc`, `wrangler secret put` | `wrangler deploy` |
 | Zones, DNS records, zone settings, rulesets | `apps/pub/infra/alchemy.run.ts` | `alchemy deploy` |
 
-The serve Worker's route moves into `wrangler.jsonc` as `*.dekusercontent.com/*`, since a route pattern takes a wildcard only at the start of the host; the Worker already answers 404 to any host that is not `d-<id>`. Alchemy declares the proxied record that route needs. The records `void deploy` writes for the mail domain are left to it; which those are is read from the account after the first deploy, and Alchemy declares only the rest, DMARC at least.
+The serve Worker's route moves into `wrangler.jsonc` as `*.dekusercontent.com/*`, with `workers_dev` off, since a route pattern takes a wildcard only at the start of the host; the Worker already answers 404 to any host that is not `d-<id>`. The records `void deploy` writes for `mail.dek.pub`, its SPF and DKIM, are left to it.
+
+**What the program declares,** for each of `dek.pub` and `dekusercontent.com`:
+
+- the zone, adopted and retained
+- `always_use_https` on, and `min_tls_version` 1.2
+- at the apex, `v=spf1 -all`, since neither domain sends mail itself
+- `_dmarc`: `v=DMARC1; p=reject; sp=quarantine`. The apex rejects what fails. A subdomain with no policy of its own, the sending one included, is quarantined rather than lost until a received mail's headers show its SPF and DKIM pass
+
+and for `dekusercontent.com`, the record the serve Worker's route needs: `*` as a proxied `AAAA` to `100::`, an address that leads nowhere but the proxy. No rulesets yet: whether rate limits live at the edge is an open question.
+
+The names each stage uses are in `infra/site.ts`, plain data apart from the program, and a test holds them to `env.ts`'s `APP_ORIGIN` and `DECK_ORIGIN` and to the serve Worker's route and `APP_ORIGIN`.
 
 **Registering a domain stays by hand.** A purchase is not something a deploy should do. Alchemy takes each zone over with `adopt(true)` once it exists, and retains it: destroying the stack never deletes a zone.
 
-**`apps/pub/infra` is a workspace member,** private and AGPL-3.0 like the rest of `apps/pub`, with one file, `alchemy.run.ts`, and `alchemy`, `@alchemy.run/cloudflare`, `effect` and `@effect/platform-bun` pinned exactly. Nothing else in the repository imports from it, and it imports nothing from `apps/pub/src`, so Effect stays out of the app and the CLI. It starts on `2.0.0-beta.85`, and moves only by a Dependabot pull request.
+**`apps/pub/infra` is a workspace member,** private and AGPL-3.0 like the rest of `apps/pub`. It holds `alchemy.run.ts`, `site.ts` and its test, and a `tsconfig.json`. `alchemy` and `@alchemy.run/cloudflare` 2.0.0-beta.85, and `effect`, `@effect/platform-bun` and `@effect/platform-node` 4.1.2, are pinned exactly. The CLI refuses to start without `@effect/platform-node`; Alchemy's other optional peers, Vite and `ws`, are not needed. Nothing else in the repository imports from it, and it imports nothing from `apps/pub/src`, so Effect stays out of the app and the CLI. Versions move only by a Dependabot pull request.
 
-**One program, two stages: `prod` and `staging`.** The stage chooses the hostnames; the staging names are settled with the staging configuration ADR 43 asks for. Each stage is deployed with its own profile, so the account each reaches is named where it is deployed.
+**Alchemy's telemetry is off.** It sends OpenTelemetry traces to `otel.alchemy.run` by default: its version, the OS, the CPU count and memory, whether it runs in CI. Every `alchemy` run in `package.json`'s scripts and in `infra.yml` sets `DO_NOT_TRACK=1`.
+
+**One program, a stage for each site.** The stage chooses the names. `prod` is the only one named; `site.ts` refuses `staging` until its hostnames are settled with the staging configuration ADR 43 asks for, and refuses any other stage, such as Alchemy's default `dev_$USER`, outright. Each stage is deployed with its own profile, so the account each reaches is named where it is deployed.
 
 **State is kept in the account, with `Cloudflare.state()`:** a state Worker with a Durable Object, its token and encryption key in the account's Secrets Store. It is made once, by hand, with `alchemy state bootstrap`; a CI run that finds none fails rather than making one.
 
-**CI runs Alchemy in its own workflow, `infra.yml`, as `apps/pub/infra` changes:**
+**CI checks the program on every pull request, and runs it in its own workflow, `infra.yml`:**
 
-- On a pull request from this repository, `alchemy plan --stage prod`, with a read-only token, so the diff is part of the review. A fork's pull request gets no plan, since it gets no secrets.
-- Deploying is `alchemy deploy --stage <stage>` from `main`, started by hand (`workflow_dispatch`), in a GitHub environment that holds the deploy token and asks for an approval for `prod`.
-- Once a week, `alchemy drift --stage prod`; exit 2, an edit made outside the program, fails the run.
+- The `pub` job in `ci.yml` type-checks `apps/pub/infra` and runs its test. Neither needs an account.
+- On a pull request from this repository that touches `apps/pub/infra`, `bun.lock` or the workflow, `alchemy plan --stage prod` with `CLOUDFLARE_PLAN_TOKEN`, so the diff is part of the review. A fork's pull request gets no plan, since it gets no secrets.
+- Deploying is `alchemy deploy --stage prod --yes` from `main`, started by hand (`workflow_dispatch`), in the `cloudflare-prod` environment, which holds `CLOUDFLARE_DEPLOY_TOKEN` and asks for an approval.
+- Every Monday, `alchemy drift --stage prod`; exit 2, an edit made outside the program, fails the run.
+- Every job waits for the repository variable `CLOUDFLARE_ACCOUNT_ID`, so the workflow does nothing until the account exists.
 
-The tokens are account-owned and hold only the permission groups these commands need, found on the first run and written into the workflow's comments.
+The tokens are account-owned and hold only the permission groups these commands need, found on the first run.
 
 **What was not chosen:**
 
@@ -66,5 +81,6 @@ The tokens are account-owned and hold only the permission groups these commands 
 - Adding a record, a setting or a rule edits `alchemy.run.ts` only; the Workers' config files do not change for it.
 - The repository takes on a beta that changes often, and Effect, in one workspace member. A version that changes a plan unexpectedly is held back in its Dependabot pull request; if Alchemy stops being kept up, the stack moves to Terraform.
 - The account gains Alchemy's state Worker, on a `workers.dev` subdomain, and a Secrets Store.
-- `knip`, `biome ci` and the typecheck take in `apps/pub/infra`; whether Alchemy's peer dependencies (Vite, `ws`, `@effect/platform-node`) need to be installed there is found when it is added.
-- The wildcard record and the mail records listed as missing for dek.pub are made by this program, not by hand; a deploy workflow for the Workers is still to come.
+- `knip` takes in `apps/pub/infra` as a workspace. Biome leaves it out, as it does `apps/pub/serve`.
+- Nothing here has run against an account. Which permission groups the tokens need, and whether a plan works with a token that only reads, are found when the account exists.
+- The wildcard record and DMARC are made by this program, not by hand; a deploy workflow for the Workers is still to come.

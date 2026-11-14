@@ -52,6 +52,11 @@
       "ignoreDependencies": [
         "esbuild"
       ]
+    },
+    "apps/pub/infra": {
+      "entry": [
+        "alchemy.run.ts"
+      ]
     }
   }
 }

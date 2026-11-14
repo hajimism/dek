@@ -13,6 +13,7 @@ The dek.pub server: a Void app (Svelte 5, on Cloudflare Workers) and, in `serve/
 - `tests/unit/`: one file for each model and for `common` and `shell`, plus `boundaries.test.ts`; `tests/browser/`: components and the browser-side classes.
 - `db/schema.ts`: dek.pub's tables. After a change, run `bun run db:generate` and commit the SQL in `db/migrations/`.
 - `serve/`: the serve Worker, a plain Worker deployed with wrangler.
+- `infra/`: `alchemy.run.ts`, the zones, zone settings and DNS records no deploy command writes, applied with Alchemy (ADR 70). It never declares what `void deploy` or `wrangler deploy` writes, and nothing else imports from it.
 
 ## Rules
 

@@ -7,6 +7,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-30",
   "r2_buckets": [{ "binding": "STORAGE", "bucket_name": "dek-pub" }],
+  // Every host under the zone; the Worker answers 404 to any that is not d-<id>. The proxied
+  // wildcard record the route needs is declared in ../infra/alchemy.run.ts (ADR 70).
+  "routes": [{ "pattern": "*.dekusercontent.com/*", "zone_name": "dekusercontent.com" }],
+  "workers_dev": false,
   "vars": { "APP_ORIGIN": "https://dek.pub" }
   // SERVE_TOKEN_SECRET is a secret: `wrangler secret put SERVE_TOKEN_SECRET`.
 }
