@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createDb, sql } from "void/db";
 import { docsUrl } from "../../src/common/docs.ts";
 import {
   formatDate,
@@ -8,6 +9,7 @@ import {
   slideCount,
   translate,
 } from "../../src/common/i18n.ts";
+import { log } from "../../src/common/log.ts";
 import { xmlText } from "../../src/common/xml.ts";
 
 describe("i18n", () => {
@@ -67,5 +69,53 @@ describe("xmlText", () => {
       "abcd &amp; &lt;e&gt; &quot;f&quot; &apos;g&apos;\tok",
     );
     expect(xmlText("台本 😀")).toBe("台本 😀");
+  });
+});
+
+describe("log", () => {
+  // D1 as Void hands it to Drizzle, failing every statement as D1 does.
+  function failingD1(error: Error) {
+    const statement = {
+      bind: () => statement,
+      run: () => Promise.reject(error),
+      all: () => Promise.reject(error),
+      raw: () => Promise.reject(error),
+    };
+    return { withSession: () => ({ prepare: () => statement }) };
+  }
+
+  function logged(error: unknown): string {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      log("error", "an API request failed", error);
+      return JSON.stringify(spy.mock.calls);
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it("logs a failed query without the values it was bound to", async () => {
+    const d1 = new Error("D1_ERROR: UNIQUE constraint failed: user.email: SQLITE_CONSTRAINT");
+    const error: unknown = await createDb(failingD1(d1) as never)
+      .run(sql`insert into user (email) values (${"ada@example.com"})`)
+      .catch((thrown: unknown) => thrown);
+    // Drizzle's own message, and the stack it heads, carry the address.
+    expect(String((error as Error).stack)).toContain("ada@example.com");
+
+    const line = logged(error);
+    expect(line).not.toContain("ada@example.com");
+    expect(line).toContain("an API request failed");
+    expect(line).toContain("DrizzleQueryError");
+    expect(line).toContain("insert into user (email) values (?)");
+    expect(line).toContain("UNIQUE constraint failed: user.email: SQLITE_CONSTRAINT");
+    expect(line).toContain("at D1PreparedQuery.queryWithCache");
+  });
+
+  it("logs any other error by its name, message, stack and cause", () => {
+    const line = logged(new TypeError("no deck", { cause: new RangeError("version 0") }));
+    for (const part of ["TypeError", "no deck", "RangeError", "version 0", "common.test.ts"]) {
+      expect(line).toContain(part);
+    }
+    expect(logged("a string")).toContain("a string");
   });
 });

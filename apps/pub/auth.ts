@@ -7,6 +7,7 @@ import { apiKey } from "@better-auth/api-key";
 import { bearer, deviceAuthorization, magicLink } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
+import { log } from "./src/common/log.ts";
 import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
 import { claimOnSignIn } from "./src/model/person/feature/sign-in/claim.server.ts";
 import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
@@ -28,11 +29,21 @@ export default defineAuth(({ defaults, env }) => {
   return {
     ...defaults,
     emailAndPassword: { enabled: devLogin },
+    // Better Auth logs the errors its queries throw, which carry the values they were bound to.
+    logger: { log: (level, message, ...args) => log(level, `Better Auth: ${message}`, ...args) },
     // Mail goes out after the answer, so how long a request for a link takes says nothing of
-    // whether the address may have one.
+    // whether the address may have one. A task that fails is logged here, not left to the
+    // runtime, which would log its error whole.
     advanced: {
       ...defaults.advanced,
-      backgroundTasks: { handler: (task) => (keepAlive ? keepAlive(task) : undefined) },
+      backgroundTasks: {
+        handler: (task) => {
+          const settled = task.catch((error: unknown) =>
+            log("error", "Better Auth: a background task failed", error),
+          );
+          keepAlive?.(settled);
+        },
+      },
     },
     socialProviders: {
       ...defaults.socialProviders,
