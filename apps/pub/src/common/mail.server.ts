@@ -3,6 +3,7 @@
 // either way, so it never fails the request that sent it.
 
 import { sendEmail } from "void/email";
+import { log } from "./log.ts";
 import type { Mail } from "./mail.ts";
 
 /** Send one mail from void.config.ts's sender; true once the provider has taken it. */
@@ -20,7 +21,7 @@ export async function sendMail(mail: Mail): Promise<boolean> {
       console.error(`a mail was not sent: ${error.code} ${error.message}`);
     }
   } catch (error) {
-    console.error("a mail was not sent", error);
+    log("error", "a mail was not sent", error);
   }
   return false;
 }
