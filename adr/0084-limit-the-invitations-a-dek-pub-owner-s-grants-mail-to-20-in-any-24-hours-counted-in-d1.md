@@ -30,7 +30,7 @@ Better Auth's rate limits keep their counts in memory. On Workers each isolate c
 1. It deletes the inviter's rows that have left the window.
 2. It runs `insert into invitations select … where (select count(*) … in the window) < 20`.
 
-The count and the insert are one statement, so requests that arrive together, on any isolate, cannot pass the limit together. When the insert writes no row, nothing is made and nothing is mailed. A grant that a request racing with it made first still spends the invitation, which errs on the side of sending less.
+The count and the insert are one statement, so requests that arrive together, on any isolate, cannot pass the limit together. When the insert writes no row, nothing is made and nothing is mailed. Two requests for the same grant at once can both find no grant: both take an invitation, both mail, and the person gets two. Each mail took an invitation of its own, so the count still equals the mail sent.
 
 **Past the limit the answer is a 429, `invitations_exhausted`:**
 
@@ -57,7 +57,7 @@ The count and the insert are one statement, so requests that arrive together, on
 
 ## Consequences
 
-- No one person can make dek.pub send more than 20 invitations in a day, so the mail an invited person can send through it is bounded.
+- No one account can make dek.pub send more than 20 invitations in a day. One person can send more: a grant by address lets that address make an account (ADR 79), so they can grant to addresses of their own, and each account made from one has 20 a day of its own. The list of what dek.pub lacks names it under Quotas.
 - An owner who shares a deck with more than 20 people in a day has to wait for the rest. The answer says until when, and changes to grants already made still work.
 - `invitations` is the first table keyed by a person that a deck's deletion leaves alone. Deleting an account, still done by hand, has to delete its rows by `inviter_id` too.
 - The manage page now shows the hint of every error the sharing form is answered with, so `no_such_person`'s advice to share by address shows too.
