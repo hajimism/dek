@@ -6,6 +6,7 @@
 // has no handle until its holder chooses one.
 
 import { apiKey } from "@better-auth/api-key";
+import { APIError } from "better-auth/api";
 import { bearer, deviceAuthorization, magicLink } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
@@ -98,14 +99,16 @@ export default defineAuth(({ defaults, env }) => {
         clientId: String(env.AUTH_GITHUB_CLIENT_ID),
         clientSecret: String(env.AUTH_GITHUB_CLIENT_SECRET),
         // The login is kept as GitHub spells it, for the profile's first link and to suggest a handle;
-        // the handle itself the person chooses after (ADR 77).
+        // the handle itself the person chooses after (ADR 77). Better Auth maps the profile only
+        // when it makes the account, so a login GitHub renames later stays as it was.
         mapProfileToUser: (profile: { login: string }) => ({ githubLogin: profile.login }),
       },
     },
     user: {
       // Every way of making an account passes here first, and GitHub's carries the profile, login
-      // and all, which the user record does not yet hold. Signing in, and joining GitHub to an
-      // account, are never refused. Better Auth sends a browser back with `?error=not_invited`.
+      // and all. An account whose login is not its profile's is refused like one not invited, so
+      // a sign-up's body cannot name one (ADR 80). Signing in, and joining GitHub to an account,
+      // are never refused. Better Auth sends a browser back with `?error=not_invited`.
       validateUserInfo: async (data) => {
         if (data.source.action !== "create-user") {
           return;
@@ -117,9 +120,11 @@ export default defineAuth(({ defaults, env }) => {
       },
       additionalFields: {
         // Null until the person chooses it on /welcome, which writes it once; no API of Better
-        // Auth's may set either.
+        // Auth's may set it.
         handle: { type: "string", required: false, unique: true, input: false },
-        githubLogin: { type: "string", required: false, input: false },
+        // Taken as input, since Better Auth drops every other field `mapProfileToUser` gives; only
+        // GitHub's profile writes it, as `validateUserInfo` and `user.update.before` hold (ADR 80).
+        githubLogin: { type: "string", required: false, input: true },
       },
     },
     databaseHooks: {
@@ -137,6 +142,18 @@ export default defineAuth(({ defaults, env }) => {
             seedLinks(user).catch((error: unknown) =>
               log("error", "the links a new account starts with were not written", error),
             ),
+        },
+        update: {
+          // No update through Better Auth writes the GitHub login: update-user, which would take one
+          // from a request, answers none, and what the server updates through `auth.api` passes here.
+          before: async (user: Record<string, unknown>) => {
+            if (user.githubLogin !== undefined) {
+              throw new APIError("FORBIDDEN", {
+                code: "github_login_fixed",
+                message: "The GitHub login is GitHub's to give",
+              });
+            }
+          },
         },
       },
       session: {

@@ -44,10 +44,18 @@ import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
-// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: anyone may join,
-// no grants are claimed, no mail goes out, and the links an account starts with are only noted.
+// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: who may join is
+// asked of a stand-in that notes the question, no grants are claimed, no mail goes out, and the
+// links an account starts with are only noted.
+const invitation = vi.hoisted(() => ({
+  asked: [] as unknown[],
+  invited: true,
+}));
 vi.mock("../../src/model/person/feature/sign-in/invitation.server.ts", () => ({
-  mayMakeAccount: async () => true,
+  mayMakeAccount: async (newcomer: unknown) => {
+    invitation.asked.push(newcomer);
+    return invitation.invited;
+  },
 }));
 vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
   claimOnSignIn: async () => {},
@@ -369,7 +377,12 @@ describe("readNewcomer", () => {
   it("reads who Better Auth is about to make an account for, with the login of a GitHub profile", () => {
     expect(
       readNewcomer({
-        user: { email: "o@example.com", emailVerified: true, name: "Octo" },
+        user: {
+          email: "o@example.com",
+          emailVerified: true,
+          name: "Octo",
+          githubLogin: "Octo-Cat",
+        },
         source: {
           method: "oauth",
           action: "create-user",
@@ -403,6 +416,21 @@ describe("readNewcomer", () => {
     expect(readNewcomer({ user: {}, source: { method: "oauth" } })).toBeNull();
     expect(readNewcomer(null)).toBeNull();
     expect(error).toHaveBeenCalledTimes(2);
+    error.mockRestore();
+  });
+
+  it("refuses an account to be made with a login that is not its GitHub profile's", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const github = { providerId: "github", profile: { login: "Octo-Cat" } };
+    const user = { email: "o@example.com", emailVerified: true };
+    const named = (githubLogin: string | null, oauth?: object) =>
+      readNewcomer({ user: { ...user, githubLogin }, source: { method: "oauth", oauth } });
+    expect(named("Octo-Cat", { providerId: "github" })).toBeNull();
+    expect(named("octo-dog", github)).toBeNull();
+    expect(named(null, github)).toBeNull();
+    expect(named("Octo-Cat", { providerId: "google", profile: { login: "Octo-Cat" } })).toBeNull();
+    expect(named("Octo-Cat")).toBeNull();
+    expect(error).toHaveBeenCalledTimes(5);
     error.mockRestore();
   });
 });
@@ -688,13 +716,20 @@ describe("auth.ts, through Better Auth", () => {
       .join("; ");
   }
 
-  /** The GitHub callback's answer, after the sign-in it ends was started. */
-  async function signInWithGitHub(auth: ReturnType<typeof makeAuth>["auth"]): Promise<Response> {
+  /** The GitHub callback's answer, after the sign-in it ends was started as `/signin` starts it. */
+  async function signInWithGitHub(
+    auth: ReturnType<typeof makeAuth>["auth"],
+    next = "/",
+  ): Promise<Response> {
     const start = await auth.handler(
       new Request(`${origin}/api/auth/sign-in/social`, {
         method: "POST",
         headers: { "content-type": "application/json", origin },
-        body: JSON.stringify({ provider: "github", callbackURL: "/" }),
+        body: JSON.stringify({
+          provider: "github",
+          callbackURL: next,
+          errorCallbackURL: signInHref(next),
+        }),
       }),
     );
     const { url } = (await start.json()) as { url: string };
@@ -710,6 +745,89 @@ describe("auth.ts, through Better Auth", () => {
     vi.unstubAllGlobals();
     seeding.seeded.length = 0;
     seeding.seed = async () => {};
+    invitation.asked.length = 0;
+    invitation.invited = true;
+  });
+
+  it("sends a GitHub sign-up the invitation list refuses back to /signin, and makes nothing", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    invitation.invited = false;
+    const callback = await signInWithGitHub(auth, "/@sato/talk");
+    expect(callback.status).toBe(302);
+    const location = new URL(String(callback.headers.get("location")), origin);
+    expect(location.pathname).toBe("/signin");
+    expect(location.searchParams.get("next")).toBe("/@sato/talk");
+    expect(location.searchParams.get("error")).toBe(NOT_INVITED);
+    expect(invitation.asked).toEqual([
+      { email: "octo@example.com", emailVerified: true, githubLogin: "Octo-Cat" },
+    ]);
+    expect(db.user).toEqual([]);
+    expect(db.account).toEqual([]);
+    expect(db.session).toEqual([]);
+    expect(seeding.seeded).toEqual([]);
+  });
+
+  it("keeps the login of an account made with GitHub, and starts its links from it", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    expect((await signInWithGitHub(auth)).headers.get("location")).toBe("/");
+    expect(db.user).toMatchObject([{ email: "octo@example.com", githubLogin: "Octo-Cat" }]);
+    expect(seeding.seeded).toMatchObject([{ githubLogin: "Octo-Cat" }]);
+  });
+
+  it("signs the same account in with GitHub again", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    await signInWithGitHub(auth);
+    expect((await signInWithGitHub(auth)).headers.get("location")).toBe("/");
+    expect(db.user).toMatchObject([{ githubLogin: "Octo-Cat" }]);
+    expect(db.session).toHaveLength(2);
+    expect(seeding.seeded).toHaveLength(1);
+  });
+
+  it("takes no login from a sign-up's body", async () => {
+    const { auth, db } = makeAuth();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const signUp = (fields: object) =>
+      auth.handler(
+        new Request(`${origin}/api/auth/sign-up/email`, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin },
+          body: JSON.stringify({
+            email: "sato@example.com",
+            password: "a-long-password",
+            ...fields,
+          }),
+        }),
+      );
+    const named = await signUp({ name: "Sato", githubLogin: "Octo-Cat" });
+    expect(named.status).toBe(403);
+    expect(await named.json()).toMatchObject({ code: NOT_INVITED });
+    expect(db.user).toEqual([]);
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
+    expect((await signUp({ name: "Sato" })).ok).toBe(true);
+    expect(db.user.map((user) => user.githubLogin ?? null)).toEqual([null]);
+  });
+
+  // update-user answers no request (below), but the server may still call Better Auth to update.
+  it("lets no update on the server through Better Auth change the login", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    const headers = new Headers({ cookie: cookiesOf(await signInWithGitHub(auth)) });
+    const fixed = { statusCode: 403, body: { code: "github_login_fixed" } };
+    await expect(
+      auth.api.updateUser({ headers, body: { name: "Octo", githubLogin: "someone-else" } }),
+    ).rejects.toMatchObject(fixed);
+    const { internalAdapter } = await auth.$context;
+    const id = String(db.user[0]?.id);
+    await expect(
+      internalAdapter.updateUser(id, { githubLogin: "someone-else" }),
+    ).rejects.toMatchObject(fixed);
+    expect(db.user).toMatchObject([{ name: "Octo-Cat", githubLogin: "Octo-Cat" }]);
+    await auth.api.updateUser({ headers, body: { name: "Octo" } });
+    expect(db.user).toMatchObject([{ name: "Octo", githubLogin: "Octo-Cat" }]);
   });
 
   it("has no update-user, so a name and an image go only through dek.pub's own API", async () => {
