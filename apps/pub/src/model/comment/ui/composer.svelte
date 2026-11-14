@@ -2,6 +2,7 @@
   import type { ThreadScope } from "../../../../../../src/pub/protocol.ts";
   import Button from "../../../common/ui/button.svelte";
   import { useApp } from "../../../shell/use-app.ts";
+  import { dropDraft, keepDraft, readDraft } from "../drafts.ts";
   import type { ReplyInput } from "../type.ts";
 
   let {
@@ -10,6 +11,7 @@
     submitLabel,
     compact = false,
     autofocus = false,
+    draftKey,
     oncancel,
     onsubmit,
   }: {
@@ -19,6 +21,8 @@
     submitLabel?: string;
     compact?: boolean;
     autofocus?: boolean;
+    /** Where the unsent text is kept across a reload; with none, it is not kept. */
+    draftKey?: string;
     oncancel?: () => void;
     onsubmit: (input: ReplyInput) => Promise<boolean>;
   } = $props();
@@ -30,6 +34,14 @@
   let sending = $state(false);
   let field: HTMLTextAreaElement | undefined = $state();
   const uid = $props.id();
+
+  // Read after mounting: the server has no storage, and the page it rendered has an empty field.
+  $effect(() => {
+    const kept = draftKey ? readDraft(draftKey) : "";
+    if (kept) {
+      text = kept;
+    }
+  });
 
   $effect(() => {
     if (autofocus && field) {
@@ -50,9 +62,20 @@
     const ok = await onsubmit({ text: text.trim(), ...(scopes ? { scope } : {}) });
     sending = false;
     if (ok) {
+      // Cleared here, not by watching the text: a new thread's composer is gone by now.
+      if (draftKey) {
+        dropDraft(draftKey);
+      }
       text = "";
       shared = false;
     }
+  }
+
+  function cancel() {
+    if (draftKey) {
+      dropDraft(draftKey);
+    }
+    oncancel?.();
   }
 
   function onkeydown(event: KeyboardEvent) {
@@ -61,7 +84,7 @@
       submit();
     } else if (event.key === "Escape" && !text) {
       event.preventDefault();
-      oncancel?.();
+      cancel();
     }
   }
 </script>
@@ -83,6 +106,7 @@
     rows="1"
     maxlength="4000"
     {onkeydown}
+    oninput={(event) => draftKey && keepDraft(draftKey, event.currentTarget.value)}
   ></textarea>
   {#if scopes}
     <label class="share">
@@ -93,7 +117,7 @@
   <div class="row">
     <span class="hint" aria-hidden="true">{t("comment.shortcut")}</span>
     {#if oncancel}
-      <Button variant="ghost" size="sm" onclick={oncancel}>{t("common.cancel")}</Button>
+      <Button variant="ghost" size="sm" onclick={cancel}>{t("common.cancel")}</Button>
     {/if}
     <Button variant="primary" size="sm" type="submit" loading={sending}>
       {submitLabel ?? t("comment.post")}

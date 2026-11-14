@@ -7,12 +7,14 @@
   import Icon from "../../../common/ui/icon.svelte";
   import { useApp } from "../../../shell/use-app.ts";
   import Avatar from "../../person/ui/avatar.svelte";
+  import { draftKeys } from "../drafts.ts";
   import type { CardComment, ReplyInput } from "../type.ts";
   import { elementOf, quoteOf } from "../view.ts";
   import Composer from "./composer.svelte";
 
   let {
     comment,
+    deckId,
     slideNumber,
     selected = false,
     canResolve = false,
@@ -29,6 +31,8 @@
     oncopylink,
   }: {
     comment: CardComment;
+    /** The deck whose unsent replies are kept across a reload; with none, they are not kept. */
+    deckId?: string;
     /** The slide's place in the deck, for the anchor chip. */
     slideNumber: number | null;
     selected?: boolean;
@@ -236,6 +240,7 @@
             placeholder={t("comment.replyPlaceholder")}
             submitLabel={t("comment.reply")}
             autofocus
+            draftKey={deckId && draftKeys.reply(deckId, comment.id)}
             oncancel={() => (replying = false)}
             onsubmit={async (input) => {
               const ok = await onreply(input);
