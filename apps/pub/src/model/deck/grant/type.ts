@@ -1,5 +1,5 @@
 // A grant lets one person other than the owner open, or comment on, a deck that is not public,
-// on the team's side of the work or the client's.
+// on the team's side of the work or the guests'.
 
 import type { grants } from "@schema";
 import type { z } from "zod";

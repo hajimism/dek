@@ -300,7 +300,7 @@ export const Reply = z.strictObject({
 
 /**
  * Who reads a thread: `team`, the owner and those invited on the team's side; `shared`, the
- * clients too.
+ * guests too.
  */
 export const ThreadScope = z.enum(["team", "shared"]);
 export type ThreadScope = z.infer<typeof ThreadScope>;
@@ -313,7 +313,7 @@ export const CommentRow = z.strictObject({
       "Per deck and scope, in the order the threads were opened or shared; a team thread's is shown as T and the number.",
     ),
   id: z.string(),
-  scope: ThreadScope.describe("team: the deck's team only; shared: its clients too."),
+  scope: ThreadScope.describe("team: the deck's team only; shared: its guests too."),
   slug: z.string(),
   step: z.string(),
   status: CommentStatus,
@@ -336,7 +336,7 @@ export const NewComment = z.strictObject({
   /** The version the commenter was reading; the current one when absent. */
   version: z.number().int().min(1).optional(),
   text: z.string().min(1).max(4000),
-  /** Who reads it; when absent, `team` for one on the team's side and `shared` for anyone else. */
+  /** Who reads it; when absent, `team` for one on the team's side and `shared` for a guest. */
   scope: ThreadScope.optional(),
 });
 export type NewComment = z.infer<typeof NewComment>;
@@ -379,8 +379,8 @@ export type LikeState = z.infer<typeof LikeState>;
 // Grants: people other than the owner who may open, or comment on, a deck that is not public.
 
 export const GrantRole = z.enum(["view", "comment"]);
-/** Which side of the work a grantee is on: the `team` that makes the deck, or its `client`. */
-export const GrantSide = z.enum(["team", "client"]);
+/** Which side of the work a grantee is on: the `team` that makes the deck, or a `guest` of it. */
+export const GrantSide = z.enum(["team", "guest"]);
 export const Grant = z.strictObject({
   id: z.string(),
   /** A signed-in person's handle, or an email address no account has claimed yet. */
@@ -392,7 +392,7 @@ export const Grant = z.strictObject({
 export const NewGrant = z.strictObject({
   who: z.string().min(1).max(254),
   role: GrantRole,
-  /** When absent, `client` for a new grant, and unchanged for one already made. */
+  /** When absent, `guest` for a new grant, and unchanged for one already made. */
   side: GrantSide.optional(),
 });
 

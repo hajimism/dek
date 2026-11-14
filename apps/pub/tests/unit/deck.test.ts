@@ -80,12 +80,12 @@ describe("access", () => {
     expect(canLike(deck("private"), owner)).toBe(false);
   });
 
-  it("puts the owner on the team's side, a grantee where the grant says, and anyone else with the client", () => {
+  it("puts the owner on the team's side, a grantee where the grant says, and anyone else with the guests", () => {
     expect(sideOf(deck("private"), owner, null)).toBe("team");
     expect(sideOf(deck("private"), other, "team")).toBe("team");
-    expect(sideOf(deck("private"), other, "client")).toBe("client");
-    expect(sideOf(deck("public"), other, null)).toBe("client");
-    expect(sideOf(deck("public"), null, null)).toBe("client");
+    expect(sideOf(deck("private"), other, "guest")).toBe("guest");
+    expect(sideOf(deck("public"), other, null)).toBe("guest");
+    expect(sideOf(deck("public"), null, null)).toBe("guest");
   });
 
   it("lets only the owner manage", () => {
@@ -271,26 +271,26 @@ describe("versions and the script, by who asks", () => {
     latestVersion: 3,
   };
 
-  it("shows the client's side the current version, and the team's any it asks for", () => {
-    expect(shownVersion(deck, "client", null)).toBe(2);
+  it("shows the guests' side the current version, and the team's any it asks for", () => {
+    expect(shownVersion(deck, "guest", null)).toBe(2);
     expect(shownVersion(deck, "team", null)).toBe(2);
     expect(shownVersion(deck, "team", 3)).toBe(3);
     expect(shownVersion(deck, "team", 1)).toBe(1);
-    expect(shownVersion(deck, "client", 2)).toBe(2);
-    expect(shownVersion(deck, "client", 3)).toBeNull();
-    expect(shownVersion(deck, "client", 1)).toBeNull();
+    expect(shownVersion(deck, "guest", 2)).toBe(2);
+    expect(shownVersion(deck, "guest", 3)).toBeNull();
+    expect(shownVersion(deck, "guest", 1)).toBeNull();
     expect(shownVersion(deck, "team", 4)).toBeNull();
   });
 
-  it("shows the team's side the newest version when none is current, and the client's none", () => {
+  it("shows the team's side the newest version when none is current, and the guests' none", () => {
     expect(shownVersion({ ...deck, currentVersion: null }, "team", null)).toBe(3);
-    expect(shownVersion({ ...deck, currentVersion: null }, "client", null)).toBeNull();
+    expect(shownVersion({ ...deck, currentVersion: null }, "guest", null)).toBeNull();
   });
 
-  it("lets the client's side read the current version only, and the team's any uploaded", () => {
-    expect(mayReadVersion(deck, "client", 2)).toBe(true);
-    expect(mayReadVersion(deck, "client", 1)).toBe(false);
-    expect(mayReadVersion(deck, "client", 3)).toBe(false);
+  it("lets the guests' side read the current version only, and the team's any uploaded", () => {
+    expect(mayReadVersion(deck, "guest", 2)).toBe(true);
+    expect(mayReadVersion(deck, "guest", 1)).toBe(false);
+    expect(mayReadVersion(deck, "guest", 3)).toBe(false);
     expect(mayReadVersion(deck, "team", 3)).toBe(true);
     expect(mayReadVersion(deck, "team", 1)).toBe(true);
     expect(mayReadVersion(deck, "team", 4)).toBe(false);
@@ -376,8 +376,8 @@ describe("grants", () => {
   });
 
   it("counts the side that sees more", () => {
-    expect(widestSide(["client", "team"])).toBe("team");
-    expect(widestSide(["client"])).toBe("client");
+    expect(widestSide(["guest", "team"])).toBe("team");
+    expect(widestSide(["guest"])).toBe("guest");
     expect(widestSide([])).toBeNull();
   });
 });

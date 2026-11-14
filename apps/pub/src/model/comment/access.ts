@@ -1,5 +1,5 @@
 // Who may read a deck's threads, which of them, and who may resolve one, open it again or share it
-// with the client: the deck's owner, and whoever wrote it. The server knows people by account and
+// with the guests: the deck's owner, and whoever wrote it. The server knows people by account and
 // decides; the page knows them by handle and only shows the button.
 
 import type { CommentRow, ThreadScope } from "../../../../../src/pub/protocol.ts";
@@ -19,10 +19,10 @@ export function canReadComments(
 }
 
 /**
- * Whether someone on `side` may see a thread. By version: the team's side any; the client's one
- * opened on a version no newer than the current one, so a thread on a draft stays the team's
- * until that version or a later one is current. By scope: the team's side any; the client's a
- * shared one only.
+ * Whether someone on `side` may see a thread. By version: the team's side any; the guests' side
+ * one opened on a version no newer than the current one, so a thread on a draft stays the
+ * team's until that version or a later one is current. By scope: the team's side any; the
+ * guests' side a shared one only.
  */
 export function canSeeThread(
   deck: { currentVersion: number | null },
@@ -36,10 +36,10 @@ export function canSeeThread(
 
 /**
  * The scope a thread opened by someone on `side` takes: what they asked, or by default the
- * narrower one their side may have. The client's side opens shared threads only.
+ * narrower one their side may have. The guests' side opens shared threads only.
  */
 export function scopeFor(asked: ThreadScope | undefined, side: GrantSide): ThreadScope {
-  if (side === "client" && asked === "team") {
+  if (side === "guest" && asked === "team") {
     throw new ApiError(
       403,
       "team_only",
@@ -69,7 +69,7 @@ export function mayResolve(
   return isOwner || comment.author.handle === viewer.handle;
 }
 
-/** Whether the page offers to share a team thread with the client: to whom may resolve it. */
+/** Whether the page offers to share a team thread with the guests: to whom may resolve it. */
 export function mayWiden(
   comment: Pick<CommentRow, "author" | "scope">,
   viewer: { handle: string } | null,

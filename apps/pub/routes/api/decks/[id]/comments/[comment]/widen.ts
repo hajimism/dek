@@ -1,4 +1,4 @@
-// Share a team thread with the deck's client: it is shown to them from now on, with every reply,
+// Share a team thread with the deck's guests: it is shown to them from now on, with every reply,
 // under the next shared number. A shared thread is answered as it is.
 
 import { defineHandler } from "void";
@@ -22,7 +22,7 @@ export const POST = defineHandler((c) =>
       throw new ApiError(
         403,
         "not_yours",
-        "only the deck's owner and the comment's author may share it with the client",
+        "only the deck's owner and the comment's author may share it with the guests",
       );
     }
     await widenThread(thread);

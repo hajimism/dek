@@ -100,7 +100,7 @@ export class CommentList {
     }
   }
 
-  /** Share a team thread with the client; it comes back under its shared number. */
+  /** Share a team thread with the guests; it comes back under its shared number. */
   async widen(comment: CardComment): Promise<boolean> {
     try {
       this.#replace(await api<CommentRow>(`${this.#path}/${comment.id}/widen`, { method: "POST" }));

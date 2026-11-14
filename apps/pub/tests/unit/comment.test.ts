@@ -222,11 +222,11 @@ describe("who may resolve", () => {
   it("shows a thread on a version not yet current to the team's side only", () => {
     const shown = { currentVersion: 2 };
     const at = (n: number) => ({ n, scope: "shared" as const });
-    expect(canSeeThread(shown, at(2), "client")).toBe(true);
-    expect(canSeeThread(shown, at(1), "client")).toBe(true);
-    expect(canSeeThread(shown, at(3), "client")).toBe(false);
+    expect(canSeeThread(shown, at(2), "guest")).toBe(true);
+    expect(canSeeThread(shown, at(1), "guest")).toBe(true);
+    expect(canSeeThread(shown, at(3), "guest")).toBe(false);
     expect(canSeeThread(shown, at(3), "team")).toBe(true);
-    expect(canSeeThread({ currentVersion: null }, at(1), "client")).toBe(false);
+    expect(canSeeThread({ currentVersion: null }, at(1), "guest")).toBe(false);
     expect(canSeeThread({ currentVersion: null }, at(1), "team")).toBe(true);
   });
 
@@ -234,7 +234,7 @@ describe("who may resolve", () => {
     const shown = { currentVersion: 2 };
     const team = { n: 1, scope: "team" as const };
     expect(canSeeThread(shown, team, "team")).toBe(true);
-    expect(canSeeThread(shown, team, "client")).toBe(false);
+    expect(canSeeThread(shown, team, "guest")).toBe(false);
   });
 
   it("reads review threads as the owner or as anyone granted the deck, whatever the policy", () => {
@@ -305,12 +305,12 @@ describe("thread scope", () => {
   it("opens a team thread for the team's side unless asked, and a shared one for anyone else", () => {
     expect(scopeFor(undefined, "team")).toBe("team");
     expect(scopeFor("shared", "team")).toBe("shared");
-    expect(scopeFor(undefined, "client")).toBe("shared");
-    expect(scopeFor("shared", "client")).toBe("shared");
+    expect(scopeFor(undefined, "guest")).toBe("shared");
+    expect(scopeFor("shared", "guest")).toBe("shared");
   });
 
-  it("refuses a team thread from the client's side", () => {
-    expect(() => scopeFor("team", "client")).toThrow(ApiError);
+  it("refuses a team thread from the guests' side", () => {
+    expect(() => scopeFor("team", "guest")).toThrow(ApiError);
   });
 
   it("lets the owner and the author share a team thread, and nothing narrows a shared one", () => {
@@ -334,7 +334,7 @@ describe("notices", () => {
   };
   const shared = { n: 1, scope: "shared" as const };
   const team = { n: 1, scope: "team" as const };
-  const reader = { role: "comment" as const, side: "client" as const, muted: false };
+  const reader = { role: "comment" as const, side: "guest" as const, muted: false };
 
   it("go to the owner, the author and those who replied, once each, never to who acted", () => {
     expect(

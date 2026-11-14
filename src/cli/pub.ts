@@ -477,7 +477,7 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
 }
 
 /**
- * `dekc pub promote <n>`: make version `n` the one the client's side reads, as the manage page's
+ * `dekc pub promote <n>`: make version `n` the one the guests read, as the manage page's
  * "Make current" does: a draft the team has looked at, or an older version to roll back to.
  */
 export async function promoteCommand(

@@ -42,7 +42,7 @@ export type Talk = {
   owner: Profile;
   /** The version the page shows. */
   version: number;
-  /** The version the client's side reads; null while none is. */
+  /** The version the guests' side reads; null while none is. */
   current: number | null;
   /** The versions the reader may switch to, newest first: the team's side only, else null. */
   versions: TalkVersion[] | null;

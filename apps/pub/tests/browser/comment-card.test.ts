@@ -49,7 +49,7 @@ describe("CommentCard", () => {
     await expect.element(page.getByRole("button", { name: "Reply" })).not.toBeInTheDocument();
   });
 
-  it("marks a team thread, numbers it with a T, and offers to show it to the client", async () => {
+  it("marks a team thread, numbers it with a T, and offers to share it with guests", async () => {
     const onwiden = vi.fn();
     await renderPage(CommentCard, {
       comment: row({ scope: "team" }),
@@ -60,7 +60,7 @@ describe("CommentCard", () => {
     });
     await expect.element(page.getByText("Team only")).toBeVisible();
     await expect.element(page.getByText("#T3")).toBeVisible();
-    await page.getByRole("button", { name: "Show to client" }).click();
+    await page.getByRole("button", { name: "Share with guests" }).click();
     expect(onwiden).toHaveBeenCalledOnce();
   });
 
@@ -69,7 +69,7 @@ describe("CommentCard", () => {
     await expect.element(page.getByText("#3")).toBeVisible();
     await expect.element(page.getByText("Team only")).not.toBeInTheDocument();
     await expect
-      .element(page.getByRole("button", { name: "Show to client" }))
+      .element(page.getByRole("button", { name: "Share with guests" }))
       .not.toBeInTheDocument();
   });
 

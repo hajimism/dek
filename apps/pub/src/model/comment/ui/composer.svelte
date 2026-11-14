@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { ThreadScope } from "../../../../../../src/pub/protocol.ts";
   import Button from "../../../common/ui/button.svelte";
-  import SegmentedControl from "../../../common/ui/segmented-control.svelte";
   import { useApp } from "../../../shell/use-app.ts";
   import type { ReplyInput } from "../type.ts";
 
@@ -14,7 +13,7 @@
     oncancel,
     onsubmit,
   }: {
-    /** Offer to keep the thread to the team, as it is unless changed, or share it with the client. */
+    /** Offer to share the thread with the guests; each one is kept to the team unless checked. */
     scopes?: boolean;
     placeholder?: string;
     submitLabel?: string;
@@ -26,7 +25,8 @@
 
   const { t } = useApp();
   let text = $state("");
-  let scope: ThreadScope = $state("team");
+  let shared = $state(false);
+  const scope: ThreadScope = $derived(shared ? "shared" : "team");
   let sending = $state(false);
   let field: HTMLTextAreaElement | undefined = $state();
   const uid = $props.id();
@@ -51,6 +51,7 @@
     sending = false;
     if (ok) {
       text = "";
+      shared = false;
     }
   }
 
@@ -84,17 +85,10 @@
     {onkeydown}
   ></textarea>
   {#if scopes}
-    <div class="scope">
-      <SegmentedControl
-        label={t("comment.scope")}
-        options={[
-          { value: "team", label: t("comment.scope.team"), icon: "lock" },
-          { value: "shared", label: t("comment.scope.shared") },
-        ]}
-        value={scope}
-        onselect={(next: ThreadScope) => (scope = next)}
-      />
-    </div>
+    <label class="share">
+      <input type="checkbox" bind:checked={shared} />
+      <span>{t("comment.share")}</span>
+    </label>
   {/if}
   <div class="row">
     <span class="hint" aria-hidden="true">{t("comment.shortcut")}</span>
@@ -113,13 +107,25 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  .scope {
-    display: flex;
-  }
   label {
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     color: var(--text);
+  }
+  .share {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    align-self: flex-start;
+    cursor: pointer;
+  }
+  .share input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    cursor: pointer;
   }
   textarea {
     width: 100%;

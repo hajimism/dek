@@ -3626,7 +3626,7 @@
                       "team",
                       "shared"
                     ],
-                    "description": "team: the deck's team only; shared: its clients too."
+                    "description": "team: the deck's team only; shared: its guests too."
                   },
                   "slug": {
                     "type": "string"
@@ -5083,7 +5083,7 @@
                       "team",
                       "shared"
                     ],
-                    "description": "team: the deck's team only; shared: its clients too."
+                    "description": "team: the deck's team only; shared: its guests too."
                   },
                   "slug": {
                     "type": "string"

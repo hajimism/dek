@@ -73,7 +73,7 @@ const comment = (overrides: Partial<CommentRow>): CommentRow => ({
 });
 
 describe("dekc pub promote", () => {
-  test.serial("makes a version the one the client's side reads", async () => {
+  test.serial("makes a version the one the guests read", async () => {
     await withPublished(async (fake, root, id) => {
       const deck = fake.decks.get(id);
       if (deck) {
@@ -149,7 +149,7 @@ describe("dekc pub share", () => {
     });
   });
 
-  test.serial("refuses --comments guests: only signed-in accounts comment", async () => {
+  test.serial("refuses the old --comments guests: only signed-in accounts comment", async () => {
     await withPublished(async (fake, root) => {
       const result = await run(fake, root, ["share", "--comments", "guests", "--json"]);
       expect(result.exitCode).toBe(1);

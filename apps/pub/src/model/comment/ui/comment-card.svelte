@@ -34,7 +34,7 @@
     selected?: boolean;
     canResolve?: boolean;
     canReply?: boolean;
-    /** Offer to share a team thread with the client. */
+    /** Offer to share a team thread with the guests. */
     canWiden?: boolean;
     now: number;
     onselect?: () => void;

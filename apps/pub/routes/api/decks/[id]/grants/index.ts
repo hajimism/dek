@@ -18,7 +18,7 @@ export const GET = defineHandler((c) =>
 
 /**
  * Share the deck with one person, by handle, or by an email address no account has yet, on the
- * team's side or the client's. A new share is mailed to them; a change to one is not.
+ * team's side or the guests'. A new share is mailed to them; a change to one is not.
  */
 export const POST = defineHandler((c) =>
   api(async () => {

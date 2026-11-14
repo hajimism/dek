@@ -157,7 +157,7 @@ export async function openThread(
   // The version the commenter was reading, which may be older than the current one by now;
   // the thread is kept on it, so the renames since are followed when it is shown.
   const n = comment.version ?? deck.currentVersion;
-  // The client's side comments on the version it reads, the current one; the team's on any it
+  // The guests' side comments on the version it reads, the current one; the team's on any it
   // may open. One whose page shows an older version is told so, whatever that version was:
   // whether it was ever shown is not kept.
   if (n !== null && !mayReadVersion(deck, side, n)) {
@@ -257,7 +257,7 @@ export async function addReply(thread: ThreadRow, person: Person, text: string):
 }
 
 /**
- * Share a team thread with the client, under the next shared number, so the client's count of
+ * Share a team thread with the guests, under the next shared number, so the guests' count of
  * threads has no gap where it was. A shared thread is left as it is: none is ever narrowed.
  */
 export async function widenThread(thread: ThreadRow): Promise<void> {

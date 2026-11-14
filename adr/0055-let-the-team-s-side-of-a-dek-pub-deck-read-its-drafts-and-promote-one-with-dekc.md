@@ -6,6 +6,8 @@ Date: 2026-11-14
 
 Accepted
 
+Amended by [64. Call the side of a dek.pub deck that is not the team its guests, and share a thread with them by a checkbox](0064-call-the-side-of-a-dek-pub-deck-that-is-not-the-team-its-guests-and-share-a-thread-with-them-by-a-checkbox.md)
+
 ## Context
 
 `dekc pub publish --no-promote` uploads a version without making it the one readers see. Until now such a version was the owner's alone. Only the owner could read it, its pictures and the threads on it, and the talk page showed it to them only while no version was current. So the owner could not open a draft on the page once an earlier version was current, and the rest of the team could not open one at all.

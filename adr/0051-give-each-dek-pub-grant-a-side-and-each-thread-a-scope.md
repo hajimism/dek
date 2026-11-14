@@ -6,6 +6,8 @@ Date: 2026-11-13
 
 Accepted
 
+Amended by [64. Call the side of a dek.pub deck that is not the team its guests, and share a thread with them by a checkbox](0064-call-the-side-of-a-dek-pub-deck-that-is-not-the-team-its-guests-and-share-a-thread-with-them-by-a-checkbox.md)
+
 ## Context
 
 dek.pub is meant for client work: a team makes a deck, and reviews it with a few people at the client. The two sides write different things. The team notes what it has not settled yet and what it has not told the client. The client asks and approves. Today every thread is read by everyone who may read the deck's comments, so a team that wants to talk among itself has to do it somewhere else.

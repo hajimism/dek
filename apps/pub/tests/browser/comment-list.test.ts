@@ -76,7 +76,7 @@ describe("CommentList", () => {
     expect(list.rows[2]).toMatchObject({ scope: "team", number: 2 });
   });
 
-  it("shares a team thread with the client and shows it as the server answers", async () => {
+  it("shares a team thread with guests and shows it as the server answers", async () => {
     const fetch = answers(row({ id: "c_t", scope: "shared", number: 5 }));
     const list = new CommentList("d_x", [row({ id: "c_t", scope: "team", number: 1 })], () => {});
     expect(await list.widen(list.rows[0] as NonNullable<(typeof list.rows)[0]>)).toBe(true);

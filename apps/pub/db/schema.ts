@@ -82,7 +82,7 @@ export const threads = sqliteTable(
   {
     id: text("id").primaryKey(),
     deckId: text("deck_id").notNull(),
-    /** Per deck and scope, so a client cannot count the team's threads by the gaps. */
+    /** Per deck and scope, so a guest cannot count the team's threads by the gaps. */
     number: integer("number").notNull(),
     scope: text("scope", { enum: ["team", "shared"] })
       .notNull()
@@ -126,9 +126,9 @@ export const grants = sqliteTable(
     userId: text("user_id"),
     email: text("email"),
     role: text("role", { enum: ["view", "comment"] }).notNull(),
-    side: text("side", { enum: ["team", "client"] })
+    side: text("side", { enum: ["team", "guest"] })
       .notNull()
-      .default("client"),
+      .default("guest"),
     createdAt: text("created_at").notNull().default(now),
   },
   (table) => [
