@@ -6,6 +6,7 @@ import {
   canSeeThread,
   mayResolve,
   mayWiden,
+  mustResolve,
   scopeFor,
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
@@ -15,11 +16,12 @@ import {
   canPostPublic,
   mayDeletePublic,
   mayEditPublic,
+  mustPostPublic,
 } from "../../src/model/comment/public/access.ts";
 import { threadPublic } from "../../src/model/comment/public/view.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
 import { hideQuotes } from "../../src/model/comment/view.ts";
-import { opensToAnyone } from "../../src/model/deck/access.ts";
+import { type DeckRules, opensToAnyone } from "../../src/model/deck/access.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
 describe("placeComment", () => {
@@ -213,6 +215,25 @@ describe("who may resolve", () => {
     expect(canResolve(deck, { authorId: "u2" }, null, null)).toBe(false);
   });
 
+  it("refuses anyone else with not_yours, naming what they tried", () => {
+    expect(() =>
+      mustResolve(deck, { authorId: "u2" }, { id: "u2" }, "view", "reopen"),
+    ).not.toThrow();
+    const refused = (() => {
+      try {
+        mustResolve(deck, { authorId: "u2" }, { id: "u3" }, "comment", "reopen");
+      } catch (error) {
+        return error;
+      }
+    })();
+    expect(refused).toBeInstanceOf(ApiError);
+    expect(refused).toMatchObject({
+      status: 403,
+      code: "not_yours",
+      message: "only the deck's owner and the comment's author may reopen it",
+    });
+  });
+
   it("is not an author the deck is no longer shared with", () => {
     expect(canResolve(deck, { authorId: "u2" }, { id: "u2" }, null)).toBe(false);
   });
@@ -259,6 +280,27 @@ describe("public comments", () => {
     expect(canPostPublic({ ...open, visibility: "public" }, { id: "u2" })).toBe(true);
     expect(canPostPublic({ ...open, comments: "off" }, { id: "u1" })).toBe(false);
     expect(canPostPublic({ ...open, visibility: "private" }, { id: "u1" })).toBe(false);
+  });
+
+  it("refuse a poster with no_comments, asking someone signed out to sign in", () => {
+    const refusal = (deck: DeckRules, person: { id: string } | null) => {
+      try {
+        mustPostPublic(deck, person);
+      } catch (error) {
+        return error;
+      }
+    };
+    expect(refusal(open, { id: "u2" })).toBeUndefined();
+    expect(refusal(open, null)).toMatchObject({
+      status: 403,
+      code: "no_comments",
+      hint: "sign in to comment",
+    });
+    expect(refusal({ ...open, comments: "off" }, null)).toMatchObject({ hint: undefined });
+    expect(refusal({ ...open, comments: "off" }, { id: "u2" })).toMatchObject({
+      code: "no_comments",
+      hint: undefined,
+    });
   });
 
   it("are never posted by someone signed out, whatever the policy", () => {

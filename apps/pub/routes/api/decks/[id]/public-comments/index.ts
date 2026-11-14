@@ -1,8 +1,8 @@
 import { defineHandler } from "void";
 import { NewPublicComment } from "../../../../../../../src/pub/protocol.ts";
-import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
+import { notFound } from "../../../../../src/common/api-error.ts";
 import { api, jsonBody } from "../../../../../src/common/http.server.ts";
-import { canPostPublic } from "../../../../../src/model/comment/public/access.ts";
+import { mustPostPublic } from "../../../../../src/model/comment/public/access.ts";
 import {
   postPublic,
   publicCommentFor,
@@ -31,14 +31,7 @@ export const POST = defineHandler((c) =>
     if (!opensToAnyone(deck)) {
       throw notFound("comments");
     }
-    if (person === null || !canPostPublic(deck, person)) {
-      throw new ApiError(
-        403,
-        "no_comments",
-        "comments on this talk are not open to you",
-        person || deck.comments === "off" ? undefined : "sign in to comment",
-      );
-    }
+    mustPostPublic(deck, person);
     const body = await jsonBody(c, NewPublicComment);
     const id = await postPublic(deck.id, person, body);
     return Response.json(await publicCommentFor(c, deck.id, id), { status: 201 });

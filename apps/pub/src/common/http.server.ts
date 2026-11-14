@@ -26,10 +26,10 @@ function errorResponse(error: ApiError): Response {
  */
 export async function api(
   fn: () => Promise<Response | object>,
-  request?: Request,
+  request: Request,
 ): Promise<Response> {
   try {
-    const spoken = Number(request?.headers.get(PROTOCOL_HEADER) ?? PROTOCOL_VERSION);
+    const spoken = Number(request.headers.get(PROTOCOL_HEADER) ?? PROTOCOL_VERSION);
     if (Number.isFinite(spoken) && spoken > PROTOCOL_VERSION) {
       throw new ApiError(
         400,
@@ -40,7 +40,7 @@ export async function api(
     }
     // A cookie rides along on any request the browser makes, so a change made with one must come
     // from a page of this origin. The CLI sends a key and no cookie.
-    if (request && !SAFE_METHODS.has(request.method) && request.headers.has("cookie")) {
+    if (!SAFE_METHODS.has(request.method) && request.headers.has("cookie")) {
       const origin = request.headers.get("origin");
       if (origin !== new URL(request.url).origin) {
         throw new ApiError(403, "cross_origin", "a change must come from a page of dek.pub");

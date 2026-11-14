@@ -12,7 +12,9 @@
 //   person model does not know the shell; deck and comment may use it. So the order is common,
 //   person, shell, deck, comment.
 // - Models come in the order person, deck, comment: each may import the ones before it, and the
-//   ones after it only from a feature.
+//   ones after it only from a feature. A folder in `src/model/` that is not in the order fails.
+// - A deck's row is written by the deck's store and its version store, and by the comment store's
+//   thread counters, nowhere else (ADR 50).
 // - A model's own files never import a `feature/`, and a feature imports no other feature.
 // - `deck/serving/` is shared with the serve Worker, so it imports only itself and the protocol,
 //   and the serve Worker imports only it.
@@ -197,6 +199,25 @@ describe("import boundaries", () => {
 
   it("keep Void code, layers, models and features apart", () => {
     expect(problems()).toEqual([]);
+  });
+
+  it("give every model a place in the order", () => {
+    const folders = readdirSync(join(APP, "src/model"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    expect(folders.sort()).toEqual([...MODELS].sort());
+  });
+
+  it("write a deck's row from the deck's stores and the comment store's counter alone", () => {
+    const writers = [...sources("src"), ...sources("routes"), ...sources("pages")]
+      .filter((file) => /\.(update|insert|delete)\(decks\)/.test(readFileSync(file, "utf8")))
+      .map((file) => relative(APP, file))
+      .sort();
+    expect(writers).toEqual([
+      "src/model/comment/store.server.ts",
+      "src/model/deck/store.server.ts",
+      "src/model/deck/version/store.server.ts",
+    ]);
   });
 
   it("keep zod out of what the browser loads", () => {
