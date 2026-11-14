@@ -18,7 +18,7 @@ import {
 } from "../../src/model/comment/public/access.ts";
 import { threadPublic } from "../../src/model/comment/public/view.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
-import { hideQuotes } from "../../src/model/comment/view.ts";
+import { hideQuotes, isDrawn } from "../../src/model/comment/view.ts";
 import { opensToAnyone } from "../../src/model/deck/access.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
@@ -180,6 +180,15 @@ describe("segments", () => {
 
   it("leaves text without marks whole", () => {
     expect(segments("plain", [])).toEqual([{ text: "plain", ids: [] }]);
+  });
+});
+
+describe("isDrawn", () => {
+  it("draws a comment that is open or moved, and not one resolved or detached", () => {
+    expect(isDrawn({ status: "open" })).toBe(true);
+    expect(isDrawn({ status: "moved" })).toBe(true);
+    expect(isDrawn({ status: "resolved" })).toBe(false);
+    expect(isDrawn({ status: "detached" })).toBe(false);
   });
 });
 
