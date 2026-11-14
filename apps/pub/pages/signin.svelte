@@ -4,6 +4,7 @@
   import { api } from "../src/common/ui/api.ts";
   import Button from "../src/common/ui/button.svelte";
   import Icon from "../src/common/ui/icon.svelte";
+  import { SIGN_IN_LINK_SECONDS } from "../src/model/person/feature/sign-in/mail.ts";
   import { signInHref } from "../src/model/person/sign-in-path.ts";
   import { useApp } from "../src/shell/use-app.ts";
   import type { Props } from "./signin.server";
@@ -83,7 +84,7 @@
 
       <p class="or"><span>{t("signin.or")}</span></p>
       {#if linkSent}
-        <p class="sent" role="status"><Icon name="check" size={14} />{t("signin.linkSent", { email: linkSent })}</p>
+        <p class="sent" role="status"><Icon name="check" size={14} />{t("signin.linkSent", { email: linkSent, minutes: SIGN_IN_LINK_SECONDS / 60 })}</p>
         <button type="button" class="switch" onclick={() => (linkSent = "")}>{t("signin.linkAgain")}</button>
       {:else}
         <form class="link" onsubmit={withLink}>

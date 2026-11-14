@@ -2,12 +2,18 @@
 // notices go to the people in it: the deck's owner, its author and those who replied, each only
 // while they may read it on their own side, and never to whoever did what the mail is about.
 
-import { excerpt, type Mail } from "../../common/mail.ts";
+import type { Mail } from "../../common/mail.ts";
 import { type DeckRules, standingOn } from "../deck/access.ts";
 import type { GrantRow } from "../deck/grant/type.ts";
 import type { Person } from "../person/type.ts";
 import { canReadComments, canSeeThread } from "./access.ts";
 import type { ThreadRow } from "./type.ts";
+
+/** A comment as a mail quotes it: on one line, cut to `max` characters. */
+export function excerpt(text: string, max = 280): string {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length <= max ? line : `${line.slice(0, max - 1)}…`;
+}
 
 export type NoticeEvent = "thread" | "reply" | "resolve";
 
