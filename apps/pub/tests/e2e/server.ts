@@ -26,21 +26,18 @@ export type Store = {
   put(key: string, body: string): Promise<void>;
 };
 
-/** The address the run signs `name` up with; the same all run long, so the server can invite it. */
+/** The address the run signs `name` up with; the same all run long, so an operator can invite it. */
 export function addressOf(name: string): string {
   return `${name.toLowerCase()}-${RUN}@example.com`;
 }
 const RUN = Date.now();
 
 /**
- * Start the server, letting sign up only `invited`, as `DEK_PUB_INVITED` lists them, with the
- * addresses `operators` as the operators `DEK_PUB_OPERATORS` names.
+ * Start the server on an empty database, with the addresses `operators` as the operators
+ * `DEK_PUB_OPERATORS` names and sign-up not open: until an operator invites someone from
+ * /settings, only the operators and the people a deck is shared with may sign up.
  */
-export async function startDevServer(
-  port: number,
-  invited: string[],
-  operators: string[] = [],
-): Promise<DevServer> {
+export async function startDevServer(port: number, operators: string[]): Promise<DevServer> {
   const state = mkdtempSync(join(tmpdir(), "dek-pub-e2e-"));
   const url = `http://localhost:${port}`;
   const child = Bun.spawn(["node_modules/.bin/vp", "dev", "--port", String(port), "--strictPort"], {
@@ -51,7 +48,7 @@ export async function startDevServer(
       APP_ORIGIN: url,
       DECK_ORIGIN: `http://d-{id}.localhost:${port}`,
       DEK_PUB_DEV_LOGIN: "1",
-      DEK_PUB_INVITED: invited.join(","),
+      DEK_PUB_OPEN_SIGN_UP: "0",
       DEK_PUB_OPERATORS: operators.join(","),
       SERVE_TOKEN_SECRET: "e2e-serve-token-secret",
       AUTH_GITHUB_CLIENT_ID: "e2e",

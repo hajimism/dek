@@ -31,6 +31,7 @@ const props = {
   name: "Hajime Nakagawa",
   links: ["https://github.com/hajimism", "https://hajimism.dev/"],
   keys: [] as unknown[],
+  invites: null as unknown[] | null,
 };
 
 /** Two keys, as the settings page is given them: one used an hour before NOW, one never. */
@@ -233,6 +234,132 @@ describe("SettingsPage", () => {
         .element(page.getByText("Couldn’t reach dek.pub", { exact: false }))
         .toBeInTheDocument();
       await expect.element(page.getByText("hajime-mbp", { exact: true })).toBeInTheDocument();
+    });
+  });
+
+  describe("Invitations", () => {
+    /** Two entries, as an operator is shown them: one an account was made from, one waiting. */
+    const invites = [
+      {
+        id: "i_waiting",
+        entry: "kato@example.com",
+        addedAt: "2026-11-12T09:00:00.000Z",
+        addedBy: "demo",
+        claimedAt: null,
+        claimedBy: null,
+      },
+      {
+        id: "i_claimed",
+        entry: "@octo-cat",
+        addedAt: "2026-11-01T09:00:00.000Z",
+        addedBy: "demo",
+        claimedAt: "2026-11-02T09:00:00.000Z",
+        claimedBy: "octo",
+      },
+    ];
+
+    /** Answer as dek.pub does, with the list after the call; and keep what was asked. */
+    function inviter(after: unknown[]) {
+      const fetch = vi.fn(async (_path: string, _init?: RequestInit) =>
+        Response.json({ invites: after }),
+      );
+      vi.stubGlobal("fetch", fetch);
+      return fetch;
+    }
+
+    it("is not there for someone who does not run dek.pub", async () => {
+      server();
+      await renderPage(SettingsPage, props);
+      await expect.element(page.getByRole("heading", { name: "CLI keys" })).toBeInTheDocument();
+      await expect
+        .element(page.getByRole("heading", { name: "Invitations" }))
+        .not.toBeInTheDocument();
+    });
+
+    it("lists each entry, who added it and when, and the account made from it", async () => {
+      inviter(invites);
+      await renderPage(SettingsPage, { ...props, invites });
+      const section = page.getByRole("region", { name: "Invitations" });
+      await expect
+        .element(section.getByText("kato@example.com", { exact: true }))
+        .toBeInTheDocument();
+      await expect.element(section.getByText("Added Nov 12, 2026 by @demo")).toBeInTheDocument();
+      await expect.element(section.getByText("Not signed up yet")).toBeInTheDocument();
+      await expect
+        .element(section.getByText("Signed up as @octo on Nov 2, 2026"))
+        .toBeInTheDocument();
+      await expect
+        .element(section.getByRole("button", { name: "Remove kato@example.com" }))
+        .toBeInTheDocument();
+      await expect
+        .element(section.getByRole("button", { name: "Remove @octo-cat" }))
+        .not.toBeInTheDocument();
+    });
+
+    it("adds what is typed, split by commas or lines, and shows the list dek.pub answers", async () => {
+      const added = {
+        ...invites[0],
+        id: "i_new",
+        entry: "sato@example.com",
+        addedAt: "2026-11-13T11:00:00.000Z",
+      };
+      const fetch = inviter([added, ...invites]);
+      await renderPage(SettingsPage, { ...props, invites });
+      const field = page.getByRole("textbox", { name: "Addresses or GitHub logins" });
+      await field.fill("Sato@example.com,\n @Octo-Dog");
+      await page.getByRole("button", { name: "Invite" }).click();
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+      expect(sent(fetch)).toEqual([
+        {
+          path: "/api/invites",
+          method: "POST",
+          body: { entries: ["sato@example.com", "@octo-dog"] },
+        },
+      ]);
+      await expect.element(page.getByText("sato@example.com", { exact: true })).toBeInTheDocument();
+      await expect.element(field).toHaveValue("");
+    });
+
+    it("says which entry it cannot read, and sends nothing", async () => {
+      const fetch = inviter(invites);
+      await renderPage(SettingsPage, { ...props, invites });
+      await page.getByRole("textbox", { name: "Addresses or GitHub logins" }).fill("sato, @ok");
+      await page.getByRole("button", { name: "Invite" }).click();
+      await expect
+        .element(page.getByText("“sato” is neither an email address nor @ and a GitHub login."))
+        .toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("removes an entry no account was made from, and takes it off the list", async () => {
+      const fetch = inviter([invites[1]]);
+      await renderPage(SettingsPage, { ...props, invites });
+      await page.getByRole("button", { name: "Remove kato@example.com" }).click();
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+      expect(fetch.mock.calls.map(([path, init]) => `${init?.method} ${path}`)).toEqual([
+        "DELETE /api/invites/i_waiting",
+      ]);
+      await expect
+        .element(page.getByText("kato@example.com", { exact: true }))
+        .not.toBeInTheDocument();
+    });
+
+    it("keeps the list as it was when dek.pub refused, and says why", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json(
+            { error: { code: "invite_claimed", message: "an account was made from it" } },
+            { status: 409 },
+          ),
+        ),
+      );
+      await renderPage(SettingsPage, { ...props, invites });
+      await page.getByRole("button", { name: "Remove kato@example.com" }).click();
+      await expect
+        .element(page.getByText("an account was made from it", { exact: false }))
+        .toBeInTheDocument();
+      await expect.element(page.getByText("kato@example.com", { exact: true })).toBeInTheDocument();
     });
   });
 });

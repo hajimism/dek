@@ -10,15 +10,15 @@ export default defineEnv({
   /** Set to 1 on a machine where email sign-up stands in for GitHub; never in production. */
   DEK_PUB_DEV_LOGIN: string().default("0"),
   /**
-   * Who may sign up, as addresses and `@<GitHub login>`s split by commas or whitespace, or `*` for
-   * anyone; besides them, only the people a deck is shared with by address. Never `*` in production
-   * until dek.pub is ready for anyone (ADR 79).
+   * Set to 1, beside `DEK_PUB_DEV_LOGIN`, to let anyone sign up, for local runs; never in production,
+   * where the operators invite people from /settings (ADR 85). Unset, only the people invited, the
+   * operators and the people a deck is shared with by address may sign up.
    */
-  DEK_PUB_INVITED: string().default(""),
+  DEK_PUB_OPEN_SIGN_UP: string().default("0"),
   /**
    * The people who run dek.pub, by email address, split by commas or whitespace: the account whose
    * verified address is listed may delete anyone's talk, for a takedown, and each such deletion is
-   * logged. A listed address may make an account though `DEK_PUB_INVITED` leaves it out (ADR 82).
+   * logged. A listed address may always make an account, and invite others from /settings (ADR 82, 85).
    */
   DEK_PUB_OPERATORS: string().default(""),
   /** The talk the landing page shows as its sample, as `@handle/slug`; empty shows none. */

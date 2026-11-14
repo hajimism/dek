@@ -22,6 +22,7 @@ export const newThreadId = (): string => randomId("c_", 16);
 export const newReplyId = (): string => randomId("r_", 16);
 export const newGrantId = (): string => randomId("g_", 16);
 export const newPublicCommentId = (): string => randomId("p_", 16);
+export const newSignUpInviteId = (): string => randomId("i_", 16);
 
 /** The secret a `link` deck's URL carries: 26 characters, about 134 bits. */
 export const newLinkKey = (): string => randomId("", 26);

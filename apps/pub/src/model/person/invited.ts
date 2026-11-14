@@ -1,25 +1,21 @@
-// Who may make an account on dek.pub. It opens by invitation: `DEK_PUB_INVITED` lists the
-// addresses and GitHub logins it lets in, or is `*` for anyone, and a person a deck is shared
-// with by address gets in too, so a reviewer needs no invitation of their own (ADR 79), and so does
-// an operator, by the address `DEK_PUB_OPERATORS` lists (ADR 82). Signing in to an account that
-// exists is never held to it.
+// Who may make an account on dek.pub. It opens by invitation: an operator lists the addresses and
+// GitHub logins it lets in, from /settings (ADR 85), and a person a deck is shared with by address
+// gets in too, so a reviewer needs no invitation of their own (ADR 79), and so does an operator, by
+// the address `DEK_PUB_OPERATORS` lists (ADR 82). Signing in to an account that exists is never
+// held to it.
 
-import { isAddressEntry, listSetting } from "../../common/list-setting.ts";
-import { type Invited, Newcomer } from "./type.ts";
+import { inviteEntriesOf } from "./sign-up-invite.ts";
+import { type JoinRule, Newcomer } from "./type.ts";
 
 /**
- * The list `DEK_PUB_INVITED` holds: entries split by commas or whitespace, each an address or
- * `@<GitHub login>`; `*`, as the whole list, lets anyone in. Any other entry counts for nothing.
+ * Whether sign-up is open to anyone, as it is for local runs: `DEK_PUB_OPEN_SIGN_UP` is 1, and so
+ * is `DEK_PUB_DEV_LOGIN`, which production never sets. Either alone opens nothing.
  */
-export function readInvited(setting: string): Invited {
-  const entries = listSetting(setting);
-  const logins = entries.filter((entry) => /^@[^@]+$/.test(entry)).map((entry) => entry.slice(1));
-  const emails = entries.filter(isAddressEntry);
-  return {
-    anyone: entries.length === 1 && entries[0] === "*",
-    emails: new Set(emails),
-    logins: new Set(logins),
-  };
+export function signUpIsOpen(env: {
+  DEK_PUB_OPEN_SIGN_UP: string;
+  DEK_PUB_DEV_LOGIN: string;
+}): boolean {
+  return env.DEK_PUB_OPEN_SIGN_UP === "1" && env.DEK_PUB_DEV_LOGIN === "1";
 }
 
 /** What Better Auth's `validateUserInfo` is handed, read; null, with the reason logged, for anything else. */
@@ -33,26 +29,23 @@ export function readNewcomer(data: unknown): Newcomer | null {
 }
 
 /**
- * Whether an account may be made for `newcomer`: anyone may when the list is `*`; otherwise a
- * GitHub login on it, a verified address on it or among `operators`, or a verified address a
- * share waits for, which `grantWaits` is asked of last. An address that is not verified never
- * counts, so the first operator can make an account on an empty database from the settings alone.
+ * Whether an account may be made for `newcomer`: anyone may where sign-up is open; otherwise a
+ * verified address among the operators, an entry no account has claimed that names the verified
+ * address or the GitHub login, or a verified address a share waits for, which is asked last. An
+ * address that is not verified never counts, so the first operator can make an account on an
+ * empty database from the settings alone.
  */
-export async function mayJoin(
-  invited: Invited,
-  operators: ReadonlySet<string>,
-  newcomer: Newcomer,
-  grantWaits: (email: string) => Promise<boolean>,
-): Promise<boolean> {
-  if (invited.anyone) {
+export async function mayJoin(newcomer: Newcomer, rule: JoinRule): Promise<boolean> {
+  if (rule.open) {
     return true;
-  }
-  if (newcomer.githubLogin && invited.logins.has(newcomer.githubLogin.toLowerCase())) {
-    return true;
-  }
-  if (!newcomer.emailVerified) {
-    return false;
   }
   const email = newcomer.email.toLowerCase();
-  return invited.emails.has(email) || operators.has(email) || grantWaits(email);
+  if (newcomer.emailVerified && rule.operators.has(email)) {
+    return true;
+  }
+  const entries = inviteEntriesOf(newcomer);
+  if (entries.length > 0 && (await rule.invited(entries))) {
+    return true;
+  }
+  return newcomer.emailVerified && rule.grantWaits(email);
 }

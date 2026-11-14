@@ -3,6 +3,7 @@
 // their first sign-in, and is a Person from then on. Pages and other people see only the parts of
 // it meant for them.
 
+import type { signUpInvites } from "@schema";
 import { z } from "zod";
 
 export const Account = z
@@ -75,14 +76,20 @@ export const Newcomer = z
 export type Newcomer = z.output<typeof Newcomer>;
 
 /**
- * Who dek.pub lets sign up, from `DEK_PUB_INVITED`: anyone, or the addresses and GitHub logins
- * on the list, in lowercase. A person a deck is shared with by address gets in besides.
+ * What lets an account be made (ADR 85): sign-up open to anyone, as only local runs have it; the
+ * operators' addresses, in lowercase; whether an entry no account has claimed names any of the
+ * entries given; and whether a share waits for an address. The person model reads neither D1 nor
+ * the deck model, so the sign-in feature hands it the lookups.
  */
-export type Invited = {
-  anyone: boolean;
-  emails: ReadonlySet<string>;
-  logins: ReadonlySet<string>;
+export type JoinRule = {
+  open: boolean;
+  operators: ReadonlySet<string>;
+  invited: (entries: readonly string[]) => Promise<boolean>;
+  grantWaits: (email: string) => Promise<boolean>;
 };
+
+/** An entry of who an operator invited to sign up, as `sign_up_invites` holds it. */
+export type SignUpInviteRow = typeof signUpInvites.$inferSelect;
 
 /** What Better Auth's api-key plugin answers when a key is checked. */
 export const KeyCheck = z.object({

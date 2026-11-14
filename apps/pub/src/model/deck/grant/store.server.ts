@@ -3,7 +3,7 @@
 // That happens when the account signs in, or when the grant is made to an address an account has
 // verified already; reading a deck never writes (ADR 73).
 
-import { grants, invitations } from "@schema";
+import { decks, grants, invitations } from "@schema";
 import type { Context } from "hono";
 import { and, asc, db, eq, gt, isNull, lte, notInArray, or, sql } from "void/db";
 import { ApiError } from "../../../common/api-error.ts";
@@ -218,11 +218,16 @@ async function takeInvitation(inviterId: string): Promise<void> {
   );
 }
 
-/** Whether a grant on any deck waits for `email`, as one that may sign in by a link. */
+/**
+ * Whether a grant on any deck waits for `email`, as one that may sign in by a link. Only a deck
+ * that is there counts: a grant made while its deck was being deleted can outlive it (ADR 82), and
+ * would otherwise let its address make an account.
+ */
 export async function hasWaitingGrant(email: string): Promise<boolean> {
   const row = await db
     .select({ id: grants.id })
     .from(grants)
+    .innerJoin(decks, eq(decks.id, grants.deckId))
     .where(and(eq(grants.email, email.toLowerCase()), isNull(grants.userId)))
     .get();
   return row !== undefined;

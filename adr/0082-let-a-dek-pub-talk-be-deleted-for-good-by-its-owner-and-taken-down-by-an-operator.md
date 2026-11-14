@@ -10,6 +10,8 @@ Amends [47. Put a talk on dek.pub with the dekc pub commands](0047-put-a-talk-on
 
 Amends [79. Open dek.pub by invitation to the people it lists and those a deck is shared with](0079-open-dek-pub-by-invitation-to-the-people-it-lists-and-those-a-deck-is-shared-with.md)
 
+Amended by [85. Let dek.pub's operators invite people to sign up from the settings page, and keep who is invited in D1](0085-let-dek-pub-s-operators-invite-people-to-sign-up-from-the-settings-page-and-keep-who-is-invited-in-d1.md)
+
 ## Context
 
 Nobody could delete a talk. The deck routes took `GET` and `PATCH` only, and the app's list of what it does not do yet had deleting among what dek.pub needs before it opens by invitation. An owner could not take back a talk put up by mistake. Whoever runs dek.pub could not remove a talk that breaks the law or the terms, short of editing D1 and R2 by hand.
@@ -45,7 +47,7 @@ The serve Worker answers nothing for a deck with no access file, with a token or
 - **The operators are a setting, `DEK_PUB_OPERATORS`:** email addresses, split by commas or whitespace. An operator's account is the one whose address is listed and verified. `readOperators` (`src/model/person/operator.ts`) reads the setting with `listSetting` (`src/common/list-setting.ts`), the splitting `readInvited` now uses too (ADR 79), and keeps only the entries `isAddressEntry` takes for an address, as `readInvited` does; a handle, `@<GitHub login>` or `*` counts for nothing. `namesOperator` holds an account to the list, and `isOperator` (`operator.server.ts`) asks it of the setting. It defaults to empty, which names no one, and `dev.env` sets it empty.
 - **A verified address names an operator, not a handle, a user ID or a GitHub login.** Handles are first come, first served (ADR 77), so whoever claimed a listed handle first would become an operator, and a handle freed with its account would pass the role on to whoever took it next. A user ID does not exist until the account is made, so it could not name the first operator of a new database; and the change after this one moves sign-up invitations into D1, managed by operators, so the first operator must be able to sign up from the settings alone. A GitHub login can be renamed, and the old one taken by someone else on GitHub. An address cannot be changed on dek.pub (`/change-email` is closed in `auth.ts`), and only a verified one counts, so an account made by the development email form, which verifies none, is never an operator's.
 - **An address in `DEK_PUB_OPERATORS` may always make an account.** `mayJoin` takes the operators beside the invited (ADR 79): a verified address among them may join, though `DEK_PUB_INVITED` leaves it out. An operator thus needs no invitation of their own, and a sign-in link is mailed to their address as to an invited one.
-- **An operator may do nothing else.** They cannot open a talk that is not theirs, nor change one. Deleting is all a takedown needs.
+- **An operator may do nothing else here.** They cannot open a talk that is not theirs, nor change one. Deleting is all a takedown needs. ADR 85 adds one more power: inviting people to sign up.
 - **An operator's deletion is logged** through `log` (`src/common/log.ts`), as `an operator took a deck down`, with the deck's ID, the owner's account ID and the operator's account ID. It logs no handle, title or address.
 
 **`dekc pub delete [deck] --yes` deletes the deck that `pub:` names.** Its owner runs it in the project, as they run `share` and `status`.

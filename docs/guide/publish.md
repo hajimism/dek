@@ -14,7 +14,7 @@ dekc pub login
 
 dek prints a URL and a code on stderr. Open the URL, sign in to dek.pub, and approve the code; dek waits for that, then keeps the API key dek.pub gives it, in the OS keychain, or in `~/.config/dek/credentials.json`, readable only by you, where there is no keychain. `dekc pub whoami` says who you are signed in as, and `dekc pub logout` revokes the key and forgets it.
 
-For now dek.pub is open by invitation: you can make an account only with an address or a GitHub account dek.pub has invited, or with an address a deck has been shared with. An account you have keeps signing in.
+For now dek.pub is open by invitation: you can make an account only with an address or a GitHub account dek.pub has invited, or with an address a deck has been shared with. An address dek.pub invites is mailed a link to its sign-in page; sign in there with that address. An account you have keeps signing in.
 
 The first time you sign in, dek.pub asks you to choose your handle before anything else: the name your profile and your talks go under, as `/@handle/<slug>`. It offers your GitHub login, or your address's part before the `@`, when no one has it. You choose it once and cannot change it later. On dek.pub's settings page, `/settings`, you set your name and up to five links for your profile: to GitHub, X, your site or anywhere else. An account made with GitHub starts with a link to its GitHub profile.
 
@@ -112,7 +112,7 @@ dekc pub delete --yes
 
 Deleting a talk removes it from dek.pub for good: every version, the review threads and their replies, the comments and likes at the bottom, and who it is shared with. Nothing of it opens after that, its pictures and its build included, and it cannot be undone. Without `--yes`, `dekc pub delete` deletes nothing and says what it would. It then takes `pub:` out of `script.md`, to commit, so the next `dekc pub publish` makes a new deck at the same URL, with nothing of the old one. The talk's manage page on dek.pub has the same at its bottom, Delete talk, which asks you to type the talk's slug first.
 
-Whoever runs a dek.pub can take down anyone's talk: `dekc pub takedown <talk> --yes`, with the talk's URL or its deck ID, from any directory. A dek.pub names those who may by their verified email address, in its `DEK_PUB_OPERATORS` setting, and logs each takedown. An API key can do whatever its account can: one in `DEK_TOKEN` can delete every talk of its owner, and an operator's can take down anyone's, so never put an operator's key in CI.
+Whoever runs a dek.pub can take down anyone's talk: `dekc pub takedown <talk> --yes`, with the talk's URL or its deck ID, from any directory. A dek.pub names those who may by their verified email address, in its `DEK_PUB_OPERATORS` setting, and logs each takedown. The same people invite who may sign up, on the dek.pub's `/settings` page: an address is mailed an invitation, and a GitHub login, written as `@login`, is mailed nothing. An API key can do whatever its account can: one in `DEK_TOKEN` can delete every talk of its owner, and an operator's can take down anyone's, so never put an operator's key in CI.
 
 ## Another server
 
