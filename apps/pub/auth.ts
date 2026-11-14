@@ -8,6 +8,7 @@ import { bearer, deviceAuthorization, magicLink } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
 import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
+import { claimOnSignIn } from "./src/model/person/feature/sign-in/claim.server.ts";
 import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
 import { SIGN_IN_LINK_SECONDS } from "./src/model/person/feature/sign-in/mail.ts";
 import { handleFromEmail, normalizeHandle } from "./src/model/person/handle.ts";
@@ -60,6 +61,19 @@ export default defineAuth(({ defaults, env }) => {
               handle: user.handle ?? handleFromEmail(user.email),
             },
           }),
+        },
+      },
+      session: {
+        create: {
+          // Grants waiting on an address are claimed when its owner signs in, not when they read.
+          after: async (
+            session: { userId: string },
+            ctx: {
+              context: { internalAdapter: { findUserById(id: string): Promise<unknown> } };
+            } | null,
+          ) => {
+            await claimOnSignIn(await ctx?.context.internalAdapter.findUserById(session.userId));
+          },
         },
       },
     },

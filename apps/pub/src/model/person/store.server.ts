@@ -15,6 +15,15 @@ export async function personByHandle(c: Context, handle: string): Promise<Person
   return user ? readAccount(user) : null;
 }
 
+export async function personByEmail(c: Context, email: string): Promise<Person | null> {
+  const context = await authOf(c).$context;
+  const user = await context.adapter.findOne({
+    model: "user",
+    where: [{ field: "email", value: email.toLowerCase() }],
+  });
+  return user ? readAccount(user) : null;
+}
+
 export async function personById(c: Context, id: string): Promise<Person | null> {
   const context = await authOf(c).$context;
   const user = await context.internalAdapter.findUserById(id);

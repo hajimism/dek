@@ -98,7 +98,6 @@ The comment feature is planned to grow into two: public comments and a like on t
   - Whether review threads and their mail count as carrying others' messages, which may need a notice to the ministry (電気通信事業の届出), is not checked.
   - The footer's Source link goes to the repository's front page, not to the commit that is running.
 - **Every request with an API key writes to D1.** Better Auth's API key plugin records each use.
-- **Reading a deck writes.** `visibleDeck` claims the grants waiting on the reader's address on every read, page loads and GETs included.
 - **Checks a browser test does not make.** No accessibility check such as axe, no test at a phone's width, and no measure of how fast a page loads.
 - **`.dek/renames.json` only grows.** When `.dek/` is ignored by git, another checkout does not have the renames (ADR 49).
 
