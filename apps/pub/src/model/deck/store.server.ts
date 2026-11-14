@@ -3,7 +3,7 @@
 
 import { decks } from "@schema";
 import type { Context } from "hono";
-import { and, db, desc, eq } from "void/db";
+import { and, db, desc, eq, isNotNull } from "void/db";
 import type { DeckStatus } from "../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
@@ -67,6 +67,19 @@ export async function recentPublicDecks(limit: number): Promise<Deck[]> {
     .select()
     .from(decks)
     .where(eq(decks.visibility, "public"))
+    .orderBy(desc(decks.updatedAt))
+    .limit(limit)
+    .all();
+}
+
+/** The public decks readers can open, the one changed last first, as much as the sitemap needs. */
+export async function indexedDecks(
+  limit: number,
+): Promise<Pick<Deck, "ownerId" | "slug" | "updatedAt">[]> {
+  return db
+    .select({ ownerId: decks.ownerId, slug: decks.slug, updatedAt: decks.updatedAt })
+    .from(decks)
+    .where(and(eq(decks.visibility, "public"), isNotNull(decks.currentVersion)))
     .orderBy(desc(decks.updatedAt))
     .limit(limit)
     .all();

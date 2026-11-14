@@ -21,16 +21,28 @@ export async function personById(c: Context, id: string): Promise<Person | null>
   return user ? readAccount(user) : null;
 }
 
+/** How many IDs one query asks for: D1 binds at most 100 values to a statement. */
+const IDS_PER_QUERY = 90;
+
 export async function peopleById(c: Context, ids: readonly string[]): Promise<Map<string, Person>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) {
     return new Map();
   }
   const context = await authOf(c).$context;
-  const users = (await context.adapter.findMany({
-    model: "user",
-    where: [{ field: "id", operator: "in", value: unique }],
-  })) as unknown[];
-  const people = users.flatMap((user) => readAccount(user) ?? []);
+  const batches: string[][] = [];
+  for (let at = 0; at < unique.length; at += IDS_PER_QUERY) {
+    batches.push(unique.slice(at, at + IDS_PER_QUERY));
+  }
+  const found = await Promise.all(
+    batches.map(
+      (batch) =>
+        context.adapter.findMany({
+          model: "user",
+          where: [{ field: "id", operator: "in", value: batch }],
+        }) as Promise<unknown[]>,
+    ),
+  );
+  const people = found.flat().flatMap((user) => readAccount(user) ?? []);
   return new Map(people.map((person) => [person.id, person]));
 }

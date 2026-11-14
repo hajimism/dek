@@ -90,9 +90,6 @@ The comment feature is planned to grow into two: public comments and a like on t
   - Nobody can report a talk, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
 - **Search.** No search; the plan's D1 FTS5 index is not built.
-- **Search engines.**
-  - No sitemap.
-  - The landing page and the About page have no canonical URL, and each language is the same URL told apart by `?lang=` or a cookie, with no `hreflang`.
 - **Headers.** The app's CSP holds only `frame-ancestors`, `base-uri` and `object-src`; a full one needs a hash or nonce for the talk page's inline listener (ADR 67).
 - **Terms and the law.**
   - No terms of service, privacy policy, or contact page; the footer has no link to them.

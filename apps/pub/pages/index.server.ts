@@ -2,6 +2,7 @@ import { defineHandler, defineHead, type InferProps } from "void";
 import { env } from "void/env";
 import { translate } from "../src/common/i18n.ts";
 import { featuredTalk, recentPublicTalks } from "../src/model/deck/card.server.ts";
+import { langLinks, langUrl } from "../src/shell/lang-url.ts";
 
 export type Props = InferProps<typeof loader>;
 
@@ -21,9 +22,10 @@ export const head = defineHead<Props>((c) => {
       { name: "description", content: translate(lang, "site.description") },
       { property: "og:title", content: "dek.pub" },
       { property: "og:description", content: translate(lang, "site.description") },
-      { property: "og:url", content: `${env.APP_ORIGIN}/` },
+      { property: "og:url", content: langUrl(env.APP_ORIGIN, "/", lang) },
       { property: "og:site_name", content: "dek.pub" },
       { name: "twitter:card", content: "summary" },
     ],
+    link: langLinks(env.APP_ORIGIN, "/", lang),
   };
 });
