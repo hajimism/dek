@@ -21,12 +21,7 @@ export type Filter = "open" | "resolved" | "all";
 export type CardComment = CommentRow & { pending?: boolean; failed?: boolean };
 
 /** What a composer sends; `scope` only from one that offered the choice, to open a thread. */
-export type ReplyInput = {
-  text: string;
-  scope?: ThreadScope;
-  guestName?: string;
-  turnstile?: string;
-};
+export type ReplyInput = { text: string; scope?: ThreadScope };
 
 /** A comment being written: what it will point at. */
 export type Draft = { anchor: CommentAnchor; slideNumber: number | null };

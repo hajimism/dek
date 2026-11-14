@@ -4,12 +4,11 @@
   import Menu from "../../common/ui/menu.svelte";
   import { profilePath } from "../../model/person/profile-path.ts";
   import Avatar from "../../model/person/ui/avatar.svelte";
-  import { followLang } from "../lang-link.ts";
   import { applyTheme } from "../theme.ts";
   import type { Theme } from "../type.ts";
   import { useApp } from "../use-app.ts";
 
-  const { shared, lang, t } = useApp();
+  const { shared, t } = useApp();
   let theme: Theme = $state(shared.theme);
   let scrolled = $state(false);
 
@@ -25,7 +24,9 @@
     { value: "light", icon: "sun" },
     { value: "dark", icon: "moon" },
   ] as const;
-  const themeIcon = $derived(themes.find((entry) => entry.value === theme)?.icon ?? "monitor");
+  // The button shows the theme the page is in, not the choice. Under the system's, only the
+  // browser knows which that is, so both icons are drawn and the color scheme keeps one.
+  const themeIcon = $derived(theme === "dark" ? "moon" : "sun");
 
   async function signOut() {
     await auth.signOut();
@@ -43,12 +44,15 @@
     <a class="wordmark" href="/" aria-label="dek.pub">
       <span class="mark" aria-hidden="true"></span><span>dek<span class="dot">.</span>pub</span>
     </a>
-    <nav class="tools" aria-label={t("lang.label")}>
-      <a class="lang" href={lang === "ja" ? "?lang=en" : "?lang=ja"} onclick={(event) => followLang(event, lang === "ja" ? "en" : "ja")} hreflang={lang === "ja" ? "en" : "ja"} lang={lang === "ja" ? "en" : "ja"}>
-        {lang === "ja" ? "EN" : "日本語"}
-      </a>
+    <div class="tools">
       <Menu label="{t('theme.label')}: {t(`theme.${theme}`)}">
-        {#snippet trigger()}<Icon name={themeIcon} />{/snippet}
+        {#snippet trigger()}
+          {#if theme === "system"}
+            <span class="follows light"><Icon name="sun" /></span><span class="follows dark"><Icon name="moon" /></span>
+          {:else}
+            <Icon name={themeIcon} />
+          {/if}
+        {/snippet}
         {#snippet children(close)}
           {#each themes as entry (entry.value)}
             <button
@@ -84,7 +88,7 @@
       {:else}
         <a class="signin" href="/signin" onclick={(event) => (event.currentTarget.href = signInHref())}>{t("nav.signin")}</a>
       {/if}
-    </nav>
+    </div>
   </div>
 </header>
 
@@ -141,7 +145,20 @@
     align-items: center;
     gap: var(--space-1);
   }
-  .lang,
+  .follows {
+    display: contents;
+  }
+  .follows.dark {
+    display: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    .follows.light {
+      display: none;
+    }
+    .follows.dark {
+      display: contents;
+    }
+  }
   .signin {
     display: inline-flex;
     align-items: center;
@@ -152,10 +169,6 @@
     font-size: var(--text-md);
     font-weight: var(--weight-medium);
     text-decoration: none;
-  }
-  .lang:hover {
-    background: var(--bg-subtle);
-    color: var(--text);
   }
   .signin {
     margin-left: var(--space-1);

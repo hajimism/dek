@@ -63,7 +63,7 @@ const comment = (overrides: Partial<CommentRow>): CommentRow => ({
   status: "open",
   text: "言い方を変えたい",
   targets: [],
-  author: { name: "Ann", handle: "ann", guest: false },
+  author: { name: "Ann", handle: "ann" },
   version: 1,
   url: "https://dek.pub/@hajime/talk#c_one",
   thread: [],
@@ -73,7 +73,7 @@ const comment = (overrides: Partial<CommentRow>): CommentRow => ({
 });
 
 describe("dekc pub promote", () => {
-  test.serial("makes a version the one the client's side reads", async () => {
+  test.serial("makes a version the one the guests read", async () => {
     await withPublished(async (fake, root, id) => {
       const deck = fake.decks.get(id);
       if (deck) {
@@ -129,7 +129,7 @@ describe("dekc pub share", () => {
         "--embed",
         "on",
         "--comments",
-        "guests",
+        "signed-in",
         "--json",
       ]);
       expect(jsonStdout<Json>(result)).toMatchObject({
@@ -139,13 +139,28 @@ describe("dekc pub share", () => {
         visibility: "link",
         scriptPublic: true,
         embed: true,
-        comments: "guests",
+        comments: "signed-in",
       });
       expect(fake.requests.at(-1)).toMatchObject({
         method: "PATCH",
         path: `/api/decks/${id}`,
-        json: { visibility: "link", scriptPublic: true, embed: true, comments: "guests" },
+        json: { visibility: "link", scriptPublic: true, embed: true, comments: "signed-in" },
       });
+    });
+  });
+
+  test.serial("refuses the old --comments guests: only signed-in accounts comment", async () => {
+    await withPublished(async (fake, root) => {
+      const result = await run(fake, root, ["share", "--comments", "guests", "--json"]);
+      expect(result.exitCode).toBe(1);
+      expect(jsonStdout<Json>(result)).toMatchObject({
+        ok: false,
+        error: {
+          message: 'invalid --comments "guests"',
+          hint: "--comments takes off or signed-in, e.g. `dekc pub share --comments signed-in`",
+        },
+      });
+      expect(fake.requests).toEqual([]);
     });
   });
 

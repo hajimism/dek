@@ -78,7 +78,7 @@ export type Invite = { to: string; byEmail: boolean };
 
 /**
  * Share a deck with one person, or change what an earlier share allows them. A new share is on
- * the client's side unless `side` says otherwise; an earlier one keeps its side unless it does.
+ * the guests' side unless `side` says otherwise; an earlier one keeps its side unless it does.
  */
 export async function share(
   c: Context,
@@ -116,7 +116,7 @@ export async function share(
   const id = newGrantId();
   await db
     .insert(grants)
-    .values({ id, deckId: deck.id, ...target, role, side: side ?? "client" })
+    .values({ id, deckId: deck.id, ...target, role, side: side ?? "guest" })
     .onConflictDoUpdate({
       target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
       set: side ? { role, side } : { role },
@@ -131,7 +131,7 @@ export async function share(
       id: row?.id ?? id,
       who: "email" in grantee ? grantee.email : grantee.handle,
       role,
-      side: row?.side ?? side ?? "client",
+      side: row?.side ?? side ?? "guest",
       createdAt: row?.createdAt ?? "",
     },
     invite: before ? null : { to: address, byEmail: "email" in grantee },

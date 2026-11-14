@@ -375,10 +375,11 @@ try {
     method: "POST",
     json: { text: "良い発表でした" },
   });
-  const postedRow = (await posted.json()) as { id: string; author: { guest: boolean } };
+  const postedRow = (await posted.json()) as { id: string; author: { handle: string } };
   check(
-    posted.status === 201 && !postedRow.author.guest,
-    "a signed-in reader posts a public comment",
+    posted.status === 201 && postedRow.author.handle !== "",
+    "a signed-in reader posts a public comment, under their handle",
+    postedRow,
   );
   const publicReply = await reader.fetch(publicPath, {
     method: "POST",
@@ -442,18 +443,24 @@ try {
       (await reader.fetch(publicPath)).status === 200,
     "with the policy off, no one posts and anyone still reads",
   );
-  await dekc(["pub", "share", "--comments", "guests"]);
-  const guest = new Browser(server.url);
-  const asGuest = await guest.fetch(publicPath, {
-    method: "POST",
-    json: { text: "ゲストです", guestName: "来場者" },
-  });
-  check(
-    asGuest.status === 201 &&
-      ((await asGuest.json()) as { author: { guest: boolean } }).author.guest,
-    "under guests, a guest posts with a name",
-  );
   await dekc(["pub", "share", "--comments", "signed-in"]);
+  const signedOut = new Browser(server.url);
+  const refused = await signedOut.fetch(publicPath, { method: "POST", json: { text: "x" } });
+  const refusal = (await refused.json()) as { error: { code: string; hint?: string } };
+  check(
+    refused.status === 403 &&
+      refusal.error.code === "no_comments" &&
+      refusal.error.hint === "sign in to comment",
+    "someone signed out posts no public comment, and is told to sign in",
+    refusal,
+  );
+  const noSignedOut = await dekc(["pub", "share", "--comments", "guests"]);
+  check(
+    noSignedOut.ok === false &&
+      (noSignedOut.error as { message: string }).message === 'invalid --comments "guests"',
+    "dekc takes no --comments guests, the old policy for signed-out writers",
+    noSignedOut,
+  );
   const likePath = `/api/decks/${id}/like`;
   const liked = (await (await reader.fetch(likePath, { method: "PUT" })).json()) as {
     count: number;
@@ -470,7 +477,10 @@ try {
     "each account likes a talk once, and may take it back",
     { liked, unliked },
   );
-  check((await guest.fetch(likePath, { method: "PUT" })).status === 401, "a guest cannot like");
+  check(
+    (await signedOut.fetch(likePath, { method: "PUT" })).status === 401,
+    "someone signed out cannot like",
+  );
 
   // Grants: a private deck shared with one person by handle.
   await dekc(["pub", "share", "--visibility", "private"]);
@@ -496,15 +506,15 @@ try {
     "the granted colleague sees the private talk",
   );
 
-  // Team and client: a view grant reads the threads its side may, and the client's side never
+  // Team and guests: a view grant reads the threads its side may, and the guests' side never
   // learns of a thread kept to the team until it is shared.
   const strangerHandle = (await stranger.fetch("/api/me").then((r) => r.json())).handle;
-  const clientList = async () =>
+  const guestList = async () =>
     (await (await stranger.fetch(`/api/decks/${id}/comments?status=all`)).json()) as {
       comments?: Array<{ id: string; number: number; scope: string }>;
     };
   check(
-    Array.isArray((await clientList()).comments),
+    Array.isArray((await guestList()).comments),
     "a colleague granted a view reads the comments",
   );
   const teamNote = await author.fetch(`/api/decks/${id}/comments`, {
@@ -518,13 +528,13 @@ try {
     teamRow,
   );
   check(
-    !(await clientList()).comments?.some((row) => row.id === teamRow.id),
-    "the client's side does not see a team thread",
+    !(await guestList()).comments?.some((row) => row.id === teamRow.id),
+    "the guests' side does not see a team thread",
   );
   check(
     (await stranger.fetch(`/api/decks/${id}/comments/${teamRow.id}/widen`, { method: "POST" }))
       .status === 404,
-    "the client's side cannot reach a team thread at all",
+    "the guests' side cannot reach a team thread at all",
   );
   await author.fetch(`/api/decks/${id}/grants`, {
     method: "POST",
@@ -540,19 +550,19 @@ try {
   });
   check(
     asTeam.status === 403 && (await asTeam.json()).error?.code === "team_only",
-    "the client's side cannot open a thread for the team alone",
+    "the guests' side cannot open a thread for the team alone",
   );
   const widened = await author.fetch(`/api/decks/${id}/comments/${teamRow.id}/widen`, {
     method: "POST",
   });
   const widenedRow = (await widened.json()) as { scope: string; number: number };
-  const shownToClient = (await clientList()).comments?.find((row) => row.id === teamRow.id);
+  const shownToGuest = (await guestList()).comments?.find((row) => row.id === teamRow.id);
   check(
     widened.status === 200 &&
       widenedRow.scope === "shared" &&
-      shownToClient?.number === Math.max(...rows.map((row) => row.number)) + 1,
-    "a shared team thread reaches the client under the next shared number",
-    { widenedRow, shownToClient },
+      shownToGuest?.number === Math.max(...rows.map((row) => row.number)) + 1,
+    "a shared team thread reaches the guest under the next shared number",
+    { widenedRow, shownToGuest },
   );
   const teamGrant = await author.fetch(`/api/decks/${id}/grants`, {
     method: "POST",
@@ -560,58 +570,58 @@ try {
   });
   check(
     ((await teamGrant.json()) as { side?: string }).side === "team" &&
-      ((await clientList()).comments ?? []).some((row) => row.scope === "team"),
+      ((await guestList()).comments ?? []).some((row) => row.scope === "team"),
     "a colleague moved to the team's side reads the team's threads",
   );
 
-  // A client invited by address signs in by a link mailed to it, with no account made first. An
+  // A guest invited by address signs in by a link mailed to it, with no account made first. An
   // address nothing waits for gets no link, and the same answer.
-  const clientEmail = `client-${Date.now()}@example.com`;
+  const guestEmail = `guest-${Date.now()}@example.com`;
   const nobody = `nobody-${Date.now()}@example.com`;
   await author.fetch(`/api/decks/${id}/grants`, {
     method: "POST",
-    json: { who: clientEmail, role: "comment" },
+    json: { who: guestEmail, role: "comment" },
   });
-  const invitation = (await inbox.waitFor(clientEmail, "shared"))[0];
+  const invitation = (await inbox.waitFor(guestEmail, "shared"))[0];
   check(
     invitation?.text.includes(`/signin?next=${encodeURIComponent(talkPath)}`) &&
-      invitation.text.includes(`sign in with ${clientEmail}`),
+      invitation.text.includes(`sign in with ${guestEmail}`),
     "a grant by address mails an invitation to sign in with it",
     invitation,
   );
-  const client = new Browser(server.url);
+  const guest = new Browser(server.url);
   const askFor = (email: string) =>
-    client.fetch("/api/auth/sign-in/magic-link", {
+    guest.fetch("/api/auth/sign-in/magic-link", {
       method: "POST",
       json: { email, callbackURL: talkPath, errorCallbackURL: "/signin" },
     });
   const unknown = await askFor(nobody);
-  const known = await askFor(clientEmail);
+  const known = await askFor(guestEmail);
   check(
     unknown.status === 200 &&
       known.status === 200 &&
       JSON.stringify(await unknown.json()) === JSON.stringify(await known.json()),
     "asking for a sign-in link answers the same for any address",
   );
-  const linkMail = (await inbox.waitFor(clientEmail, "Sign in"))[0];
+  const linkMail = (await inbox.waitFor(guestEmail, "Sign in"))[0];
   const link = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(linkMail?.text ?? "")?.[0];
   check(link !== undefined, "an invited address is mailed a sign-in link", linkMail);
   check((await inbox.to(nobody)).length === 0, "an address nothing waits for is mailed nothing");
-  const verified = await client.fetch(new URL(link).pathname + new URL(link).search);
+  const verified = await guest.fetch(new URL(link).pathname + new URL(link).search);
   check(
     verified.status === 302 && verified.headers.get("location")?.endsWith(talkPath),
-    "the link signs the client in and sends them to the talk",
+    "the link signs the guest in and sends them to the talk",
     { status: verified.status, location: verified.headers.get("location") },
   );
   check(
-    (await client.fetch(talkPath)).status === 200,
-    "signed in by the link, the client opens the private talk shared with their address",
+    (await guest.fetch(talkPath)).status === 200,
+    "signed in by the link, the guest opens the private talk shared with their address",
   );
-  const clientMe = (await (await client.fetch("/api/me")).json()) as { name?: string };
+  const guestMe = (await (await guest.fetch("/api/me")).json()) as { name?: string };
   check(
-    clientMe.name === clientEmail.split("@")[0],
+    guestMe.name === guestEmail.split("@")[0],
     "an account made by a sign-in link goes by its address's local part",
-    clientMe,
+    guestMe,
   );
   const again = await new Browser(server.url).fetch(new URL(link).pathname + new URL(link).search);
   check(again.headers.get("location")?.includes("error=") === true, "a sign-in link works once", {
@@ -620,54 +630,54 @@ try {
   });
 
   // The people in a thread are mailed of replies, unless they muted the deck.
-  const asked = await client.fetch(`/api/decks/${id}/comments`, {
+  const asked = await guest.fetch(`/api/decks/${id}/comments`, {
     method: "POST",
     json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "この数字の根拠は？" },
   });
   const askedRow = (await asked.json()) as { id: string };
-  const replyToClient = (text: string) =>
+  const replyToGuest = (text: string) =>
     author.fetch(`/api/decks/${id}/comments/${askedRow.id}/replies`, {
       method: "POST",
       json: { text },
     });
-  await replyToClient("社内の調査です");
-  const replied = await inbox.waitFor(clientEmail, "replied on");
+  await replyToGuest("社内の調査です");
+  const replied = await inbox.waitFor(guestEmail, "replied on");
   check(
     replied.length === 1 && replied[0]?.text.includes("社内の調査です"),
     "the thread's author is mailed of a reply",
     replied,
   );
-  const mute = await client.fetch(`/api/decks/${id}/mute`, { method: "PUT" });
+  const mute = await guest.fetch(`/api/decks/${id}/mute`, { method: "PUT" });
   check(
     mute.status === 200 && ((await mute.json()) as { muted?: boolean }).muted === true,
     "a reader mutes the deck's mail",
   );
-  await replyToClient("補足です");
-  await client.fetch(`/api/decks/${id}/mute`, { method: "DELETE" });
-  await replyToClient("もう一つ補足です");
-  const afterMute = await inbox.waitFor(clientEmail, "replied on", 2);
+  await replyToGuest("補足です");
+  await guest.fetch(`/api/decks/${id}/mute`, { method: "DELETE" });
+  await replyToGuest("もう一つ補足です");
+  const afterMute = await inbox.waitFor(guestEmail, "replied on", 2);
   check(
     afterMute.length === 2 && !afterMute.some((mail) => mail.text.split("\n")[0] === "補足です"),
     "nothing is mailed while the deck is muted, and mail comes again once it is not",
     afterMute.map((mail) => mail.text),
   );
 
-  const resolvedByClient = await client.fetch(`/api/decks/${id}/comments/${askedRow.id}/resolve`, {
+  const resolvedByGuest = await guest.fetch(`/api/decks/${id}/comments/${askedRow.id}/resolve`, {
     method: "POST",
   });
-  const resolvedMail = await inbox.waitFor(me.email, clientEmail.split("@")[0] ?? "", 2);
+  const resolvedMail = await inbox.waitFor(me.email, guestEmail.split("@")[0] ?? "", 2);
   check(
-    resolvedByClient.status === 200 &&
+    resolvedByGuest.status === 200 &&
       resolvedMail.some((mail) => mail.subject.includes(" resolved #")),
-    "the owner is mailed when the client resolves their thread",
+    "the owner is mailed when the guest resolves their thread",
     {
-      status: resolvedByClient.status,
+      status: resolvedByGuest.status,
       mails: (await inbox.to(me.email)).map((mail) => mail.subject),
     },
   );
 
   // Drafts: a version uploaded with --no-promote is the team's to read and comment on, and reaches
-  // the client's side only once it is current.
+  // the guests' side only once it is current.
   const draft = await dekc(["pub", "publish", "-m", "draft", "--no-promote"]);
   check(draft.ok && draft.current !== draft.n, "publish --no-promote uploads a draft", draft);
   const frameOn = async (who: Browser, path: string) => {
@@ -684,12 +694,12 @@ try {
     teamDraft,
   );
   check(
-    (await client.fetch(`${talkPath}?v=${draft.n}`)).status === 404,
-    "a draft is missing to the client's side",
+    (await guest.fetch(`${talkPath}?v=${draft.n}`)).status === 404,
+    "a draft is missing to the guests' side",
   );
   check(
-    (await frameOn(client, talkPath)).frame.includes(`/v/${draft.current}/`),
-    "the client's side reads the current version meanwhile",
+    (await frameOn(guest, talkPath)).frame.includes(`/v/${draft.current}/`),
+    "the guests' side reads the current version meanwhile",
   );
   const onDraft = await stranger.fetch(`/api/decks/${id}/comments`, {
     method: "POST",
@@ -701,14 +711,14 @@ try {
     },
   });
   const onDraftRow = (await onDraft.json()) as { id: string; version: number };
-  const clientSees = async () =>
+  const guestSees = async () =>
     (
-      (await (await client.fetch(`/api/decks/${id}/comments?status=all`)).json()) as {
+      (await (await guest.fetch(`/api/decks/${id}/comments?status=all`)).json()) as {
         comments: Array<{ id: string }>;
       }
     ).comments.some((row) => row.id === onDraftRow.id);
   check(
-    onDraft.status === 201 && onDraftRow.version === draft.n && !(await clientSees()),
+    onDraft.status === 201 && onDraftRow.version === draft.n && !(await guestSees()),
     "a shared thread on a draft stays with the team while the draft is one",
     onDraftRow,
   );
@@ -719,8 +729,8 @@ try {
     promoted,
   );
   check(
-    (await clientSees()) && (await frameOn(client, talkPath)).frame.includes(`/v/${draft.n}/`),
-    "once it is current, the client's side reads the version and the thread on it",
+    (await guestSees()) && (await frameOn(guest, talkPath)).frame.includes(`/v/${draft.n}/`),
+    "once it is current, the guests' side reads the version and the thread on it",
   );
 
   // What changed between the versions.

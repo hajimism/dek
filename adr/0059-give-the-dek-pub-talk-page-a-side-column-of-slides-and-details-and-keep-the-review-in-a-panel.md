@@ -6,6 +6,10 @@ Date: 2026-11-14
 
 Accepted
 
+Amended by [60. Take the dek.pub talk page's table of contents to the article, and mark the slide being read](0060-take-the-dek-pub-talk-page-s-table-of-contents-to-the-article-and-mark-the-slide-being-read.md)
+
+Amended by [63. Name each of a dek.pub talk's details for what it is, and give its duration from the frontmatter](0063-name-each-of-a-dek-pub-talk-s-details-for-what-it-is-and-give-its-duration-from-the-frontmatter.md)
+
 ## Context
 
 On a screen 1280 pixels wide or more, the talk page had a third column beside the article. It held the review panel, its cards placed by the anchor each pointed at in the article, the way a margin of notes is. Below 1280 pixels the same panel was a drawer, and below 1024 a sheet from the bottom.

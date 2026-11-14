@@ -1,8 +1,8 @@
 // Fills a running dek.pub dev server with demo data, the way `dekc pub` would: it builds the
 // sample decks in ../../sample with dek's own core, takes one picture per slide with Playwright,
 // signs up a demo author and a reviewer, publishes the decks with their versions, shares them,
-// and leaves comments, replies, and a guest comment on them. It can run again: the accounts sign
-// in, each deck gets new versions on top of its newest, and comments already there are kept.
+// and leaves comments and replies on them. It can run again: the accounts sign in, each deck gets
+// new versions on top of its newest, and comments already there are kept.
 //
 // Run from apps/pub, with the dev server up: `bun scripts/seed.ts`; BASE picks another server.
 
@@ -466,15 +466,15 @@ async function hasComments(owner: Session, deck: RemoteDeck): Promise<boolean> {
 
 /**
  * The review the seed leaves: on why-dek, the reviewer's quote with the author's reply, the
- * author's own note resolved, an element comment on a heading, and a guest's; on with-agents,
- * one quote by the reviewer, who may comment there by a grant.
+ * author's own note resolved, and an element comment on a heading; on with-agents, one quote by
+ * the reviewer, who may comment there by a grant.
  */
 async function leaveComments(
-  people: { demo: Session; reviewer: Session; guest: Session },
+  people: { demo: Session; reviewer: Session },
   whyDek: { id: string; map: SlideMap; heading: ElementTarget },
   withAgents: { id: string; map: SlideMap },
 ): Promise<void> {
-  const { demo, reviewer, guest } = people;
+  const { demo, reviewer } = people;
   const onTime = await comment(reviewer, whyDek.id, {
     anchor: anchor("later", [quote(whyDek.map, "later", "二十分の枠に三十分ぶん作ってしまった")]),
     text: "この例、身に覚えがありすぎます。実際の数字があるともっと刺さりそう。",
@@ -491,11 +491,6 @@ async function leaveComments(
     anchor: anchor("later", [whyDek.heading]),
     text: "見出しが長くて一息で読めません。「三つが後回しになる」くらいまで縮めたい。",
   });
-  await comment(guest, whyDek.id, {
-    anchor: anchor("deck", [quote(whyDek.map, "deck", "ディレクトリごとコピーすれば")]),
-    text: "assets の画像も含めてコピーで済むのは助かります。",
-    guestName: "Guest Reader",
-  });
   await comment(reviewer, withAgents.id, {
     anchor: anchor("why", [quote(withAgents.map, "why", "自分が書いた画面が見えません")]),
     text: "ここで実際のはみ出しのスクリーンショットを一枚見せたい。",
@@ -505,7 +500,7 @@ async function leaveComments(
 async function comment(
   session: Session,
   deckId: string,
-  body: { anchor: CommentAnchor; text: string; guestName?: string },
+  body: { anchor: CommentAnchor; text: string },
 ): Promise<Comment> {
   return session.call<Comment>("POST", paths.comments(deckId), body);
 }
@@ -546,7 +541,6 @@ async function main(): Promise<void> {
 
   const demo = await signIn(DEMO);
   const reviewer = await signIn(REVIEWER);
-  const guest = new Session("guest");
 
   const published = new Map<string, { deck: RemoteDeck; versions: number[]; map: SlideMap }>();
   const publish = async (name: string, versions: Version[]) => {
@@ -569,7 +563,7 @@ async function main(): Promise<void> {
 
   const share = (deck: RemoteDeck, request: ShareRequest) =>
     demo.session.call("PATCH", paths.deck(deck.id), request);
-  await share(whyDek, { visibility: "public", scriptPublic: true, comments: "guests" });
+  await share(whyDek, { visibility: "public", scriptPublic: true, comments: "signed-in" });
   await share(withAgents, { visibility: "link", scriptPublic: false, comments: "signed-in" });
   await demo.session.call("POST", paths.grants(withAgents.id), {
     who: reviewer.handle,
@@ -590,18 +584,18 @@ async function main(): Promise<void> {
     console.log("why-dek has comments from an earlier run; adding none");
   } else {
     await leaveComments(
-      { demo: demo.session, reviewer: reviewer.session, guest },
+      { demo: demo.session, reviewer: reviewer.session },
       { id: whyDek.id, map: whyMap, heading },
       { id: withAgents.id, map: agentsMap },
     );
   }
 
-  await requirePublicShot(guest, whyDek, whyMap.slides[0]?.slug ?? "");
+  await requirePublicShot(whyDek, whyMap.slides[0]?.slug ?? "");
   printSummary(demo.handle, reviewer.handle, published);
 }
 
 /** The public deck's slide picture must reach someone signed out. */
-async function requirePublicShot(guest: Session, deck: RemoteDeck, slug: string): Promise<void> {
+async function requirePublicShot(deck: RemoteDeck, slug: string): Promise<void> {
   const response = await fetch(`${BASE}/i/${deck.id}/${deck.latest}/s-${slug}`, {
     headers: { origin: BASE },
   });
@@ -611,7 +605,7 @@ async function requirePublicShot(guest: Session, deck: RemoteDeck, slug: string)
     response.headers.get("content-type") !== "image/png" ||
     bytes[0] !== 0x89
   ) {
-    throw new Error(`${guest.who} could not fetch why-dek's ${slug} picture: ${response.status}`);
+    throw new Error(`someone signed out could not fetch why-dek's ${slug} picture: ${response.status}`);
   }
 }
 

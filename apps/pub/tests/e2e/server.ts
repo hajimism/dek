@@ -20,7 +20,6 @@ export async function startDevServer(port: number): Promise<DevServer> {
       APP_ORIGIN: url,
       DECK_ORIGIN: `http://d-{id}.localhost:${port}`,
       DEK_PUB_DEV_LOGIN: "1",
-      TURNSTILE_SECRET: "off",
       SERVE_TOKEN_SECRET: "e2e-serve-token-secret",
       AUTH_GITHUB_CLIENT_ID: "e2e",
       AUTH_GITHUB_CLIENT_SECRET: "e2e",

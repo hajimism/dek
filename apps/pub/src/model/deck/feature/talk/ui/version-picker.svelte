@@ -1,5 +1,5 @@
 <script lang="ts">
-  // For the team's side: which version the page shows, and whether it is the one the client's
+  // For the team's side: which version the page shows, and whether it is the one the guests'
   // side reads. Choosing another reloads the page on it.
   import Icon from "../../../../../common/ui/icon.svelte";
   import { useApp } from "../../../../../shell/use-app.ts";

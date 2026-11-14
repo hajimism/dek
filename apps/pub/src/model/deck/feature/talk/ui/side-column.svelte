@@ -2,7 +2,7 @@
   // The column beside the article, on a wide screen: the slides as a table of contents, the
   // talk's details, and for a reader of the review its open threads and the way into it, full
   // screen beside the slide.
-  import { formatDate, slideCount } from "../../../../../common/i18n.ts";
+  import { formatDate, formatMinutes } from "../../../../../common/i18n.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import { useApp } from "../../../../../shell/use-app.ts";
   import SlideToc from "./slide-toc.svelte";
@@ -13,6 +13,7 @@
     author,
     date,
     version,
+    minutes,
     review,
     onslide,
     onreview,
@@ -22,6 +23,8 @@
     author: string;
     date: string | null;
     version: number;
+    /** The talk's length in minutes, as its frontmatter gives it; null without one. */
+    minutes: number | null;
     /** The review's open threads, for a reader of it; null for anyone else. */
     review: { open: number } | null;
     onslide: (slug: string) => void;
@@ -54,8 +57,12 @@
       {/if}
       <dt>{t("side.version")}</dt>
       <dd class="num">v{version}</dd>
-      <dt>{t("side.length")}</dt>
-      <dd>{slideCount(lang, slides.length)}</dd>
+      {#if minutes !== null}
+        <dt>{t("side.duration")}</dt>
+        <dd>{formatMinutes(lang, minutes)}</dd>
+      {/if}
+      <dt>{t("side.slideCount")}</dt>
+      <dd class="num">{slides.length}</dd>
     </dl>
   </section>
 </div>

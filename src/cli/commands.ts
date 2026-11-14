@@ -958,7 +958,7 @@ export const COMMANDS = {
       "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
       "dekc pub whoami | logout",
       "dekc pub publish [--message <text>] [--no-promote] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
-      "dekc pub share --visibility private|link|public --script shown|hidden --embed on|off --comments off|signed-in|guests",
+      "dekc pub share --visibility private|link|public --script shown|hidden --embed on|off --comments off|signed-in",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
       "dekc pub promote <n>   make a version uploaded with --no-promote, or an older one, the one readers see",
     ],
@@ -1020,7 +1020,7 @@ export const COMMANDS = {
         args: [],
         flags: ["server", "visibility", "script", "embed", "comments"],
         usage: [
-          "dekc pub share [deck] [--visibility private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in|guests] [--server <url>]",
+          "dekc pub share [deck] [--visibility private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in] [--server <url>]",
         ],
         run: async ({ flags, target }) => {
           const { shareCommand } = await import("./pub.ts");

@@ -141,7 +141,7 @@ describe("dekc pub whoami and logout", () => {
         key: "file",
       });
       expect(fake.requests[0]?.headers["x-api-key"]).toBe(key);
-      expect(fake.requests[0]?.headers["dek-protocol"]).toBe("1");
+      expect(fake.requests[0]?.headers["dek-protocol"]).toBe("2");
     });
   });
 

@@ -10,21 +10,18 @@ export function publicCommentsOn(deck: Pick<DeckRules, "visibility">): boolean {
   return deck.visibility !== "private";
 }
 
-/** Anyone signed in under `signed-in`, guests too under `guests`, no one under `off`. */
+/** Anyone signed in under `signed-in`, no one under `off`; never anyone signed out. */
 export function canPostPublic(deck: DeckRules, person: Caller): boolean {
-  if (!publicCommentsOn(deck) || deck.comments === "off") {
-    return false;
-  }
-  return person !== null || deck.comments === "guests";
+  return publicCommentsOn(deck) && deck.comments !== "off" && person !== null;
 }
 
-export function mayEditPublic(comment: { authorId: string | null }, person: Caller): boolean {
+export function mayEditPublic(comment: { authorId: string }, person: Caller): boolean {
   return person !== null && comment.authorId === person.id;
 }
 
 export function mayDeletePublic(
   deck: Pick<DeckRules, "ownerId">,
-  comment: { authorId: string | null },
+  comment: { authorId: string },
   person: Caller,
 ): boolean {
   return mayEditPublic(comment, person) || canManage(deck, person);

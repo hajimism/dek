@@ -3,7 +3,6 @@
   // each with one level of replies. Their author changes them; the author or the owner removes them.
   import type { PublicComment, PublicReply } from "../../../../../../../src/pub/protocol.ts";
   import { absoluteTime, relativeTime } from "../../../../common/i18n.ts";
-  import Badge from "../../../../common/ui/badge.svelte";
   import Button from "../../../../common/ui/button.svelte";
   import { now as currentTime } from "../../../../common/ui/clock.svelte.ts";
   import { useApp } from "../../../../shell/use-app.ts";
@@ -33,7 +32,6 @@
   } = $props();
 
   const { shared, lang, t } = useApp();
-  const guest = $derived(canPost && !shared.viewer);
   const count = $derived(comments.reduce((n, top) => n + 1 + top.replies.length, 0));
   let replying: string | null = $state(null);
   let editing: string | null = $state(null);
@@ -41,7 +39,7 @@
   let confirming: string | null = $state(null);
 
   const mine = (comment: PublicReply) =>
-    !comment.author.guest && shared.viewer !== null && comment.author.handle === shared.viewer.handle;
+    shared.viewer !== null && comment.author.handle === shared.viewer.handle;
 
   async function save(id: string) {
     if (draft.trim() && (await onedit(id, draft.trim()))) {
@@ -53,9 +51,8 @@
 {#snippet item(comment: PublicReply, top: boolean)}
   <article class="item" class:reply={!top}>
     <header class="byline">
-      <Avatar name={comment.author.name} size={28} guest={comment.author.guest} />
+      <Avatar name={comment.author.name} size={28} />
       <span class="name">{comment.author.name}</span>
-      {#if comment.author.guest}<Badge tone="outline">{t("comment.guestBadge")}</Badge>{/if}
       <time datetime={comment.createdAt} title={absoluteTime(lang, comment.createdAt)}>
         {relativeTime(lang, comment.createdAt, currentTime(shared.now))}
       </time>
@@ -124,7 +121,6 @@
               {#if replying === top.id}
                 <li class="reply-box">
                   <Composer
-                    {guest}
                     compact
                     autofocus
                     placeholder={t("public.replyPlaceholder")}
@@ -148,7 +144,7 @@
   {/if}
   {#if canPost}
     <div class="new">
-      <Composer {guest} placeholder={t("public.placeholder")} onsubmit={(input) => onpost(input, null)} />
+      <Composer placeholder={t("public.placeholder")} onsubmit={(input) => onpost(input, null)} />
     </div>
   {:else if off}
     <p class="empty">{t("public.off")}</p>

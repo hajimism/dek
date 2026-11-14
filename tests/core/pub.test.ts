@@ -220,7 +220,7 @@ describe("the protocol", () => {
       status: "open",
       text: "t",
       targets: [{ kind: "quote", quote: "q", prefix: "", suffix: "", score: 1 }],
-      author: { name: "Ann", guest: true, avatar: "x" },
+      author: { name: "Ann", handle: "ann", avatar: "x" },
       version: 1,
       url: "https://dek.pub/x",
       thread: [],
@@ -236,7 +236,7 @@ describe("the protocol", () => {
       prefix: "",
       suffix: "",
     });
-    expect(read.comments[0]?.author).toEqual({ name: "Ann", guest: true });
+    expect(read.comments[0]?.author).toEqual({ name: "Ann", handle: "ann" });
     expect(() => answerOf(CommentList).parse({ comments: [{ ...row, status: "lost" }] })).toThrow();
   });
 

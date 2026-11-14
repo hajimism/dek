@@ -9,6 +9,11 @@ import {
 import { readJson } from "../../../common/json.ts";
 import { ChangedSlugs, FileHashes, ShotHashes, type Version, type VersionRow } from "./type.ts";
 
+/** The minutes in a manifest's `duration`, such as `12m`; none when it gives none. */
+export function minutesOf(duration: string | undefined): number | null {
+  return duration === undefined ? null : Number.parseInt(duration, 10);
+}
+
 export function versionOf(row: VersionRow): Version {
   return {
     ...row,

@@ -2,7 +2,6 @@ import { defineHandler } from "void";
 import { NewPublicComment } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../../../../src/common/api-error.ts";
 import { api, jsonBody } from "../../../../../src/common/http.server.ts";
-import { admitGuest } from "../../../../../src/model/comment/guest.server.ts";
 import { canPostPublic, publicCommentsOn } from "../../../../../src/model/comment/public/access.ts";
 import { postPublic, publicCommentFor, publicCommentsOf } from "../../../../../src/model/comment/public/store.server.ts";
 import { visibleDeck } from "../../../../../src/model/deck/store.server.ts";
@@ -27,7 +26,7 @@ export const POST = defineHandler((c) =>
     if (!publicCommentsOn(deck)) {
       throw notFound("comments");
     }
-    if (!canPostPublic(deck, person)) {
+    if (person === null || !canPostPublic(deck, person)) {
       throw new ApiError(
         403,
         "no_comments",
@@ -36,7 +35,6 @@ export const POST = defineHandler((c) =>
       );
     }
     const body = await jsonBody(c, NewPublicComment);
-    await admitGuest(c, person, body, body.parentId ? "reply" : "comment");
     const id = await postPublic(deck.id, person, body);
     return Response.json(await publicCommentFor(c, deck.id, id), { status: 201 });
   }, c.req.raw),

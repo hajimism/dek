@@ -290,7 +290,7 @@ export async function publishCommand(
     },
   );
 
-  const { description, event, date, lang } = deck.deck;
+  const { description, event, date, duration, lang } = deck.deck;
   const manifest: VersionManifest = {
     protocol: PROTOCOL_VERSION,
     dekVersion: pkg.version,
@@ -299,6 +299,7 @@ export async function publishCommand(
     ...(description !== undefined ? { description } : {}),
     ...(event !== undefined ? { event } : {}),
     ...(date !== undefined ? { date } : {}),
+    ...(duration !== undefined ? { duration } : {}),
     lang,
     base,
     slideMap: version.slideMap,
@@ -443,7 +444,7 @@ export async function statusCommand(target: ReadableDeck, flags: FlagValues): Pr
 }
 
 const SHARE_FLAGS =
-  "--visibility private|link|public, --script shown|hidden, --embed on|off, or --comments off|signed-in|guests";
+  "--visibility private|link|public, --script shown|hidden, --embed on|off, or --comments off|signed-in";
 
 /** `dekc pub share`: who may open the deck, read its script, embed it, and comment. */
 export async function shareCommand(target: ReadableDeck, flags: FlagValues): Promise<PubResult> {
@@ -476,7 +477,7 @@ export async function shareCommand(target: ReadableDeck, flags: FlagValues): Pro
 }
 
 /**
- * `dekc pub promote <n>`: make version `n` the one the client's side reads, as the manage page's
+ * `dekc pub promote <n>`: make version `n` the one the guests read, as the manage page's
  * "Make current" does: a draft the team has looked at, or an older version to roll back to.
  */
 export async function promoteCommand(

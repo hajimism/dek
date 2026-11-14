@@ -27,7 +27,7 @@ export function widestSide(sides: readonly GrantSide[]): GrantSide | null {
   if (sides.includes("team")) {
     return "team";
   }
-  return sides.length > 0 ? "client" : null;
+  return sides.length > 0 ? "guest" : null;
 }
 
 /**

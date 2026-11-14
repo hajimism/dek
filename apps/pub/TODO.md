@@ -13,8 +13,7 @@ What it does not do:
 - **Notifications.** No one hears that a comment arrived: no email, no unread marker, nothing in the app.
 - **Live updates.** Comments load with the page. Others' comments appear only after a reload; only your own are merged in as you post them.
 - **Editing and deleting.** Nobody can edit or delete a comment or a reply, and the API has no routes for it.
-- **Moderation.** The owner can resolve any thread but cannot hide or delete one. A guest cannot resolve or reopen their own thread, because resolving needs a signed-in account.
-- **Guest identity.** A guest's name is remembered in the browser (`dek-pub:guest-name`). Nothing ties a guest to their earlier comments.
+- **Moderation.** The owner can resolve any thread but cannot hide or delete one.
 - **Anchoring to beats.** An element comment keeps the beat it was picked at. A comment on a quote, and one on a slide made before the deck reported ready, are saved at step `"0"`. Pins are drawn at every beat of their slide (ADR 45).
 - **Re-anchoring after a publish** (`src/model/comment/anchor.ts`).
   - Quotes are searched for again, and renames are followed.
@@ -22,9 +21,9 @@ What it does not do:
   - So the "Moved" and "Changed" badges appear only for quotes and renames.
 - **Versions.**
   - There is no way to see comments where they sat on an older version. The API's `?version=` filter is used by neither the CLI nor the pages, and a reader may ask it for the current version only.
-  - Which versions were once current is not kept. So the client's side comments on the current version only: a page opened before a promote gets 409 `stale_version` and must be reloaded. A thread opened on a draft is the team's alone until that version is current (ADR 55).
+  - Which versions were once current is not kept. So the guests' side comments on the current version only: a page opened before a promote gets 409 `stale_version` and must be reloaded. A thread opened on a draft is the team's alone until that version is current (ADR 55).
 - **What changed.** Only the manage page lists the slides a version changed. The talk page does not mark changed slides for someone coming back to review.
-- **Team and client** (ADR 51, 52).
+- **Team and guests** (ADR 51, 52).
   - A thread's scope is set only on the page and by the API: `dekc pub comments` has no command to share a team thread, and no flag to open one, since the CLI opens no threads.
   - The pins the deck draws show a team thread's bare number, so on the team's side `T3` and `3` both show as 3 there (the embed API takes a number).
 - **Text.** Comments are plain text: no Markdown, no mentions.
@@ -38,12 +37,8 @@ What it does not do:
   - The like appears beside the title and in the full-screen header (ADR 58).
 - **Scale.** `listComments` loads every thread and reply at once. The card folds long threads only in the browser.
 - **Drafts.** A draft is lost on reload.
-- **Turnstile setup.**
-  - `TURNSTILE_SITE_KEY` (`env.ts`) is missing from `dev.env` and from ADR 43's list of production settings.
-  - The composer shows the widget only when the site key is set, yet the server asks for a token whenever `TURNSTILE_SECRET` is not `off`. With the secret set and no site key, a guest cannot comment.
-  - The e2e run posts a guest's public comment with the check off; nothing exercises Turnstile itself.
 
-## Comments for client work
+## Comments for reviews with guests
 
 The comment feature is planned to grow into two: public comments and a like on the whole talk, at the bottom of its page; and review threads, for the people a deck is shared with, in a comments mode of the full-screen viewer. Grant sides and thread scopes are built (ADR 51), anyone a deck is shared with reads its threads and nobody else does, public comments and likes sit at the bottom of a `link` or `public` talk (ADR 56), the team's side reads drafts (ADR 55), the talk goes full screen with a header and a review mode (ADR 57, 58), and a side column holds the slides, the details and the way into the review (ADR 59). Still to come, each with its own ADR:
 
@@ -82,7 +77,7 @@ The comment feature is planned to grow into two: public comments and a like on t
   - SPF, DKIM and DMARC records for it, checked in a received mail's headers.
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing.
   - Asking for sign-in links is held only by Better Auth's default limit, 5 a minute from one client; nothing limits how many addresses are tried.
-- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, plus `TURNSTILE_SITE_KEY`. `DEK_PUB_DEV_LOGIN` must be unset.
+- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`. `DEK_PUB_DEV_LOGIN` must be unset.
 - **Domains.**
   - `dek.pub` and `dekusercontent.com` are not registered.
   - `serve/wrangler.jsonc` has no routes for `d-*.dekusercontent.com`, and there is no wildcard DNS.
@@ -111,7 +106,6 @@ The comment feature is planned to grow into two: public comments and a like on t
   - source history and `dekc pub pull`, syncing either to Cloudflare Artifacts or as pull requests to the author's GitHub (not yet decided)
   - changing slides by instruction
 - **Open questions:**
-  - whether guests may comment at all
   - where a live room keeps its state
   - storage limits per plan
   - whether the deck's CSP applies to a local `dekc build` too

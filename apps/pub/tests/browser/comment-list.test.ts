@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CommentRow, NewComment } from "../../../../src/pub/protocol.ts";
 import { CommentList } from "../../src/model/comment/client.svelte.ts";
 
-const author = { name: "Hajime", handle: "demo", guest: false };
+const author = { name: "Hajime", handle: "demo" };
 
 function row(overrides: Partial<CommentRow> = {}): CommentRow {
   return {
@@ -76,7 +76,7 @@ describe("CommentList", () => {
     expect(list.rows[2]).toMatchObject({ scope: "team", number: 2 });
   });
 
-  it("shares a team thread with the client and shows it as the server answers", async () => {
+  it("shares a team thread with guests and shows it as the server answers", async () => {
     const fetch = answers(row({ id: "c_t", scope: "shared", number: 5 }));
     const list = new CommentList("d_x", [row({ id: "c_t", scope: "team", number: 1 })], () => {});
     expect(await list.widen(list.rows[0] as NonNullable<(typeof list.rows)[0]>)).toBe(true);

@@ -20,7 +20,7 @@ export async function sendNotices(
   deck: Deck,
   thread: ThreadRow,
   event: NoticeEvent,
-  actor: { person: Person | null; guestName?: string },
+  actor: Person,
   text: string,
 ): Promise<void> {
   const repliers = await db
@@ -32,7 +32,7 @@ export async function sendNotices(
     ownerId: deck.ownerId,
     authorId: thread.authorId,
     replierIds: repliers.map((row) => row.authorId),
-    actorId: actor.person?.id ?? null,
+    actorId: actor.id,
   });
   if (ids.length === 0) {
     return;
@@ -42,9 +42,7 @@ export async function sendNotices(
     mutedAmong(deck.id, ids),
     talkUrl(c, deck),
   ]);
-  const name = actor.person
-    ? actor.person.name || actor.person.handle
-    : (actor.guestName ?? "A guest");
+  const name = actor.name || actor.handle;
   for (const id of ids) {
     const person = people.get(id);
     if (!person) {

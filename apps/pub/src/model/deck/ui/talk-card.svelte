@@ -1,12 +1,24 @@
 <script lang="ts">
-  import { formatDate, guessLang, slideCount } from "../../../common/i18n.ts";
+  
+  import type { Visibility } from "../../../../../../src/pub/protocol.ts";
+import { formatDate, guessLang, slideCount } from "../../../common/i18n.ts";
   import Icon from "../../../common/ui/icon.svelte";
   import { useApp } from "../../../shell/use-app.ts";
   import Avatar from "../../person/ui/avatar.svelte";
   import { talkPath } from "../deck.ts";
   import type { TalkCard } from "../type.ts";
+  import VisibilityBadge from "./visibility-badge.svelte";
 
-  let { card, showOwner = true }: { card: TalkCard; showOwner?: boolean } = $props();
+  let {
+    card,
+    showOwner = true,
+    visibility,
+  }: {
+    card: TalkCard;
+    showOwner?: boolean;
+    /** The talk's visibility, shown to its owner; nobody else is given it. */
+    visibility?: Visibility;
+  } = $props();
   const { lang } = useApp();
 </script>
 
@@ -30,6 +42,9 @@
         <Avatar name={card.owner.name} image={card.owner.image} size={20} />
         {card.owner.name}
       </span>
+    {/if}
+    {#if visibility}
+      <span class="badge"><VisibilityBadge {visibility} /></span>
     {/if}
   </span>
 </a>
@@ -95,6 +110,9 @@
     gap: 6px;
     color: var(--text-muted);
     font-size: var(--text-sm);
+  }
+  .badge {
+    margin-top: 2px;
   }
   .owner {
     display: flex;

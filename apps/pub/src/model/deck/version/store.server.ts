@@ -11,7 +11,7 @@ import { now } from "../../../common/db.server.ts";
 import { versionKey } from "../serving/origin.ts";
 import { syncAccess } from "../sync-access.server.ts";
 import type { RenameRow, Version } from "./type.ts";
-import { versionOf } from "./version.ts";
+import { minutesOf, versionOf } from "./version.ts";
 
 export async function versionsOf(deckId: string): Promise<Version[]> {
   const rows = await db
@@ -140,6 +140,7 @@ export async function recordVersion(
         description: manifest.description ?? null,
         event: manifest.event ?? null,
         talkDate: manifest.date ?? null,
+        minutes: minutesOf(manifest.duration),
         lang: manifest.lang ?? null,
         updatedAt: now,
       })

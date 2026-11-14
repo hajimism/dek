@@ -26,6 +26,7 @@
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import { DeckLink } from "../deck-link.svelte.ts";
   import { withSlide } from "../embed.ts";
+  import { readingSlug } from "../reading.ts";
   import type { QuoteSelection, Talk } from "../type.ts";
   import Article from "./article.svelte";
   import SideColumn from "./side-column.svelte";
@@ -38,7 +39,6 @@
 
   const { shared, lang, t } = useApp();
   const commentsOn = $derived(talk.comments !== null);
-  const guest = $derived(talk.canComment && !shared.viewer);
   const slideNumbers = $derived(new Map(talk.slides.map((slide, i) => [slide.slug, i + 1])));
   const slugs = $derived(talk.slides.map((slide) => slide.slug));
   const contentLang = $derived(talk.lang ?? lang);
@@ -253,6 +253,60 @@
     scrollToViewer();
   }
 
+  // The table of contents marks the slide being read in the article, and above the article the
+  // one the deck shows. A slide picked from it stays marked until the reader moves the page
+  // themselves, since the last sections cannot scroll up as far as the reading line.
+  let reading: string | null = $state(null);
+  let picked: string | null = $state(null);
+  const tocCurrent = $derived(picked ?? reading ?? link.current?.slug ?? null);
+
+  $effect(() => {
+    const ids = slugs;
+    let pending = 0;
+    const measure = () => {
+      pending = 0;
+      const headings = ids.flatMap((slug) => {
+        const heading = document.getElementById(slug);
+        return heading ? [{ slug, top: heading.getBoundingClientRect().top }] : [];
+      });
+      reading = readingSlug(headings, window.innerHeight / 3);
+    };
+    const schedule = () => {
+      pending ||= requestAnimationFrame(measure);
+    };
+    const release = () => {
+      picked = null;
+    };
+    const moves = ["wheel", "touchstart", "keydown"] as const;
+    measure();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    for (const type of moves) {
+      window.addEventListener(type, release, { passive: true });
+    }
+    return () => {
+      cancelAnimationFrame(pending);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      for (const type of moves) {
+        window.removeEventListener(type, release);
+      }
+    };
+  });
+
+  // The article's section for the slide; a talk whose script is hidden has none, so the deck
+  // goes there instead.
+  function readSlide(slug: string) {
+    const heading = document.getElementById(slug);
+    if (!heading) {
+      showSlide(slug);
+      return;
+    }
+    picked = slug;
+    history.replaceState(history.state, "", `#${slug}`);
+    heading.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function commentOnSlide(slug: string) {
     if (!talk.canComment) {
       return;
@@ -316,7 +370,7 @@
   }
 
   async function create(input: ReplyInput): Promise<boolean> {
-    if (!draft) {
+    if (!draft || !shared.viewer) {
       return false;
     }
     const body: NewComment = {
@@ -324,12 +378,8 @@
       text: input.text,
       version: talk.version,
       ...(input.scope ? { scope: input.scope } : {}),
-      ...(input.guestName ? { guestName: input.guestName } : {}),
-      ...(input.turnstile ? { turnstile: input.turnstile } : {}),
     };
-    const author = shared.viewer
-      ? { name: shared.viewer.name, handle: shared.viewer.handle, guest: false }
-      : { name: input.guestName ?? "", guest: true };
+    const author = { name: shared.viewer.name, handle: shared.viewer.handle };
     draft = null;
     const row = await list.create(body, author);
     if (row) {
@@ -404,7 +454,6 @@
     isOwner={talk.isOwner}
     canComment={talk.canComment}
     scopes={talk.side === "team"}
-    {guest}
     closable
     {muted}
     onmute={setMuted}
@@ -519,7 +568,7 @@
 {#if talk.slides.length > 1}
   <details class="toc-fold" lang={contentLang}>
     <summary>{t("side.slides")} <span class="num">{talk.slides.length}</span></summary>
-    <SlideToc slides={talk.slides} current={link.current?.slug ?? null} onslide={showSlide} />
+    <SlideToc slides={talk.slides} current={tocCurrent} onslide={readSlide} />
   </details>
 {/if}
 
@@ -527,12 +576,13 @@
   <aside class="side-col" aria-label={t("side.details")} lang={contentLang}>
     <SideColumn
       slides={talk.slides}
-      current={link.current?.slug ?? null}
+      current={tocCurrent}
       author={talk.owner.name}
       date={talk.date}
       version={talk.version}
+      minutes={talk.minutes}
       review={commentsOn ? { open: openCount } : null}
-      onslide={showSlide}
+      onslide={readSlide}
       onreview={() => theater?.enter(true)}
     />
   </aside>
@@ -609,12 +659,7 @@
           signinHref={signinHref()}
           onpost={(input, parentId) =>
             publicChange(() => {
-              const body: NewPublicComment = {
-                text: input.text,
-                ...(parentId ? { parentId } : {}),
-                ...(input.guestName ? { guestName: input.guestName } : {}),
-                ...(input.turnstile ? { turnstile: input.turnstile } : {}),
-              };
+              const body: NewPublicComment = { text: input.text, ...(parentId ? { parentId } : {}) };
               return api(publicPath, { method: "POST", body });
             })}
           onedit={(id, text) =>

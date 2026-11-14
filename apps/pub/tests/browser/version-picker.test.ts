@@ -10,10 +10,10 @@ const versions = [
 ];
 
 describe("VersionPicker", () => {
-  it("says when the page shows a draft, and what the client's side reads instead", async () => {
+  it("says when the page shows a draft, and what guests read instead", async () => {
     await renderPage(VersionPicker, { versions, version: 3, current: 2, onpick: () => {} });
     await expect
-      .element(page.getByText("Draft: version 3. The client’s side reads version 2."))
+      .element(page.getByText("Draft: version 3. Guests read version 2."))
       .toBeInTheDocument();
     await expect.element(page.getByRole("combobox", { name: "Version" })).toHaveValue("3");
     await expect
@@ -34,9 +34,7 @@ describe("VersionPicker", () => {
     await renderPage(VersionPicker, { versions, version: 3, current: null, onpick: () => {} });
     await expect
       .element(
-        page.getByText(
-          "Draft: version 3. No version is current, so the client’s side sees nothing yet.",
-        ),
+        page.getByText("Draft: version 3. No version is current, so guests see nothing yet."),
       )
       .toBeInTheDocument();
   });

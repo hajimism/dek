@@ -36,14 +36,14 @@ export function canComment(deck: DeckRules, person: Caller, grant: GrantRole | n
 
 /**
  * Which side of the work `person` is on: the owner the team's; a grantee the one their grants
- * give; anyone else, guests included, the client's.
+ * give; anyone else, signed out included, the guests'.
  */
 export function sideOf(
   deck: Pick<DeckRules, "ownerId">,
   person: Caller,
   granted: GrantSide | null,
 ): GrantSide {
-  return canManage(deck, person) ? "team" : (granted ?? "client");
+  return canManage(deck, person) ? "team" : (granted ?? "guest");
 }
 
 export function canManage(deck: Pick<DeckRules, "ownerId">, person: Caller): boolean {
@@ -59,7 +59,7 @@ export function canSeeScript(
 }
 
 /**
- * The version the talk page shows. The client's side reads the current one, and asking for any
+ * The version the talk page shows. The guests' side reads the current one, and asking for any
  * other finds nothing. The team's side reads the one it asks for, of those uploaded; by default
  * the current one, or the newest while none is current, so a deck whose versions were all
  * uploaded with --no-promote is never missing to the team that made it.
@@ -73,7 +73,7 @@ export function shownVersion(deck: Versions, side: GrantSide, asked: number | nu
 
 /**
  * Whether someone on `side` may read version `n`, its pictures and the comments placed on it: the
- * client's side the current version only; the team's any version uploaded, the drafts included.
+ * guests' side the current version only; the team's any version uploaded, the drafts included.
  */
 export function mayReadVersion(deck: Versions, side: GrantSide, n: number): boolean {
   if (side === "team") {

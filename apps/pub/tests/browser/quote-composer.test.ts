@@ -93,7 +93,7 @@ describe("commenting on a selection", () => {
           status: "open",
           text: "Source?",
           targets: [{ kind: "quote", quote: "dek is fast", prefix: "", suffix: "." }],
-          author: { name: "Sato", handle: "sato", guest: false },
+          author: { name: "Sato", handle: "sato" },
           version: 1,
           url: "",
           thread: [],

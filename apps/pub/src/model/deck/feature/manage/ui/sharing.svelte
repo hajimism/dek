@@ -13,7 +13,7 @@
   let grants: GrantView[] = $state(untrack(() => initial));
   let who = $state("");
   let role: GrantRole = $state("view");
-  let side: GrantSide = $state("client");
+  let side: GrantSide = $state("guest");
   let adding = $state(false);
   let error = $state("");
 
@@ -106,7 +106,7 @@
   <div class="field">
     <label for="grant-side">{t("side.label")}</label>
     <select id="grant-side" bind:value={side} aria-describedby="grant-side-hint">
-      <option value="client">{t("side.client")}</option>
+      <option value="guest">{t("side.guest")}</option>
       <option value="team">{t("side.team")}</option>
     </select>
   </div>
@@ -121,7 +121,7 @@
   <ul class="list">
     {#each grants as grant (grant.id)}
       <li class="row">
-        <Avatar name={grant.who.replace(/@.*/, "") || grant.who} size={28} guest={isEmail(grant.who)} />
+        <Avatar name={grant.who.replace(/@.*/, "") || grant.who} size={28} pending={isEmail(grant.who)} />
         <span class="name">
           <span class="who-text">{label(grant)}</span>
           {#if isEmail(grant.who)}<span class="pending">{t("manage.sharing.pending")}</span>{/if}
@@ -143,7 +143,7 @@
           value={grant.side}
           onchange={(event) => change(grant, { role: grant.role, side: event.currentTarget.value as GrantSide })}
         >
-          <option value="client">{t("side.client")}</option>
+          <option value="guest">{t("side.guest")}</option>
           <option value="team">{t("side.team")}</option>
         </select>
         <button type="button" class="remove" aria-label={t("manage.sharing.remove", { who: label(grant) })} title={t("manage.sharing.remove", { who: label(grant) })} onclick={() => remove(grant)}>

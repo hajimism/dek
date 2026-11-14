@@ -65,8 +65,8 @@ async function listComments(
     .all();
   const renameRows = await renamesOf(deck.id);
   const people = await peopleById(c, [
-    ...wanted.flatMap((row) => (row.authorId ? [row.authorId] : [])),
-    ...replyRows.flatMap((row) => (row.authorId ? [row.authorId] : [])),
+    ...wanted.map((row) => row.authorId),
+    ...replyRows.map((row) => row.authorId),
   ]);
   const url = await talkUrl(c, deck);
 
@@ -108,20 +108,10 @@ async function listComments(
   });
 }
 
-/** Who wrote a comment, as anyone who reads it is told: a signed-in author by handle, else a guest. */
-export function authorOf(
-  row: { authorId: string | null; guestName: string | null },
-  people: Map<string, Person>,
-) {
-  if (row.authorId) {
-    const person = people.get(row.authorId);
-    return {
-      name: person?.name ?? "someone",
-      handle: person?.handle ?? row.authorId,
-      guest: false,
-    };
-  }
-  return { name: row.guestName ?? "guest", guest: true };
+/** Who wrote a comment, as anyone who reads it is told: its author's name and handle. */
+export function authorOf(row: { authorId: string }, people: Map<string, Person>) {
+  const person = people.get(row.authorId);
+  return { name: person?.name ?? "someone", handle: person?.handle ?? row.authorId };
 }
 
 /**
@@ -159,7 +149,7 @@ export async function commentFor(
 
 export async function openThread(
   deck: Deck,
-  person: Person | null,
+  person: Person,
   side: GrantSide,
   comment: NewComment,
 ): Promise<string> {
@@ -167,7 +157,7 @@ export async function openThread(
   // The version the commenter was reading, which may be older than the current one by now;
   // the thread is kept on it, so the renames since are followed when it is shown.
   const n = comment.version ?? deck.currentVersion;
-  // The client's side comments on the version it reads, the current one; the team's on any it
+  // The guests' side comments on the version it reads, the current one; the team's on any it
   // may open. One whose page shows an older version is told so, whatever that version was:
   // whether it was ever shown is not kept.
   if (n !== null && !mayReadVersion(deck, side, n)) {
@@ -224,8 +214,7 @@ export async function openThread(
     step: comment.anchor.step,
     targets: JSON.stringify(comment.anchor.targets),
     text: comment.text,
-    authorId: person?.id ?? null,
-    guestName: person ? null : (comment.guestName ?? null),
+    authorId: person.id,
   });
   return id;
 }
@@ -261,25 +250,14 @@ export async function visibleThread(deck: Deck, side: GrantSide, id: string): Pr
   return thread;
 }
 
-export async function addReply(
-  thread: ThreadRow,
-  person: Person | null,
-  text: string,
-  guestName?: string,
-): Promise<string> {
+export async function addReply(thread: ThreadRow, person: Person, text: string): Promise<string> {
   const id = newReplyId();
-  await db.insert(replies).values({
-    id,
-    threadId: thread.id,
-    text,
-    authorId: person?.id ?? null,
-    guestName: person ? null : (guestName ?? null),
-  });
+  await db.insert(replies).values({ id, threadId: thread.id, text, authorId: person.id });
   return id;
 }
 
 /**
- * Share a team thread with the client, under the next shared number, so the client's count of
+ * Share a team thread with the guests, under the next shared number, so the guests' count of
  * threads has no gap where it was. A shared thread is left as it is: none is ever narrowed.
  */
 export async function widenThread(thread: ThreadRow): Promise<void> {

@@ -50,7 +50,7 @@ Commit that line, so a publish from any checkout updates the same deck. The deck
 
 Each publish is a new version. It becomes the one readers see unless you pass `--no-promote`. Sections renamed with `dekc mv` since the last version take their comments with them.
 
-A version uploaded with `--no-promote` is a draft. You and the team's side of the people the deck is shared with open it on the talk page, which lets them choose the version and says when the one shown is a draft, and comment on it there; the client's side sees the current version only, and a thread opened on a draft reaches them once that version, or a later one, is current. When the draft is ready:
+A version uploaded with `--no-promote` is a draft. You and the team's side of the people the deck is shared with open it on the talk page, which lets them choose the version and says when the one shown is a draft, and comment on it there; the guests' side sees the current version only, and a thread opened on a draft reaches them once that version, or a later one, is current. When the draft is ready:
 
 ```bash
 dekc pub promote 5
@@ -71,9 +71,9 @@ dekc pub share --visibility link --script shown --comments signed-in
 | `--visibility` | `private`: you and those you share it with; `link`: anyone with the link; `public`: everyone |
 | `--script` | `shown`: readers see the script beside the slides, without its stage directions and comments; `hidden`: the slides alone |
 | `--embed` | `on` lets other sites embed the deck |
-| `--comments` | who may post comments at the bottom of a `link` or `public` talk: `off`, `signed-in`, or `guests` |
+| `--comments` | who may post comments at the bottom of a `link` or `public` talk: `off`, no one; `signed-in`, anyone signed in to dek.pub |
 
-Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people on its manage page on dek.pub, by handle or email address, each to view or to comment, and each on the team's side or the client's. The team reads every thread; a client reads only those shared with them, and never learns of the others. A thread you or your team open is kept to the team unless you choose to share it, and one kept to the team can be shared later, never taken back.
+Below a `link` or `public` talk, readers post comments on the talk as a whole, and like it, one like to an account; `--comments` says who may post, and only a reader signed in to dek.pub ever does. The review threads on the slides are for the people you share the deck with, whatever `--comments` says. You share a deck with people on its manage page on dek.pub, by handle or email address, each to view or to comment, and each on the team's side or the guests'. The team reads every thread; a guest reads only those shared with them, and never learns of the others. A thread you or your team open is kept to the team unless you check Share with guests, and one kept to the team can be shared later, never taken back.
 
 Each person you share a deck with is mailed a link to it. Someone invited by email address needs no GitHub account: on dek.pub's sign-in page they ask for a link by mail, sent only to an address a deck is shared with or that has signed in before. Whoever is in a thread, as its author, by a reply, or as the deck's owner, is mailed of new replies and of its resolve, and you are mailed of new threads on your decks. The bell beside a talk's comments stops that mail for the talk. The talk page's Fullscreen button shows the deck with a header naming the talk and the page; its Review button, or `c`, opens the review beside the slide.
 

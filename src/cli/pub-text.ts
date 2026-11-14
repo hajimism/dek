@@ -61,7 +61,7 @@ export function formatPub(data: PubResult): string {
         .flatMap((row) => {
           const beat = row.step === "0" ? row.slug : `${row.slug} › ${row.step}`;
           const status = row.status === "open" ? "" : ` (${row.status})`;
-          const author = row.author.handle ? `@${row.author.handle}` : `${row.author.name} (guest)`;
+          const author = `@${row.author.handle}`;
           const targets = row.targets.map((target) =>
             target.kind === "element"
               ? `   ${target.path ?? "(no slide file)"}  ${target.name}${target.found ? "" : " (not found)"}`
@@ -79,7 +79,7 @@ export function formatPub(data: PubResult): string {
             ...targets,
             ...words(row.text, ">"),
             ...row.thread.flatMap((reply) => [
-              `   ${reply.author.handle ? `@${reply.author.handle}` : reply.author.name}:`,
+              `   @${reply.author.handle}:`,
               ...words(reply.text, "  >"),
             ]),
             `   ${row.shot}`,

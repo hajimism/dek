@@ -37,6 +37,7 @@ const en = {
   "common.loading": "Loading…",
   "common.slides": "{n} slides",
   "common.slide": "1 slide",
+  "common.minutes": "{n} min",
   "common.error": "Something went wrong. {message}",
   "common.offline": "Couldn’t reach dek.pub. Check your connection and try again.",
 
@@ -112,6 +113,9 @@ const en = {
   "device.startOver": "Enter another code",
 
   "profile.talks": "Talks",
+  "profile.view": "Show talks as",
+  "profile.gallery": "Gallery",
+  "profile.timeline": "Timeline",
   "profile.rss": "RSS",
   "profile.empty": "No public talks yet.",
   "profile.emptyOwner": "No talks yet. Publish one from a dek project:",
@@ -140,10 +144,11 @@ const en = {
   "talk.thisSlide": "This slide",
   "side.slides": "Slides",
   "side.details": "About this talk",
-  "side.author": "Speaker",
-  "side.date": "Date",
+  "side.author": "Author",
+  "side.date": "Talk date",
   "side.version": "Version",
-  "side.length": "Length",
+  "side.duration": "Duration",
+  "side.slideCount": "Slides",
   "side.review": "Review",
   "side.openThreads": "{n} open threads",
   "side.openThread": "1 open thread",
@@ -176,9 +181,6 @@ const en = {
   "comment.replyPlaceholder": "Reply…",
   "comment.empty": "No comments yet.",
   "comment.emptyHint": "Select a sentence or tap a part of a slide to comment.",
-  "comment.guest": "Comment as a guest",
-  "comment.guestName": "Your name",
-  "comment.guestBadge": "Guest",
   "comment.signin": "Sign in",
   "comment.signinToComment": "Sign in to comment",
   "comment.post": "Comment",
@@ -217,12 +219,10 @@ const en = {
   "comment.collapse": "Show less of the comments",
   "comment.quotedScript": "Quoted the script",
   "comment.pin": "Comment {n}",
-  "comment.scope": "Who reads it",
-  "comment.scope.team": "Team only",
-  "comment.scope.shared": "Client too",
+  "comment.share": "Share with guests",
   "comment.teamOnly": "Team only",
-  "comment.widen": "Show to client",
-  "comment.widened": "Shared with the client.",
+  "comment.widen": "Share with guests",
+  "comment.widened": "Shared with guests.",
   "comment.mail": "Email me about these comments",
   "talk.versionPick": "Version",
   "public.title": "Comments",
@@ -242,9 +242,8 @@ const en = {
   "talk.versionCurrent": "v{n} · current",
   "talk.versionDraft": "v{n} · draft",
   "talk.versionOlder": "v{n}",
-  "talk.draft": "Draft: version {n}. The client’s side reads version {current}.",
-  "talk.draftNone":
-    "Draft: version {n}. No version is current, so the client’s side sees nothing yet.",
+  "talk.draft": "Draft: version {n}. Guests read version {current}.",
+  "talk.draftNone": "Draft: version {n}. No version is current, so guests see nothing yet.",
   "talk.older": "Version {n}, older than the current version {current}.",
   "comment.muted": "You won’t get email about this talk’s comments.",
   "comment.unmuted": "You’ll get email about threads you’re in.",
@@ -271,13 +270,10 @@ const en = {
   "manage.comments": "Comments",
   "manage.comments.off": "Off",
   "manage.comments.signed-in": "Signed in",
-  "manage.comments.guests": "Guests too",
   "manage.comments.off.hint":
     "No one can comment below the talk. Review threads are for the people you share it with, whatever this says.",
   "manage.comments.signed-in.hint":
     "Anyone who can open the talk and is signed in can comment below it. Review threads are for the people you share it with.",
-  "manage.comments.guests.hint":
-    "Guests can comment below the talk too, with a name, after a human check.",
   "manage.sharing": "Sharing",
   "manage.sharing.hint":
     "Invite people by dek.pub handle, or by email before they have an account.",
@@ -295,9 +291,9 @@ const en = {
   "role.comment": "Can comment",
   "side.label": "Side",
   "side.team": "Team",
-  "side.client": "Client",
+  "side.guest": "Guest",
   "manage.sharing.sideHint":
-    "Team members read every thread; clients read only those shared with them.",
+    "Team members read every thread; guests read only those shared with them.",
   "manage.versions": "Versions",
   "manage.versions.hint": "Each publish is a new version. Readers see the current one.",
   "manage.versions.current": "Current",
@@ -344,7 +340,7 @@ const ja: Record<MessageKey, string> = {
   "theme.system": "システム",
   "theme.light": "ライト",
   "theme.dark": "ダーク",
-  "footer.builtWith": "dek で作られています",
+  "footer.builtWith": "Built with dek",
   "footer.docs": "dek ドキュメント",
   "footer.source": "ソース",
   "footer.terms": "利用規約",
@@ -359,6 +355,7 @@ const ja: Record<MessageKey, string> = {
   "common.loading": "読み込み中…",
   "common.slides": "{n} 枚",
   "common.slide": "1 枚",
+  "common.minutes": "{n} 分",
   "common.error": "うまくいきませんでした。{message}",
   "common.offline": "dek.pub に接続できませんでした。接続を確かめて、もう一度お試しください。",
 
@@ -439,6 +436,9 @@ const ja: Record<MessageKey, string> = {
   "device.startOver": "別のコードを入力",
 
   "profile.talks": "トーク",
+  "profile.view": "トークの表示",
+  "profile.gallery": "ギャラリー",
+  "profile.timeline": "タイムライン",
   "profile.rss": "RSS",
   "profile.empty": "公開されたトークはまだありません。",
   "profile.emptyOwner": "トークはまだありません。dek のプロジェクトから公開できます。",
@@ -466,10 +466,11 @@ const ja: Record<MessageKey, string> = {
   "talk.thisSlide": "このスライド",
   "side.slides": "スライド",
   "side.details": "このトークについて",
-  "side.author": "話す人",
-  "side.date": "日付",
+  "side.author": "作成者",
+  "side.date": "発表日",
   "side.version": "版",
-  "side.length": "長さ",
+  "side.duration": "時間",
+  "side.slideCount": "スライド数",
   "side.review": "レビュー",
   "side.openThreads": "未解決のスレッド {n} 件",
   "side.openThread": "未解決のスレッド 1 件",
@@ -502,9 +503,6 @@ const ja: Record<MessageKey, string> = {
   "comment.replyPlaceholder": "返信…",
   "comment.empty": "まだコメントはありません。",
   "comment.emptyHint": "文を選ぶか、スライドの一部をタップしてコメントできます。",
-  "comment.guest": "ゲストとしてコメント",
-  "comment.guestName": "お名前",
-  "comment.guestBadge": "ゲスト",
   "comment.signin": "サインイン",
   "comment.signinToComment": "サインインしてコメント",
   "comment.post": "コメント",
@@ -542,12 +540,10 @@ const ja: Record<MessageKey, string> = {
   "comment.collapse": "コメントを狭めて表示",
   "comment.quotedScript": "台本を引用したコメント",
   "comment.pin": "コメント {n}",
-  "comment.scope": "読む人",
-  "comment.scope.team": "チームのみ",
-  "comment.scope.shared": "クライアントにも",
+  "comment.share": "ゲストにも公開",
   "comment.teamOnly": "チームのみ",
-  "comment.widen": "クライアントに見せる",
-  "comment.widened": "クライアントと共有しました。",
+  "comment.widen": "ゲストにも公開",
+  "comment.widened": "ゲストにも公開しました。",
   "comment.mail": "このトークのコメントをメールで受け取る",
   "talk.versionPick": "版",
   "public.title": "コメント",
@@ -567,9 +563,8 @@ const ja: Record<MessageKey, string> = {
   "talk.versionCurrent": "v{n}・公開版",
   "talk.versionDraft": "v{n}・ドラフト",
   "talk.versionOlder": "v{n}",
-  "talk.draft": "ドラフト: 版 {n}。クライアント側には版 {current} が見えています。",
-  "talk.draftNone":
-    "ドラフト: 版 {n}。公開版がまだないため、クライアント側には何も見えていません。",
+  "talk.draft": "ドラフト: 版 {n}。ゲストには版 {current} が見えています。",
+  "talk.draftNone": "ドラフト: 版 {n}。公開版がまだないため、ゲストには何も見えていません。",
   "talk.older": "版 {n}。公開版の {current} より前の版です。",
   "comment.muted": "このトークのコメントのメールを止めました。",
   "comment.unmuted": "参加しているスレッドのメールが届きます。",
@@ -596,13 +591,10 @@ const ja: Record<MessageKey, string> = {
   "manage.comments": "コメント",
   "manage.comments.off": "オフ",
   "manage.comments.signed-in": "サインイン済み",
-  "manage.comments.guests": "ゲストも可",
   "manage.comments.off.hint":
     "トークの下のコメントは誰も書けません。レビューのスレッドは、この設定によらず共有した人のためのものです。",
   "manage.comments.signed-in.hint":
     "トークを開けて、サインインしている人がトークの下にコメントできます。レビューのスレッドは共有した人のためのものです。",
-  "manage.comments.guests.hint":
-    "ゲストも名前を入れ、人間かどうかの確認を経て、トークの下にコメントできます。",
   "manage.sharing": "共有",
   "manage.sharing.hint": "dek.pub のハンドルか、アカウント作成前ならメールアドレスで招待します。",
   "manage.sharing.who": "ハンドルまたはメール",
@@ -619,9 +611,9 @@ const ja: Record<MessageKey, string> = {
   "role.comment": "コメント可",
   "side.label": "立場",
   "side.team": "チーム",
-  "side.client": "クライアント",
+  "side.guest": "ゲスト",
   "manage.sharing.sideHint":
-    "チームの人はすべてのスレッドを、クライアントは共有されたスレッドだけを読めます。",
+    "チームの人はすべてのスレッドを、ゲストは公開されたスレッドだけを読めます。",
   "manage.versions": "版",
   "manage.versions.hint": "公開するたびに新しい版になります。読む人には現在の版が表示されます。",
   "manage.versions.current": "現在の版",
@@ -656,38 +648,15 @@ function isLang(value: unknown): value is Lang {
   return (LANGS as readonly unknown[]).includes(value);
 }
 
-/** The language a request asks for: `?lang=`, then the cookie, then the browser's list. */
+/** The reader's language: the one `?lang=` asks for, else the one they chose before, else Japanese. */
 export function pickLang(
   query: string | null | undefined,
   cookie: string | null | undefined,
-  acceptLanguage: string | null | undefined,
 ): Lang {
   if (isLang(query)) {
     return query;
   }
-  if (isLang(cookie)) {
-    return cookie;
-  }
-  return fromAcceptLanguage(acceptLanguage ?? "");
-}
-
-function fromAcceptLanguage(header: string): Lang {
-  const ranked = header
-    .split(",")
-    .map((part, index) => {
-      const [tag = "", ...params] = part.trim().split(";");
-      const q = params.map((param) => param.trim()).find((param) => param.startsWith("q="));
-      return { tag: tag.toLowerCase(), q: q ? Number(q.slice(2)) : 1, index };
-    })
-    .filter((entry) => entry.tag && entry.q > 0)
-    .sort((a, b) => b.q - a.q || a.index - b.index);
-  for (const entry of ranked) {
-    const base = entry.tag.split("-")[0];
-    if (isLang(base)) {
-      return base;
-    }
-  }
-  return "en";
+  return isLang(cookie) ? cookie : "ja";
 }
 
 export type Vars = Record<string, string | number>;
@@ -705,6 +674,11 @@ export function translate(lang: Lang, key: MessageKey, vars?: Vars): string {
 /** "12 slides" / "1 slide", in the page's language. */
 export function slideCount(lang: Lang, n: number): string {
   return n === 1 ? translate(lang, "common.slide") : translate(lang, "common.slides", { n });
+}
+
+/** A talk's length: "12 min" or "12 分". */
+export function formatMinutes(lang: Lang, n: number): string {
+  return translate(lang, "common.minutes", { n });
 }
 
 /** A date as the page's language writes it: "Sep 25, 2026" or "2026年9月25日". */
