@@ -18,7 +18,7 @@ function viewerOf(user: unknown) {
 
 export function sharedOf(c: Context): Shared {
   const asked = new URL(c.req.url).searchParams.get("lang");
-  const lang = pickLang(asked, getCookie(c, "lang"), c.req.header("accept-language"));
+  const lang = pickLang(asked, getCookie(c, "lang"));
   if (asked === lang) {
     setCookie(c, "lang", lang, { path: "/", maxAge: YEAR, sameSite: "Lax" });
   }

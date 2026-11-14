@@ -11,11 +11,16 @@ import {
 import { excerpt } from "../../src/common/mail.ts";
 
 describe("i18n", () => {
-  it("picks ?lang=, then the cookie, then Accept-Language", () => {
-    expect(pickLang("ja", "en", "en-US")).toBe("ja");
-    expect(pickLang(null, "ja", "en-US")).toBe("ja");
-    expect(pickLang(null, null, "fr-FR,ja;q=0.8,en;q=0.5")).toBe("ja");
-    expect(pickLang("xx", undefined, "de")).toBe("en");
+  it("picks ?lang=, then the cookie, and Japanese for anyone who has not chosen", () => {
+    expect(pickLang("en", "ja")).toBe("en");
+    expect(pickLang(null, "en")).toBe("en");
+    expect(pickLang(null, null)).toBe("ja");
+    expect(pickLang("xx", "fr")).toBe("ja");
+  });
+
+  it('signs the footer "Built with dek" in either language', () => {
+    expect(translate("ja", "footer.builtWith")).toBe("Built with dek");
+    expect(translate("en", "footer.builtWith")).toBe("Built with dek");
   });
 
   it("fills in values", () => {

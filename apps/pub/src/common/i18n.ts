@@ -340,7 +340,7 @@ const ja: Record<MessageKey, string> = {
   "theme.system": "システム",
   "theme.light": "ライト",
   "theme.dark": "ダーク",
-  "footer.builtWith": "dek で作られています",
+  "footer.builtWith": "Built with dek",
   "footer.docs": "dek ドキュメント",
   "footer.source": "ソース",
   "footer.terms": "利用規約",
@@ -648,38 +648,15 @@ function isLang(value: unknown): value is Lang {
   return (LANGS as readonly unknown[]).includes(value);
 }
 
-/** The language a request asks for: `?lang=`, then the cookie, then the browser's list. */
+/** The reader's language: the one `?lang=` asks for, else the one they chose before, else Japanese. */
 export function pickLang(
   query: string | null | undefined,
   cookie: string | null | undefined,
-  acceptLanguage: string | null | undefined,
 ): Lang {
   if (isLang(query)) {
     return query;
   }
-  if (isLang(cookie)) {
-    return cookie;
-  }
-  return fromAcceptLanguage(acceptLanguage ?? "");
-}
-
-function fromAcceptLanguage(header: string): Lang {
-  const ranked = header
-    .split(",")
-    .map((part, index) => {
-      const [tag = "", ...params] = part.trim().split(";");
-      const q = params.map((param) => param.trim()).find((param) => param.startsWith("q="));
-      return { tag: tag.toLowerCase(), q: q ? Number(q.slice(2)) : 1, index };
-    })
-    .filter((entry) => entry.tag && entry.q > 0)
-    .sort((a, b) => b.q - a.q || a.index - b.index);
-  for (const entry of ranked) {
-    const base = entry.tag.split("-")[0];
-    if (isLang(base)) {
-      return base;
-    }
-  }
-  return "en";
+  return isLang(cookie) ? cookie : "ja";
 }
 
 export type Vars = Record<string, string | number>;
