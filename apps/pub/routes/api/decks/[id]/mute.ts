@@ -11,8 +11,8 @@ import { requirePerson } from "../../../../src/model/person/actor.server.ts";
 /** The deck whose mail the signed-in person sets, if they read its comments at all. */
 async function readable(c: Context) {
   const person = await requirePerson(c);
-  const { deck, grant } = await visibleDeck(c.req.param("id") ?? "", person);
-  if (!canReadComments(deck, person, grant)) {
+  const { deck, role } = await visibleDeck(c.req.param("id") ?? "", person);
+  if (!canReadComments(deck, person, role)) {
     throw notFound("comments");
   }
   return { person, deck };

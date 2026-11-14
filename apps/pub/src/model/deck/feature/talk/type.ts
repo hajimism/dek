@@ -48,11 +48,11 @@ export type Talk = {
   canComment: boolean;
   /** Whether the signed-in reader of the comments has muted their mail; null for anyone else. */
   muted: boolean | null;
-  /** The public comments at the bottom of the page; null on a private deck, which has none. */
+  /** The public comments at the bottom of the page; null on a talk not open to anyone, which has none. */
   publicComments: PublicComment[] | null;
   /** Whether the deck's comment policy lets this reader post one. */
   canPostPublic: boolean;
-  /** The talk's likes; null on a private deck. `liked` is false for a reader not signed in. */
+  /** The talk's likes; null on a talk not open to anyone. `liked` is false for a reader not signed in. */
   likes: LikeState | null;
   /** The side of the work the reader is on; the team's may open a thread for the team alone. */
   side: GrantSide;

@@ -8,7 +8,7 @@ import type { Person } from "../person/type.ts";
 import { talkNamed } from "./deck.ts";
 import { decksOf, recentPublicDecks } from "./store.server.ts";
 import type { Deck, TalkCard } from "./type.ts";
-import { findVersion } from "./version/store.server.ts";
+import { currentVersionOf } from "./version/store.server.ts";
 import { coverOf } from "./version/version.ts";
 
 async function cardsOf(
@@ -22,27 +22,29 @@ async function cardsOf(
       c,
       rows.map((row) => row.ownerId),
     ));
-  const cards: TalkCard[] = [];
-  for (const row of rows) {
+  const versions = await Promise.all(
+    rows.map((row) => (people.has(row.ownerId) ? currentVersionOf(row) : null)),
+  );
+  return rows.flatMap((row, i) => {
     const owner = people.get(row.ownerId);
-    const version =
-      owner && row.currentVersion !== null ? await findVersion(row.id, row.currentVersion) : null;
+    const version = versions[i];
     if (!owner || !version) {
-      continue;
+      return [];
     }
-    cards.push({
-      slug: row.slug,
-      title: row.title,
-      event: row.event,
-      date: row.talkDate,
-      slides: version.slideMap.slides.length,
-      visibility: row.visibility,
-      picture: coverOf(row.id, version),
-      owner: profileOf(owner),
-      updatedAt: row.updatedAt,
-    });
-  }
-  return cards;
+    return [
+      {
+        slug: row.slug,
+        title: row.title,
+        event: row.event,
+        date: row.talkDate,
+        slides: version.slideMap.slides.length,
+        visibility: row.visibility,
+        picture: coverOf(row.id, version),
+        owner: profileOf(owner),
+        updatedAt: row.updatedAt,
+      },
+    ];
+  });
 }
 
 /** A person's talks, newest first; only the public ones unless `publicOnly` is false. */

@@ -4,7 +4,7 @@
 import { defineHandler } from "void";
 import { notFound } from "../../../../src/common/api-error.ts";
 import { api } from "../../../../src/common/http.server.ts";
-import { mayReadVersion } from "../../../../src/model/deck/access.ts";
+import { versionStanding } from "../../../../src/model/deck/access.ts";
 import { accessOf, isOpen } from "../../../../src/model/deck/serving/access-file.ts";
 import { visibleDeck } from "../../../../src/model/deck/store.server.ts";
 import { versionFile } from "../../../../src/model/deck/version/store.server.ts";
@@ -17,7 +17,7 @@ export const GET = defineHandler((c) =>
     const { deck } = await visibleDeck(c.req.param("id") ?? "", person);
     const n = Number(c.req.param("n"));
     const file = pictureFile(c.req.param("name") ?? "");
-    if (!file || !mayReadVersion(deck, n)) {
+    if (!file || versionStanding(deck, n) !== "current") {
       throw notFound("picture");
     }
     const object = await versionFile(deck.id, n, file);

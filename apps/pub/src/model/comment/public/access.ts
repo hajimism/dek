@@ -6,13 +6,9 @@ import type { Person } from "../../person/type.ts";
 
 type Caller = Pick<Person, "id"> | null;
 
-export function publicCommentsOn(deck: Pick<DeckRules, "visibility">): boolean {
-  return opensToAnyone(deck);
-}
-
 /** Anyone signed in under `signed-in`, no one under `off`; never anyone signed out. */
 export function canPostPublic(deck: DeckRules, person: Caller): boolean {
-  return publicCommentsOn(deck) && deck.comments !== "off" && person !== null;
+  return opensToAnyone(deck) && deck.comments !== "off" && person !== null;
 }
 
 export function mayEditPublic(comment: { authorId: string }, person: Caller): boolean {

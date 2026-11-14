@@ -15,11 +15,11 @@ import {
   canPostPublic,
   mayDeletePublic,
   mayEditPublic,
-  publicCommentsOn,
 } from "../../src/model/comment/public/access.ts";
 import { threadPublic } from "../../src/model/comment/public/view.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
 import { hideQuotes } from "../../src/model/comment/view.ts";
+import { opensToAnyone } from "../../src/model/deck/access.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
 describe("placeComment", () => {
@@ -248,10 +248,10 @@ describe("public comments", () => {
   const mine = { authorId: "u2" };
 
   it("are on a talk anyone may open, and not on a private one", () => {
-    expect(publicCommentsOn(open)).toBe(true);
-    expect(publicCommentsOn({ ...open, visibility: "public" })).toBe(true);
-    expect(publicCommentsOn({ ...open, visibility: "private" })).toBe(false);
-    expect(publicCommentsOn({ ...open, visibility: "team" })).toBe(false);
+    expect(opensToAnyone(open)).toBe(true);
+    expect(opensToAnyone({ ...open, visibility: "public" })).toBe(true);
+    expect(opensToAnyone({ ...open, visibility: "private" })).toBe(false);
+    expect(opensToAnyone({ ...open, visibility: "team" })).toBe(false);
   });
 
   it("may be posted as the policy says: by anyone signed in, or by no one", () => {
@@ -374,8 +374,10 @@ describe("notices", () => {
   };
   const shared = { scope: "shared" as const };
   const team = { scope: "team" as const };
-  const reader = { role: "comment" as const, side: "guest" as const, muted: false };
-
+  const held = (side: "team" | "guest" | null, muted = false) => ({
+    grants: side ? [{ role: "comment" as const, side }] : [],
+    muted,
+  });
   it("go to the owner, the author and those who replied, once each, never to who acted", () => {
     expect(
       noticeRecipients({
@@ -391,19 +393,15 @@ describe("notices", () => {
   });
 
   it("reach only someone who may read the thread, on their own side, and has not muted the deck", () => {
-    expect(mayBeNoticed(deck, shared, { id: "u2" }, reader)).toBe(true);
-    expect(mayBeNoticed(deck, team, { id: "u2" }, reader)).toBe(false);
-    expect(mayBeNoticed(deck, team, { id: "u2" }, { ...reader, side: "team" })).toBe(true);
-    expect(mayBeNoticed(deck, team, { id: "u1" }, { role: null, side: null, muted: false })).toBe(
-      true,
-    );
-    expect(mayBeNoticed(deck, shared, { id: "u2" }, { ...reader, muted: true })).toBe(false);
-    expect(mayBeNoticed(deck, shared, { id: "u2" }, { ...reader, role: null, side: null })).toBe(
-      false,
-    );
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, held("guest"))).toBe(true);
+    expect(mayBeNoticed(deck, team, { id: "u2" }, held("guest"))).toBe(false);
+    expect(mayBeNoticed(deck, team, { id: "u2" }, held("team"))).toBe(true);
+    expect(mayBeNoticed(deck, team, { id: "u1" }, held(null))).toBe(true);
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, held("guest", true))).toBe(false);
+    expect(mayBeNoticed(deck, shared, { id: "u2" }, held(null))).toBe(false);
     const teamDeck = { ...deck, visibility: "team" as const };
-    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, reader)).toBe(false);
-    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, { ...reader, side: "team" })).toBe(true);
+    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, held("guest"))).toBe(false);
+    expect(mayBeNoticed(teamDeck, shared, { id: "u2" }, held("team"))).toBe(true);
   });
 
   it("say who did what on which thread, with the words and the way back", () => {

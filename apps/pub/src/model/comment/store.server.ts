@@ -11,11 +11,11 @@ import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
-import { canSeeScript, mayReadVersion } from "../deck/access.ts";
+import { canSeeScript, versionStanding } from "../deck/access.ts";
 import type { GrantSide } from "../deck/grant/type.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
-import { findVersion, renamesOf } from "../deck/version/store.server.ts";
+import { currentVersionOf, renamesOf } from "../deck/version/store.server.ts";
 import { peopleById } from "../person/store.server.ts";
 import type { Person } from "../person/type.ts";
 import { canSeeThread, scopeFor } from "./access.ts";
@@ -30,8 +30,7 @@ async function listComments(
   deck: Deck,
   options: { status: Status; id?: string },
 ): Promise<CommentRow[]> {
-  const n = deck.currentVersion;
-  const version = n === null ? null : await findVersion(deck.id, n);
+  const version = await currentVersionOf(deck);
   const rows = await db
     .select()
     .from(threads)
@@ -155,15 +154,16 @@ export async function openThread(
   const n = comment.version ?? deck.currentVersion;
   // Every side comments on the current version. One whose page still shows an older version is
   // told so: the deck no longer holds it.
-  if (n !== null && !mayReadVersion(deck, n)) {
-    if (Number.isInteger(n) && n >= 1 && n < (deck.currentVersion ?? 0)) {
-      throw new ApiError(
-        409,
-        "stale_version",
-        `version ${n} is no longer the one readers see`,
-        "reload the page and comment again",
-      );
-    }
+  const standing = n === null ? null : versionStanding(deck, n);
+  if (standing === "gone") {
+    throw new ApiError(
+      409,
+      "stale_version",
+      `version ${n} is no longer the one readers see`,
+      "reload the page and comment again",
+    );
+  }
+  if (standing === "unknown") {
     throw new ApiError(422, "unknown_version", `the deck has no version ${n}`);
   }
   // Whether a passage is in the script is the script's to tell, so one it is hidden from may not
@@ -174,8 +174,8 @@ export async function openThread(
   ) {
     throw new ApiError(403, "script_hidden", "the script is not public, so it cannot be quoted");
   }
-  const version = n === null ? null : await findVersion(deck.id, n);
-  if (n === null || !version) {
+  const version = await currentVersionOf(deck);
+  if (!version) {
     throw new ApiError(409, "no_version", "the deck has no version to comment on yet");
   }
   const slide = version.slideMap.slides.find((candidate) => candidate.slug === comment.anchor.slug);
@@ -204,7 +204,7 @@ export async function openThread(
     deckId: deck.id,
     number: await takeNumber(deck.id, scope),
     scope,
-    n,
+    n: version.n,
     slug: comment.anchor.slug,
     step: comment.anchor.step,
     targets: JSON.stringify(comment.anchor.targets),

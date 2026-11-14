@@ -11,6 +11,7 @@ import { ApiError } from "../../../common/api-error.ts";
 import { now } from "../../../common/db.server.ts";
 import { versionKey, versionsPrefix } from "../serving/origin.ts";
 import { syncAccess } from "../sync-access.server.ts";
+import type { Deck } from "../type.ts";
 import type { RenameRow, Version } from "./type.ts";
 import { minutesOf, versionOf } from "./version.ts";
 
@@ -21,6 +22,13 @@ export async function findVersion(deckId: string, n: number): Promise<Version | 
     .where(and(eq(versions.deckId, deckId), eq(versions.n, n)))
     .get();
   return row ? versionOf(row) : null;
+}
+
+/** The version readers see, or null before the first is published. */
+export async function currentVersionOf(
+  deck: Pick<Deck, "id" | "currentVersion">,
+): Promise<Version | null> {
+  return deck.currentVersion === null ? null : findVersion(deck.id, deck.currentVersion);
 }
 
 /** Every rename the deck's versions arrived with, in the order they were made. */
