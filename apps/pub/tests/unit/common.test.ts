@@ -9,6 +9,7 @@ import {
   translate,
 } from "../../src/common/i18n.ts";
 import { excerpt } from "../../src/common/mail.ts";
+import { xmlText } from "../../src/common/xml.ts";
 
 describe("i18n", () => {
   it("picks ?lang=, then the cookie, and Japanese for anyone who has not chosen", () => {
@@ -66,5 +67,14 @@ describe("docsUrl", () => {
     expect(docsUrl("ja", "guide/publish")).toBe(
       "https://hajimism.github.io/dek/ja/guide/publish.html",
     );
+  });
+});
+
+describe("xmlText", () => {
+  it("drops characters XML refuses and escapes the rest", () => {
+    expect(xmlText("a\u0000b\u0007c\u000bd & <e> \"f\" 'g'\tok")).toBe(
+      "abcd &amp; &lt;e&gt; &quot;f&quot; &apos;g&apos;\tok",
+    );
+    expect(xmlText("台本 😀")).toBe("台本 😀");
   });
 });

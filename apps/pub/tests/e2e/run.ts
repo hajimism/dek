@@ -107,9 +107,15 @@ try {
   const talkPath = `/@${me.handle}/why-dek`;
   check((await stranger.fetch(talkPath)).status === 404, "a team talk is a 404 to someone else");
   const about = await fetch(`${server.url}/about?lang=en`);
+  const aboutHtml = await about.text();
   check(
-    about.status === 200 && /<h1[^>]*>A talk keeps reaching people/.test(await about.text()),
+    about.status === 200 && /<h1[^>]*>A talk keeps reaching people/.test(aboutHtml),
     "the About page answers anyone",
+  );
+  check(
+    aboutHtml.includes(`<link rel="canonical" href="${server.url}/about?lang=en"`) &&
+      aboutHtml.includes(`hreflang="ja" href="${server.url}/about"`),
+    "the About page in English names its own URL as canonical, and the Japanese one beside it",
   );
   check(
     (await fetch(`${server.deckOrigin(id)}/v/1/`)).status === 404,
@@ -140,6 +146,15 @@ try {
     shared.ok && (shared as { visibility?: string }).visibility === "link",
     "share opens the deck to the link",
     shared,
+  );
+  const sitemap = await fetch(`${server.url}/sitemap.xml`);
+  const sitemapXml = await sitemap.text();
+  check(
+    sitemap.ok &&
+      sitemapXml.includes(`<loc>${server.url}/about?lang=en</loc>`) &&
+      !sitemapXml.includes(talkPath),
+    "the sitemap lists the About page, and not a talk shared by link",
+    sitemapXml,
   );
   const page = await stranger.fetch(talkPath);
   const html = await page.text();

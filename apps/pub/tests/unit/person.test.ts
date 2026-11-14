@@ -4,7 +4,7 @@ import {
   isCompleteUserCode,
   normalizeUserCode,
 } from "../../src/model/person/feature/connect-cli/device-code.ts";
-import { rssDate, talkFeed, xmlText } from "../../src/model/person/feature/profile/rss.ts";
+import { rssDate, talkFeed } from "../../src/model/person/feature/profile/rss.ts";
 import { profileView } from "../../src/model/person/feature/profile/view.ts";
 import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
 import { safeNext } from "../../src/model/person/next-path.ts";
@@ -45,13 +45,6 @@ describe("safeNext", () => {
 });
 
 describe("rss", () => {
-  it("drops characters XML refuses and escapes the rest", () => {
-    expect(xmlText("a\u0000b\u0007c\u000bd & <e> \"f\" 'g'\tok")).toBe(
-      "abcd &amp; &lt;e&gt; &quot;f&quot; &apos;g&apos;\tok",
-    );
-    expect(xmlText("台本 😀")).toBe("台本 😀");
-  });
-
   it("dates an item by its talk, else its update, else not at all", () => {
     expect(rssDate("2026-09-25", "2026-11-01T00:00:00Z")).toBe("Fri, 25 Sep 2026 00:00:00 GMT");
     expect(rssDate("someday", "2026-11-01T00:00:00Z")).toBe("Sun, 01 Nov 2026 00:00:00 GMT");
