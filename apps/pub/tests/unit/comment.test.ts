@@ -205,10 +205,15 @@ describe("who may resolve", () => {
   const deck = { ownerId: "u1", visibility: "link" as const, comments: "signed-in" as const };
 
   it("is the owner and the author, by account on the server", () => {
-    expect(canResolve(deck, { authorId: "u2" }, { id: "u1" })).toBe(true);
-    expect(canResolve(deck, { authorId: "u2" }, { id: "u2" })).toBe(true);
-    expect(canResolve(deck, { authorId: "u2" }, { id: "u3" })).toBe(false);
-    expect(canResolve(deck, { authorId: "u2" }, null)).toBe(false);
+    expect(canResolve(deck, { authorId: "u2" }, { id: "u1" }, null)).toBe(true);
+    expect(canResolve(deck, { authorId: "u2" }, { id: "u2" }, "comment")).toBe(true);
+    expect(canResolve(deck, { authorId: "u2" }, { id: "u2" }, "view")).toBe(true);
+    expect(canResolve(deck, { authorId: "u2" }, { id: "u3" }, "comment")).toBe(false);
+    expect(canResolve(deck, { authorId: "u2" }, null, null)).toBe(false);
+  });
+
+  it("is not an author the deck is no longer shared with", () => {
+    expect(canResolve(deck, { authorId: "u2" }, { id: "u2" }, null)).toBe(false);
   });
 
   it("is the owner and the author, by handle on the page", () => {

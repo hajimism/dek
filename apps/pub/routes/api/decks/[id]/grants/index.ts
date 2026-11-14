@@ -38,7 +38,13 @@ export const POST = defineHandler((c) =>
       afterAnswer(
         c,
         sendMail(
-          invitationMail({ ...invite, inviter: owner.name || owner.handle, title: deck.title, role, url }),
+          invitationMail({
+            ...invite,
+            inviter: owner.name || owner.handle,
+            title: deck.title,
+            role,
+            url,
+          }),
         ),
       );
     }

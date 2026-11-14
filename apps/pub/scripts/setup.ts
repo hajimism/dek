@@ -14,7 +14,10 @@ if (existsSync(env)) {
   console.log("wrote .env from dev.env");
 }
 
-const prepare = Bun.spawnSync(["node_modules/.bin/void", "prepare"], { cwd: here, stdio: ["ignore", "inherit", "inherit"] });
+const prepare = Bun.spawnSync(["node_modules/.bin/void", "prepare"], {
+  cwd: here,
+  stdio: ["ignore", "inherit", "inherit"],
+});
 if (prepare.exitCode !== 0) {
   process.exit(prepare.exitCode ?? 1);
 }

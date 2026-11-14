@@ -2,6 +2,10 @@
   "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
   "root": false,
   "extends": "//",
+  // The root's includes would be read from here, and only src/ and tests/ would match.
+  "files": {
+    "includes": ["**", "!db/migrations", "!.void", "!.cloudflare", "!infra/.alchemy"]
+  },
   "overrides": [
     {
       "includes": ["**/*.svelte"],

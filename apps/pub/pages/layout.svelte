@@ -1,11 +1,11 @@
 <script lang="ts">
   import "../src/common/ui/tokens.css";
   import type { Snippet } from "svelte";
-  import { useApp } from "../src/shell/use-app.ts";
+  import { startClock } from "../src/common/ui/clock.svelte.ts";
+  import Toaster from "../src/common/ui/toaster.svelte";
   import Footer from "../src/shell/ui/footer.svelte";
   import Header from "../src/shell/ui/header.svelte";
-  import Toaster from "../src/common/ui/toaster.svelte";
-  import { startClock } from "../src/common/ui/clock.svelte.ts";
+  import { useApp } from "../src/shell/use-app.ts";
 
   let { children }: { children: Snippet } = $props();
   const { t } = useApp();

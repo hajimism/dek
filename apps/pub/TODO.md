@@ -74,23 +74,42 @@ The comment feature is planned to grow into two: public comments and a like on t
 
 - **Mail.**
   - The sending domain, `mail.dek.pub` in `void.config.ts`, is set up with `void deploy`, which needs a Cloudflare token with Email Routing Edit and Email Sending Edit.
-  - SPF, DKIM and DMARC records for it, checked in a received mail's headers.
+  - SPF and DKIM records for it, which `void deploy` writes, checked in a received mail's headers. DMARC is declared in `infra/alchemy.run.ts`; the sending subdomain is quarantined, not rejected, until those headers are checked.
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing.
   - Asking for sign-in links is held only by Better Auth's default limit, 5 a minute from one client; nothing limits how many addresses are tried.
-- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`. `DEK_PUB_DEV_LOGIN` must be unset.
+- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` must be unset.
 - **Domains.**
   - `dek.pub` and `dekusercontent.com` are not registered.
-  - `serve/wrangler.jsonc` has no routes for `d-*.dekusercontent.com`, and there is no wildcard DNS.
+  - The serve Worker's route (`serve/wrangler.jsonc`) and the zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
+  - Staging has no hostnames, so `infra/site.ts` refuses any stage but `prod`.
   - The Public Suffix List request is not sent.
-- **Deploying.** There is no staging configuration (ADR 43), no HTTPS staging server for the CLI to talk to (ADR 48), and no deploy workflow. CI only checks, tests and builds.
+- **Deploying.**
+  - There is no staging configuration (ADR 43), no HTTPS staging server for the CLI to talk to (ADR 48), and no deploy workflow. CI only checks, tests and builds.
+  - Nothing applies `db/migrations/` to the remote D1, and there is no way back from a deploy but deploying again.
+- **Backups.** D1 and R2 have none, and no restore has been tried.
+- **Watching it.** No error tracking, health check, alert or budget alert. Unexpected errors go to `console.error` whole, and a D1 error may carry the values it was bound to: an address, a comment's text.
 - **Limits and abuse.**
   - No rate limits; the API key plugin's own is off in `auth.ts`.
+  - Better Auth's own limits on sign-in, links and the device flow keep their counts in memory, so on Workers each isolate counts alone. Nothing limits `POST /api/cli/key` or `/api/decks/*`.
+  - An owner can grant any address, and each grant mails an invitation carrying the deck's title, which the owner chose. Nothing limits how many, so dek.pub can be made to mail strangers words of someone else's choosing.
   - No storage quota per user, and no limit on new accounts.
   - The only limit is 50 MiB per version.
   - Nobody can report a talk, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
 - **Search.** No search; the plan's D1 FTS5 index is not built.
+- **Search engines.**
+  - No sitemap.
+  - The landing page and the About page have no canonical URL, and each language is the same URL told apart by `?lang=` or a cookie, with no `hreflang`.
+- **Headers.** The app's CSP holds only `frame-ancestors`, `base-uri` and `object-src`; a full one needs a hash or nonce for the talk page's inline listener (ADR 67).
+- **Terms and the law.**
+  - No terms of service, privacy policy, or contact page; the footer has no link to them.
+  - The privacy policy has to cover what dek.pub keeps of people who never signed up: a grant holds the address it was made for.
+  - Pages load Google Fonts and GitHub's avatars, which Japan's rule on sending a visitor's data to others (電気通信事業法の外部送信規律) may require dek.pub to disclose. Serving the fonts from dek.pub would leave only the avatars.
+  - Whether review threads and their mail count as carrying others' messages, which may need a notice to the ministry (電気通信事業の届出), is not checked.
+  - The footer's Source link goes to the repository's front page, not to the commit that is running.
 - **Every request with an API key writes to D1.** Better Auth's API key plugin records each use.
+- **Reading a deck writes.** `visibleDeck` claims the grants waiting on the reader's address on every read, page loads and GETs included.
+- **Checks a browser test does not make.** No accessibility check such as axe, no test at a phone's width, and no measure of how fast a page loads.
 - **`.dek/renames.json` only grows.** When `.dek/` is ignored by git, another checkout does not have the renames (ADR 49).
 
 ## Later phases

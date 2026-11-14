@@ -1,5 +1,5 @@
 import { defineHandler } from "void";
-import { ApiError, notFound } from "../../../../../../src/common/api-error.ts";
+import { ApiError } from "../../../../../../src/common/api-error.ts";
 import { afterAnswer, api } from "../../../../../../src/common/http.server.ts";
 import { canResolve } from "../../../../../../src/model/comment/access.ts";
 import { sendNotices } from "../../../../../../src/model/comment/notice.server.ts";
@@ -14,9 +14,9 @@ import { requirePerson } from "../../../../../../src/model/person/actor.server.t
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
-    const { deck, side } = await visibleDeck(c.req.param("id") ?? "", person);
+    const { deck, grant, side } = await visibleDeck(c.req.param("id") ?? "", person);
     const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
-    if (!canResolve(deck, thread, person)) {
+    if (!canResolve(deck, thread, person, grant)) {
       throw new ApiError(
         403,
         "not_yours",

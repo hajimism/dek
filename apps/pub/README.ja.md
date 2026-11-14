@@ -2,7 +2,7 @@
 
 [dek.pub](https://dek.pub) のサーバーです。[dek](../../README.ja.md) で作ったトークを、めくれるデッキと読める台本として公開し、レビューのコメントを受け付けます。コメントは `dekc pub comments` で作者のエージェントに戻ります。
 
-Cloudflare Workers 上の [Void](https://void.cloud) アプリで、Svelte 5、D1、R2 を使います。`serve/` にはもう 1 つの Worker があり、デッキをそれぞれ専用のオリジンから配信します。開発は Miniflare によってすべて手元で動き、Cloudflare のアカウントは要りません。
+Cloudflare Workers 上の [Void](https://void.cloud) アプリで、Svelte 5、D1、R2 を使います。`serve/` にはもう 1 つの Worker があり、デッキをそれぞれ専用のオリジンから配信します。開発は Miniflare によってすべて手元で動き、Cloudflare のアカウントは要りません。2 つの Worker のまわりのゾーンと DNS レコードは、`infra/` で [Alchemy](https://alchemy.run) を使って宣言しています。
 
 ```bash
 mise install         # Bun と、Void と Vite+ が動く Node

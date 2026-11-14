@@ -3,6 +3,7 @@ dist
 .void
 .wrangler
 .cloudflare
+infra/.alchemy
 .void-wrangler.jsonc
 .env
 .env.*

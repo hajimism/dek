@@ -308,6 +308,39 @@ describe("dekc pub publish", () => {
     });
   });
 
+  test.serial(
+    "stops before anything is sent when a field is longer than dek.pub keeps",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        const long = SCRIPT.replace("title: Why dek", `title: ${"x".repeat(501)}`);
+        await withTempProject(spec(long), async (root) => {
+          const result = await publish(fake, root);
+          expect(result.exitCode).toBe(1);
+          expect(jsonStdout<Json>(result)).toMatchObject({
+            ok: false,
+            error: {
+              message: "the title is 501 characters, and dek.pub keeps 500 at most",
+              path: "decks/Why_Dek/script.md",
+              hint: "shorten title: in the frontmatter, then publish again",
+            },
+          });
+          expect(fake.requests.filter((request) => request.method === "POST")).toEqual([]);
+        });
+        await withTempProject(spec(), async (root) => {
+          const result = await publish(fake, root, ["-m", "x".repeat(2001)]);
+          expect(jsonStdout<Json>(result)).toMatchObject({
+            ok: false,
+            error: {
+              message: "the message is 2001 characters, and dek.pub keeps 2000 at most",
+              hint: "shorten --message, then publish again",
+            },
+          });
+        });
+      });
+    },
+  );
+
   test.serial("says how large a version may be when the server refuses one", async () => {
     await withFakePub(async (fake) => {
       signIn(fake);
