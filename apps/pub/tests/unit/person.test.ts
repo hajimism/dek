@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { betterAuth } from "better-auth";
+import { memoryAdapter } from "better-auth/adapters/memory";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import authConfig from "../../auth.ts";
 import {
   formatUserCode,
   isCompleteUserCode,
@@ -38,6 +41,25 @@ import {
 import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
+
+// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: no grants are
+// claimed, no mail goes out, and the links an account starts with are only noted.
+vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
+  claimOnSignIn: async () => {},
+}));
+vi.mock("../../src/model/person/feature/sign-in/link.server.ts", () => ({
+  sendSignInLink: async () => {},
+}));
+const seeding = vi.hoisted(() => ({
+  seeded: [] as unknown[],
+  seed: async (_user: unknown): Promise<void> => {},
+}));
+vi.mock("../../src/model/person/link.server.ts", () => ({
+  seedLinks: (user: unknown) => {
+    seeding.seeded.push(user);
+    return seeding.seed(user);
+  },
+}));
 
 describe("device code", () => {
   it("takes the code with or without its hyphen, in any case", () => {
@@ -475,5 +497,159 @@ describe("readName", () => {
       name: "a".repeat(MAX_NAME_LENGTH),
     });
     expect(readName("a".repeat(MAX_NAME_LENGTH + 1))).toEqual({ ok: false, problem: "too_long" });
+  });
+});
+
+describe("auth.ts, through Better Auth", () => {
+  const origin = "http://localhost:3000";
+
+  function makeAuth() {
+    const db = {
+      user: [] as Record<string, unknown>[],
+      session: [] as Record<string, unknown>[],
+      account: [] as Record<string, unknown>[],
+      verification: [] as Record<string, unknown>[],
+      apikey: [] as Record<string, unknown>[],
+      deviceCode: [] as Record<string, unknown>[],
+    };
+    const config = authConfig({
+      defaults: {},
+      env: {
+        DEK_PUB_DEV_LOGIN: "1",
+        AUTH_GITHUB_CLIENT_ID: "client",
+        AUTH_GITHUB_CLIENT_SECRET: "secret",
+      },
+      dialect: "sqlite",
+      request: new Request(origin),
+    });
+    const auth = betterAuth({
+      ...config,
+      baseURL: origin,
+      basePath: "/api/auth",
+      secret: "a-secret-only-these-tests-use-0123456789",
+      database: memoryAdapter(db),
+    });
+    return { auth, db };
+  }
+
+  // GitHub as Better Auth's provider asks it: the token for the code, then the profile and its addresses.
+  function fakeGitHub(login: string): void {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("https://github.com/login/oauth/access_token")) {
+        return Response.json({
+          access_token: "gho_token",
+          token_type: "bearer",
+          scope: "read:user",
+        });
+      }
+      if (url === "https://api.github.com/user") {
+        return Response.json({ id: 583231, login, name: login, email: null, avatar_url: "" });
+      }
+      if (url === "https://api.github.com/user/emails") {
+        return Response.json([{ email: "octo@example.com", primary: true, verified: true }]);
+      }
+      throw new Error(`nothing fakes ${url}`);
+    });
+  }
+
+  function cookiesOf(response: Response): string {
+    return response.headers
+      .getSetCookie()
+      .map((cookie) => cookie.split(";")[0])
+      .join("; ");
+  }
+
+  /** The GitHub callback's answer, after the sign-in it ends was started. */
+  async function signInWithGitHub(auth: ReturnType<typeof makeAuth>["auth"]): Promise<Response> {
+    const start = await auth.handler(
+      new Request(`${origin}/api/auth/sign-in/social`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin },
+        body: JSON.stringify({ provider: "github", callbackURL: "/" }),
+      }),
+    );
+    const { url } = (await start.json()) as { url: string };
+    const state = new URL(url).searchParams.get("state");
+    return auth.handler(
+      new Request(`${origin}/api/auth/callback/github?code=the-code&state=${state}`, {
+        headers: { cookie: cookiesOf(start) },
+      }),
+    );
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    seeding.seeded.length = 0;
+    seeding.seed = async () => {};
+  });
+
+  it("has no update-user, so a name and an image go only through dek.pub's own API", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    const cookie = cookiesOf(await signInWithGitHub(auth));
+    const session = await auth.handler(
+      new Request(`${origin}/api/auth/get-session`, { headers: { cookie } }),
+    );
+    expect(session.status).toBe(200);
+    const before = structuredClone(db.user);
+    const update = (path: string) =>
+      auth.handler(
+        new Request(`${origin}${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin, cookie },
+          body: JSON.stringify({ name: "", image: "https://tracker.example/p.gif" }),
+        }),
+      );
+    expect((await update("/api/auth/update-user")).status).toBe(404);
+    expect((await update("/api/auth/update-user/")).status).toBe(404);
+    expect(db.user).toEqual(before);
+    expect(db.user).toMatchObject([{ name: "Octo-Cat" }]);
+  });
+
+  it("answers over HTTP only the endpoints dek.pub's pages, the CLI and the dev login call", () => {
+    const { auth } = makeAuth();
+    const disabled = new Set(auth.options.disabledPaths);
+    const open = Object.values(auth.api as Record<string, { path?: string }>)
+      .map((endpoint) => endpoint.path)
+      .filter((path): path is string => path !== undefined && !disabled.has(path))
+      .sort();
+    expect(open).toEqual(
+      [
+        "/callback/:id",
+        "/device",
+        "/device/approve",
+        "/device/code",
+        "/device/deny",
+        "/device/token",
+        "/error",
+        "/get-session",
+        "/magic-link/verify",
+        "/sign-in/email",
+        "/sign-in/magic-link",
+        "/sign-in/social",
+        "/sign-out",
+        "/sign-up/email",
+      ].sort(),
+    );
+  });
+
+  it("makes the account although the links it starts with could not be written", async () => {
+    const { auth, db } = makeAuth();
+    fakeGitHub("Octo-Cat");
+    seeding.seed = async () => {
+      throw new Error("D1_ERROR: the database is not there");
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const callback = await signInWithGitHub(auth);
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get("location")).toBe("/");
+    expect(db.user).toHaveLength(1);
+    expect(seeding.seeded).toHaveLength(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("links"),
+      expect.objectContaining({ message: "D1_ERROR: the database is not there" }),
+    );
+    error.mockRestore();
   });
 });
