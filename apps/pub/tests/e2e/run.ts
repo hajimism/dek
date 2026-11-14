@@ -7,7 +7,8 @@
 import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Browser, Inbox, startDevServer } from "./server.ts";
+import { translate } from "../../src/common/i18n.ts";
+import { addressOf, Browser, Inbox, startDevServer } from "./server.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..", "..");
 const CLI = join(REPO, "src", "cli.ts");
@@ -29,7 +30,12 @@ type Json = Record<string, unknown> & { ok: boolean };
 
 const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
-const server = await startDevServer(PORT);
+// dek.pub opens by invitation: the server lets sign up the people the run signs up, by address,
+// and anyone a deck is shared with. "Form" is on the list for the development form to be refused.
+const server = await startDevServer(
+  PORT,
+  ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form"].map(addressOf),
+);
 const inbox = new Inbox(server.url);
 
 async function dekc(
@@ -760,6 +766,74 @@ try {
     status: again.status,
     location: again.headers.get("location"),
   });
+
+  // Sign-up is by invitation. The guest above got in by the share waiting on their address. An
+  // address on the list gets in by a link with nothing shared. One whose share was taken back
+  // before they followed their link is sent to /signin and told why, and the development form,
+  // which verifies no address, makes no account even for one on the list. Signing in to an
+  // account is never refused, whether or not anything would let it in now.
+  const invitee = new Browser(server.url);
+  const inviteeAccount = await invitee.register("Invitee");
+  check(
+    inviteeAccount.email === addressOf("Invitee") &&
+      (await invitee.fetch("/api/me")).status === 409,
+    "an address dek.pub invited signs up by a link, with nothing shared with it",
+    inviteeAccount,
+  );
+  const late = `late-${Date.now()}@example.com`;
+  const lateGrant = (await (
+    await author.fetch(`/api/decks/${id}/grants`, {
+      method: "POST",
+      json: { who: late, role: "comment" },
+    })
+  ).json()) as { id: string };
+  const latecomer = new Browser(server.url);
+  await latecomer.fetch("/api/auth/sign-in/magic-link", {
+    method: "POST",
+    json: { email: late, callbackURL: talkPath, errorCallbackURL: "/signin" },
+  });
+  const lateLink = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(
+    (await inbox.waitFor(late, "Sign in"))[0]?.text ?? "",
+  )?.[0];
+  check(lateLink !== undefined, "an address a share waits for is mailed a sign-in link");
+  await author.fetch(`/api/decks/${id}/grants/${lateGrant.id}`, { method: "DELETE" });
+  const lateFollowed = await latecomer.fetch(new URL(lateLink).pathname + new URL(lateLink).search);
+  const refusedTo = new URL(lateFollowed.headers.get("location") ?? "/", server.url);
+  const refusedPage = await (await latecomer.fetch(refusedTo.pathname + refusedTo.search)).text();
+  const pageLang = /<html lang="ja"/.test(refusedPage) ? "ja" : "en";
+  const lateAccounts = await server.store.sql("SELECT id FROM user WHERE email = ?", [late]);
+  const lateMe = (await latecomer.fetch("/api/me")).status;
+  check(
+    lateFollowed.status === 302 &&
+      refusedTo.pathname === "/signin" &&
+      refusedTo.searchParams.get("error") === "not_invited" &&
+      refusedPage.includes(translate(pageLang, "signin.notInvited")) &&
+      lateAccounts.length === 0 &&
+      lateMe === 401,
+    "a link to an address nothing lets in any more makes no account, and /signin says it is by invitation",
+    { status: lateFollowed.status, location: refusedTo.href, lateAccounts, lateMe },
+  );
+  const formed = await new Browser(server.url).fetch("/api/auth/sign-up/email", {
+    method: "POST",
+    json: { email: addressOf("Form"), password: "password-1234", name: "Form" },
+  });
+  check(
+    formed.status === 403 && ((await formed.json()) as { code?: string }).code === "not_invited",
+    "the development form makes no account for an address on the list, as it verifies none",
+    formed.status,
+  );
+  const guestAgain = new Browser(server.url);
+  const backTo = await guestAgain.signInByLink(guestEmail, {
+    callbackURL: talkPath,
+    errorCallbackURL: "/signin",
+  });
+  check(
+    backTo.endsWith(talkPath) &&
+      ((await (await guestAgain.fetch("/api/me")).json()) as { handle?: string }).handle ===
+        guestMe.handle,
+    "the guest, not on the list and with no share waiting, signs in again by a link",
+    backTo,
+  );
 
   // The people in a thread are mailed of replies, unless they muted the deck.
   const asked = await guest.fetch(`/api/decks/${id}/comments`, {

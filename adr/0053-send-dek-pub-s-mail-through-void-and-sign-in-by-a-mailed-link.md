@@ -10,6 +10,8 @@ Amended by [73. Claim a dek.pub grant by address when its holder signs in or whe
 
 Amended by [77. Let a dek.pub person choose their handle after their first sign-in](0077-let-a-dek-pub-person-choose-their-handle-after-their-first-sign-in.md)
 
+Amended by [79. Open dek.pub by invitation, to the people it lists and those a deck is shared with](0079-open-dek-pub-by-invitation-to-the-people-it-lists-and-those-a-deck-is-shared-with.md)
+
 ## Context
 
 dek.pub is meant for client work (ADR 51), and the people at the client are not developers. Three things need mail:

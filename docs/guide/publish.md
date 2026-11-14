@@ -14,6 +14,8 @@ dekc pub login
 
 dek prints a URL and a code on stderr. Open the URL, sign in to dek.pub, and approve the code; dek waits for that, then keeps the API key dek.pub gives it, in the OS keychain, or in `~/.config/dek/credentials.json`, readable only by you, where there is no keychain. `dekc pub whoami` says who you are signed in as, and `dekc pub logout` revokes the key and forgets it.
 
+For now dek.pub is open by invitation: you can make an account only with an address or a GitHub account dek.pub has invited, or with an address a deck has been shared with. An account you have keeps signing in.
+
 The first time you sign in, dek.pub asks you to choose your handle before anything else: the name your profile and your talks go under, as `/@handle/<slug>`. It offers your GitHub login, or your address's part before the `@`, when no one has it. You choose it once and cannot change it later. On dek.pub's settings page, `/settings`, you set your name and up to five links for your profile: to GitHub, X, your site or anywhere else. An account made with GitHub starts with a link to its GitHub profile.
 
 An agent cannot open a browser for you, so with `--json` the sign-in comes in two runs. The first returns at once:
@@ -78,7 +80,7 @@ dekc pub grants remove client@example.com
 
 A new grant lets the person view, on the guests' side, unless `--role` and `--side` say otherwise; run `grants add` again to change one, and what you leave out stays as it was.
 
-Each person you share a deck with is mailed a link to it. Someone invited by email address needs no GitHub account: on dek.pub's sign-in page they ask for a link by mail, sent only to an address a deck is shared with or that has signed in before. Whoever is in a thread, as its author, by a reply, or as the deck's owner, is mailed of new replies and of its resolve, and you are mailed of new threads on your decks. The bell beside a talk's comments stops that mail for the talk. The talk page's Fullscreen button shows the deck with a header naming the talk and the page; its Review button, or `c`, opens the review beside the slide.
+Each person you share a deck with is mailed a link to it. Someone invited by email address needs no GitHub account: on dek.pub's sign-in page they ask for a link by mail, sent only to an address a deck is shared with, that dek.pub has invited, or that has signed in before. Whoever is in a thread, as its author, by a reply, or as the deck's owner, is mailed of new replies and of its resolve, and you are mailed of new threads on your decks. The bell beside a talk's comments stops that mail for the talk. The talk page's Fullscreen button shows the deck with a header naming the talk and the page; its Review button, or `c`, opens the review beside the slide.
 
 `dekc pub status` prints the settings, the version readers see, and whether it is the source as it is in your project. `dekc pub open` opens the deck in the browser.
 

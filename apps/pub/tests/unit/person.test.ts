@@ -14,6 +14,7 @@ import {
 } from "../../src/model/person/feature/profile/paging.ts";
 import { rssDate, talkFeed } from "../../src/model/person/feature/profile/rss.ts";
 import { profileView } from "../../src/model/person/feature/profile/view.ts";
+import { NOT_INVITED, signInFailure } from "../../src/model/person/feature/sign-in/failure.ts";
 import { signInMail } from "../../src/model/person/feature/sign-in/mail.ts";
 import {
   handleProblem,
@@ -21,6 +22,7 @@ import {
   normalizeHandle,
   suggestHandle,
 } from "../../src/model/person/handle.ts";
+import { mayJoin, readInvited, readNewcomer } from "../../src/model/person/invited.ts";
 import {
   firstLinks,
   linkFace,
@@ -42,8 +44,11 @@ import { handleOf, profilePath } from "../../src/model/person/profile-path.ts";
 import { safeNext, signInHref, welcomeHref } from "../../src/model/person/sign-in-path.ts";
 import { Account } from "../../src/model/person/type.ts";
 
-// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: no grants are
-// claimed, no mail goes out, and the links an account starts with are only noted.
+// auth.ts as it is, with dek.pub's own stores, which need Void's D1, put aside: anyone may join,
+// no grants are claimed, no mail goes out, and the links an account starts with are only noted.
+vi.mock("../../src/model/person/feature/sign-in/invitation.server.ts", () => ({
+  mayMakeAccount: async () => true,
+}));
 vi.mock("../../src/model/person/feature/sign-in/claim.server.ts", () => ({
   claimOnSignIn: async () => {},
 }));
@@ -286,6 +291,129 @@ describe("signInMail", () => {
     expect(mail.subject).toBe("Sign in to dek.pub");
     expect(mail.text).toContain("https://dek.pub/api/auth/magic-link/verify?token=t");
     expect(mail.text).toContain("15 minutes");
+  });
+});
+
+describe("readInvited", () => {
+  it("reads addresses and GitHub logins, split by commas or whitespace, trimmed and in lowercase", () => {
+    const invited = readInvited(" Sato@Example.com,@Octo-Cat\n  kato@example.com ,, @hajimism\t");
+    expect(invited.anyone).toBe(false);
+    expect([...invited.emails]).toEqual(["sato@example.com", "kato@example.com"]);
+    expect([...invited.logins]).toEqual(["octo-cat", "hajimism"]);
+  });
+
+  it("opens sign-up to anyone only when `*` is the whole list", () => {
+    expect(readInvited(" * ").anyone).toBe(true);
+    const mixed = readInvited("*, sato@example.com");
+    expect(mixed.anyone).toBe(false);
+    expect([...mixed.emails]).toEqual(["sato@example.com"]);
+  });
+
+  it("invites nobody from an empty setting, and leaves out what is neither an address nor a login", () => {
+    for (const setting of ["", "   ", "@, sato, *@*x"]) {
+      const invited = readInvited(setting);
+      expect(invited.anyone).toBe(false);
+      expect(invited.emails.size + invited.logins.size).toBe(0);
+    }
+  });
+});
+
+describe("mayJoin", () => {
+  const nobodyWaits = vi.fn(async () => false);
+  const newcomer = { email: "sato@example.com", emailVerified: true, githubLogin: null };
+
+  it("lets anyone in when the list is `*`, a verified address or not", async () => {
+    const anyone = readInvited("*");
+    expect(await mayJoin(anyone, { ...newcomer, emailVerified: false }, nobodyWaits)).toBe(true);
+  });
+
+  it("lets in a verified address on the list, whatever its case", async () => {
+    const invited = readInvited("Sato@Example.com");
+    expect(await mayJoin(invited, { ...newcomer, email: "SATO@example.com" }, nobodyWaits)).toBe(
+      true,
+    );
+    expect(await mayJoin(invited, { ...newcomer, email: "kato@example.com" }, nobodyWaits)).toBe(
+      false,
+    );
+  });
+
+  it("never counts an address that is not verified, on the list or with a share waiting", async () => {
+    const waits = vi.fn(async () => true);
+    const unverified = { ...newcomer, emailVerified: false };
+    expect(await mayJoin(readInvited("sato@example.com"), unverified, waits)).toBe(false);
+    expect(await mayJoin(readInvited(""), unverified, waits)).toBe(false);
+    expect(waits).not.toHaveBeenCalled();
+  });
+
+  it("lets in a GitHub account on the list as `@login`, whatever its address", async () => {
+    const invited = readInvited("@octo-cat");
+    const github = { email: "o@example.com", emailVerified: false, githubLogin: "Octo-Cat" };
+    expect(await mayJoin(invited, github, nobodyWaits)).toBe(true);
+    expect(await mayJoin(invited, { ...github, githubLogin: "octo-dog" }, nobodyWaits)).toBe(false);
+    expect(await mayJoin(readInvited("octo-cat@example.com"), github, nobodyWaits)).toBe(false);
+  });
+
+  it("lets in a verified address a share waits for, asking by the address in lowercase", async () => {
+    const waits = vi.fn(async (email: string) => email === "sato@example.com");
+    expect(await mayJoin(readInvited(""), { ...newcomer, email: "Sato@example.com" }, waits)).toBe(
+      true,
+    );
+    expect(waits).toHaveBeenCalledWith("sato@example.com");
+    expect(await mayJoin(readInvited(""), { ...newcomer, email: "kato@example.com" }, waits)).toBe(
+      false,
+    );
+  });
+});
+
+describe("readNewcomer", () => {
+  it("reads who Better Auth is about to make an account for, with the login of a GitHub profile", () => {
+    expect(
+      readNewcomer({
+        user: { email: "o@example.com", emailVerified: true, name: "Octo" },
+        source: {
+          method: "oauth",
+          action: "create-user",
+          oauth: { providerId: "github", profile: { login: "Octo-Cat", id: 1 } },
+        },
+      }),
+    ).toEqual({ email: "o@example.com", emailVerified: true, githubLogin: "Octo-Cat" });
+  });
+
+  it("gives no login for any other way in, and takes an address as unverified unless it says so", () => {
+    expect(
+      readNewcomer({
+        user: { email: "s@example.com" },
+        source: { method: "magic-link", action: "create-user" },
+      }),
+    ).toEqual({ email: "s@example.com", emailVerified: false, githubLogin: null });
+    expect(
+      readNewcomer({
+        user: { email: "s@example.com", emailVerified: true },
+        source: {
+          method: "oauth",
+          action: "create-user",
+          oauth: { providerId: "google", profile: { login: "x" } },
+        },
+      })?.githubLogin,
+    ).toBeNull();
+  });
+
+  it("refuses what has no address, and says so", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(readNewcomer({ user: {}, source: { method: "oauth" } })).toBeNull();
+    expect(readNewcomer(null)).toBeNull();
+    expect(error).toHaveBeenCalledTimes(2);
+    error.mockRestore();
+  });
+});
+
+describe("signInFailure", () => {
+  it("tells a refused sign-up from a link that no longer works and from anything else", () => {
+    expect(signInFailure(NOT_INVITED)).toBe("not-invited");
+    expect(signInFailure("INVALID_TOKEN")).toBe("link-failed");
+    expect(signInFailure("access_denied")).toBe("failed");
+    expect(signInFailure("")).toBe("failed");
+    expect(signInFailure(undefined)).toBeNull();
   });
 });
 
