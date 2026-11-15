@@ -389,6 +389,13 @@ try {
       html.includes(`<meta property="og:url" content="${server.url}${talkPath}"`),
     "a link talk names its URL without the key as canonical and in its preview",
   );
+  check(
+    /<title>[^<]*\(@author\) · dek\.pub<\/title>/.test(html) &&
+      /<meta property="og:title" content="[^"]*\(@author\)"/.test(html) &&
+      /<meta name="twitter:title" content="[^"]*\(@author\)"/.test(html),
+    "a talk's title and preview name its owner by handle",
+    /<title>[^<]*<\/title>/.exec(html)?.[0],
+  );
   const preview = /<meta property="og:image" content="([^"]+)"/
     .exec(html)?.[1]
     ?.replace(/&amp;/g, "&");
