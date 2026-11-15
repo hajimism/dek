@@ -1,11 +1,16 @@
 // The comment store against D1: the counters a thread takes its number from, and the lists it
 // asks for in parts, which only a real D1 shows right or wrong.
 
-import { mutes, threads } from "@schema";
+import { mutes, replies, threads } from "@schema";
 import { describe, expect, it } from "vitest";
 import { db, eq } from "void/db";
 import { mutedAmong } from "../../src/model/comment/mute.server.ts";
-import { openThread, visibleThread, widenThread } from "../../src/model/comment/store.server.ts";
+import {
+  openThread,
+  repliesOf,
+  visibleThread,
+  widenThread,
+} from "../../src/model/comment/store.server.ts";
 import { owner, publishedDeck, stranger } from "./fixtures.ts";
 
 const comment = (scope: "team" | "shared") => ({
@@ -80,5 +85,32 @@ describe("mutes", () => {
       await db.insert(mutes).values({ userId, deckId: deck.id });
     }
     expect([...(await mutedAmong(deck.id, people))].sort()).toEqual([...muted].sort());
+  });
+});
+
+describe("replies", () => {
+  it("finds the replies to more threads than D1 binds to one statement, each thread's in order", async () => {
+    const deck = await publishedDeck();
+    const ids = await Promise.all(
+      Array.from({ length: 120 }, () => openThread(deck, owner, "team", comment("team"))),
+    );
+    for (const [i, threadId] of ids.entries()) {
+      for (const n of [2, 1]) {
+        await db.insert(replies).values({
+          id: `r${i}_${n}`,
+          threadId,
+          text: `reply ${n}`,
+          authorId: owner.id,
+          createdAt: `2026-11-15T00:00:0${n}.000Z`,
+        });
+      }
+    }
+    const found = await repliesOf(ids);
+    expect(found).toHaveLength(240);
+    for (const threadId of [ids[0], ids[119]]) {
+      expect(
+        found.filter((reply) => reply.threadId === threadId).map((reply) => reply.text),
+      ).toEqual(["reply 1", "reply 2"]);
+    }
   });
 });

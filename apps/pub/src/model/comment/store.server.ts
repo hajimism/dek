@@ -23,10 +23,28 @@ import type { Account, Person } from "../person/type.ts";
 import { canReadThread, canSeeThread, scopeFor } from "./access.ts";
 import { placeComment } from "./anchor.ts";
 import { mustOpenThread } from "./new-thread.ts";
-import { CommentTargets, type ThreadRow } from "./type.ts";
+import { CommentTargets, type ReplyRow, type ThreadRow } from "./type.ts";
 import { hideQuotes } from "./view.ts";
 
 type Status = "open" | "resolved" | "all";
+
+/**
+ * The replies to the threads `threadIds` names, each thread's in the order they were written,
+ * asked for in parts so that any number of threads stays under what D1 binds to one statement.
+ */
+export async function repliesOf(threadIds: readonly string[]): Promise<ReplyRow[]> {
+  const parts = await Promise.all(
+    chunks(threadIds, IDS_PER_QUERY).map((ids) =>
+      db
+        .select()
+        .from(replies)
+        .where(inArray(replies.threadId, ids))
+        .orderBy(asc(replies.createdAt))
+        .all(),
+    ),
+  );
+  return parts.flat();
+}
 
 async function listComments(
   c: Context,
@@ -54,24 +72,7 @@ async function listComments(
   if (wanted.length === 0) {
     return [];
   }
-  const replyRows = (
-    await Promise.all(
-      chunks(
-        wanted.map((row) => row.id),
-        IDS_PER_QUERY,
-      ).map((ids) =>
-        db
-          .select()
-          .from(replies)
-          .where(inArray(replies.threadId, ids))
-          .orderBy(asc(replies.createdAt))
-          .all(),
-      ),
-    )
-  )
-    .flat()
-    // Each part comes in order; the parts together are put in order again.
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const replyRows = await repliesOf(wanted.map((row) => row.id));
   const renameRows = await renamesOf(deck.id);
   const people = await peopleById(c, [
     ...wanted.map((row) => row.authorId),

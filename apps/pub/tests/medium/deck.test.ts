@@ -69,16 +69,20 @@ describe("the access file", () => {
   it("stays closed when the write fails on a change that opens", async () => {
     const deck = await publishedDeck({ visibility: "private" });
     failWritesAfter(0);
-    await expect(updateDeck(deck, { visibility: "public", embed: true })).rejects.toThrow();
+    await expect(updateDeck(deck, { visibility: "public", embed: true })).rejects.toThrow(
+      "R2 is down",
+    );
     expect((await deckById(deck.id))?.visibility).toBe("public");
     expect(await accessFile(deck.id)).toMatchObject({ visibility: "private", embed: false });
   });
 
-  it("is not written for a change that touches none of its columns", async () => {
-    const deck = await publishedDeck();
-    const put = failWritesAfter(0);
+  it("opens again at the next change, whatever it touches, after a failed write left it closed", async () => {
+    const deck = await publishedDeck({ visibility: "private" });
+    failWritesAfter(0);
+    await expect(updateDeck(deck, { visibility: "public" })).rejects.toThrow("R2 is down");
+    vi.restoreAllMocks();
     await updateDeck(deck, { comments: "off" });
-    expect(put).not.toHaveBeenCalled();
+    expect(await accessFile(deck.id)).toMatchObject({ visibility: "public" });
   });
 });
 
