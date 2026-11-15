@@ -1,9 +1,11 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { paths } from "../../../../../../../../src/pub/paths.ts";
   import type { CommentPolicy, DeckStatus, Grant, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
   import { guessLang } from "../../../../../common/i18n.ts";
   import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { showFirst } from "../../../../../common/ui/call.ts";
   import CopyField from "../../../../../common/ui/copy-field.svelte";
   import Dialog from "../../../../../common/ui/dialog.svelte";
   import { failureText } from "../../../../../common/ui/failure.ts";
@@ -99,17 +101,16 @@
   async function save(change: Setting, undoable = true) {
     const key = Object.keys(change)[0] as keyof Setting;
     const before: Setting = { [key]: status[key] } as Setting;
-    const previous = $state.snapshot(status);
-    status = { ...status, ...change } as DeckStatus;
     saving = key;
-    try {
-      status = await api<DeckStatus>(`/api/decks/${status.id}`, { method: "PATCH", body: change });
+    const saved = await showFirst(
+      { get: () => $state.snapshot(status), set: (next) => (status = next) },
+      { ...status, ...change } as DeckStatus,
+      () => api<DeckStatus>(paths.deck(status.id), { method: "PATCH", body: change }),
+      (error) => toast(failureText(t, error), { tone: "error" }),
+    );
+    saving = null;
+    if (saved) {
       toast(t("saved"), undoable ? { action: { label: t("undo"), run: () => save(before, false) } } : {});
-    } catch (error) {
-      status = previous;
-      toast(failureText(t, error), { tone: "error" });
-    } finally {
-      saving = null;
     }
   }
 
@@ -117,7 +118,7 @@
   async function newLink() {
     saving = "newLink";
     try {
-      status = await api<DeckStatus>(`/api/decks/${status.id}`, { method: "PATCH", body: { newLink: true } });
+      status = await api<DeckStatus>(paths.deck(status.id), { method: "PATCH", body: { newLink: true } });
       toast(t("manage.sharing.newLinkDone"));
     } catch (error) {
       toast(failureText(t, error), { tone: "error" });
@@ -130,7 +131,7 @@
   async function deleteTalk() {
     deleting = true;
     try {
-      await api(`/api/decks/${status.id}`, { method: "DELETE" });
+      await api(paths.deck(status.id), { method: "DELETE" });
       ondeleted(profilePath(status.owner));
     } catch (error) {
       deleting = false;

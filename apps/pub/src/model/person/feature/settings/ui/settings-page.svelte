@@ -5,6 +5,8 @@
   import { untrack } from "svelte";
   import type { CliKeyInfo, SignUpInvite } from "../../../../../../../../src/pub/protocol.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import type { CallFailure } from "../../../../../common/ui/call.ts";
+  import { failedText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useI18n } from "../../../../../common/ui/use-i18n.ts";
@@ -12,7 +14,6 @@
   import { MAX_NAME_LENGTH, type NameProblem, readName } from "../../../name.ts";
   import { profilePath } from "../../../profile-path.ts";
   import { saveName } from "../settings-api.ts";
-  import type { SaveFailure } from "../type.ts";
   import CliKeys from "./cli-keys.svelte";
   import LinksEditor from "./links-editor.svelte";
   import SignUpInvites from "./sign-up-invites.svelte";
@@ -36,16 +37,14 @@
   let nameProblem: string | null = $state(null);
   let savingName = $state(false);
 
-  function nameText(problem: NameProblem | SaveFailure, message: string): string {
+  function nameText(problem: NameProblem | CallFailure, message: string): string {
     switch (problem) {
       case "empty":
         return t("settings.name.empty");
       case "too_long":
         return t("settings.name.too_long", { n: MAX_NAME_LENGTH });
-      case "offline":
-        return t("common.offline");
       default:
-        return t("common.error", { message });
+        return failedText(t, { problem, message });
     }
   }
 

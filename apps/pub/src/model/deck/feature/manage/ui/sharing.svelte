@@ -1,8 +1,10 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { paths } from "../../../../../../../../src/pub/paths.ts";
   import type { Grant, GrantRole, GrantSide } from "../../../../../../../../src/pub/protocol.ts";
   import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { showFirst } from "../../../../../common/ui/call.ts";
   import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -27,7 +29,7 @@
   }
 
   async function reload() {
-    grants = (await api<{ grants: Grant[] }>(`/api/decks/${deckId}/grants`)).grants;
+    grants = (await api<{ grants: Grant[] }>(paths.grants(deckId))).grants;
   }
 
   async function add(event: SubmitEvent) {
@@ -41,7 +43,7 @@
     }
     adding = true;
     try {
-      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: name, role, side } });
+      await api(paths.grants(deckId), { method: "POST", body: { who: name, role, side } });
       await reload();
       toast(t("manage.sharing.added", { who: name }));
       who = "";
@@ -55,7 +57,7 @@
 
   async function change(grant: Grant, next: Pick<Grant, "role" | "side">) {
     try {
-      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: grant.who, ...next } });
+      await api(paths.grants(deckId), { method: "POST", body: { who: grant.who, ...next } });
       await reload();
       toast(t("saved"));
     } catch (err) {
@@ -64,16 +66,19 @@
   }
 
   async function remove(grant: Grant) {
-    const before = grants;
-    grants = grants.filter((entry) => entry.id !== grant.id);
-    try {
-      await api(`/api/decks/${deckId}/grants/${grant.id}`, { method: "DELETE" });
+    const removed = await showFirst(
+      { get: () => grants, set: (next) => (grants = next) },
+      grants.filter((entry) => entry.id !== grant.id),
+      async () => {
+        await api(paths.grant(deckId, grant.id), { method: "DELETE" });
+        return grants;
+      },
+      (err) => toast(failureText(t, err), { tone: "error" }),
+    );
+    if (removed) {
       toast(t("manage.sharing.removed", { who: label(grant) }), {
         action: { label: t("undo"), run: () => change(grant, { role: grant.role, side: grant.side }) },
       });
-    } catch (err) {
-      grants = before;
-      toast(failureText(t, err), { tone: "error" });
     }
   }
 

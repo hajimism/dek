@@ -44,11 +44,3 @@ export const INVITE_CODES = {
   too_many: "invites_too_many",
   claimed: "invite_claimed",
 } as const satisfies Record<InvitesProblem["problem"] | "claimed", string>;
-
-/** Why a save did not happen, beyond what the rules say: dek.pub was not reached, or it failed. */
-export type SaveFailure = "offline" | "failed";
-
-/** A save done, with what was saved; or not, and why. */
-export type Saved<T, Problem extends string> =
-  | { ok: true; value: T }
-  | { ok: false; problem: Problem | SaveFailure; message: string };

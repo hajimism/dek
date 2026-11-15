@@ -9,6 +9,7 @@ import { handleProblem, normalizeHandle } from "../../handle.ts";
 import { meOf } from "../../person.ts";
 import { personByHandle, setHandle } from "../../store.server.ts";
 import type { Account } from "../../type.ts";
+import { HANDLE_CODES } from "./type.ts";
 
 /** Whether `value`, read as a handle, may be chosen now. */
 async function handleStatus(c: Context, value: string): Promise<HandleStatus> {
@@ -37,7 +38,7 @@ export async function askHandle(c: Context, value: string): Promise<HandleStatus
 const chosenAlready = (): ApiError =>
   new ApiError(
     409,
-    "handle_chosen",
+    HANDLE_CODES.chosen,
     "you have chosen your handle already",
     "a handle cannot be changed",
   );
@@ -52,14 +53,14 @@ export async function chooseHandle(c: Context, value: string): Promise<Me> {
   if (status === "invalid") {
     throw new ApiError(
       422,
-      "handle_invalid",
+      HANDLE_CODES.invalid,
       "a handle is lowercase letters, digits and single hyphens, up to 39, with no hyphen at either end",
     );
   }
   if (status === "reserved") {
-    throw new ApiError(422, "handle_reserved", `@${handle} is kept for dek.pub`);
+    throw new ApiError(422, HANDLE_CODES.reserved, `@${handle} is kept for dek.pub`);
   }
-  const taken = new ApiError(409, "handle_taken", `@${handle} is taken`, "choose another");
+  const taken = new ApiError(409, HANDLE_CODES.taken, `@${handle} is taken`, "choose another");
   if (status === "taken") {
     throw taken;
   }

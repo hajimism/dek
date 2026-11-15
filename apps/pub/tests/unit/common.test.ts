@@ -16,7 +16,8 @@ import {
 import { log } from "../../src/common/log.ts";
 import { sendMail } from "../../src/common/mail.server.ts";
 import { ApiFailure } from "../../src/common/ui/api.ts";
-import { failureText } from "../../src/common/ui/failure.ts";
+import { called, showFirst } from "../../src/common/ui/call.ts";
+import { failedText, failureText } from "../../src/common/ui/failure.ts";
 import { untilWritten } from "../../src/common/until-written.ts";
 import { xmlText } from "../../src/common/xml.ts";
 
@@ -164,6 +165,102 @@ describe("failureText", () => {
     expect(failureText(t, new TypeError("x is undefined"))).toBe(
       t("common.error", { message: "" }),
     );
+  });
+});
+
+describe("failedText", () => {
+  const t = (key: Parameters<typeof translate>[1], vars?: Parameters<typeof translate>[2]) =>
+    translate("en", key, vars);
+
+  it("says the same of a call that failed as of the error it threw", () => {
+    expect(failedText(t, { problem: "offline", message: "" })).toBe(t("common.offline"));
+    expect(failedText(t, { problem: "failed", message: "no" })).toBe(
+      t("common.error", { message: "no" }),
+    );
+    expect(failedText(t, { problem: "too_many", message: "at most 5" })).toBe(
+      t("common.error", { message: "at most 5" }),
+    );
+  });
+});
+
+describe("called", () => {
+  const CODES = { taken: "handle_taken", too_long: "name_too_long" } as const;
+
+  it("answers what the call answered", async () => {
+    expect(await called(async () => 3, CODES)).toEqual({ ok: true, value: 3 });
+  });
+
+  it("names the problem the error's code is given to, with the server's message", async () => {
+    const result = await called(async () => {
+      throw new ApiFailure(409, "handle_taken", "@sato is taken");
+    }, CODES);
+    expect(result).toEqual({ ok: false, problem: "taken", message: "@sato is taken" });
+  });
+
+  it("says a call failed when its code is not in the table, or there is no table", async () => {
+    const thrown = new ApiFailure(500, "internal", "something broke");
+    expect(await called(() => Promise.reject(thrown), CODES)).toEqual({
+      ok: false,
+      problem: "failed",
+      message: "something broke",
+    });
+    expect(await called(() => Promise.reject(thrown))).toEqual({
+      ok: false,
+      problem: "failed",
+      message: "something broke",
+    });
+  });
+
+  it("tells dek.pub not answering from any other error", async () => {
+    expect(await called(() => Promise.reject(new ApiFailure(0, "offline", "")), CODES)).toEqual({
+      ok: false,
+      problem: "offline",
+      message: "",
+    });
+    expect(await called(() => Promise.reject(new TypeError("x")), CODES)).toEqual({
+      ok: false,
+      problem: "failed",
+      message: "",
+    });
+  });
+});
+
+describe("showFirst", () => {
+  function box<T>(value: T) {
+    const seen: T[] = [];
+    return {
+      seen,
+      shown: {
+        get: () => value,
+        set: (next: T) => {
+          value = next;
+          seen.push(next);
+        },
+      },
+    };
+  }
+
+  it("shows the change before the call answers, then what it answers", async () => {
+    const { seen, shown } = box(1);
+    let shownDuring: number | null = null;
+    const done = await showFirst(
+      shown,
+      2,
+      async () => {
+        shownDuring = shown.get();
+        return 3;
+      },
+      vi.fn(),
+    );
+    expect([done, shownDuring, seen]).toEqual([true, 2, [2, 3]]);
+  });
+
+  it("puts back what was shown when the call fails, and says why", async () => {
+    const { seen, shown } = box([1, 2]);
+    const failed = vi.fn();
+    const error = new ApiFailure(0, "offline", "");
+    const done = await showFirst(shown, [1], () => Promise.reject(error), failed);
+    expect([done, seen, failed.mock.calls]).toEqual([false, [[1], [1, 2]], [[error]]]);
   });
 });
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import Button from "../../../../../common/ui/button.svelte";
+  import { failedText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { useI18n } from "../../../../../common/ui/use-i18n.ts";
   import { handleProblem, normalizeHandle } from "../../../handle.ts";
@@ -61,10 +62,8 @@
         return t("welcome.taken", vars);
       case "chosen":
         return t("welcome.chosen");
-      case "offline":
-        return t("common.offline");
       default:
-        return t("common.error", { message: "" });
+        return failedText(t, { problem: check.problem, message: "" });
     }
   });
 
