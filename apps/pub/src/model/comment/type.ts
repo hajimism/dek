@@ -1,7 +1,7 @@
 // A comment is a thread on one slide of one version, with the replies under it. Its row is the
 // protocol's CommentRow; the page adds what it shows while one is being written or sent.
 
-import type { threads } from "@schema";
+import type { replies, threads } from "@schema";
 import { z } from "zod";
 import {
   type CommentAnchor,
@@ -11,6 +11,7 @@ import {
 } from "../../../../../src/pub/protocol.ts";
 
 export type ThreadRow = typeof threads.$inferSelect;
+export type ReplyRow = typeof replies.$inferSelect;
 
 /** What a thread points at, as its `targets` column holds it. */
 export const CommentTargets = z.array(CommentTarget);
