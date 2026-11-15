@@ -4,7 +4,7 @@
   import type { Grant, GrantRole, GrantSide } from "../../../../../../../../src/pub/protocol.ts";
   import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
-  import { showFirst } from "../../../../../common/ui/call.ts";
+  import { type Shown, showFirst } from "../../../../../common/ui/call.ts";
   import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -65,13 +65,16 @@
     }
   }
 
+  const shownGrants: Shown<Grant[]> = { get: () => grants, set: (next) => (grants = next) };
+
   async function remove(grant: Grant) {
+    const rest = grants.filter((entry) => entry.id !== grant.id);
     const removed = await showFirst(
-      { get: () => grants, set: (next) => (grants = next) },
-      grants.filter((entry) => entry.id !== grant.id),
+      shownGrants,
+      rest,
       async () => {
         await api(paths.grant(deckId, grant.id), { method: "DELETE" });
-        return grants;
+        return rest;
       },
       (err) => toast(failureText(t, err), { tone: "error" }),
     );

@@ -11,7 +11,7 @@
   import { formatDate } from "../../../../../common/i18n.ts";
   import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
-  import { showFirst } from "../../../../../common/ui/call.ts";
+  import { type Shown, showFirst } from "../../../../../common/ui/call.ts";
   import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import SegmentedControl from "../../../../../common/ui/segmented-control.svelte";
@@ -57,11 +57,12 @@
   );
   const comments = $derived(list.rows);
   let muted = $state(untrack(() => talk.muted));
+  const shownMuted: Shown<boolean | null> = { get: () => muted, set: (value) => (muted = value) };
 
   /** Turn the reader's mail of these comments off or on, showing the change before it is made. */
   async function setMuted(next: boolean) {
     const done = await showFirst(
-      { get: () => muted, set: (value) => (muted = value) },
+      shownMuted,
       next,
       async () => (await api<MuteState>(paths.mute(talk.id), { method: next ? "PUT" : "DELETE" })).muted,
       failed,
@@ -438,12 +439,14 @@
     }
   }
 
+  const shownLikes: Shown<LikeState | null> = { get: () => likes, set: (value) => (likes = value) };
+
   async function like(next: boolean) {
     if (!likes) {
       return;
     }
-    await showFirst<LikeState | null>(
-      { get: () => likes, set: (value) => (likes = value) },
+    await showFirst(
+      shownLikes,
       { count: likes.count + (next ? 1 : -1), liked: next },
       () => api<LikeState>(keyed(paths.like(talk.id), talk.key), { method: next ? "PUT" : "DELETE" }),
       failed,
