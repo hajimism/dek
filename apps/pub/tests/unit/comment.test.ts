@@ -523,8 +523,9 @@ describe("notices", () => {
   });
 });
 
-// Every visibility by every kind of caller, through what the routes ask in turn: whether the deck
-// opens to them (a 404 if not), then what they may do on it. The table is written out by hand, so
+// Every visibility by every kind of caller, through the rules the routes ask: whether the deck
+// opens to them (a 404 if not), then what they may do on it. Which rule a route asks first is the
+// routes' own, held end to end. The table is written out by hand, so
 // a change to any rule that moves one cell fails here, wherever the rule is.
 describe("who may do what with a deck, every visibility by every caller", () => {
   const OWNER = { id: "owner" };
@@ -535,6 +536,7 @@ describe("who may do what with a deck, every visibility by every caller", () => 
     | "teamComment"
     | "guestView"
     | "guestComment"
+    | "mixed"
     | "stranger"
     | "strangerKey"
     | "out"
@@ -552,6 +554,16 @@ describe("who may do what with a deck, every visibility by every caller", () => 
     teamComment: { person: { id: "tc" }, grants: [{ role: "comment", side: "team" }], key: null },
     guestView: { person: { id: "gv" }, grants: [{ role: "view", side: "guest" }], key: null },
     guestComment: { person: { id: "gc" }, grants: [{ role: "comment", side: "guest" }], key: null },
+    // One grant by account and one by address: the role and the side that allow more each count
+    // on their own (ADR 51), so this caller comments on the team's side.
+    mixed: {
+      person: { id: "mx" },
+      grants: [
+        { role: "view", side: "team" },
+        { role: "comment", side: "guest" },
+      ],
+      key: null,
+    },
     stranger: { person: { id: "st" }, grants: [], key: null },
     strangerKey: { person: { id: "sk" }, grants: [], key: KEY },
     out: { person: null, grants: [], key: null },
@@ -567,6 +579,7 @@ describe("who may do what with a deck, every visibility by every caller", () => 
       teamComment: "team R W T S - -",
       guestView: "closed",
       guestComment: "closed",
+      mixed: "team R W T S - -",
       stranger: "closed",
       strangerKey: "closed",
       out: "closed",
@@ -578,6 +591,7 @@ describe("who may do what with a deck, every visibility by every caller", () => 
       teamComment: "team R W T S - -",
       guestView: "guest R - - S - -",
       guestComment: "guest R W - S - -",
+      mixed: "team R W T S - -",
       stranger: "closed",
       strangerKey: "closed",
       out: "closed",
@@ -589,6 +603,7 @@ describe("who may do what with a deck, every visibility by every caller", () => 
       teamComment: "team R W T S P L",
       guestView: "guest R - - S P L",
       guestComment: "guest R W - S P L",
+      mixed: "team R W T S P L",
       stranger: "closed",
       strangerKey: "guest - - - - P L",
       out: "closed",
@@ -600,6 +615,7 @@ describe("who may do what with a deck, every visibility by every caller", () => 
       teamComment: "team R W T S P L",
       guestView: "guest R - - S P L",
       guestComment: "guest R W - S P L",
+      mixed: "team R W T S P L",
       stranger: "guest - - - - P L",
       strangerKey: "guest - - - - P L",
       out: "guest - - - - - -",
@@ -619,8 +635,8 @@ describe("who may do what with a deck, every visibility by every caller", () => 
       side,
       flag(reads, "R"),
       flag(canComment(deck, person, role), "W"),
-      flag(reads && canSeeThread({ scope: "team" }, side), "T"),
-      flag(reads && canSeeThread({ scope: "shared" }, side), "S"),
+      flag(canReadThread(deck, person, role, side, { scope: "team" }), "T"),
+      flag(canReadThread(deck, person, role, side, { scope: "shared" }), "S"),
       flag(canPostPublic(deck, person), "P"),
       flag(canLike(deck, person), "L"),
     ].join(" ");
@@ -655,11 +671,18 @@ describe("who may do what with a deck, every visibility by every caller", () => 
     },
   );
 
-  it("opens a link deck by its own key alone", () => {
+  it("opens a link deck by its own key alone, and a deck with no key by none", () => {
     const deck = deckOf("link", "signed-in");
     for (const key of ["", "K".repeat(22), `${KEY}x`, KEY.slice(1)]) {
       expect(standingOn(deck, { id: "st" }, [], key).opens).toBe(false);
       expect(standingOn(deck, null, [], key).opens).toBe(false);
+    }
+    for (const visibility of ["link", "private"] as const) {
+      const keyless = { ...deckOf(visibility, "signed-in"), linkKey: null };
+      for (const key of ["", KEY, null]) {
+        expect(standingOn(keyless, { id: "st" }, [], key).opens).toBe(false);
+        expect(standingOn(keyless, null, [], key).opens).toBe(false);
+      }
     }
   });
 
@@ -679,6 +702,7 @@ describe("who may do what with a deck, every visibility by every caller", () => 
       teamComment: false,
       guestView: false,
       guestComment: true,
+      mixed: false,
       stranger: false,
       strangerKey: false,
       out: false,
