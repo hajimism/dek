@@ -48,7 +48,7 @@ Continue with [Getting Started](https://hajimism.github.io/dek/guide/getting-sta
 
 ## Sample
 
-`sample/` is a full project with Playwright, rumdl, and voice, holding three decks about dek itself: `why-dek`, a twelve-minute explainer built to read as a handout; `lightning`, a three-minute lightning talk that builds a talk in a terminal; and `with-agents`, a six-minute talk about handing slides to an AI agent. See [sample/README.md](sample/README.md).
+`sample/` is a full project with Playwright, rumdl, and voice, holding three decks about dek itself: `why-dek`, a twelve-minute explainer built to read as a handout; `lightning`, a three-minute lightning talk that builds a talk in a terminal; and `with-agents`, a six-minute talk about handing slides to an AI agent. They are on dek.pub as [@dek](https://dek.pub/@dek). See [sample/README.md](sample/README.md).
 
 ```bash
 cd sample
