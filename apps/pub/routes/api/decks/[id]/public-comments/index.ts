@@ -9,17 +9,13 @@ import {
   publicCommentFor,
   publicCommentsOf,
 } from "../../../../../src/model/deck/public-comment/store.server.ts";
-import { requestKey, visibleDeck } from "../../../../../src/model/deck/store.server.ts";
+import { requestedDeck } from "../../../../../src/model/deck/store.server.ts";
 import { currentAccount, currentPerson } from "../../../../../src/model/person/actor.server.ts";
 
 /** The talk's public comments; only a talk anyone may open has them. */
 export const GET = defineHandler((c) =>
   api(async () => {
-    const { deck } = await visibleDeck(
-      c.req.param("id") ?? "",
-      await currentAccount(c),
-      requestKey(c),
-    );
+    const { deck } = await requestedDeck(c, await currentAccount(c));
     if (!opensWithoutGrant(deck)) {
       throw notFound("comments");
     }
@@ -31,7 +27,7 @@ export const GET = defineHandler((c) =>
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
+    const { deck } = await requestedDeck(c, person);
     if (!opensWithoutGrant(deck)) {
       throw notFound("comments");
     }

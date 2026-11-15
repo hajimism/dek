@@ -251,6 +251,14 @@ export async function visibleDeck(
   return { deck, ...standing };
 }
 
+/** The deck the request's `:id` names, if `person` may see it, holding the key the request carries. */
+export function requestedDeck(
+  c: Context,
+  person: Account | null,
+): Promise<Standing & { deck: Deck }> {
+  return visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
+}
+
 /**
  * The deck, if `person` may delete it: its owner, or an operator of dek.pub. Anyone else gets the
  * 404 a missing deck gets.

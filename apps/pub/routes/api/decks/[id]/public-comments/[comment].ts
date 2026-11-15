@@ -14,12 +14,12 @@ import {
   findPublic,
   publicCommentFor,
 } from "../../../../../src/model/deck/public-comment/store.server.ts";
-import { requestKey, visibleDeck } from "../../../../../src/model/deck/store.server.ts";
+import { requestedDeck } from "../../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../../src/model/person/actor.server.ts";
 
 async function target(c: Context) {
   const person = await requirePerson(c);
-  const { deck } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
+  const { deck } = await requestedDeck(c, person);
   if (!opensWithoutGrant(deck)) {
     throw notFound("comment");
   }

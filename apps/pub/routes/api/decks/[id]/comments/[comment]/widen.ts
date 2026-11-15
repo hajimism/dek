@@ -9,13 +9,13 @@ import {
   visibleThread,
   widenThread,
 } from "../../../../../../src/model/comment/store.server.ts";
-import { requestKey, visibleDeck } from "../../../../../../src/model/deck/store.server.ts";
+import { requestedDeck } from "../../../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../../../src/model/person/actor.server.ts";
 
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
-    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
+    const { deck, role, side } = await requestedDeck(c, person);
     const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
     mustResolve(deck, thread, person, role, "share");
     await widenThread(thread);
