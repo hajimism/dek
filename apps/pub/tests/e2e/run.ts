@@ -616,7 +616,7 @@ try {
     json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "レビュー" },
   });
   check(review.status === 403, "a reader with no grant writes no review thread");
-  const changed = await Promise.all(
+  const threadChanges = await Promise.all(
     ["resolve", "reopen", "widen"].map(
       async (change) =>
         (
@@ -627,9 +627,9 @@ try {
     ),
   );
   check(
-    changed.every((status) => status === 404),
+    threadChanges.every((status) => status === 404),
     "a reader with no grant cannot tell a review thread is there by changing it",
-    changed,
+    threadChanges,
   );
   const posted = await reader.fetch(publicPath, {
     method: "POST",
