@@ -3,6 +3,11 @@ import { defineConfig } from "void/config";
 export default defineConfig({
   cloudflare: {
     name: "dek-pub",
+    // The app answers on dek.pub alone, a Workers Custom Domain whose record and certificate
+    // Cloudflare keeps (ADR 92). No workers.dev or preview URL serves it under another origin.
+    routes: [{ pattern: "dek.pub", custom_domain: true }],
+    workers_dev: false,
+    preview_urls: false,
     // The bucket the serve Worker reads decks from (serve/wrangler.jsonc). Unnamed, `void deploy`
     // would make the app one of its own.
     r2_buckets: [{ binding: "STORAGE", bucket_name: "dek-pub" }],
