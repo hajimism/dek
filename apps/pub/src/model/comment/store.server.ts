@@ -13,14 +13,14 @@ import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
 import { canSeeScript } from "../deck/access.ts";
-import type { GrantSide } from "../deck/grant/type.ts";
+import type { GrantRole, GrantSide } from "../deck/grant/type.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
 import { currentVersionOf, renamesOf } from "../deck/version/store.server.ts";
 import { authorOf } from "../person/person.ts";
 import { peopleById } from "../person/store.server.ts";
 import type { Account, Person } from "../person/type.ts";
-import { canSeeThread, scopeFor } from "./access.ts";
+import { canReadThread, canSeeThread, scopeFor } from "./access.ts";
 import { placeComment } from "./anchor.ts";
 import { mustOpenThread } from "./new-thread.ts";
 import { CommentTargets, type ThreadRow } from "./type.ts";
@@ -193,16 +193,23 @@ async function takeNumber(deckId: string, scope: ThreadScope): Promise<number> {
 }
 
 /**
- * A thread someone on `side` may see, to reply to, resolve or share; any other is as missing as
- * one that is not.
+ * A thread `person`, holding `role` on `side`, may read, to reply to, resolve or share; any other
+ * is as missing as one that is not, so a reader of a public deck the threads are not shared with
+ * cannot learn one is there.
  */
-export async function visibleThread(deck: Deck, side: GrantSide, id: string): Promise<ThreadRow> {
+export async function visibleThread(
+  deck: Deck,
+  person: Pick<Person, "id"> | null,
+  role: GrantRole | null,
+  side: GrantSide,
+  id: string,
+): Promise<ThreadRow> {
   const thread = await db
     .select()
     .from(threads)
     .where(and(eq(threads.deckId, deck.id), eq(threads.id, id)))
     .get();
-  if (!thread || !canSeeThread(thread, side)) {
+  if (!thread || !canReadThread(deck, person, role, side, thread)) {
     throw notFound("comment");
   }
   return thread;

@@ -24,6 +24,21 @@ export function canSeeThread(thread: Pick<ThreadRow, "scope">, side: GrantSide):
 }
 
 /**
+ * Whether `person`, holding `grant` on `side`, may read a thread: whoever reads the deck's review
+ * threads, and of them the guests' side a shared thread alone. Anyone else may not learn the thread
+ * is there.
+ */
+export function canReadThread(
+  deck: DeckRules,
+  person: Pick<Person, "id"> | null,
+  grant: GrantRole | null,
+  side: GrantSide,
+  thread: Pick<ThreadRow, "scope">,
+): boolean {
+  return canReadComments(deck, person, grant) && canSeeThread(thread, side);
+}
+
+/**
  * The scope a thread opened by someone on `side` takes: what they asked, or by default the
  * narrower one their side may have. The guests' side opens shared threads only.
  */

@@ -17,7 +17,7 @@ export const POST = defineHandler((c) =>
     const person = await currentPerson(c);
     const { deck, role, side } = await requestedDeck(c, person);
     mustComment(canComment(deck, person, role), person);
-    const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
+    const thread = await visibleThread(deck, person, role, side, c.req.param("comment") ?? "");
     const body = await jsonBody(c, NewReply);
     const replyId = await addReply(thread, person, body.text);
     afterAnswer(c, sendNotices(c, deck, thread, "reply", person, body.text));

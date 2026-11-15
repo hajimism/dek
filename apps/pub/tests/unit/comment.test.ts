@@ -3,6 +3,7 @@ import { ApiError } from "../../src/common/api-error.ts";
 import { keepDraft, readDraft } from "../../src/common/ui/drafts.ts";
 import {
   canReadComments,
+  canReadThread,
   canResolve,
   canSeeThread,
   mayResolve,
@@ -270,6 +271,27 @@ describe("who may resolve", () => {
     expect(
       canReadComments({ ...deck, visibility: "private" as const }, { id: "u2" }, "comment"),
     ).toBe(true);
+  });
+});
+
+describe("who may read a thread", () => {
+  const deck = { ownerId: "u1", visibility: "public" as const, comments: "signed-in" as const };
+  const team = { scope: "team" as const };
+  const shared = { scope: "shared" as const };
+
+  it("lets the owner read every thread", () => {
+    expect(canReadThread(deck, { id: "u1" }, null, "team", team)).toBe(true);
+  });
+
+  it("lets the team's side read any thread, and the guests' a shared one", () => {
+    expect(canReadThread(deck, { id: "u2" }, "view", "team", team)).toBe(true);
+    expect(canReadThread(deck, { id: "u2" }, "view", "guest", shared)).toBe(true);
+    expect(canReadThread(deck, { id: "u2" }, "comment", "guest", team)).toBe(false);
+  });
+
+  it("lets no one read a thread the deck is not shared with, though the deck is public", () => {
+    expect(canReadThread(deck, { id: "u3" }, null, "guest", shared)).toBe(false);
+    expect(canReadThread(deck, null, null, "guest", shared)).toBe(false);
   });
 });
 

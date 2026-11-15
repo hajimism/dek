@@ -5,8 +5,8 @@ import { mutes, threads } from "@schema";
 import { describe, expect, it } from "vitest";
 import { db, eq } from "void/db";
 import { mutedAmong } from "../../src/model/comment/mute.server.ts";
-import { openThread, widenThread } from "../../src/model/comment/store.server.ts";
-import { owner, publishedDeck } from "./fixtures.ts";
+import { openThread, visibleThread, widenThread } from "../../src/model/comment/store.server.ts";
+import { owner, publishedDeck, stranger } from "./fixtures.ts";
 
 const comment = (scope: "team" | "shared") => ({
   anchor: { slug: "intro", step: "0", targets: [] },
@@ -40,14 +40,34 @@ describe("thread numbers", () => {
     const deck = await publishedDeck();
     await openThread(deck, owner, "team", comment("shared"));
     const id = await openThread(deck, owner, "team", comment("team"));
-    const thread = await db.select().from(threads).where(eq(threads.id, id)).get();
-    if (!thread) {
-      throw new Error("the thread just opened is not there");
-    }
+    const thread = await visibleThread(deck, owner, null, "team", id);
     await Promise.all([widenThread(thread), widenThread(thread)]);
     expect(await numbers(deck.id, "shared")).toEqual([1, 2]);
     await openThread(deck, owner, "team", comment("shared"));
     expect(await numbers(deck.id, "shared")).toEqual([1, 2, 3]);
+  });
+});
+
+describe("a thread by its ID", () => {
+  it("is a 404 to someone the deck is not shared with, though the deck is public", async () => {
+    const deck = await publishedDeck({ visibility: "public" });
+    const id = await openThread(deck, owner, "team", comment("shared"));
+    await expect(visibleThread(deck, owner, null, "team", id)).resolves.toMatchObject({ id });
+    await expect(visibleThread(deck, stranger, "view", "guest", id)).resolves.toMatchObject({ id });
+    await expect(visibleThread(deck, stranger, null, "guest", id)).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(visibleThread(deck, null, null, "guest", id)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it("is a 404 to the guests' side for a team thread", async () => {
+    const deck = await publishedDeck();
+    const id = await openThread(deck, owner, "team", comment("team"));
+    await expect(visibleThread(deck, stranger, "comment", "guest", id)).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });
 

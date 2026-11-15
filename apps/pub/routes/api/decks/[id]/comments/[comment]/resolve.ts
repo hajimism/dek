@@ -14,7 +14,7 @@ export const POST = defineHandler((c) =>
   api(async () => {
     const person = await requirePerson(c);
     const { deck, role, side } = await requestedDeck(c, person);
-    const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
+    const thread = await visibleThread(deck, person, role, side, c.req.param("comment") ?? "");
     mustResolve(deck, thread, person, role, "resolve");
     await setResolved(thread, person, true);
     if (thread.resolvedAt === null) {

@@ -39,7 +39,7 @@ export const POST = defineHandler((c) =>
     mustComment(canComment(deck, person, role), person);
     const body = await jsonBody(c, NewComment);
     const id = await openThread(deck, person, side, body);
-    const thread = await visibleThread(deck, side, id);
+    const thread = await visibleThread(deck, person, role, side, id);
     afterAnswer(c, sendNotices(c, deck, thread, "thread", person, body.text));
     return Response.json(await commentFor(c, deck, person, side, id), { status: 201 });
   }, c.req.raw),
