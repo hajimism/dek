@@ -19,7 +19,7 @@ From the repository, run the CLI as `bun src/cli.ts`, or work in `sample/`, whic
 
 ## Before you open a pull request
 
-CI runs each of these; run them locally first. On a pull request, CI skips the ones the changed files cannot reach: a change only under `apps/pub/` skips `bun test`, the docs build and the package check, and one only to the docs, the ADRs or dek's tests skips dek.pub's checks below. `main` runs them all ([ADR 91](./adr/0091-run-only-the-ci-checks-a-pull-request-s-files-need-and-every-check-on-main.md)).
+CI runs each of these; run them locally first. On a pull request, CI skips the ones the changed files cannot reach: a change only under `apps/pub/` skips dek's tests, the docs build and the package check, and one only to the docs, the ADRs or dek's tests skips dek.pub's checks below. `main` runs them all ([ADR 91](./adr/0091-run-only-the-ci-checks-a-pull-request-s-files-need-and-every-check-on-main.md)).
 
 ```bash
 bunx biome ci .        # format and lint
