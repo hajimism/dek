@@ -16,6 +16,7 @@ import { createPluginHost } from "./plugins.ts";
 import { createPresenterView } from "./presenter-view.ts";
 import { createRailView } from "./rail-view.ts";
 import { deckChannelName } from "./routes.ts";
+import { createSearchView, type SearchView } from "./search-view.ts";
 import { createStage } from "./stage.ts";
 
 /**
@@ -48,6 +49,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     stage.render(pos);
     presenter.render(pos);
     rail.markCurrent(pos.slideIndex);
+    search?.render(pos);
     marks?.render(pos);
     plugins.render(pos);
     embed?.layout();
@@ -144,6 +146,12 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
     framed,
   });
 
+  // A video plays the talk through; nobody types in it.
+  const search: SearchView | undefined =
+    page.mode === "video"
+      ? undefined
+      : createSearchView({ slides, go: (next) => control.request(next, "local") });
+
   function setPresenterOpen(open: boolean): void {
     presenter.setOpen(open);
     fitAll();
@@ -173,6 +181,7 @@ export function startPlayer(createDevLine?: CreateDevLine): void {
       rail.setOpen(!rail.isOpen());
       return true;
     },
+    openSearch: () => search?.open() ?? false,
     togglePlay: control.togglePlay,
     toggleLaser: () => laser?.toggle() ?? false,
     toggleMark: () => marks?.toggle() ?? false,

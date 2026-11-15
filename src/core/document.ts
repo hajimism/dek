@@ -206,8 +206,8 @@ export function renderRailHtml(slides: Array<{ slug: string; title: string }>): 
 }
 
 const KEY_HINT_LABELS = {
-  ja: { rail: "スライド一覧", presenter: "発表者ビュー" },
-  en: { rail: "Slide rail", presenter: "Presenter view" },
+  ja: { rail: "スライド一覧", search: "検索", presenter: "発表者ビュー" },
+  en: { rail: "Slide rail", search: "Search", presenter: "Presenter view" },
 };
 
 /**
@@ -238,15 +238,15 @@ function laserLabel(lang: string): string {
 }
 
 /**
- * The keys a viewer of a built file cannot discover by looking: `s`, and `p` when it has a
- * presenter view. Shown once as the file opens, it fades on its own and goes away at the first
- * key or move.
+ * The keys a viewer of a built file cannot discover by looking: `s`, `/`, and `p` when it has a
+ * presenter view. `/` is named since the browser's own find reads only the slide on screen.
+ * Shown once as the file opens, it fades on its own and goes away at the first key or move.
  */
 function renderKeyHintHtml(lang: string, presenter: boolean): string {
   const labels = lang.toLowerCase().startsWith("ja") ? KEY_HINT_LABELS.ja : KEY_HINT_LABELS.en;
   // A build with no script has no presenter view to name.
   const p = presenter ? `<span><kbd>p</kbd>${labels.presenter}</span>` : "";
-  return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span>${p}</div>`;
+  return `<div id="${PAGE_ID.hint}" role="status"><span><kbd>s</kbd>${labels.rail}</span><span><kbd>/</kbd>${labels.search}</span>${p}</div>`;
 }
 
 /**

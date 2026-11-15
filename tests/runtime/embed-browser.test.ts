@@ -49,7 +49,7 @@ type Page = {
   mainFrame(): Frame;
   frames(): Frame[];
   mouse: { move(x: number, y: number): Promise<void>; click(x: number, y: number): Promise<void> };
-  keyboard: { press(key: string): Promise<void> };
+  keyboard: { press(key: string): Promise<void>; type(text: string): Promise<void> };
   on(event: "pageerror", listener: (error: Error) => void): void;
   close(): Promise<void>;
 };
@@ -322,6 +322,49 @@ describe("a built deck framed by a page on another origin", () => {
       }
     });
   });
+
+  browserTest(
+    "keeps what is typed into its search from the deck and the framing page",
+    async () => {
+      await withBrowser(async (browser) => {
+        const page = (await browser.newPage({
+          viewport: { width: 1280, height: 720 },
+        })) as unknown as Page;
+        try {
+          await page.goto(`http://localhost:${pageServer?.port}/`);
+          await waitFor(page, "dek:ready");
+          const frame = deckFrame(page);
+          const count = (await heard(page)).length;
+          // The reader works the deck: the keys go to its frame.
+          await page.evaluate(() => {
+            (document.getElementById("deck") as HTMLIFrameElement).contentWindow?.focus();
+          }, undefined);
+          await page.keyboard.press("/");
+          // A space would move the deck and a c reach the framing page, but for the search's guard.
+          await page.keyboard.type(" chart");
+          const rows = frame.locator("#dek-search li");
+          await rows.first().waitFor({ timeout: WAIT_MS });
+          expect(await rows.allTextContents()).toEqual(["2planplan chart"]);
+          expect((await heard(page)).slice(count)).toEqual([]);
+
+          await page.keyboard.press("Enter");
+          expect((await waitFor(page, "dek:moved", count)).data).toEqual({
+            type: "dek:moved",
+            slug: "plan",
+            step: "chart",
+            index: 1,
+            by: "reader",
+          });
+          // The words found are marked on the slide, which the deck's markup never is.
+          expect(await frame.evaluate(() => CSS.highlights.get("dek-search")?.size)).toBe(1);
+          expect(await frame.evaluate(() => document.querySelector("#deck mark"))).toBeNull();
+          expect((await heard(page)).some((each) => each.data.type === "dek:key")).toBe(false);
+        } finally {
+          await page.close();
+        }
+      });
+    },
+  );
 
   for (const query of ["?eager", "?eager-hidden"]) {
     browserTest(`takes a dek:goto sent as soon as it says it is ready (${query})`, async () => {
