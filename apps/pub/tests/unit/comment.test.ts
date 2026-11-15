@@ -1,17 +1,26 @@
 import { describe, expect, it } from "vitest";
+import type {
+  CommentPolicy,
+  GrantRole,
+  GrantSide,
+  Visibility,
+} from "../../../../src/pub/protocol.ts";
 import { ApiError } from "../../src/common/api-error.ts";
 import { keepDraft, readDraft } from "../../src/common/ui/drafts.ts";
 import {
   canReadComments,
+  canReadThread,
   canResolve,
   canSeeThread,
   mayResolve,
   mayWiden,
+  mustComment,
   mustResolve,
   scopeFor,
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
 import { draftKeys } from "../../src/model/comment/drafts.ts";
+import { mustOpenThread } from "../../src/model/comment/new-thread.ts";
 import {
   excerpt,
   mayBeNoticed,
@@ -20,6 +29,9 @@ import {
 } from "../../src/model/comment/notice.ts";
 import { locateQuote, quoteAt, segments } from "../../src/model/comment/quote.ts";
 import { hideQuotes, isDrawn } from "../../src/model/comment/view.ts";
+import { canComment, type OpeningRules, standingOn } from "../../src/model/deck/access.ts";
+import { canLike } from "../../src/model/deck/like/like.ts";
+import { canPostPublic, mustPostPublic } from "../../src/model/deck/public-comment/access.ts";
 import { draftKeys as publicDraftKeys } from "../../src/model/deck/public-comment/drafts.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
@@ -272,6 +284,102 @@ describe("who may resolve", () => {
   });
 });
 
+describe("who may read a thread", () => {
+  const deck = { ownerId: "u1", visibility: "public" as const, comments: "signed-in" as const };
+  const team = { scope: "team" as const };
+  const shared = { scope: "shared" as const };
+
+  it("lets the owner read every thread", () => {
+    expect(canReadThread(deck, { id: "u1" }, null, "team", team)).toBe(true);
+  });
+
+  it("lets the team's side read any thread, and the guests' a shared one", () => {
+    expect(canReadThread(deck, { id: "u2" }, "view", "team", team)).toBe(true);
+    expect(canReadThread(deck, { id: "u2" }, "view", "guest", shared)).toBe(true);
+    expect(canReadThread(deck, { id: "u2" }, "comment", "guest", team)).toBe(false);
+  });
+
+  it("lets no one read a thread the deck is not shared with, though the deck is public", () => {
+    expect(canReadThread(deck, { id: "u3" }, null, "guest", shared)).toBe(false);
+    expect(canReadThread(deck, null, null, "guest", shared)).toBe(false);
+  });
+});
+
+describe("opening a thread", () => {
+  const deck = { currentVersion: 3 };
+  const version = { n: 3, slideMap: map([["intro", ["We start here.", "Then we go on."]]]) };
+  const quote = (text: string) => ({ kind: "quote" as const, quote: text, prefix: "", suffix: "" });
+  const comment = (
+    anchor: Partial<{ slug: string; step: string; targets: ReturnType<typeof quote>[] }> = {},
+    n?: number,
+  ) => ({
+    anchor: { slug: "intro", step: "0", targets: [], ...anchor },
+    text: "Nice.",
+    ...(n === undefined ? {} : { version: n }),
+  });
+
+  function refusal(run: () => unknown): unknown {
+    try {
+      run();
+    } catch (error) {
+      return error;
+    }
+    return null;
+  }
+
+  it("opens on the current version a slide, beat and passage it has", () => {
+    const anchored = comment({ targets: [quote("start here. Then we")] }, 3);
+    expect(mustOpenThread(deck, version, anchored, true)).toBe(version);
+    expect(mustOpenThread(deck, version, comment(), false)).toBe(version);
+  });
+
+  it("tells a page that still shows an older version to reload", () => {
+    expect(refusal(() => mustOpenThread(deck, version, comment({}, 2), true))).toMatchObject({
+      status: 409,
+      code: "stale_version",
+    });
+  });
+
+  it("refuses a version the deck never had", () => {
+    for (const n of [4, 0]) {
+      expect(refusal(() => mustOpenThread(deck, version, comment({}, n), true))).toMatchObject({
+        status: 422,
+        code: "unknown_version",
+      });
+    }
+  });
+
+  it("lets no one the script is hidden from quote it, said there or not", () => {
+    for (const text of ["We start here.", "not in the script"]) {
+      const quoted = comment({ targets: [quote(text)] });
+      expect(refusal(() => mustOpenThread(deck, version, quoted, false))).toMatchObject({
+        status: 403,
+        code: "script_hidden",
+      });
+    }
+  });
+
+  it("refuses a deck with no version yet", () => {
+    expect(
+      refusal(() => mustOpenThread({ currentVersion: null }, null, comment(), true)),
+    ).toMatchObject({ status: 409, code: "no_version" });
+  });
+
+  it("refuses a slide, a beat or a passage the version does not have", () => {
+    const cases = [
+      [comment({ slug: "outro" }), "unknown_slide"],
+      [comment({ step: "1" }), "unknown_step"],
+      [comment({ targets: [quote("We end here.")] }), "unknown_quote"],
+    ] as const;
+    for (const [anchored, code] of cases) {
+      expect(refusal(() => mustOpenThread(deck, version, anchored, true))).toMatchObject({
+        status: 422,
+        code,
+      });
+    }
+  });
+});
+
 describe("thread scope", () => {
   it("opens a team thread for the team's side unless asked, and a shared one for anyone else", () => {
     expect(scopeFor(undefined, "team")).toBe("team");
@@ -412,5 +520,236 @@ describe("notices", () => {
     );
     const resolved = noticeMail({ ...base, event: "resolve", text: "" });
     expect(resolved.subject).toBe("Hajime resolved #T3 on “Why dek”");
+  });
+});
+
+// Every visibility by every kind of caller, through the rules the routes ask: whether the deck
+// opens to them (a 404 if not), then what they may do on it. Which rule a route asks first is the
+// routes' own, held end to end. The table is written out by hand, so
+// a change to any rule that moves one cell fails here, wherever the rule is.
+describe("who may do what with a deck, every visibility by every caller", () => {
+  const OWNER = { id: "owner" };
+  const KEY = "k".repeat(22);
+  type Who =
+    | "owner"
+    | "teamView"
+    | "teamComment"
+    | "guestView"
+    | "guestComment"
+    | "mixed"
+    | "stranger"
+    | "strangerKey"
+    | "out"
+    | "outKey";
+  const CALLERS: Record<
+    Who,
+    {
+      person: { id: string } | null;
+      grants: { role: GrantRole; side: GrantSide }[];
+      key: string | null;
+    }
+  > = {
+    owner: { person: OWNER, grants: [], key: null },
+    teamView: { person: { id: "tv" }, grants: [{ role: "view", side: "team" }], key: null },
+    teamComment: { person: { id: "tc" }, grants: [{ role: "comment", side: "team" }], key: null },
+    guestView: { person: { id: "gv" }, grants: [{ role: "view", side: "guest" }], key: null },
+    guestComment: { person: { id: "gc" }, grants: [{ role: "comment", side: "guest" }], key: null },
+    // One grant by account and one by address: the role and the side that allow more each count
+    // on their own (ADR 51), so this caller comments on the team's side.
+    mixed: {
+      person: { id: "mx" },
+      grants: [
+        { role: "view", side: "team" },
+        { role: "comment", side: "guest" },
+      ],
+      key: null,
+    },
+    stranger: { person: { id: "st" }, grants: [], key: null },
+    strangerKey: { person: { id: "sk" }, grants: [], key: KEY },
+    out: { person: null, grants: [], key: null },
+    outKey: { person: null, grants: [], key: KEY },
+  };
+
+  // Opens, then: side, Reads the review threads, Writes them, sees a Team thread, sees a Shared
+  // thread, Posts a public comment, Likes. `closed` is a 404.
+  const EXPECTED: Record<Visibility, Record<Who, string>> = {
+    team: {
+      owner: "team R W T S - -",
+      teamView: "team R - T S - -",
+      teamComment: "team R W T S - -",
+      guestView: "closed",
+      guestComment: "closed",
+      mixed: "team R W T S - -",
+      stranger: "closed",
+      strangerKey: "closed",
+      out: "closed",
+      outKey: "closed",
+    },
+    private: {
+      owner: "team R W T S - -",
+      teamView: "team R - T S - -",
+      teamComment: "team R W T S - -",
+      guestView: "guest R - - S - -",
+      guestComment: "guest R W - S - -",
+      mixed: "team R W T S - -",
+      stranger: "closed",
+      strangerKey: "closed",
+      out: "closed",
+      outKey: "closed",
+    },
+    link: {
+      owner: "team R W T S P L",
+      teamView: "team R - T S P L",
+      teamComment: "team R W T S P L",
+      guestView: "guest R - - S P L",
+      guestComment: "guest R W - S P L",
+      mixed: "team R W T S P L",
+      stranger: "closed",
+      strangerKey: "guest - - - - P L",
+      out: "closed",
+      outKey: "guest - - - - - -",
+    },
+    public: {
+      owner: "team R W T S P L",
+      teamView: "team R - T S P L",
+      teamComment: "team R W T S P L",
+      guestView: "guest R - - S P L",
+      guestComment: "guest R W - S P L",
+      mixed: "team R W T S P L",
+      stranger: "guest - - - - P L",
+      strangerKey: "guest - - - - P L",
+      out: "guest - - - - - -",
+      outKey: "guest - - - - - -",
+    },
+  };
+
+  function cell(deck: OpeningRules, who: Who): string {
+    const { person, grants, key } = CALLERS[who];
+    const { opens, role, side } = standingOn(deck, person, grants, key);
+    if (!opens) {
+      return "closed";
+    }
+    const reads = canReadComments(deck, person, role);
+    const flag = (yes: boolean, letter: string) => (yes ? letter : "-");
+    return [
+      side,
+      flag(reads, "R"),
+      flag(canComment(deck, person, role), "W"),
+      flag(canReadThread(deck, person, role, side, { scope: "team" }), "T"),
+      flag(canReadThread(deck, person, role, side, { scope: "shared" }), "S"),
+      flag(canPostPublic(deck, person), "P"),
+      flag(canLike(deck, person), "L"),
+    ].join(" ");
+  }
+
+  const deckOf = (visibility: Visibility, comments: CommentPolicy): OpeningRules => ({
+    ownerId: OWNER.id,
+    visibility,
+    comments,
+    linkKey: KEY,
+  });
+
+  it.each(Object.keys(EXPECTED) as Visibility[])("on a %s deck", (visibility) => {
+    const deck = deckOf(visibility, "signed-in");
+    const found = Object.fromEntries(
+      (Object.keys(CALLERS) as Who[]).map((who) => [who, cell(deck, who)]),
+    );
+    expect(found).toEqual(EXPECTED[visibility]);
+  });
+
+  it.each(Object.keys(EXPECTED) as Visibility[])(
+    "on a %s deck with public comments off, the same but no one posts one",
+    (visibility) => {
+      const deck = deckOf(visibility, "off");
+      const found = Object.fromEntries(
+        (Object.keys(CALLERS) as Who[]).map((who) => [who, cell(deck, who)]),
+      );
+      const expected = Object.fromEntries(
+        Object.entries(EXPECTED[visibility]).map(([who, row]) => [who, row.replace(" P ", " - ")]),
+      );
+      expect(found).toEqual(expected);
+    },
+  );
+
+  it("opens a link deck by its own key alone, and a deck with no key by none", () => {
+    const deck = deckOf("link", "signed-in");
+    for (const key of ["", "K".repeat(22), `${KEY}x`, KEY.slice(1)]) {
+      expect(standingOn(deck, { id: "st" }, [], key).opens).toBe(false);
+      expect(standingOn(deck, null, [], key).opens).toBe(false);
+    }
+    for (const visibility of ["link", "private"] as const) {
+      const keyless = { ...deckOf(visibility, "signed-in"), linkKey: null };
+      for (const key of ["", KEY, null]) {
+        expect(standingOn(keyless, { id: "st" }, [], key).opens).toBe(false);
+        expect(standingOn(keyless, null, [], key).opens).toBe(false);
+      }
+    }
+  });
+
+  it("lets the owner, and the author while the deck is still shared with them, change a thread", () => {
+    const deck = deckOf("private", "signed-in");
+    const thread = { authorId: "gc" };
+    const changes = Object.fromEntries(
+      (Object.keys(CALLERS) as Who[]).map((who) => {
+        const { person, grants } = CALLERS[who];
+        const { role } = standingOn(deck, person, grants, null);
+        return [who, canResolve(deck, thread, person, role)];
+      }),
+    );
+    expect(changes).toEqual({
+      owner: true,
+      teamView: false,
+      teamComment: false,
+      guestView: false,
+      guestComment: true,
+      mixed: false,
+      stranger: false,
+      strangerKey: false,
+      out: false,
+      outKey: false,
+    });
+    // The author, once their grant is gone.
+    expect(canResolve(deck, thread, { id: "gc" }, null)).toBe(false);
+  });
+
+  it("asks only someone signed out to sign in when comments are refused", () => {
+    const refused = (refuse: () => void) => {
+      try {
+        refuse();
+      } catch (error) {
+        return error instanceof ApiError ? [error.status, error.code, error.hint] : error;
+      }
+      return "allowed";
+    };
+    expect(refused(() => mustComment(false, null))).toEqual([
+      403,
+      "no_comments",
+      "sign in to comment",
+    ]);
+    expect(refused(() => mustComment(false, { id: "st" }))).toEqual([
+      403,
+      "no_comments",
+      undefined,
+    ]);
+    expect(refused(() => mustComment(true, { id: "st" }))).toBe("allowed");
+    const open = deckOf("public", "signed-in");
+    const off = deckOf("public", "off");
+    expect(refused(() => mustPostPublic(open, null))).toEqual([
+      403,
+      "no_comments",
+      "sign in to comment",
+    ]);
+    expect(refused(() => mustPostPublic(off, null))).toEqual([403, "no_comments", undefined]);
+    expect(refused(() => mustPostPublic(off, { id: "st" }))).toEqual([
+      403,
+      "no_comments",
+      undefined,
+    ]);
+    expect(refused(() => mustPostPublic(deckOf("private", "signed-in"), { id: "st" }))).toEqual([
+      403,
+      "no_comments",
+      undefined,
+    ]);
+    expect(refused(() => mustPostPublic(open, { id: "st" }))).toBe("allowed");
   });
 });

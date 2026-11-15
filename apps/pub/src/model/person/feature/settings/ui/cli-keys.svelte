@@ -7,10 +7,11 @@
   import Button from "../../../../../common/ui/button.svelte";
   import { now as currentTime } from "../../../../../common/ui/clock.svelte.ts";
   import Dialog from "../../../../../common/ui/dialog.svelte";
+  import { failedText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
-  import { type CallFailure, revokeKeys } from "../settings-api.ts";
+  import { revokeKeys } from "../settings-api.ts";
 
   let { keys: initial }: { keys: CliKeyInfo[] } = $props();
   const { shared, lang, t } = useApp();
@@ -21,12 +22,6 @@
   let problem: string | null = $state(null);
   let confirmAll = $state(false);
 
-  function failureText(failure: CallFailure): string {
-    return failure.problem === "offline"
-      ? t("common.offline")
-      : t("common.error", { message: failure.message });
-  }
-
   async function revoke(id?: string) {
     if (revoking !== null) {
       return;
@@ -36,7 +31,7 @@
     const result = await revokeKeys(id);
     revoking = null;
     if (!result.ok) {
-      problem = failureText(result);
+      problem = failedText(t, result);
       return;
     }
     problem = null;

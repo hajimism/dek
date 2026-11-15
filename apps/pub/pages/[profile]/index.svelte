@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick, untrack } from "svelte";
+  import { paths } from "../../../../src/pub/paths.ts";
   import type { TalkPage } from "../../../../src/pub/protocol.ts";
   import { docsUrl } from "../../src/common/docs.ts";
   import { api } from "../../src/common/ui/api.ts";
@@ -51,7 +52,7 @@
     loading = true;
     try {
       const next = await api<TalkPage>(
-        `/api/people/${encodeURIComponent(profile.handle)}/talks?page=${loaded + 1}`,
+        `${paths.talksOf(profile.handle)}?page=${loaded + 1}`,
       );
       const known = new Set(talks.map((talk) => talk.slug));
       const added = next.talks.filter((talk) => !known.has(talk.slug));

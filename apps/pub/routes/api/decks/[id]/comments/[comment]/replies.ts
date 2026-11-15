@@ -9,15 +9,15 @@ import {
   visibleThread,
 } from "../../../../../../src/model/comment/store.server.ts";
 import { canComment } from "../../../../../../src/model/deck/access.ts";
-import { requestKey, visibleDeck } from "../../../../../../src/model/deck/store.server.ts";
+import { requestedDeck } from "../../../../../../src/model/deck/store.server.ts";
 import { currentPerson } from "../../../../../../src/model/person/actor.server.ts";
 
 export const POST = defineHandler((c) =>
   api(async () => {
     const person = await currentPerson(c);
-    const { deck, role, side } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
+    const { deck, role, side } = await requestedDeck(c, person);
     mustComment(canComment(deck, person, role), person);
-    const thread = await visibleThread(deck, side, c.req.param("comment") ?? "");
+    const thread = await visibleThread(deck, person, role, side, c.req.param("comment") ?? "");
     const body = await jsonBody(c, NewReply);
     const replyId = await addReply(thread, person, body.text);
     afterAnswer(c, sendNotices(c, deck, thread, "reply", person, body.text));

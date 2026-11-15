@@ -3,6 +3,8 @@
 // may invite others to sign up from /settings; nothing else is theirs to do (ADR 82, 85).
 
 import { isAddressEntry, listSetting } from "../../common/list-setting.ts";
+import { hasHandle } from "./person.ts";
+import type { Account, Person } from "./type.ts";
 
 /**
  * The addresses `DEK_PUB_OPERATORS` holds: entries split by commas or whitespace, in lowercase.
@@ -19,4 +21,15 @@ export function namesOperator(
   account: { email: string; emailVerified: boolean },
 ): boolean {
   return account.emailVerified && operators.has(account.email.toLowerCase());
+}
+
+/**
+ * Whether `account` may manage who signs up from /settings: an operator, signed in, who has chosen
+ * a handle, since the page shows who added each entry by handle.
+ */
+export function managesInvites(
+  operators: ReadonlySet<string>,
+  account: Account | null,
+): account is Person {
+  return account !== null && hasHandle(account) && namesOperator(operators, account);
 }

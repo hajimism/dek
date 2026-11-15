@@ -1,11 +1,14 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { CommentPolicy, DeckStatus, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
+  import { paths } from "../../../../../../../../src/pub/paths.ts";
+  import type { CommentPolicy, DeckStatus, Grant, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
   import { guessLang } from "../../../../../common/i18n.ts";
-  import { ApiFailure, api } from "../../../../../common/ui/api.ts";
+  import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { type Shown, showFirst } from "../../../../../common/ui/call.ts";
   import CopyField from "../../../../../common/ui/copy-field.svelte";
   import Dialog from "../../../../../common/ui/dialog.svelte";
+  import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import RadioList from "../../../../../common/ui/radio-list.svelte";
   import SegmentedControl from "../../../../../common/ui/segmented-control.svelte";
@@ -13,7 +16,6 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import { profilePath } from "../../../../person/profile-path.ts";
-  import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import type { CurrentVersion } from "../type.ts";
   import Sharing from "./sharing.svelte";
@@ -26,7 +28,7 @@
     ondeleted = (profile: string) => window.location.assign(profile),
   }: {
     status: DeckStatus;
-    grants: GrantView[];
+    grants: Grant[];
     version: CurrentVersion | null;
     /** Where the page goes once the talk is deleted: the owner's profile. */
     ondeleted?: (profile: string) => void;
@@ -93,30 +95,27 @@
     return () => observer.disconnect();
   });
 
-  function message(error: unknown): string {
-    if (error instanceof ApiFailure) {
-      return error.code === "offline" ? t("common.offline") : t("common.error", { message: error.message });
-    }
-    return t("common.error", { message: "" });
-  }
-
   /** A setting the page saves and can undo: any change but a new link. */
   type Setting = Omit<ShareRequest, "newLink">;
+
+  const shownStatus: Shown<DeckStatus> = {
+    get: () => $state.snapshot(status),
+    set: (next) => (status = next),
+  };
 
   async function save(change: Setting, undoable = true) {
     const key = Object.keys(change)[0] as keyof Setting;
     const before: Setting = { [key]: status[key] } as Setting;
-    const previous = $state.snapshot(status);
-    status = { ...status, ...change } as DeckStatus;
     saving = key;
-    try {
-      status = await api<DeckStatus>(`/api/decks/${status.id}`, { method: "PATCH", body: change });
+    const saved = await showFirst(
+      shownStatus,
+      { ...status, ...change } as DeckStatus,
+      () => api<DeckStatus>(paths.deck(status.id), { method: "PATCH", body: change }),
+      (error) => toast(failureText(t, error), { tone: "error" }),
+    );
+    saving = null;
+    if (saved) {
       toast(t("saved"), undoable ? { action: { label: t("undo"), run: () => save(before, false) } } : {});
-    } catch (error) {
-      status = previous;
-      toast(message(error), { tone: "error" });
-    } finally {
-      saving = null;
     }
   }
 
@@ -124,10 +123,10 @@
   async function newLink() {
     saving = "newLink";
     try {
-      status = await api<DeckStatus>(`/api/decks/${status.id}`, { method: "PATCH", body: { newLink: true } });
+      status = await api<DeckStatus>(paths.deck(status.id), { method: "PATCH", body: { newLink: true } });
       toast(t("manage.sharing.newLinkDone"));
     } catch (error) {
-      toast(message(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
     } finally {
       saving = null;
     }
@@ -137,11 +136,11 @@
   async function deleteTalk() {
     deleting = true;
     try {
-      await api(`/api/decks/${status.id}`, { method: "DELETE" });
+      await api(paths.deck(status.id), { method: "DELETE" });
       ondeleted(profilePath(status.owner));
     } catch (error) {
       deleting = false;
-      toast(message(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
     }
   }
 

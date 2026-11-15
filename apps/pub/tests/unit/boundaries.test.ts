@@ -18,6 +18,8 @@
 // - A model's own files never import a `feature/`, and a feature imports no other feature.
 // - `deck/serving/` is shared with the serve Worker, so it imports only itself and the protocol,
 //   and the serve Worker imports only it.
+// - The protocol, in the repository's `src/pub/`, is no layer's: any file may import it. Its
+//   `paths.ts` and `thread.ts` bring no zod, so a component may import them.
 // - Nothing a page sends to the browser imports zod, which would add 25 kB to it: no component,
 //   and nothing a component imports, other than with `import type`.
 
@@ -26,7 +28,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const APP = resolve(import.meta.dirname, "../..");
-const PROTOCOL = resolve(APP, "../../src/pub/protocol.ts");
+/** The protocol in the repository's `src/pub/`, named one by one: nothing else there is the app's. */
+const PROTOCOL = ["protocol.ts", "paths.ts", "thread.ts"].map((file) =>
+  resolve(APP, "../../src/pub", file),
+);
 const MODELS = ["person", "deck", "comment"] as const;
 const VOID_SERVER = /^void(\/(db|env|storage|auth|email|schema-d1))?$/;
 
@@ -98,7 +103,7 @@ function problems(): string[] {
           say("only a *.server.ts file imports another");
         }
       }
-      if (!target || target === PROTOCOL) {
+      if (!target || PROTOCOL.includes(target)) {
         continue;
       }
       const to = placeOf(target);

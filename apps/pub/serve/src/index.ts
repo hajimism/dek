@@ -2,10 +2,10 @@
 // else: no cookie, no database, no other deck. A public deck's current version is served to
 // anyone; every other build needs a token the app signed for that deck, version and build.
 
-import { isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
+import { serving } from "../../src/model/deck/serving/access-file.ts";
 import { accessKey, deckIdFromHost, versionKey } from "../../src/model/deck/serving/origin.ts";
 import { verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
-import { DeckAccess, type Variant } from "../../src/model/deck/serving/type.ts";
+import { DeckAccess } from "../../src/model/deck/serving/type.ts";
 
 export type ServeEnv = {
   STORAGE: R2Bucket;
@@ -43,32 +43,23 @@ async function answer(request: Request, env: ServeEnv, nowSeconds: number): Prom
   }
   const n = Number(match[1]);
   const access = await readAccess(env.STORAGE, deckId);
-  if (!access) {
-    return plain(404, "not found");
-  }
-
   const token = url.searchParams.get("t");
-  let variant: Variant;
-  let open: boolean;
-  if (token) {
-    const claims = await verifyServeToken(env.SERVE_TOKEN_SECRET, token, nowSeconds);
-    if (!claims || claims.deck !== deckId || claims.n !== n) {
-      return plain(403, "this link has expired; reload the talk page");
-    }
-    variant = claims.variant;
-    open = false;
-  } else if (isOpen(access, n)) {
-    variant = readerVariant(access.scriptPublic);
-    open = true;
-  } else {
-    return plain(404, "not found");
+  const claims = token
+    ? ((await verifyServeToken(env.SERVE_TOKEN_SECRET, token, nowSeconds)) ?? "invalid")
+    : null;
+  const served = serving(deckId, access, n, claims);
+  if (served.status !== 200) {
+    return served.status === 403
+      ? plain(403, "this link has expired; reload the talk page")
+      : plain(404, "not found");
   }
+  const { variant, open, embeddable } = served;
 
   const object = await env.STORAGE.get(versionKey(deckId, n, `${variant}.html`));
   if (!object) {
     return plain(404, "not found");
   }
-  const headers = deckHeaders(env.APP_ORIGIN, access.embed && open);
+  const headers = deckHeaders(env.APP_ORIGIN, embeddable);
   headers.set("content-type", "text/html; charset=utf-8");
   headers.set(
     "cache-control",

@@ -4,7 +4,7 @@
 import { env } from "void/env";
 import { hasWaitingGrant } from "../../../deck/grant/store.server.ts";
 import { mayJoin, signUpIsOpen } from "../../invited.ts";
-import { readOperators } from "../../operator.ts";
+import { operators } from "../../operator.server.ts";
 import { hasOpenSignUpInvite } from "../../sign-up-invite.server.ts";
 import type { Newcomer } from "../../type.ts";
 
@@ -12,7 +12,7 @@ import type { Newcomer } from "../../type.ts";
 export function mayMakeAccount(newcomer: Newcomer): Promise<boolean> {
   return mayJoin(newcomer, {
     open: signUpIsOpen(env),
-    operators: readOperators(env.DEK_PUB_OPERATORS),
+    operators: operators(),
     invited: hasOpenSignUpInvite,
     grantWaits: hasWaitingGrant,
   });

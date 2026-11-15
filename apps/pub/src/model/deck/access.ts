@@ -1,14 +1,17 @@
 // Who may do what with a deck, and which of its versions they read. Pure: the caller loads the
 // deck, the person and their grant.
 
-import type { CommentPolicy, Visibility } from "../../../../../src/pub/protocol.ts";
+import type {
+  CommentPolicy,
+  GrantRole,
+  GrantSide,
+  Visibility,
+} from "../../../../../src/pub/protocol.ts";
 import { sameKey } from "../../common/ids.ts";
-import type { Person } from "../person/type.ts";
+import type { Caller } from "../person/type.ts";
 import { strongestRole, widestSide } from "./grant/grant.ts";
-import type { GrantRole, GrantRow, GrantSide } from "./grant/type.ts";
+import type { GrantRow } from "./grant/type.ts";
 import type { Standing } from "./type.ts";
-
-type Caller = Pick<Person, "id"> | null;
 
 export type DeckRules = {
   ownerId: string;

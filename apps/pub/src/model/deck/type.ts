@@ -1,8 +1,7 @@
 // A deck is a talk on dek.pub: who owns it, who may see it, and the version readers get.
 
 import type { decks } from "@schema";
-import type { TalkCard } from "../../../../../src/pub/protocol.ts";
-import type { GrantRole, GrantSide } from "./grant/type.ts";
+import type { GrantRole, GrantSide, TalkCard } from "../../../../../src/pub/protocol.ts";
 
 export type Deck = typeof decks.$inferSelect;
 

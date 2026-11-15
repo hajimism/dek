@@ -14,8 +14,8 @@ import { ApiError, notFound } from "../../../../common/api-error.ts";
 import { afterAnswer, appUrl, jsonBody } from "../../../../common/http.server.ts";
 import { sendMail } from "../../../../common/mail.server.ts";
 import { sessionAccount } from "../../actor.server.ts";
-import { isOperator } from "../../operator.server.ts";
-import { hasHandle } from "../../person.ts";
+import { operators } from "../../operator.server.ts";
+import { managesInvites } from "../../operator.ts";
 import {
   addSignUpInvites,
   removeSignUpInvite,
@@ -27,15 +27,10 @@ import type { Account, Person, SignUpInviteRow } from "../../type.ts";
 import { inviteMail } from "./invite-mail.ts";
 import { INVITE_CODES } from "./type.ts";
 
-/** Whether `account` may manage who signs up: an operator with a handle, signed in. */
-function managesInvites(account: Account | null): account is Person {
-  return account !== null && hasHandle(account) && isOperator(account);
-}
-
 /** The operator signed in through the browser's session; for anyone else, a 404. */
 function sessionOperator(c: Context): Person {
   const account = sessionAccount(c);
-  if (!managesInvites(account)) {
+  if (!managesInvites(operators(), account)) {
     throw notFound("page");
   }
   return account;
@@ -63,7 +58,7 @@ async function invitesOf(c: Context): Promise<SignUpInvite[]> {
 
 /** For the settings page's loader: the entries for an operator, and null for anyone else. */
 export async function invitesFor(c: Context, account: Account): Promise<SignUpInvite[] | null> {
-  return managesInvites(account) ? invitesOf(c) : null;
+  return managesInvites(operators(), account) ? invitesOf(c) : null;
 }
 
 export async function listInvites(c: Context): Promise<SignUpInvites> {

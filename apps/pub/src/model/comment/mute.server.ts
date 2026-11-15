@@ -2,6 +2,7 @@
 
 import { mutes } from "@schema";
 import { and, db, eq, inArray } from "void/db";
+import { chunks, IDS_PER_QUERY } from "../../common/chunks.ts";
 
 export async function isMuted(userId: string, deckId: string): Promise<boolean> {
   return (await mutedAmong(deckId, [userId])).has(userId);
@@ -12,12 +13,16 @@ export async function mutedAmong(deckId: string, userIds: readonly string[]): Pr
   if (userIds.length === 0) {
     return new Set();
   }
-  const rows = await db
-    .select({ userId: mutes.userId })
-    .from(mutes)
-    .where(and(eq(mutes.deckId, deckId), inArray(mutes.userId, [...userIds])))
-    .all();
-  return new Set(rows.map((row) => row.userId));
+  const rows = await Promise.all(
+    chunks(userIds, IDS_PER_QUERY).map((ids) =>
+      db
+        .select({ userId: mutes.userId })
+        .from(mutes)
+        .where(and(eq(mutes.deckId, deckId), inArray(mutes.userId, ids)))
+        .all(),
+    ),
+  );
+  return new Set(rows.flat().map((row) => row.userId));
 }
 
 export async function setMuted(userId: string, deckId: string, muted: boolean): Promise<void> {

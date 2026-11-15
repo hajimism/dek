@@ -6,25 +6,50 @@
 import { decks, replies, threads } from "@schema";
 import type { Context } from "hono";
 import { and, asc, db, eq, exists, inArray, sql } from "void/db";
-import type { CommentRow, NewComment, ThreadScope } from "../../../../../src/pub/protocol.ts";
-import { ApiError, notFound } from "../../common/api-error.ts";
+import type {
+  CommentRow,
+  GrantRole,
+  GrantSide,
+  NewComment,
+  ThreadScope,
+} from "../../../../../src/pub/protocol.ts";
+import { notFound } from "../../common/api-error.ts";
+import { chunks, IDS_PER_QUERY } from "../../common/chunks.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
-import { canSeeScript, versionStanding } from "../deck/access.ts";
-import type { GrantSide } from "../deck/grant/type.ts";
-import { talkUrl } from "../deck/store.server.ts";
-import type { Deck } from "../deck/type.ts";
+import { canSeeScript } from "../deck/access.ts";
+import { requestedDeck, talkUrl } from "../deck/store.server.ts";
+import type { Deck, Standing } from "../deck/type.ts";
 import { currentVersionOf, renamesOf } from "../deck/version/store.server.ts";
 import { authorOf } from "../person/person.ts";
 import { peopleById } from "../person/store.server.ts";
-import type { Account, Person } from "../person/type.ts";
-import { canSeeThread, scopeFor } from "./access.ts";
-import { placeComment, saysQuote } from "./anchor.ts";
-import { CommentTargets, type ThreadRow } from "./type.ts";
+import type { Account, Caller, Person } from "../person/type.ts";
+import { canReadThread, canSeeThread, mustResolve, scopeFor, type ThreadChange } from "./access.ts";
+import { placeComment } from "./anchor.ts";
+import { mustOpenThread } from "./new-thread.ts";
+import { CommentTargets, type ReplyRow, type ThreadRow } from "./type.ts";
 import { hideQuotes } from "./view.ts";
 
 type Status = "open" | "resolved" | "all";
+
+/**
+ * The replies to the threads `threadIds` names, each thread's in the order they were written,
+ * asked for in parts so that any number of threads stays under what D1 binds to one statement.
+ */
+export async function repliesOf(threadIds: readonly string[]): Promise<ReplyRow[]> {
+  const parts = await Promise.all(
+    chunks(threadIds, IDS_PER_QUERY).map((ids) =>
+      db
+        .select()
+        .from(replies)
+        .where(inArray(replies.threadId, ids))
+        .orderBy(asc(replies.createdAt))
+        .all(),
+    ),
+  );
+  return parts.flat();
+}
 
 async function listComments(
   c: Context,
@@ -52,17 +77,7 @@ async function listComments(
   if (wanted.length === 0) {
     return [];
   }
-  const replyRows = await db
-    .select()
-    .from(replies)
-    .where(
-      inArray(
-        replies.threadId,
-        wanted.map((row) => row.id),
-      ),
-    )
-    .orderBy(asc(replies.createdAt))
-    .all();
+  const replyRows = await repliesOf(wanted.map((row) => row.id));
   const renameRows = await renamesOf(deck.id);
   const people = await peopleById(c, [
     ...wanted.map((row) => row.authorId),
@@ -144,55 +159,14 @@ export async function openThread(
   comment: NewComment,
 ): Promise<string> {
   const scope = scopeFor(comment.scope, side);
-  // The version the commenter was reading; the thread is kept on it, so the renames since are
-  // followed when it is shown on a later one.
-  const n = comment.version ?? deck.currentVersion;
-  // Every side comments on the current version. One whose page still shows an older version is
-  // told so: the deck no longer holds it.
-  const standing = n === null ? null : versionStanding(deck, n);
-  if (standing === "gone") {
-    throw new ApiError(
-      409,
-      "stale_version",
-      `version ${n} is no longer the one readers see`,
-      "reload the page and comment again",
-    );
-  }
-  if (standing === "unknown") {
-    throw new ApiError(422, "unknown_version", `the deck has no version ${n}`);
-  }
-  // Whether a passage is in the script is the script's to tell, so one it is hidden from may not
-  // quote it at all.
-  if (
-    !canSeeScript(deck, person) &&
-    comment.anchor.targets.some((target) => target.kind === "quote")
-  ) {
-    throw new ApiError(403, "script_hidden", "the script is not public, so it cannot be quoted");
-  }
-  const version = await currentVersionOf(deck);
-  if (!version) {
-    throw new ApiError(409, "no_version", "the deck has no version to comment on yet");
-  }
-  const slide = version.slideMap.slides.find((candidate) => candidate.slug === comment.anchor.slug);
-  if (!slide) {
-    throw new ApiError(422, "unknown_slide", `the deck has no slide ${comment.anchor.slug}`);
-  }
-  if (!slide.steps.some((step) => step.step === comment.anchor.step)) {
-    throw new ApiError(
-      422,
-      "unknown_step",
-      `slide ${slide.slug} has no step ${comment.anchor.step}`,
-    );
-  }
-  for (const target of comment.anchor.targets) {
-    if (target.kind === "quote" && !saysQuote(slide.paragraphs, target.quote)) {
-      throw new ApiError(
-        422,
-        "unknown_quote",
-        `slide ${slide.slug} does not say the quoted passage`,
-      );
-    }
-  }
+  // The thread is kept on the version the commenter was reading, which must be the current one,
+  // so the renames since are followed when it is shown on a later one.
+  const version = mustOpenThread(
+    deck,
+    await currentVersionOf(deck),
+    comment,
+    canSeeScript(deck, person),
+  );
   const id = newThreadId();
   await db.insert(threads).values({
     id,
@@ -225,19 +199,43 @@ async function takeNumber(deckId: string, scope: ThreadScope): Promise<number> {
 }
 
 /**
- * A thread someone on `side` may see, to reply to, resolve or share; any other is as missing as
- * one that is not.
+ * A thread `person`, holding `role` on `side`, may read, to reply to, resolve or share; any other
+ * is as missing as one that is not, so a reader of a public deck the threads are not shared with
+ * cannot learn one is there.
  */
-export async function visibleThread(deck: Deck, side: GrantSide, id: string): Promise<ThreadRow> {
+export async function visibleThread(
+  deck: Deck,
+  person: Caller,
+  role: GrantRole | null,
+  side: GrantSide,
+  id: string,
+): Promise<ThreadRow> {
   const thread = await db
     .select()
     .from(threads)
     .where(and(eq(threads.deckId, deck.id), eq(threads.id, id)))
     .get();
-  if (!thread || !canSeeThread(thread, side)) {
+  if (!thread || !canReadThread(deck, person, role, side, thread)) {
     throw notFound("comment");
   }
   return thread;
+}
+
+/**
+ * The thread the request's `:comment` names, on the deck its `:id` names, once `person` may make
+ * `change` to it: as missing as one that is not to whoever may not read it, refused to whoever
+ * reads it but may not change it.
+ */
+export async function threadToChange(
+  c: Context,
+  person: Person,
+  change: ThreadChange,
+): Promise<Standing & { deck: Deck; thread: ThreadRow }> {
+  const standing = await requestedDeck(c, person);
+  const { deck, role, side } = standing;
+  const thread = await visibleThread(deck, person, role, side, c.req.param("comment") ?? "");
+  mustResolve(deck, thread, person, role, change);
+  return { ...standing, thread };
 }
 
 export async function addReply(thread: ThreadRow, person: Person, text: string): Promise<string> {

@@ -27,38 +27,50 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The merge commit and its base, for scripts/ci-scope.ts.
+          fetch-depth: 2
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ matrix.bun }}
+      # Which checks the change needs (scripts/ci-scope.ts, ADR 91). A step it does not need is
+      # skipped, not the job, so the job's required check still reports.
+      - id: scope
+        run: bun scripts/ci-scope.ts
       - run: bun install --frozen-lockfile
       # The visual checks, shots, and video capture are tested in a real Chromium. The runner
       # already has the libraries it needs, so it skips --with-deps: that goes through apt, and
       # an Ubuntu mirror slowing to a crawl has held this step up for over ten minutes.
       - name: Read the Playwright version
+        if: steps.scope.outputs.root == 'true'
         id: playwright
         run: echo "version=$(bun -p 'require("playwright/package.json").version')" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - if: steps.scope.outputs.root == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install Chromium
+        if: steps.scope.outputs.root == 'true'
         run: bunx playwright install chromium
       # The line-break tests measure Japanese, so they need the CJK fonts --with-deps used to
       # bring. Their packages are cached, so apt is reached only when the cache is cold.
       - id: cjk-fonts
+        if: steps.scope.outputs.root == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/cjk-fonts
           key: cjk-fonts-${{ runner.os }}-ipafont-gothic-wqy-zenhei
       - name: Download the CJK fonts
-        if: steps.cjk-fonts.outputs.cache-hit != 'true'
+        if: steps.scope.outputs.root == 'true' && steps.cjk-fonts.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update -q
           mkdir -p ~/cjk-fonts
           cd ~/cjk-fonts && apt-get download fonts-ipafont-gothic fonts-wqy-zenhei
       - name: Install the CJK fonts
+        if: steps.scope.outputs.root == 'true'
         run: sudo dpkg -i ~/cjk-fonts/*.deb
       - name: Install rumdl
+        if: steps.scope.outputs.root == 'true'
         env:
           RUMDL_VERSION: 0.2.73
           RUMDL_SHA256: d56a8e40471af32fe3229e845f3e299e3691665b15cd4ca28f2deb502c487666
@@ -75,11 +87,14 @@ jobs:
       # Exports, files, and dependencies nothing uses.
       - run: bun run knip
       # Lets Chromium's sandbox start on Ubuntu 24.04, whose AppArmor blocks user namespaces (ADR 29).
-      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - if: steps.scope.outputs.root == 'true'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       # tests/setup.ts sets this default, WAIT_MS * 2, but only for the first test file. The
       # runner has four cores, as package.json's test script assumes; the files run four at a time.
-      - run: bun test --coverage --timeout=20000 --parallel=4
-      - run: bun run docs:build
+      - if: steps.scope.outputs.root == 'true'
+        run: bun test --coverage --timeout=20000 --parallel=4
+      - if: steps.scope.outputs.root == 'true'
+        run: bun run docs:build
 
   # The tarball npm would ship, installed and run the way the docs say.
   package:
@@ -89,11 +104,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The merge commit and its base, for scripts/ci-scope.ts.
+          fetch-depth: 2
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.0
-      - run: bun install --frozen-lockfile
-      - run: bash scripts/check-package.sh
+      # Which checks the change needs (scripts/ci-scope.ts, ADR 91). A step it does not need is
+      # skipped, not the job, so the job's required check still reports.
+      - id: scope
+        run: bun scripts/ci-scope.ts
+      - if: steps.scope.outputs.root == 'true'
+        run: bun install --frozen-lockfile
+      - if: steps.scope.outputs.root == 'true'
+        run: bash scripts/check-package.sh
 
   # The dek.pub server (ADR 43): its types with svelte-check on TypeScript 6, its unit tests in
   # Node and components in Chromium, the serve Worker in workerd, a production build, and the
@@ -108,37 +131,58 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The merge commit and its base, for scripts/ci-scope.ts.
+          fetch-depth: 2
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.0
+      # Which checks the change needs (scripts/ci-scope.ts, ADR 91). A step it does not need is
+      # skipped, not the job, so the job's required check still reports.
+      - id: scope
+        run: bun scripts/ci-scope.ts
+        working-directory: .
       # Void and Vite+ run on Node 24.22 or later, as mise.toml pins it.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - if: steps.scope.outputs.pub == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24.22"
-      - run: bun install --frozen-lockfile
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun install --frozen-lockfile
         working-directory: .
       - name: Read the Playwright version
+        if: steps.scope.outputs.pub == 'true'
         id: playwright
         run: echo "version=$(bun -p 'require("playwright/package.json").version')" >> "$GITHUB_OUTPUT"
         working-directory: .
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - if: steps.scope.outputs.pub == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install Chromium
+        if: steps.scope.outputs.pub == 'true'
         run: bunx playwright install chromium
         working-directory: .
-      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: bun run setup
-      - run: bun run check
-      - run: bun run test
-      - run: bun run test:serve
-      - run: bun run build
-      - run: bun run test:e2e
+      - if: steps.scope.outputs.pub == 'true'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run setup
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run check
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run test
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run test:serve
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run build
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run test:e2e
       # The Alchemy program for the zones and DNS (ADR 70): its types and the names it declares.
       # Planning it needs the account, so infra.yml does that.
-      - run: bun run --cwd infra check
-      - run: bun run --cwd infra test
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run --cwd infra check
+      - if: steps.scope.outputs.pub == 'true'
+        run: bun run --cwd infra test
 
   # The decision records, checked by the adrs that mise.toml pins.
   adr:

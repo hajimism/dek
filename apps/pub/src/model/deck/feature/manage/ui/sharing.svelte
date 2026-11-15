@@ -1,16 +1,19 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { paths } from "../../../../../../../../src/pub/paths.ts";
+  import type { Grant, GrantRole, GrantSide } from "../../../../../../../../src/pub/protocol.ts";
   import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { type Shown, showFirst } from "../../../../../common/ui/call.ts";
+  import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
-  import type { GrantRole, GrantSide, GrantView } from "../../../grant/type.ts";
 
-  let { deckId, initial }: { deckId: string; initial: GrantView[] } = $props();
+  let { deckId, initial }: { deckId: string; initial: Grant[] } = $props();
   const { t } = useApp();
-  let grants: GrantView[] = $state(untrack(() => initial));
+  let grants: Grant[] = $state(untrack(() => initial));
   let who = $state("");
   let role: GrantRole = $state("view");
   let side: GrantSide = $state("guest");
@@ -26,7 +29,7 @@
   }
 
   async function reload() {
-    grants = (await api<{ grants: GrantView[] }>(`/api/decks/${deckId}/grants`)).grants;
+    grants = (await api<{ grants: Grant[] }>(paths.grants(deckId))).grants;
   }
 
   async function add(event: SubmitEvent) {
@@ -40,7 +43,7 @@
     }
     adding = true;
     try {
-      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: name, role, side } });
+      await api(paths.grants(deckId), { method: "POST", body: { who: name, role, side } });
       await reload();
       toast(t("manage.sharing.added", { who: name }));
       who = "";
@@ -52,27 +55,33 @@
     }
   }
 
-  async function change(grant: GrantView, next: Pick<GrantView, "role" | "side">) {
+  async function change(grant: Grant, next: Pick<Grant, "role" | "side">) {
     try {
-      await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: grant.who, ...next } });
+      await api(paths.grants(deckId), { method: "POST", body: { who: grant.who, ...next } });
       await reload();
       toast(t("saved"));
     } catch (err) {
-      toast(t("common.error", { message: failure(err) }), { tone: "error" });
+      toast(failureText(t, err), { tone: "error" });
     }
   }
 
-  async function remove(grant: GrantView) {
-    const before = grants;
-    grants = grants.filter((entry) => entry.id !== grant.id);
-    try {
-      await api(`/api/decks/${deckId}/grants/${grant.id}`, { method: "DELETE" });
+  const shownGrants: Shown<Grant[]> = { get: () => grants, set: (next) => (grants = next) };
+
+  async function remove(grant: Grant) {
+    const rest = grants.filter((entry) => entry.id !== grant.id);
+    const removed = await showFirst(
+      shownGrants,
+      rest,
+      async () => {
+        await api(paths.grant(deckId, grant.id), { method: "DELETE" });
+        return rest;
+      },
+      (err) => toast(failureText(t, err), { tone: "error" }),
+    );
+    if (removed) {
       toast(t("manage.sharing.removed", { who: label(grant) }), {
         action: { label: t("undo"), run: () => change(grant, { role: grant.role, side: grant.side }) },
       });
-    } catch (err) {
-      grants = before;
-      toast(t("common.error", { message: failure(err) }), { tone: "error" });
     }
   }
 
@@ -80,7 +89,7 @@
     return value.includes("@") && !value.startsWith("@");
   }
 
-  function label(grant: GrantView): string {
+  function label(grant: Grant): string {
     return isEmail(grant.who) ? grant.who : `@${grant.who}`;
   }
 </script>

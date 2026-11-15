@@ -2,25 +2,40 @@
 // with the guests: the deck's owner, and whoever wrote it. The server knows people by account and
 // decides; the page knows them by handle and only shows the button.
 
-import type { CommentRow, ThreadScope } from "../../../../../src/pub/protocol.ts";
+import type {
+  CommentRow,
+  GrantRole,
+  GrantSide,
+  ThreadScope,
+} from "../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../common/api-error.ts";
 import { canManage, type DeckRules } from "../deck/access.ts";
-import type { GrantRole, GrantSide } from "../deck/grant/type.ts";
-import type { Person } from "../person/type.ts";
+import type { Caller, Person } from "../person/type.ts";
 import type { ThreadRow } from "./type.ts";
 
 /** The owner and anyone the deck is shared with read its review threads. */
-export function canReadComments(
-  deck: DeckRules,
-  person: Pick<Person, "id"> | null,
-  grant: GrantRole | null,
-): boolean {
+export function canReadComments(deck: DeckRules, person: Caller, grant: GrantRole | null): boolean {
   return canManage(deck, person) || (person !== null && grant !== null);
 }
 
 /** Whether someone on `side` may see a thread: the team's side any, the guests' a shared one. */
 export function canSeeThread(thread: Pick<ThreadRow, "scope">, side: GrantSide): boolean {
   return thread.scope === "shared" || side === "team";
+}
+
+/**
+ * Whether `person`, holding `grant` on `side`, may read a thread: whoever reads the deck's review
+ * threads, and of them the guests' side a shared thread alone. Anyone else may not learn the thread
+ * is there.
+ */
+export function canReadThread(
+  deck: DeckRules,
+  person: Caller,
+  grant: GrantRole | null,
+  side: GrantSide,
+  thread: Pick<ThreadRow, "scope">,
+): boolean {
+  return canReadComments(deck, person, grant) && canSeeThread(thread, side);
 }
 
 /**
@@ -46,7 +61,7 @@ export function scopeFor(asked: ThreadScope | undefined, side: GrantSide): Threa
 export function canResolve(
   deck: { ownerId: string },
   thread: Pick<ThreadRow, "authorId">,
-  person: Pick<Person, "id"> | null,
+  person: Caller,
   role: GrantRole | null,
 ): boolean {
   if (person === null) {
@@ -54,6 +69,9 @@ export function canResolve(
   }
   return person.id === deck.ownerId || (person.id === thread.authorId && role !== null);
 }
+
+/** What may be done to a thread besides replying, and the words a refusal names it by. */
+export type ThreadChange = keyof typeof CHANGES;
 
 const CHANGES = {
   resolve: "resolve it",
@@ -65,9 +83,9 @@ const CHANGES = {
 export function mustResolve(
   deck: { ownerId: string },
   thread: Pick<ThreadRow, "authorId">,
-  person: Pick<Person, "id"> | null,
+  person: Caller,
   role: GrantRole | null,
-  change: keyof typeof CHANGES,
+  change: ThreadChange,
 ): void {
   if (!canResolve(deck, thread, person, role)) {
     throw new ApiError(

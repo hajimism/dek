@@ -3,6 +3,8 @@
   // API saves it by, and shown as the profile will name it; the list is saved whole, in its order.
   import { tick, untrack } from "svelte";
   import Button from "../../../../../common/ui/button.svelte";
+  import type { CallFailure } from "../../../../../common/ui/call.ts";
+  import { failedText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useI18n } from "../../../../../common/ui/use-i18n.ts";
@@ -36,16 +38,15 @@
     return read?.ok ? { url: read.url } : null;
   }
 
-  function problemText(problem: LinksProblem | "offline" | "failed", message = ""): string {
+  function problemText(problem: LinksProblem | CallFailure, message = ""): string {
     switch (problem) {
       case "too_long":
         return t("settings.links.too_long", { n: MAX_LINK_LENGTH });
       case "too_many":
         return t("settings.links.too_many", { n: MAX_LINKS });
       case "offline":
-        return t("common.offline");
       case "failed":
-        return t("common.error", { message });
+        return failedText(t, { problem, message });
       default:
         return t(`settings.links.${problem}`);
     }

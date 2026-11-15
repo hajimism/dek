@@ -1,6 +1,6 @@
-// Decks in D1. Every change an owner makes to a deck goes through updateDeck, which writes the
-// access file again whenever what it says may have changed; recording a version writes it too,
-// and deleteDeck takes it away first.
+// Decks in D1. Every change an owner makes to a deck goes through updateDeck, which closes in the
+// access file before the row and writes it again after, whenever what it says may have changed;
+// recording a version writes it too, and deleteDeck takes it away first.
 
 import {
   decks,
@@ -28,7 +28,7 @@ import { talkHref, talkPath } from "./deck.ts";
 import { DECK_ROWS, type DeckTable, deleteInOrder } from "./deletion.ts";
 import { grantsOf } from "./grant/store.server.ts";
 import { deckPrefix } from "./serving/origin.ts";
-import { removeAccess, syncAccess } from "./sync-access.server.ts";
+import { narrowAccess, removeAccess, syncAccess } from "./sync-access.server.ts";
 import type { Deck, DeckPatch, Standing } from "./type.ts";
 import { currentVersionOf, deleteFilesUnder } from "./version/store.server.ts";
 import type { Version } from "./version/type.ts";
@@ -145,14 +145,21 @@ export async function createDeck(owner: Person, slug: string, title: string): Pr
   return mustFind(id);
 }
 
+/**
+ * Change the deck's row, and then its access file: what the patch closes is closed in the file
+ * first, and what it opens is opened only after the row says so, so a failure in between serves
+ * no more than the row. The file is written after every change, whatever it touches, so one left
+ * narrower than the row by an earlier failure is put right by the next (ADR 87).
+ */
 export async function updateDeck(deck: Deck, patch: DeckPatch): Promise<Deck> {
+  if (ACCESS_COLUMNS.some((column) => column in patch)) {
+    await narrowAccess(deck.id, patch);
+  }
   await db
     .update(decks)
     .set({ ...patch, updatedAt: now })
     .where(eq(decks.id, deck.id));
-  if (ACCESS_COLUMNS.some((column) => column in patch)) {
-    await syncAccess(deck.id);
-  }
+  await syncAccess(deck.id);
   return mustFind(deck.id);
 }
 
@@ -242,6 +249,14 @@ export async function visibleDeck(
   return { deck, ...standing };
 }
 
+/** The deck the request's `:id` names, if `person` may see it, holding the key the request carries. */
+export function requestedDeck(
+  c: Context,
+  person: Account | null,
+): Promise<Standing & { deck: Deck }> {
+  return visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
+}
+
 /**
  * The deck, if `person` may delete it: its owner, or an operator of dek.pub. Anyone else gets the
  * 404 a missing deck gets.
@@ -253,8 +268,12 @@ export function deletableDeck(deck: Deck | null, person: Person): Deck {
   return deck;
 }
 
-export async function ownedDeck(id: string, person: Person): Promise<Deck> {
-  const deck = await deckById(id);
+/**
+ * The deck the request's `:id` names, if `person` owns it. Anyone else gets the 404 a missing deck
+ * gets.
+ */
+export async function ownedDeck(c: Context, person: Person): Promise<Deck> {
+  const deck = await deckById(c.req.param("id") ?? "");
   if (!deck || !canManage(deck, person)) {
     throw notFound();
   }

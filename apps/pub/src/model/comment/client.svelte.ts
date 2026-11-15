@@ -1,20 +1,21 @@
 // A deck's comments in the browser. A comment written here shows at once, faded until the server
 // has it; one that fails to send stays, marked, to be sent again.
 
+import { paths } from "../../../../../src/pub/paths.ts";
 import type { CommentRow, CommentTarget, NewComment } from "../../../../../src/pub/protocol.ts";
 import { api } from "../../common/ui/api.ts";
 import type { CardComment, ReplyInput } from "./type.ts";
 
 export class CommentList {
   rows: CardComment[] = $state([]);
-  readonly #path: string;
+  readonly #deckId: string;
   readonly #unsent = new Map<string, NewComment>();
   readonly #failed: (error: unknown) => void;
   #count = 0;
 
   /** `failed` is told of each call the server refused or that did not reach it. */
   constructor(deckId: string, rows: readonly CommentRow[], failed: (error: unknown) => void) {
-    this.#path = `/api/decks/${deckId}/comments`;
+    this.#deckId = deckId;
     this.rows = [...rows];
     this.#failed = failed;
   }
@@ -30,7 +31,7 @@ export class CommentList {
 
   async #send(id: string, body: NewComment): Promise<CommentRow | null> {
     try {
-      const row = await api<CommentRow>(this.#path, { method: "POST", body });
+      const row = await api<CommentRow>(paths.comments(this.#deckId), { method: "POST", body });
       this.#unsent.delete(id);
       this.#replace(row, id);
       return row;
@@ -88,7 +89,7 @@ export class CommentList {
     try {
       // The API answers with the reply alone; it joins the end of its thread.
       const answer = await api<CommentRow["thread"][number]>(
-        `${this.#path}/${comment.id}/replies`,
+        paths.replies(this.#deckId, comment.id),
         { method: "POST", body: input },
       );
       const current = this.rows.find((candidate) => candidate.id === comment.id) ?? comment;
@@ -103,7 +104,9 @@ export class CommentList {
   /** Share a team thread with the guests; it comes back under its shared number. */
   async widen(comment: CardComment): Promise<boolean> {
     try {
-      this.#replace(await api<CommentRow>(`${this.#path}/${comment.id}/widen`, { method: "POST" }));
+      this.#replace(
+        await api<CommentRow>(paths.widen(this.#deckId, comment.id), { method: "POST" }),
+      );
       return true;
     } catch (error) {
       this.#failed(error);
@@ -114,7 +117,7 @@ export class CommentList {
   async setResolved(comment: CardComment, resolved: boolean): Promise<void> {
     try {
       this.#replace(
-        await api<CommentRow>(`${this.#path}/${comment.id}/${resolved ? "resolve" : "reopen"}`, {
+        await api<CommentRow>((resolved ? paths.resolve : paths.reopen)(this.#deckId, comment.id), {
           method: "POST",
         }),
       );

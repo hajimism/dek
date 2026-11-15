@@ -2,6 +2,7 @@
 // Void names the auth tables or their columns.
 
 import type { Context } from "hono";
+import { chunks, IDS_PER_QUERY } from "../../common/chunks.ts";
 import { authOf } from "../../common/void-auth.server.ts";
 import { hasHandle, readAccount } from "./person.ts";
 import type { Account, Person } from "./type.ts";
@@ -80,9 +81,6 @@ export async function setName(c: Context, id: string, name: string): Promise<voi
   });
 }
 
-/** How many IDs one query asks for: D1 binds at most 100 values to a statement. */
-const IDS_PER_QUERY = 90;
-
 /** The people among `ids`; an account with no handle yet is among none. */
 export async function peopleById(c: Context, ids: readonly string[]): Promise<Map<string, Person>> {
   const unique = [...new Set(ids)];
@@ -90,12 +88,8 @@ export async function peopleById(c: Context, ids: readonly string[]): Promise<Ma
     return new Map();
   }
   const context = await authOf(c).$context;
-  const batches: string[][] = [];
-  for (let at = 0; at < unique.length; at += IDS_PER_QUERY) {
-    batches.push(unique.slice(at, at + IDS_PER_QUERY));
-  }
   const found = await Promise.all(
-    batches.map(
+    chunks(unique, IDS_PER_QUERY).map(
       (batch) =>
         context.adapter.findMany({
           model: "user",

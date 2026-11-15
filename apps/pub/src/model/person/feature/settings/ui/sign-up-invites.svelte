@@ -6,6 +6,7 @@
   import type { SignUpInvite } from "../../../../../../../../src/pub/protocol.ts";
   import { formatDate } from "../../../../../common/i18n.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { failedText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
@@ -15,7 +16,7 @@
     readInviteEntries,
     splitInviteInput,
   } from "../../../sign-up-invite.ts";
-  import { addInvites, type CallFailure, removeInvite } from "../settings-api.ts";
+  import { addInvites, removeInvite } from "../settings-api.ts";
 
   let { invites: initial }: { invites: SignUpInvite[] } = $props();
   const { lang, t } = useApp();
@@ -38,12 +39,6 @@
     }
   }
 
-  function failureText(failure: CallFailure): string {
-    return failure.problem === "offline"
-      ? t("common.offline")
-      : t("common.error", { message: failure.message });
-  }
-
   async function add(event: SubmitEvent) {
     event.preventDefault();
     if (adding) {
@@ -58,11 +53,11 @@
     const result = await addInvites(read.entries);
     adding = false;
     if (!result.ok) {
-      problem = failureText(result);
+      problem = failedText(t, result);
       return;
     }
     problem = null;
-    invites = result.invites;
+    invites = result.value;
     typed = "";
     toast(t("settings.invites.addedToast"));
   }
@@ -75,11 +70,11 @@
     const result = await removeInvite(id);
     removing = null;
     if (!result.ok) {
-      problem = failureText(result);
+      problem = failedText(t, result);
       return;
     }
     problem = null;
-    invites = result.invites;
+    invites = result.value;
     toast(t("settings.invites.removed"));
   }
 </script>

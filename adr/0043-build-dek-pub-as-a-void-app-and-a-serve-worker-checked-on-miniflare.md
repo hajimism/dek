@@ -12,6 +12,8 @@ Amended by [61. Let only signed-in accounts write dek.pub public comments, and d
 
 Amended by [79. Open dek.pub by invitation, to the people it lists and those a deck is shared with](0079-open-dek-pub-by-invitation-to-the-people-it-lists-and-those-a-deck-is-shared-with.md)
 
+Amended by [88. Test dek.pub's decisions as pure functions in Node, and its stores against D1 and R2 in workerd](0088-test-dek-pub-s-decisions-as-pure-functions-in-node-and-its-stores-against-d1-and-r2-in-workerd.md)
+
 ## Context
 
 dek.pub needs server-rendered pages (the script article must reach search engines and link previews), a JSON API for the CLI, sign-in through GitHub with a device flow for the CLI, a relational store for decks, versions and comments, object storage for the built files, and, from phase 3, a room per presentation for live sync. The deck itself is its author's JavaScript, so it must be served from an origin that holds nothing: no cookie, no database, no other deck.

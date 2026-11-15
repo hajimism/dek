@@ -1,14 +1,18 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { paths } from "../../../../../../../../src/pub/paths.ts";
   import type {
     LikeState,
+    MuteState,
     NewComment,
     NewPublicComment,
     PublicComment,
   } from "../../../../../../../../src/pub/protocol.ts";
   import { formatDate } from "../../../../../common/i18n.ts";
-  import { ApiFailure, api } from "../../../../../common/ui/api.ts";
+  import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { type Shown, showFirst } from "../../../../../common/ui/call.ts";
+  import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import SegmentedControl from "../../../../../common/ui/segmented-control.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -43,25 +47,28 @@
   const slugs = $derived(talk.slides.map((slide) => slide.slug));
   const contentLang = $derived(talk.lang ?? lang);
 
+  /** Tell the reader why a call failed. */
+  const failed = (error: unknown) => toast(failureText(t, error), { tone: "error" });
   // The page is keyed by the talk, so what it starts from is read once.
   const list = new CommentList(
     untrack(() => talk.id),
     untrack(() => talk.comments ?? []),
-    (error) => toast(failure(error), { tone: "error" }),
+    failed,
   );
   const comments = $derived(list.rows);
   let muted = $state(untrack(() => talk.muted));
+  const shownMuted: Shown<boolean | null> = { get: () => muted, set: (value) => (muted = value) };
 
   /** Turn the reader's mail of these comments off or on, showing the change before it is made. */
   async function setMuted(next: boolean) {
-    const before = muted;
-    muted = next;
-    try {
-      await api(`/api/decks/${encodeURIComponent(talk.id)}/mute`, { method: next ? "PUT" : "DELETE" });
+    const done = await showFirst(
+      shownMuted,
+      next,
+      async () => (await api<MuteState>(paths.mute(talk.id), { method: next ? "PUT" : "DELETE" })).muted,
+      failed,
+    );
+    if (done) {
       toast(t(next ? "comment.muted" : "comment.unmuted"));
-    } catch (error) {
-      muted = before;
-      toast(failure(error), { tone: "error" });
     }
   }
   let filter: Filter = $state("open");
@@ -362,13 +369,6 @@
     }
   }
 
-  function failure(error: unknown): string {
-    if (error instanceof ApiFailure) {
-      return error.code === "offline" ? t("common.offline") : t("common.error", { message: error.message });
-    }
-    return t("common.error", { message: "" });
-  }
-
   async function create(input: ReplyInput): Promise<boolean> {
     if (!draft || !shared.viewer?.handle) {
       return false;
@@ -421,8 +421,8 @@
   // which opens them to a reader the talk is not shared with.
   let publicList: PublicComment[] | null = $state(untrack(() => talk.publicComments));
   let likes: LikeState | null = $state(untrack(() => talk.likes));
-  const publicPath = (rest = "") =>
-    keyed(`/api/decks/${encodeURIComponent(talk.id)}/public-comments${rest}`, talk.key);
+  const publicPath = (id?: string) =>
+    keyed(id === undefined ? paths.publicComments(talk.id) : paths.publicComment(talk.id, id), talk.key);
 
   async function reloadPublic() {
     publicList = (await api<{ comments: PublicComment[] }>(publicPath())).comments;
@@ -434,23 +434,23 @@
       await reloadPublic();
       return true;
     } catch (error) {
-      toast(failure(error), { tone: "error" });
+      failed(error);
       return false;
     }
   }
+
+  const shownLikes: Shown<LikeState | null> = { get: () => likes, set: (value) => (likes = value) };
 
   async function like(next: boolean) {
     if (!likes) {
       return;
     }
-    const before = likes;
-    likes = { count: likes.count + (next ? 1 : -1), liked: next };
-    try {
-      likes = await api<LikeState>(keyed(`/api/decks/${encodeURIComponent(talk.id)}/like`, talk.key), { method: next ? "PUT" : "DELETE" });
-    } catch (error) {
-      likes = before;
-      toast(failure(error), { tone: "error" });
-    }
+    await showFirst(
+      shownLikes,
+      { count: likes.count + (next ? 1 : -1), liked: next },
+      () => api<LikeState>(keyed(paths.like(talk.id), talk.key), { method: next ? "PUT" : "DELETE" }),
+      failed,
+    );
   }
 </script>
 
@@ -655,9 +655,9 @@
               return api(publicPath(), { method: "POST", body });
             })}
           onedit={(id, text) =>
-            publicChange(() => api(publicPath(`/${encodeURIComponent(id)}`), { method: "PATCH", body: { text } }))}
+            publicChange(() => api(publicPath(id), { method: "PATCH", body: { text } }))}
           ondelete={async (id) => {
-            await publicChange(() => api(publicPath(`/${encodeURIComponent(id)}`), { method: "DELETE" }));
+            await publicChange(() => api(publicPath(id), { method: "DELETE" }));
           }}
         />
       </div>

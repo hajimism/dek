@@ -53,18 +53,26 @@ import {
   mustPostPublic,
 } from "../../src/model/deck/public-comment/access.ts";
 import { threadPublic } from "../../src/model/deck/public-comment/view.ts";
-import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
+import {
+  accessOf,
+  isOpen,
+  narrowing,
+  readerVariant,
+  serving,
+} from "../../src/model/deck/serving/access-file.ts";
 import {
   accessKey,
   deckIdFromHost,
   deckOrigin,
   deckPrefix,
   versionKey,
+  versionsPrefix,
 } from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
 import { DeckAccess } from "../../src/model/deck/serving/type.ts";
 import {
   coverOf,
+  keysBelow,
   minutesOf,
   pictureFile,
   slidePicture,
@@ -414,6 +422,111 @@ describe("serving without a token", () => {
   });
 });
 
+describe("narrowing the access file before a change", () => {
+  const open = { visibility: "public" as const, scriptPublic: true, embed: true, current: 2 };
+
+  it("closes first whatever the change closes", () => {
+    expect(narrowing(open, { ...open, visibility: "private" })).toEqual({
+      ...open,
+      visibility: "private",
+    });
+    expect(narrowing(open, { ...open, scriptPublic: false })).toEqual({
+      ...open,
+      scriptPublic: false,
+    });
+    expect(narrowing(open, { ...open, embed: false })).toEqual({ ...open, embed: false });
+  });
+
+  it("opens nothing early in a change that closes one thing and opens another", () => {
+    const before = { ...open, embed: false };
+    const after = { ...open, scriptPublic: false, embed: true };
+    expect(narrowing(before, after)).toEqual({ ...open, scriptPublic: false, embed: false });
+  });
+
+  it("writes nothing first for a change that only opens, or changes nothing", () => {
+    const closed = { visibility: "team" as const, scriptPublic: false, embed: false, current: 2 };
+    expect(narrowing(closed, open)).toBeNull();
+    expect(narrowing(open, open)).toBeNull();
+    expect(narrowing(closed, { ...closed, visibility: "link" })).toBeNull();
+  });
+
+  /** Whether `a` hands out no more than `b`: no build `b` keeps back, no script, no framing. */
+  function noWider(a: ReturnType<typeof serving>, b: ReturnType<typeof serving>): boolean {
+    if (a.status !== 200) {
+      return true;
+    }
+    return (
+      b.status === 200 &&
+      (a.variant === "bare" || a.variant === b.variant) &&
+      (!a.embeddable || b.embeddable)
+    );
+  }
+
+  it("serves nothing in between that the old file or the new one would keep back", () => {
+    const states = [
+      open,
+      { ...open, visibility: "link" as const },
+      { ...open, scriptPublic: false },
+      { ...open, embed: false },
+      { ...open, visibility: "private" as const, embed: false },
+    ];
+    for (const before of states) {
+      for (const after of states) {
+        const between = serving("d_x", narrowing(before, after) ?? before, 2, null);
+        for (const end of [before, after]) {
+          expect(noWider(between, serving("d_x", end, 2, null))).toBe(true);
+        }
+      }
+    }
+  });
+});
+
+describe("what the serve Worker hands out", () => {
+  const access = { visibility: "public" as const, scriptPublic: false, embed: true, current: 2 };
+  const claims = { deck: "d_x", n: 2, variant: "full" as const, exp: 0 };
+
+  it("hands out nothing of a deck with no access file, token or not", () => {
+    expect(serving("d_x", null, 2, null)).toEqual({ status: 404 });
+    expect(serving("d_x", null, 2, claims)).toEqual({ status: 404 });
+  });
+
+  it("serves a public deck's current version to anyone, and lets any page frame it if it says so", () => {
+    expect(serving("d_x", access, 2, null)).toEqual({
+      status: 200,
+      variant: "bare",
+      open: true,
+      embeddable: true,
+    });
+    expect(serving("d_x", { ...access, embed: false }, 2, null)).toMatchObject({
+      embeddable: false,
+    });
+  });
+
+  it("serves no other version, and no deck that is not public, without a token", () => {
+    expect(serving("d_x", access, 1, null)).toEqual({ status: 404 });
+    for (const visibility of ["link", "team", "private"] as const) {
+      expect(serving("d_x", { ...access, visibility }, 2, null)).toEqual({ status: 404 });
+    }
+    expect(serving("d_x", { ...access, current: null }, 2, null)).toEqual({ status: 404 });
+  });
+
+  it("serves the build a token was signed for, to be framed by the app alone", () => {
+    expect(serving("d_x", { ...access, visibility: "private" }, 2, claims)).toEqual({
+      status: 200,
+      variant: "full",
+      open: false,
+      embeddable: false,
+    });
+    expect(serving("d_x", access, 1, { ...claims, n: 1 })).toMatchObject({ status: 200 });
+  });
+
+  it("refuses a token that did not verify, or was signed for another deck or version", () => {
+    expect(serving("d_x", access, 2, "invalid")).toEqual({ status: 403 });
+    expect(serving("d_x", access, 2, { ...claims, deck: "d_y" })).toEqual({ status: 403 });
+    expect(serving("d_x", access, 2, { ...claims, n: 1 })).toEqual({ status: 403 });
+  });
+});
+
 describe("talk paths", () => {
   it("puts a talk under its owner's profile", () => {
     expect(talkPath("hajimism", "intro")).toBe("/@hajimism/intro");
@@ -622,6 +735,29 @@ describe("version pictures", () => {
       "shots/intro.png",
     );
     expect(pictureFile("full")).toBeNull();
+  });
+});
+
+describe("deleting older versions", () => {
+  const prefix = versionsPrefix("d_x");
+  const key = (n: number | string, file = "full.html") => `${prefix}${n}/${file}`;
+
+  it("takes every file of a version below n, and of an upload never recorded", () => {
+    const keys = [key(1), key(1, "shots/intro.png"), key(2), key(3), key(10), key(12)];
+    expect(keysBelow(prefix, keys, 10)).toEqual([
+      key(1),
+      key(1, "shots/intro.png"),
+      key(2),
+      key(3),
+    ]);
+  });
+
+  it("never takes version n itself, or one above it, which another publish may be writing", () => {
+    expect(keysBelow(prefix, [key(4), key(5), key(40)], 4)).toEqual([]);
+  });
+
+  it("leaves a key whose version is not a whole number", () => {
+    expect(keysBelow(prefix, [key("x"), key("1.5"), key(""), `${prefix}`], 9)).toEqual([]);
   });
 });
 

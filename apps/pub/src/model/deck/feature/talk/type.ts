@@ -4,13 +4,13 @@
 import type {
   CommentPolicy,
   CommentRow,
+  GrantSide,
   LikeState,
   PublicComment,
   Visibility,
 } from "../../../../../../../src/pub/protocol.ts";
 import type { Quote } from "../../../comment/quote.ts";
 import type { Profile } from "../../../person/type.ts";
-import type { GrantSide } from "../../grant/type.ts";
 import type { TalkCard } from "../../type.ts";
 
 export type ArticleSlide = {

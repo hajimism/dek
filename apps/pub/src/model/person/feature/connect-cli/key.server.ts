@@ -4,7 +4,7 @@
 
 import type { Context } from "hono";
 import { API_KEY_HEADER, type CliKey, NewCliKey } from "../../../../../../../src/pub/protocol.ts";
-import { ApiError } from "../../../../common/api-error.ts";
+import { signedOut } from "../../../../common/api-error.ts";
 import { jsonBody } from "../../../../common/http.server.ts";
 import { authOf } from "../../../../common/void-auth.server.ts";
 import { requirePerson } from "../../actor.server.ts";
@@ -14,12 +14,7 @@ import { meOf } from "../../person.ts";
 
 export async function tradeSessionForKey(c: Context): Promise<CliKey> {
   if (!c.get("user")) {
-    throw new ApiError(
-      401,
-      "signed_out",
-      "trade a device-flow session for a key",
-      "run `dekc pub login`",
-    );
+    throw signedOut("trade a device-flow session for a key", "run `dekc pub login`");
   }
   const person = await requirePerson(c);
   // An older dekc, and a script, send no body; the key is then called dekc.
@@ -40,7 +35,7 @@ export async function tradeSessionForKey(c: Context): Promise<CliKey> {
 export async function revokeCallersKey(c: Context): Promise<{ revoked: boolean }> {
   const key = c.req.header(API_KEY_HEADER);
   if (!key) {
-    throw new ApiError(401, "signed_out", "send the key to revoke");
+    throw signedOut("send the key to revoke");
   }
   const checked = await checkKey(c, key);
   return { revoked: checked !== null && (await revokeKeyOf(c, checked.userId, checked.id)) };

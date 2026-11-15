@@ -40,3 +40,15 @@ export function pictureFile(name: string): string | null {
   }
   return name.startsWith("s-") ? `shots/${name.slice(2)}.png` : null;
 }
+
+/**
+ * The keys under `prefix`, the deck's versions prefix, that belong to a version below `n`: a
+ * folder named by a whole number less than `n`. Version `n` and those above it are left, since
+ * another publish may be writing them.
+ */
+export function keysBelow(prefix: string, keys: readonly string[], n: number): string[] {
+  return keys.filter((key) => {
+    const folder = key.slice(prefix.length).split("/")[0] ?? "";
+    return /^\d+$/.test(folder) && Number(folder) < n;
+  });
+}

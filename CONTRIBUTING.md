@@ -19,7 +19,7 @@ From the repository, run the CLI as `bun src/cli.ts`, or work in `sample/`, whic
 
 ## Before you open a pull request
 
-CI runs each of these; run them locally first.
+CI runs each of these; run them locally first. On a pull request, CI skips the ones the changed files cannot reach: a change only under `apps/pub/` skips dek's tests, the docs build and the package check, and one only to the docs, the ADRs or dek's tests skips dek.pub's checks below. `main` runs them all ([ADR 91](./adr/0091-run-only-the-ci-checks-a-pull-request-s-files-need-and-every-check-on-main.md)).
 
 ```bash
 bunx biome ci .        # format and lint
@@ -30,7 +30,7 @@ bun run docs:build     # docs and the sample decks
 bash scripts/check-package.sh   # the tarball npm would ship, installed and run
 ```
 
-CI also checks the dek.pub server with these, from `apps/pub/`, on the Node that `mise.toml` pins. Run them when `apps/pub/` or `src/pub/` changed:
+CI also checks the dek.pub server with these, from `apps/pub/`, on the Node that `mise.toml` pins. Run them when `apps/pub/` or `src/pub/` changed; CI runs them for any change to `src/` or `sample/` as well, since the round trip builds a sample deck with this checkout's `dekc`:
 
 ```bash
 bun run setup          # .env from dev.env, and Void's types

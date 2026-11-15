@@ -2,10 +2,8 @@
 // anyone may open, `link` or `public`; the deck's comment policy says who may post them.
 
 import { ApiError } from "../../../common/api-error.ts";
-import type { Person } from "../../person/type.ts";
+import type { Caller, Person } from "../../person/type.ts";
 import { canManage, type DeckRules, opensWithoutGrant } from "../access.ts";
-
-type Caller = Pick<Person, "id"> | null;
 
 /** Anyone signed in under `signed-in`, no one under `off`; never anyone signed out. */
 export function canPostPublic(deck: DeckRules, person: Caller): boolean {
