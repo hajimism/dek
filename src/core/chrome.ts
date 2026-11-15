@@ -31,12 +31,11 @@ body.is-rail-hidden #dek-rail, body.is-rail-hidden #dek-rail-resize, body[data-m
 @media (max-width: 640px) {
   body:not(.is-presenter):not(.is-rail-hidden) #dek-shell:has(> #dek-rail) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "current"; }
   #dek-rail, #dek-rail-resize { display: none; }
-  body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: 50%; }
 }
 .dek-panel-label { display: none; }
 #dek-announce { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 #dek-hint { position: fixed; left: 50%; bottom: 28px; z-index: 20; display: flex; gap: 18px; padding: 10px 18px; background: rgba(18,18,18,0.86); color: #fff; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; box-shadow: 0 8px 28px rgba(0,0,0,0.35); font: 500 13px/1.4 system-ui, sans-serif; white-space: nowrap; pointer-events: none; opacity: 0; transform: translate(-50%, 12px); animation: dek-hint 5s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards; }
-body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: calc(50% + var(--dek-rail-w, 188px) / 2); }
+@media not all and (max-width: 640px) { body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: calc(50% + var(--dek-rail-w, 188px) / 2); } }
 #dek-hint > span { display: inline-flex; align-items: center; gap: 8px; }
 #dek-hint kbd { min-width: 1.6em; padding: 1px 6px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.35); border-bottom-width: 2px; border-radius: 5px; font: 600 12px/1.4 ui-monospace, monospace; text-align: center; }
 @keyframes dek-hint { 12% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }

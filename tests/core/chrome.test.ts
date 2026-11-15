@@ -23,9 +23,12 @@ describe("playerChromeCss", () => {
     expect(css).toMatch(/#dek-hint \{[^}]*pointer-events: none;[^}]*animation: dek-hint /);
     expect(css).toContain("@keyframes dek-hint");
     expect(css).toMatch(/prefers-reduced-motion: reduce[^@]*#dek-hint/);
+    // Beside an open rail it centres on the slide; on a narrow screen, which hides the rail, on
+    // the page.
     expect(css).toContain(
-      "body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: calc(50% + var(--dek-rail-w, 188px) / 2); }",
+      "@media not all and (max-width: 640px) { body:not(.is-rail-hidden):has(> #dek-shell > #dek-rail) #dek-hint { left: calc(50% + var(--dek-rail-w, 188px) / 2); } }",
     );
+    expect(css.match(/#dek-hint \{ left: calc/g)).toHaveLength(1);
   });
 
   test("prints every slide on its own page with every beat shown and no chrome", () => {
