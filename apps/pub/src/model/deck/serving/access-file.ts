@@ -28,6 +28,26 @@ export function readerVariant(scriptPublic: boolean): Variant {
   return scriptPublic ? "public" : "bare";
 }
 
+/**
+ * The access file to write before a deck changes from `before` to `after`, so that a failure
+ * between the two writes leaves it serving no more than either: what `after` closes is closed,
+ * and nothing `after` opens is opened yet. Null when the change closes nothing, and the file can
+ * wait for the row.
+ */
+export function narrowing(before: DeckAccess, after: DeckAccess): DeckAccess | null {
+  const narrowed: DeckAccess = {
+    visibility: before.visibility === "public" ? after.visibility : before.visibility,
+    scriptPublic: before.scriptPublic && after.scriptPublic,
+    embed: before.embed && after.embed,
+    current: before.current,
+  };
+  const closes =
+    narrowed.visibility !== before.visibility ||
+    narrowed.scriptPublic !== before.scriptPublic ||
+    narrowed.embed !== before.embed;
+  return closes ? narrowed : null;
+}
+
 /** What the serve Worker answers for a version: a build, or a refusal. */
 export type Serving =
   | { status: 200; variant: Variant; open: boolean; embeddable: boolean }

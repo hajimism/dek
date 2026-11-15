@@ -56,6 +56,7 @@ import { threadPublic } from "../../src/model/deck/public-comment/view.ts";
 import {
   accessOf,
   isOpen,
+  narrowing,
   readerVariant,
   serving,
 } from "../../src/model/deck/serving/access-file.ts";
@@ -418,6 +419,65 @@ describe("serving without a token", () => {
     expect(DeckAccess.safeParse(accessOf(deck)).success).toBe(true);
     expect(DeckAccess.safeParse({ ...accessOf(deck), visibility: "everyone" }).success).toBe(false);
     expect(DeckAccess.safeParse({ visibility: "public" }).success).toBe(false);
+  });
+});
+
+describe("narrowing the access file before a change", () => {
+  const open = { visibility: "public" as const, scriptPublic: true, embed: true, current: 2 };
+
+  it("closes first whatever the change closes", () => {
+    expect(narrowing(open, { ...open, visibility: "private" })).toEqual({
+      ...open,
+      visibility: "private",
+    });
+    expect(narrowing(open, { ...open, scriptPublic: false })).toEqual({
+      ...open,
+      scriptPublic: false,
+    });
+    expect(narrowing(open, { ...open, embed: false })).toEqual({ ...open, embed: false });
+  });
+
+  it("opens nothing early in a change that closes one thing and opens another", () => {
+    const before = { ...open, embed: false };
+    const after = { ...open, scriptPublic: false, embed: true };
+    expect(narrowing(before, after)).toEqual({ ...open, scriptPublic: false, embed: false });
+  });
+
+  it("writes nothing first for a change that only opens, or changes nothing", () => {
+    const closed = { visibility: "team" as const, scriptPublic: false, embed: false, current: 2 };
+    expect(narrowing(closed, open)).toBeNull();
+    expect(narrowing(open, open)).toBeNull();
+    expect(narrowing(closed, { ...closed, visibility: "link" })).toBeNull();
+  });
+
+  /** Whether `a` hands out no more than `b`: no build `b` keeps back, no script, no framing. */
+  function noWider(a: ReturnType<typeof serving>, b: ReturnType<typeof serving>): boolean {
+    if (a.status !== 200) {
+      return true;
+    }
+    return (
+      b.status === 200 &&
+      (a.variant === "bare" || a.variant === b.variant) &&
+      (!a.embeddable || b.embeddable)
+    );
+  }
+
+  it("serves nothing in between that the old file or the new one would keep back", () => {
+    const states = [
+      open,
+      { ...open, visibility: "link" as const },
+      { ...open, scriptPublic: false },
+      { ...open, embed: false },
+      { ...open, visibility: "private" as const, embed: false },
+    ];
+    for (const before of states) {
+      for (const after of states) {
+        const between = serving("d_x", narrowing(before, after) ?? before, 2, null);
+        for (const end of [before, after]) {
+          expect(noWider(between, serving("d_x", end, 2, null))).toBe(true);
+        }
+      }
+    }
   });
 });
 

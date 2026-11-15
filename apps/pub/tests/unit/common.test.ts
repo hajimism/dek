@@ -17,6 +17,7 @@ import { log } from "../../src/common/log.ts";
 import { sendMail } from "../../src/common/mail.server.ts";
 import { ApiFailure } from "../../src/common/ui/api.ts";
 import { failureText } from "../../src/common/ui/failure.ts";
+import { untilWritten } from "../../src/common/until-written.ts";
 import { xmlText } from "../../src/common/xml.ts";
 
 vi.mock("void/email", () => ({ sendEmail: vi.fn() }));
@@ -69,6 +70,37 @@ describe("chunks", () => {
     for (const size of [0, -1, 1.5, Number.NaN]) {
       expect(() => chunks([1], size)).toThrow(RangeError);
     }
+  });
+});
+
+describe("untilWritten", () => {
+  it("stops at the first attempt that writes", async () => {
+    const attempt = vi.fn(async () => true);
+    await untilWritten(attempt, "the file");
+    expect(attempt).toHaveBeenCalledTimes(1);
+  });
+
+  it("tries again while another write wins the race", async () => {
+    const results = [false, false, true];
+    const attempt = vi.fn(async () => results.shift() ?? false);
+    await untilWritten(attempt, "the file");
+    expect(attempt).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up after five lost races, saying what kept changing", async () => {
+    const attempt = vi.fn(async () => false);
+    await expect(untilWritten(attempt, "the access file of d_x")).rejects.toThrow(
+      "the access file of d_x kept changing under the write",
+    );
+    expect(attempt).toHaveBeenCalledTimes(5);
+  });
+
+  it("throws what an attempt throws, without trying again", async () => {
+    const attempt = vi.fn(async () => {
+      throw new Error("R2 is down");
+    });
+    await expect(untilWritten(attempt, "the file")).rejects.toThrow("R2 is down");
+    expect(attempt).toHaveBeenCalledTimes(1);
   });
 });
 

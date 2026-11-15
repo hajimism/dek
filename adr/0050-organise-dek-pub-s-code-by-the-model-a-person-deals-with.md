@@ -10,6 +10,8 @@ Amends [43. Build dek.pub as a Void app and a serve Worker, checked on Miniflare
 
 Amended by [76. Keep dek.pub's public comments in the deck model beside its likes, and call a feature a task a page or a route carries out](0076-keep-dek-pub-s-public-comments-in-the-deck-model-beside-its-likes-and-call-a-feature-a-task-a-page-or-a-route-carries-out.md)
 
+Amended by [87. Close in a dek.pub deck's access file before its row changes, and open it only after](0087-close-in-a-dek-pub-deck-s-access-file-before-its-row-changes-and-open-it-only-after.md)
+
 ## Context
 
 ADR 43 laid `apps/pub` out by layer: domain logic in `src/lib/` with no Void import, the Void-facing code in `src/server/`, components in `src/ui/`. Two phases in, each thing a person deals with on dek.pub was spread across all three, and the rules that should hold everywhere were held by whoever remembered them:
