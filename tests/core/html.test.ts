@@ -596,7 +596,7 @@ lang: en
 hello
 `;
 
-  test("a built player names the rail and presenter keys in the deck's language", async () => {
+  test("a built player names the rail, search and presenter keys in the deck's language", async () => {
     await withTempProject(
       {
         decks: [
@@ -611,6 +611,7 @@ hello
         const html = await renderPage(join(root, "decks", "demo"));
         expect(html).toContain('id="dek-hint"');
         expect(html).toContain("<kbd>s</kbd>スライド一覧");
+        expect(html).toContain("<kbd>/</kbd>検索");
         expect(html).toContain("<kbd>p</kbd>発表者ビュー");
       },
     );
@@ -619,6 +620,7 @@ hello
       async (root) => {
         const html = await renderPage(join(root, "decks", "demo"));
         expect(html).toContain("<kbd>s</kbd>Slide rail");
+        expect(html).toContain("<kbd>/</kbd>Search");
         expect(html).toContain("<kbd>p</kbd>Presenter view");
         expect(html).not.toContain("スライド一覧");
       },
@@ -637,6 +639,7 @@ hello
         });
         const page = html.replace(/<script>[\s\S]*?<\/script>/g, "");
         expect(page).toContain("<kbd>s</kbd>Slide rail");
+        expect(page).toContain("<kbd>/</kbd>Search");
         expect(page).not.toMatch(/Presenter view|<kbd>p<\/kbd>|id="dek-presenter/);
       },
     );

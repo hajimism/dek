@@ -4,6 +4,7 @@ import { PAGE_ID } from "../core/page.ts";
 import type { Move } from "../core/position.ts";
 import { isPresenterToggleKey } from "./presenter.ts";
 import { isRailToggleKey } from "./rail.ts";
+import { isSearchKey } from "./search.ts";
 import { isInteractive, isLetterKey, isTextEntry, keyToMove, pointerMove } from "./step.ts";
 
 /** What a key or a touch on the page may ask for. Each returns whether it took the request. */
@@ -13,6 +14,8 @@ export type InputActions = {
   togglePresenter: () => boolean;
   toggleFullscreen: () => void;
   toggleRail: () => boolean;
+  /** `/`: the search across the slides. */
+  openSearch: () => boolean;
   /** Space; left to `move` unless this takes it (a rehearsal plays and pauses). */
   togglePlay: () => boolean;
   toggleLaser: () => boolean;
@@ -33,6 +36,13 @@ export function bindInput(actions: InputActions): void {
     actions.onKey();
     if (isPresenterToggleKey(event)) {
       if (actions.togglePresenter()) {
+        event.preventDefault();
+      }
+      return;
+    }
+    // Taken, or Firefox would open its own find, which reads only the slide on screen.
+    if (isSearchKey(event)) {
+      if (actions.openSearch()) {
         event.preventDefault();
       }
       return;

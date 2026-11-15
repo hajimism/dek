@@ -32,6 +32,7 @@ export const PAGE_ID = {
   annotateToggle: "dek-annotate-toggle",
   hint: "dek-hint",
   announce: "dek-announce",
+  search: "dek-search",
 } as const;
 
 /**

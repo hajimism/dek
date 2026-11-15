@@ -44,13 +44,14 @@ body.is-rail-hidden #dek-rail, body.is-rail-hidden #dek-rail-resize, body[data-m
 #dek-laser { position: absolute; z-index: 30; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; background: radial-gradient(circle, #fff 0 12%, #ff3b30 22% 38%, rgba(255,59,48,0.45) 52%, rgba(255,59,48,0) 70%); pointer-events: none; }
 #dek-laser[hidden] { display: none; }
 body.is-laser #dek-current-stage { cursor: crosshair; touch-action: none; }
+::highlight(dek-search) { background-color: rgba(255, 214, 10, 0.5); }
 .dek-diagnostics { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 12px; background: #900; color: #fff; font: 12px/1.4 monospace; white-space: pre-wrap; z-index: 10; }
 body[data-mode="video"] .dek-diagnostics { display: none !important; }
 @media print {
 ${indent(printPageCss({ width, height }))}
   body, #dek-shell, #dek-current, #dek-current-stage { display: block; height: auto; overflow: visible; position: static; padding: 0; }
   #deck [data-step] { opacity: 1 !important; transform: none !important; transition: none !important; }
-  #dek-rail, #dek-rail-resize, #dek-hint, #dek-laser, .dek-panel-label, .dek-diagnostics { display: none !important; }
+  #dek-rail, #dek-rail-resize, #dek-hint, #dek-laser, #dek-search, .dek-panel-label, .dek-diagnostics { display: none !important; }
 }`;
   if (options.presenter === false) {
     return base;
