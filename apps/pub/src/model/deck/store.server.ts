@@ -146,22 +146,20 @@ export async function createDeck(owner: Person, slug: string, title: string): Pr
 }
 
 /**
- * Change the deck's row, and its access file when the patch touches a column the file is made
- * from: what the patch closes is closed in the file first, and what it opens is opened only after
- * the row says so, so a failure in between serves no more than the row (ADR 87).
+ * Change the deck's row, and then its access file: what the patch closes is closed in the file
+ * first, and what it opens is opened only after the row says so, so a failure in between serves
+ * no more than the row. The file is written after every change, whatever it touches, so one left
+ * narrower than the row by an earlier failure is put right by the next (ADR 87).
  */
 export async function updateDeck(deck: Deck, patch: DeckPatch): Promise<Deck> {
-  const touchesAccess = ACCESS_COLUMNS.some((column) => column in patch);
-  if (touchesAccess) {
+  if (ACCESS_COLUMNS.some((column) => column in patch)) {
     await narrowAccess(deck.id, patch);
   }
   await db
     .update(decks)
     .set({ ...patch, updatedAt: now })
     .where(eq(decks.id, deck.id));
-  if (touchesAccess) {
-    await syncAccess(deck.id);
-  }
+  await syncAccess(deck.id);
   return mustFind(deck.id);
 }
 

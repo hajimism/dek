@@ -24,7 +24,9 @@ The access file is the only thing the serve Worker trusts, so it has to fail clo
 2. The row is written.
 3. `syncAccess` writes the file the row now gives, as before.
 
-A failure at step 1 throws before anything has changed, so the request can be made again. A failure at step 2 or 3 leaves the file narrower than the row, never wider, until the next change or the next version writes it again. A change that both closes one thing and opens another, such as hiding the script while allowing framing, closes at step 1 and opens at step 3.
+Step 3 runs after every change, whatever columns the patch touches, so a change to the comment policy or the link key also writes the file again.
+
+A failure at step 1 leaves the row as it was and the file at most narrower, so the request can be made again. A failure at step 2 or 3 leaves the file narrower than the row, never wider, until the next change or the next version writes it again. A change that both closes one thing and opens another, such as hiding the script while allowing framing, closes at step 1 and opens at step 3.
 
 Both writes read the row from D1 and replace the file only if it has not changed since they read it, as `syncAccess` did, so of two changes at once the later state still stays. Step 1 computes the narrowing from the row it reads, not from the deck the request loaded, so it never closes in from a stale state. The retry on a lost race is `untilWritten` in `src/common/until-written.ts`, which knows nothing of decks.
 
@@ -39,7 +41,7 @@ Recording a version and creating a deck keep their order: they write the row, th
 ## Consequences
 
 - No failed write, at any step, leaves the serve Worker serving a deck, its script, or a frame of it that the row no longer allows.
-- A change that closes something costs one more R2 write, and a read of the row.
+- Every change writes the file at step 3, including one that touches none of its columns, which costs an R2 write and a read of the row. A change that closes something costs one more of each, at step 1.
 - A failure at step 2 or 3 leaves a deck closed that the row says is open, until the next change. The owner sees the deck as they set it on the manage page, and readers get a 404 for its frame. Changing any setting again, or publishing, puts it right.
-- Two changes made at once can still leave the file wider than the row in one case: a change that opens a deck writes the file between another's step 1 and step 2, and that other change then fails at step 3. The file then says what the row said before the failing change, until the next one.
+- Two writes at once can still leave the file wider than the row in one case: another write of the file, from the row as it was, lands between a change's step 1 and step 2, and that change then fails at step 3. The other write may be another change's step 1 or step 3, or a version being recorded. The file then says what the row said before the failing change, until the next one.
 - `narrowing`, `serving` and `untilWritten` are pure, and unit tests hold them, including a check that nothing written at step 1 serves more than the file before or after it would. The order of the three writes is held by `updateDeck` alone, with no test below the end-to-end run.
