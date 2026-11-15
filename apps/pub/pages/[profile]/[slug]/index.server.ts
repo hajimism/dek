@@ -24,18 +24,23 @@ export const head = defineHead<Props>((c, { talk }) => {
     talk.description ??
     talk.slides.find((slide) => slide.paragraphs?.length)?.paragraphs?.[0]?.slice(0, 200) ??
     "";
-  return {
+  const title = translate(c.get("shared").lang, "talk.pageTitle", {
     title: talk.title,
+    name: talk.owner.name,
+    handle: talk.owner.handle,
+  });
+  return {
+    title,
     meta: [
       { name: "description", content: description },
       { property: "og:type", content: "article" },
-      { property: "og:title", content: talk.title },
+      { property: "og:title", content: title },
       { property: "og:description", content: description },
       { property: "og:url", content: talk.canonical },
       { property: "og:site_name", content: "dek.pub" },
       ...(talk.image ? [{ property: "og:image", content: talk.image }] : []),
       { name: "twitter:card", content: talk.image ? "summary_large_image" : "summary" },
-      { name: "twitter:title", content: talk.title },
+      { name: "twitter:title", content: title },
       ...(talk.image ? [{ name: "twitter:image", content: talk.image }] : []),
       ...(talk.visibility === "public" ? [] : [{ name: "robots", content: "noindex" }]),
     ],

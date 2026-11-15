@@ -1,1 +1,0 @@
-ALTER TABLE `decks` ADD `minutes` integer;

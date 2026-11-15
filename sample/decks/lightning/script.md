@@ -5,6 +5,7 @@ description: ターミナルとテキストエディタと dek だけで、三�
 event: dek sample
 date: 2026-09-25
 duration: 3m
+pub: d_p6y9nnghxjg5pdfm
 ---
 
 ## 三分で、発表をひとつ作る {#cover}

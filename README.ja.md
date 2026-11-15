@@ -48,7 +48,7 @@ bunx dekc build     # 3. dist/2026-04-vite.html — トーク全体がこの 1 �
 
 ## サンプル
 
-`sample/` は Playwright、rumdl、声まで入れたフル構成のプロジェクトで、3 つのデッキが入っています。どれも dek 自身が題材で、配布資料としても読める約 12 分の解説 `why-dek`、ターミナルで発表を作ってみせる 3 分のライトニングトーク `lightning`、スライドを AI エージェントに任せる 6 分のトーク `with-agents` です。手順は [sample/README.ja.md](sample/README.ja.md)。
+`sample/` は Playwright、rumdl、声まで入れたフル構成のプロジェクトで、3 つのデッキが入っています。どれも dek 自身が題材で、配布資料としても読める約 12 分の解説 `why-dek`、ターミナルで発表を作ってみせる 3 分のライトニングトーク `lightning`、スライドを AI エージェントに任せる 6 分のトーク `with-agents` です。dek.pub の [@dek](https://dek.pub/@dek) で公開しています。手順は [sample/README.ja.md](sample/README.ja.md)。
 
 ```bash
 cd sample

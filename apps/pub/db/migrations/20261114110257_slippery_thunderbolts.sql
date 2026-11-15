@@ -1,1 +1,0 @@
-ALTER TABLE `decks` ADD `link_key` text;

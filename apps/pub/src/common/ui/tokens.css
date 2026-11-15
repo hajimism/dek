@@ -338,8 +338,11 @@ time,
   text-wrap: pretty;
 }
 
+/* Japanese breaks between any two characters, so pretty buys nothing there, and WebKit, which
+   weighs every line of a paragraph for an even rag, ends each line short of the edge on a phone. */
 .prose:lang(ja) {
   line-height: var(--leading-read-ja);
+  text-wrap: wrap;
 }
 
 @media (min-width: 768px) {

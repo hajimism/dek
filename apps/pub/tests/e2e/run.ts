@@ -31,6 +31,22 @@ function check(condition: unknown, what: string, detail?: unknown): asserts cond
 
 type Json = Record<string, unknown> & { ok: boolean };
 
+/**
+ * Copies the sample project into `to`, less what a build leaves, and takes the `pub:` line out of
+ * each deck's script: the sample's decks are published on dek.pub as @dek (ADR 46), and those IDs
+ * name no deck on the empty database this run starts from.
+ */
+function copySample(to: string): void {
+  cpSync(join(REPO, "sample"), to, {
+    recursive: true,
+    filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
+  });
+  for (const deck of ["why-dek", "lightning", "with-agents"]) {
+    const script = join(to, "decks", deck, "script.md");
+    writeFileSync(script, readFileSync(script, "utf8").replace(/^pub: .*\n/m, ""));
+  }
+}
+
 const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
 // dek.pub opens by invitation. Keeper runs the server, as an operator: named by address in
@@ -83,10 +99,7 @@ async function dekc(
 }
 
 try {
-  cpSync(join(REPO, "sample"), work, {
-    recursive: true,
-    filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
-  });
+  copySample(work);
 
   // The operator signs up on the empty database by DEK_PUB_OPERATORS alone, and invites the people
   // the run signs up from /settings. Each address is mailed an invitation to sign in; an entry
@@ -375,6 +388,13 @@ try {
     html.includes(`<link rel="canonical" href="${server.url}${talkPath}"`) &&
       html.includes(`<meta property="og:url" content="${server.url}${talkPath}"`),
     "a link talk names its URL without the key as canonical and in its preview",
+  );
+  check(
+    /<title>[^<]*\(@author\) · dek\.pub<\/title>/.test(html) &&
+      /<meta property="og:title" content="[^"]*\(@author\)"/.test(html) &&
+      /<meta name="twitter:title" content="[^"]*\(@author\)"/.test(html),
+    "a talk's title and preview name its owner by handle",
+    /<title>[^<]*<\/title>/.exec(html)?.[0],
   );
   const preview = /<meta property="og:image" content="([^"]+)"/
     .exec(html)?.[1]
@@ -1538,10 +1558,7 @@ try {
   ).key;
   const hostWork = mkdtempSync(join(tmpdir(), "dek-pub-e2e-host-"));
   try {
-    cpSync(join(REPO, "sample"), hostWork, {
-      recursive: true,
-      filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
-    });
+    copySample(hostWork);
     const hostScript = join(hostWork, "decks", "why-dek", "script.md");
     writeFileSync(
       hostScript,

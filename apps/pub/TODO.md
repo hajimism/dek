@@ -1,6 +1,6 @@
 # What dek.pub does not do yet
 
-Phases 1 and 2 of the plan are built: publishing from `dekc pub`, the talk page with its viewer and script article, sharing, and review comments that `dekc pub comments` hands back. All of it runs locally on Miniflare, and `bun run test:e2e` covers the round trip. Nothing is deployed.
+Phases 1 and 2 of the plan are built: publishing from `dekc pub`, the talk page with its viewer and script article, sharing, and review comments that `dekc pub comments` hands back. All of it runs locally on Miniflare, and `bun run test:e2e` covers the round trip. Production runs on `dek.pub` and `dekusercontent.com`; no one has signed in yet.
 
 dek.pub opens first by invitation: only the people it lets in can sign up. dek 0.7.0, the first release with `dekc pub`, comes out once dek.pub runs on its own domain; until then the release-please pull request stays open, though `docs/guide/publish.md` is already on the docs site.
 
@@ -35,9 +35,9 @@ Staging runs in the same Cloudflare account as production, deployed with its own
 Each of these is needed on production, and again on staging.
 
 - **Domains.** `dek.pub` and `dekusercontent.com` are registered, and their zones are in the account. Both still hold the records the registrar's import left: A records at the apex and a `www` CNAME to a parking page, and an SPF and a DMARC TXT record that `infra/alchemy.run.ts` declares again. They are removed by hand before the first apply; the app's Custom Domain refuses an apex that has a record (ADR 92).
-- **Infrastructure.** The zones, settings, SPF and DMARC records and the wildcard record (`infra/alchemy.run.ts`, ADR 70) were applied by `infra.yml` on 2026-11-15, with the tokens ADR 93 describes. The serve Worker's route is declared but not deployed.
+- **Infrastructure.** The zones, settings, SPF and DMARC records and the wildcard record (`infra/alchemy.run.ts`, ADR 70) were applied by `infra.yml` on 2026-11-15, with the tokens ADR 93 describes.
 - **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists, less `TURNSTILE_SECRET`, which ADR 61 dropped: stored in `fnox.toml` and set with `bun run secrets` (ADR 86). `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` and `DEK_PUB_OPEN_SIGN_UP` must be unset (ADR 85). `DEK_PUB_OPERATORS` lists the addresses of those who run dek.pub, who may take any talk down and invite people on `/settings` (ADR 82, 85).
-- **Deploying.** No script deploys the app and the serve Worker together. `void deploy` applies `db/migrations/` to the remote D1, and refuses to deploy while a required value of `env.ts` has no Worker secret, so `bun run secrets` comes before the app's first deploy. There is no way back from a deploy but deploying again.
+- **Deploying.** The app and the serve Worker first ran on production on 2026-11-15, from one machine; `void.lock.json` pins the D1 the app binds. No script deploys the two together. `void deploy` applies `db/migrations/` to the remote D1, and refuses to deploy while a required value of `env.ts` has no Worker secret, so `bun run secrets` comes before the app's first deploy. There is no way back from a deploy but deploying again.
 - **Mail.**
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing. The token `void deploy` uses needs Email Routing Edit and Email Sending Edit.
   - SPF and DKIM, which `void deploy` writes, checked in a received mail's headers. DMARC is declared in `infra/alchemy.run.ts`; the sending subdomain is quarantined, not rejected, until those headers are checked.

@@ -327,6 +327,7 @@ const en = {
   "talk.linkCopied": "Link to this slide copied.",
   "talk.read": "Read the script",
   "talk.viewerTitle": "Slides of “{title}”",
+  "talk.pageTitle": "{title} by {name} (@{handle})",
   "talk.viewerOffline":
     "The slides couldn’t be controlled from this page; use the keys inside the deck.",
   "talk.manage": "Manage",
@@ -812,6 +813,7 @@ const ja: Record<MessageKey, string> = {
   "talk.linkCopied": "このスライドへのリンクをコピーしました。",
   "talk.read": "台本を読む",
   "talk.viewerTitle": "「{title}」のスライド",
+  "talk.pageTitle": "{title}｜{name} (@{handle})",
   "talk.viewerOffline":
     "このページからはスライドを操作できません。デッキの中でキーを使ってください。",
   "talk.manage": "管理",

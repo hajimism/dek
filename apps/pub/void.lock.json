@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "source": {
+    "name": "dek-pub",
+    "routes": [
+      {
+        "pattern": "dek.pub",
+        "custom_domain": true
+      }
+    ],
+    "workers_dev": false,
+    "preview_urls": false,
+    "r2_buckets": [
+      {
+        "binding": "STORAGE",
+        "bucket_name": "dek-pub"
+      }
+    ]
+  },
+  "resolved": {
+    "name": "dek-pub",
+    "routes": [
+      {
+        "pattern": "dek.pub",
+        "custom_domain": true
+      }
+    ],
+    "workers_dev": false,
+    "preview_urls": false,
+    "r2_buckets": [
+      {
+        "binding": "STORAGE",
+        "bucket_name": "dek-pub"
+      }
+    ],
+    "account_id": "b0aa72f458b4df746126f84e49194d28",
+    "compatibility_date": "2026-02-24",
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "dek-pub-db",
+        "database_id": "5d03c0a0-3621-4538-947e-a63bf076c538",
+        "migrations_dir": "./db/migrations"
+      }
+    ]
+  },
+  "text": "{\n  \"name\": \"dek-pub\",\n  \"routes\": [\n    {\n      \"pattern\": \"dek.pub\",\n      \"custom_domain\": true\n    }\n  ],\n  \"workers_dev\": false,\n  \"preview_urls\": false,\n  \"r2_buckets\": [\n    {\n      \"binding\": \"STORAGE\",\n      \"bucket_name\": \"dek-pub\"\n    }\n  ],\n  \"account_id\": \"b0aa72f458b4df746126f84e49194d28\",\n  \"compatibility_date\": \"2026-02-24\",\n  \"d1_databases\": [\n    {\n      \"binding\": \"DB\",\n      \"database_name\": \"dek-pub-db\",\n      \"database_id\": \"5d03c0a0-3621-4538-947e-a63bf076c538\",\n      \"migrations_dir\": \"./db/migrations\"\n    }\n  ]\n}\n"
+}
