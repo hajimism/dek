@@ -18,16 +18,16 @@ The code is laid out so that what a change can reach follows from where it is. N
 
 **A pull request runs the checks its files need.** `scripts/ci-scope.ts` reads the files the pull request's merge commit changes from its base and answers two flags:
 
-- `pub` alone for a change under `apps/`;
+- `pub` alone for a change under `apps/pub/`;
 - `root` alone for `docs/`, `adr/`, `tests/`, `skills/`, and the repository's README, CONTRIBUTING, CHANGELOG, AGENTS and CLAUDE files;
 - both for `src/` and `sample/`, which dek.pub's round trip builds and publishes;
-- both for any other file, such as `package.json`, `bun.lock`, `mise.toml`, the configs and the workflows, and for anything it does not know.
+- both for any other file, such as `package.json`, `bun.lock`, `mise.toml`, the configs and the workflows, and for anything it does not know, another app under `apps/` included.
 
-A pull request's flags are those of all its files together.
+A pull request's flags are those of all its files together. A file moved counts where it was and where it went (`git diff --no-renames`), since moving a deck out of `sample/` reaches dek.pub's round trip as much as changing it does.
 
 **A push to `main` runs every check,** so whatever a pull request's checks left out is checked once it lands.
 
-**Each job reads the flags itself and skips steps, not itself.** Every job checks out with `fetch-depth: 2`, for the merge commit and its base, and runs the script as a step before the rest; the steps the change does not need are skipped. So each required check reports, with its expanded name. A job never depends on another job's answer, so a failure to read the change fails the job instead of skipping it. `check` always runs `biome ci`, `typecheck` and `knip`, which cover `apps/pub/` as well and take seconds. The `adr` job always runs.
+**Each job reads the flags itself and skips steps, not itself.** Every job checks out with `fetch-depth: 2`, for the merge commit and its base, and runs the script as a step before the rest; the steps the change does not need are skipped. So each required check reports, with its expanded name. A job never depends on another job's answer, so a failure to read the change fails the job instead of skipping it. `check` always runs `biome ci`, `typecheck` and `knip`, which take seconds; `biome ci` and `knip` cover `apps/pub/` as well, and `typecheck` reads only the root's `src/`, `tests/` and `evals/`, so dek.pub's types are checked by its own `bun run check` in `pub`. The `adr` job always runs.
 
 **Rejected:**
 

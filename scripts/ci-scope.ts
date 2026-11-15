@@ -3,7 +3,8 @@
  * dek.pub's (apps/pub's checks and its round trip), from the files it changes.
  *
  * dek.pub's round trip builds a sample deck with this checkout's `dekc` and publishes it, so a
- * change to `src/` or `sample/` needs both. A file this does not know needs both. A push to main
+ * change to `src/` or `sample/` needs both. A file this does not know needs both, another app
+ * under `apps/` included. A push to main
  * always needs both, so what one check let through, the next run on main catches.
  *
  * In CI: `bun scripts/ci-scope.ts` writes `root` and `pub` to $GITHUB_OUTPUT. On a pull request,
@@ -24,7 +25,7 @@ const ROOT_ONLY = [
 ];
 
 function scopeOfFile(file: string): Scope {
-  if (file.startsWith("apps/")) {
+  if (file.startsWith("apps/pub/")) {
     return { root: false, pub: true };
   }
   if (ROOT_ONLY.some((pattern) => pattern.test(file))) {
@@ -45,9 +46,14 @@ export function scopeOf(files: readonly string[]): Scope {
   };
 }
 
-/** The files the pull request checked out as its merge commit changes from its base. */
-function changedFiles(): string[] {
-  const diff = Bun.spawnSync(["git", "diff", "--name-only", "HEAD^1", "HEAD"]);
+/**
+ * The files the merge commit checked out in `dir` changes from its base: a file moved is named
+ * where it was and where it went, since leaving a directory reaches what read it there.
+ */
+export function changedFiles(dir = "."): string[] {
+  const diff = Bun.spawnSync(["git", "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"], {
+    cwd: dir,
+  });
   if (diff.exitCode !== 0) {
     throw new Error(`git diff failed: ${diff.stderr.toString().trim()}`);
   }
