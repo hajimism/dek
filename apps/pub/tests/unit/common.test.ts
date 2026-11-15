@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createDb, sql } from "void/db";
 import { sendEmail } from "void/email";
 import { PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
+import { chunks, IDS_PER_QUERY } from "../../src/common/chunks.ts";
 import { docsUrl } from "../../src/common/docs.ts";
 import { refusal } from "../../src/common/http.ts";
 import {
@@ -44,6 +45,28 @@ describe("i18n", () => {
     const now = Date.parse("2026-11-13T12:00:00Z");
     expect(relativeTime("en", "2026-11-10T12:00:00Z", now)).toBe("3 days ago");
     expect(relativeTime("en", "2026-11-13T11:59:50Z", now)).toBe("just now");
+  });
+});
+
+describe("chunks", () => {
+  it("splits a list in order into runs of at most the size", () => {
+    expect(chunks([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(chunks([1, 2], 2)).toEqual([[1, 2]]);
+    expect(chunks([], 2)).toEqual([]);
+  });
+
+  it("keeps every query under the 100 values D1 binds to a statement", () => {
+    const ids = Array.from({ length: 2 * IDS_PER_QUERY + 1 }, (_, i) => `u${i}`);
+    const runs = chunks(ids, IDS_PER_QUERY);
+    expect(runs.map((run) => run.length)).toEqual([IDS_PER_QUERY, IDS_PER_QUERY, 1]);
+    expect(runs.flat()).toEqual(ids);
+    expect(IDS_PER_QUERY).toBeLessThan(100);
+  });
+
+  it("refuses a size that would never end", () => {
+    for (const size of [0, -1, 1.5, Number.NaN]) {
+      expect(() => chunks([1], size)).toThrow(RangeError);
+    }
   });
 });
 

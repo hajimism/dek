@@ -8,6 +8,7 @@ import type { Context } from "hono";
 import { and, asc, db, eq, exists, inArray, sql } from "void/db";
 import type { CommentRow, NewComment, ThreadScope } from "../../../../../src/pub/protocol.ts";
 import { notFound } from "../../common/api-error.ts";
+import { chunks, IDS_PER_QUERY } from "../../common/chunks.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
@@ -53,17 +54,24 @@ async function listComments(
   if (wanted.length === 0) {
     return [];
   }
-  const replyRows = await db
-    .select()
-    .from(replies)
-    .where(
-      inArray(
-        replies.threadId,
+  const replyRows = (
+    await Promise.all(
+      chunks(
         wanted.map((row) => row.id),
+        IDS_PER_QUERY,
+      ).map((ids) =>
+        db
+          .select()
+          .from(replies)
+          .where(inArray(replies.threadId, ids))
+          .orderBy(asc(replies.createdAt))
+          .all(),
       ),
     )
-    .orderBy(asc(replies.createdAt))
-    .all();
+  )
+    .flat()
+    // Each part comes in order; the parts together are put in order again.
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const renameRows = await renamesOf(deck.id);
   const people = await peopleById(c, [
     ...wanted.map((row) => row.authorId),
