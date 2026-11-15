@@ -68,10 +68,7 @@ async function listComments(
           .all(),
       ),
     )
-  )
-    .flat()
-    // Each part comes in order; the parts together are put in order again.
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  ).flat();
   const renameRows = await renamesOf(deck.id);
   const people = await peopleById(c, [
     ...wanted.map((row) => row.authorId),
