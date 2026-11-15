@@ -616,6 +616,21 @@ try {
     json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "レビュー" },
   });
   check(review.status === 403, "a reader with no grant writes no review thread");
+  const changed = await Promise.all(
+    ["resolve", "reopen", "widen"].map(
+      async (change) =>
+        (
+          await reader.fetch(keyedPath(`/api/decks/${id}/comments/${quotedId}/${change}`), {
+            method: "POST",
+          })
+        ).status,
+    ),
+  );
+  check(
+    changed.every((status) => status === 404),
+    "a reader with no grant cannot tell a review thread is there by changing it",
+    changed,
+  );
   const posted = await reader.fetch(publicPath, {
     method: "POST",
     json: { text: "良い発表でした" },

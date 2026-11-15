@@ -262,6 +262,83 @@ describe("showFirst", () => {
     const done = await showFirst(shown, [1], () => Promise.reject(error), failed);
     expect([done, seen, failed.mock.calls]).toEqual([false, [[1], [1, 2]], [[error]]]);
   });
+
+  /** A call that answers when the test says. */
+  function later<T>() {
+    let answer!: (value: T) => void;
+    let fail!: (error: unknown) => void;
+    const promise = new Promise<T>((resolve, reject) => {
+      answer = resolve;
+      fail = reject;
+    });
+    return { call: () => promise, answer, fail };
+  }
+
+  it("shows what the latest change answers, not one made before it that answers after", async () => {
+    const { shown } = box(false);
+    const [first, second] = [later<boolean>(), later<boolean>()];
+    const made = [
+      showFirst(shown, true, first.call, vi.fn()),
+      showFirst(shown, false, second.call, vi.fn()),
+    ];
+    second.answer(false);
+    first.answer(true);
+    expect([await Promise.all(made), shown.get()]).toEqual([[true, true], false]);
+  });
+
+  it("leaves a newer change shown when an older one fails, and still says why", async () => {
+    const { shown } = box(0);
+    const [first, second] = [later<number>(), later<number>()];
+    const failed = vi.fn();
+    const made = [
+      showFirst(shown, 1, first.call, failed),
+      showFirst(shown, 2, second.call, vi.fn()),
+    ];
+    const error = new Error("down");
+    first.fail(error);
+    await made[0];
+    expect([shown.get(), failed.mock.calls]).toEqual([2, [[error]]]);
+    second.answer(2);
+    await made[1];
+    expect(shown.get()).toBe(2);
+  });
+
+  it("puts back the last value a call answered when the latest change fails", async () => {
+    const { shown } = box(0);
+    const [first, second] = [later<number>(), later<number>()];
+    const made = [
+      showFirst(shown, 1, first.call, vi.fn()),
+      showFirst(shown, 2, second.call, vi.fn()),
+    ];
+    first.answer(7);
+    await made[0];
+    expect(shown.get()).toBe(2);
+    second.fail(new Error("down"));
+    await made[1];
+    expect(shown.get()).toBe(7);
+  });
+
+  it("shows what an older change answers when the newer one failed before it", async () => {
+    const { shown } = box(false);
+    const [first, second] = [later<boolean>(), later<boolean>()];
+    const made = [
+      showFirst(shown, true, first.call, vi.fn()),
+      showFirst(shown, false, second.call, vi.fn()),
+    ];
+    second.fail(new Error("down"));
+    await made[1];
+    first.answer(true);
+    await made[0];
+    expect(shown.get()).toBe(true);
+  });
+
+  it("starts from what is shown again once no change is waiting", async () => {
+    const { shown } = box(0);
+    await showFirst(shown, 1, async () => 1, vi.fn());
+    shown.set(5);
+    await showFirst(shown, 6, () => Promise.reject(new Error("down")), vi.fn());
+    expect(shown.get()).toBe(5);
+  });
 });
 
 describe("guessLang", () => {

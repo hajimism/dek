@@ -5,7 +5,7 @@
   import { guessLang } from "../../../../../common/i18n.ts";
   import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
-  import { showFirst } from "../../../../../common/ui/call.ts";
+  import { type Shown, showFirst } from "../../../../../common/ui/call.ts";
   import CopyField from "../../../../../common/ui/copy-field.svelte";
   import Dialog from "../../../../../common/ui/dialog.svelte";
   import { failureText } from "../../../../../common/ui/failure.ts";
@@ -98,12 +98,17 @@
   /** A setting the page saves and can undo: any change but a new link. */
   type Setting = Omit<ShareRequest, "newLink">;
 
+  const shownStatus: Shown<DeckStatus> = {
+    get: () => $state.snapshot(status),
+    set: (next) => (status = next),
+  };
+
   async function save(change: Setting, undoable = true) {
     const key = Object.keys(change)[0] as keyof Setting;
     const before: Setting = { [key]: status[key] } as Setting;
     saving = key;
     const saved = await showFirst(
-      { get: () => $state.snapshot(status), set: (next) => (status = next) },
+      shownStatus,
       { ...status, ...change } as DeckStatus,
       () => api<DeckStatus>(paths.deck(status.id), { method: "PATCH", body: change }),
       (error) => toast(failureText(t, error), { tone: "error" }),

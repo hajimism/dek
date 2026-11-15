@@ -28,7 +28,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const APP = resolve(import.meta.dirname, "../..");
-const PUB = resolve(APP, "../../src/pub");
+/** The protocol in the repository's `src/pub/`, named one by one: nothing else there is the app's. */
+const PROTOCOL = ["protocol.ts", "paths.ts", "thread.ts"].map((file) =>
+  resolve(APP, "../../src/pub", file),
+);
 const MODELS = ["person", "deck", "comment"] as const;
 const VOID_SERVER = /^void(\/(db|env|storage|auth|email|schema-d1))?$/;
 
@@ -100,7 +103,7 @@ function problems(): string[] {
           say("only a *.server.ts file imports another");
         }
       }
-      if (!target || target.startsWith(`${PUB}/`)) {
+      if (!target || PROTOCOL.includes(target)) {
         continue;
       }
       const to = placeOf(target);
