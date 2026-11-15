@@ -22,9 +22,9 @@ This file lists what is missing, in the order it is needed. Remove an item when 
 
 ### Staging
 
-Staging runs in the same Cloudflare account as production, deployed with its own tokens: the app on `workers.dev`, and decks and mail on one domain of its own. The steps under "Running it" are taken on staging first, then on production.
+Staging runs in the same Cloudflare account as production, deployed with its own tokens: the app on `workers.dev`, and decks and mail on one domain of its own. Production comes up first, by invitation; the steps under "Running it" are then taken again on staging.
 
-- The staging domain is not chosen or registered.
+- The staging domain, `dek-stg.com`, is registered, and its zone is in the account; nothing is declared for it yet.
 - `infra/site.ts` refuses any stage but `prod`.
 - Void has no named environments. It reads `void.config.ts`, `void.lock.json` and `.void/project.json` from the project root, so a second target needs its own root or a config that switches on the stage; which works is not tried.
 - `void.config.ts` names the Worker, the R2 bucket and the mail sender (`mail.dek.pub`) for production alone, so staging, in the same account, would bind production's bucket, `dek-pub`. `serve/wrangler.jsonc` has no `env.staging`, and `infra.yml` passes `--stage prod` in every job.
@@ -32,12 +32,12 @@ Staging runs in the same Cloudflare account as production, deployed with its own
 
 ### Running it
 
-Each of these is needed on staging and on production.
+Each of these is needed on production, and again on staging.
 
-- **Domains.** `dek.pub` and `dekusercontent.com` are not registered. The Public Suffix List request for `dekusercontent.com` is not sent; it takes weeks.
-- **Infrastructure.** The zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) and the serve Worker's route are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
+- **Domains.** `dek.pub` and `dekusercontent.com` are registered, and their zones are in the account. Both still hold the records the registrar's import left: A records at the apex and a `www` CNAME to a parking page, and an SPF and a DMARC TXT record that `infra/alchemy.run.ts` declares again. They are removed by hand before the first apply; the app's Custom Domain refuses an apex that has a record (ADR 92).
+- **Infrastructure.** The zones, settings, SPF and DMARC records and the wildcard record (`infra/alchemy.run.ts`, ADR 70) were applied by `infra.yml` on 2026-11-15, with the tokens ADR 93 describes. The serve Worker's route is declared but not deployed.
 - **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists, less `TURNSTILE_SECRET`, which ADR 61 dropped: stored in `fnox.toml` and set with `bun run secrets` (ADR 86). `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` and `DEK_PUB_OPEN_SIGN_UP` must be unset (ADR 85). `DEK_PUB_OPERATORS` lists the addresses of those who run dek.pub, who may take any talk down and invite people on `/settings` (ADR 82, 85).
-- **Deploying.** No script deploys the app and the serve Worker together, and nothing applies `db/migrations/` to the remote D1. There is no way back from a deploy but deploying again.
+- **Deploying.** No script deploys the app and the serve Worker together. `void deploy` applies `db/migrations/` to the remote D1, and refuses to deploy while a required value of `env.ts` has no Worker secret, so `bun run secrets` comes before the app's first deploy. There is no way back from a deploy but deploying again.
 - **Mail.**
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing. The token `void deploy` uses needs Email Routing Edit and Email Sending Edit.
   - SPF and DKIM, which `void deploy` writes, checked in a received mail's headers. DMARC is declared in `infra/alchemy.run.ts`; the sending subdomain is quarantined, not rejected, until those headers are checked.
@@ -56,6 +56,7 @@ Each of these is needed on staging and on production.
 - **Abuse.**
   - Nobody can report a talk or a public comment, and there is no block list.
   - The plan's guard against phishing on the deck domain, a limit on what a new account can make public, is not built.
+  - `dekusercontent.com` is not on the Public Suffix List, so a browser takes every deck host for one site, and a warning for one deck can cover them all. The list declines projects with few users, so the request waits for this section; it takes weeks, needs two years left on the registration (now until 2028-11-15), and a `_psl` TXT record declared in `infra/alchemy.run.ts`.
 - **Account deletion** by the person themselves, as a section of `/settings`.
 
 ## Later
