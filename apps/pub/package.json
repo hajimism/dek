@@ -5,6 +5,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "setup": "bun scripts/setup.ts",
+    "secrets": "bun scripts/secrets.ts",
     "dev": "vp dev --strictPort",
     "build": "vp build",
     "preview": "vp preview",
