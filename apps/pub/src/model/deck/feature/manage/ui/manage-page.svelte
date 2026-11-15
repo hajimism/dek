@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { CommentPolicy, DeckStatus, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
+  import type { CommentPolicy, DeckStatus, Grant, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
   import { guessLang } from "../../../../../common/i18n.ts";
   import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
@@ -14,7 +14,6 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import { profilePath } from "../../../../person/profile-path.ts";
-  import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import type { CurrentVersion } from "../type.ts";
   import Sharing from "./sharing.svelte";
@@ -27,7 +26,7 @@
     ondeleted = (profile: string) => window.location.assign(profile),
   }: {
     status: DeckStatus;
-    grants: GrantView[];
+    grants: Grant[];
     version: CurrentVersion | null;
     /** Where the page goes once the talk is deleted: the owner's profile. */
     ondeleted?: (profile: string) => void;

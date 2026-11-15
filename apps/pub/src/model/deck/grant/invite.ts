@@ -1,8 +1,8 @@
 // The mail that tells someone a deck was shared with them. It names the talk and what the grant
 // lets them do, never the side they are on.
 
+import type { GrantRole } from "../../../../../../src/pub/protocol.ts";
 import type { Mail } from "../../../common/mail.ts";
-import type { GrantRole } from "./type.ts";
 
 export function invitationMail(invite: {
   to: string;

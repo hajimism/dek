@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import type { Grant, GrantRole, GrantSide } from "../../../../../../../../src/pub/protocol.ts";
   import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import { failureText } from "../../../../../common/ui/failure.ts";
@@ -7,11 +8,10 @@
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
   import Avatar from "../../../../person/ui/avatar.svelte";
-  import type { GrantRole, GrantSide, GrantView } from "../../../grant/type.ts";
 
-  let { deckId, initial }: { deckId: string; initial: GrantView[] } = $props();
+  let { deckId, initial }: { deckId: string; initial: Grant[] } = $props();
   const { t } = useApp();
-  let grants: GrantView[] = $state(untrack(() => initial));
+  let grants: Grant[] = $state(untrack(() => initial));
   let who = $state("");
   let role: GrantRole = $state("view");
   let side: GrantSide = $state("guest");
@@ -27,7 +27,7 @@
   }
 
   async function reload() {
-    grants = (await api<{ grants: GrantView[] }>(`/api/decks/${deckId}/grants`)).grants;
+    grants = (await api<{ grants: Grant[] }>(`/api/decks/${deckId}/grants`)).grants;
   }
 
   async function add(event: SubmitEvent) {
@@ -53,7 +53,7 @@
     }
   }
 
-  async function change(grant: GrantView, next: Pick<GrantView, "role" | "side">) {
+  async function change(grant: Grant, next: Pick<Grant, "role" | "side">) {
     try {
       await api(`/api/decks/${deckId}/grants`, { method: "POST", body: { who: grant.who, ...next } });
       await reload();
@@ -63,7 +63,7 @@
     }
   }
 
-  async function remove(grant: GrantView) {
+  async function remove(grant: Grant) {
     const before = grants;
     grants = grants.filter((entry) => entry.id !== grant.id);
     try {
@@ -81,7 +81,7 @@
     return value.includes("@") && !value.startsWith("@");
   }
 
-  function label(grant: GrantView): string {
+  function label(grant: Grant): string {
     return isEmail(grant.who) ? grant.who : `@${grant.who}`;
   }
 </script>

@@ -6,6 +6,7 @@
 import { decks, grants, invitations } from "@schema";
 import type { Context } from "hono";
 import { and, asc, db, eq, gt, isNull, lte, notInArray, or, sql } from "void/db";
+import type { Grant, GrantRole, GrantSide } from "../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
 import { accountByEmail, peopleById, personByHandle } from "../../person/store.server.ts";
@@ -16,7 +17,7 @@ import {
   invitationWindowStart,
   utcMinute,
 } from "./grant.ts";
-import type { Grantee, GrantRole, GrantRow, GrantSide, GrantView } from "./type.ts";
+import type { Grantee, GrantRow } from "./type.ts";
 
 /** The grants that name `person` on a deck: by account, or by an address they have verified. */
 export async function grantsOf(
@@ -71,7 +72,7 @@ export async function claimGrants(
  * The people a deck is shared with, oldest grant first: by handle, or by the address a grant
  * waits on, or was claimed by an account that has no handle yet.
  */
-export async function grantList(c: Context, deckId: string): Promise<GrantView[]> {
+export async function grantList(c: Context, deckId: string): Promise<Grant[]> {
   const rows = await db
     .select()
     .from(grants)
@@ -110,7 +111,7 @@ export async function share(
   grantee: Grantee,
   role?: GrantRole,
   side?: GrantSide,
-): Promise<{ grant: GrantView; invite: Invite | null }> {
+): Promise<{ grant: Grant; invite: Invite | null }> {
   let target: { userId: string | null; email: string | null };
   let address: string;
   if ("email" in grantee) {

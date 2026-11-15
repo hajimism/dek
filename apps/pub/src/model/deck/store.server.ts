@@ -270,8 +270,12 @@ export function deletableDeck(deck: Deck | null, person: Person): Deck {
   return deck;
 }
 
-export async function ownedDeck(id: string, person: Person): Promise<Deck> {
-  const deck = await deckById(id);
+/**
+ * The deck the request's `:id` names, if `person` owns it. Anyone else gets the 404 a missing deck
+ * gets.
+ */
+export async function ownedDeck(c: Context, person: Person): Promise<Deck> {
+  const deck = await deckById(c.req.param("id") ?? "");
   if (!deck || !canManage(deck, person)) {
     throw notFound();
   }

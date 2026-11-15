@@ -406,8 +406,10 @@ export type TalkPage = z.infer<typeof TalkPage>;
 // Grants: people other than the owner who may open, or comment on, a deck that is not public.
 
 export const GrantRole = z.enum(["view", "comment"]);
+export type GrantRole = z.infer<typeof GrantRole>;
 /** Which side of the work a grantee is on: the `team` that makes the deck, or a `guest` of it. */
 export const GrantSide = z.enum(["team", "guest"]);
+export type GrantSide = z.infer<typeof GrantSide>;
 export const Grant = z.strictObject({
   id: z.string(),
   /**

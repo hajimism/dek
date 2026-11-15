@@ -36,6 +36,9 @@ export type Account = z.output<typeof Account>;
  */
 export type Person = Account & { handle: string };
 
+/** Whoever a rule is asked about: known by their account, or null when signed out. */
+export type Caller = Pick<Account, "id"> | null;
+
 const SignUpSource = z.object({
   oauth: z
     .object({

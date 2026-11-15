@@ -6,7 +6,7 @@ import { requirePerson } from "../../../../../src/model/person/actor.server.ts";
 
 export const DELETE = defineHandler((c) =>
   api(async () => {
-    const deck = await ownedDeck(c.req.param("id") ?? "", await requirePerson(c));
+    const deck = await ownedDeck(c, await requirePerson(c));
     await unshare(deck.id, c.req.param("grant") ?? "");
     return { removed: true };
   }, c.req.raw),

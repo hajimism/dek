@@ -5,7 +5,7 @@
 
 import type { Context } from "hono";
 import { API_KEY_HEADER, HANDLE_NEEDED, SESSION_NEEDED } from "../../../../../src/pub/protocol.ts";
-import { ApiError } from "../../common/api-error.ts";
+import { ApiError, signedOut } from "../../common/api-error.ts";
 import { appUrl } from "../../common/http.server.ts";
 import { checkKey } from "./api-key.server.ts";
 import { hasHandle, readAccount } from "./person.ts";
@@ -64,7 +64,7 @@ export async function currentPerson(c: Context): Promise<Person | null> {
 export async function requirePerson(c: Context): Promise<Person> {
   const found = await currentPerson(c);
   if (!found) {
-    throw new ApiError(401, "signed_out", "sign in first", "run `dekc pub login`");
+    throw signedOut(undefined, "run `dekc pub login`");
   }
   return found;
 }

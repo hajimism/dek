@@ -12,7 +12,7 @@ import { signInHref } from "../../../../../src/model/person/sign-in-path.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {
-    const deck = await ownedDeck(c.req.param("id") ?? "", await requirePerson(c));
+    const deck = await ownedDeck(c, await requirePerson(c));
     return { grants: await grantList(c, deck.id) };
   }, c.req.raw),
 );
@@ -26,7 +26,7 @@ export const GET = defineHandler((c) =>
 export const POST = defineHandler((c) =>
   api(async () => {
     const owner = await requirePerson(c);
-    const deck = await ownedDeck(c.req.param("id") ?? "", owner);
+    const deck = await ownedDeck(c, owner);
     const { who, role, side } = await jsonBody(c, NewGrant);
     const grantee = granteeOf(who);
     if (!grantee) {

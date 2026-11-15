@@ -6,21 +6,26 @@
 import { decks, replies, threads } from "@schema";
 import type { Context } from "hono";
 import { and, asc, db, eq, exists, inArray, sql } from "void/db";
-import type { CommentRow, NewComment, ThreadScope } from "../../../../../src/pub/protocol.ts";
+import type {
+  CommentRow,
+  GrantRole,
+  GrantSide,
+  NewComment,
+  ThreadScope,
+} from "../../../../../src/pub/protocol.ts";
 import { notFound } from "../../common/api-error.ts";
 import { chunks, IDS_PER_QUERY } from "../../common/chunks.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
 import { canSeeScript } from "../deck/access.ts";
-import type { GrantRole, GrantSide } from "../deck/grant/type.ts";
-import { talkUrl } from "../deck/store.server.ts";
-import type { Deck } from "../deck/type.ts";
+import { requestedDeck, talkUrl } from "../deck/store.server.ts";
+import type { Deck, Standing } from "../deck/type.ts";
 import { currentVersionOf, renamesOf } from "../deck/version/store.server.ts";
 import { authorOf } from "../person/person.ts";
 import { peopleById } from "../person/store.server.ts";
-import type { Account, Person } from "../person/type.ts";
-import { canReadThread, canSeeThread, scopeFor } from "./access.ts";
+import type { Account, Caller, Person } from "../person/type.ts";
+import { canReadThread, canSeeThread, mustResolve, scopeFor, type ThreadChange } from "./access.ts";
 import { placeComment } from "./anchor.ts";
 import { mustOpenThread } from "./new-thread.ts";
 import { CommentTargets, type ThreadRow } from "./type.ts";
@@ -199,7 +204,7 @@ async function takeNumber(deckId: string, scope: ThreadScope): Promise<number> {
  */
 export async function visibleThread(
   deck: Deck,
-  person: Pick<Person, "id"> | null,
+  person: Caller,
   role: GrantRole | null,
   side: GrantSide,
   id: string,
@@ -213,6 +218,23 @@ export async function visibleThread(
     throw notFound("comment");
   }
   return thread;
+}
+
+/**
+ * The thread the request's `:comment` names, on the deck its `:id` names, once `person` may make
+ * `change` to it: as missing as one that is not to whoever may not read it, refused to whoever
+ * reads it but may not change it.
+ */
+export async function threadToChange(
+  c: Context,
+  person: Person,
+  change: ThreadChange,
+): Promise<Standing & { deck: Deck; thread: ThreadRow }> {
+  const standing = await requestedDeck(c, person);
+  const { deck, role, side } = standing;
+  const thread = await visibleThread(deck, person, role, side, c.req.param("comment") ?? "");
+  mustResolve(deck, thread, person, role, change);
+  return { ...standing, thread };
 }
 
 export async function addReply(thread: ThreadRow, person: Person, text: string): Promise<string> {

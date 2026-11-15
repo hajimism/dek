@@ -17,7 +17,7 @@ import { requirePerson } from "../../../../src/model/person/actor.server.ts";
 
 export const GET = defineHandler((c) =>
   api(async () => {
-    const deck = await ownedDeck(c.req.param("id") ?? "", await requirePerson(c));
+    const deck = await ownedDeck(c, await requirePerson(c));
     return deckStatus(c, deck);
   }, c.req.raw),
 );
@@ -25,7 +25,7 @@ export const GET = defineHandler((c) =>
 /** Change who may see the deck, its script, embedding, and comments, or give it a new link. */
 export const PATCH = defineHandler((c) =>
   api(async () => {
-    const deck = await ownedDeck(c.req.param("id") ?? "", await requirePerson(c));
+    const deck = await ownedDeck(c, await requirePerson(c));
     const patch = sharePatch(deck, await jsonBody(c, ShareRequest));
     return deckStatus(c, await updateDeck(deck, patch));
   }, c.req.raw),

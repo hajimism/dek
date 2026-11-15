@@ -1,7 +1,8 @@
 // What a grant means: whom it names and how much it allows.
 
+import type { GrantRole, GrantSide } from "../../../../../../src/pub/protocol.ts";
 import { isHandle } from "../../person/handle.ts";
-import type { Grantee, GrantRole, GrantSide } from "./type.ts";
+import type { Grantee } from "./type.ts";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 

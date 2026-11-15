@@ -3,7 +3,7 @@
 
 import type { Context } from "hono";
 import type { HandleStatus, Me } from "../../../../../../../src/pub/protocol.ts";
-import { ApiError } from "../../../../common/api-error.ts";
+import { ApiError, signedOut } from "../../../../common/api-error.ts";
 import { currentAccount } from "../../actor.server.ts";
 import { handleProblem, normalizeHandle } from "../../handle.ts";
 import { meOf } from "../../person.ts";
@@ -23,7 +23,7 @@ async function handleStatus(c: Context, value: string): Promise<HandleStatus> {
 async function signedIn(c: Context): Promise<Account> {
   const account = await currentAccount(c);
   if (!account) {
-    throw new ApiError(401, "signed_out", "sign in first");
+    throw signedOut();
   }
   return account;
 }
