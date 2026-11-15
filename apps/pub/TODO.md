@@ -28,7 +28,7 @@ Staging runs in the same Cloudflare account as production, deployed with its own
 - `infra/site.ts` refuses any stage but `prod`.
 - Void has no named environments. It reads `void.config.ts`, `void.lock.json` and `.void/project.json` from the project root, so a second target needs its own root or a config that switches on the stage; which works is not tried.
 - `void.config.ts` names the Worker, the R2 bucket and the mail sender (`mail.dek.pub`) for production alone, so staging, in the same account, would bind production's bucket, `dek-pub`. `serve/wrangler.jsonc` has no `env.staging`, and `infra.yml` passes `--stage prod` in every job.
-- Staging needs its own GitHub OAuth app and its own secrets.
+- Staging needs its own GitHub OAuth app and its own secrets, in a `staging` profile of `fnox.toml` (ADR 86).
 
 ### Running it
 
@@ -36,7 +36,7 @@ Each of these is needed on staging and on production.
 
 - **Domains.** `dek.pub` and `dekusercontent.com` are not registered. The Public Suffix List request for `dekusercontent.com` is not sent; it takes weeks.
 - **Infrastructure.** The zones, settings and wildcard record (`infra/alchemy.run.ts`, ADR 70) and the serve Worker's route are declared but never applied. Alchemy's state store is not made (`alchemy state bootstrap`), and the repository has no `CLOUDFLARE_ACCOUNT_ID` variable, no `CLOUDFLARE_PLAN_TOKEN` or `CLOUDFLARE_DEPLOY_TOKEN`, and no `cloudflare-prod` environment, so `infra.yml` skips every job.
-- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists set with `void secret put`, less `TURNSTILE_SECRET`, which ADR 61 dropped. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` and `DEK_PUB_OPEN_SIGN_UP` must be unset (ADR 85). `DEK_PUB_OPERATORS` lists the addresses of those who run dek.pub, who may take any talk down and invite people on `/settings` (ADR 82, 85).
+- **Accounts and secrets.** A GitHub OAuth app, and the settings ADR 43 lists, less `TURNSTILE_SECRET`, which ADR 61 dropped: stored in `fnox.toml` and set with `bun run secrets` (ADR 86). `fnox.toml` holds no value yet. `void deploy` makes `BETTER_AUTH_SECRET` itself when the Worker has none. `DEK_PUB_DEV_LOGIN` and `DEK_PUB_OPEN_SIGN_UP` must be unset (ADR 85). `DEK_PUB_OPERATORS` lists the addresses of those who run dek.pub, who may take any talk down and invite people on `/settings` (ADR 82, 85).
 - **Deploying.** No script deploys the app and the serve Worker together, and nothing applies `db/migrations/` to the remote D1. There is no way back from a deploy but deploying again.
 - **Mail.**
   - Workers Paid and Email Sending onboarding, then `void email setup --platform cloudflare`; until then mail reaches only addresses verified in Email Routing. The token `void deploy` uses needs Email Routing Edit and Email Sending Edit.

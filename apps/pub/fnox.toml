@@ -1,0 +1,23 @@
+# dek.pub's production secrets, encrypted with age to the keys below (ADR 86). Local runs and CI
+# take dev.env and the e2e server's own values, so the default profile holds nothing.
+#
+#   fnox -P prod set NAME --provider age   store or change a value
+#   fnox -P prod check                     every value is here and decrypts
+#   bun run secrets                        put them on both Workers
+#
+# A reader's age public key goes in recipients, followed by `fnox reencrypt`; the private key
+# stays outside the repository, in ~/.config/fnox/age.txt or FNOX_AGE_KEY.
+
+[providers.age]
+type = "age"
+recipients = ["age12x87xquknk7r44ywpg53czvj756nm5hewsvg7w5h9ptwpzcjfcjq4x97k5"]
+
+[profiles.prod.targets.serve]
+type = "cloudflare-workers"
+worker = "dek-pub-serve"
+
+[profiles.prod.secrets]
+SERVE_TOKEN_SECRET = { provider = "age", if_missing = "error", push = ["serve"], description = "Signs deck tokens; both Workers hold the same value" }
+AUTH_GITHUB_CLIENT_ID = { provider = "age", if_missing = "error", description = "dek.pub's GitHub OAuth app, at github.com/settings/developers" }
+AUTH_GITHUB_CLIENT_SECRET = { provider = "age", if_missing = "error", description = "dek.pub's GitHub OAuth app, at github.com/settings/developers" }
+DEK_PUB_OPERATORS = { provider = "age", if_missing = "error", description = "Email addresses of those who run dek.pub (ADR 82, 85)" }
