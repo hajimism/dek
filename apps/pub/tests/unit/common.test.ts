@@ -15,6 +15,8 @@ import {
 } from "../../src/common/i18n.ts";
 import { log } from "../../src/common/log.ts";
 import { sendMail } from "../../src/common/mail.server.ts";
+import { ApiFailure } from "../../src/common/ui/api.ts";
+import { failureText } from "../../src/common/ui/failure.ts";
 import { xmlText } from "../../src/common/xml.ts";
 
 vi.mock("void/email", () => ({ sendEmail: vi.fn() }));
@@ -110,6 +112,26 @@ describe("refusal", () => {
         refusal(request(method, { cookie: "s=1", origin: "https://evil.example" })),
       ).toBeNull();
     }
+  });
+});
+
+describe("failureText", () => {
+  const t = (key: Parameters<typeof translate>[1], vars?: Parameters<typeof translate>[2]) =>
+    translate("en", key, vars);
+
+  it("says once that dek.pub could not be reached", () => {
+    expect(failureText(t, new ApiFailure(0, "offline", ""))).toBe(t("common.offline"));
+  });
+
+  it("puts the server's message under the page's line", () => {
+    const text = failureText(t, new ApiFailure(409, "slug_taken", "you already have that deck"));
+    expect(text).toBe(t("common.error", { message: "you already have that deck" }));
+  });
+
+  it("says only that something went wrong for any other error", () => {
+    expect(failureText(t, new TypeError("x is undefined"))).toBe(
+      t("common.error", { message: "" }),
+    );
   });
 });
 

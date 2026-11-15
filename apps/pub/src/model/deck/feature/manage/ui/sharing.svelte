@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { ApiFailure, api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
@@ -58,7 +59,7 @@
       await reload();
       toast(t("saved"));
     } catch (err) {
-      toast(t("common.error", { message: failure(err) }), { tone: "error" });
+      toast(failureText(t, err), { tone: "error" });
     }
   }
 
@@ -72,7 +73,7 @@
       });
     } catch (err) {
       grants = before;
-      toast(t("common.error", { message: failure(err) }), { tone: "error" });
+      toast(failureText(t, err), { tone: "error" });
     }
   }
 

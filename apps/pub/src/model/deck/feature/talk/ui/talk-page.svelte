@@ -7,8 +7,9 @@
     PublicComment,
   } from "../../../../../../../../src/pub/protocol.ts";
   import { formatDate } from "../../../../../common/i18n.ts";
-  import { ApiFailure, api } from "../../../../../common/ui/api.ts";
+  import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
+  import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import SegmentedControl from "../../../../../common/ui/segmented-control.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
@@ -47,7 +48,7 @@
   const list = new CommentList(
     untrack(() => talk.id),
     untrack(() => talk.comments ?? []),
-    (error) => toast(failure(error), { tone: "error" }),
+    (error) => toast(failureText(t, error), { tone: "error" }),
   );
   const comments = $derived(list.rows);
   let muted = $state(untrack(() => talk.muted));
@@ -61,7 +62,7 @@
       toast(t(next ? "comment.muted" : "comment.unmuted"));
     } catch (error) {
       muted = before;
-      toast(failure(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
     }
   }
   let filter: Filter = $state("open");
@@ -362,13 +363,6 @@
     }
   }
 
-  function failure(error: unknown): string {
-    if (error instanceof ApiFailure) {
-      return error.code === "offline" ? t("common.offline") : t("common.error", { message: error.message });
-    }
-    return t("common.error", { message: "" });
-  }
-
   async function create(input: ReplyInput): Promise<boolean> {
     if (!draft || !shared.viewer?.handle) {
       return false;
@@ -434,7 +428,7 @@
       await reloadPublic();
       return true;
     } catch (error) {
-      toast(failure(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
       return false;
     }
   }
@@ -449,7 +443,7 @@
       likes = await api<LikeState>(keyed(`/api/decks/${encodeURIComponent(talk.id)}/like`, talk.key), { method: next ? "PUT" : "DELETE" });
     } catch (error) {
       likes = before;
-      toast(failure(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
     }
   }
 </script>

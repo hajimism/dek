@@ -2,10 +2,11 @@
   import { untrack } from "svelte";
   import type { CommentPolicy, DeckStatus, ShareRequest, Visibility } from "../../../../../../../../src/pub/protocol.ts";
   import { guessLang } from "../../../../../common/i18n.ts";
-  import { ApiFailure, api } from "../../../../../common/ui/api.ts";
+  import { api } from "../../../../../common/ui/api.ts";
   import Button from "../../../../../common/ui/button.svelte";
   import CopyField from "../../../../../common/ui/copy-field.svelte";
   import Dialog from "../../../../../common/ui/dialog.svelte";
+  import { failureText } from "../../../../../common/ui/failure.ts";
   import Icon from "../../../../../common/ui/icon.svelte";
   import RadioList from "../../../../../common/ui/radio-list.svelte";
   import SegmentedControl from "../../../../../common/ui/segmented-control.svelte";
@@ -93,13 +94,6 @@
     return () => observer.disconnect();
   });
 
-  function message(error: unknown): string {
-    if (error instanceof ApiFailure) {
-      return error.code === "offline" ? t("common.offline") : t("common.error", { message: error.message });
-    }
-    return t("common.error", { message: "" });
-  }
-
   /** A setting the page saves and can undo: any change but a new link. */
   type Setting = Omit<ShareRequest, "newLink">;
 
@@ -114,7 +108,7 @@
       toast(t("saved"), undoable ? { action: { label: t("undo"), run: () => save(before, false) } } : {});
     } catch (error) {
       status = previous;
-      toast(message(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
     } finally {
       saving = null;
     }
@@ -127,7 +121,7 @@
       status = await api<DeckStatus>(`/api/decks/${status.id}`, { method: "PATCH", body: { newLink: true } });
       toast(t("manage.sharing.newLinkDone"));
     } catch (error) {
-      toast(message(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
     } finally {
       saving = null;
     }
@@ -141,7 +135,7 @@
       ondeleted(profilePath(status.owner));
     } catch (error) {
       deleting = false;
-      toast(message(error), { tone: "error" });
+      toast(failureText(t, error), { tone: "error" });
     }
   }
 
