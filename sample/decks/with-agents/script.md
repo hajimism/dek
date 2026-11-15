@@ -5,6 +5,7 @@ description: スライド作りを AI コーディングエージェントに任
 event: dek sample
 date: 2026-09-25
 duration: 6m
+pub: d_jsjk7mwgovu9p6ys
 ---
 
 ## スライドを、エージェントに任せる {#cover}

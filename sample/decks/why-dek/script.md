@@ -5,6 +5,7 @@ description: 喋る台本を先に書き、そこからスライドを組み立�
 event: dek sample
 date: 2026-09-25
 duration: 12m
+pub: d_7t51kgn71cnzqr77
 ---
 
 ## 台本から、発表まで {#cover}
