@@ -42,12 +42,23 @@ export async function called<T, Problem extends string = never>(
   }
 }
 
-/** A value a page shows, read and set through these, as a `$state` is from outside its component. */
+/**
+ * A value a page shows, read and set through these, as a `$state` is from outside its component.
+ * Made once for each value, so `showFirst` knows the changes to it apart.
+ */
 export type Shown<T> = { get(): T; set(value: T): void };
+
+/** The changes to one shown value still waiting on their call, and what the server last said. */
+type Waiting = { made: number; waiting: Set<number>; answered: unknown; answeredBy: number };
+
+const waitingOn = new WeakMap<object, Waiting>();
 
 /**
  * Show `next` at once, then make `call`, and show what it answers, the value as the server has it.
- * If it fails, what was shown before comes back and `failed` hears why. Whether it went through.
+ * If it fails, the value the server last answered comes back, or what was shown before the first
+ * change still waiting, and `failed` hears why. A call that answers while a newer change to the
+ * same value still waits shows nothing, so an older answer never shows over a newer change.
+ * Whether it went through.
  */
 export async function showFirst<T>(
   shown: Shown<T>,
@@ -55,13 +66,38 @@ export async function showFirst<T>(
   call: () => Promise<T>,
   failed: (error: unknown) => void,
 ): Promise<boolean> {
-  const before = shown.get();
+  const state = waitingOn.get(shown) ?? {
+    made: 0,
+    waiting: new Set<number>(),
+    answered: undefined,
+    answeredBy: 0,
+  };
+  waitingOn.set(shown, state);
+  if (state.waiting.size === 0) {
+    state.answered = shown.get();
+    state.answeredBy = state.made;
+  }
+  state.made += 1;
+  const turn = state.made;
+  state.waiting.add(turn);
   shown.set(next);
+  const newerWaits = () => [...state.waiting].some((other) => other > turn);
   try {
-    shown.set(await call());
+    const answer = await call();
+    state.waiting.delete(turn);
+    if (turn > state.answeredBy) {
+      state.answered = answer;
+      state.answeredBy = turn;
+    }
+    if (!newerWaits()) {
+      shown.set(state.answered as T);
+    }
     return true;
   } catch (error) {
-    shown.set(before);
+    state.waiting.delete(turn);
+    if (!newerWaits()) {
+      shown.set(state.answered as T);
+    }
     failed(error);
     return false;
   }
