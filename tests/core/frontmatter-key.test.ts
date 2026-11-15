@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { withFrontmatterKey } from "../../src/core/frontmatter-key.ts";
+import { withFrontmatterKey, withoutFrontmatterKey } from "../../src/core/frontmatter-key.ts";
 import { parseScript } from "../../src/core/parse.ts";
 
 const ID = "d_0123456789ab";
@@ -48,6 +48,33 @@ describe("withFrontmatterKey", () => {
   test("writes a script that parses with the key", () => {
     const written = withFrontmatterKey("---\ntitle: Talk\n---\n\n## intro\n\nhello\n", "pub", ID);
     expect(parseScript(written).pub).toBe(ID);
+  });
+});
+
+describe("withoutFrontmatterKey", () => {
+  test("takes the key out, with the lines that continue its value, and leaves the rest", () => {
+    const source = `---\ntitle: Talk\npub:\n  ${ID}\nlang: en\n---\n\n## intro\n`;
+    expect(withoutFrontmatterKey(source, "pub")).toBe(
+      "---\ntitle: Talk\nlang: en\n---\n\n## intro\n",
+    );
+  });
+
+  test("takes out only the top-level key, and keeps CRLF and a byte order mark", () => {
+    const source = `\uFEFF---\r\ntitle: Talk\r\npublic: yes\r\n  pub: nested\r\npub: ${ID}\r\n---\r\nbody`;
+    expect(withoutFrontmatterKey(source, "pub")).toBe(
+      "\uFEFF---\r\ntitle: Talk\r\npublic: yes\r\n  pub: nested\r\n---\r\nbody",
+    );
+  });
+
+  test("leaves a script without the key, or without frontmatter, as it was", () => {
+    for (const source of ["---\ntitle: Talk\n---\nbody\n", "## intro\n", ""]) {
+      expect(withoutFrontmatterKey(source, "pub")).toBe(source);
+    }
+  });
+
+  test("undoes withFrontmatterKey", () => {
+    const source = "---\ntitle: Talk\n---\n\n## intro\n\nhello\n";
+    expect(withoutFrontmatterKey(withFrontmatterKey(source, "pub", ID), "pub")).toBe(source);
   });
 });
 

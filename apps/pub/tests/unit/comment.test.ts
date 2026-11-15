@@ -354,6 +354,7 @@ describe("notices", () => {
     ownerId: "u1",
     visibility: "private" as const,
     comments: "signed-in" as const,
+    linkKey: null,
   };
   const shared = { scope: "shared" as const };
   const team = { scope: "team" as const };

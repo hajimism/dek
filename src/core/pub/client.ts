@@ -79,6 +79,8 @@ export type PubCall = {
   form?: FormData;
   /** The API key, sent as x-api-key, and where it came from, for the hint when it is refused. */
   key?: Key;
+  /** The hint for a 404, when the call knows better than the one about a project's `pub:`. */
+  notFound?: string;
   /** The device flow's access token, sent as a Bearer token. */
   bearer?: string;
   timeoutMs?: number;
@@ -183,8 +185,14 @@ export function failure(status: number, body: unknown, origin: string, call: Pub
   });
 }
 
-/** The hint dek gives whatever the server says: for a key from DEK_TOKEN, and for a size. */
+/**
+ * The hint dek gives whatever the server says: for a key from DEK_TOKEN, for a size, and for a 404
+ * the call has its own hint for.
+ */
 function ownHint(status: number, call: PubCall): string | undefined {
+  if (status === 404 && call.notFound !== undefined) {
+    return call.notFound;
+  }
   if (status === 401 && call.key?.source === "env") {
     return "the server does not take the key in DEK_TOKEN: replace it with a key that works, or unset DEK_TOKEN to use the one `dekc pub login` keeps";
   }
@@ -202,7 +210,7 @@ function statusHint(status: number): string {
     return "the account signed in may not do this; `dekc pub whoami` says which it is";
   }
   if (status === 404) {
-    return "check `pub:` in script.md, and that `dekc pub whoami` names the deck's owner";
+    return "check `pub:` in script.md, and that `dekc pub whoami` names the deck's owner; a deck deleted from dek.pub is gone, so take pub: out of script.md to publish it as a new one";
   }
   return status >= 500 ? "dek.pub failed to answer; run the command again in a while" : SERVER_HINT;
 }

@@ -3,7 +3,7 @@ import { chmodSync, existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { deckSlug } from "../../src/cli/pub.ts";
 import { DEFAULT_SERVER, serverOrigin } from "../../src/core/pub/client.ts";
-import { awaitLogin, startLogin } from "../../src/core/pub/login.ts";
+import { awaitLogin, hostLabel, startLogin } from "../../src/core/pub/login.ts";
 import { locateQuote } from "../../src/core/pub/quote.ts";
 import { forgetKey, readKey, storeKey } from "../../src/core/pub/store.ts";
 import { deckSource, requireUploadable } from "../../src/core/pub/version.ts";
@@ -12,6 +12,16 @@ import { answerOf, CommentList, paths } from "../../src/pub/protocol.ts";
 import { withFakePub } from "../helpers/fake-pub.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
+
+describe("hostLabel", () => {
+  test("names a machine by its host name's first label, and by nothing past it", () => {
+    expect(hostLabel("hajime-mbp.local")).toBe("hajime-mbp");
+    expect(hostLabel("runner-7.corp.example.com")).toBe("runner-7");
+    expect(hostLabel("box")).toBe("box");
+    expect(hostLabel("")).toBeUndefined();
+    expect(hostLabel(".local")).toBeUndefined();
+  });
+});
 
 describe("serverOrigin", () => {
   test("takes --server, then DEK_PUB_SERVER, then dek.pub, as an origin", () => {

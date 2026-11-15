@@ -84,7 +84,7 @@
       <span class="badge"><Icon name="x" size={24} /></span>
       <h1 id="device-title">{t("device.denied")}</h1>
       <p class="sub">{t("device.deniedHint")}</p>
-    {:else if step === "confirm" && shared.viewer}
+    {:else if step === "confirm" && shared.viewer?.handle}
       <span class="badge term"><Icon name="terminal" size={22} /></span>
       <h1 id="device-title">{t("device.confirm", { handle: shared.viewer.handle })}</h1>
       <div class="who">

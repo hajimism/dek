@@ -1,12 +1,15 @@
 // The CLI's API key. `dekc pub login` ends the device flow with a session token and trades it
-// for a key that lasts; `dekc pub logout` revokes the key it holds.
+// for a key that lasts, named after the machine it sends; `dekc pub logout` revokes the key it
+// holds.
 
 import type { Context } from "hono";
-import { API_KEY_HEADER, type CliKey } from "../../../../../../../src/pub/protocol.ts";
+import { API_KEY_HEADER, type CliKey, NewCliKey } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../../common/api-error.ts";
+import { jsonBody } from "../../../../common/http.server.ts";
 import { authOf } from "../../../../common/void-auth.server.ts";
 import { requirePerson } from "../../actor.server.ts";
-import { checkKey, makeKey, revokeKey } from "../../api-key.server.ts";
+import { checkKey, makeKey, revokeKeyOf } from "../../api-key.server.ts";
+import { keyName } from "../../api-key.ts";
 import { meOf } from "../../person.ts";
 
 export async function tradeSessionForKey(c: Context): Promise<CliKey> {
@@ -19,8 +22,11 @@ export async function tradeSessionForKey(c: Context): Promise<CliKey> {
     );
   }
   const person = await requirePerson(c);
-  const agent = c.req.header("user-agent") ?? "dekc";
-  const key = await makeKey(c, person.id, `dekc (${agent.slice(0, 60)})`);
+  // An older dekc, and a script, send no body; the key is then called dekc.
+  const sent = c.req.header("content-type")?.startsWith("application/json")
+    ? await jsonBody(c, NewCliKey)
+    : {};
+  const key = await makeKey(c, person.id, keyName(sent.name));
   // The device flow's session existed only to be traded for the key; it ends here.
   const session = c.get("session") as { token?: string } | null;
   if (session?.token && c.req.header("authorization")?.startsWith("Bearer ")) {
@@ -37,8 +43,5 @@ export async function revokeCallersKey(c: Context): Promise<{ revoked: boolean }
     throw new ApiError(401, "signed_out", "send the key to revoke");
   }
   const checked = await checkKey(c, key);
-  if (checked) {
-    await revokeKey(c, checked.id);
-  }
-  return { revoked: checked !== null };
+  return { revoked: checked !== null && (await revokeKeyOf(c, checked.userId, checked.id)) };
 }

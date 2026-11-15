@@ -935,15 +935,18 @@ export const COMMANDS = {
         "dekc pub login [--server <url>]",
         "sign in through the browser; --json prints the code, then waits",
       ],
-      ["dekc pub logout", "revoke the key and forget it"],
+      [
+        "dekc pub logout [--all]",
+        "revoke the key and forget it; --all revokes every key of the account",
+      ],
       ["dekc pub whoami", "who the key signs in as"],
       [
         "dekc pub publish [deck] [--message <text>] [--slug <slug>]",
         "lint, build, and upload the version readers see; writes pub: on the first",
       ],
       [
-        "dekc pub share [deck] --visibility|--script|--embed|--comments <value>",
-        "who may open the deck, read its script, embed it, and comment",
+        "dekc pub share [deck] --visibility|--script|--embed|--comments <value> | --new-link",
+        "who may open the deck, read its script, embed it, and comment; a new link URL",
       ],
       ["dekc pub status [deck]", "the deck's settings, its version, and whether it is up to date"],
       ["dekc pub open [deck]", "open the deck on dek.pub"],
@@ -957,14 +960,21 @@ export const COMMANDS = {
         "dekc pub grants add <who> [--role view|comment] [--side team|guest]",
         "share it with a handle or an address; remove <who> stops",
       ],
+      ["dekc pub delete [deck] --yes", "delete the talk for good, and take pub: out of script.md"],
+      [
+        "dekc pub takedown <talk> --yes",
+        "delete a talk named by its URL or deck ID, as an operator",
+      ],
     ],
     agent: [
       "dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait",
-      "dekc pub whoami | logout",
+      "dekc pub whoami | logout [--all]   --all revokes every key of the account, DEK_TOKEN's too, as after a leak",
       "dekc pub publish [--message <text>] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:",
-      "dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in",
+      "dekc pub share --visibility team|private|link|public --script shown|hidden --embed on|off --comments off|signed-in --new-link   a link deck's url carries ?key=; --new-link replaces it",
       "dekc pub status | open | comments [--status open|resolved|all] | comments reply <id> <text> | comments resolve|reopen <id>",
       "dekc pub grants | grants add <@handle|email> [--role view|comment] [--side team|guest] | grants remove <@handle|email|id>   only a new grant is mailed",
+      "dekc pub delete --yes   deletes the talk and all on it for good, takes pub: out of script.md; commit it",
+      "dekc pub takedown <talk-url|deck-id> --yes   an operator deletes anyone's talk, from any directory",
     ],
     run: async ({ cwd }) => {
       const { usageError } = await import("./usage.ts");
@@ -991,8 +1001,8 @@ export const COMMANDS = {
       },
       logout: {
         args: [],
-        flags: ["server"],
-        usage: ["dekc pub logout [--server <url>]"],
+        flags: ["server", "all"],
+        usage: ["dekc pub logout [--all] [--server <url>]"],
         run: async ({ flags }) => {
           const { logoutCommand } = await import("./pub.ts");
           return logoutCommand(flags);
@@ -1020,9 +1030,9 @@ export const COMMANDS = {
       share: {
         scope: "deck",
         args: [],
-        flags: ["server", "visibility", "script", "embed", "comments"],
+        flags: ["server", "visibility", "script", "embed", "comments", "new-link"],
         usage: [
-          "dekc pub share [deck] [--visibility team|private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in] [--server <url>]",
+          "dekc pub share [deck] [--visibility team|private|link|public] [--script shown|hidden] [--embed on|off] [--comments off|signed-in] [--new-link] [--server <url>]",
         ],
         run: async ({ flags, target }) => {
           const { shareCommand } = await import("./pub.ts");
@@ -1109,6 +1119,25 @@ export const COMMANDS = {
         run: async ({ flags, target, args }) => {
           const { grantRemoveCommand } = await import("./pub.ts");
           return grantRemoveCommand(target, args.who, flags);
+        },
+      },
+      delete: {
+        scope: "deck",
+        args: [],
+        flags: ["server", "yes"],
+        usage: ["dekc pub delete [deck] --yes [--server <url>]"],
+        run: async ({ flags, target }) => {
+          const { deleteCommand } = await import("./pub.ts");
+          return deleteCommand(target, flags);
+        },
+      },
+      takedown: {
+        args: ["talk"],
+        flags: ["server", "yes"],
+        usage: ["dekc pub takedown <talk> --yes [--server <url>]"],
+        run: async ({ flags, args }) => {
+          const { takedownCommand } = await import("./pub.ts");
+          return takedownCommand(args.talk, flags);
         },
       },
       "comments reopen": {

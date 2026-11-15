@@ -231,6 +231,13 @@ const PUB_FIELDS = z.union([
     revoked: z.boolean().describe("The server took the key back."),
     forgotten: z.boolean().describe("dek held a key for the server and no longer does."),
     reason: z.string().optional().describe("Why the key was not revoked, when it was not."),
+    revokedKeys: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        "Set with --all: how many keys of the account the server revoked, the one sent included.",
+      ),
   }),
   z.strictObject({
     action: z.literal("whoami"),
@@ -293,6 +300,21 @@ const PUB_FIELDS = z.union([
     action: z.literal("revoke"),
     server,
     grant: Grant.describe("The grant removed."),
+  }),
+  z.strictObject({
+    action: z.literal("delete"),
+    server,
+    id: DeckId.describe("The deck deleted, with every version, comment, like, and grant on it."),
+    owner: z.string().describe("The owner's handle."),
+    slug: z.string().describe("The slug, free to publish at again."),
+    changed: paths.describe("script.md, with pub: taken out, to commit."),
+  }),
+  z.strictObject({
+    action: z.literal("takedown"),
+    server,
+    id: DeckId.describe("The deck deleted, with every version, comment, like, and grant on it."),
+    owner: z.string().describe("The owner's handle."),
+    slug: z.string().describe("The slug, free for its owner to publish at again."),
   }),
   z.strictObject({ action: z.literal("comments"), server, comments: z.array(PubComment) }),
   z.strictObject({ action: z.literal("reply"), server, comment: z.string(), reply: Reply }),

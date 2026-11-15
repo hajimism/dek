@@ -9,6 +9,7 @@ import {
   type Grant,
   MAX_VERSION_BYTES,
   type Me,
+  NewCliKey,
   NewGrant,
   NewReply,
   PROTOCOL_HEADER,
@@ -116,7 +117,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
         latest: deck.current ?? null,
         grants: [],
       };
-      made.url = `${fake.url}/@${ME.handle}/${made.slug}`;
+      made.url = `${fake.url}/@${made.owner}/${made.slug}`;
       fake.decks.set(made.id, made);
       return made;
     },
@@ -219,6 +220,9 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if (!tokens.has(token)) {
         return error(401, "unauthorized", "no session");
       }
+      if (!NewCliKey.safeParse(body ?? {}).success) {
+        return error(422, "invalid", "not a NewCliKey");
+      }
       return Response.json({ key: fake.issueKey(), me: fake.me });
     }
     // As the server does: revoking needs a key sent, not a valid one.
@@ -227,6 +231,12 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     }
     if (!signedIn(request)) {
       return error(401, "signed_out", "the key is not valid", "run `dekc pub login`");
+    }
+    // Every key the fake holds is the one account's.
+    if (method === "DELETE" && path === "/api/me/keys") {
+      const revoked = fake.keys.size;
+      fake.keys.clear();
+      return Response.json({ revoked });
     }
     if (method === "GET" && path === "/api/me") {
       return Response.json(fake.me);
@@ -246,6 +256,15 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       }
       return Response.json(status(fake.addDeck(parsed.data)), { status: 201 });
     }
+    const talk = path.match(/^\/api\/people\/([^/]+)\/talks\/([^/]+)$/);
+    if (method === "GET" && talk) {
+      const found = [...fake.decks.values()].find(
+        (deck) => deck.owner === talk[1] && deck.slug === talk[2],
+      );
+      return found
+        ? Response.json({ id: found.id, owner: found.owner, slug: found.slug })
+        : error(404, "not_found", "no such deck");
+    }
     const match = path.match(/^\/api\/decks\/([^/]+)(\/.*)?$/);
     const deck = match ? fake.decks.get(match[1] ?? "") : undefined;
     if (!match || !deck) {
@@ -255,12 +274,20 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     if (method === "GET" && rest === "") {
       return Response.json(status(deck));
     }
+    if (method === "DELETE" && rest === "") {
+      fake.decks.delete(deck.id);
+      return Response.json({ deleted: true, id: deck.id, owner: deck.owner, slug: deck.slug });
+    }
     if (method === "PATCH" && rest === "") {
       const parsed = ShareRequest.safeParse(body);
       if (!parsed.success) {
         return error(422, "invalid", parsed.error.message);
       }
-      Object.assign(deck, parsed.data);
+      const { newLink, ...settings } = parsed.data;
+      Object.assign(deck, settings);
+      if (newLink) {
+        deck.url = `${fake.url}/@${deck.owner}/${deck.slug}?key=${id("")}`;
+      }
       return Response.json(status(deck));
     }
     if (method === "POST" && rest === "/versions") {

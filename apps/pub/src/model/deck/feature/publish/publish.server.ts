@@ -12,7 +12,8 @@ import {
 } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../../common/api-error.ts";
 import { afterAnswer } from "../../../../common/http.server.ts";
-import { deckById, talkUrl } from "../../store.server.ts";
+import { log } from "../../../../common/log.ts";
+import { deckById, shareUrl } from "../../store.server.ts";
 import type { Deck } from "../../type.ts";
 import {
   claimVersion,
@@ -107,7 +108,9 @@ export async function publish(c: Context, deck: Deck): Promise<PublishResult> {
     // A version recorded stays, even if writing the access file after it failed. The files of
     // one not recorded go, as far as they can; its number is skipped.
     if (!(await findVersion(deck.id, n))) {
-      await deleteVersionFiles(deck.id, n).catch((cleanup: unknown) => console.error(cleanup));
+      await deleteVersionFiles(deck.id, n).catch((cleanup: unknown) =>
+        log("error", "the files of a version not recorded were not deleted", cleanup),
+      );
     }
     throw error;
   }
@@ -120,7 +123,7 @@ export async function publish(c: Context, deck: Deck): Promise<PublishResult> {
     id: deck.id,
     n,
     current: updated.currentVersion,
-    url: await talkUrl(c, updated),
+    url: await shareUrl(c, updated),
     visibility: updated.visibility,
   };
 }

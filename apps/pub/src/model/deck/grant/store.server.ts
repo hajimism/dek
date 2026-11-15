@@ -3,17 +3,26 @@
 // That happens when the account signs in, or when the grant is made to an address an account has
 // verified already; reading a deck never writes (ADR 73).
 
-import { grants } from "@schema";
+import { decks, grants, invitations } from "@schema";
 import type { Context } from "hono";
-import { and, asc, db, eq, isNull, notInArray, or } from "void/db";
+import { and, asc, db, eq, gt, isNull, lte, notInArray, or, sql } from "void/db";
 import { ApiError } from "../../../common/api-error.ts";
 import { newGrantId } from "../../../common/ids.ts";
-import { peopleById, personByEmail, personByHandle } from "../../person/store.server.ts";
-import type { Person } from "../../person/type.ts";
+import { accountByEmail, peopleById, personByHandle } from "../../person/store.server.ts";
+import type { Account } from "../../person/type.ts";
+import {
+  INVITATIONS_PER_WINDOW,
+  invitationsFreeAt,
+  invitationWindowStart,
+  utcMinute,
+} from "./grant.ts";
 import type { Grantee, GrantRole, GrantRow, GrantSide, GrantView } from "./type.ts";
 
 /** The grants that name `person` on a deck: by account, or by an address they have verified. */
-export async function grantsOf(deckId: string, person: Person | null): Promise<GrantRow[]> {
+export async function grantsOf(
+  deckId: string,
+  person: Pick<Account, "id" | "email" | "emailVerified"> | null,
+): Promise<GrantRow[]> {
   if (!person) {
     return [];
   }
@@ -34,7 +43,10 @@ export async function grantsOf(deckId: string, person: Person | null): Promise<G
  * handle keeps that one tied, as one account can hold only one: the grant by address beside it
  * keeps waiting, and still counts while the address is theirs.
  */
-export async function claimGrants(person: Person, deckId?: string): Promise<void> {
+export async function claimGrants(
+  person: Pick<Account, "id" | "email" | "emailVerified">,
+  deckId?: string,
+): Promise<void> {
   if (!person.emailVerified) {
     return;
   }
@@ -55,7 +67,10 @@ export async function claimGrants(person: Person, deckId?: string): Promise<void
     );
 }
 
-/** The people a deck is shared with, oldest grant first. */
+/**
+ * The people a deck is shared with, oldest grant first: by handle, or by the address a grant
+ * waits on, or was claimed by an account that has no handle yet.
+ */
 export async function grantList(c: Context, deckId: string): Promise<GrantView[]> {
   const rows = await db
     .select()
@@ -69,7 +84,7 @@ export async function grantList(c: Context, deckId: string): Promise<GrantView[]
   );
   return rows.map((row) => ({
     id: row.id,
-    who: row.userId ? (people.get(row.userId)?.handle ?? row.userId) : (row.email ?? ""),
+    who: (row.userId ? people.get(row.userId)?.handle : undefined) ?? row.email ?? row.userId ?? "",
     role: row.role,
     side: row.side,
     createdAt: row.createdAt,
@@ -86,7 +101,8 @@ export type Invite = { to: string; byEmail: boolean };
 /**
  * Share a deck with one person, or change what an earlier share allows them. A new share lets them
  * view, on the guests' side, unless `role` or `side` says otherwise; an earlier one keeps what
- * they leave out.
+ * they leave out. A new share takes one of the owner's invitations first, and is not made when
+ * none is left.
  */
 export async function share(
   c: Context,
@@ -121,6 +137,9 @@ export async function share(
     target.userId ? eq(grants.userId, target.userId) : eq(grants.email, target.email ?? ""),
   );
   const before = await db.select({ id: grants.id }).from(grants).where(match).get();
+  if (!before) {
+    await takeInvitation(deck.ownerId);
+  }
   const id = newGrantId();
   const change = { ...(role ? { role } : {}), ...(side ? { side } : {}) };
   const insert = db
@@ -132,7 +151,7 @@ export async function share(
         target: target.userId ? [grants.deckId, grants.userId] : [grants.deckId, grants.email],
         set: change,
       }));
-  const holder = "email" in grantee ? await personByEmail(c, grantee.email) : null;
+  const holder = "email" in grantee ? await accountByEmail(c, grantee.email) : null;
   if (holder && holder.id !== deck.ownerId) {
     await claimGrants(holder, deck.id);
   }
@@ -150,7 +169,7 @@ export async function share(
   return {
     grant: {
       id: row?.id ?? id,
-      who: holder && row?.userId === holder.id ? holder.handle : granteeName(grantee),
+      who: (holder && row?.userId === holder.id ? holder.handle : null) ?? granteeName(grantee),
       role: row?.role ?? role ?? "view",
       side: row?.side ?? side ?? "guest",
       createdAt: row?.createdAt ?? "",
@@ -159,11 +178,56 @@ export async function share(
   };
 }
 
-/** Whether a grant on any deck waits for `email`, as one that may sign in by a link. */
+/**
+ * Count one invitation against `inviterId`, or refuse with a 429 that says when the next may go.
+ * The count and the row are one statement, so requests that come at once, to any isolate, cannot
+ * pass the limit together; rows that have left the window are deleted on the way.
+ */
+async function takeInvitation(inviterId: string): Promise<void> {
+  const now = new Date();
+  const since = invitationWindowStart(now);
+  const [, taken] = await db.batch([
+    db
+      .delete(invitations)
+      .where(and(eq(invitations.inviterId, inviterId), lte(invitations.createdAt, since))),
+    db
+      .insert(invitations)
+      .select(
+        sql`select ${inviterId}, ${now.toISOString()} where (select count(*) from ${invitations} where ${invitations.inviterId} = ${inviterId} and ${invitations.createdAt} > ${since}) < ${INVITATIONS_PER_WINDOW}`,
+      )
+      .returning({ inviterId: invitations.inviterId }),
+  ]);
+  if (taken.length > 0) {
+    return;
+  }
+  const sent = await db
+    .select({ at: invitations.createdAt })
+    .from(invitations)
+    .where(and(eq(invitations.inviterId, inviterId), gt(invitations.createdAt, since)));
+  // Null only when invitations left the window since the count; one may go now, then.
+  const next =
+    invitationsFreeAt(
+      sent.map((row) => row.at),
+      now,
+    ) ?? now;
+  throw new ApiError(
+    429,
+    "invitations_exhausted",
+    `your shares mailed ${INVITATIONS_PER_WINDOW} invitations in the last 24 hours, as many as dek.pub sends for one person`,
+    `share with someone new after ${utcMinute(next)}; a change to a share mails nothing and can be made now`,
+  );
+}
+
+/**
+ * Whether a grant on any deck waits for `email`, as one that may sign in by a link. Only a deck
+ * that is there counts: a grant made while its deck was being deleted can outlive it (ADR 82), and
+ * would otherwise let its address make an account.
+ */
 export async function hasWaitingGrant(email: string): Promise<boolean> {
   const row = await db
     .select({ id: grants.id })
     .from(grants)
+    .innerJoin(decks, eq(decks.id, grants.deckId))
     .where(and(eq(grants.email, email.toLowerCase()), isNull(grants.userId)))
     .get();
   return row !== undefined;

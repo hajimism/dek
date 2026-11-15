@@ -12,7 +12,7 @@
   import Switch from "../../../../../common/ui/switch.svelte";
   import { toast } from "../../../../../common/ui/toast.svelte.ts";
   import { useApp } from "../../../../../shell/use-app.ts";
-  import { talkPath } from "../../../deck.ts";
+  import { profilePath } from "../../../../person/profile-path.ts";
   import type { GrantView } from "../../../grant/type.ts";
   import VisibilityBadge from "../../../ui/visibility-badge.svelte";
   import type { CurrentVersion } from "../type.ts";
@@ -23,15 +23,31 @@
     status: initial,
     grants,
     version,
-  }: { status: DeckStatus; grants: GrantView[]; version: CurrentVersion | null } = $props();
+    ondeleted = (profile: string) => window.location.assign(profile),
+  }: {
+    status: DeckStatus;
+    grants: GrantView[];
+    version: CurrentVersion | null;
+    /** Where the page goes once the talk is deleted: the owner's profile. */
+    ondeleted?: (profile: string) => void;
+  } = $props();
 
   const { lang, t } = useApp();
   let status: DeckStatus = $state(untrack(() => initial));
   let saving: keyof ShareRequest | null = $state(null);
   let confirmPublic = $state(false);
+  let confirmNewLink = $state(false);
+  let confirmDelete = $state(false);
+  let deleting = $state(false);
+  /** The slug as typed in the dialog that deletes the talk, which opens only once they match. */
+  let typedSlug = $state("");
   let visibilityControl: ReturnType<typeof RadioList> | undefined = $state();
   let active = $state("overview");
-  const path = $derived(talkPath(status.owner, status.slug));
+  /** The talk as it is shared: a `link` one's path carries its key, so its address can be passed on. */
+  const path = $derived.by(() => {
+    const url = new URL(status.url);
+    return url.pathname + url.search;
+  });
 
   const sections = [
     { id: "overview", label: "manage.overview" },
@@ -40,6 +56,7 @@
     { id: "comments", label: "manage.comments" },
     { id: "sharing", label: "manage.sharing" },
     { id: "version", label: "manage.version" },
+    { id: "delete", label: "manage.delete" },
   ] as const;
 
   const visibilityIcons = { team: "lock", private: "users", link: "link", public: "globe" } as const;
@@ -83,9 +100,12 @@
     return t("common.error", { message: "" });
   }
 
-  async function save(change: ShareRequest, undoable = true) {
-    const key = Object.keys(change)[0] as keyof ShareRequest;
-    const before: ShareRequest = { [key]: status[key] } as ShareRequest;
+  /** A setting the page saves and can undo: any change but a new link. */
+  type Setting = Omit<ShareRequest, "newLink">;
+
+  async function save(change: Setting, undoable = true) {
+    const key = Object.keys(change)[0] as keyof Setting;
+    const before: Setting = { [key]: status[key] } as Setting;
     const previous = $state.snapshot(status);
     status = { ...status, ...change } as DeckStatus;
     saving = key;
@@ -97,6 +117,31 @@
       toast(message(error), { tone: "error" });
     } finally {
       saving = null;
+    }
+  }
+
+  /** Replace the link's key: the URL given out before opens no more, so there is nothing to undo. */
+  async function newLink() {
+    saving = "newLink";
+    try {
+      status = await api<DeckStatus>(`/api/decks/${status.id}`, { method: "PATCH", body: { newLink: true } });
+      toast(t("manage.sharing.newLinkDone"));
+    } catch (error) {
+      toast(message(error), { tone: "error" });
+    } finally {
+      saving = null;
+    }
+  }
+
+  /** Delete the talk for good: there is nothing to undo, so the page leaves for the profile. */
+  async function deleteTalk() {
+    deleting = true;
+    try {
+      await api(`/api/decks/${status.id}`, { method: "DELETE" });
+      ondeleted(profilePath(status.owner));
+    } catch (error) {
+      deleting = false;
+      toast(message(error), { tone: "error" });
     }
   }
 
@@ -192,7 +237,10 @@
         {#if status.visibility === "link"}
           <div class="anyone">
             <Icon name="link" size={14} />
-            <span>{t("manage.sharing.anyone")}</span>
+            <span class="anyone-text">{t("manage.sharing.anyone")}</span>
+            <Button variant="secondary" size="sm" disabled={saving === "newLink"} onclick={() => (confirmNewLink = true)}
+              >{t("manage.sharing.newLink")}</Button
+            >
           </div>
         {/if}
         <Sharing deckId={status.id} initial={grants} />
@@ -202,6 +250,14 @@
         <h2 id="version-title">{t("manage.version")}</h2>
         <p class="hint">{t("manage.version.hint")}</p>
         <Version {version} />
+      </section>
+
+      <section id="delete" class="section" aria-labelledby="delete-title">
+        <h2 id="delete-title">{t("manage.delete")}</h2>
+        <p class="hint">{t("manage.delete.hint")}</p>
+        <div>
+          <Button variant="danger-quiet" icon="trash" onclick={() => (confirmDelete = true)}>{t("manage.delete.open")}</Button>
+        </div>
       </section>
     </div>
   </div>
@@ -225,6 +281,48 @@
         confirmPublic = false;
         save({ visibility: "public" });
       }}>{t("visibility.confirm")}</Button
+    >
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={confirmNewLink} title={t("manage.sharing.newLinkTitle")}>
+  <p>{t("manage.sharing.newLinkBody")}</p>
+  {#snippet actions()}
+    <Button variant="secondary" autofocus onclick={() => (confirmNewLink = false)}>{t("common.cancel")}</Button>
+    <Button
+      variant="primary"
+      onclick={() => {
+        confirmNewLink = false;
+        newLink();
+      }}>{t("manage.sharing.newLinkConfirm")}</Button
+    >
+  {/snippet}
+</Dialog>
+
+<Dialog
+  bind:open={confirmDelete}
+  title={t("manage.delete.title", { title: status.title })}
+  onclose={() => {
+    confirmDelete = false;
+    typedSlug = "";
+  }}
+>
+  <p>{t("manage.delete.body")}</p>
+  <label class="confirm-label" for="delete-slug">{t("manage.delete.type", { slug: status.slug })}</label>
+  <!-- svelte-ignore a11y_autofocus -->
+  <input
+    id="delete-slug"
+    class="confirm-input"
+    bind:value={typedSlug}
+    autocomplete="off"
+    autocapitalize="off"
+    spellcheck="false"
+    autofocus
+  />
+  {#snippet actions()}
+    <Button variant="secondary" onclick={() => (confirmDelete = false)}>{t("common.cancel")}</Button>
+    <Button variant="danger" icon="trash" disabled={typedSlug !== status.slug || deleting} onclick={deleteTalk}
+      >{t("manage.delete.confirm")}</Button
     >
   {/snippet}
 </Dialog>
@@ -389,5 +487,30 @@
     color: var(--accent);
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
+  }
+  .anyone-text {
+    flex: 1;
+  }
+  .confirm-label {
+    display: block;
+    margin-top: var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+  }
+  .confirm-input {
+    width: 100%;
+    height: 40px;
+    margin-top: var(--space-2);
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+  }
+  .confirm-input:focus-visible {
+    border-color: var(--accent);
+    outline-offset: 0;
   }
 </style>

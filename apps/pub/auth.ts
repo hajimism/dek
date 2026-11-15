@@ -1,17 +1,28 @@
 // dek.pub's Better Auth setup, on top of Void's defaults. On the deployed app one signs in with
-// GitHub, or by a link mailed to an address that has an account or a share waiting for it; email
-// sign-up with a password exists only where DEK_PUB_DEV_LOGIN is 1, for local runs and tests.
-// The device flow lets `dekc pub login` sign in, and the CLI then holds an API key.
+// GitHub, or by a link mailed to an address that has an account or may make one; email sign-up
+// with a password exists only where DEK_PUB_DEV_LOGIN is 1, for local runs and tests. An account
+// is made only for someone an operator invited, an operator, or someone a deck is shared with
+// (ADR 79, 85).
+// The device flow lets `dekc pub login` sign in, and the CLI then holds an API key. A new account
+// has no handle until its holder chooses one.
 
 import { apiKey } from "@better-auth/api-key";
+import { APIError } from "better-auth/api";
 import { bearer, deviceAuthorization, magicLink } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
 import { CLI_CLIENT_ID } from "../../src/pub/protocol.ts";
+import { log } from "./src/common/log.ts";
 import { API_KEY_PREFIX } from "./src/model/person/api-key.ts";
-import { claimOnSignIn } from "./src/model/person/feature/sign-in/claim.server.ts";
+import {
+  claimInvitesOnSignUp,
+  claimOnSignIn,
+} from "./src/model/person/feature/sign-in/claim.server.ts";
+import { NOT_INVITED } from "./src/model/person/feature/sign-in/failure.ts";
+import { mayMakeAccount } from "./src/model/person/feature/sign-in/invitation.server.ts";
 import { sendSignInLink } from "./src/model/person/feature/sign-in/link.server.ts";
 import { SIGN_IN_LINK_SECONDS } from "./src/model/person/feature/sign-in/mail.ts";
-import { handleFromEmail, normalizeHandle } from "./src/model/person/handle.ts";
+import { readNewcomer } from "./src/model/person/invited.ts";
+import { seedLinks } from "./src/model/person/link.server.ts";
 
 // The Worker's waitUntil, which keeps it running for mail sent after the answer. Imported lazily:
 // `void db generate` reads this file in Node, which has no such module.
@@ -23,16 +34,67 @@ import("cloudflare:workers").then(
   () => undefined,
 );
 
+// Better Auth answers over HTTP only what dek.pub's pages, `dekc pub` and the dev login call:
+// signing in and out, the device flow, and its own error page. Every other endpoint is closed
+// here, as it would otherwise write past dek.pub's own API and its rules (ADR 78). The server
+// still calls some of them through `auth.api`, which these paths do not close.
+const CLOSED_PATHS = [
+  // The account: its name and image go through PATCH /api/me, which reads them first; its address,
+  // password and joined accounts no page changes, and deleting it must delete dek.pub's rows too.
+  "/update-user",
+  "/update-session",
+  "/change-email",
+  "/change-password",
+  "/request-password-reset",
+  "/reset-password",
+  "/reset-password/:token",
+  "/verify-password",
+  "/send-verification-email",
+  "/verify-email",
+  "/delete-user",
+  "/delete-user/callback",
+  "/link-social",
+  "/unlink-account",
+  // The GitHub token, which dek.pub never uses after sign-in, and what it reads.
+  "/list-accounts",
+  "/get-access-token",
+  "/refresh-token",
+  "/account-info",
+  // Sessions, which no page lists or revokes.
+  "/list-sessions",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+  // API keys, which dek.pub makes for `dekc pub login` and checks on the server.
+  "/api-key/create",
+  "/api-key/get",
+  "/api-key/list",
+  "/api-key/update",
+  "/api-key/delete",
+  "/ok",
+];
+
 export default defineAuth(({ defaults, env }) => {
   const devLogin = env.DEK_PUB_DEV_LOGIN === "1";
   return {
     ...defaults,
     emailAndPassword: { enabled: devLogin },
+    disabledPaths: CLOSED_PATHS,
+    // Better Auth logs the errors its queries throw, which carry the values they were bound to.
+    logger: { log: (level, message, ...args) => log(level, `Better Auth: ${message}`, ...args) },
     // Mail goes out after the answer, so how long a request for a link takes says nothing of
-    // whether the address may have one.
+    // whether the address may have one. A task that fails is logged here, not left to the
+    // runtime, which would log its error whole.
     advanced: {
       ...defaults.advanced,
-      backgroundTasks: { handler: (task) => (keepAlive ? keepAlive(task) : undefined) },
+      backgroundTasks: {
+        handler: (task) => {
+          const settled = task.catch((error: unknown) =>
+            log("error", "Better Auth: a background task failed", error),
+          );
+          keepAlive?.(settled);
+        },
+      },
     },
     socialProviders: {
       ...defaults.socialProviders,
@@ -40,27 +102,69 @@ export default defineAuth(({ defaults, env }) => {
         ...defaults.socialProviders?.github,
         clientId: String(env.AUTH_GITHUB_CLIENT_ID),
         clientSecret: String(env.AUTH_GITHUB_CLIENT_SECRET),
-        mapProfileToUser: (profile: { login: string }) => ({
-          handle: normalizeHandle(profile.login),
-        }),
+        // The login is kept as GitHub spells it, for the profile's first link and to suggest a handle;
+        // the handle itself the person chooses after (ADR 77). Better Auth maps the profile only
+        // when it makes the account, so a login GitHub renames later stays as it was.
+        mapProfileToUser: (profile: { login: string }) => ({ githubLogin: profile.login }),
       },
     },
     user: {
+      // Every way of making an account passes here first, and GitHub's carries the profile, login
+      // and all. An account whose login is not its profile's is refused like one not invited, so
+      // a sign-up's body cannot name one (ADR 80). Signing in, and joining GitHub to an account,
+      // are never refused. Better Auth sends a browser back with `?error=not_invited`.
+      validateUserInfo: async (data) => {
+        if (data.source.action !== "create-user") {
+          return;
+        }
+        const newcomer = readNewcomer(data);
+        if (!newcomer || !(await mayMakeAccount(newcomer))) {
+          return { error: NOT_INVITED, errorDescription: "dek.pub is open by invitation for now" };
+        }
+      },
       additionalFields: {
+        // Null until the person chooses it on /welcome, which writes it once; no API of Better
+        // Auth's may set it.
         handle: { type: "string", required: false, unique: true, input: false },
+        // Taken as input, since Better Auth drops every other field `mapProfileToUser` gives; only
+        // GitHub's profile writes it, as `validateUserInfo` and `user.update.before` hold (ADR 80).
+        githubLogin: { type: "string", required: false, input: true },
       },
     },
     databaseHooks: {
       user: {
         create: {
           // An account a sign-in link makes has no name; it goes by its address's local part.
-          before: async (user: { email: string; name?: string; handle?: string | null }) => ({
-            data: {
-              ...user,
-              name: user.name || (user.email.split("@")[0] ?? user.email),
-              handle: user.handle ?? handleFromEmail(user.email),
-            },
+          before: async (user: { email: string; name?: string }) => ({
+            data: { ...user, name: user.name || (user.email.split("@")[0] ?? user.email) },
           }),
+          // One made with GitHub starts its profile's links with its GitHub profile (ADR 78), and
+          // the entries that let the account in are claimed (ADR 85). Better Auth runs this once
+          // the account is written and fails the sign-up with what it throws, and the next try is
+          // a sign-in: what could not be written is logged. The person adds a link on /settings;
+          // an entry left unclaimed lets in no one but the account it names, which has signed up.
+          after: async (user: unknown) => {
+            await Promise.all([
+              seedLinks(user).catch((error: unknown) =>
+                log("error", "the links a new account starts with were not written", error),
+              ),
+              claimInvitesOnSignUp(user).catch((error: unknown) =>
+                log("error", "the invitations a new account came in by were not claimed", error),
+              ),
+            ]);
+          },
+        },
+        update: {
+          // No update through Better Auth writes the GitHub login: update-user, which would take one
+          // from a request, answers none, and what the server updates through `auth.api` passes here.
+          before: async (user: Record<string, unknown>) => {
+            if (user.githubLogin !== undefined) {
+              throw new APIError("FORBIDDEN", {
+                code: "github_login_fixed",
+                message: "The GitHub login is GitHub's to give",
+              });
+            }
+          },
         },
       },
       session: {

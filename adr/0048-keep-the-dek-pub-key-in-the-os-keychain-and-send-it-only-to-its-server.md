@@ -6,6 +6,8 @@ Date: 2026-11-12
 
 Accepted
 
+Amended by [83. Let a dek.pub person list and revoke their CLI keys, and revoke them all with dekc pub logout --all](0083-let-a-dek-pub-person-list-and-revoke-their-cli-keys-and-revoke-them-all-with-dekc-pub-logout-all.md)
+
 ## Context
 
 `dekc pub` (ADR 47) is the second command that reaches the network, after `dekc ref`, and the first that holds a credential of its own: the API key dek.pub gives for a sign-in. That key can publish and change the user's decks, so where it is kept and where it is sent matter as much as for the GitHub token of ADR 12.

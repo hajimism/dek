@@ -5,7 +5,7 @@ import type { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { env } from "void/env";
 import { pickLang } from "../common/i18n.ts";
-import { sessionPerson } from "../model/person/actor.server.ts";
+import { sessionAccount } from "../model/person/actor.server.ts";
 import { selfOf } from "../model/person/person.ts";
 import { type Shared, Theme } from "./type.ts";
 
@@ -17,9 +17,9 @@ export function sharedOf(c: Context): Shared {
   if (asked === lang) {
     setCookie(c, "lang", lang, { path: "/", maxAge: YEAR, sameSite: "Lax" });
   }
-  const person = sessionPerson(c);
+  const account = sessionAccount(c);
   return {
-    viewer: person ? selfOf(person) : null,
+    viewer: account ? selfOf(account) : null,
     lang,
     theme: Theme.parse(getCookie(c, "theme")),
     devLogin: env.DEK_PUB_DEV_LOGIN === "1",

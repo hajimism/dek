@@ -2,12 +2,16 @@
 // An author signs in with the device flow, publishes a sample deck, shares it; a colleague
 // comments on a quoted sentence and on a slide element; the author reads the comments as JSON,
 // renames the slide with `dekc mv`, publishes again, and resolves every comment from the CLI.
+// It starts on an empty database, where an operator signs up first and invites the others from
+// /settings. At the end the author deletes the talk with all on it, and the operator takes one
+// down; the author lists and revokes their CLI keys, and `dekc pub logout --all` revokes the rest.
 // Run from apps/pub: `bun run test:e2e`.
 
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
-import { Browser, Inbox, startDevServer } from "./server.ts";
+import { translate } from "../../src/common/i18n.ts";
+import { addressOf, Browser, Inbox, startDevServer } from "./server.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..", "..");
 const CLI = join(REPO, "src", "cli.ts");
@@ -29,8 +33,22 @@ type Json = Record<string, unknown> & { ok: boolean };
 
 const work = mkdtempSync(join(tmpdir(), "dek-pub-e2e-project-"));
 const config = mkdtempSync(join(tmpdir(), "dek-pub-e2e-config-"));
-const server = await startDevServer(PORT);
+// dek.pub opens by invitation. Keeper runs the server, as an operator: named by address in
+// DEK_PUB_OPERATORS, which lets them sign up on the empty database, invite the people the run
+// signs up from /settings, and take any talk down. Anyone a deck is shared with gets in besides.
+// "Form" is invited for the development form to be refused. "Host" shares a deck with as many as
+// dek.pub mails invitations for, and one more.
+const INVITED = ["Author", "Stranger", "Reader", "Speaker", "Invitee", "Form", "Host"];
+const server = await startDevServer(PORT, [addressOf("Keeper")]);
 const inbox = new Inbox(server.url);
+
+type Invite = {
+  id: string;
+  entry: string;
+  addedBy: string | null;
+  claimedAt: string | null;
+  claimedBy: string | null;
+};
 
 async function dekc(
   args: string[],
@@ -70,14 +88,151 @@ try {
     filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
   });
 
+  // The operator signs up on the empty database by DEK_PUB_OPERATORS alone, and invites the people
+  // the run signs up from /settings. Each address is mailed an invitation to sign in; an entry
+  // dek.pub cannot read adds nothing, and one there already is mailed nothing again.
+  const keeper = new Browser(server.url);
+  const keeperMe = await keeper.signUp("Keeper");
+  const keeperSettings = await (await keeper.fetch("/settings")).text();
+  const keeperLang = /<html lang="ja"/.test(keeperSettings) ? "ja" : "en";
+  check(
+    keeperMe.handle === "keeper" &&
+      keeperSettings.includes(`>${translate(keeperLang, "settings.invites")}</h2>`),
+    "an operator signs up on an empty database, and /settings shows them who may sign up",
+    keeperMe,
+  );
+  const invitesAs = async (browser: Browser) => {
+    const response = await browser.fetch("/api/invites");
+    return response.ok ? ((await response.json()) as { invites: Invite[] }).invites : [];
+  };
+  const invite = (browser: Browser, entries: string[]) =>
+    browser.fetch("/api/invites", { method: "POST", json: { entries } });
+  const unreadable = await invite(keeper, [addressOf("Author"), "author"]);
+  check(
+    unreadable.status === 422 &&
+      ((await unreadable.json()) as { error: { code: string } }).error.code === "invite_invalid" &&
+      (await invitesAs(keeper)).length === 0,
+    "an entry that is neither an address nor @ and a login adds none of the list",
+  );
+  const inviting = await invite(
+    keeper,
+    INVITED.map((name) => addressOf(name).toUpperCase()),
+  );
+  const addedList = ((await inviting.json()) as { invites: Invite[] }).invites;
+  check(
+    inviting.status === 200 &&
+      INVITED.every((name) =>
+        addedList.some(
+          (row) =>
+            row.entry === addressOf(name) &&
+            row.addedBy === keeperMe.handle &&
+            row.claimedAt === null,
+        ),
+      ),
+    "the operator invites the run's people by address, kept in lowercase, none signed up yet",
+    addedList,
+  );
+  const inviteMail = (await inbox.waitFor(addressOf("Author"), "invited"))[0];
+  check(
+    inviteMail?.text.split(/\r?\n/).includes(`${server.url}/signin`) &&
+      inviteMail.text.includes(`sign in with this address, ${addressOf("Author")}`) &&
+      !inviteMail.text.includes(keeperMe.handle),
+    "each address invited is mailed the sign-in page, in words no operator wrote",
+    inviteMail,
+  );
+  await invite(keeper, [addressOf("Author")]);
+  const mailsBefore = (await inbox.to("")).length;
+  const byLogin = await invite(keeper, ["@Octo-E2E"]);
+  await Bun.sleep(1000);
+  check(
+    byLogin.ok &&
+      (await invitesAs(keeper)).some(
+        (row) => row.entry === "@octo-e2e" && row.claimedAt === null,
+      ) &&
+      (await inbox.to("")).length === mailsBefore &&
+      (await inbox.to(addressOf("Author"))).filter((mail) => mail.subject.includes("invited"))
+        .length === 1,
+    "a GitHub login is invited without a mail, and an address invited again is not mailed again",
+  );
+
   // The author signs in: the CLI asks for a code, the browser approves it, the CLI gets a key.
+  // A new account chooses its handle first, on the way to /device and back.
   const author = new Browser(server.url);
-  const me = await author.signUp("Author");
+  const registered = await author.register("Author");
   const pending = await dekc(["pub", "login"]);
   check(
     pending.ok && pending.status === "pending" && typeof pending.code === "string",
     "login --json gives a code to show",
     pending,
+  );
+  const deviceUrl = new URL(String(pending.url));
+  const devicePath = deviceUrl.pathname + deviceUrl.search;
+  const toWelcome = await author.fetch(devicePath);
+  check(
+    toWelcome.status === 302 &&
+      toWelcome.headers.get("location") === `/welcome?next=${encodeURIComponent(devicePath)}`,
+    "a new account opening /device is sent to choose a handle first, with the way back",
+    { status: toWelcome.status, location: toWelcome.headers.get("location") },
+  );
+  const welcomePage = await author.fetch(toWelcome.headers.get("location") ?? "");
+  check(
+    welcomePage.status === 200 &&
+      (await welcomePage.text()).includes(`value="${registered.email.split("@")[0]}"`),
+    "the page to choose a handle offers the address's local part",
+  );
+  const keyless = await author.fetch("/api/cli/key", { method: "POST" });
+  check(
+    keyless.status === 409 &&
+      ((await keyless.json()) as { error: { code: string } }).error.code === "handle_needed",
+    "an account with no handle gets no API key: handle_needed",
+  );
+  const reserved = await author.fetch("/api/handles/Admin");
+  const reservedChoice = await author.chooseHandle("admin");
+  check(
+    ((await reserved.json()) as { status: string }).status === "reserved" &&
+      reservedChoice.status === 422 &&
+      ((await reservedChoice.json()) as { error: { code: string } }).error.code ===
+        "handle_reserved",
+    "a reserved handle is refused",
+  );
+  const chosen = await author.chooseHandle("Author");
+  const me = { ...registered, ...((await chosen.json()) as { handle: string }) };
+  check(chosen.status === 200 && me.handle === "author", "the author chooses @author", me);
+  check(
+    (await invitesAs(keeper)).find((row) => row.entry === me.email)?.claimedBy === me.handle,
+    "the entry the author signed up by is claimed by their account",
+  );
+
+  // Who may sign up is the operators' alone: anyone else is answered as if there were no such
+  // route, and /settings shows them no such section.
+  const notOperator = [
+    await author.fetch("/api/invites"),
+    await invite(author, ["someone@example.com"]),
+    await author.fetch(`/api/invites/${addedList[0]?.id}`, { method: "DELETE" }),
+    await new Browser(server.url).fetch("/api/invites"),
+  ];
+  const authorSettings = await (await author.fetch("/settings")).text();
+  const authorLang = /<html lang="ja"/.test(authorSettings) ? "ja" : "en";
+  check(
+    notOperator.every((response) => response.status === 404) &&
+      !authorSettings.includes(`>${translate(authorLang, "settings.invites")}</h2>`) &&
+      (await invitesAs(keeper)).length === INVITED.length + 1,
+    "someone who does not run dek.pub gets a 404 from every invitation route, and no section",
+    notOperator.map((response) => response.status),
+  );
+  const twice = await author.chooseHandle("author-2");
+  check(
+    twice.status === 409 &&
+      ((await twice.json()) as { error: { code: string } }).error.code === "handle_chosen",
+    "a handle is chosen once, and cannot be changed",
+  );
+  const onward = await author.fetch(toWelcome.headers.get("location") ?? "");
+  check(
+    onward.status === 302 &&
+      onward.headers.get("location") === devicePath &&
+      (await author.fetch(devicePath)).status === 200,
+    "with a handle chosen, the welcome page goes back to /device, which now opens",
+    { status: onward.status, location: onward.headers.get("location") },
   );
   await author.approveDevice(String(pending.code));
   const signedIn = await dekc(["pub", "login"]);
@@ -103,7 +258,20 @@ try {
   // A new deck is the team's alone, invisible to others, in the page and on its own origin.
   check(first.visibility === "team", "a new deck starts with the team alone", first);
   const stranger = new Browser(server.url);
-  const strangerMe = await stranger.signUp("Stranger");
+  const strangerAccount = await stranger.register("Stranger");
+  const takenStatus = await stranger.fetch("/api/handles/author");
+  const takenChoice = await stranger.chooseHandle("Author");
+  check(
+    ((await takenStatus.json()) as { status: string }).status === "taken" &&
+      takenChoice.status === 409 &&
+      ((await takenChoice.json()) as { error: { code: string } }).error.code === "handle_taken",
+    "a handle someone holds is refused, in any case",
+  );
+  const strangerChoice = await stranger.chooseHandle("stranger");
+  const strangerMe = {
+    ...strangerAccount,
+    ...((await strangerChoice.json()) as { handle: string }),
+  };
   const talkPath = `/@${me.handle}/why-dek`;
   check((await stranger.fetch(talkPath)).status === 404, "a team talk is a 404 to someone else");
   const about = await fetch(`${server.url}/about?lang=en`);
@@ -147,6 +315,25 @@ try {
     "share opens the deck to the link",
     shared,
   );
+  const sharedUrl = new URL(String((shared as { url?: string }).url));
+  let linkKey = sharedUrl.searchParams.get("key") ?? "";
+  check(
+    sharedUrl.pathname === talkPath && /^[0-9a-z]{26}$/.test(linkKey),
+    "a link deck's URL is its path with a key that cannot be guessed",
+    shared,
+  );
+  /** `path` with the link key, as the URL and the talk page's own requests carry it. */
+  const keyedPath = (path: string) => `${path}${path.includes("?") ? "&" : "?"}key=${linkKey}`;
+  check(
+    (await stranger.fetch(talkPath)).status === 404 &&
+      (await stranger.fetch(`${talkPath}?key=${"0".repeat(26)}`)).status === 404 &&
+      (await stranger.fetch(`${talkPath}?key=${linkKey.slice(1)}`)).status === 404,
+    "a link talk is a 404 to someone with no grant, without its key or with a wrong one",
+  );
+  check(
+    (await author.fetch(talkPath)).status === 200,
+    "the owner opens a link talk without its key",
+  );
   const profile = `/@${me.handle}`;
   check(
     (await stranger.fetch(profile)).status === 200 &&
@@ -181,9 +368,30 @@ try {
     "the sitemap lists the About page, and not a talk shared by link",
     sitemapXml,
   );
-  const page = await stranger.fetch(talkPath);
+  const page = await stranger.fetch(keyedPath(talkPath));
   const html = await page.text();
   check(page.status === 200, "the talk page answers anyone with the link");
+  check(
+    html.includes(`<link rel="canonical" href="${server.url}${talkPath}"`) &&
+      html.includes(`<meta property="og:url" content="${server.url}${talkPath}"`),
+    "a link talk names its URL without the key as canonical and in its preview",
+  );
+  const preview = /<meta property="og:image" content="([^"]+)"/
+    .exec(html)?.[1]
+    ?.replace(/&amp;/g, "&");
+  const picture = preview ? new URL(preview) : null;
+  const bareImage = picture?.pathname ?? "";
+  check(
+    picture?.searchParams.get("key") === linkKey && bareImage.startsWith(`/i/${id}/`),
+    "a link talk's preview picture carries its key",
+    preview,
+  );
+  check(
+    (await new Browser(server.url).fetch(bareImage)).status === 404 &&
+      (await stranger.fetch(bareImage)).status === 404 &&
+      (await new Browser(server.url).fetch(keyedPath(bareImage))).status === 200,
+    "a link talk's pictures, found by its deck ID, need its key too",
+  );
   const frame = /<iframe[^>]+src="([^"]+)"/.exec(html)?.[1]?.replace(/&amp;/g, "&");
   check(
     frame?.startsWith(server.deckOrigin(id)),
@@ -210,9 +418,15 @@ try {
   check(commentGrant.status === 201, "the owner grants the colleague comment");
   const invited = await inbox.waitFor(strangerMe.email, "shared");
   check(
-    invited.length === 1 && invited[0]?.text.includes(talkPath),
-    "a new grant mails the colleague a link to the talk",
+    invited.length === 1 &&
+      invited[0]?.text.split(/\r?\n/).includes(`${server.url}${talkPath}`) &&
+      !invited[0].text.includes("key="),
+    "a new grant mails the colleague a link to the talk without its key, which their grant makes needless",
     invited,
+  );
+  check(
+    (await stranger.fetch(talkPath)).status === 200,
+    "a colleague granted a link talk opens it without its key",
   );
 
   // The colleague comments on a sentence of the script and on an element of a slide.
@@ -245,8 +459,13 @@ try {
   );
   const told = await inbox.waitFor(me.email, "commented on");
   check(
-    told.some((mail) => mail.text.includes("出典がほしい") && mail.text.includes(talkPath)),
-    "the owner is mailed of a new thread, with its words and a link to it",
+    told.some(
+      (mail) =>
+        mail.text.includes("出典がほしい") &&
+        mail.text.includes(`${server.url}${talkPath}#`) &&
+        !mail.text.includes("key="),
+    ),
+    "the owner is mailed of a new thread, with its words and a link to it without the key",
     told,
   );
   const element = await stranger.fetch(`/api/decks/${id}/comments`, {
@@ -285,10 +504,16 @@ try {
           slug: string;
           status: string;
           targets: Array<Record<string, unknown>>;
+          url: string;
         }>;
       }
     ).comments ?? [];
   check(listed.ok && rows.length === 2, "dekc pub comments lists both", listed);
+  check(
+    rows.every((row) => row.url === `${server.url}${talkPath}#${row.id}`),
+    "a review thread's URL is the talk's without its key, so pasting it gives the key away nowhere",
+    rows.map((row) => row.url),
+  );
   const quoteRow = rows.find((row) => row.targets.some((t) => t.kind === "quote"));
   check(
     quoteRow?.targets.some((t) => t.line !== undefined || t.found !== undefined),
@@ -378,8 +603,15 @@ try {
   // comment policy lets, by people who read no review threads, and a like from each account.
   const reader = new Browser(server.url);
   await reader.signUp("Reader");
-  const publicPath = `/api/decks/${id}/public-comments`;
-  const review = await reader.fetch(`/api/decks/${id}/comments`, {
+  const publicBare = `/api/decks/${id}/public-comments`;
+  check(
+    (await reader.fetch(publicBare)).status === 404 &&
+      (await reader.fetch(publicBare, { method: "POST", json: { text: "x" } })).status === 404 &&
+      (await reader.fetch(`/api/decks/${id}/like`, { method: "PUT" })).status === 404,
+    "the public comments and likes of a link talk, found by its deck ID, need its key",
+  );
+  const publicPath = keyedPath(publicBare);
+  const review = await reader.fetch(keyedPath(`/api/decks/${id}/comments`), {
     method: "POST",
     json: { anchor: { slug: renamed, step: "0", targets: [] }, text: "レビュー" },
   });
@@ -427,7 +659,7 @@ try {
     ).status === 422,
     "a reply answers a comment, not another reply",
   );
-  const edited = await reader.fetch(`${publicPath}/${postedRow.id}`, {
+  const edited = await reader.fetch(keyedPath(`${publicBare}/${postedRow.id}`), {
     method: "PATCH",
     json: { text: "とても良い発表でした" },
   });
@@ -438,7 +670,7 @@ try {
   );
   check(
     (
-      await stranger.fetch(`${publicPath}/${postedRow.id}`, {
+      await stranger.fetch(keyedPath(`${publicBare}/${postedRow.id}`), {
         method: "PATCH",
         json: { text: "x" },
       })
@@ -446,8 +678,8 @@ try {
     "no one else changes it",
   );
   check(
-    (await author.fetch(`${publicPath}/${postedRow.id}`, { method: "DELETE" })).status === 200 &&
-      (await publicList(reader)).length === 0,
+    (await author.fetch(keyedPath(`${publicBare}/${postedRow.id}`), { method: "DELETE" }))
+      .status === 200 && (await publicList(reader)).length === 0,
     "the owner removes a public comment, and its replies go with it",
   );
   await dekc(["pub", "share", "--comments", "off"]);
@@ -474,7 +706,7 @@ try {
     "dekc takes no --comments guests, the old policy for signed-out writers",
     noSignedOut,
   );
-  const likePath = `/api/decks/${id}/like`;
+  const likePath = keyedPath(`/api/decks/${id}/like`);
   const liked = (await (await reader.fetch(likePath, { method: "PUT" })).json()) as {
     count: number;
     liked: boolean;
@@ -495,12 +727,38 @@ try {
     "someone signed out cannot like",
   );
 
+  // A new link: the URL given out before opens the talk no more.
+  const oldLink = keyedPath(talkPath);
+  const renewed = await dekc(["pub", "share", "--new-link"]);
+  const newKey = new URL(String((renewed as { url?: string }).url)).searchParams.get("key") ?? "";
+  check(
+    renewed.ok && /^[0-9a-z]{26}$/.test(newKey) && newKey !== linkKey,
+    "share --new-link gives the deck a new key",
+    renewed,
+  );
+  linkKey = newKey;
+  check(
+    (await reader.fetch(oldLink)).status === 404 &&
+      (await reader.fetch(keyedPath(talkPath))).status === 200 &&
+      (await reader.fetch(publicPath)).status === 404 &&
+      (await reader.fetch(keyedPath(publicBare))).status === 200,
+    "the new link opens the talk and its comments, and the old one no more",
+  );
+
   // Grants: a private deck shared with one person by handle.
   await dekc(["pub", "share", "--visibility", "private"]);
   check(
-    (await reader.fetch(talkPath)).status === 404,
-    "back to private, the talk is a 404 again to anyone not granted it",
+    (await reader.fetch(talkPath)).status === 404 &&
+      (await reader.fetch(keyedPath(talkPath))).status === 404,
+    "back to private, the talk is a 404 again to anyone not granted it, its key included",
   );
+  const relinked = await dekc(["pub", "share", "--visibility", "link"]);
+  check(
+    (relinked as { url?: string }).url === `${server.url}${keyedPath(talkPath)}`,
+    "back to link, the talk opens at the URL it had",
+    relinked,
+  );
+  await dekc(["pub", "share", "--visibility", "private"]);
   check((await author.fetch(publicPath)).status === 404, "a private talk has no public comments");
   const grant = await author.fetch(`/api/decks/${id}/grants`, {
     method: "POST",
@@ -652,26 +910,42 @@ try {
     "the link signs the guest in and sends them to the talk",
     { status: verified.status, location: verified.headers.get("location") },
   );
-  const guestMe = (await (await guest.fetch("/api/me")).json()) as {
-    name?: string;
-    handle?: string;
-  };
-  check(
-    guestMe.name === guestEmail.split("@")[0],
-    "an account made by a sign-in link goes by its address's local part",
-    guestMe,
-  );
+  const guestLocal = guestEmail.split("@")[0] ?? "";
   const grantees = async () =>
     (
       (await (await author.fetch(`/api/decks/${id}/grants`)).json()) as {
         grants: Array<{ id: string; who: string }>;
       }
     ).grants;
+  const [claimedRow] = await server.store.sql("SELECT user_id FROM grants WHERE email = ?", [
+    guestEmail,
+  ]);
+  const listedBefore = await grantees();
+  check(
+    typeof claimedRow?.[0] === "string" && listedBefore.some((row) => row.who === guestEmail),
+    "signing in by the link claims the grant waiting on the address, listed by it until a handle is chosen",
+    { claimedRow, listedBefore },
+  );
+  const guestAsked = await guest.fetch(talkPath);
+  check(
+    guestAsked.status === 302 &&
+      guestAsked.headers.get("location") === `/welcome?next=${encodeURIComponent(talkPath)}` &&
+      (await guest.fetch("/api/me")).status === 409,
+    "a guest new to dek.pub chooses a handle before the talk opens",
+    { status: guestAsked.status, location: guestAsked.headers.get("location") },
+  );
+  const guestChosen = await guest.chooseHandle(guestLocal);
+  const guestMe = (await guestChosen.json()) as { name?: string; handle?: string };
+  check(
+    guestChosen.status === 200 && guestMe.name === guestLocal && guestMe.handle === guestLocal,
+    "an account made by a sign-in link goes by its address's local part, and may take it as its handle",
+    guestMe,
+  );
   const claimedGrants = await grantees();
   check(
     claimedGrants.some((row) => row.who === guestMe.handle) &&
       !claimedGrants.some((row) => row.who === guestEmail),
-    "signing in by the link claims the grant waiting on the address, before any deck is read",
+    "once the guest has a handle, the grant they claimed is listed by it",
     claimedGrants,
   );
   check(
@@ -683,6 +957,149 @@ try {
     status: again.status,
     location: again.headers.get("location"),
   });
+
+  // Sign-up is by invitation. The guest above got in by the share waiting on their address. An
+  // address on the list gets in by a link with nothing shared. One whose share was taken back
+  // before they followed their link is sent to /signin and told why, and the development form,
+  // which verifies no address, makes no account even for one on the list. Signing in to an
+  // account is never refused, whether or not anything would let it in now.
+  const invitee = new Browser(server.url);
+  const inviteeAccount = await invitee.register("Invitee");
+  check(
+    inviteeAccount.email === addressOf("Invitee") &&
+      (await invitee.fetch("/api/me")).status === 409,
+    "an address dek.pub invited signs up by a link, with nothing shared with it",
+    inviteeAccount,
+  );
+  const inviteeEntry = (await invitesAs(keeper)).find((row) => row.entry === inviteeAccount.email);
+  const claimedRemoval = await keeper.fetch(`/api/invites/${inviteeEntry?.id}`, {
+    method: "DELETE",
+  });
+  check(
+    inviteeEntry?.claimedAt !== null &&
+      inviteeEntry?.claimedBy === null &&
+      claimedRemoval.status === 409 &&
+      ((await claimedRemoval.json()) as { error: { code: string } }).error.code ===
+        "invite_claimed",
+    "the entry an account was made from is claimed, with no handle yet, and stays",
+    inviteeEntry,
+  );
+  // An entry removed before its address followed its link lets in no one: the link makes no account.
+  const withdrawn = `withdrawn-${Date.now()}@example.com`;
+  await invite(keeper, [withdrawn]);
+  await inbox.waitFor(withdrawn, "invited");
+  const withdrawnBrowser = new Browser(server.url);
+  await withdrawnBrowser.fetch("/api/auth/sign-in/magic-link", {
+    method: "POST",
+    json: { email: withdrawn, errorCallbackURL: "/signin" },
+  });
+  const withdrawnLink = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(
+    (await inbox.waitFor(withdrawn, "Sign in"))[0]?.text ?? "",
+  )?.[0];
+  const withdrawnEntry = (await invitesAs(keeper)).find((row) => row.entry === withdrawn);
+  const removal = await keeper.fetch(`/api/invites/${withdrawnEntry?.id}`, { method: "DELETE" });
+  const withdrawnFollowed = await withdrawnBrowser.fetch(
+    new URL(withdrawnLink ?? "/", server.url).pathname +
+      new URL(withdrawnLink ?? "/", server.url).search,
+  );
+  check(
+    withdrawnLink !== undefined &&
+      removal.status === 200 &&
+      !(await invitesAs(keeper)).some((row) => row.entry === withdrawn) &&
+      new URL(withdrawnFollowed.headers.get("location") ?? "/", server.url).searchParams.get(
+        "error",
+      ) === "not_invited" &&
+      (await server.store.sql("SELECT id FROM user WHERE email = ?", [withdrawn])).length === 0,
+    "an invited address is mailed a sign-in link, and once its entry is removed the link makes no account",
+    { status: removal.status, location: withdrawnFollowed.headers.get("location") },
+  );
+  const late = `late-${Date.now()}@example.com`;
+  const lateGrant = (await (
+    await author.fetch(`/api/decks/${id}/grants`, {
+      method: "POST",
+      json: { who: late, role: "comment" },
+    })
+  ).json()) as { id: string };
+  const latecomer = new Browser(server.url);
+  await latecomer.fetch("/api/auth/sign-in/magic-link", {
+    method: "POST",
+    json: { email: late, callbackURL: talkPath, errorCallbackURL: "/signin" },
+  });
+  const lateLink = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(
+    (await inbox.waitFor(late, "Sign in"))[0]?.text ?? "",
+  )?.[0];
+  check(lateLink !== undefined, "an address a share waits for is mailed a sign-in link");
+  await author.fetch(`/api/decks/${id}/grants/${lateGrant.id}`, { method: "DELETE" });
+  const lateFollowed = await latecomer.fetch(new URL(lateLink).pathname + new URL(lateLink).search);
+  const refusedTo = new URL(lateFollowed.headers.get("location") ?? "/", server.url);
+  const refusedPage = await (await latecomer.fetch(refusedTo.pathname + refusedTo.search)).text();
+  const pageLang = /<html lang="ja"/.test(refusedPage) ? "ja" : "en";
+  const lateAccounts = await server.store.sql("SELECT id FROM user WHERE email = ?", [late]);
+  const lateMe = (await latecomer.fetch("/api/me")).status;
+  check(
+    lateFollowed.status === 302 &&
+      refusedTo.pathname === "/signin" &&
+      refusedTo.searchParams.get("error") === "not_invited" &&
+      refusedPage.includes(translate(pageLang, "signin.notInvited")) &&
+      lateAccounts.length === 0 &&
+      lateMe === 401,
+    "a link to an address nothing lets in any more makes no account, and /signin says it is by invitation",
+    { status: lateFollowed.status, location: refusedTo.href, lateAccounts, lateMe },
+  );
+  // A grant whose deck is gone lets no one in, as one made while its deck was deleted would be.
+  const orphan = `orphan-${Date.now()}@example.com`;
+  const orphanGrant = (await (
+    await author.fetch(`/api/decks/${id}/grants`, {
+      method: "POST",
+      json: { who: orphan, role: "view" },
+    })
+  ).json()) as { id: string };
+  const orphanBrowser = new Browser(server.url);
+  await orphanBrowser.fetch("/api/auth/sign-in/magic-link", {
+    method: "POST",
+    json: { email: orphan, errorCallbackURL: "/signin" },
+  });
+  const orphanLink = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(
+    (await inbox.waitFor(orphan, "Sign in"))[0]?.text ?? "",
+  )?.[0];
+  await server.store.sql("UPDATE grants SET deck_id = ? WHERE id = ?", [
+    "d_deletedmeanwhile",
+    orphanGrant.id,
+  ]);
+  const orphanFollowed = await orphanBrowser.fetch(
+    new URL(orphanLink ?? "/", server.url).pathname + new URL(orphanLink ?? "/", server.url).search,
+  );
+  check(
+    orphanLink !== undefined &&
+      new URL(orphanFollowed.headers.get("location") ?? "/", server.url).searchParams.get(
+        "error",
+      ) === "not_invited" &&
+      (await server.store.sql("SELECT id FROM user WHERE email = ?", [orphan])).length === 0,
+    "a share whose deck is gone lets its address make no account",
+    orphanFollowed.headers.get("location"),
+  );
+  await server.store.sql("DELETE FROM grants WHERE id = ?", [orphanGrant.id]);
+  const formed = await new Browser(server.url).fetch("/api/auth/sign-up/email", {
+    method: "POST",
+    json: { email: addressOf("Form"), password: "password-1234", name: "Form" },
+  });
+  check(
+    formed.status === 403 && ((await formed.json()) as { code?: string }).code === "not_invited",
+    "the development form makes no account for an address on the list, as it verifies none",
+    formed.status,
+  );
+  const guestAgain = new Browser(server.url);
+  const backTo = await guestAgain.signInByLink(guestEmail, {
+    callbackURL: talkPath,
+    errorCallbackURL: "/signin",
+  });
+  check(
+    backTo.endsWith(talkPath) &&
+      ((await (await guestAgain.fetch("/api/me")).json()) as { handle?: string }).handle ===
+        guestMe.handle,
+    "the guest, not on the list and with no share waiting, signs in again by a link",
+    backTo,
+  );
 
   // The people in a thread are mailed of replies, unless they muted the deck.
   const asked = await guest.fetch(`/api/decks/${id}/comments`, {
@@ -747,9 +1164,93 @@ try {
     ownProfile.includes(`href="${talkPath}"`) && ownProfile.includes("Team only"),
     "the owner's profile lists the team deck with its badge",
   );
+  // The footer links to dek's repository; the profile's own link says it is the person's, rel="me".
   check(
-    !ownProfile.includes(`href="https://github.com/${me.handle}"`),
-    "a profile made by a sign-in link links to no GitHub account",
+    !/href="https:\/\/github\.com\/[^"]*" rel="me/.test(ownProfile),
+    "a profile of an account made without GitHub links to no GitHub account",
+  );
+
+  // A person sets the links their profile shows, and their name, on /settings.
+  const settingsAway = await new Browser(server.url).fetch("/settings");
+  check(
+    settingsAway.status === 302 &&
+      settingsAway.headers.get("location") === `/signin?next=${encodeURIComponent("/settings")}`,
+    "the settings page sends a visitor signed out to sign in, and back",
+    { status: settingsAway.status, location: settingsAway.headers.get("location") },
+  );
+  const speaker = new Browser(server.url);
+  const speakerMe = await speaker.signUp("Speaker");
+  const settingsPage = await speaker.fetch("/settings?lang=en");
+  const settingsHtml = await settingsPage.text();
+  check(
+    settingsPage.status === 200 &&
+      settingsHtml.includes(`@${speakerMe.handle}`) &&
+      settingsHtml.includes("No links yet."),
+    "the settings page shows the handle, and no links for an account made without GitHub",
+  );
+  const refusedLinks = async (links: string[]) => {
+    const response = await speaker.fetch("/api/me/links", { method: "PUT", json: { links } });
+    const body = (await response.json()) as { error?: { code: string } };
+    return `${response.status} ${body.error?.code}`;
+  };
+  const six = ["a", "b", "c", "d", "e", "f"].map((host) => `https://${host}.example/`);
+  check(
+    (await refusedLinks(["http://speaker.example"])) === "422 link_not_https" &&
+      (await refusedLinks(["https://me:pw@speaker.example"])) === "422 link_credentials" &&
+      (await refusedLinks(["javascript:alert(1)"])) === "422 link_not_https" &&
+      (await refusedLinks(six)) === "422 links_too_many",
+    "a link that is not https, carries a password, or one too many is refused with its code",
+  );
+  const setLinks = await speaker.fetch("/api/me/links", {
+    method: "PUT",
+    json: {
+      links: ["zenn.dev/speaker", "https://GitHub.com/speaker-gh", "https://speaker.example/talks"],
+    },
+  });
+  const savedLinks = (await setLinks.json()) as { links: string[] };
+  const ordered = [
+    "https://zenn.dev/speaker",
+    "https://github.com/speaker-gh",
+    "https://speaker.example/talks",
+  ];
+  check(
+    setLinks.status === 200 && savedLinks.links.join() === ordered.join(),
+    "PUT /api/me/links answers the links as saved, written out",
+    savedLinks,
+  );
+  check(
+    ((await (await speaker.fetch("/api/me/links")).json()) as { links: string[] }).links.join() ===
+      ordered.join(),
+    "GET /api/me/links answers them in their order",
+  );
+  const speakerProfile = await (await stranger.fetch(`/@${speakerMe.handle}?lang=en`)).text();
+  const at = ordered.map((url) =>
+    speakerProfile.indexOf(`href="${url}" rel="me nofollow ugc noopener"`),
+  );
+  check(
+    at.every((index, n) => index > 0 && (n === 0 || index > (at[n - 1] ?? 0))) &&
+      speakerProfile.includes("Zenn") &&
+      speakerProfile.includes("speaker.example"),
+    'the profile shows each link in its order, rel="me nofollow ugc noopener", named by its service or site',
+    at,
+  );
+  const newName = await speaker.fetch("/api/me", {
+    method: "PATCH",
+    json: { name: "  Speaker   K " },
+  });
+  const emptyName = await speaker.fetch("/api/me", { method: "PATCH", json: { name: " " } });
+  check(
+    newName.status === 200 &&
+      ((await newName.json()) as { name: string }).name === "Speaker K" &&
+      emptyName.status === 422 &&
+      ((await emptyName.json()) as { error: { code: string } }).error.code === "name_empty" &&
+      (await (await stranger.fetch(`/@${speakerMe.handle}`)).text()).includes("Speaker K"),
+    "a person changes their name with PATCH /api/me, and an empty one is refused",
+  );
+  check(
+    (await speaker.fetch("/api/me/links", { method: "PUT", json: { links: [] } })).status === 200 &&
+      !(await (await stranger.fetch(`/@${speakerMe.handle}`)).text()).includes('rel="me'),
+    "a person may take every link off their profile",
   );
   check(
     !(await (await stranger.fetch(profilePath)).text()).includes(`href="${talkPath}"`),
@@ -945,10 +1446,423 @@ try {
     removed,
   );
 
-  const logout = await dekc(["pub", "logout"]);
-  check(logout.ok, "logout revokes the key", logout);
-  const gone = await dekc(["pub", "whoami"]);
-  check(!gone.ok, "after logout the CLI is signed out", gone);
+  // An owner's new shares mail at most 20 invitations a day, by handle or by address, and a share
+  // removed and made again mails again, so it counts again. Past the limit a new share is
+  // refused with when the next may go, from the page's API and from the CLI alike; a change to a
+  // share still works, and deleting the deck frees nothing.
+  const inviter = new Browser(server.url);
+  const hostMe = await inviter.signUp("Host");
+  const newDeck = async (slug: string) =>
+    (
+      (await (
+        await inviter.fetch("/api/decks", {
+          method: "POST",
+          json: { slug, title: `Limits ${slug}` },
+        })
+      ).json()) as { id: string }
+    ).id;
+  const hostDeck = await newDeck("limits");
+  const shareWith = (deckId: string, who: string, role?: string) =>
+    inviter.fetch(`/api/decks/${deckId}/grants`, {
+      method: "POST",
+      json: { who, ...(role ? { role } : {}) },
+    });
+  const stamp = Date.now();
+  const byAddress = Array.from({ length: 19 }, (_, i) => `limit-${i}-${stamp}@example.com`);
+  const statuses: number[] = [];
+  for (const who of ["@reader", ...byAddress.slice(0, 18)]) {
+    statuses.push((await shareWith(hostDeck, who)).status);
+  }
+  check(
+    statuses.every((status) => status === 201) &&
+      (await inbox.waitFor(addressOf("Reader"), "Limits limits")).length === 1 &&
+      (await inbox.waitFor(byAddress[17] ?? "", "Limits limits")).length === 1,
+    "an owner shares a deck with 19 people, one by handle, and each is mailed",
+    statuses,
+  );
+  const reshared = byAddress[0] ?? "";
+  const hostGrants = async (deckId: string) =>
+    (
+      (await (await inviter.fetch(`/api/decks/${deckId}/grants`)).json()) as {
+        grants: { id: string; who: string }[];
+      }
+    ).grants;
+  const toRemove = (await hostGrants(hostDeck)).find((row) => row.who === reshared);
+  await inviter.fetch(`/api/decks/${hostDeck}/grants/${toRemove?.id}`, { method: "DELETE" });
+  const readded = await shareWith(hostDeck, reshared);
+  check(
+    readded.status === 201 && (await inbox.waitFor(reshared, "Limits limits", 2)).length === 2,
+    "a share removed and made again mails again: the twentieth invitation",
+  );
+  const over = byAddress[18] ?? "";
+  const overLimit = await shareWith(hostDeck, over);
+  const overBody = (await overLimit.json()) as {
+    error?: { code: string; message: string; hint?: string };
+  };
+  check(
+    overLimit.status === 429 &&
+      overBody.error?.code === "invitations_exhausted" &&
+      overBody.error.message.includes("20 invitations in the last 24 hours") &&
+      /after \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/.test(overBody.error.hint ?? "") &&
+      !(await hostGrants(hostDeck)).some((row) => row.who === over) &&
+      (await inbox.to(over)).length === 0,
+    "the twenty-first is refused with a 429 that says when the next may go, and is not made",
+    overBody,
+  );
+  check(
+    (await shareWith(hostDeck, `@${speakerMe.handle}`)).status === 429,
+    "a share by handle mails too, so it is refused as well",
+  );
+  const changed = await shareWith(hostDeck, reshared, "comment");
+  check(
+    changed.status === 201 && ((await changed.json()) as { role: string }).role === "comment",
+    "a change to a share mails nothing, so it still works",
+  );
+  const hostKey = (
+    (await (await inviter.fetch("/api/cli/key", { method: "POST" })).json()) as { key: string }
+  ).key;
+  const hostWork = mkdtempSync(join(tmpdir(), "dek-pub-e2e-host-"));
+  try {
+    cpSync(join(REPO, "sample"), hostWork, {
+      recursive: true,
+      filter: (path) => !/\/(node_modules|dist|\.cache)(\/|$)/.test(path),
+    });
+    const hostScript = join(hostWork, "decks", "why-dek", "script.md");
+    writeFileSync(
+      hostScript,
+      readFileSync(hostScript, "utf8").replace(/^---\n/, `---\npub: ${hostDeck}\n`),
+    );
+    const cliRefused = await dekc(
+      ["pub", "grants", "add", over],
+      join(hostWork, "decks", "why-dek"),
+      {
+        env: { DEK_TOKEN: hostKey, DEK_TOKEN_SERVER: server.url },
+      },
+    );
+    const cliError = cliRefused.error as { message?: string; hint?: string } | undefined;
+    check(
+      cliRefused.ok === false &&
+        String(cliError?.message).includes("20 invitations") &&
+        /after .* UTC/.test(String(cliError?.hint)),
+      "dekc pub grants add prints the refusal and, as its hint, when the next may go",
+      cliRefused,
+    );
+  } finally {
+    rmSync(hostWork, { recursive: true, force: true });
+  }
+  await inviter.fetch(`/api/decks/${hostDeck}`, { method: "DELETE" });
+  const [[counted]] = (await server.store.sql(
+    "select count(*) from invitations where inviter_id = ?",
+    [hostMe.id],
+  )) as [[number]];
+  check(
+    counted === 20 && (await shareWith(await newDeck("limits-reshared"), over)).status === 429,
+    "deleting the deck keeps the invitations it mailed counted",
+    { counted },
+  );
+
+  // The author deletes the talk: every row and file of it goes, nothing of it opens, and its slug
+  // is free to publish again, as a new deck.
+  await dekc(["pub", "share", "--visibility", "public"]);
+  const deleting = (await dekc(["pub", "status"])) as Json & { current?: number };
+  const n = Number(deleting.current);
+  await reader.fetch(`/api/decks/${id}/public-comments`, { method: "POST", json: { text: "x" } });
+  await reader.fetch(`/api/decks/${id}/like`, { method: "PUT" });
+  const muted = await guest.fetch(`/api/decks/${id}/mute`, { method: "PUT" });
+  // Every table with a deck_id column, as D1 has them, so a table added later is checked too.
+  const deckTables = async () =>
+    (await store.sql("select name, sql from sqlite_master where type = 'table'"))
+      .filter(([, sql]) => /[`"\s(]deck_id[`"\s]/.test(String(sql)))
+      .map(([name]) => String(name));
+  const tables = await deckTables();
+  const replyIds = (
+    await store.sql(
+      "select id from replies where thread_id in (select id from threads where deck_id = ?)",
+      [id],
+    )
+  ).map(([reply]) => String(reply));
+  const rowsOf = async (deckId: string) => {
+    const counts: Record<string, number> = {};
+    for (const table of tables) {
+      const [[count]] = (await store.sql(`select count(*) from "${table}" where deck_id = ?`, [
+        deckId,
+      ])) as [[number]];
+      counts[table] = count;
+    }
+    const [[deck]] = (await store.sql("select count(*) from decks where id = ?", [deckId])) as [
+      [number],
+    ];
+    const [[replies]] = (await store.sql(
+      `select count(*) from replies where id in (${replyIds.map(() => "?").join(",") || "''"})`,
+      replyIds,
+    )) as [[number]];
+    return { ...counts, decks: deck, replies };
+  };
+  const before = await rowsOf(id);
+  const cover = `/i/${id}/${n}/cover`;
+  const version = `${server.deckOrigin(id)}/v/${n}/`;
+  check(
+    muted.status === 200 &&
+      Object.values(before).every((count) => count > 0) &&
+      tables.length === 7 &&
+      (await author.fetch(cover)).status === 200 &&
+      (await fetch(version)).status === 200,
+    "before it is deleted, the talk has a row in every table keyed by deck, and is served",
+    { before, tables },
+  );
+  for (const [who, name] of [
+    [stranger, "a stranger"],
+    [guest, "someone it is shared with"],
+  ] as const) {
+    check(
+      (await who.fetch(`/api/decks/${id}`, { method: "DELETE" })).status === 404 &&
+        (await author.fetch(talkPath)).status === 200,
+      `${name} deleting the talk gets a 404, and the talk stays`,
+    );
+  }
+  const unasked = await dekc(["pub", "delete"]);
+  check(
+    unasked.ok === false && (await author.fetch(talkPath)).status === 200,
+    "dekc pub delete without --yes deletes nothing",
+    unasked,
+  );
+  const deleted = await dekc(["pub", "delete", "--yes"]);
+  const scriptPath = join(work, "decks", "why-dek", "script.md");
+  check(
+    deleted.ok &&
+      deleted.action === "delete" &&
+      deleted.id === id &&
+      deleted.owner === me.handle &&
+      deleted.slug === "why-dek" &&
+      JSON.stringify(deleted.changed) === JSON.stringify(["script.md"]) &&
+      !/^pub:/m.test(readFileSync(scriptPath, "utf8")),
+    "dekc pub delete --yes deletes the talk and takes pub: out of script.md",
+    deleted,
+  );
+  const left = await rowsOf(id);
+  check(
+    Object.values(left).every((count) => count === 0),
+    "no row of the talk is left in D1",
+    left,
+  );
+  check(
+    (await store.keys(`decks/${id}/`)).length === 0,
+    "no file of the talk is left in R2, its access file included",
+  );
+  const answers = await Promise.all([
+    author.fetch(talkPath),
+    author.fetch(`${talkPath}/manage`),
+    author.fetch(cover),
+    new Browser(server.url).fetch(cover),
+    fetch(version),
+    ...["", "/comments", "/grants", "/public-comments", "/mute"].map((rest) =>
+      author.fetch(`/api/decks/${id}${rest}`),
+    ),
+    reader.fetch(`/api/decks/${id}/like`, { method: "PUT" }),
+    author.fetch(`/api/decks/${id}`, { method: "DELETE" }),
+  ]);
+  check(
+    answers.every((response) => response.status === 404),
+    "the talk page, its pictures, its build on the deck's origin and every API route are 404",
+    answers.map((response) => `${response.status} ${response.url}`),
+  );
+  const republished = await dekc(["pub", "publish", "-m", "again"]);
+  check(
+    republished.ok &&
+      typeof republished.id === "string" &&
+      republished.id !== id &&
+      republished.url === `${server.url}${talkPath}` &&
+      (await author.fetch(talkPath)).status === 200,
+    "the slug is free: publishing again makes a new deck at the same URL",
+    republished,
+  );
+
+  // The operator takes down someone else's talk, named by its URL, from any directory. Their API
+  // key gets the 404 of a route that is not there from the invitations, which take the browser.
+  const keeperKey = (
+    (await (await keeper.fetch("/api/cli/key", { method: "POST" })).json()) as {
+      key: string;
+    }
+  ).key;
+  const asKeeper = { env: { DEK_TOKEN: keeperKey, DEK_TOKEN_SERVER: server.url } };
+  const invitesByKey = await fetch(`${server.url}/api/invites`, {
+    headers: { "x-api-key": keeperKey },
+  });
+  check(
+    invitesByKey.status === 404,
+    "an operator's API key gets a 404 from the invitations, which take the browser's session",
+    invitesByKey.status,
+  );
+  const takenDown = await dekc(
+    ["pub", "takedown", String(republished.url), "--yes"],
+    config,
+    asKeeper,
+  );
+  check(
+    takenDown.ok &&
+      takenDown.action === "takedown" &&
+      takenDown.id === republished.id &&
+      takenDown.owner === me.handle &&
+      (await author.fetch(talkPath)).status === 404 &&
+      (await store.keys(`decks/${String(republished.id)}/`)).length === 0,
+    "an operator takes the talk down with dekc pub takedown",
+    takenDown,
+  );
+  const ownerAfter = await dekc(["pub", "status"]);
+  check(
+    ownerAfter.ok === false &&
+      String((ownerAfter.error as { hint?: string }).hint).includes("take pub: out of script.md"),
+    "its owner's next dekc pub status is a 404 that says to take pub: out",
+    ownerAfter,
+  );
+
+  // The author's CLI keys: one for each dekc signed in, and one for CI. Each is listed on
+  // /settings and can be revoked there; `dekc pub logout --all` revokes them all from any one.
+  const keyIn = async (folder: string) =>
+    String(
+      (
+        (await Bun.file(join(folder, "credentials.json")).json()) as {
+          keys: Record<string, string>;
+        }
+      ).keys[server.url],
+    );
+  /** A call with an API key alone, as the CLI or a script makes one. */
+  const keyed = (key: string, path: string, init: { method?: string; json?: unknown } = {}) =>
+    fetch(`${server.url}${path}`, {
+      method: init.method ?? "GET",
+      headers: {
+        "x-api-key": key,
+        ...(init.json === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: init.json === undefined ? undefined : JSON.stringify(init.json),
+    });
+  const laptopKey = await keyIn(config);
+  const desk = mkdtempSync(join(tmpdir(), "dek-pub-e2e-desk-"));
+  try {
+    const atDesk = {
+      env: { DEK_PUB_CREDENTIALS: join(desk, "credentials.json"), XDG_CONFIG_HOME: desk },
+    };
+    const deskPending = await dekc(["pub", "login"], config, atDesk);
+    await author.approveDevice(String(deskPending.code));
+    const deskIn = await dekc(["pub", "login"], config, atDesk);
+    check(
+      deskIn.ok && deskIn.status === "signed-in",
+      "a second dekc signs in as the author",
+      deskIn,
+    );
+    const deskKey = await keyIn(desk);
+    const ciKey = (
+      (await (await author.fetch("/api/cli/key", { method: "POST" })).json()) as { key: string }
+    ).key;
+    const asCi = { env: { DEK_TOKEN: ciKey, DEK_TOKEN_SERVER: server.url } };
+    check((await dekc(["pub", "whoami"], config, asCi)).ok, "a key made for CI works as DEK_TOKEN");
+    check(
+      new Set([laptopKey, deskKey, ciKey]).size === 3,
+      "each login, and the key for CI, is a key of its own",
+    );
+
+    type Listed = {
+      id: string;
+      name: string;
+      createdAt: string;
+      lastUsedAt: string | null;
+      expiresAt: string;
+    };
+    const listedAnswer = await author.fetch("/api/me/keys");
+    const listedText = await listedAnswer.text();
+    const listed = (JSON.parse(listedText) as { keys: Listed[] }).keys;
+    const host = hostname().split(".")[0];
+    check(
+      listedAnswer.status === 200 &&
+        listed.map((key) => key.name).join() === ["dekc", host, host].join() &&
+        listed[0]?.lastUsedAt !== null &&
+        listed[1]?.lastUsedAt === null &&
+        listed[2]?.lastUsedAt !== null &&
+        listed.every(
+          (key) =>
+            Date.parse(key.expiresAt) - Date.parse(key.createdAt) > 364 * 24 * 60 * 60 * 1000,
+        ),
+      "GET /api/me/keys lists the three keys, newest first: CI's, then each machine's by its name",
+      listed,
+    );
+    check(
+      [laptopKey, deskKey, ciKey].every((key) => !listedText.includes(key.slice(0, 16))) &&
+        !listedText.includes("dekpub_"),
+      "the list holds no key, nor the start of one",
+    );
+    const settingsKeys = await (await author.fetch("/settings?lang=en")).text();
+    check(
+      settingsKeys.includes("CLI keys") &&
+        settingsKeys.includes(String(host)) &&
+        settingsKeys.includes("Revoke all"),
+      "the settings page lists the CLI keys",
+    );
+
+    const deskListed = listed[1];
+    const refused = await Promise.all([
+      keyed(laptopKey, "/api/me/keys"),
+      keyed(laptopKey, `/api/me/keys/${deskListed?.id}`, { method: "DELETE" }),
+      keyed(laptopKey, "/api/me/links", { method: "PUT", json: { links: [] } }),
+      keyed(laptopKey, "/api/me", { method: "PATCH", json: { name: "Stolen" } }),
+    ]);
+    const codes = await Promise.all(
+      refused.map(async (response) => {
+        const body = (await response.json()) as { error: { code: string } };
+        return `${response.status} ${body.error.code}`;
+      }),
+    );
+    check(
+      codes.every((code) => code === "403 session_needed") &&
+        (await keyed(laptopKey, "/api/me")).status === 200,
+      "an API key may not list the keys, revoke another, or change the settings; it may read who it is",
+      codes,
+    );
+
+    const revokedOne = await author.fetch(`/api/me/keys/${deskListed?.id}`, { method: "DELETE" });
+    check(
+      revokedOne.status === 200 &&
+        ((await revokedOne.json()) as { revoked: number }).revoked === 1 &&
+        (await keyed(deskKey, "/api/me")).status === 401 &&
+        (await keyed(laptopKey, "/api/me")).status === 200 &&
+        (await keyed(ciKey, "/api/me")).status === 200,
+      "revoking one key on the settings page stops it, and leaves the others",
+    );
+    check(
+      (await author.fetch(`/api/me/keys/${deskListed?.id}`, { method: "DELETE" })).status === 404,
+      "a key revoked already is a 404, as one of another person's is",
+    );
+    const deskGone = await dekc(["pub", "whoami"], config, atDesk);
+    check(!deskGone.ok, "the dekc whose key was revoked is refused", deskGone);
+
+    const all = await dekc(["pub", "logout", "--all"]);
+    check(
+      all.ok && all.revoked === true && all.revokedKeys === 2 && all.forgotten === true,
+      "logout --all revokes the account's two keys left, its own included, and forgets it",
+      all,
+    );
+    check(
+      (await keyed(laptopKey, "/api/me")).status === 401 &&
+        (await keyed(ciKey, "/api/me")).status === 401 &&
+        !(await dekc(["pub", "whoami"], config, asCi)).ok,
+      "after logout --all neither the machine's key nor CI's DEK_TOKEN works",
+    );
+    check(
+      ((await (await author.fetch("/api/me/keys")).json()) as { keys: unknown[] }).keys.length ===
+        0 && (await author.fetch("/settings")).status === 200,
+      "the account has no key left, and the browser's session stays signed in",
+    );
+
+    // A plain logout revokes the key it holds, and that one alone.
+    const again = await dekc(["pub", "login"], config, atDesk);
+    await author.approveDevice(String(again.code));
+    check((await dekc(["pub", "login"], config, atDesk)).ok, "the second dekc signs in again");
+    const logout = await dekc(["pub", "logout"], config, atDesk);
+    check(logout.ok && logout.revoked === true, "logout revokes the key", logout);
+    const gone = await dekc(["pub", "whoami"], config, atDesk);
+    check(!gone.ok, "after logout the CLI is signed out", gone);
+  } finally {
+    rmSync(desk, { recursive: true, force: true });
+  }
   console.log(`\nall ${step} checks passed`);
   passed = true;
 } finally {

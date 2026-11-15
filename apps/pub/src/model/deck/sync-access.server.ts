@@ -32,3 +32,13 @@ export async function syncAccess(deckId: string): Promise<void> {
   }
   throw new Error(`the access file of ${deckId} kept changing under the write`);
 }
+
+/**
+ * Take the access file away, so the serve Worker hands out no build of the deck, with a token or
+ * without, while the deck is deleted. A `syncAccess` that read the deck's row before it went may
+ * write the file again, so `deleteDeck` takes it away once more after the rows, and its sweep of
+ * the deck's files after that takes it too.
+ */
+export async function removeAccess(deckId: string): Promise<void> {
+  await storage.delete(accessKey(deckId));
+}

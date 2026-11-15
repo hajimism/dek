@@ -10,6 +10,8 @@ Supersedes [52. Let anyone a dek.pub deck is shared with read its threads](0052-
 
 Amended by [61. Let only signed-in accounts write dek.pub public comments, and drop guests and Turnstile](0061-let-only-signed-in-accounts-write-dek-pub-public-comments-and-drop-guests-and-turnstile.md)
 
+Amended by [81. Open a dek.pub link talk only with the key its URL carries](0081-open-a-dek-pub-link-talk-only-with-the-key-its-url-carries.md)
+
 ## Context
 
 A dek.pub talk has had one kind of comment: a thread on a slide, an element or a quoted passage, resolved and placed again on each version. Two kinds of readers were mixed in it:

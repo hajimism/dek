@@ -1,18 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
+import { getTableConfig, type SQLiteTable } from "void/schema-d1";
 import { CreateDeckRequest, DeckId, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
-import { newDeckId } from "../../src/common/ids.ts";
+import * as schema from "../../db/schema.ts";
+import { newDeckId, newLinkKey, sameKey } from "../../src/common/ids.ts";
 import {
   canComment,
+  canDelete,
   canManage,
   canSeeScript,
   canView,
   type DeckRules,
-  opensToAnyone,
+  type OpeningRules,
+  opensWithoutGrant,
   sideOf,
   standingOn,
   versionStanding,
 } from "../../src/model/deck/access.ts";
-import { talkNamed, talkPath } from "../../src/model/deck/deck.ts";
+import {
+  keyed,
+  sharePatch,
+  talkHref,
+  talkNamed,
+  talkPath,
+  withLinkKey,
+} from "../../src/model/deck/deck.ts";
+import { DECK_ROWS, deleteInOrder } from "../../src/model/deck/deletion.ts";
 import { newRenames, readManifest } from "../../src/model/deck/feature/publish/manifest.ts";
 import { slideChanges } from "../../src/model/deck/feature/publish/slide-diff.ts";
 import { sitemapOf } from "../../src/model/deck/feature/sitemap/sitemap.ts";
@@ -22,7 +34,16 @@ import {
   withSlide,
 } from "../../src/model/deck/feature/talk/embed.ts";
 import { readingSlug } from "../../src/model/deck/feature/talk/reading.ts";
-import { granteeOf, strongestRole, widestSide } from "../../src/model/deck/grant/grant.ts";
+import {
+  granteeOf,
+  INVITATION_WINDOW_MS,
+  INVITATIONS_PER_WINDOW,
+  invitationsFreeAt,
+  invitationWindowStart,
+  strongestRole,
+  utcMinute,
+  widestSide,
+} from "../../src/model/deck/grant/grant.ts";
 import { invitationMail } from "../../src/model/deck/grant/invite.ts";
 import { canLike } from "../../src/model/deck/like/like.ts";
 import {
@@ -33,7 +54,13 @@ import {
 } from "../../src/model/deck/public-comment/access.ts";
 import { threadPublic } from "../../src/model/deck/public-comment/view.ts";
 import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
-import { deckIdFromHost, deckOrigin } from "../../src/model/deck/serving/origin.ts";
+import {
+  accessKey,
+  deckIdFromHost,
+  deckOrigin,
+  deckPrefix,
+  versionKey,
+} from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
 import { DeckAccess } from "../../src/model/deck/serving/type.ts";
 import {
@@ -43,47 +70,64 @@ import {
   slidePicture,
   versionOf,
 } from "../../src/model/deck/version/version.ts";
-import { handleFromEmail, isHandle } from "../../src/model/person/handle.ts";
 import { slideMapOf as map } from "./slide-map.ts";
 
 const owner = { id: "u1", handle: "hajimism", name: "Hajime" };
 const other = { id: "u2", handle: "sato", name: "Sato" };
+const KEY = "0123456789abcdefghijklmnop";
 
 describe("access", () => {
   const deck = (
     visibility: DeckRules["visibility"],
     comments: DeckRules["comments"] = "signed-in",
-  ) => ({
+  ): OpeningRules => ({
     ownerId: "u1",
     visibility,
     comments,
+    linkKey: KEY,
   });
 
   it("keeps a team deck to its owner and the team's side of its grants", () => {
-    expect(canView(deck("team"), owner, null, null)).toBe(true);
-    expect(canView(deck("team"), other, "view", "team")).toBe(true);
-    expect(canView(deck("team"), other, "comment", "guest")).toBe(false);
-    expect(canView(deck("team"), other, null, null)).toBe(false);
-    expect(canView(deck("team"), null, null, null)).toBe(false);
+    expect(canView(deck("team"), owner, null, null, null)).toBe(true);
+    expect(canView(deck("team"), other, "view", "team", null)).toBe(true);
+    expect(canView(deck("team"), other, "comment", "guest", null)).toBe(false);
+    expect(canView(deck("team"), other, null, null, null)).toBe(false);
+    expect(canView(deck("team"), null, null, null, null)).toBe(false);
   });
 
   it("keeps a private deck to its owner and grants, on either side", () => {
-    expect(canView(deck("private"), owner, null, null)).toBe(true);
-    expect(canView(deck("private"), other, null, null)).toBe(false);
-    expect(canView(deck("private"), null, null, null)).toBe(false);
-    expect(canView(deck("private"), other, "view", "guest")).toBe(true);
-    expect(canView(deck("private"), other, "view", "team")).toBe(true);
+    expect(canView(deck("private"), owner, null, null, null)).toBe(true);
+    expect(canView(deck("private"), other, null, null, null)).toBe(false);
+    expect(canView(deck("private"), null, null, null, null)).toBe(false);
+    expect(canView(deck("private"), other, "view", "guest", null)).toBe(true);
+    expect(canView(deck("private"), other, "view", "team", null)).toBe(true);
     expect(canComment(deck("private"), other, "view")).toBe(false);
     expect(canComment(deck("private"), other, "comment")).toBe(true);
   });
 
   it("lets the owner and those granted comment write review threads, whatever the policy", () => {
-    expect(canView(deck("link"), null, null, null)).toBe(true);
-    expect(canView(deck("public"), other, null, null)).toBe(true);
+    expect(canView(deck("public"), other, null, null, null)).toBe(true);
     expect(canComment(deck("link", "signed-in"), null, null)).toBe(false);
     expect(canComment(deck("link", "signed-in"), other, null)).toBe(false);
     expect(canComment(deck("public", "off"), other, "comment")).toBe(true);
     expect(canComment(deck("public", "off"), owner, null)).toBe(true);
+  });
+
+  it("opens a link deck to anyone holding its key, and to its grants without it", () => {
+    expect(canView(deck("link"), null, null, null, KEY)).toBe(true);
+    expect(canView(deck("link"), other, null, null, KEY)).toBe(true);
+    expect(canView(deck("link"), null, null, null, null)).toBe(false);
+    expect(canView(deck("link"), null, null, null, `${KEY.slice(1)}x`)).toBe(false);
+    expect(canView(deck("link"), null, null, null, KEY.slice(1))).toBe(false);
+    expect(canView({ ...deck("link"), linkKey: null }, null, null, null, "")).toBe(false);
+    expect(canView(deck("link"), owner, null, null, null)).toBe(true);
+    expect(canView(deck("link"), other, "view", "guest", null)).toBe(true);
+  });
+
+  it("opens no other visibility by the key a deck kept from being link", () => {
+    expect(canView(deck("private"), null, null, null, KEY)).toBe(false);
+    expect(canView(deck("team"), other, "view", "guest", KEY)).toBe(false);
+    expect(standingOn(deck("private"), other, [], KEY).opens).toBe(false);
   });
 
   it("lets a signed-in account like a talk anyone may open, once", () => {
@@ -103,35 +147,57 @@ describe("access", () => {
   });
 
   it("sums up a person's grants as whether the deck opens, their role, and their side", () => {
-    expect(standingOn(deck("team"), owner, [])).toEqual({ opens: true, role: null, side: "team" });
+    expect(standingOn(deck("team"), owner, [], null)).toEqual({
+      opens: true,
+      role: null,
+      side: "team",
+    });
     expect(
-      standingOn(deck("team"), other, [
-        { role: "view", side: "guest" },
-        { role: "comment", side: "team" },
-      ]),
+      standingOn(
+        deck("team"),
+        other,
+        [
+          { role: "view", side: "guest" },
+          { role: "comment", side: "team" },
+        ],
+        null,
+      ),
     ).toEqual({ opens: true, role: "comment", side: "team" });
-    expect(standingOn(deck("team"), other, [{ role: "comment", side: "guest" }])).toEqual({
+    expect(standingOn(deck("team"), other, [{ role: "comment", side: "guest" }], null)).toEqual({
       opens: false,
       role: "comment",
       side: "guest",
     });
-    expect(standingOn(deck("private"), other, [{ role: "view", side: "guest" }])).toEqual({
+    expect(standingOn(deck("private"), other, [{ role: "view", side: "guest" }], null)).toEqual({
       opens: true,
       role: "view",
       side: "guest",
     });
-    expect(standingOn(deck("public"), null, [])).toEqual({
+    expect(standingOn(deck("public"), null, [], null)).toEqual({
       opens: true,
       role: null,
       side: "guest",
     });
-    expect(standingOn(deck("private"), null, []).opens).toBe(false);
+    expect(standingOn(deck("private"), null, [], null).opens).toBe(false);
+    expect(standingOn(deck("link"), null, [], KEY)).toEqual({
+      opens: true,
+      role: null,
+      side: "guest",
+    });
+    expect(standingOn(deck("link"), null, [], null).opens).toBe(false);
   });
 
   it("lets only the owner manage", () => {
     expect(canManage(deck("public"), owner)).toBe(true);
     expect(canManage(deck("public"), other)).toBe(false);
     expect(canManage(deck("public"), null)).toBe(false);
+  });
+
+  it("lets the owner delete a deck, and an operator anyone's", () => {
+    expect(canDelete(deck("team"), owner, false)).toBe(true);
+    expect(canDelete(deck("public"), other, false)).toBe(false);
+    expect(canDelete(deck("team"), other, true)).toBe(true);
+    expect(canDelete(deck("public"), null, false)).toBe(false);
   });
 });
 
@@ -219,13 +285,6 @@ describe("deck origins and IDs", () => {
     } finally {
       draw.mockRestore();
     }
-  });
-
-  it("makes handles that fit a URL", () => {
-    expect(handleFromEmail("Sato.Taro+test@example.com")).toBe("sato-taro-test");
-    expect(isHandle("sato-taro")).toBe(true);
-    expect(isHandle("-sato")).toBe(false);
-    expect(isHandle("Sato")).toBe(false);
   });
 });
 
@@ -360,6 +419,37 @@ describe("talk paths", () => {
     expect(talkPath("hajimism", "intro")).toBe("/@hajimism/intro");
   });
 
+  it("shares a link talk at its path with its key, and any other at its path alone", () => {
+    const talk = { slug: "intro", visibility: "link" as const, linkKey: KEY };
+    expect(talkHref("hajimism", talk)).toBe(`/@hajimism/intro?key=${KEY}`);
+    expect(talkHref("hajimism", { ...talk, visibility: "public" })).toBe("/@hajimism/intro");
+    expect(talkHref("hajimism", { ...talk, visibility: "private" })).toBe("/@hajimism/intro");
+    expect(talkHref("hajimism", { ...talk, linkKey: null })).toBe("/@hajimism/intro");
+  });
+
+  it("puts a key on a path, after any query it has", () => {
+    expect(keyed("/i/d_1/2/cover", KEY)).toBe(`/i/d_1/2/cover?key=${KEY}`);
+    expect(keyed("/api/decks/d_1/comments?status=all", KEY)).toBe(
+      `/api/decks/d_1/comments?status=all&key=${KEY}`,
+    );
+    expect(keyed("/i/d_1/2/cover", null)).toBe("/i/d_1/2/cover");
+  });
+
+  it("puts a link talk's key into the address it was opened at, keeping the rest", () => {
+    expect(withLinkKey("https://dek.pub/@hajimism/intro#s-2", KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?key=${KEY}#s-2`,
+    );
+    expect(withLinkKey("https://dek.pub/@hajimism/intro?lang=ja&key=old#c_1", KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?lang=ja&key=${KEY}#c_1`,
+    );
+    expect(withLinkKey(`https://dek.pub/@hajimism/intro?key=${KEY}`, KEY)).toBe(
+      `https://dek.pub/@hajimism/intro?key=${KEY}`,
+    );
+    expect(withLinkKey("https://dek.pub/@hajimism/intro#s-2", null)).toBe(
+      "https://dek.pub/@hajimism/intro#s-2",
+    );
+  });
+
   it("reads a talk named as @handle/slug, and nothing else", () => {
     expect(talkNamed(" @hajimism/intro ")).toEqual({ segment: "@hajimism", slug: "intro" });
     expect(talkNamed("hajimism/intro")).toBeNull();
@@ -442,6 +532,53 @@ describe("grants", () => {
     expect(widestSide(["guest", "team"])).toBe("team");
     expect(widestSide(["guest"])).toBe("guest");
     expect(widestSide([])).toBeNull();
+  });
+});
+
+describe("the limit on invitations", () => {
+  const now = new Date("2026-11-15T12:00:00.000Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+  const hour = 60 * 60 * 1000;
+
+  it("counts the invitations of the last 24 hours, written as the tables write times", () => {
+    expect(INVITATION_WINDOW_MS).toBe(24 * hour);
+    expect(invitationWindowStart(now)).toBe("2026-11-14T12:00:00.000Z");
+  });
+
+  it("leaves room while fewer than the limit fall in the window", () => {
+    const sent = Array.from({ length: INVITATIONS_PER_WINDOW - 1 }, (_, i) => ago(i * hour));
+    expect(invitationsFreeAt(sent, now)).toBeNull();
+    expect(invitationsFreeAt([], now)).toBeNull();
+  });
+
+  it("frees the next one when the oldest that still counts leaves the window", () => {
+    const sent = Array.from({ length: INVITATIONS_PER_WINDOW }, (_, i) => ago(i * 60_000));
+    const oldest = INVITATIONS_PER_WINDOW - 1;
+    expect(invitationsFreeAt(sent, now)?.toISOString()).toBe(
+      new Date(now.getTime() - oldest * 60_000 + INVITATION_WINDOW_MS).toISOString(),
+    );
+  });
+
+  it("does not count an invitation older than the window", () => {
+    const sent = [
+      ago(25 * hour),
+      ...Array.from({ length: INVITATIONS_PER_WINDOW - 1 }, (_, i) => ago(i * hour)),
+    ];
+    expect(invitationsFreeAt(sent, now)).toBeNull();
+  });
+
+  it("waits for as many to leave as went over, when more than the limit were sent at once", () => {
+    const sent = Array.from({ length: INVITATIONS_PER_WINDOW + 2 }, (_, i) => ago(i * hour));
+    // Of 22 in the window, the 3 oldest must leave; the third oldest was sent 19 hours ago.
+    expect(invitationsFreeAt(sent, now)?.toISOString()).toBe(
+      new Date(now.getTime() - 19 * hour + INVITATION_WINDOW_MS).toISOString(),
+    );
+  });
+
+  it("writes a time to the minute in UTC, rounded up so that it is never too early", () => {
+    expect(utcMinute(new Date("2026-11-15T09:12:00.000Z"))).toBe("2026-11-15 09:12 UTC");
+    expect(utcMinute(new Date("2026-11-15T09:12:00.001Z"))).toBe("2026-11-15 09:13 UTC");
+    expect(utcMinute(new Date("2026-11-15T23:59:30.000Z"))).toBe("2026-11-16 00:00 UTC");
   });
 });
 
@@ -553,15 +690,49 @@ describe("invitationMail", () => {
   });
 });
 
+describe("link keys", () => {
+  it("are 26 of the ID alphabet's characters, over 128 bits, and never the same twice", () => {
+    const keys = Array.from({ length: 32 }, newLinkKey);
+    expect(keys.every((key) => /^[0-9a-z]{26}$/.test(key))).toBe(true);
+    expect(26 * Math.log2(36)).toBeGreaterThan(128);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("match only the very key, and never when the deck has none", () => {
+    expect(sameKey(KEY, KEY)).toBe(true);
+    expect(sameKey(KEY, `${KEY.slice(0, -1)}q`)).toBe(false);
+    expect(sameKey(KEY, `${KEY}0`)).toBe(false);
+    expect(sameKey(KEY, null)).toBe(false);
+    expect(sameKey(KEY, undefined)).toBe(false);
+    expect(sameKey(null, "")).toBe(false);
+    expect(sameKey("", "")).toBe(false);
+  });
+
+  it("are made the first time a deck becomes link, kept after, and replaced when asked", () => {
+    const made = sharePatch({ linkKey: null }, { visibility: "link" });
+    expect(made.visibility).toBe("link");
+    expect(made.linkKey).toMatch(/^[0-9a-z]{26}$/);
+    expect(sharePatch({ linkKey: KEY }, { visibility: "link" })).toEqual({ visibility: "link" });
+    expect(sharePatch({ linkKey: null }, { visibility: "private" })).toEqual({
+      visibility: "private",
+    });
+    expect(sharePatch({ linkKey: KEY }, { scriptPublic: true })).toEqual({ scriptPublic: true });
+    const renewed = sharePatch({ linkKey: KEY }, { newLink: true });
+    expect(Object.keys(renewed)).toEqual(["linkKey"]);
+    expect(renewed.linkKey).toMatch(/^[0-9a-z]{26}$/);
+    expect(renewed.linkKey).not.toBe(KEY);
+  });
+});
+
 describe("public comments", () => {
   const open = { ownerId: "u1", visibility: "link" as const, comments: "signed-in" as const };
   const mine = { authorId: "u2" };
 
-  it("are on a talk anyone may open, and not on a private one", () => {
-    expect(opensToAnyone(open)).toBe(true);
-    expect(opensToAnyone({ ...open, visibility: "public" })).toBe(true);
-    expect(opensToAnyone({ ...open, visibility: "private" })).toBe(false);
-    expect(opensToAnyone({ ...open, visibility: "team" })).toBe(false);
+  it("are on a talk that opens without a grant, and not on a private one", () => {
+    expect(opensWithoutGrant(open)).toBe(true);
+    expect(opensWithoutGrant({ ...open, visibility: "public" })).toBe(true);
+    expect(opensWithoutGrant({ ...open, visibility: "private" })).toBe(false);
+    expect(opensWithoutGrant({ ...open, visibility: "team" })).toBe(false);
   });
 
   it("may be posted as the policy says: by anyone signed in, or by no one", () => {
@@ -627,3 +798,117 @@ describe("public comments", () => {
     ]);
   });
 });
+
+describe("deleting a deck", () => {
+  const tables = Object.values(schema).map((table) => {
+    const config = getTableConfig(table as SQLiteTable);
+    return { name: config.name, columns: config.columns.map((column) => column.name) };
+  });
+
+  it("takes every row that names the deck, or a thread of it, and no other", () => {
+    const keyed = tables.flatMap(({ name, columns }) =>
+      name === "decks"
+        ? [{ table: name, column: "id" }]
+        : columns.includes("deck_id")
+          ? [{ table: name, column: "deck_id" }]
+          : columns.includes("thread_id")
+            ? [{ table: name, column: "thread_id" }]
+            : [],
+    );
+    expect(DECK_ROWS.map(({ table, column }) => ({ table, column })).sort(byTable)).toEqual(
+      keyed.sort(byTable),
+    );
+    expect(keyed.map(({ table }) => table)).not.toContain("profile_links");
+  });
+
+  it("takes the replies through their threads, while the threads are still there", () => {
+    const replies = DECK_ROWS.findIndex((rows) => rows.table === "replies");
+    expect(DECK_ROWS[replies]).toEqual({
+      table: "replies",
+      column: "thread_id",
+      through: "threads",
+    });
+    expect(replies).toBeLessThan(DECK_ROWS.findIndex((rows) => rows.table === "threads"));
+    expect(DECK_ROWS.at(-1)).toEqual({ table: "decks", column: "id" });
+  });
+
+  /**
+   * A deck in two stores, as `deleteInOrder` deletes it: its rows, and the files the serve Worker
+   * reads, among them the access file. `racing` writes the access file while the rows are deleted,
+   * as a `syncAccess` that read the row just before does; `sweepFails` makes the files' sweep throw.
+   */
+  function storedDeck({ racing = false, sweepFails = false } = {}) {
+    const stored = { rows: true, access: true, files: true };
+    const steps = {
+      removeAccess: vi.fn(async () => {
+        stored.access = false;
+      }),
+      deleteRows: vi.fn(async () => {
+        if (racing) {
+          stored.access = true;
+        }
+        stored.rows = false;
+      }),
+      deleteFiles: vi.fn(async () => {
+        if (sweepFails) {
+          throw new Error("R2 is down");
+        }
+        stored.access = false;
+        stored.files = false;
+      }),
+    };
+    return { stored, steps };
+  }
+
+  it("takes the access file away before the rows go, and again after", async () => {
+    const { stored, steps } = storedDeck({ racing: true, sweepFails: true });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await deleteInOrder("d_0123456789", steps);
+    expect(stored).toEqual({ rows: false, access: false, files: true });
+    expect(steps.removeAccess).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged.mock.calls[0]?.[0]).toBe(
+      "the files of the deleted deck d_0123456789 were not all deleted",
+    );
+    logged.mockRestore();
+  });
+
+  it("leaves the deck as it was when the access file cannot be taken away first", async () => {
+    const { stored, steps } = storedDeck();
+    steps.removeAccess.mockRejectedValueOnce(new Error("R2 is down"));
+    await expect(deleteInOrder("d_0123456789", steps)).rejects.toThrow("R2 is down");
+    expect(stored).toEqual({ rows: true, access: true, files: true });
+    expect(steps.deleteRows).not.toHaveBeenCalled();
+  });
+
+  it("logs the access file left after the rows went on its own line, and still sweeps", async () => {
+    const { stored, steps } = storedDeck({ racing: true });
+    steps.removeAccess.mockImplementationOnce(async () => {
+      stored.access = false;
+    });
+    steps.removeAccess.mockRejectedValueOnce(new Error("R2 is down"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await deleteInOrder("d_0123456789", steps);
+    expect(logged.mock.calls.map(([message]) => message)).toEqual([
+      "the access file of the deleted deck d_0123456789 was not deleted",
+    ]);
+    expect(stored).toEqual({ rows: false, access: false, files: false });
+    logged.mockRestore();
+  });
+
+  it("finds every file of the deck under its own prefix, the access file too, and no other's", () => {
+    const id = "d_0123456789";
+    for (const key of [
+      accessKey(id),
+      versionKey(id, 3, "public.html"),
+      versionKey(id, 3, "cover.png"),
+    ]) {
+      expect(key.startsWith(deckPrefix(id))).toBe(true);
+    }
+    expect(accessKey("d_01234567890").startsWith(deckPrefix(id))).toBe(false);
+  });
+});
+
+function byTable(a: { table: string }, b: { table: string }): number {
+  return a.table.localeCompare(b.table);
+}

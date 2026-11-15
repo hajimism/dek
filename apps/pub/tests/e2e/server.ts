@@ -1,5 +1,6 @@
 // Starts `vp dev` on a port of its own with a fresh local state, for the end-to-end run, and
-// stands in for the browser where a person would click: signing up, and approving a device code.
+// stands in for the browser where a person would click: signing up by a mailed link, and
+// approving a device code.
 
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -25,7 +26,18 @@ export type Store = {
   put(key: string, body: string): Promise<void>;
 };
 
-export async function startDevServer(port: number): Promise<DevServer> {
+/** The address the run signs `name` up with; the same all run long, so an operator can invite it. */
+export function addressOf(name: string): string {
+  return `${name.toLowerCase()}-${RUN}@example.com`;
+}
+const RUN = Date.now();
+
+/**
+ * Start the server on an empty database, with the addresses `operators` as the operators
+ * `DEK_PUB_OPERATORS` names and sign-up not open: until an operator invites someone from
+ * /settings, only the operators and the people a deck is shared with may sign up.
+ */
+export async function startDevServer(port: number, operators: string[]): Promise<DevServer> {
   const state = mkdtempSync(join(tmpdir(), "dek-pub-e2e-"));
   const url = `http://localhost:${port}`;
   const child = Bun.spawn(["node_modules/.bin/vp", "dev", "--port", String(port), "--strictPort"], {
@@ -36,6 +48,8 @@ export async function startDevServer(port: number): Promise<DevServer> {
       APP_ORIGIN: url,
       DECK_ORIGIN: `http://d-{id}.localhost:${port}`,
       DEK_PUB_DEV_LOGIN: "1",
+      DEK_PUB_OPEN_SIGN_UP: "0",
+      DEK_PUB_OPERATORS: operators.join(","),
       SERVE_TOKEN_SECRET: "e2e-serve-token-secret",
       AUTH_GITHUB_CLIENT_ID: "e2e",
       AUTH_GITHUB_CLIENT_SECRET: "e2e",
@@ -136,23 +150,71 @@ function descendants(pid: number): number[] {
   return children.flatMap((child) => [...descendants(child), child]);
 }
 
-/** A browser session: signs up with the development email form's endpoint and keeps the cookie. */
+/**
+ * A browser session: signs up by a link mailed to its address, chooses a handle as /welcome
+ * does, and keeps the cookie. It asks for every page as a browser opens one.
+ */
 export class Browser {
   private cookie = "";
 
   constructor(private readonly base: string) {}
 
+  /** Sign up, and choose the name in lowercase as the handle. */
   async signUp(name: string): Promise<{ id: string; handle: string; email: string }> {
-    const email = `${name.toLowerCase()}-${Date.now()}@example.com`;
-    const response = await this.fetch("/api/auth/sign-up/email", {
-      method: "POST",
-      json: { email, password: "password-1234", name },
-    });
-    if (!response.ok) {
-      throw new Error(`sign-up failed: ${response.status} ${await response.text()}`);
+    const { id, email } = await this.register(name);
+    const chosen = await this.chooseHandle(name.toLowerCase());
+    if (!chosen.ok) {
+      throw new Error(`choosing a handle failed: ${chosen.status} ${await chosen.text()}`);
     }
-    return ((await response.json()) as { user: { id: string; handle: string; email: string } })
-      .user;
+    const { handle } = (await chosen.json()) as { handle: string };
+    return { id, handle, email };
+  }
+
+  /** Sign up as `addressOf(name)`, which the server must have invited, and choose no handle yet. */
+  async register(name: string): Promise<{ id: string; email: string }> {
+    const email = addressOf(name);
+    const location = await this.signInByLink(email, { name });
+    const session = await this.fetch("/api/auth/get-session");
+    const user = session.ok
+      ? ((await session.json()) as { user?: { id: string; email: string } } | null)?.user
+      : undefined;
+    if (!user) {
+      throw new Error(`signing up ${email} by a link failed: sent to ${location}`);
+    }
+    return user;
+  }
+
+  /**
+   * Ask for a sign-in link as /signin does, follow the one mailed to `email`, and answer where it
+   * sent the browser, as Better Auth's `?error=` says when it failed.
+   */
+  async signInByLink(
+    email: string,
+    body: { name?: string; callbackURL?: string; errorCallbackURL?: string } = {},
+  ): Promise<string> {
+    const inbox = new Inbox(this.base);
+    const links = async () =>
+      (await inbox.to(email)).filter((mail) => mail.subject.includes("Sign in")).length;
+    const before = await links();
+    const asked = await this.fetch("/api/auth/sign-in/magic-link", {
+      method: "POST",
+      json: { email, ...body },
+    });
+    if (!asked.ok) {
+      throw new Error(`asking for a link failed: ${asked.status} ${await asked.text()}`);
+    }
+    const mail = (await inbox.waitFor(email, "Sign in", before + 1))[before];
+    const link = /https?:\/\/\S+\/magic-link\/verify\S+/.exec(mail?.text ?? "")?.[0];
+    if (!link) {
+      throw new Error(`no sign-in link was mailed to ${email}`);
+    }
+    const followed = await this.fetch(new URL(link).pathname + new URL(link).search);
+    return followed.headers.get("location") ?? "";
+  }
+
+  /** What /welcome does to save the handle chosen. */
+  chooseHandle(handle: string): Promise<Response> {
+    return this.fetch("/api/me/handle", { method: "PUT", json: { handle } });
   }
 
   /** What the /device page does: claim the code while signed in, then approve it. */
@@ -172,7 +234,7 @@ export class Browser {
   }
 
   async fetch(path: string, init: { method?: string; json?: unknown } = {}): Promise<Response> {
-    const headers = new Headers({ origin: this.base });
+    const headers = new Headers({ origin: this.base, accept: "text/html,*/*" });
     if (this.cookie) {
       headers.set("cookie", this.cookie);
     }

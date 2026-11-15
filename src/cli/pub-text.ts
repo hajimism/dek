@@ -11,6 +11,12 @@ export function formatPub(data: PubResult): string {
         ? `open ${data.url} and enter ${data.code} to sign in, then run \`${data.next}\``
         : `signed in to ${data.server} as @${data.me.handle} (key kept in the ${data.stored === "keychain" ? "OS keychain" : "credentials file"})`;
     case "logout":
+      if (data.revokedKeys !== undefined) {
+        return [
+          `revoked ${data.revokedKeys} ${data.revokedKeys === 1 ? "key" : "keys"} of the account on ${data.server}, this one included`,
+          data.forgotten ? "forgot the key" : "no key was kept here",
+        ].join("\n");
+      }
       return [
         data.revoked
           ? `revoked the key on ${data.server}`
@@ -70,6 +76,13 @@ export function formatPub(data: PubResult): string {
     }
     case "revoke":
       return `stopped sharing the deck with ${grantee(data.grant.who)}`;
+    case "delete":
+      return [
+        `deleted @${data.owner}/${data.slug} from ${data.server}`,
+        ...data.changed.map((path) => `took pub: out of ${path}; commit it`),
+      ].join("\n");
+    case "takedown":
+      return `took @${data.owner}/${data.slug} down from ${data.server}`;
     case "comments":
       if (data.comments.length === 0) {
         return "no comments";
@@ -143,6 +156,8 @@ export function pubPaths(data: PubResult, display: (path: string) => string): Pu
             changed: data.changed.map(display),
           }
         : { ...data, diagnostics: displayDiagnostics(data.diagnostics, display) };
+    case "delete":
+      return { ...data, changed: data.changed.map(display) };
     case "comments":
       return {
         ...data,

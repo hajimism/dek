@@ -5,13 +5,13 @@ import { notFound } from "../../../../src/common/api-error.ts";
 import { api } from "../../../../src/common/http.server.ts";
 import { canReadComments } from "../../../../src/model/comment/access.ts";
 import { isMuted, setMuted } from "../../../../src/model/comment/mute.server.ts";
-import { visibleDeck } from "../../../../src/model/deck/store.server.ts";
+import { requestKey, visibleDeck } from "../../../../src/model/deck/store.server.ts";
 import { requirePerson } from "../../../../src/model/person/actor.server.ts";
 
 /** The deck whose mail the signed-in person sets, if they read its comments at all. */
 async function readable(c: Context) {
   const person = await requirePerson(c);
-  const { deck, role } = await visibleDeck(c.req.param("id") ?? "", person);
+  const { deck, role } = await visibleDeck(c.req.param("id") ?? "", person, requestKey(c));
   if (!canReadComments(deck, person, role)) {
     throw notFound("comments");
   }

@@ -1,8 +1,10 @@
 // What every page knows before its own loader runs: who is signed in, the language and theme, and
 // the switches the server runs with. The language and theme also go on <html>, which only the
-// first render sets, so changing either reloads the document.
+// first render sets, so changing either reloads the document. An account with no handle yet is
+// sent to choose one before any page but that (ADR 77).
 
 import { defineMiddleware } from "void";
+import { handleGate } from "../src/shell/handle-gate.ts";
 import { sharedOf } from "../src/shell/shared.server.ts";
 import type { Shared } from "../src/shell/type.ts";
 
@@ -25,6 +27,15 @@ export default defineMiddleware(async (c, next) => {
     return next();
   }
   const shared = sharedOf(c);
+  const welcome = handleGate(shared.viewer, {
+    method: c.req.method,
+    url,
+    accept: c.req.header("accept") ?? null,
+    pageData: c.req.header("x-voidpages") === "true",
+  });
+  if (welcome) {
+    return c.redirect(welcome);
+  }
   const { lang, theme } = shared;
   c.set("shared", shared);
   c.set("headDefaults", {

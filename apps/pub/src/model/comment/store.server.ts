@@ -18,7 +18,7 @@ import type { Deck } from "../deck/type.ts";
 import { currentVersionOf, renamesOf } from "../deck/version/store.server.ts";
 import { authorOf } from "../person/person.ts";
 import { peopleById } from "../person/store.server.ts";
-import type { Person } from "../person/type.ts";
+import type { Account, Person } from "../person/type.ts";
 import { canSeeThread, scopeFor } from "./access.ts";
 import { placeComment, saysQuote } from "./anchor.ts";
 import { CommentTargets, type ThreadRow } from "./type.ts";
@@ -114,7 +114,7 @@ async function listComments(
 export async function commentsFor(
   c: Context,
   deck: Deck,
-  person: Person | null,
+  person: Account | null,
   side: GrantSide,
   status: Status,
 ): Promise<CommentRow[]> {
@@ -126,7 +126,7 @@ export async function commentsFor(
 export async function commentFor(
   c: Context,
   deck: Deck,
-  person: Person | null,
+  person: Account | null,
   side: GrantSide,
   id: string,
 ): Promise<CommentRow> {

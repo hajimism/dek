@@ -1,6 +1,6 @@
 // What the talk page loads: the deck in its frame, the script, the comments this person may read
-// and the owner's other talks. A talk someone may not see loads as a missing one, so its page
-// cannot tell the two apart.
+// and the owner's other talks. A talk someone may not see, a `link` one asked for without its key
+// included, loads as a missing one, so its page cannot tell the two apart.
 
 import type { Context } from "hono";
 import { appUrl } from "../../../../common/http.server.ts";
@@ -12,13 +12,13 @@ import { viewerOf } from "../../../person/actor.server.ts";
 import { profileOf } from "../../../person/person.ts";
 import { handleOf } from "../../../person/profile-path.ts";
 import { personByHandle } from "../../../person/store.server.ts";
-import { canComment, canManage, canSeeScript, opensToAnyone } from "../../access.ts";
+import { canComment, canManage, canSeeScript, opensWithoutGrant } from "../../access.ts";
 import { talksBy } from "../../card.server.ts";
-import { talkPath } from "../../deck.ts";
+import { keyed, linkKeyOf, talkHref, talkPath } from "../../deck.ts";
 import { likeState } from "../../like/store.server.ts";
 import { canPostPublic } from "../../public-comment/access.ts";
 import { publicCommentsOf } from "../../public-comment/store.server.ts";
-import { deckBySlug, standingWith } from "../../store.server.ts";
+import { deckBySlug, requestKey, standingWith } from "../../store.server.ts";
 import { currentVersionOf } from "../../version/store.server.ts";
 import { coverOf, slidePicture } from "../../version/version.ts";
 import { frameOf } from "./frame.server.ts";
@@ -36,7 +36,7 @@ export async function loadTalk(
     return null;
   }
   const person = await viewerOf(c);
-  const standing = await standingWith(deck, person);
+  const standing = await standingWith(deck, person, requestKey(c));
   const version = standing && (await currentVersionOf(deck));
   if (!standing || !version) {
     return null;
@@ -47,7 +47,8 @@ export async function loadTalk(
   const isOwner = canManage(deck, person);
   const seesScript = canSeeScript(deck, person);
   const readsComments = canReadComments(deck, person, role);
-  const open = opensToAnyone(deck);
+  const open = opensWithoutGrant(deck);
+  const key = linkKeyOf(deck);
   const picture = coverOf(deck.id, version);
 
   const [viewer, comments, muted, publicComments, likes, more] = await Promise.all([
@@ -75,7 +76,9 @@ export async function loadTalk(
     visibility: deck.visibility,
     scriptPublic: deck.scriptPublic,
     commentPolicy: deck.comments,
-    url: appUrl(talkPath(owner.handle, deck.slug)),
+    url: appUrl(talkHref(owner.handle, deck)),
+    canonical: appUrl(talkPath(owner.handle, deck.slug)),
+    key,
     owner: profileOf(owner),
     version: n,
     viewer,
@@ -84,7 +87,7 @@ export async function loadTalk(
       title: slide.title,
       steps: slide.steps.map((step) => step.step),
       paragraphs: seesScript ? slide.paragraphs : null,
-      picture: version.shots[slide.slug] ? slidePicture(deck.id, n, slide.slug) : null,
+      picture: version.shots[slide.slug] ? keyed(slidePicture(deck.id, n, slide.slug), key) : null,
     })),
     script: deck.scriptPublic ? "public" : seesScript ? "owner" : "hidden",
     isOwner,
@@ -95,7 +98,7 @@ export async function loadTalk(
     canPostPublic: canPostPublic(deck, person),
     likes,
     side,
-    image: picture ? appUrl(picture) : null,
+    image: picture ? appUrl(keyed(picture, key)) : null,
     more: more.filter((card) => card.slug !== deck.slug).slice(0, 3),
   };
 }

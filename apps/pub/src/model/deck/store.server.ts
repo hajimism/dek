@@ -1,7 +1,18 @@
 // Decks in D1. Every change an owner makes to a deck goes through updateDeck, which writes the
-// access file again whenever what it says may have changed; recording a version writes it too.
+// access file again whenever what it says may have changed; recording a version writes it too,
+// and deleteDeck takes it away first.
 
-import { decks } from "@schema";
+import {
+  decks,
+  grants,
+  likes,
+  mutes,
+  publicComments,
+  renames,
+  replies,
+  threads,
+  versions,
+} from "@schema";
 import type { Context } from "hono";
 import { and, count, db, desc, eq, isNotNull, sql } from "void/db";
 import type { DeckStatus } from "../../../../../src/pub/protocol.ts";
@@ -9,14 +20,17 @@ import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { appUrl } from "../../common/http.server.ts";
 import { newDeckId } from "../../common/ids.ts";
+import { isOperator } from "../person/operator.server.ts";
 import { personById } from "../person/store.server.ts";
-import type { Person } from "../person/type.ts";
-import { canManage, standingOn } from "./access.ts";
-import { talkPath } from "./deck.ts";
+import type { Account, Person } from "../person/type.ts";
+import { canDelete, canManage, standingOn } from "./access.ts";
+import { talkHref, talkPath } from "./deck.ts";
+import { DECK_ROWS, type DeckTable, deleteInOrder } from "./deletion.ts";
 import { grantsOf } from "./grant/store.server.ts";
-import { syncAccess } from "./sync-access.server.ts";
+import { deckPrefix } from "./serving/origin.ts";
+import { removeAccess, syncAccess } from "./sync-access.server.ts";
 import type { Deck, DeckPatch, Standing } from "./type.ts";
-import { currentVersionOf } from "./version/store.server.ts";
+import { currentVersionOf, deleteFilesUnder } from "./version/store.server.ts";
 import type { Version } from "./version/type.ts";
 
 /** The columns of the access file an owner may change; a change to any of them writes it again. */
@@ -142,6 +156,46 @@ export async function updateDeck(deck: Deck, patch: DeckPatch): Promise<Deck> {
   return mustFind(deck.id);
 }
 
+/** Each table DECK_ROWS names, as Drizzle has it. */
+const DECK_TABLES = {
+  replies,
+  threads,
+  public_comments: publicComments,
+  likes,
+  mutes,
+  grants,
+  renames,
+  versions,
+  decks,
+} satisfies Record<DeckTable, unknown>;
+
+/**
+ * Delete the deck for good, in the order `deleteInOrder` keeps: its access file, so the serve
+ * Worker hands out nothing of it; every row, as DECK_ROWS lists them, in one batch, after which
+ * nothing of it opens and its slug is free; the access file again; then every file under
+ * deckPrefix. A file left there is reached by nothing: the app finds a file only through the
+ * deck's rows, and the serve Worker only through its access file.
+ */
+export function deleteDeck(deck: Deck): Promise<void> {
+  return deleteInOrder(deck.id, {
+    removeAccess: () => removeAccess(deck.id),
+    deleteRows: async () => {
+      const statements = DECK_ROWS.map((rows) =>
+        db
+          .delete(DECK_TABLES[rows.table])
+          .where(
+            "through" in rows
+              ? sql`${sql.identifier(rows.column)} in (select id from ${sql.identifier(rows.through)} where deck_id = ${deck.id})`
+              : sql`${sql.identifier(rows.column)} = ${deck.id}`,
+          ),
+      );
+      // A batch takes at least one statement, and DECK_ROWS is never empty.
+      await db.batch(statements as [(typeof statements)[number], ...typeof statements]);
+    },
+    deleteFiles: () => deleteFilesUnder(deckPrefix(deck.id)),
+  });
+}
+
 async function mustFind(id: string): Promise<Deck> {
   const deck = await deckById(id);
   if (!deck) {
@@ -150,30 +204,53 @@ async function mustFind(id: string): Promise<Deck> {
   return deck;
 }
 
+/** The link key a request carries as `?key=`, which opens a `link` deck to whoever holds it. */
+export function requestKey(c: Context): string | null {
+  return c.req.query("key") ?? null;
+}
+
 /**
- * Where `person` stands with the deck, or null when it does not open to them. A grant by an
- * address they have verified counts whether or not it is claimed yet, so reading writes nothing.
+ * Where `person`, holding `key`, stands with the deck, or null when it does not open to them. A
+ * grant by an address they have verified counts whether or not it is claimed yet, so reading
+ * writes nothing.
  */
-export async function standingWith(deck: Deck, person: Person | null): Promise<Standing | null> {
+export async function standingWith(
+  deck: Deck,
+  person: Account | null,
+  key: string | null,
+): Promise<Standing | null> {
   const grants = await grantsOf(deck.id, person);
-  const standing = standingOn(deck, person, grants);
+  const standing = standingOn(deck, person, grants, key);
   return standing.opens ? standing : null;
 }
 
 /**
- * The deck, if `person` may see it, with where they stand; a deck they may not see is as missing
- * as one that is not.
+ * The deck, if `person`, holding `key`, may see it, with where they stand; a deck they may not see
+ * is as missing as one that is not. The deck's ID opens nothing by itself: a script.md committed
+ * with its `pub:` gives it away.
  */
 export async function visibleDeck(
   id: string,
-  person: Person | null,
+  person: Account | null,
+  key: string | null,
 ): Promise<Standing & { deck: Deck }> {
   const deck = await deckById(id);
-  const standing = deck && (await standingWith(deck, person));
+  const standing = deck && (await standingWith(deck, person, key));
   if (!deck || !standing) {
     throw notFound();
   }
   return { deck, ...standing };
+}
+
+/**
+ * The deck, if `person` may delete it: its owner, or an operator of dek.pub. Anyone else gets the
+ * 404 a missing deck gets.
+ */
+export function deletableDeck(deck: Deck | null, person: Person): Deck {
+  if (!deck || !canDelete(deck, person, isOperator(person))) {
+    throw notFound();
+  }
+  return deck;
 }
 
 export async function ownedDeck(id: string, person: Person): Promise<Deck> {
@@ -184,13 +261,25 @@ export async function ownedDeck(id: string, person: Person): Promise<Deck> {
   return deck;
 }
 
-async function ownerHandle(c: Context, deck: Deck): Promise<string> {
+export async function ownerHandle(c: Context, deck: Deck): Promise<string> {
   return (await personById(c, deck.ownerId))?.handle ?? deck.ownerId;
 }
 
-/** The deck's absolute URL, for the CLI, feeds and comments. */
+/**
+ * The deck's absolute URL with no key, for those it is shared with, who open it by their grant or
+ * as its owner: review threads' links and the mail about them, and invitations. A key in these
+ * would open nothing more to them, and would go wherever they are pasted.
+ */
 export async function talkUrl(c: Context, deck: Deck): Promise<string> {
   return appUrl(talkPath(await ownerHandle(c, deck), deck.slug));
+}
+
+/**
+ * The deck's absolute URL to hand out, with the key a `link` deck opens by, as `DeckStatus.url`
+ * gives it too: for `PublishResult.url`.
+ */
+export async function shareUrl(c: Context, deck: Deck): Promise<string> {
+  return appUrl(talkHref(await ownerHandle(c, deck), deck));
 }
 
 /** The deck as the CLI is told of it; `version` is its current one, when the caller has it. */
@@ -206,7 +295,7 @@ export async function deckStatus(
     slug: deck.slug,
     owner: handle,
     title: deck.title,
-    url: appUrl(talkPath(handle, deck.slug)),
+    url: appUrl(talkHref(handle, deck)),
     visibility: deck.visibility,
     scriptPublic: deck.scriptPublic,
     embed: deck.embed,

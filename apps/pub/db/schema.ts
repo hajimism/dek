@@ -27,6 +27,11 @@ export const decks = sqliteTable(
     comments: text("comments", { enum: ["off", "signed-in"] })
       .notNull()
       .default("signed-in"),
+    /**
+     * The secret a `link` deck's URL carries as `?key=`; made the first time the deck becomes
+     * `link`, kept through other visibilities, and replaced only when its owner asks.
+     */
+    linkKey: text("link_key"),
     currentVersion: integer("current_version"),
     latestVersion: integer("latest_version"),
     /** The next number a shared thread takes; a team thread's come from `nextTeamThread`. */
@@ -137,6 +142,40 @@ export const grants = sqliteTable(
   ],
 );
 
+/**
+ * An invitation a new grant mailed, by the person who made it: what the limit on invitations counts
+ * (ADR 84). It names no deck and no address, so it outlasts the deck and the grant, and keeps
+ * nothing of the person mailed; rows older than the window are deleted as new ones come.
+ */
+export const invitations = sqliteTable(
+  "invitations",
+  {
+    inviterId: text("inviter_id").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+  },
+  (table) => [index("invitations_inviter").on(table.inviterId, table.createdAt)],
+);
+
+/**
+ * Who an operator has invited to sign up, from /settings: an email address, or `@` and a GitHub
+ * login, in lowercase (ADR 85). An entry lets one account in: the first made for it claims it, and
+ * a claimed entry lets no one else in. It is no invitation a grant mails, which `invitations` counts.
+ */
+export const signUpInvites = sqliteTable(
+  "sign_up_invites",
+  {
+    id: text("id").primaryKey(),
+    entry: text("entry").notNull(),
+    /** The operator who added it. */
+    addedBy: text("added_by").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+    /** The account made from it, and when; null until then. */
+    claimedBy: text("claimed_by"),
+    claimedAt: text("claimed_at"),
+  },
+  (table) => [uniqueIndex("sign_up_invites_entry").on(table.entry)],
+);
+
 /** A deck whose comments one person hears nothing of by mail. */
 export const mutes = sqliteTable(
   "mutes",
@@ -178,4 +217,19 @@ export const likes = sqliteTable(
     createdAt: text("created_at").notNull().default(now),
   },
   (table) => [primaryKey({ columns: [table.deckId, table.userId] })],
+);
+
+/**
+ * The links a person's profile shows, `position` from 0 in the order they put them. Setting them
+ * replaces them all; an account made with GitHub starts with its GitHub profile (ADR 78).
+ */
+export const profileLinks = sqliteTable(
+  "profile_links",
+  {
+    userId: text("user_id").notNull(),
+    position: integer("position").notNull(),
+    url: text("url").notNull(),
+    createdAt: text("created_at").notNull().default(now),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.position] })],
 );

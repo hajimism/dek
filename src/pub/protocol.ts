@@ -205,6 +205,26 @@ export const DeckStatus = z.strictObject({
 });
 export type DeckStatus = z.infer<typeof DeckStatus>;
 
+/**
+ * The deck at `/@handle/slug`, as its owner or an operator finds it to take it down: what names
+ * it, and nothing that opens it, so a `link` talk's key stays with those it was handed to.
+ */
+export const DeckFound = z.strictObject({
+  id: DeckId,
+  owner: z.string().describe("The owner's handle."),
+  slug: z.string(),
+});
+export type DeckFound = z.infer<typeof DeckFound>;
+
+/** The talk a `DELETE` of a deck took away: every row and file of it is gone, and its slug free. */
+export const DeckDeleted = z.strictObject({
+  deleted: z.literal(true),
+  id: DeckId,
+  owner: z.string().describe("The owner's handle."),
+  slug: z.string(),
+});
+export type DeckDeleted = z.infer<typeof DeckDeleted>;
+
 export const PublishResult = z.strictObject({
   id: DeckId,
   n: z.number().int(),
@@ -219,6 +239,8 @@ export const ShareRequest = z.strictObject({
   scriptPublic: z.boolean().optional(),
   embed: z.boolean().optional(),
   comments: CommentPolicy.optional(),
+  /** Replace the key a `link` deck's URL carries, so the URL given out before opens no more. */
+  newLink: z.literal(true).optional(),
 });
 export type ShareRequest = z.infer<typeof ShareRequest>;
 
@@ -388,7 +410,10 @@ export const GrantRole = z.enum(["view", "comment"]);
 export const GrantSide = z.enum(["team", "guest"]);
 export const Grant = z.strictObject({
   id: z.string(),
-  /** A signed-in person's handle, or an email address no account has claimed yet. */
+  /**
+   * A person's handle, or an email address: one no account has claimed yet, or one claimed by an
+   * account that has not chosen its handle.
+   */
   who: z.string(),
   role: GrantRole,
   side: GrantSide,
@@ -415,9 +440,90 @@ export const Me = z.strictObject({
 });
 export type Me = z.infer<typeof Me>;
 
+/**
+ * Whether a handle may be chosen: `free`, `taken` by someone, `reserved` for no one, or `invalid`
+ * as a handle. Only the page to choose one asks.
+ */
+export const HandleStatus = z.strictObject({
+  handle: z.string(),
+  status: z.enum(["free", "taken", "reserved", "invalid"]),
+});
+export type HandleStatus = z.infer<typeof HandleStatus>;
+
+/** The handle a person chooses, once; the answer is Me. */
+export const ChooseHandle = z.strictObject({ handle: z.string().min(1).max(64) });
+export type ChooseHandle = z.infer<typeof ChooseHandle>;
+
+/**
+ * The links a person's profile shows, in their order. PUT replaces them all, and both it and GET
+ * answer them as saved; what a link may be, and how many, the server says by a code of its own.
+ */
+export const ProfileLinks = z.strictObject({ links: z.array(z.string().max(2048)).max(20) });
+export type ProfileLinks = z.infer<typeof ProfileLinks>;
+
+/** What a person changes of themself with PATCH on `paths.me`: their name; the answer is Me. */
+export const UpdateMe = z.strictObject({ name: z.string().max(200) });
+export type UpdateMe = z.infer<typeof UpdateMe>;
+
+/**
+ * What the CLI may send, as JSON, to trade the device flow's session for a key: the name the key
+ * is listed by, its machine's. An older dekc sends no body, and its key is called dekc.
+ */
+export const NewCliKey = z.strictObject({ name: z.string().max(255).optional() });
+export type NewCliKey = z.infer<typeof NewCliKey>;
+
 /** What the server gives the CLI for the session the device flow made. */
 export const CliKey = z.strictObject({ key: z.string(), me: Me });
 export type CliKey = z.infer<typeof CliKey>;
+
+/**
+ * One of a person's API keys as they see it: what it is called, and when it was made, last used
+ * and runs out. Never the key, nor its hash or its first characters.
+ */
+export const CliKeyInfo = z.strictObject({
+  id: z.string(),
+  name: z.string().nullable(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+});
+export type CliKeyInfo = z.infer<typeof CliKeyInfo>;
+
+/** GET on `paths.myKeys`, from a browser's session only: the person's keys, newest first. */
+export const CliKeys = z.strictObject({ keys: z.array(CliKeyInfo) });
+export type CliKeys = z.infer<typeof CliKeys>;
+
+/** What revoking keys answers: DELETE on `paths.myKeys` revokes them all, on `paths.myKey` one. */
+export const KeysRevoked = z.strictObject({ revoked: z.number().int() });
+export type KeysRevoked = z.infer<typeof KeysRevoked>;
+
+/**
+ * One entry of who may sign up, as an operator sees it on /settings: an address, or `@` and a
+ * GitHub login, in lowercase; the operator who added it and when; and the account made from it
+ * and when, once one has been. A handle is null for an account that has none, or none any more.
+ */
+export const SignUpInvite = z.strictObject({
+  id: z.string(),
+  entry: z.string(),
+  addedAt: z.string(),
+  addedBy: z.string().nullable(),
+  claimedAt: z.string().nullable(),
+  claimedBy: z.string().nullable(),
+});
+export type SignUpInvite = z.infer<typeof SignUpInvite>;
+
+/**
+ * Every entry, the newest first: what GET on `paths.invites` answers, from an operator's browser
+ * session alone, and what adding or removing one answers, as the list stands after it.
+ */
+export const SignUpInvites = z.strictObject({ invites: z.array(SignUpInvite) });
+export type SignUpInvites = z.infer<typeof SignUpInvites>;
+
+/** What POST on `paths.invites` adds: addresses and `@<GitHub login>`s; the server reads each. */
+export const NewSignUpInvites = z.strictObject({
+  entries: z.array(z.string().max(320)).max(200),
+});
+export type NewSignUpInvites = z.infer<typeof NewSignUpInvites>;
 
 /** Every error answer. `code` is stable; `message` is for people. */
 export const ErrorBody = z.strictObject({
@@ -429,6 +535,19 @@ export const ErrorBody = z.strictObject({
 });
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
+/**
+ * The code of the 409 an account is answered with when it does what only a person with a handle
+ * may, publish or take an API key among them, before it has chosen one; the hint names the page
+ * to choose it on.
+ */
+export const HANDLE_NEEDED = "handle_needed";
+
+/**
+ * The code of the 403 an API key is answered with when it asks for what only a browser's session
+ * may do: change the settings, list the keys, or revoke one other than itself.
+ */
+export const SESSION_NEEDED = "session_needed";
+
 /** Whether the signed-in person is mailed of a deck's comments; PUT mutes it, DELETE unmutes. */
 export const MuteState = z.strictObject({ muted: z.boolean() });
 export type MuteState = z.infer<typeof MuteState>;
@@ -436,7 +555,17 @@ export type MuteState = z.infer<typeof MuteState>;
 /** The API's paths, relative to the server's origin. */
 export const paths = {
   me: "/api/me",
+  myHandle: "/api/me/handle",
+  myLinks: "/api/me/links",
+  myKeys: "/api/me/keys",
+  myKey: (id: string) => `/api/me/keys/${segment(id)}`,
+  /** Who may sign up, as an operator lists, adds and removes them; a 404 to anyone else. */
+  invites: "/api/invites",
+  invite: (id: string) => `/api/invites/${segment(id)}`,
+  handle: (handle: string) => `/api/handles/${segment(handle)}`,
   talksOf: (handle: string) => `/api/people/${segment(handle)}/talks`,
+  /** One talk by its URL's handle and slug, as its owner or an operator manages it. */
+  talk: (handle: string, slug: string) => `/api/people/${segment(handle)}/talks/${segment(slug)}`,
   cliKey: "/api/cli/key",
   revokeKey: "/api/cli/key",
   decks: "/api/decks",

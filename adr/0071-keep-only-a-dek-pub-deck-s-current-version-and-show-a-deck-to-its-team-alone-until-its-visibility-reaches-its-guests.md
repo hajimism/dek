@@ -8,6 +8,8 @@ Accepted
 
 Supersedes [55. Let the team's side of a dek.pub deck read its drafts, and promote one with dekc](0055-let-the-team-s-side-of-a-dek-pub-deck-read-its-drafts-and-promote-one-with-dekc.md)
 
+Amended by [81. Open a dek.pub link talk only with the key its URL carries](0081-open-a-dek-pub-link-talk-only-with-the-key-its-url-carries.md)
+
 ## Context
 
 ADR 55 let the team's side read a version before it is current: `dekc pub publish --no-promote` uploads a draft, the team reads it and comments on it, and `dekc pub promote` or the manage page makes it the one the guests read. ADR 64 renamed the client's side to the guests. So a deck holds every version it was ever sent, the talk page has a version picker for the team, threads carry a version clause beside their scope, and `dekc pub status` lists the versions.

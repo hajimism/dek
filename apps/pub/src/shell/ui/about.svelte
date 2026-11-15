@@ -140,9 +140,9 @@
 
   <footer class="end">
     <p>{t("about.end")}</p>
-    {#if shared.viewer}
+    {#if shared.viewer?.handle}
       <Button variant="primary" size="lg" href={profilePath(shared.viewer.handle)} iconAfter="chevron-right">{t("landing.ctaProfile")}</Button>
-    {:else}
+    {:else if !shared.viewer}
       <Button variant="neutral" size="lg" icon="github" href="/signin">{t("landing.ctaSignin")}</Button>
     {/if}
   </footer>

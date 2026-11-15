@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 // The page's own tokens and base styles, as the layout loads them, so widths are the real ones.
 import "../../src/common/ui/tokens.css";
 import type { DeckStatus } from "../../../../src/pub/protocol.ts";
+import { toasts } from "../../src/common/ui/toast.svelte.ts";
 import ManagePage from "../../src/model/deck/feature/manage/ui/manage-page.svelte";
 import { renderPage } from "./setup.ts";
 
@@ -34,7 +35,9 @@ describe("ManagePage's visibility", () => {
     ).toEqual(["Team only", "Team and guests", "Link only", "Public"]);
     await expect
       .element(group.getByRole("radio", { name: "Link only" }))
-      .toHaveAccessibleDescription("Anyone with the link. It isn’t listed or indexed.");
+      .toHaveAccessibleDescription(
+        "Anyone with the link, whose key can’t be guessed. It isn’t listed or indexed.",
+      );
     await expect.element(group.getByRole("radio", { name: "Team only" })).toBeChecked();
   });
 
@@ -68,4 +71,155 @@ describe("ManagePage's visibility", () => {
       });
     }
   }
+});
+
+describe("ManagePage's link", () => {
+  const linked: DeckStatus = {
+    ...status,
+    visibility: "link",
+    url: "https://dek.pub/@demo/why-dek?key=0123456789abcdefghijklmnop",
+  };
+  const renewed = "https://dek.pub/@demo/why-dek?key=qrstuvwxyz0123456789abcdef";
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("makes a new link only once asked twice, and shows the URL that now opens the talk", async () => {
+    const fetch = vi.fn(
+      async (_path: string, _init?: RequestInit) =>
+        new Response(JSON.stringify({ ...linked, url: renewed })),
+    );
+    vi.stubGlobal("fetch", fetch);
+    await renderPage(ManagePage, { ...props, status: linked });
+    await expect
+      .element(page.getByLabelText("Talk URL", { exact: true }))
+      .toHaveTextContent(linked.url);
+    await page.getByRole("button", { name: "New link" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect
+      .element(dialog.getByText(/^The link given out so far stops working\./))
+      .toBeVisible();
+    expect(fetch).not.toHaveBeenCalled();
+    await dialog.getByRole("button", { name: "Make a new link" }).click();
+    await expect
+      .element(page.getByLabelText("Talk URL", { exact: true }))
+      .toHaveTextContent(renewed);
+    await expect
+      .element(page.getByRole("link", { name: "Open talk" }))
+      .toHaveAttribute("href", "/@demo/why-dek?key=qrstuvwxyz0123456789abcdef");
+    expect(fetch.mock.calls.map(([path, init]) => [path, init?.method, init?.body])).toEqual([
+      [`/api/decks/${status.id}`, "PATCH", JSON.stringify({ newLink: true })],
+    ]);
+  });
+
+  it("opens the talk, and goes back to it, at the URL it is shared at", async () => {
+    await renderPage(ManagePage, { ...props, status: linked });
+    const shared = "/@demo/why-dek?key=0123456789abcdefghijklmnop";
+    await expect
+      .element(page.getByRole("link", { name: "Open talk" }))
+      .toHaveAttribute("href", shared);
+    await expect
+      .element(page.getByRole("link", { name: "Back to the talk" }))
+      .toHaveAttribute("href", shared);
+  });
+
+  it("offers no new link on a talk that is not link only", async () => {
+    await renderPage(ManagePage, props);
+    await expect.element(page.getByRole("button", { name: "New link" })).not.toBeInTheDocument();
+  });
+});
+
+describe("ManagePage's delete", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("deletes the talk only once its slug is typed, then goes to the owner's profile", async () => {
+    const fetch = vi.fn(
+      async (_path: string, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({ deleted: true, id: status.id, owner: "demo", slug: "why-dek" }),
+        ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const ondeleted = vi.fn();
+    await renderPage(ManagePage, { ...props, ondeleted });
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    const dialog = page.getByRole("dialog", { name: "Delete “Why dek”?" });
+    const confirm = dialog.getByRole("button", { name: "Delete for good" });
+    await expect.element(confirm).toBeDisabled();
+    const field = dialog.getByLabelText("To confirm, type why-dek");
+    await expect.element(field).toHaveFocus();
+    await field.fill("why-de");
+    await expect.element(confirm).toBeDisabled();
+    await field.fill("why-dek");
+    await confirm.click();
+    await expect.poll(() => ondeleted.mock.calls).toEqual([["/@demo"]]);
+    expect(fetch.mock.calls.map(([path, init]) => [path, init?.method])).toEqual([
+      [`/api/decks/${status.id}`, "DELETE"],
+    ]);
+  });
+
+  it("keeps the talk when the dialog is cancelled, and asks for the slug afresh", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    await renderPage(ManagePage, props);
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabelText("To confirm, type why-dek").fill("why-dek");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    await expect.element(dialog.getByLabelText("To confirm, type why-dek")).toHaveValue("");
+    await expect.element(dialog.getByRole("button", { name: "Delete for good" })).toBeDisabled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("says when the talk could not be deleted, and stays", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { code: "internal", message: "down" } }), {
+            status: 500,
+          }),
+      ),
+    );
+    const ondeleted = vi.fn();
+    await renderPage(ManagePage, { ...props, ondeleted });
+    await page.getByRole("button", { name: "Delete this talk" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabelText("To confirm, type why-dek").fill("why-dek");
+    await dialog.getByRole("button", { name: "Delete for good" }).click();
+    await expect
+      .poll(() => toasts.map((note) => [note.message, note.tone]))
+      .toContainEqual(["Something went wrong. down", "error"]);
+    await expect.element(dialog.getByRole("button", { name: "Delete for good" })).toBeEnabled();
+    expect(ondeleted).not.toHaveBeenCalled();
+  });
+});
+
+describe("ManagePage's sharing", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("says why a share was refused and what to do, as the server put both", async () => {
+    const error = {
+      code: "invitations_exhausted",
+      message: "your shares mailed 20 invitations in the last 24 hours",
+      hint: "share with someone new after 2026-11-15 09:13 UTC",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error }), { status: 429 })),
+    );
+    await renderPage(ManagePage, props);
+    const who = page.getByLabelText("Handle or email");
+    await who.fill("new@example.com");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const alert = page.getByRole("alert");
+    await expect.element(alert.getByText(error.message)).toBeVisible();
+    await expect.element(alert.getByText(error.hint)).toBeVisible();
+    await expect.element(who).toHaveAccessibleDescription(`${error.message} ${error.hint}`);
+    await expect.element(who).toHaveValue("new@example.com");
+  });
 });
