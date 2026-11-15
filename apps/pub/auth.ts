@@ -96,6 +96,9 @@ export default defineAuth(({ defaults, env }) => {
         },
       },
     },
+    // GitHub's tokens are never used after sign-in, so a copy of the database must not hand them
+    // out: they are kept encrypted with BETTER_AUTH_SECRET (ADR 94).
+    account: { ...defaults.account, encryptOAuthTokens: true },
     socialProviders: {
       ...defaults.socialProviders,
       github: {
@@ -191,6 +194,8 @@ export default defineAuth(({ defaults, env }) => {
       }),
       magicLink({
         expiresIn: SIGN_IN_LINK_SECONDS,
+        // The database keeps a link's token hashed, so reading it signs no one in (ADR 94).
+        storeToken: "hashed",
         sendMagicLink: ({ email, url }, ctx) => {
           ctx?.context.runInBackground(
             (async () => {

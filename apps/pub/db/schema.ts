@@ -2,9 +2,30 @@
 // are made by Void from auth.ts. D1 holds metadata only; every file of a version is in R2.
 
 import { sql } from "void/db";
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "void/schema-d1";
+import {
+  check,
+  index,
+  integer,
+  primaryKey,
+  type SQLiteColumn,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "void/schema-d1";
 
 const now = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
+
+// A column's `enum` and `boolean` mode hold only in TypeScript; these put the same rule in the
+// table, so a row written by hand or by a query that skips the types cannot break it (ADR 94).
+const VISIBILITIES = ["team", "private", "link", "public"] as const;
+const COMMENTS = ["off", "signed-in"] as const;
+const SCOPES = ["team", "shared"] as const;
+const ROLES = ["view", "comment"] as const;
+const SIDES = ["team", "guest"] as const;
+
+const oneOf = (name: string, column: SQLiteColumn, values: readonly string[]) =>
+  check(name, sql`${column} in (${sql.raw(values.map((value) => `'${value}'`).join(", "))})`);
+const flag = (name: string, column: SQLiteColumn) => check(name, sql`${column} in (0, 1)`);
 
 export const decks = sqliteTable(
   "decks",
@@ -19,14 +40,10 @@ export const decks = sqliteTable(
     /** The talk's length in minutes, from the frontmatter's `duration`. */
     minutes: integer("minutes"),
     lang: text("lang"),
-    visibility: text("visibility", { enum: ["team", "private", "link", "public"] })
-      .notNull()
-      .default("team"),
+    visibility: text("visibility", { enum: VISIBILITIES }).notNull().default("team"),
     scriptPublic: integer("script_public", { mode: "boolean" }).notNull().default(false),
     embed: integer("embed", { mode: "boolean" }).notNull().default(false),
-    comments: text("comments", { enum: ["off", "signed-in"] })
-      .notNull()
-      .default("signed-in"),
+    comments: text("comments", { enum: COMMENTS }).notNull().default("signed-in"),
     /**
      * The secret a `link` deck's URL carries as `?key=`; made the first time the deck becomes
      * `link`, kept through other visibilities, and replaced only when its owner asks.
@@ -43,6 +60,10 @@ export const decks = sqliteTable(
   (table) => [
     uniqueIndex("decks_owner_slug").on(table.ownerId, table.slug),
     index("decks_visibility").on(table.visibility, table.updatedAt),
+    oneOf("decks_visibility_known", table.visibility, VISIBILITIES),
+    oneOf("decks_comments_known", table.comments, COMMENTS),
+    flag("decks_script_public_flag", table.scriptPublic),
+    flag("decks_embed_flag", table.embed),
   ],
 );
 
@@ -89,9 +110,7 @@ export const threads = sqliteTable(
     deckId: text("deck_id").notNull(),
     /** Per deck and scope, so a guest cannot count the team's threads by the gaps. */
     number: integer("number").notNull(),
-    scope: text("scope", { enum: ["team", "shared"] })
-      .notNull()
-      .default("team"),
+    scope: text("scope", { enum: SCOPES }).notNull().default("team"),
     /** The version the thread was opened on. */
     n: integer("n").notNull(),
     slug: text("slug").notNull(),
@@ -107,6 +126,7 @@ export const threads = sqliteTable(
   (table) => [
     uniqueIndex("threads_deck_number").on(table.deckId, table.scope, table.number),
     index("threads_deck_slug").on(table.deckId, table.slug),
+    oneOf("threads_scope_known", table.scope, SCOPES),
   ],
 );
 
@@ -130,15 +150,19 @@ export const grants = sqliteTable(
     /** Set once the grant names an account; until then it waits on `email`. */
     userId: text("user_id"),
     email: text("email"),
-    role: text("role", { enum: ["view", "comment"] }).notNull(),
-    side: text("side", { enum: ["team", "guest"] })
-      .notNull()
-      .default("guest"),
+    role: text("role", { enum: ROLES }).notNull(),
+    side: text("side", { enum: SIDES }).notNull().default("guest"),
     createdAt: text("created_at").notNull().default(now),
   },
   (table) => [
     uniqueIndex("grants_deck_user").on(table.deckId, table.userId),
     uniqueIndex("grants_deck_email").on(table.deckId, table.email),
+    // Claiming on sign-in, and asking whether an address has a grant waiting, look across decks.
+    index("grants_user").on(table.userId),
+    index("grants_email").on(table.email),
+    oneOf("grants_role_known", table.role, ROLES),
+    oneOf("grants_side_known", table.side, SIDES),
+    check("grants_names_someone", sql`${table.userId} is not null or ${table.email} is not null`),
   ],
 );
 
@@ -184,7 +208,11 @@ export const mutes = sqliteTable(
     deckId: text("deck_id").notNull(),
     createdAt: text("created_at").notNull().default(now),
   },
-  (table) => [primaryKey({ columns: [table.userId, table.deckId] })],
+  (table) => [
+    primaryKey({ columns: [table.userId, table.deckId] }),
+    // Deleting a deck deletes its mutes, which the key, led by the person, cannot find.
+    index("mutes_deck").on(table.deckId),
+  ],
 );
 
 /**

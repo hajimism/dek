@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e8d5b7af-a52f-422a-9afe-0e89dbf1b365",
-  "prevId": "650f038f-69fd-41fc-83c4-05e8d596c778",
+  "id": "cee84a8d-5117-4181-a486-bf3834f863ec",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "decks": {
       "name": "decks",
@@ -56,6 +56,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "minutes": {
+          "name": "minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "lang": {
           "name": "lang",
           "type": "text",
@@ -69,7 +76,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'private'"
+          "default": "'team'"
         },
         "script_public": {
           "name": "script_public",
@@ -94,6 +101,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'signed-in'"
+        },
+        "link_key": {
+          "name": "link_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "current_version": {
           "name": "current_version",
@@ -163,7 +177,24 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "decks_visibility_known": {
+          "name": "decks_visibility_known",
+          "value": "\"decks\".\"visibility\" in ('team', 'private', 'link', 'public')"
+        },
+        "decks_comments_known": {
+          "name": "decks_comments_known",
+          "value": "\"decks\".\"comments\" in ('off', 'signed-in')"
+        },
+        "decks_script_public_flag": {
+          "name": "decks_script_public_flag",
+          "value": "\"decks\".\"script_public\" in (0, 1)"
+        },
+        "decks_embed_flag": {
+          "name": "decks_embed_flag",
+          "value": "\"decks\".\"embed\" in (0, 1)"
+        }
+      }
     },
     "grants": {
       "name": "grants",
@@ -209,7 +240,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'client'"
+          "default": "'guest'"
         },
         "created_at": {
           "name": "created_at",
@@ -236,6 +267,278 @@
             "email"
           ],
           "isUnique": true
+        },
+        "grants_user": {
+          "name": "grants_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "grants_email": {
+          "name": "grants_email",
+          "columns": [
+            "email"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "grants_role_known": {
+          "name": "grants_role_known",
+          "value": "\"grants\".\"role\" in ('view', 'comment')"
+        },
+        "grants_side_known": {
+          "name": "grants_side_known",
+          "value": "\"grants\".\"side\" in ('team', 'guest')"
+        },
+        "grants_names_someone": {
+          "name": "grants_names_someone",
+          "value": "\"grants\".\"user_id\" is not null or \"grants\".\"email\" is not null"
+        }
+      }
+    },
+    "invitations": {
+      "name": "invitations",
+      "columns": {
+        "inviter_id": {
+          "name": "inviter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "invitations_inviter": {
+          "name": "invitations_inviter",
+          "columns": [
+            "inviter_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "likes": {
+      "name": "likes",
+      "columns": {
+        "deck_id": {
+          "name": "deck_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "likes_deck_id_user_id_pk": {
+          "columns": [
+            "deck_id",
+            "user_id"
+          ],
+          "name": "likes_deck_id_user_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "mutes": {
+      "name": "mutes",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deck_id": {
+          "name": "deck_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "mutes_deck": {
+          "name": "mutes_deck",
+          "columns": [
+            "deck_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "mutes_user_id_deck_id_pk": {
+          "columns": [
+            "user_id",
+            "deck_id"
+          ],
+          "name": "mutes_user_id_deck_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "profile_links": {
+      "name": "profile_links",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "profile_links_user_id_position_pk": {
+          "columns": [
+            "user_id",
+            "position"
+          ],
+          "name": "profile_links_user_id_position_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "public_comments": {
+      "name": "public_comments",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deck_id": {
+          "name": "deck_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "public_comments_deck": {
+          "name": "public_comments_deck",
+          "columns": [
+            "deck_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "public_comments_parent": {
+          "name": "public_comments_parent",
+          "columns": [
+            "parent_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -326,14 +629,7 @@
           "name": "author_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "guest_name": {
-          "name": "guest_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "created_at": {
@@ -353,6 +649,67 @@
             "created_at"
           ],
           "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "sign_up_invites": {
+      "name": "sign_up_invites",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry": {
+          "name": "entry",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "added_by": {
+          "name": "added_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "claimed_by": {
+          "name": "claimed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "sign_up_invites_entry": {
+          "name": "sign_up_invites_entry",
+          "columns": [
+            "entry"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},
@@ -431,14 +788,7 @@
           "name": "author_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "guest_name": {
-          "name": "guest_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "resolved_by": {
@@ -486,7 +836,12 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "threads_scope_known": {
+          "name": "threads_scope_known",
+          "value": "\"threads\".\"scope\" in ('team', 'shared')"
+        }
+      }
     },
     "versions": {
       "name": "versions",
@@ -1129,6 +1484,13 @@
         },
         "handle": {
           "name": "handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "githubLogin": {
+          "name": "githubLogin",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

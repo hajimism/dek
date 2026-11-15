@@ -6,16 +6,23 @@ CREATE TABLE `decks` (
 	`description` text,
 	`event` text,
 	`talk_date` text,
+	`minutes` integer,
 	`lang` text,
-	`visibility` text DEFAULT 'private' NOT NULL,
+	`visibility` text DEFAULT 'team' NOT NULL,
 	`script_public` integer DEFAULT false NOT NULL,
 	`embed` integer DEFAULT false NOT NULL,
 	`comments` text DEFAULT 'signed-in' NOT NULL,
+	`link_key` text,
 	`current_version` integer,
 	`latest_version` integer,
 	`next_thread` integer DEFAULT 1 NOT NULL,
+	`next_team_thread` integer DEFAULT 1 NOT NULL,
 	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
-	`updated_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+	`updated_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	CONSTRAINT "decks_visibility_known" CHECK("decks"."visibility" in ('team', 'private', 'link', 'public')),
+	CONSTRAINT "decks_comments_known" CHECK("decks"."comments" in ('off', 'signed-in')),
+	CONSTRAINT "decks_script_public_flag" CHECK("decks"."script_public" in (0, 1)),
+	CONSTRAINT "decks_embed_flag" CHECK("decks"."embed" in (0, 1))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `decks_owner_slug` ON `decks` (`owner_id`,`slug`);--> statement-breakpoint
@@ -26,11 +33,58 @@ CREATE TABLE `grants` (
 	`user_id` text,
 	`email` text,
 	`role` text NOT NULL,
-	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+	`side` text DEFAULT 'guest' NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	CONSTRAINT "grants_role_known" CHECK("grants"."role" in ('view', 'comment')),
+	CONSTRAINT "grants_side_known" CHECK("grants"."side" in ('team', 'guest')),
+	CONSTRAINT "grants_names_someone" CHECK("grants"."user_id" is not null or "grants"."email" is not null)
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `grants_deck_user` ON `grants` (`deck_id`,`user_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `grants_deck_email` ON `grants` (`deck_id`,`email`);--> statement-breakpoint
+CREATE INDEX `grants_user` ON `grants` (`user_id`);--> statement-breakpoint
+CREATE INDEX `grants_email` ON `grants` (`email`);--> statement-breakpoint
+CREATE TABLE `invitations` (
+	`inviter_id` text NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `invitations_inviter` ON `invitations` (`inviter_id`,`created_at`);--> statement-breakpoint
+CREATE TABLE `likes` (
+	`deck_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	PRIMARY KEY(`deck_id`, `user_id`)
+);
+--> statement-breakpoint
+CREATE TABLE `mutes` (
+	`user_id` text NOT NULL,
+	`deck_id` text NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	PRIMARY KEY(`user_id`, `deck_id`)
+);
+--> statement-breakpoint
+CREATE INDEX `mutes_deck` ON `mutes` (`deck_id`);--> statement-breakpoint
+CREATE TABLE `profile_links` (
+	`user_id` text NOT NULL,
+	`position` integer NOT NULL,
+	`url` text NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	PRIMARY KEY(`user_id`, `position`)
+);
+--> statement-breakpoint
+CREATE TABLE `public_comments` (
+	`id` text PRIMARY KEY NOT NULL,
+	`deck_id` text NOT NULL,
+	`parent_id` text,
+	`author_id` text NOT NULL,
+	`text` text NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	`edited_at` text
+);
+--> statement-breakpoint
+CREATE INDEX `public_comments_deck` ON `public_comments` (`deck_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `public_comments_parent` ON `public_comments` (`parent_id`);--> statement-breakpoint
 CREATE TABLE `renames` (
 	`deck_id` text NOT NULL,
 	`from_slug` text NOT NULL,
@@ -44,29 +98,39 @@ CREATE TABLE `replies` (
 	`id` text PRIMARY KEY NOT NULL,
 	`thread_id` text NOT NULL,
 	`text` text NOT NULL,
-	`author_id` text,
-	`guest_name` text,
+	`author_id` text NOT NULL,
 	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX `replies_thread` ON `replies` (`thread_id`,`created_at`);--> statement-breakpoint
+CREATE TABLE `sign_up_invites` (
+	`id` text PRIMARY KEY NOT NULL,
+	`entry` text NOT NULL,
+	`added_by` text NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	`claimed_by` text,
+	`claimed_at` text
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `sign_up_invites_entry` ON `sign_up_invites` (`entry`);--> statement-breakpoint
 CREATE TABLE `threads` (
 	`id` text PRIMARY KEY NOT NULL,
 	`deck_id` text NOT NULL,
 	`number` integer NOT NULL,
+	`scope` text DEFAULT 'team' NOT NULL,
 	`n` integer NOT NULL,
 	`slug` text NOT NULL,
 	`step` text NOT NULL,
 	`targets` text NOT NULL,
 	`text` text NOT NULL,
-	`author_id` text,
-	`guest_name` text,
+	`author_id` text NOT NULL,
 	`resolved_by` text,
 	`resolved_at` text,
-	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	CONSTRAINT "threads_scope_known" CHECK("threads"."scope" in ('team', 'shared'))
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `threads_deck_number` ON `threads` (`deck_id`,`number`);--> statement-breakpoint
+CREATE UNIQUE INDEX `threads_deck_number` ON `threads` (`deck_id`,`scope`,`number`);--> statement-breakpoint
 CREATE INDEX `threads_deck_slug` ON `threads` (`deck_id`,`slug`);--> statement-breakpoint
 CREATE TABLE `versions` (
 	`deck_id` text NOT NULL,
@@ -165,7 +229,8 @@ CREATE TABLE `user` (
 	`image` text,
 	`createdAt` integer NOT NULL,
 	`updatedAt` integer NOT NULL,
-	`handle` text
+	`handle` text,
+	`githubLogin` text
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `user_email_unique` ON `user` (`email`);--> statement-breakpoint

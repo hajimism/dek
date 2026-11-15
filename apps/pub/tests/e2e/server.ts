@@ -117,9 +117,24 @@ function explorer(api: string): Store {
     }
     return body.result;
   };
+  // The app's database, by the ID Miniflare keys it under: `local` until `void.lock.json` names the
+  // deployed database, whose ID it takes after.
+  let database: Promise<string> | undefined;
+  const databaseId = () => {
+    database ??= (call("/d1/database") as Promise<Array<{ name: string; uuid: string }>>).then(
+      (databases) => {
+        const found = databases.find((entry) => entry.name === "DB") ?? databases[0];
+        if (!found) {
+          throw new Error("the dev server has no D1 database");
+        }
+        return found.uuid;
+      },
+    );
+    return database;
+  };
   return {
     async sql(query, params = []) {
-      const [result] = (await call("/d1/database/local/raw", {
+      const [result] = (await call(`/d1/database/${await databaseId()}/raw`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sql: query, params }),
