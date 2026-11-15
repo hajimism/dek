@@ -13,7 +13,7 @@ import { versionKey, versionsPrefix } from "../serving/origin.ts";
 import { syncAccess } from "../sync-access.server.ts";
 import type { Deck } from "../type.ts";
 import type { RenameRow, Version } from "./type.ts";
-import { minutesOf, versionOf } from "./version.ts";
+import { keysBelow, minutesOf, versionOf } from "./version.ts";
 
 export async function findVersion(deckId: string, n: number): Promise<Version | null> {
   const row = await db
@@ -178,11 +178,7 @@ export async function deleteVersionFiles(deckId: string, n: number): Promise<voi
  */
 export async function deleteVersionsBelow(deckId: string, n: number): Promise<void> {
   const prefix = versionsPrefix(deckId);
-  const below = (await keysUnder(prefix)).filter((key) => {
-    const m = Number(key.slice(prefix.length).split("/")[0]);
-    return Number.isInteger(m) && m < n;
-  });
-  await deleteKeys(below);
+  await deleteKeys(keysBelow(prefix, await keysUnder(prefix), n));
   await db.delete(versions).where(and(eq(versions.deckId, deckId), lt(versions.n, n)));
 }
 

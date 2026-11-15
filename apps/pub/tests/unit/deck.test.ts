@@ -53,18 +53,25 @@ import {
   mustPostPublic,
 } from "../../src/model/deck/public-comment/access.ts";
 import { threadPublic } from "../../src/model/deck/public-comment/view.ts";
-import { accessOf, isOpen, readerVariant } from "../../src/model/deck/serving/access-file.ts";
+import {
+  accessOf,
+  isOpen,
+  readerVariant,
+  serving,
+} from "../../src/model/deck/serving/access-file.ts";
 import {
   accessKey,
   deckIdFromHost,
   deckOrigin,
   deckPrefix,
   versionKey,
+  versionsPrefix,
 } from "../../src/model/deck/serving/origin.ts";
 import { signServeToken, verifyServeToken } from "../../src/model/deck/serving/serve-token.ts";
 import { DeckAccess } from "../../src/model/deck/serving/type.ts";
 import {
   coverOf,
+  keysBelow,
   minutesOf,
   pictureFile,
   slidePicture,
@@ -414,6 +421,52 @@ describe("serving without a token", () => {
   });
 });
 
+describe("what the serve Worker hands out", () => {
+  const access = { visibility: "public" as const, scriptPublic: false, embed: true, current: 2 };
+  const claims = { deck: "d_x", n: 2, variant: "full" as const, exp: 0 };
+
+  it("hands out nothing of a deck with no access file, token or not", () => {
+    expect(serving("d_x", null, 2, null)).toEqual({ status: 404 });
+    expect(serving("d_x", null, 2, claims)).toEqual({ status: 404 });
+  });
+
+  it("serves a public deck's current version to anyone, and lets any page frame it if it says so", () => {
+    expect(serving("d_x", access, 2, null)).toEqual({
+      status: 200,
+      variant: "bare",
+      open: true,
+      embeddable: true,
+    });
+    expect(serving("d_x", { ...access, embed: false }, 2, null)).toMatchObject({
+      embeddable: false,
+    });
+  });
+
+  it("serves no other version, and no deck that is not public, without a token", () => {
+    expect(serving("d_x", access, 1, null)).toEqual({ status: 404 });
+    for (const visibility of ["link", "team", "private"] as const) {
+      expect(serving("d_x", { ...access, visibility }, 2, null)).toEqual({ status: 404 });
+    }
+    expect(serving("d_x", { ...access, current: null }, 2, null)).toEqual({ status: 404 });
+  });
+
+  it("serves the build a token was signed for, to be framed by the app alone", () => {
+    expect(serving("d_x", { ...access, visibility: "private" }, 2, claims)).toEqual({
+      status: 200,
+      variant: "full",
+      open: false,
+      embeddable: false,
+    });
+    expect(serving("d_x", access, 1, { ...claims, n: 1 })).toMatchObject({ status: 200 });
+  });
+
+  it("refuses a token that did not verify, or was signed for another deck or version", () => {
+    expect(serving("d_x", access, 2, "invalid")).toEqual({ status: 403 });
+    expect(serving("d_x", access, 2, { ...claims, deck: "d_y" })).toEqual({ status: 403 });
+    expect(serving("d_x", access, 2, { ...claims, n: 1 })).toEqual({ status: 403 });
+  });
+});
+
 describe("talk paths", () => {
   it("puts a talk under its owner's profile", () => {
     expect(talkPath("hajimism", "intro")).toBe("/@hajimism/intro");
@@ -622,6 +675,29 @@ describe("version pictures", () => {
       "shots/intro.png",
     );
     expect(pictureFile("full")).toBeNull();
+  });
+});
+
+describe("deleting older versions", () => {
+  const prefix = versionsPrefix("d_x");
+  const key = (n: number | string, file = "full.html") => `${prefix}${n}/${file}`;
+
+  it("takes every file of a version below n, and of an upload never recorded", () => {
+    const keys = [key(1), key(1, "shots/intro.png"), key(2), key(3), key(10), key(12)];
+    expect(keysBelow(prefix, keys, 10)).toEqual([
+      key(1),
+      key(1, "shots/intro.png"),
+      key(2),
+      key(3),
+    ]);
+  });
+
+  it("never takes version n itself, or one above it, which another publish may be writing", () => {
+    expect(keysBelow(prefix, [key(4), key(5), key(40)], 4)).toEqual([]);
+  });
+
+  it("leaves a key whose version is not a whole number", () => {
+    expect(keysBelow(prefix, [key("x"), key("1.5"), key(""), `${prefix}`], 9)).toEqual([]);
   });
 });
 

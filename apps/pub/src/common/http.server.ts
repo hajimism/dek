@@ -3,11 +3,10 @@
 import type { Context } from "hono";
 import { env } from "void/env";
 import type { z } from "zod";
-import { type ErrorBody, PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
+import type { ErrorBody } from "../../../../src/pub/protocol.ts";
 import { ApiError } from "./api-error.ts";
+import { refusal } from "./http.ts";
 import { log } from "./log.ts";
-
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function errorResponse(error: ApiError): Response {
   const body: ErrorBody = {
@@ -22,30 +21,17 @@ function errorResponse(error: ApiError): Response {
 
 /**
  * Run a handler, turning an ApiError it throws into its answer, and anything else into a 500 in
- * the same shape, so a client always reads one kind of error. A client that speaks a newer
- * protocol than this server is told so before anything runs.
+ * the same shape, so a client always reads one kind of error. What `refusal` refuses is answered
+ * before anything runs.
  */
 export async function api(
   fn: () => Promise<Response | object>,
   request: Request,
 ): Promise<Response> {
   try {
-    const spoken = Number(request.headers.get(PROTOCOL_HEADER) ?? PROTOCOL_VERSION);
-    if (Number.isFinite(spoken) && spoken > PROTOCOL_VERSION) {
-      throw new ApiError(
-        400,
-        "protocol",
-        `this server speaks protocol ${PROTOCOL_VERSION}, not ${spoken}`,
-        "use a dekc as old as the server, or wait for the server to update",
-      );
-    }
-    // A cookie rides along on any request the browser makes, so a change made with one must come
-    // from a page of this origin. The CLI sends a key and no cookie.
-    if (!SAFE_METHODS.has(request.method) && request.headers.has("cookie")) {
-      const origin = request.headers.get("origin");
-      if (origin !== new URL(request.url).origin) {
-        throw new ApiError(403, "cross_origin", "a change must come from a page of dek.pub");
-      }
+    const refused = refusal(request);
+    if (refused) {
+      throw refused;
     }
     const result = await fn();
     return result instanceof Response ? result : Response.json(result);

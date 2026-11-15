@@ -41,7 +41,7 @@ import {
   readLinks,
 } from "../../src/model/person/link.ts";
 import { MAX_NAME_LENGTH, readName } from "../../src/model/person/name.ts";
-import { namesOperator, readOperators } from "../../src/model/person/operator.ts";
+import { managesInvites, namesOperator, readOperators } from "../../src/model/person/operator.ts";
 import {
   authorOf,
   hasHandle,
@@ -448,6 +448,30 @@ describe("namesOperator", () => {
 
   it("never names an account whose address is not verified", () => {
     expect(namesOperator(operators, { ...account, emailVerified: false })).toBe(false);
+  });
+});
+
+describe("managesInvites", () => {
+  const operators = readOperators("hajime@example.com");
+  const account = {
+    id: "u1",
+    handle: "hajimism",
+    name: "Hajime",
+    image: null,
+    email: "hajime@example.com",
+    emailVerified: true,
+    githubLogin: null,
+  };
+
+  it("lets an operator with a handle manage who signs up", () => {
+    expect(managesInvites(operators, account)).toBe(true);
+  });
+
+  it("lets no one else: signed out, not listed, unverified, or without a handle yet", () => {
+    expect(managesInvites(operators, null)).toBe(false);
+    expect(managesInvites(operators, { ...account, email: "sato@example.com" })).toBe(false);
+    expect(managesInvites(operators, { ...account, emailVerified: false })).toBe(false);
+    expect(managesInvites(operators, { ...account, handle: null })).toBe(false);
   });
 });
 

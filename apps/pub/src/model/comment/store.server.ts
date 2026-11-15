@@ -7,11 +7,11 @@ import { decks, replies, threads } from "@schema";
 import type { Context } from "hono";
 import { and, asc, db, eq, exists, inArray, sql } from "void/db";
 import type { CommentRow, NewComment, ThreadScope } from "../../../../../src/pub/protocol.ts";
-import { ApiError, notFound } from "../../common/api-error.ts";
+import { notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { newReplyId, newThreadId } from "../../common/ids.ts";
 import { readJson } from "../../common/json.ts";
-import { canSeeScript, versionStanding } from "../deck/access.ts";
+import { canSeeScript } from "../deck/access.ts";
 import type { GrantSide } from "../deck/grant/type.ts";
 import { talkUrl } from "../deck/store.server.ts";
 import type { Deck } from "../deck/type.ts";
@@ -20,7 +20,8 @@ import { authorOf } from "../person/person.ts";
 import { peopleById } from "../person/store.server.ts";
 import type { Account, Person } from "../person/type.ts";
 import { canSeeThread, scopeFor } from "./access.ts";
-import { placeComment, saysQuote } from "./anchor.ts";
+import { placeComment } from "./anchor.ts";
+import { mustOpenThread } from "./new-thread.ts";
 import { CommentTargets, type ThreadRow } from "./type.ts";
 import { hideQuotes } from "./view.ts";
 
@@ -144,55 +145,14 @@ export async function openThread(
   comment: NewComment,
 ): Promise<string> {
   const scope = scopeFor(comment.scope, side);
-  // The version the commenter was reading; the thread is kept on it, so the renames since are
-  // followed when it is shown on a later one.
-  const n = comment.version ?? deck.currentVersion;
-  // Every side comments on the current version. One whose page still shows an older version is
-  // told so: the deck no longer holds it.
-  const standing = n === null ? null : versionStanding(deck, n);
-  if (standing === "gone") {
-    throw new ApiError(
-      409,
-      "stale_version",
-      `version ${n} is no longer the one readers see`,
-      "reload the page and comment again",
-    );
-  }
-  if (standing === "unknown") {
-    throw new ApiError(422, "unknown_version", `the deck has no version ${n}`);
-  }
-  // Whether a passage is in the script is the script's to tell, so one it is hidden from may not
-  // quote it at all.
-  if (
-    !canSeeScript(deck, person) &&
-    comment.anchor.targets.some((target) => target.kind === "quote")
-  ) {
-    throw new ApiError(403, "script_hidden", "the script is not public, so it cannot be quoted");
-  }
-  const version = await currentVersionOf(deck);
-  if (!version) {
-    throw new ApiError(409, "no_version", "the deck has no version to comment on yet");
-  }
-  const slide = version.slideMap.slides.find((candidate) => candidate.slug === comment.anchor.slug);
-  if (!slide) {
-    throw new ApiError(422, "unknown_slide", `the deck has no slide ${comment.anchor.slug}`);
-  }
-  if (!slide.steps.some((step) => step.step === comment.anchor.step)) {
-    throw new ApiError(
-      422,
-      "unknown_step",
-      `slide ${slide.slug} has no step ${comment.anchor.step}`,
-    );
-  }
-  for (const target of comment.anchor.targets) {
-    if (target.kind === "quote" && !saysQuote(slide.paragraphs, target.quote)) {
-      throw new ApiError(
-        422,
-        "unknown_quote",
-        `slide ${slide.slug} does not say the quoted passage`,
-      );
-    }
-  }
+  // The thread is kept on the version the commenter was reading, which must be the current one,
+  // so the renames since are followed when it is shown on a later one.
+  const version = mustOpenThread(
+    deck,
+    await currentVersionOf(deck),
+    comment,
+    canSeeScript(deck, person),
+  );
   const id = newThreadId();
   await db.insert(threads).values({
     id,

@@ -12,6 +12,7 @@ import {
 } from "../../src/model/comment/access.ts";
 import { placeComment } from "../../src/model/comment/anchor.ts";
 import { draftKeys } from "../../src/model/comment/drafts.ts";
+import { mustOpenThread } from "../../src/model/comment/new-thread.ts";
 import {
   excerpt,
   mayBeNoticed,
@@ -269,6 +270,81 @@ describe("who may resolve", () => {
     expect(
       canReadComments({ ...deck, visibility: "private" as const }, { id: "u2" }, "comment"),
     ).toBe(true);
+  });
+});
+
+describe("opening a thread", () => {
+  const deck = { currentVersion: 3 };
+  const version = { n: 3, slideMap: map([["intro", ["We start here.", "Then we go on."]]]) };
+  const quote = (text: string) => ({ kind: "quote" as const, quote: text, prefix: "", suffix: "" });
+  const comment = (
+    anchor: Partial<{ slug: string; step: string; targets: ReturnType<typeof quote>[] }> = {},
+    n?: number,
+  ) => ({
+    anchor: { slug: "intro", step: "0", targets: [], ...anchor },
+    text: "Nice.",
+    ...(n === undefined ? {} : { version: n }),
+  });
+
+  function refusal(run: () => unknown): unknown {
+    try {
+      run();
+    } catch (error) {
+      return error;
+    }
+    return null;
+  }
+
+  it("opens on the current version a slide, beat and passage it has", () => {
+    const anchored = comment({ targets: [quote("start here. Then we")] }, 3);
+    expect(mustOpenThread(deck, version, anchored, true)).toBe(version);
+    expect(mustOpenThread(deck, version, comment(), false)).toBe(version);
+  });
+
+  it("tells a page that still shows an older version to reload", () => {
+    expect(refusal(() => mustOpenThread(deck, version, comment({}, 2), true))).toMatchObject({
+      status: 409,
+      code: "stale_version",
+    });
+  });
+
+  it("refuses a version the deck never had", () => {
+    for (const n of [4, 0]) {
+      expect(refusal(() => mustOpenThread(deck, version, comment({}, n), true))).toMatchObject({
+        status: 422,
+        code: "unknown_version",
+      });
+    }
+  });
+
+  it("lets no one the script is hidden from quote it, said there or not", () => {
+    for (const text of ["We start here.", "not in the script"]) {
+      const quoted = comment({ targets: [quote(text)] });
+      expect(refusal(() => mustOpenThread(deck, version, quoted, false))).toMatchObject({
+        status: 403,
+        code: "script_hidden",
+      });
+    }
+  });
+
+  it("refuses a deck with no version yet", () => {
+    expect(
+      refusal(() => mustOpenThread({ currentVersion: null }, null, comment(), true)),
+    ).toMatchObject({ status: 409, code: "no_version" });
+  });
+
+  it("refuses a slide, a beat or a passage the version does not have", () => {
+    const cases = [
+      [comment({ slug: "outro" }), "unknown_slide"],
+      [comment({ step: "1" }), "unknown_step"],
+      [comment({ targets: [quote("We end here.")] }), "unknown_quote"],
+    ] as const;
+    for (const [anchored, code] of cases) {
+      expect(refusal(() => mustOpenThread(deck, version, anchored, true))).toMatchObject({
+        status: 422,
+        code,
+      });
+    }
   });
 });
 

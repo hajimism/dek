@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDb, sql } from "void/db";
 import { sendEmail } from "void/email";
+import { PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
 import { docsUrl } from "../../src/common/docs.ts";
+import { refusal } from "../../src/common/http.ts";
 import {
   formatDate,
   guessLang,
@@ -42,6 +44,49 @@ describe("i18n", () => {
     const now = Date.parse("2026-11-13T12:00:00Z");
     expect(relativeTime("en", "2026-11-10T12:00:00Z", now)).toBe("3 days ago");
     expect(relativeTime("en", "2026-11-13T11:59:50Z", now)).toBe("just now");
+  });
+});
+
+describe("refusal", () => {
+  const APP = "https://dek.pub/api/decks/d_x";
+
+  function request(method: string, headers: Record<string, string> = {}): Request {
+    return new Request(APP, { method, headers });
+  }
+
+  it("lets a client through that speaks this protocol, an older one, or says nothing", () => {
+    expect(refusal(request("GET"))).toBeNull();
+    expect(refusal(request("GET", { [PROTOCOL_HEADER]: String(PROTOCOL_VERSION) }))).toBeNull();
+    expect(refusal(request("GET", { [PROTOCOL_HEADER]: "0" }))).toBeNull();
+    expect(refusal(request("GET", { [PROTOCOL_HEADER]: "soon" }))).toBeNull();
+  });
+
+  it("tells a client that speaks a newer protocol, before anything runs", () => {
+    const refused = refusal(request("POST", { [PROTOCOL_HEADER]: String(PROTOCOL_VERSION + 1) }));
+    expect(refused).toMatchObject({ status: 400, code: "protocol" });
+  });
+
+  it("refuses a change made with a cookie from another origin, or from none", () => {
+    for (const origin of ["https://evil.example", "null", "https://dek.pub.evil.example"]) {
+      expect(refusal(request("POST", { cookie: "s=1", origin }))).toMatchObject({
+        status: 403,
+        code: "cross_origin",
+      });
+    }
+    expect(refusal(request("DELETE", { cookie: "s=1" }))).toMatchObject({ code: "cross_origin" });
+  });
+
+  it("lets a change through from a page of dek.pub, or from the CLI, which sends no cookie", () => {
+    expect(refusal(request("PATCH", { cookie: "s=1", origin: "https://dek.pub" }))).toBeNull();
+    expect(refusal(request("POST", { authorization: "Bearer k" }))).toBeNull();
+  });
+
+  it("lets a read through with a cookie from anywhere", () => {
+    for (const method of ["GET", "HEAD", "OPTIONS"]) {
+      expect(
+        refusal(request(method, { cookie: "s=1", origin: "https://evil.example" })),
+      ).toBeNull();
+    }
   });
 });
 
