@@ -1,4 +1,6 @@
-/** The files of a ZIP archive, read from its central directory: stored entries only, as dek writes. */
+import { inflateRawSync } from "node:zlib";
+
+/** The files of a ZIP archive, read from its central directory: stored or deflated, as dek writes them. */
 export function readZip(bytes: Uint8Array): Map<string, Uint8Array> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let end = bytes.length - 22;
@@ -18,19 +20,20 @@ export function readZip(bytes: Uint8Array): Map<string, Uint8Array> {
     }
     const method = view.getUint16(at + 10, true);
     const crc = view.getUint32(at + 16, true);
-    const size = view.getUint32(at + 20, true);
+    const packed = view.getUint32(at + 20, true);
     const nameLength = view.getUint16(at + 28, true);
     const extraLength = view.getUint16(at + 30, true);
     const commentLength = view.getUint16(at + 32, true);
     const local = view.getUint32(at + 42, true);
     const name = decoder.decode(bytes.subarray(at + 46, at + 46 + nameLength));
-    if (method !== 0) {
-      throw new Error(`${name} is not stored`);
+    if (method !== 0 && method !== 8) {
+      throw new Error(`${name} is packed by method ${method}`);
     }
     const localName = view.getUint16(local + 26, true);
     const localExtra = view.getUint16(local + 28, true);
     const start = local + 30 + localName + localExtra;
-    const data = bytes.subarray(start, start + size);
+    const raw = bytes.subarray(start, start + packed);
+    const data = method === 0 ? raw : new Uint8Array(inflateRawSync(raw));
     if (Bun.hash.crc32(data) !== crc) {
       throw new Error(`${name} fails its CRC`);
     }

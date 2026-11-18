@@ -3,6 +3,7 @@ import { posix } from "node:path";
 import { Window } from "happy-dom";
 import {
   type PptxDeck,
+  type PptxLayer,
   type PptxRun,
   type PptxShape,
   type PptxSlide,
@@ -317,12 +318,13 @@ describe("pptxPackage", () => {
     const body = shape?.getElementsByTagName("a:bodyPr")[0];
     expect(body?.getAttribute("wrap")).toBe("square");
     expect(body?.getAttribute("anchor")).toBe("t");
-    // The insets are the border box's, less the border's half the path already took.
+    // The insets are the border box's, less the border's half the path already took, and less
+    // what a rounded rectangle's own text area starts inside its corners: (12 - 1) × (1 - √½).
     expect(["lIns", "tIns", "rIns", "bIns"].map((name) => body?.getAttribute(name))).toEqual([
-      "219075",
-      "752475",
-      "219075",
-      "219075",
+      "188387",
+      "721787",
+      "188387",
+      "188387",
     ]);
     const paragraphs = [...(shape?.getElementsByTagName("a:p") ?? [])];
     expect(paragraphs.map((p) => p.getElementsByTagName("a:pPr")[0]?.getAttribute("algn"))).toEqual(
@@ -737,5 +739,115 @@ describe("pptxPackage", () => {
         (rel.getAttribute("Type") ?? "").endsWith("/notesSlide"),
       ),
     ).toHaveLength(1);
+  });
+
+  test("sets a block's text in a text box of its own, and the slide's title where its layout has one", () => {
+    const prose = (title: boolean, wrap: boolean): PptxLayer => ({
+      kind: "prose",
+      x: 80,
+      y: title ? 60 : 160,
+      width: 600,
+      height: 48,
+      text: {
+        inset: { left: 0, top: 0, right: 0, bottom: 0 },
+        wrap,
+        paragraphs: [
+          {
+            align: "left",
+            lineHeight: 48,
+            spaceBefore: 0,
+            marginLeft: 0,
+            marginRight: 0,
+            indent: 0,
+            runs: [run(title ? "見出し" : "本文")],
+          },
+        ],
+      },
+      ...(title ? { title: true } : {}),
+    });
+    const { files, xml } = open([
+      slide({ layers: [prose(true, true), prose(false, false)] }),
+      slide({ layers: [prose(false, true)] }),
+    ]);
+    const [title, body] = [...xml("ppt/slides/slide1.xml").getElementsByTagName("p:sp")];
+    // The title says where it lies and how it is set: the layout gives it only its place in
+    // PowerPoint's outline, and PowerPoint keeps it out of a group.
+    expect(title?.getElementsByTagName("p:cNvPr")[0]?.getAttribute("name")).toBe("Title 1");
+    expect(title?.getElementsByTagName("p:ph")[0]?.getAttribute("type")).toBe("title");
+    expect(title?.getElementsByTagName("a:spLocks")[0]?.getAttribute("noGrp")).toBe("1");
+    expect(title?.getElementsByTagName("p:cNvSpPr")[0]?.getAttribute("txBox")).toBeNull();
+    expect(title?.getElementsByTagName("a:off")[0]?.getAttribute("x")).toBe("762000");
+    expect(title?.getElementsByTagName("a:ext")[0]?.getAttribute("cx")).toBe("5715000");
+    expect(title?.getElementsByTagName("a:noFill")).toHaveLength(1);
+    const bodyPr = (shape: typeof title) => shape?.getElementsByTagName("a:bodyPr")[0];
+    expect(bodyPr(title)?.getAttribute("wrap")).toBe("square");
+    expect(bodyPr(title)?.getAttribute("lIns")).toBe("0");
+    expect(title?.textContent).toBe("見出し");
+    // Any other is a text box, which wraps only when it says so.
+    expect(body?.getElementsByTagName("p:cNvSpPr")[0]?.getAttribute("txBox")).toBe("1");
+    expect(body?.getElementsByTagName("p:ph")).toHaveLength(0);
+    expect(bodyPr(body)?.getAttribute("wrap")).toBe("none");
+
+    // A slide with a title is laid out as one; any other stays blank.
+    const layoutOf = (n: number) =>
+      [...xml(`ppt/slides/_rels/slide${n}.xml.rels`).getElementsByTagName("Relationship")]
+        .find((rel) => (rel.getAttribute("Type") ?? "").endsWith("/slideLayout"))
+        ?.getAttribute("Target");
+    expect([layoutOf(1), layoutOf(2)]).toEqual([
+      "../slideLayouts/slideLayout2.xml",
+      "../slideLayouts/slideLayout1.xml",
+    ]);
+    const layout = xml("ppt/slideLayouts/slideLayout2.xml");
+    expect(layout.documentElement.getAttribute("type")).toBe("titleOnly");
+    expect(layout.getElementsByTagName("p:ph")[0]?.getAttribute("type")).toBe("title");
+    const master = xml("ppt/slideMasters/slideMaster1.xml");
+    expect(master.getElementsByTagName("p:ph")[0]?.getAttribute("type")).toBe("title");
+    expect(master.getElementsByTagName("p:sldLayoutId")).toHaveLength(2);
+    expect(
+      [
+        ...xml("ppt/slideMasters/_rels/slideMaster1.xml.rels").getElementsByTagName("Relationship"),
+      ].map((rel) => rel.getAttribute("Target")),
+    ).toEqual([
+      "../slideLayouts/slideLayout1.xml",
+      "../slideLayouts/slideLayout2.xml",
+      "../theme/theme1.xml",
+    ]);
+    expect(files.has("ppt/slideLayouts/_rels/slideLayout2.xml.rels")).toBe(true);
+    expect(
+      [...xml("[Content_Types].xml").getElementsByTagName("Override")].map((each) =>
+        each.getAttribute("PartName"),
+      ),
+    ).toContain("/ppt/slideLayouts/slideLayout2.xml");
+  });
+
+  test("names the face that drew a run's East Asian text beside the one that drew its Latin", () => {
+    const line = (runs: PptxRun[]): PptxLayer => ({
+      kind: "text",
+      x: 80,
+      y: 100,
+      width: 400,
+      height: 48,
+      lineHeight: 48,
+      runs,
+    });
+    const { xml } = open([
+      slide({
+        layers: [
+          line([
+            run("code 台本", { font: "Menlo", ea: "Hiragino Sans" }),
+            run("—", { font: "Menlo" }),
+          ]),
+        ],
+      }),
+    ]);
+    const faces = [...xml("ppt/slides/slide1.xml").getElementsByTagName("a:rPr")].map((rPr) =>
+      ["a:latin", "a:ea", "a:cs"].map((tag) =>
+        rPr.getElementsByTagName(tag)[0]?.getAttribute("typeface"),
+      ),
+    );
+    expect(faces).toEqual([
+      ["Menlo", "Hiragino Sans", "Menlo"],
+      ["Menlo", "Menlo", "Menlo"],
+    ]);
   });
 });

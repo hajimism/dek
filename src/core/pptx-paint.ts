@@ -21,6 +21,8 @@ type PptxPseudoPaint = {
   reach: number;
   /** For a marker PowerPoint has a bullet for, which. */
   bullet?: { char: string } | { ordinal: number };
+  /** Whether it draws its text and nothing else: no box, shadow, outline, or image. */
+  bare?: boolean;
 };
 
 export type PptxPagePaint = {
@@ -481,11 +483,19 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
         continue;
       }
       const at = pseudo === "before" ? index + 0.25 : -1;
+      const outlined = style.outlineStyle !== "none" && px(style.outlineWidth) > 0;
       pseudos.push({
         host,
         pseudo,
         key: [...key, layerOf(style, el), at],
         reach: Math.max(reachOf(style.boxShadow), reachOf(style.textShadow)),
+        // Text and nothing else: with its text set again, nothing of it is left in the picture.
+        ...(!box &&
+        !outlined &&
+        reachOf(style.textShadow) === 0 &&
+        !/url\(|gradient\(|image-set\(/.test(style.content)
+          ? { bare: true }
+          : {}),
       });
       drawn = true;
     }

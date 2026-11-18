@@ -639,6 +639,8 @@ function isPptxLayer(value: unknown): value is PptxLayer<PptxPictureFile> {
   switch (layer.kind) {
     case "text":
       return isPptxBox(layer);
+    case "prose":
+      return at && isShapeText(layer.text) && (layer.title === undefined || layer.title === true);
     case "rule":
       return (
         ["x1", "y1", "x2", "y2", "width"].every((key) => isNumber(layer[key])) &&
@@ -705,14 +707,15 @@ function isPptxRun(run: unknown): run is PptxTextBox["runs"][number] {
   if (!run || typeof run !== "object") {
     return false;
   }
-  const { text, size, alpha, letterSpacing, color, font } = run as Record<string, unknown>;
+  const { text, size, alpha, letterSpacing, color, font, ea } = run as Record<string, unknown>;
   return (
     isString(text) &&
     isNumber(size) &&
     isNumber(alpha) &&
     isNumber(letterSpacing) &&
     isArrayOf(color, isNumber) &&
-    (font === undefined || isString(font))
+    (font === undefined || isString(font)) &&
+    (ea === undefined || isString(ea))
   );
 }
 

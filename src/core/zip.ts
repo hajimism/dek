@@ -1,41 +1,53 @@
+import { deflateRawSync } from "node:zlib";
+
 /** One file of an archive: its path inside it, with `/` between folders, and its bytes. */
 export type ZipFile = { path: string; data: Uint8Array };
 
+/** Pictures that are compressed already: deflating them again buys nothing. */
+const PACKED = /\.(png|jpe?g|gif|webp)$/i;
+
 /**
- * A ZIP archive of `files`, in order, each stored as it is. What dek packs is pictures, already
- * compressed, and a little XML, so deflating would buy little and cost a dependency or a
- * compressor to keep. Paths are UTF-8, and the time is fixed, so the same files make the same
- * bytes.
+ * A ZIP archive of `files`, in order: each deflated where that makes it smaller, which XML's
+ * repeated tags make it many times over, and stored as it is otherwise, as a picture is. Paths
+ * are UTF-8, and the time is fixed, so the same files make the same bytes on the same Bun.
  */
-export function zipStored(files: readonly ZipFile[]): Uint8Array {
+export function zipFiles(files: readonly ZipFile[]): Uint8Array {
   const encoder = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
   let offset = 0;
   for (const file of files) {
     const name = encoder.encode(file.path);
-    const crc = Bun.hash.crc32(file.data);
-    const size = file.data.length;
+    const deflated = PACKED.test(file.path)
+      ? undefined
+      : new Uint8Array(deflateRawSync(file.data, { level: 9 }));
+    const packed = deflated && deflated.length < file.data.length ? deflated : file.data;
+    const entry = {
+      method: packed === file.data ? 0 : 8,
+      crc: Bun.hash.crc32(file.data),
+      packed: packed.length,
+      size: file.data.length,
+    };
 
     const local = new Uint8Array(30 + name.length);
     const head = new DataView(local.buffer);
     head.setUint32(0, 0x04034b50, true);
-    writeCommon(head, 4, { crc, size });
+    writeCommon(head, 4, entry);
     head.setUint16(26, name.length, true);
     local.set(name, 30);
-    locals.push(local, file.data);
+    locals.push(local, packed);
 
     const central = new Uint8Array(46 + name.length);
-    const entry = new DataView(central.buffer);
-    entry.setUint32(0, 0x02014b50, true);
-    entry.setUint16(4, 20, true);
-    writeCommon(entry, 6, { crc, size });
-    entry.setUint16(28, name.length, true);
-    entry.setUint32(42, offset, true);
+    const listed = new DataView(central.buffer);
+    listed.setUint32(0, 0x02014b50, true);
+    listed.setUint16(4, 20, true);
+    writeCommon(listed, 6, entry);
+    listed.setUint16(28, name.length, true);
+    listed.setUint32(42, offset, true);
     central.set(name, 46);
     centrals.push(central);
 
-    offset += local.length + size;
+    offset += local.length + packed.length;
   }
   const directorySize = centrals.reduce((sum, part) => sum + part.length, 0);
   const end = new Uint8Array(22);
@@ -53,17 +65,21 @@ const DOS_DATE = (0 << 9) | (1 << 5) | 1;
 
 /**
  * What the local header and the central directory entry share, from the version needed on: no
- * flags but UTF-8 names, stored, the fixed time, the CRC, and the size twice.
+ * flags but UTF-8 names, how it is packed, the fixed time, the CRC, and its size packed and not.
  */
-function writeCommon(view: DataView, at: number, { crc, size }: { crc: number; size: number }) {
+function writeCommon(
+  view: DataView,
+  at: number,
+  entry: { method: number; crc: number; packed: number; size: number },
+) {
   view.setUint16(at, 20, true);
   view.setUint16(at + 2, 1 << 11, true);
-  view.setUint16(at + 4, 0, true);
+  view.setUint16(at + 4, entry.method, true);
   view.setUint16(at + 6, 0, true);
   view.setUint16(at + 8, DOS_DATE, true);
-  view.setUint32(at + 10, crc, true);
-  view.setUint32(at + 14, size, true);
-  view.setUint32(at + 18, size, true);
+  view.setUint32(at + 10, entry.crc, true);
+  view.setUint32(at + 14, entry.packed, true);
+  view.setUint32(at + 18, entry.size, true);
 }
 
 function concat(parts: readonly Uint8Array[]): Uint8Array {

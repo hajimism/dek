@@ -38,7 +38,7 @@ The same CLI as a human: `dekc help --agent`, `dekc check <slug> --shot`, `dekc 
 
 ## Can I hand a talk to someone who uses PowerPoint?
 
-Yes. `dekc pptx` writes `dist/<deck>.pptx`: one slide per `##`, at its last beat, as the PDF prints it. Plain boxes are PowerPoint's own shapes and images and SVGs pictures of their own, grouped with their text, which the recipient can edit, move, and recolor; text outside a shape is a text box a line, where the browser set it. The deck's color and font tokens are the file's theme, and a plain background is PowerPoint's. What PowerPoint cannot draw as the browser did, such as a gradient, a shadow, or what a pseudo-element draws, stays in a picture under them. The script goes in the notes; add `--public` to leave the stage directions out. Keynote opens the same file. See [Presenting](./present#pptx).
+Yes. `dekc pptx` writes `dist/<deck>.pptx`: one slide per `##`, at its last beat, as the PDF prints it. Plain boxes are PowerPoint's own shapes and images and SVGs pictures of their own, grouped with their text, which the recipient can edit, move, and recolor; text outside a shape is a text box a block, broken where the browser broke it, and the slide's heading is its title. The deck's color and font tokens are the file's theme, and a plain background is PowerPoint's. What PowerPoint cannot draw as the browser did, such as a gradient, a shadow, or a box a pseudo-element draws, stays in a picture under them. The script goes in the notes; add `--public` to leave the stage directions out. Keynote opens the same file. See [Presenting](./present#pptx).
 
 ## Can I present without the dev server?
 
