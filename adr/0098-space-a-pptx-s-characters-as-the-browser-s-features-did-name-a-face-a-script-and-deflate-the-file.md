@@ -10,6 +10,8 @@ Amends [8. Export a talk as PPTX with editable text over a picture of each slide
 
 Amends [23. Make a deck's tokens PowerPoint's theme and a slide's background PowerPoint's own with dekc pptx --shapes](0023-make-a-deck-s-tokens-powerpoint-s-theme-and-a-slide-s-background-powerpoint-s-own-with-dekc-pptx-shapes.md)
 
+Amended by [100. Name the face that drew a PPTX's text where its family has several on that side of bold](0100-name-the-face-that-drew-a-pptx-s-text-where-its-family-has-several-on-that-side-of-bold.md)
+
 ## Context
 
 ADR 8 sets each line of text again where the browser set it, in the same font at the same size, and names what that leaves out among its consequences: "OpenType features PowerPoint does not apply, such as `palt`, which the sample themes use to tighten Japanese punctuation, set a line a little wider than the browser did". ADR 22 put text in shapes, where a line a little wider wraps.

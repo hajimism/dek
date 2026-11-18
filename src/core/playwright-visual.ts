@@ -62,11 +62,20 @@ import {
   measurePptxPlainLinesInPage,
   measurePptxTextsInPage,
   PPTX_FACE_ATTR,
+  type PptxFaceProbe,
   type PptxPageTexts,
   pptxFaceProbesInPage,
 } from "./pptx-text.ts";
 import type { PptxPageTheme } from "./pptx-theme.ts";
-import { type PptxTypeAnswers, pptxTypeRequests, setPptxTexts } from "./pptx-type.ts";
+import {
+  type PptxFace,
+  type PptxTypeAnswers,
+  pptxFaceNames,
+  pptxNameProbes,
+  pptxSideProbes,
+  pptxTypeRequests,
+  setPptxTexts,
+} from "./pptx-type.ts";
 import { pseudoElementBoxes, pseudoTextBoxes, pseudoTextPieces } from "./pseudo-text.ts";
 import { motionSheets } from "./sheet.ts";
 import {
@@ -269,9 +278,9 @@ async function pageTheme(page: Page): Promise<PptxPageTheme> {
   const fonts: PptxPageTheme["fonts"] = {};
   for (const token of ["title", "body"] as const) {
     const family = families[token];
-    const latin = faces.get(`${token}-latin`);
+    const latin = faces.get(`${token}-latin`)?.family;
     if (family !== undefined && latin !== undefined) {
-      fonts[token] = { family, latin, ea: faces.get(`${token}-ea`) ?? latin };
+      fonts[token] = { family, latin, ea: faces.get(`${token}-ea`)?.family ?? latin };
     }
   }
   return { colors, fonts };
@@ -293,11 +302,20 @@ async function typeAnswers(
     `${JSON.stringify(probe.use)} ${probe.id.slice(probe.id.indexOf(":") + 1)}`;
   const asked = requests.faces.filter((probe) => !known.has(keyOf(probe)));
   if (asked.length > 0) {
-    await page.evaluate(pptxFaceProbesInPage, asked);
-    const found = await platformFaces(page, PPTX_FACE_ATTR);
-    await page.evaluate(pptxFaceProbesInPage, null);
+    const ask = async (probes: PptxFaceProbe[]): Promise<Map<string, PptxFace>> => {
+      await page.evaluate(pptxFaceProbesInPage, probes);
+      const found = await platformFaces(page, PPTX_FACE_ATTR);
+      await page.evaluate(pptxFaceProbesInPage, null);
+      return found;
+    };
+    // Each text as it is set, and at the other weights on its side of bold; then, where its
+    // family drew several faces there, each name its own face may go by (ADR 100).
+    const drawn = await ask([...asked, ...pptxSideProbes(asked)]);
+    const names = pptxNameProbes(asked, drawn);
+    const named = names.length > 0 ? await ask(names) : new Map<string, PptxFace>();
+    const written = pptxFaceNames(asked, drawn, named);
     for (const probe of asked) {
-      const face = found.get(probe.id);
+      const face = written.get(probe.id);
       if (face !== undefined) {
         known.set(keyOf(probe), face);
       }
@@ -322,8 +340,8 @@ async function typeAnswers(
  * that drew most of its glyphs, as the DevTools protocol reports it. A theme names a stack, or
  * only `sans-serif`; this is the face that was found.
  */
-async function platformFaces(page: Page, attr: string): Promise<Map<string, string>> {
-  const fonts = new Map<string, string>();
+async function platformFaces(page: Page, attr: string): Promise<Map<string, PptxFace>> {
+  const fonts = new Map<string, PptxFace>();
   const cdp = await page.context().newCDPSession(page);
   try {
     await cdp.send("DOM.enable");
@@ -341,11 +359,20 @@ async function platformFaces(page: Page, attr: string): Promise<Map<string, stri
       };
       const value = attributes[attributes.indexOf(attr) + 1];
       const { fonts: used } = (await cdp.send("CSS.getPlatformFontsForNode", { nodeId })) as {
-        fonts: Array<{ familyName: string; glyphCount: number }>;
+        fonts: Array<{
+          familyName: string;
+          postScriptName?: string;
+          isCustomFont?: boolean;
+          glyphCount: number;
+        }>;
       };
       const main = [...used].sort((a, b) => b.glyphCount - a.glyphCount)[0];
       if (main && value !== undefined) {
-        fonts.set(value, main.familyName);
+        fonts.set(value, {
+          family: main.familyName,
+          postScript: main.postScriptName ?? "",
+          custom: main.isCustomFont ?? false,
+        });
       }
     }
   } finally {

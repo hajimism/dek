@@ -848,6 +848,117 @@ lang: ja
   );
 
   browserTest(
+    "names a run's own face where its family drew several on that side of bold, by a name that finds it",
+    async () => {
+      // East Asian text at five weights: on a Mac in Hiragino Sans, a family with a face a
+      // weight; elsewhere in whatever sans-serif there is, perhaps a regular and a bold.
+      const weights = [300, 400, 500, 700, 800];
+      const words = ["三百の字", "四百の字", "五百の字", "七百の字", "八百の字"];
+      const css = `font-family: "Hiragino Sans", "Noto Sans CJK JP", sans-serif; font-size: 32px;`;
+      const weighedTheme = `.slide { position: relative; width: 1280px; height: 720px; color: rgb(20 20 20); background: rgb(250 250 250); }
+.slide p { position: absolute; left: 80px; margin: 0; ${css} line-height: 48px; white-space: nowrap; }
+`;
+      const weighed = `<section class="slide">${weights
+        .map(
+          (weight, at) =>
+            `<p style="top: ${80 + at * 80}px; font-weight: ${weight}">${words[at]}</p>`,
+        )
+        .join("")}</section>\n`;
+      type Face = { familyName: string; postScriptName?: string; glyphCount: number };
+      /** The face that drew each element with an id, on a page of its own, apart from the exporter. */
+      const facesOn = (html: string): Promise<Map<string, Face>> =>
+        withBrowser(async (browser) => {
+          const page = await browser.newPage();
+          try {
+            await page.setContent(html, { waitUntil: "load" });
+            await page.evaluate(() => document.fonts.ready.then(() => undefined));
+            const cdp = await page.context().newCDPSession(page);
+            await cdp.send("DOM.enable");
+            await cdp.send("CSS.enable");
+            const { root } = (await cdp.send("DOM.getDocument", { depth: -1 })) as {
+              root: { nodeId: number };
+            };
+            const { nodeIds } = (await cdp.send("DOM.querySelectorAll", {
+              nodeId: root.nodeId,
+              selector: "[id]",
+            })) as { nodeIds: number[] };
+            const found = new Map<string, Face>();
+            for (const nodeId of nodeIds) {
+              const { attributes } = (await cdp.send("DOM.getAttributes", { nodeId })) as {
+                attributes: string[];
+              };
+              const { fonts } = (await cdp.send("CSS.getPlatformFontsForNode", { nodeId })) as {
+                fonts: Face[];
+              };
+              const main = [...fonts].sort((a, b) => b.glyphCount - a.glyphCount)[0];
+              if (main) {
+                found.set(attributes[attributes.indexOf("id") + 1] ?? "", main);
+              }
+            }
+            return found;
+          } finally {
+            await page.close();
+          }
+        });
+      const drawn = await facesOn(
+        `<!doctype html><html lang="ja"><body style='${css}'>${weights
+          .map((weight, at) => `<p id="w${weight}" style="font-weight: ${weight}">${words[at]}</p>`)
+          .join("")}</body></html>`,
+      );
+      await withTempProject(
+        { decks: [{ name: "weighed", script, theme: weighedTheme, slides: { cover: weighed } }] },
+        async (root) => {
+          seen.length = 0;
+          await pptxDeck(join(root, "decks", "weighed"), { runner });
+          const runs = [
+            ...(seen[0]?.boxes ?? []).flatMap((box) => box.runs),
+            ...proseLayers(seen[0]?.layers ?? []).flatMap((prose) =>
+              prose.text.paragraphs.flatMap((paragraph) => paragraph.runs),
+            ),
+          ];
+          const written = weights.map((_, at) => {
+            const run = runs.find((each) => each.text.includes((words[at] ?? "").slice(0, 2)));
+            return { name: run?.ea ?? run?.font, bold: run?.bold };
+          });
+          // What each written name finds when a renderer is given it alone.
+          const names = [...new Set(written.map((each) => each.name ?? ""))];
+          const named = await facesOn(
+            `<!doctype html><html lang="ja"><head><style>${names
+              .map((name, at) => `@font-face { font-family: "n${at}"; src: local("${name}"); }`)
+              .join("\n")}</style></head><body>${names
+              .map((_, at) => `<p id="n${at}" style='font-family: "n${at}"'>${words[0]}</p>`)
+              .join("")}</body></html>`,
+          );
+          weights.forEach((weight, at) => {
+            const face = drawn.get(`w${weight}`);
+            const { name, bold } = written[at] ?? {};
+            expect(typeof name).toBe("string");
+            expect(bold).toBe(weight >= 600);
+            // The family's name, with bold to say the side; or a name that finds the very face.
+            const found = named.get(`n${names.indexOf(name ?? "")}`);
+            const own = found?.postScriptName === face?.postScriptName;
+            expect(own || name === face?.familyName).toBe(true);
+            // Two weights on one side of bold that one family drew in two faces are told
+            // apart in the file, which `b` alone could not do.
+            weights.forEach((other, to) => {
+              const beside = drawn.get(`w${other}`);
+              if (
+                other !== weight &&
+                other >= 600 === weight >= 600 &&
+                beside?.familyName === face?.familyName &&
+                beside?.postScriptName !== face?.postScriptName
+              ) {
+                expect(own).toBe(true);
+                expect(written[to]?.name).not.toBe(name);
+              }
+            });
+          });
+        },
+      );
+    },
+  );
+
+  browserTest(
     "sets text where the browser drew it when it is set again plainly, spaced as written",
     async () => {
       const lines = [

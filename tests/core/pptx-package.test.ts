@@ -653,7 +653,7 @@ describe("pptxPackage", () => {
 
     test("sets text in the theme's fonts when it was set in the theme's font tokens", () => {
       const runs = [
-        run("見出し", { family: '"Futura", sans-serif', font: "Futura" }),
+        run("見出し", { family: '"Futura", sans-serif', font: "Futura", ea: "Hiragino Sans" }),
         run("本文", { family: "sans-serif", font: "Hiragino Sans" }),
         run("別の字", { family: "serif", font: "Hiragino Mincho ProN" }),
       ];
@@ -676,7 +676,52 @@ describe("pptxPackage", () => {
         ["Hiragino Mincho ProN", "Hiragino Mincho ProN", "Hiragino Mincho ProN"],
       ]);
       // Without a theme, each run names the font it was drawn with, as ADR 8 has it.
-      expect(faces({})[0]).toEqual(["Futura", "Futura", "Futura"]);
+      expect(faces({})[0]).toEqual(["Futura", "Hiragino Sans", "Futura"]);
+    });
+
+    test("names a run's own faces where they are not the theme's for the scripts it holds", () => {
+      const SANS = '"Hiragino Sans", sans-serif';
+      const theme: PptxTheme = {
+        colors: {},
+        fonts: {
+          title: { family: SANS, latin: "Hiragino Sans W7", ea: "Hiragino Sans W7" },
+          body: { family: SANS, latin: "Helvetica Neue", ea: "Hiragino Sans W4" },
+        },
+      };
+      const runs = [
+        run("本文 body", { family: SANS, font: "Helvetica Neue", ea: "Hiragino Sans W4" }),
+        // No Latin in it: its East Asian face is the body's, which is all that is asked of it.
+        run("本文", { family: SANS, font: "Hiragino Sans W4" }),
+        run("Title 見出し", { family: SANS, font: "Hiragino Sans W7", bold: true }),
+        // Another weight of the family is in neither font of the theme: it names its face.
+        run("ラベル", { family: SANS, font: "Hiragino Sans W6", bold: true }),
+        run("label", { family: SANS, font: "Hiragino Sans W6", bold: true }),
+        // Nothing but spaces and an arrow, which is of neither script: no face to tell apart.
+        run(" → ", { family: SANS, font: "Hiragino Sans W6" }),
+        // A face that is not known follows the token it was set in, as before.
+        run("字", { family: SANS }),
+      ];
+      const layers = [
+        { kind: "text" as const, x: 0, y: 0, width: 10, height: 10, lineHeight: 10, runs },
+      ];
+      const faces = [
+        ...open([slide({ layers })], { theme })
+          .xml("ppt/slides/slide1.xml")
+          .getElementsByTagName("a:rPr"),
+      ].map((rPr) =>
+        ["a:latin", "a:ea"].map((script) =>
+          rPr.getElementsByTagName(script)[0]?.getAttribute("typeface"),
+        ),
+      );
+      expect(faces).toEqual([
+        ["+mn-lt", "+mn-ea"],
+        ["+mn-lt", "+mn-ea"],
+        ["+mj-lt", "+mj-ea"],
+        ["Hiragino Sans W6", "Hiragino Sans W6"],
+        ["Hiragino Sans W6", "Hiragino Sans W6"],
+        ["+mn-lt", "+mn-ea"],
+        ["+mn-lt", "+mn-ea"],
+      ]);
     });
 
     test("leaves a background the theme's own to the master, and writes any other on its slide", () => {

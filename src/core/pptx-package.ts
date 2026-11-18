@@ -1,3 +1,4 @@
+import { drawnScriptOf } from "./pptx-type.ts";
 import { zipFiles } from "./zip.ts";
 
 // A PowerPoint file as dek writes it: the fewest OOXML parts PowerPoint opens without a repair,
@@ -728,14 +729,15 @@ function runProperties(run: PptxRun, style: Style): string {
     'dirty="0"',
   ].join(" ");
   // Text set in a font token is set in the theme's font, each script in its own face, as the
-  // browser set it; the body's wins when both tokens name one font.
+  // browser set it, where the theme's font is the face that drew it; the body's wins when both
+  // tokens name one font and one face.
   const fonts = style.theme?.fonts;
   const themed =
-    run.family === undefined
+    fonts === undefined
       ? undefined
-      : run.family === fonts?.body.family
+      : followsFont(run, fonts.body)
         ? "mn"
-        : run.family === fonts?.title.family
+        : followsFont(run, fonts.title)
           ? "mj"
           : undefined;
   const faces = (face: (script: "lt" | "ea" | "cs") => string) =>
@@ -748,6 +750,25 @@ function runProperties(run: PptxRun, style: Style): string {
       ? faces((script) => escapeXml((script === "ea" ? run.ea : undefined) ?? run.font ?? ""))
       : "";
   return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${font}</a:rPr>`;
+}
+
+/**
+ * Whether a run is set in a font of the theme: in its token, and drawn, for each script the run
+ * holds, in the face the theme names for it. A theme's font is one face a script, and a family
+ * has more: text set in the token at another weight names its own face (ADR 100).
+ */
+function followsFont(run: PptxRun, font: PptxThemeFont): boolean {
+  if (run.family === undefined || run.family !== font.family) {
+    return false;
+  }
+  if (run.font === undefined) {
+    return true;
+  }
+  const scripts = new Set([...run.text].map(drawnScriptOf));
+  return (
+    (!scripts.has("latin") || run.font === font.latin) &&
+    (!scripts.has("eastAsian") || (run.ea ?? run.font) === font.ea)
+  );
 }
 
 function emu(px: number): number {

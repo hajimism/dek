@@ -920,8 +920,11 @@ export function measurePptxPlainLinesInPage(lines: PptxPlainLine[]): number[][] 
   return measured;
 }
 
-/** A text set one way, marked for Chromium to say which face drew it. */
-export type PptxFaceProbe = { id: string; use: PptxFontUse; text: string };
+/**
+ * A text set one way, marked for Chromium to say which face drew it; with `local`, set in the
+ * face that name alone finds, whatever family the use says.
+ */
+export type PptxFaceProbe = { id: string; use: PptxFontUse; text: string; local?: string };
 
 /** The attribute that marks each probe put in the page to ask for its face. */
 export const PPTX_FACE_ATTR = "data-dek-pptx-face";
@@ -941,18 +944,35 @@ export async function pptxFaceProbesInPage(probes: PptxFaceProbe[] | null): Prom
   const host = document.createElement("div");
   host.setAttribute("data-dek-pptx-faces", "");
   host.style.cssText = "position: absolute; left: 0; top: 0; white-space: pre;";
-  for (const { id, use, text } of probes) {
+  // A name is asked for through a family of one face, the one `local()` finds by it: a full
+  // name or the font file's own, as a renderer that is given the name looks it up.
+  const rules: string[] = [];
+  for (const { id, use, text, local } of probes) {
     const probe = document.createElement("div");
     probe.setAttribute("data-dek-pptx-face", id);
     if (use.lang !== "") {
       probe.setAttribute("lang", use.lang);
     }
-    probe.style.cssText = `font-weight: ${use.weight}; font-style: ${use.style}; font-stretch: ${use.stretch}; font-size: 16px; text-transform: none; ${use.axes} ${use.features}`;
-    probe.style.fontFamily = use.family;
+    if (local === undefined) {
+      probe.style.cssText = `font-weight: ${use.weight}; font-style: ${use.style}; font-stretch: ${use.stretch}; font-size: 16px; text-transform: none; ${use.axes} ${use.features}`;
+      probe.style.fontFamily = use.family;
+    } else {
+      const family = `dek-pptx-face-${rules.length}`;
+      rules.push(
+        `@font-face { font-family: "${family}"; src: local("${local.replace(/["\\\n]/g, "\\$&")}"); }`,
+      );
+      probe.style.cssText = `font-family: "${family}"; font-weight: 400; font-style: normal; font-size: 16px; text-transform: none;`;
+    }
     probe.textContent = text;
     host.append(probe);
   }
+  if (rules.length > 0) {
+    const style = document.createElement("style");
+    style.textContent = rules.join("\n");
+    host.prepend(style);
+  }
   document.body.append(host);
+  await document.fonts.ready;
   await new Promise<void>((done) =>
     requestAnimationFrame(() => requestAnimationFrame(() => done())),
   );

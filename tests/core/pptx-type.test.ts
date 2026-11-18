@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { PptxBlockText, PptxMeasuredBox, PptxMeasuredRun } from "../../src/core/pptx-plan.ts";
-import type { PptxPageTexts } from "../../src/core/pptx-text.ts";
-import { pptxTypeRequests, scriptOf, setPptxTexts } from "../../src/core/pptx-type.ts";
+import type { PptxFaceProbe, PptxPageTexts } from "../../src/core/pptx-text.ts";
+import {
+  type PptxFace,
+  pptxFaceNames,
+  pptxNameProbes,
+  pptxSideProbes,
+  pptxTypeRequests,
+  scriptOf,
+  setPptxTexts,
+} from "../../src/core/pptx-type.ts";
 
 // How measured text is set again, decided from measurements alone: no browser here, only the
 // places and widths a page would give.
@@ -283,5 +291,135 @@ describe("setPptxTexts", () => {
     expect(
       spaced(setPptxTexts(partly, answers(partly, { "、": [20, 10] })).blocks[0]?.runs),
     ).toEqual([["かな、 字\n字", 0]]);
+  });
+});
+
+describe("the name a face is written by", () => {
+  const probe = (id: string, weight: string, more: Partial<PptxFaceProbe["use"]> = {}) => ({
+    id,
+    use: { ...use(), weight, ...more },
+    text: "Aa",
+  });
+  const face = (postScript: string, family = "Hiragino Sans", custom = false): PptxFace => ({
+    family,
+    postScript,
+    custom,
+  });
+  /** What the page drew: the probe itself, then the same text at each weight given. */
+  const drawn = (id: string, own: PptxFace, sides: Record<string, PptxFace> = {}) =>
+    new Map<string, PptxFace>([
+      [id, own],
+      ...Object.entries(sides).map(([weight, each]): [string, PptxFace] => [
+        `${id}@${weight}`,
+        each,
+      ]),
+    ]);
+
+  test("asks for the same text at each other weight on the probe's side of bold", () => {
+    // A run says only whether it is bold: which face that is, a renderer decides.
+    const regular = pptxSideProbes([probe("0:latin", "400")]);
+    expect(regular.map((each) => [each.id, each.use.weight, each.text])).toEqual([
+      ["0:latin@100", "100", "Aa"],
+      ["0:latin@200", "200", "Aa"],
+      ["0:latin@300", "300", "Aa"],
+      ["0:latin@500", "500", "Aa"],
+    ]);
+    expect(pptxSideProbes([probe("0:c:—", "700")]).map((each) => each.use.weight)).toEqual([
+      "600",
+      "800",
+      "900",
+    ]);
+    // A weight between two of them is on a side all the same.
+    expect(pptxSideProbes([probe("1:eastAsian", "650")]).map((each) => each.use.weight)).toEqual([
+      "600",
+      "700",
+      "800",
+      "900",
+    ]);
+  });
+
+  test("asks nothing of text set aslant or along an axis, which no name alone finds", () => {
+    expect(pptxSideProbes([probe("0:latin", "400", { style: "italic" })])).toEqual([]);
+    expect(
+      pptxSideProbes([probe("0:latin", "400", { axes: 'font-variation-settings: "wght" 450;' })]),
+    ).toEqual([]);
+  });
+
+  test("asks which name finds a face whose family drew another on its side of bold", () => {
+    const asked = [probe("0:latin", "400"), probe("1:latin", "700")];
+    const found = new Map([
+      ...drawn("0:latin", face("HiraginoSans-W4"), {
+        "300": face("HiraginoSans-W3"),
+        "500": face("HiraginoSans-W5"),
+      }),
+      // One face for everything bold: `b` can mean no other.
+      ...drawn("1:latin", face("HelveticaNeue-Bold", "Helvetica Neue"), {
+        "600": face("HelveticaNeue-Bold", "Helvetica Neue"),
+        "900": face("HelveticaNeue-Bold", "Helvetica Neue"),
+      }),
+    ]);
+    expect(pptxNameProbes(asked, found).map((each) => [each.id, each.local])).toEqual([
+      ["0:latin#0", "Hiragino Sans"],
+      ["0:latin#1", "Hiragino Sans W4"],
+      ["0:latin#2", "HiraginoSans-W4"],
+    ]);
+    // The style's words apart, as a full name has them.
+    const demi = drawn("0:latin", face("AvenirNext-DemiBold", "Avenir Next"), {
+      "700": face("AvenirNext-Bold", "Avenir Next"),
+    });
+    expect(pptxNameProbes([probe("0:latin", "600")], demi).map((each) => each.local)).toEqual([
+      "Avenir Next",
+      "Avenir Next DemiBold",
+      "Avenir Next Demi Bold",
+      "AvenirNext-DemiBold",
+    ]);
+  });
+
+  test("writes the family where it has one face on that side, and else the first name that finds the face", () => {
+    const asked = [probe("0:latin", "400"), probe("0:eastAsian", "400"), probe("1:latin", "700")];
+    const found = new Map([
+      ...drawn("0:latin", face("HelveticaNeue", "Helvetica Neue"), {
+        "500": face("HelveticaNeue-Medium", "Helvetica Neue"),
+      }),
+      ...drawn("0:eastAsian", face("HiraginoSans-W4"), { "300": face("HiraginoSans-W3") }),
+      ...drawn("1:latin", face("Menlo-Bold", "Menlo"), { "600": face("Menlo-Bold", "Menlo") }),
+    ]);
+    const named = new Map<string, PptxFace>([
+      // The regular face of a family goes by the family's name.
+      ["0:latin#0", face("HelveticaNeue", "Helvetica Neue")],
+      // A family's name finds no face of it, or another: the full name finds this one.
+      ["0:eastAsian#0", face("Times-Roman", "Times")],
+      ["0:eastAsian#1", face("HiraginoSans-W4")],
+      ["0:eastAsian#2", face("HiraginoSans-W4")],
+    ]);
+    expect([...pptxFaceNames(asked, found, named)]).toEqual([
+      ["0:latin", "Helvetica Neue"],
+      ["0:eastAsian", "Hiragino Sans W4"],
+      ["1:latin", "Menlo"],
+    ]);
+  });
+
+  test("keeps the family where no name finds the face, for a font the page brought, and for another family's face", () => {
+    const asked = [probe("0:latin", "400"), probe("1:latin", "400"), probe("2:latin", "400")];
+    const found = new Map([
+      ...drawn("0:latin", face("HiraginoSans-W4"), { "300": face("HiraginoSans-W3") }),
+      ...drawn("1:latin", face("Inter-Regular", "Inter", true), {
+        "300": face("Inter-Light", "Inter", true),
+      }),
+      // At another weight the stack fell through to another family: that says nothing of this one.
+      ...drawn("2:latin", face("Menlo-Regular", "Menlo"), { "300": face("HiraginoSans-W3") }),
+    ]);
+    expect(pptxNameProbes(asked, found).map((each) => each.id)).toEqual([
+      "0:latin#0",
+      "0:latin#1",
+      "0:latin#2",
+    ]);
+    expect([...pptxFaceNames(asked, found, new Map())]).toEqual([
+      ["0:latin", "Hiragino Sans"],
+      ["1:latin", "Inter"],
+      ["2:latin", "Menlo"],
+    ]);
+    // A probe the page drew nothing for is not named at all.
+    expect([...pptxFaceNames([probe("9:latin", "400")], found, new Map())]).toEqual([]);
   });
 });
