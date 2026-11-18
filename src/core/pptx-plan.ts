@@ -674,17 +674,19 @@ function headingFromItsLines(block: PptxBlockText, lines: Line[]): PptxBlockText
 }
 
 /**
- * Whether a line stands more than two pixels from where a paragraph aligned as `align` would
- * set it in the block's content box: for centered text, half of what its two margins differ by.
+ * Whether a line stands off where a paragraph aligned as `align` would set it in the block's
+ * content box: by more than two pixels and more than a hundredth of its width, which is past
+ * what a word's own padding or a letter's spacing moves it by. For centered text that is half
+ * of what its two margins differ by.
  */
 function strays(align: PptxParagraph["align"], block: PptxBlockText, line: Line): boolean {
   const left = Math.min(...line.boxes.map((box) => box.x));
   const right = Math.max(...line.boxes.map((box) => box.x + box.width));
   const before = left - block.content.left;
   const after = block.content.right - right;
-  return align === "center"
-    ? Math.abs(before - after) / 2 > NEAR * 2
-    : align === "right" && Math.abs(after) > NEAR * 2;
+  const off =
+    align === "center" ? Math.abs(before - after) / 2 : align === "right" ? Math.abs(after) : 0;
+  return off > NEAR * 2 && off > (right - left) * 0.01;
 }
 
 /** How much room, in pixels, a line needs past its end for PowerPoint not to break it again. */

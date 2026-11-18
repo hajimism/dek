@@ -759,6 +759,18 @@ describe("planPptxLayers", () => {
     // Two pixels either way is where it would be set: a tag's own padding, a letter's spacing.
     expect(set("center", 202)).toEqual(["prose"]);
     expect(set("center", 203)).toEqual(["text"]);
+    // So is a hundredth of a long line's width: a marked word's padding at the start of a
+    // heading 400px long moves it four pixels, which no one sees and a paragraph may undo.
+    const long = (x: number) =>
+      planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 700, 132) } as PptxPaintNode],
+          boxes: [line(0, 0, "長い見出し", x, 103, 400)],
+          blocks: [block(0, "長い見出し", rect(100, 100, 700, 132), { align: "center" })],
+        }),
+      ).layers.map((layer) => layer.kind);
+    expect(long(204)).toEqual(["prose"]);
+    expect(long(205)).toEqual(["text"]);
   });
 
   test("lets go of a box under a pseudo-element that draws only text the file carries", () => {
