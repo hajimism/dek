@@ -12,6 +12,8 @@ Amends [22. Lay boxes, pictures, and the text in them over a PPTX's picture as P
 
 Amends [23. Make a deck's tokens PowerPoint's theme and a slide's background PowerPoint's own with dekc pptx --shapes](0023-make-a-deck-s-tokens-powerpoint-s-theme-and-a-slide-s-background-powerpoint-s-own-with-dekc-pptx-shapes.md)
 
+Amended by [99. Set a PPTX's text a block a text box, broken where the browser broke it, its heading the slide's title](0099-set-a-pptx-s-text-a-block-a-text-box-broken-where-the-browser-broke-it-its-heading-the-slide-s-title.md)
+
 ## Context
 
 ADR 22 made laying boxes, pictures, and their text out as PowerPoint's own a flag, `--shapes`, so that `dekc pptx` without it stayed ADR 8's: a picture of each slide with its text over it line by line, broken where the browser broke it. The flag was opt-in for that one guarantee, which text a shape wraps does not keep. ADR 23 put the deck's theme and a plain background behind the same flag.

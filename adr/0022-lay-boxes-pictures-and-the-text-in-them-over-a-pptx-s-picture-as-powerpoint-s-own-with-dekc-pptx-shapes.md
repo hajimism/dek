@@ -12,6 +12,8 @@ Amended by [23. Make a deck's tokens PowerPoint's theme and a slide's background
 
 Amended by [24. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0024-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
 
+Amended by [99. Set a PPTX's text a block a text box, broken where the browser broke it, its heading the slide's title](0099-set-a-pptx-s-text-a-block-a-text-box-broken-where-the-browser-broke-it-its-heading-the-slide-s-title.md)
+
 ## Context
 
 ADR 8 made a PPTX a picture of each slide with its text laid over it, line by line. A recipient fixes a word where it stands; nothing else moves.
