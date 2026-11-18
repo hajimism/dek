@@ -30,7 +30,7 @@ The words in such a heading are in a box of their own all the same: the one the 
 
 ## Consequences
 
-Every slide of the sample decks with a heading has a title: 42 of 42, from 32. The ten headings are text that wraps where it did not, 54 characters, so the share of text in a box that wraps rises from 40.2% to 40.6% and `lightning`'s from 45.6% to 47.3%.
+Every slide of the sample decks with a heading has a title: 42 of 42, from 32. The ten headings are text that wraps where it did not, 54 characters, so the share of text in a box that wraps rises from 40.2% to 40.5% and `lightning`'s from 45.6% to 47.3%.
 
 The number before the heading is not in the title. PowerPoint's outline reads "約束をひとつ", not "#02 約束をひとつ", which is how the slide's own `##` in `script.md` reads.
 
