@@ -103,9 +103,9 @@ describe("colorLeavesPicture", () => {
     expect(colorLeavesPicture(14_304, 18_015)).toBe(true);
     // A glow over the whole slide: three times the bytes on nothing.
     expect(colorLeavesPicture(560_000, 1_700_000)).toBe(false);
-    // Half again as large and 8 kB is the most it may grow by.
-    expect(colorLeavesPicture(100_000, 158_192)).toBe(true);
-    expect(colorLeavesPicture(100_000, 158_193)).toBe(false);
+    // A tenth larger and 8 kB is the most it may grow by.
+    expect(colorLeavesPicture(100_000, 118_192)).toBe(true);
+    expect(colorLeavesPicture(100_000, 118_193)).toBe(false);
   });
 });
 
