@@ -69,7 +69,10 @@ export async function pptxDeck(
     );
     const scripts = presenterSlides(deck, options.public ? "audience" : "speaker");
     // The deck's tokens are PowerPoint's theme, as most slides have them.
-    const theme = deckTheme(answer.slides.flatMap((slide) => (slide.theme ? [slide.theme] : [])));
+    const theme = deckTheme(
+      answer.slides.flatMap((slide) => (slide.theme ? [slide.theme] : [])),
+      answer.slides.map((slide) => slide.layers),
+    );
     const bytes = pptxPackage({
       title: deck.deck.title,
       lang: deck.deck.lang,

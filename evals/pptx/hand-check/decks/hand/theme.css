@@ -81,12 +81,20 @@
   font-feature-settings: normal;
 }
 
+.slide .w500 {
+  font-weight: 500;
+}
+
 .slide .w600 {
   font-weight: 600;
 }
 
 .slide .w700 {
   font-weight: 700;
+}
+
+.slide .w800 {
+  font-weight: 800;
 }
 
 .slide .card {

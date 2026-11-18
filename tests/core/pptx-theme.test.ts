@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { deckTheme, slideBackground } from "../../src/core/pptx-theme.ts";
+import type { PptxLayer, PptxParagraph, PptxRun } from "../../src/core/pptx-package.ts";
+import { colorLeavesPicture, deckTheme, slideBackground } from "../../src/core/pptx-theme.ts";
 
 // What becomes of a slide's background and the deck's theme, decided from the computed values
 // a page reports: no browser here.
@@ -96,6 +97,18 @@ describe("slideBackground", () => {
   });
 });
 
+describe("colorLeavesPicture", () => {
+  test("keeps the color in a picture that would pack much worse without it", () => {
+    // Two rules on nothing: an alpha channel's worth more than on their paper.
+    expect(colorLeavesPicture(14_304, 18_015)).toBe(true);
+    // A glow over the whole slide: three times the bytes on nothing.
+    expect(colorLeavesPicture(560_000, 1_700_000)).toBe(false);
+    // A tenth larger and 8 kB is the most it may grow by.
+    expect(colorLeavesPicture(100_000, 118_192)).toBe(true);
+    expect(colorLeavesPicture(100_000, 118_193)).toBe(false);
+  });
+});
+
 describe("deckTheme", () => {
   const FONT = { family: "sans-serif", latin: "Helvetica", ea: "Hiragino Sans" };
   const TITLE = { family: '"Futura", sans-serif', latin: "Futura", ea: "Hiragino Sans" };
@@ -120,5 +133,133 @@ describe("deckTheme", () => {
   test("names no fonts unless both font tokens are known", () => {
     expect(deckTheme([{ colors: {}, fonts: { body: FONT } }])).toEqual({ colors: {} });
     expect(deckTheme([])).toEqual({ colors: {} });
+  });
+
+  describe("with the text the slides set", () => {
+    const run = (text: string, more: Partial<PptxRun>): PptxRun => ({
+      text,
+      size: 20,
+      bold: false,
+      italic: false,
+      underline: false,
+      strike: false,
+      color: [0, 0, 0],
+      alpha: 1,
+      letterSpacing: 0,
+      ...more,
+    });
+    const paragraph = (runs: PptxRun[]): PptxParagraph => ({
+      align: "left",
+      lineHeight: 30,
+      spaceBefore: 0,
+      marginLeft: 0,
+      marginRight: 0,
+      indent: 0,
+      runs,
+    });
+    const AT = { x: 0, y: 0, width: 100, height: 30 };
+    const text = (runs: PptxRun[]): PptxLayer => ({ kind: "text", ...AT, lineHeight: 30, runs });
+    const prose = (runs: PptxRun[], title = false): PptxLayer => ({
+      kind: "prose",
+      ...AT,
+      text: {
+        inset: { left: 0, top: 0, right: 0, bottom: 0 },
+        wrap: true,
+        paragraphs: [paragraph(runs)],
+      },
+      ...(title ? { title } : {}),
+    });
+    const SANS = '"Hiragino Sans", sans-serif';
+    const page = (title: string, body: string, titleLatin = "Hiragino Sans") => ({
+      colors: {},
+      fonts: {
+        title: { family: title, latin: titleLatin, ea: "Hiragino Sans" },
+        body: { family: body, latin: "Hiragino Sans", ea: "Hiragino Sans" },
+      },
+    });
+
+    test("names each token's font by the face most of its characters were drawn in, a script at a time", () => {
+      const mono = "Menlo, monospace";
+      const theme = deckTheme(
+        [page(mono, SANS, "Menlo")],
+        [
+          [
+            prose([
+              run("本文の字が、いちばん多い。", { family: SANS, font: "Hiragino Sans W4" }),
+              run("太字", { family: SANS, font: "Hiragino Sans W7", bold: true }),
+              run("Latin words", { family: SANS, font: "Helvetica Neue", ea: "Hiragino Sans W4" }),
+            ]),
+            text([run("code", { family: mono, font: "Menlo" })]),
+            // A character named alone is set in no token.
+            text([run("—", { font: "Apple Symbols" })]),
+          ],
+        ],
+      );
+      expect(theme.fonts).toEqual({
+        // No East Asian character was set in the title's token, and another family draws
+        // them: the page's own answer stands.
+        title: { family: mono, latin: "Menlo", ea: "Hiragino Sans" },
+        body: { family: SANS, latin: "Helvetica Neue", ea: "Hiragino Sans W4" },
+      });
+    });
+
+    test("where both tokens are one family, takes the titles' face for the title's font", () => {
+      const theme = deckTheme(
+        [page(SANS, SANS)],
+        [
+          [
+            prose(
+              [run("見出し Title", { family: SANS, font: "Hiragino Sans W7", bold: true })],
+              true,
+            ),
+            {
+              kind: "shape",
+              ...AT,
+              radius: 0,
+              text: {
+                inset: { left: 0, top: 0, right: 0, bottom: 0 },
+                wrap: true,
+                paragraphs: [
+                  paragraph([
+                    run("図形の中の本文 text", { family: SANS, font: "Hiragino Sans W4" }),
+                  ]),
+                ],
+              },
+              layers: [
+                text([run("ラベル label", { family: SANS, font: "Hiragino Sans W6", bold: true })]),
+              ],
+            },
+          ],
+          [prose([run("本文 body text", { family: SANS, font: "Hiragino Sans W4" })])],
+        ],
+      );
+      expect(theme.fonts).toEqual({
+        title: { family: SANS, latin: "Hiragino Sans W7", ea: "Hiragino Sans W7" },
+        body: { family: SANS, latin: "Hiragino Sans W4", ea: "Hiragino Sans W4" },
+      });
+    });
+
+    test("takes the one face for both scripts where one family draws both and the text held one", () => {
+      const theme = deckTheme(
+        [page(SANS, SANS)],
+        [
+          [
+            prose([run("日本語だけの見出し", { family: SANS, font: "Hiragino Sans W7" })], true),
+            prose([run("Latin only", { family: SANS, font: "Hiragino Sans W4" })]),
+          ],
+        ],
+      );
+      expect(theme.fonts).toEqual({
+        title: { family: SANS, latin: "Hiragino Sans W7", ea: "Hiragino Sans W7" },
+        body: { family: SANS, latin: "Hiragino Sans W4", ea: "Hiragino Sans W4" },
+      });
+    });
+
+    test("keeps what the pages said where no text was set in a token", () => {
+      expect(deckTheme([page(SANS, SANS)], [[]]).fonts).toEqual({
+        title: { family: SANS, latin: "Hiragino Sans", ea: "Hiragino Sans" },
+        body: { family: SANS, latin: "Hiragino Sans", ea: "Hiragino Sans" },
+      });
+    });
   });
 });

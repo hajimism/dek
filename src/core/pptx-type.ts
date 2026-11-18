@@ -59,6 +59,14 @@ const graphemesOf = (text: string): string[] =>
 const isSpace = (grapheme: string) => /^[ \t\n\r\f]+$/.test(grapheme);
 
 /**
+ * The script of a character a face draws: none for white space, which is drawn in whatever face
+ * the text beside it is, so it says nothing of which face a run is in.
+ */
+export function drawnScriptOf(grapheme: string): Script | undefined {
+  return isSpace(grapheme) ? undefined : scriptOf(grapheme);
+}
+
+/**
  * What is asked of the page to set a slide's text: probes for faces, characters to measure
  * alone, and each box's line to set again plainly, in the boxes' order, empty for a box whose
  * characters the page did not place.
@@ -142,6 +150,123 @@ export function pptxTypeRequests(texts: PptxPageTexts): PptxTypeRequests {
         : [],
   );
   return { faces, glyphs, lines };
+}
+
+/**
+ * The face Chromium drew a probe's text in: its family, its own name as the font file has it,
+ * and whether the page brought the font, which a recipient then does not have.
+ */
+export type PptxFace = { family: string; postScript: string; custom: boolean };
+
+/**
+ * The weights CSS has on each side of bold. A run says only which side it is on, with `b`, and
+ * which face that is a renderer decides: of Hiragino Sans, PowerPoint for Mac draws W3 and W6
+ * where Chromium drew W4 at 400 and W7 at 700, and Quick Look W4 and W7 (ADR 100).
+ */
+const REGULAR_SIDE = ["100", "200", "300", "400", "500"];
+const BOLD_SIDE = ["600", "700", "800", "900"];
+const sideOf = (weight: string): string[] => (Number(weight) >= 600 ? BOLD_SIDE : REGULAR_SIDE);
+
+const sideId = (id: string, weight: string): string => `${id}@${weight}`;
+const nameId = (id: string, at: number): string => `${id}#${at}`;
+
+/**
+ * Whether a name alone could find the face a probe's text was drawn in: not where it is set
+ * aslant, which a run says with `i` as it says bold with `b`, nor where an axis picks the outlines.
+ */
+const nameable = (probe: PptxFaceProbe): boolean =>
+  probe.use.style === "normal" && probe.use.axes === "";
+
+/**
+ * For each probe, its text at each other weight on its side of bold: where a family drew them
+ * all in one face, `b` can mean no other, and where it drew several, the run names its own.
+ */
+export function pptxSideProbes(probes: PptxFaceProbe[]): PptxFaceProbe[] {
+  return probes.flatMap((probe) =>
+    nameable(probe)
+      ? sideOf(probe.use.weight)
+          .filter((weight) => weight !== probe.use.weight)
+          .map((weight) => ({
+            ...probe,
+            id: sideId(probe.id, weight),
+            use: { ...probe.use, weight },
+          }))
+      : [],
+  );
+}
+
+/** Whether the family that drew a probe drew its text in another face on the same side of bold. */
+function severalOnSide(
+  probe: PptxFaceProbe,
+  face: PptxFace,
+  drawn: ReadonlyMap<string, PptxFace>,
+): boolean {
+  if (face.custom || face.postScript === "" || !nameable(probe)) {
+    return false;
+  }
+  return sideOf(probe.use.weight).some((weight) => {
+    const other = drawn.get(sideId(probe.id, weight));
+    return (
+      other !== undefined && other.family === face.family && other.postScript !== face.postScript
+    );
+  });
+}
+
+/**
+ * The names a face may go by, the one a font menu shows first: its family's, as a family's
+ * regular face is named; its full name, the family's with the style after it, as the font file
+ * writes the style and with its words apart; and the font file's own name for it.
+ */
+function faceNames(face: PptxFace): string[] {
+  const dash = face.postScript.indexOf("-");
+  const style = dash < 0 ? "" : face.postScript.slice(dash + 1);
+  const full =
+    style === ""
+      ? []
+      : [`${face.family} ${style}`, `${face.family} ${style.replace(/([a-z])([A-Z])/g, "$1 $2")}`];
+  return [...new Set([face.family, ...full, face.postScript])];
+}
+
+/**
+ * For each probe whose family drew several faces on its side of bold, a probe of each name its
+ * face may go by, set in whatever face that name alone finds: the page says which one it is.
+ */
+export function pptxNameProbes(
+  probes: PptxFaceProbe[],
+  drawn: ReadonlyMap<string, PptxFace>,
+): PptxFaceProbe[] {
+  return probes.flatMap((probe) => {
+    const face = drawn.get(probe.id);
+    return face && severalOnSide(probe, face, drawn)
+      ? faceNames(face).map((local, at) => ({ ...probe, id: nameId(probe.id, at), local }))
+      : [];
+  });
+}
+
+/**
+ * What each probe's face is written as: its family, with `b` to say the side, where the family
+ * has one face there; where it has several, the first name that found the face again; and the
+ * family where none did, as before ADR 100.
+ */
+export function pptxFaceNames(
+  probes: PptxFaceProbe[],
+  drawn: ReadonlyMap<string, PptxFace>,
+  named: ReadonlyMap<string, PptxFace>,
+): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const probe of probes) {
+    const face = drawn.get(probe.id);
+    if (!face) {
+      continue;
+    }
+    const own = severalOnSide(probe, face, drawn)
+      ? faceNames(face).find(
+          (_, at) => named.get(nameId(probe.id, at))?.postScript === face.postScript,
+        )
+      : undefined;
+    names.set(probe.id, own ?? face.family);
+  }
+  return names;
 }
 
 /**

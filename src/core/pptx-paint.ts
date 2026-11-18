@@ -33,13 +33,15 @@ export type PptxPagePaint = {
   described: Array<{ node: number; text: string }>;
   /**
    * The slide's own background as computed, and whether that is all the slide paints of its own
-   * box, over the whole viewport, as PowerPoint paints a slide's background; and whether it is a
-   * stacking context.
+   * box, over the whole viewport, as PowerPoint paints a slide's background: `plain` when the
+   * background is one picture that fills the box, `flat` when its pictures, wherever they lie,
+   * are drawn over its color to the box's edge. And whether the slide is a stacking context.
    */
   slide?: {
     paint: { color: [number, number, number]; alpha: number };
     image: string;
     plain: boolean;
+    flat: boolean;
     stacking: boolean;
     width: number;
     height: number;
@@ -625,7 +627,7 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
   // The slide's own box: painted only by its background, over the whole viewport, it is what
   // PowerPoint paints as a slide's background.
   const own = getComputedStyle(slide);
-  const plain =
+  const lone =
     SIDES.every((side) => px(own.getPropertyValue(`border-${side.toLowerCase()}-width`)) === 0) &&
     [
       own.borderTopLeftRadius,
@@ -642,14 +644,24 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
     !set(own.scale) &&
     !set(own.translate) &&
     own.visibility === "visible" &&
-    /^auto( auto)?$/.test(own.backgroundSize) &&
-    /^0% 0%$|^0px 0px$/.test(own.backgroundPosition) &&
-    own.backgroundBlendMode === "normal" &&
     !offscreen(origin) &&
     origin.left <= 0.5 &&
     origin.top <= 0.5 &&
     origin.right >= window.innerWidth - 0.5 &&
     origin.bottom >= window.innerHeight - 0.5;
+  // Its background as one picture that fills it: what PowerPoint's own background can be.
+  const plain =
+    lone &&
+    /^auto( auto)?$/.test(own.backgroundSize) &&
+    /^0% 0%$|^0px 0px$/.test(own.backgroundPosition) &&
+    own.backgroundBlendMode === "normal";
+  // Its color under whatever pictures its background has, each drawn over it and not into it,
+  // out to the box's edge: the color alone can then be PowerPoint's.
+  const each = (list: string) => list.split(",").map((value) => value.trim());
+  const flat =
+    lone &&
+    each(own.backgroundBlendMode).every((mode) => mode === "normal") &&
+    each(own.backgroundClip).every((clip) => clip === "border-box" || clip === "padding-box");
   const stacking = zOf(own, slide.parentElement) !== undefined || isolates(own);
   return {
     origin: { left: origin.left, top: origin.top },
@@ -659,6 +671,7 @@ export function measurePptxPaintInPage(): Omit<PptxPagePaint, "described"> {
       paint: rgba(own.backgroundColor),
       image: own.backgroundImage,
       plain,
+      flat,
       stacking,
       width: origin.width,
       height: origin.height,
@@ -1139,13 +1152,13 @@ ${alone}${over} { visibility: visible !important; }`;
 /**
  * Takes what was laid over the picture out of it, with no change to the layout: a shape's
  * background and borders made transparent, a picture hidden, a bullet's marker unpainted, and
- * the slide's background, when PowerPoint paints it.
+ * the slide's background, when PowerPoint paints all of it.
  */
 export function hidePptxLiftedInPage(lifted: {
   shapes: number[];
   pictures: number[];
   markers: number[];
-  /** Whether the slide's background is PowerPoint's: the slide is shot on nothing. */
+  /** Whether the slide's background is PowerPoint's, all of it: the slide is shot on nothing. */
   background: boolean;
 }): void {
   const over = ":not(#dek-pptx-0):not(#dek-pptx-1):not(#dek-pptx-2)";
@@ -1175,4 +1188,27 @@ export function hidePptxLiftedInPage(lifted: {
     ...rules,
   ].join("\n");
   document.head.append(style);
+}
+
+/**
+ * Takes the slide's background color out of the drawing, and what the page paints under the
+ * slide with it, leaving the pictures its background draws over the color; or, with `shown`,
+ * puts the color back. Either way nothing moves in a transition while it is shot.
+ */
+export function pptxSlideColorInPage(shown: boolean): void {
+  const over = ":not(#dek-pptx-0):not(#dek-pptx-1):not(#dek-pptx-2)";
+  const style =
+    document.getElementById("dek-pptx-slide-color") ??
+    document.head.appendChild(
+      Object.assign(document.createElement("style"), { id: "dek-pptx-slide-color" }),
+    );
+  style.textContent = [
+    "*, *::before, *::after, *::marker { transition: none !important; }",
+    ...(shown
+      ? []
+      : [
+          `html${over}, body${over}, #deck${over} { background: transparent !important; }`,
+          `#deck > .slide${over} { background-color: transparent !important; }`,
+        ]),
+  ].join("\n");
 }

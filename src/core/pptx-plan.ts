@@ -138,10 +138,12 @@ export type PptxPageFacts = {
   /** What the slide's pictures say they show, and the element that says it. */
   described: Array<{ node: number; text: string }>;
   /**
-   * The slide's background, when PowerPoint can paint it as the browser did, and whether the
-   * slide is a stacking context, so nothing a negative `z-index` puts beneath it is hidden by it.
+   * The slide's background, when PowerPoint can paint it as the browser did, or its color with
+   * `image` when the pictures the background draws over the color stay in the slide's picture;
+   * and whether the slide is a stacking context, so nothing a negative `z-index` puts beneath it
+   * is hidden by it.
    */
-  slide?: { background?: PptxFill; stacking: boolean };
+  slide?: { background?: PptxFill; image?: true; stacking: boolean };
   /** The slide's size, which a text box of its own stays inside. */
   size?: { width: number; height: number };
 };
@@ -157,6 +159,8 @@ export type PptxPlan = {
   description: string;
   /** The slide's background, taken out of its picture to be PowerPoint's. */
   background?: PptxFill;
+  /** Whether that is its color alone, the pictures it draws over the color left in the picture. */
+  backgroundImage?: true;
 };
 
 /**
@@ -210,10 +214,20 @@ export function pptxPageFacts(
     }
   }
   const { slide } = paint;
-  const background =
+  const whole =
     slide?.plain === true
       ? slideBackground(slide, { width: slide.width, height: slide.height })
       : undefined;
+  // Under pictures PowerPoint's background would not draw as the browser did, the color is
+  // PowerPoint's all the same, and the pictures stay in the slide's, over nothing (ADR 102).
+  const under =
+    whole === undefined &&
+    slide?.flat === true &&
+    slide.image.trim() !== "none" &&
+    slide.paint.alpha === 1
+      ? ({ kind: "solid", paint: slide.paint } as const)
+      : undefined;
+  const background = whole ?? under;
   return {
     nodes: paint.nodes,
     drawn,
@@ -223,7 +237,11 @@ export function pptxPageFacts(
     described: paint.described,
     ...(slide
       ? {
-          slide: { ...(background ? { background } : {}), stacking: slide.stacking },
+          slide: {
+            ...(background ? { background } : {}),
+            ...(under ? { image: true as const } : {}),
+            stacking: slide.stacking,
+          },
           size: { width: slide.width, height: slide.height },
         }
       : {}),
@@ -302,6 +320,7 @@ export function planPptxLayers(page: PptxPageFacts): PptxPlan {
     page.slide?.background && (page.slide.stacking || !beneath) ? page.slide.background : undefined;
   return {
     ...(background ? { background } : {}),
+    ...(background && page.slide?.image ? { backgroundImage: true as const } : {}),
     layers: assemble(page, tree, lifted, state).map(({ layer }) => layer),
     lifted: {
       shapes: sorted.filter((id) => page.nodes[id]?.paint?.kind === "shape"),
@@ -624,6 +643,52 @@ function boxShape(box: PptxMeasuredBox, tree: Tree, shapes: ReadonlySet<number>)
 
 type Line = { top: number; bottom: number; boxes: PptxMeasuredBox[] };
 
+/**
+ * A heading whose lines all start at one place past its content box's edge, with that place as
+ * its edge: what a pseudo-element sets before its words, a number or a mark, the two side by
+ * side, starts every line of the words that far in. The words are then lines at one margin, a
+ * text box of their own, which the slide's title has to be (ADR 101). Only a heading: lines
+ * that anything else starts off their edge stay where they stand, as ADR 99 has them.
+ */
+function headingFromItsLines(block: PptxBlockText, lines: Line[]): PptxBlockText {
+  if (block.heading === undefined) {
+    return block;
+  }
+  const starts = lines.flatMap((line) => (line.boxes[0] ? [line.boxes[0].x] : []));
+  const start = Math.min(...starts);
+  const from = { ...block, content: { ...block.content, left: start }, textIndent: 0 };
+  if (block.align === "left" || block.align === "justify") {
+    const off = start - block.content.left - block.textIndent;
+    return starts.length > 0 &&
+      off > NEAR * 2 &&
+      starts.every((each) => Math.abs(each - start) <= NEAR * 2)
+      ? from
+      : block;
+  }
+  // One line its style centers or sets to the right, which stands elsewhere for what is set
+  // before it, is set from where it starts: there is no other line for a margin to be wrong for.
+  const [line] = lines;
+  return lines.length === 1 && line && strays(block.align, block, line)
+    ? { ...from, align: "left" }
+    : block;
+}
+
+/**
+ * Whether a line stands off where a paragraph aligned as `align` would set it in the block's
+ * content box: by more than two pixels and more than a hundredth of its width, which is past
+ * what a word's own padding or a letter's spacing moves it by. For centered text that is half
+ * of what its two margins differ by.
+ */
+function strays(align: PptxParagraph["align"], block: PptxBlockText, line: Line): boolean {
+  const left = Math.min(...line.boxes.map((box) => box.x));
+  const right = Math.max(...line.boxes.map((box) => box.x + box.width));
+  const before = left - block.content.left;
+  const after = block.content.right - right;
+  const off =
+    align === "center" ? Math.abs(before - after) / 2 : align === "right" ? Math.abs(after) : 0;
+  return off > NEAR * 2 && off > (right - left) * 0.01;
+}
+
 /** How much room, in pixels, a line needs past its end for PowerPoint not to break it again. */
 const FIT = 0.75;
 /** How much a wrapping text's far edge is moved out, so a line that just fit still fits. */
@@ -653,15 +718,16 @@ function columnOf(
   }
   const sets: Array<{ block: PptxBlockText; lines: Line[]; pitch: number }> = [];
   for (const id of order) {
-    const block = blocks.get(id);
+    const measured = blocks.get(id);
     const all = page.boxes.flatMap((box, index) => (box.block === id ? [index] : []));
-    if (!block || block.runs.length === 0 || all.some((index) => !mine.has(index))) {
+    if (!measured || measured.runs.length === 0 || all.some((index) => !mine.has(index))) {
       return undefined;
     }
     const lines = linesOf(all.map((index) => page.boxes[index] as PptxMeasuredBox));
     if (lines.some((line) => line.boxes.length > 1)) {
       return undefined;
     }
+    const block = holder ? measured : headingFromItsLines(measured, lines);
     const carried = lines.flatMap((line) => line.boxes.flatMap((box) => box.runs));
     if (ink(block.runs) !== ink(carried)) {
       return undefined;
@@ -761,6 +827,11 @@ function columnOf(
       return Math.abs((line.boxes[0]?.x ?? start) - start) > NEAR * 2;
     });
     if (moved && (aligns[index] === "left" || aligns[index] === "justify")) {
+      return undefined;
+    }
+    // So does text its style centers or sets to the right, where the browser put a line
+    // elsewhere: after something set before it, the two side by side, as a dot in a chip is.
+    if (lines.some((line) => strays(aligns[index] ?? "left", block, line))) {
       return undefined;
     }
     // Nor does one set another element in its lines: a badge or an icon the browser set beside

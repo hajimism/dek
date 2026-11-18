@@ -666,6 +666,113 @@ describe("planPptxLayers", () => {
     expect(group?.layers.some((layer) => layer.kind === "prose" && layer.title)).toBe(false);
   });
 
+  test("starts a heading where its lines start, when something set before it starts them all off its edge", () => {
+    // A number a pseudo-element draws before the heading's words, the two side by side: every
+    // line of the words starts 70px in, at 170, and the heading's own box starts at 100.
+    const numbered = (starts: Array<[x: number, y: number]>, more: Partial<PptxBlockText> = {}) => {
+      const bottom = 100 + 32 * starts.length;
+      return planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 900, bottom) } as PptxPaintNode],
+          boxes: starts.map(([x, y], at) => line(0, 0, `見出し${at}`, x, y)),
+          blocks: [
+            block(0, starts.map((_, at) => `見出し${at}`).join(""), rect(100, 100, 900, bottom), {
+              heading: 2,
+              ...more,
+            }),
+          ],
+        }),
+      ).layers;
+    };
+    // The words are a text box from where they start to the heading's far edge, and the title.
+    for (const starts of [
+      [[170, 103]],
+      [
+        [170, 103],
+        [170, 135],
+      ],
+    ] as Array<Array<[number, number]>>) {
+      const [title, ...rest] = numbered(starts);
+      expect(rest).toEqual([]);
+      expect(title).toMatchObject({ kind: "prose", title: true, x: 170 });
+      expect(title?.kind === "prose" && title.x + title.width).toBeGreaterThanOrEqual(900);
+      expect(title?.kind === "prose" && title.text.paragraphs[0]).toMatchObject({
+        marginLeft: 0,
+        indent: 0,
+      });
+    }
+    // Lines that start in two places are around a float, or after an indent: they stay lines.
+    expect(
+      numbered([
+        [170, 103],
+        [100, 135],
+      ]).map((layer) => layer.kind),
+    ).toEqual(["text", "text"]);
+    // Text that is no heading stays in lines too: it is no title, and what moved it is not known.
+    const { heading: _heading, ...plain } = block(0, "", rect(0, 0, 0, 0), { heading: 2 });
+    expect(
+      planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 900, 132) } as PptxPaintNode],
+          boxes: [line(0, 0, "見出し0", 170, 103)],
+          blocks: [{ ...plain, runs: [run("見出し0", 0)], content: rect(100, 100, 900, 132) }],
+        }),
+      ).layers.map((layer) => layer.kind),
+    ).toEqual(["text"]);
+    // Centered text where centering puts it is not touched: its 200px line in the middle.
+    const [centered] = numbered([[400, 103]], { align: "center" });
+    expect(centered).toMatchObject({ kind: "prose", title: true });
+    expect(centered?.kind === "prose" && centered.text.paragraphs[0]?.align).toBe("center");
+    // One line its style centers that stands after a mark, at the far edge, is set from where
+    // it starts, and is the title; two such lines have no one place to start from.
+    const [after, ...none] = numbered([[700, 103]], { align: "center" });
+    expect(none).toEqual([]);
+    expect(after).toMatchObject({ kind: "prose", title: true, x: 700 });
+    expect(after?.kind === "prose" && after.text.paragraphs[0]?.align).toBe("left");
+    expect(
+      numbered(
+        [
+          [700, 103],
+          [700, 135],
+        ],
+        { align: "center" },
+      ).map((layer) => layer.kind),
+    ).toEqual(["text", "text"]);
+  });
+
+  test("leaves in lines text that is not where its alignment would put it", () => {
+    // A label whose style centers it, set after a dot the two side by side: its one line ends
+    // at the far edge of its 400px content box, and a paragraph would center it.
+    const set = (align: "center" | "right", x: number) =>
+      planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 500, 132) } as PptxPaintNode],
+          boxes: [line(0, 0, "ラベル", x, 103)],
+          blocks: [block(0, "ラベル", rect(100, 100, 500, 132), { align })],
+        }),
+      ).layers.map((layer) => layer.kind);
+    expect(set("center", 300)).toEqual(["text"]);
+    // Centered where centering puts it, and flush right where that does: a text box each.
+    expect(set("center", 200)).toEqual(["prose"]);
+    expect(set("right", 300)).toEqual(["prose"]);
+    expect(set("right", 200)).toEqual(["text"]);
+    // Two pixels either way is where it would be set: a tag's own padding, a letter's spacing.
+    expect(set("center", 202)).toEqual(["prose"]);
+    expect(set("center", 203)).toEqual(["text"]);
+    // So is a hundredth of a long line's width: a marked word's padding at the start of a
+    // heading 400px long moves it four pixels, which no one sees and a paragraph may undo.
+    const long = (x: number) =>
+      planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 700, 132) } as PptxPaintNode],
+          boxes: [line(0, 0, "長い見出し", x, 103, 400)],
+          blocks: [block(0, "長い見出し", rect(100, 100, 700, 132), { align: "center" })],
+        }),
+      ).layers.map((layer) => layer.kind);
+    expect(long(204)).toEqual(["prose"]);
+    expect(long(205)).toEqual(["text"]);
+  });
+
   test("lets go of a box under a pseudo-element that draws only text the file carries", () => {
     const page = plainCard();
     const place = (bare: boolean, pseudos: string[]) =>
@@ -762,7 +869,15 @@ describe("planPptxLayers", () => {
       nodes: [],
       pseudos: [],
       described: [],
-      slide: { paint: BLACK, image: "none", plain, stacking: true, width: 1280, height: 720 },
+      slide: {
+        paint: BLACK,
+        image: "none",
+        plain,
+        flat: plain,
+        stacking: true,
+        width: 1280,
+        height: 720,
+      },
     });
     const texts = { boxes: [], blocks: [], drawn: [], uses: [], pseudos: [] };
     expect(pptxPageFacts(paint(true), texts, new Map()).slide).toEqual({
@@ -770,5 +885,58 @@ describe("planPptxLayers", () => {
       stacking: true,
     });
     expect(pptxPageFacts(paint(false), texts, new Map()).slide?.background).toBeUndefined();
+  });
+
+  test("takes the slide's color for PowerPoint's where its background's pictures stay in the slide's", () => {
+    // Rules a theme draws on every slide with gradients sized and placed: nothing PowerPoint's
+    // own background draws, over a color that is.
+    const RULES = "linear-gradient(rgb(20, 20, 20), rgb(20, 20, 20))";
+    const facts = (slide: {
+      paint?: typeof BLACK;
+      image?: string;
+      plain?: boolean;
+      flat?: boolean;
+    }) =>
+      pptxPageFacts(
+        {
+          origin: { left: 0, top: 0 },
+          nodes: [],
+          pseudos: [],
+          described: [],
+          slide: {
+            paint: BLACK,
+            image: RULES,
+            plain: false,
+            flat: true,
+            stacking: true,
+            width: 1280,
+            height: 720,
+            ...slide,
+          },
+        },
+        { boxes: [], blocks: [], drawn: [], uses: [], pseudos: [] },
+        new Map(),
+      );
+    expect(facts({}).slide).toEqual({
+      background: { kind: "solid", paint: BLACK },
+      image: true,
+      stacking: true,
+    });
+    expect(planPptxLayers(facts({}))).toMatchObject({
+      background: { kind: "solid", paint: BLACK },
+      backgroundImage: true,
+    });
+    // A color one can see through is not a slide's background, nor is one under a box that
+    // paints more than its background, or blends its pictures into the color.
+    expect(facts({ paint: { color: [0, 0, 0], alpha: 0.5 } }).slide?.background).toBeUndefined();
+    expect(facts({ flat: false }).slide?.background).toBeUndefined();
+    // A gradient PowerPoint draws as the browser did is the background whole, as before.
+    const whole = facts({
+      plain: true,
+      image: "linear-gradient(rgb(0, 0, 0), rgb(255, 255, 255))",
+    });
+    expect(whole.slide?.background?.kind).toBe("linear");
+    expect(whole.slide?.image).toBeUndefined();
+    expect(planPptxLayers(whole).backgroundImage).toBeUndefined();
   });
 });

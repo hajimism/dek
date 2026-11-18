@@ -12,6 +12,8 @@ Amends [22. Lay boxes, pictures, and the text in them over a PPTX's picture as P
 
 Amends [24. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0024-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
 
+Amended by [101. Start a PPTX's heading where its lines start, so a heading set after a number is the slide's title](0101-start-a-pptx-s-heading-where-its-lines-start-so-a-heading-set-after-a-number-is-the-slide-s-title.md)
+
 ## Context
 
 ADR 8 made each line of text a text box of its own, "no wrapping, no insets, the browser's line breaks". ADR 22 gave the text in a plain box to the box, as paragraphs that wrap "where PowerPoint wraps", and ADR 24 made that every file's. A recipient fixes a word where it stands; what they cannot do well is what people do most with a handed-over deck: retype a paragraph, or put a translation in its place, and have it wrap.

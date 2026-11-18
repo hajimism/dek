@@ -212,6 +212,14 @@ lang: ja
 ## fade
 
 背景の移り変わり。
+
+## ruled
+
+罫線のある地。
+
+## soft
+
+ぼかしのある地。
 `;
 
 const themedTheme = `.slide { --fg: rgb(20 20 20); --bg: rgb(250 248 240); --muted: rgb(225 225 215); --accent: rgb(200 60 0); --font-title: sans-serif; --font-body: serif; position: relative; width: 1280px; height: 720px; margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
@@ -220,6 +228,8 @@ const themedTheme = `.slide { --fg: rgb(20 20 20); --bg: rgb(250 248 240); --mut
 .slide .card p { margin: 0; font-size: 24px; line-height: 36px; }
 .slide.fade { background: linear-gradient(to right, rgb(250 248 240), rgb(200 220 255)); }
 .slide .drawn { position: absolute; left: 600px; top: 200px; width: 200px; height: 100px; background: linear-gradient(rgb(255 0 0), rgb(0 0 255)); }
+.slide.ruled { background-color: rgb(240 240 230); background-image: linear-gradient(rgb(20 20 20), rgb(20 20 20)); background-size: 1160px 2px; background-position: 60px 680px; background-repeat: no-repeat; }
+.slide.soft { background-color: rgb(20 30 60); background-image: radial-gradient(circle at 30% 30%, rgb(120 160 255 / 0.6), transparent 70%), radial-gradient(circle at 80% 70%, rgb(255 120 200 / 0.4), transparent 60%); }
 `;
 
 const themedCover = `<section class="slide">
@@ -231,6 +241,16 @@ const themedCover = `<section class="slide">
 const themedFade = `<section class="slide fade">
   <h2>移り変わる地</h2>
   <div class="drawn"></div>
+</section>
+`;
+
+const themedRuled = `<section class="slide ruled">
+  <h2>罫線のある地</h2>
+</section>
+`;
+
+const themedSoft = `<section class="slide soft">
+  <h2>ぼかしのある地</h2>
 </section>
 `;
 
@@ -616,7 +636,12 @@ describe("pptxDeck in a browser", () => {
               name: "themed",
               script: themedScript,
               theme: themedTheme,
-              slides: { cover: themedCover, fade: themedFade },
+              slides: {
+                cover: themedCover,
+                fade: themedFade,
+                ruled: themedRuled,
+                soft: themedSoft,
+              },
             },
           ],
         },
@@ -693,6 +718,37 @@ describe("pptxDeck in a browser", () => {
           expect((await pixel(picture, 2 * 700, 2 * 250))[3]).toBe(255);
           // The background's colors are PowerPoint's now, not the picture's.
           expect(seen[1]?.background?.kind).toBe("linear");
+
+          // The ruled slide: a rule its background draws with a gradient sized and placed is
+          // nothing PowerPoint's background draws, so it stays in the picture, on nothing, and
+          // the color under it is the slide's background all the same.
+          expect(seen[2]?.background).toEqual({
+            kind: "solid",
+            paint: { color: [240, 240, 230], alpha: 1 },
+          });
+          const ruled = read("ppt/slides/slide3.xml");
+          expect(
+            ruled
+              .getElementsByTagName("p:bg")[0]
+              ?.getElementsByTagName("a:srgbClr")[0]
+              ?.getAttribute("val"),
+          ).toBe("F0F0E6");
+          const target = /Target="\.\.\/media\/(image\d+\.png)"/.exec(
+            new TextDecoder().decode(files.get("ppt/slides/_rels/slide3.xml.rels")),
+          )?.[1];
+          const rules = files.get(`ppt/media/${target}`) ?? new Uint8Array();
+          expect((await pixel(rules, 2 * 640, 2 * 300))[3]).toBe(0);
+          expect(await pixel(rules, 2 * 640, 2 * 681)).toEqual([20, 20, 20, 255]);
+
+          // The soft slide: two glows over its color. On nothing they are a picture several
+          // times the bytes of the same picture on the color, so the color stays in it, and
+          // the slide has no background of PowerPoint's.
+          expect(seen[3]?.background).toBeUndefined();
+          const soft = /Target="\.\.\/media\/(image\d+\.png)"/.exec(
+            new TextDecoder().decode(files.get("ppt/slides/_rels/slide4.xml.rels")),
+          )?.[1];
+          const glow = files.get(`ppt/media/${soft}`) ?? new Uint8Array();
+          expect((await pixel(glow, 2 * 1270, 2 * 10))[3]).toBe(255);
         },
       );
     },
@@ -720,6 +776,9 @@ lang: ja
 .slide .words { position: absolute; left: 80px; top: 400px; width: 600px; margin: 0; font-size: 24px; line-height: 36px; }
 .slide ul { position: absolute; left: 80px; top: 160px; width: 600px; margin: 0; padding-left: 28px; font-size: 24px; line-height: 36px; }
 .slide::after { content: counter(n, decimal-leading-zero) " / 12"; position: absolute; right: 60px; bottom: 40px; font-size: 18px; }
+.slide .words::after { content: "\\3000 注記"; }
+.slide .plain { position: absolute; left: 80px; top: 480px; margin: 0; font-size: 24px; line-height: 36px; }
+.slide .plain::after { content: "注記"; }
 `;
       // Each line of the code ends in a text node that is a line break and nothing else.
       const code = `<section class="slide">
@@ -729,6 +788,7 @@ lang: ja
 <span>"ok"</span>: true
 <span>}</span></pre>
   <p class="words"><b>Bold</b> <i>Italic</i></p>
+  <p class="plain">Plain</p>
 </section>
 `;
       const list = `<section class="slide">
@@ -760,6 +820,13 @@ lang: ja
               "07 / 12",
             );
           }
+          // A space of any width that starts what a pseudo-element writes is room before its
+          // text, not text: the box starts at the first character, and is as wide without it.
+          const notes = (first?.boxes ?? []).filter(
+            (box) => box.runs.map((run) => run.text).join("") === "注記",
+          );
+          expect(notes).toHaveLength(2);
+          expect(Math.abs((notes[0]?.width ?? 0) - (notes[1]?.width ?? 1))).toBeLessThan(0.5);
           // A list is one text box, an item a paragraph, its markers PowerPoint's bullets.
           const items = proseLayers(second?.layers ?? []).find((prose) =>
             said(prose).startsWith("一つ目"),
@@ -842,6 +909,123 @@ lang: ja
             expect(run.ea ?? run.font).toBe(drawn.eastAsian);
           }
           expect(typeof drawn.latin).toBe("string");
+        },
+      );
+    },
+  );
+
+  browserTest(
+    "names a run's own face where its family drew several on that side of bold, by a name that finds it",
+    async () => {
+      // East Asian text at five weights: on a Mac in Hiragino Sans, a family with a face a
+      // weight; elsewhere in whatever sans-serif there is, perhaps a regular and a bold.
+      const weights = [300, 400, 500, 700, 800];
+      const words = ["三百の字", "四百の字", "五百の字", "七百の字", "八百の字"];
+      const css = `font-family: "Hiragino Sans", "Noto Sans CJK JP", sans-serif; font-size: 32px;`;
+      const weighedTheme = `.slide { position: relative; width: 1280px; height: 720px; color: rgb(20 20 20); background: rgb(250 250 250); }
+.slide p { position: absolute; left: 80px; margin: 0; ${css} line-height: 48px; white-space: nowrap; }
+`;
+      const weighed = `<section class="slide">${weights
+        .map(
+          (weight, at) =>
+            `<p style="top: ${80 + at * 80}px; font-weight: ${weight}">${words[at]}</p>`,
+        )
+        .join("")}</section>\n`;
+      type Face = { familyName: string; postScriptName?: string; glyphCount: number };
+      /** The face that drew each element with an id, on a page of its own, apart from the exporter. */
+      const facesOn = (html: string): Promise<Map<string, Face>> =>
+        withBrowser(async (browser) => {
+          const page = await browser.newPage();
+          try {
+            await page.setContent(html, { waitUntil: "load" });
+            await page.evaluate(() => document.fonts.ready.then(() => undefined));
+            const cdp = await page.context().newCDPSession(page);
+            await cdp.send("DOM.enable");
+            await cdp.send("CSS.enable");
+            const { root } = (await cdp.send("DOM.getDocument", { depth: -1 })) as {
+              root: { nodeId: number };
+            };
+            const { nodeIds } = (await cdp.send("DOM.querySelectorAll", {
+              nodeId: root.nodeId,
+              selector: "[id]",
+            })) as { nodeIds: number[] };
+            const found = new Map<string, Face>();
+            for (const nodeId of nodeIds) {
+              const { attributes } = (await cdp.send("DOM.getAttributes", { nodeId })) as {
+                attributes: string[];
+              };
+              const { fonts } = (await cdp.send("CSS.getPlatformFontsForNode", { nodeId })) as {
+                fonts: Face[];
+              };
+              const main = [...fonts].sort((a, b) => b.glyphCount - a.glyphCount)[0];
+              if (main) {
+                found.set(attributes[attributes.indexOf("id") + 1] ?? "", main);
+              }
+            }
+            return found;
+          } finally {
+            await page.close();
+          }
+        });
+      const drawn = await facesOn(
+        `<!doctype html><html lang="ja"><body style='${css}'>${weights
+          .map((weight, at) => `<p id="w${weight}" style="font-weight: ${weight}">${words[at]}</p>`)
+          .join("")}</body></html>`,
+      );
+      await withTempProject(
+        { decks: [{ name: "weighed", script, theme: weighedTheme, slides: { cover: weighed } }] },
+        async (root) => {
+          seen.length = 0;
+          await pptxDeck(join(root, "decks", "weighed"), { runner });
+          const runs = [
+            ...(seen[0]?.boxes ?? []).flatMap((box) => box.runs),
+            ...proseLayers(seen[0]?.layers ?? []).flatMap((prose) =>
+              prose.text.paragraphs.flatMap((paragraph) => paragraph.runs),
+            ),
+          ];
+          const written = weights.map((_, at) => {
+            const run = runs.find((each) => each.text.includes((words[at] ?? "").slice(0, 2)));
+            return { name: run?.ea ?? run?.font, bold: run?.bold };
+          });
+          // What each written name finds when a renderer is given it alone.
+          const names = [...new Set(written.map((each) => each.name ?? ""))];
+          const named = await facesOn(
+            `<!doctype html><html lang="ja"><head><style>${names
+              .map((name, at) => `@font-face { font-family: "n${at}"; src: local("${name}"); }`)
+              .join("\n")}</style></head><body>${names
+              .map((_, at) => `<p id="n${at}" style='font-family: "n${at}"'>${words[0]}</p>`)
+              .join("")}</body></html>`,
+          );
+          weights.forEach((weight, at) => {
+            const face = drawn.get(`w${weight}`);
+            const { name, bold } = written[at] ?? {};
+            expect(typeof name).toBe("string");
+            expect(bold).toBe(weight >= 600);
+            // The family's name, with bold to say the side; or a name that finds the very face.
+            const found = named.get(`n${names.indexOf(name ?? "")}`);
+            const own = found?.postScriptName === face?.postScriptName;
+            expect(own || name === face?.familyName).toBe(true);
+            // Two weights on one side of bold that one family drew in two faces are told
+            // apart in the file, which `b` alone could not do: always in Hiragino Sans on a
+            // Mac, whose faces' names are known to find them, and elsewhere wherever the page
+            // found a name for the face. Where it found none, both keep the family's.
+            weights.forEach((other, to) => {
+              const beside = drawn.get(`w${other}`);
+              if (
+                other !== weight &&
+                other >= 600 === weight >= 600 &&
+                beside?.familyName === face?.familyName &&
+                beside?.postScriptName !== face?.postScriptName
+              ) {
+                if (process.platform === "darwin" && face?.familyName === "Hiragino Sans") {
+                  expect(own).toBe(true);
+                }
+                if (own) {
+                  expect(written[to]?.name).not.toBe(name);
+                }
+              }
+            });
+          });
         },
       );
     },

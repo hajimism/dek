@@ -1,4 +1,12 @@
-import type { PptxFill, PptxPaint, PptxTheme, PptxThemeFont } from "./pptx-package.ts";
+import type {
+  PptxFill,
+  PptxLayer,
+  PptxPaint,
+  PptxRun,
+  PptxTheme,
+  PptxThemeFont,
+} from "./pptx-package.ts";
+import { drawnScriptOf } from "./pptx-type.ts";
 
 // What of a slide's look becomes PowerPoint's own rather than its picture's, from the computed
 // values a page reports: the deck's theme, from the tokens most slides have, and a slide's
@@ -13,8 +21,16 @@ export type PptxPageTheme = {
 /**
  * The deck's theme: each token as most slides have it, the first slide's on a tie, so a slide
  * that sets a token of its own keeps it to itself. Fonts only when both font tokens are known.
+ * A font token is a family, and a theme's font is what a run that follows it is drawn in: so
+ * each is named by the face most of the characters set in its token were drawn in, Latin and
+ * East Asian each by their own, as the runs of `slides` name them (ADR 100). Where both tokens
+ * are one family, the title's font is the face of the slides' titles and the body's that of
+ * everything else, as a theme's two fonts are.
  */
-export function deckTheme(pages: PptxPageTheme[]): PptxTheme {
+export function deckTheme<I>(
+  pages: PptxPageTheme[],
+  slides: ReadonlyArray<ReadonlyArray<PptxLayer<I>>> = [],
+): PptxTheme {
   const colors: PptxTheme["colors"] = {};
   for (const token of ["fg", "bg", "muted", "accent"] as const) {
     const color = mostOf(
@@ -33,7 +49,80 @@ export function deckTheme(pages: PptxPageTheme[]): PptxTheme {
     pages.map((page) => page.fonts.body),
     (font) => font.family,
   );
-  return title && body ? { colors, fonts: { title, body } } : { colors };
+  if (!title || !body) {
+    return { colors };
+  }
+  const set = slides.flatMap((layers) => [...runsOf(layers)]);
+  const oneFamily = title.family === body.family;
+  return {
+    colors,
+    fonts: {
+      title: facesOf(
+        title,
+        set.filter((each) => each.run.family === title.family && (each.title || !oneFamily)),
+      ),
+      body: facesOf(
+        body,
+        set.filter((each) => each.run.family === body.family && !(each.title && oneFamily)),
+      ),
+    },
+  };
+}
+
+/** Every run of text among some layers, and whether it is of the slide's title. */
+function* runsOf<I>(
+  layers: ReadonlyArray<PptxLayer<I>>,
+): Generator<{ run: PptxRun; title: boolean }> {
+  for (const layer of layers) {
+    if (layer.kind === "text") {
+      for (const run of layer.runs) {
+        yield { run, title: false };
+      }
+    } else if (layer.kind === "prose" || layer.kind === "shape") {
+      for (const paragraph of layer.text?.paragraphs ?? []) {
+        for (const run of paragraph.runs) {
+          yield { run, title: layer.kind === "prose" && layer.title === true };
+        }
+      }
+      if (layer.kind === "shape") {
+        yield* runsOf(layer.layers);
+      }
+    }
+  }
+}
+
+/**
+ * A token's font with the faces most of the characters of `runs` name, a script at a time. For
+ * a script none of them holds: the other script's face where the page found one family for both,
+ * and what the page said of the token otherwise.
+ */
+function facesOf(font: PptxThemeFont, runs: Array<{ run: PptxRun }>): PptxThemeFont {
+  const counts = { latin: new Map<string, number>(), eastAsian: new Map<string, number>() };
+  for (const { run } of runs) {
+    for (const char of run.text) {
+      const script = drawnScriptOf(char);
+      const face =
+        script === "latin" ? run.font : script === "eastAsian" ? (run.ea ?? run.font) : undefined;
+      if ((script === "latin" || script === "eastAsian") && face !== undefined) {
+        counts[script].set(face, (counts[script].get(face) ?? 0) + 1);
+      }
+    }
+  }
+  const most = (faces: Map<string, number>): string | undefined =>
+    [...faces].reduce<[string, number] | undefined>(
+      (best, each) => (best === undefined || each[1] > best[1] ? each : best),
+      undefined,
+    )?.[0];
+  const latin = most(counts.latin);
+  const ea = most(counts.eastAsian);
+  // Where one family draws both scripts, the face of the one the text held is the other's too:
+  // what is typed into such text is then set in the face beside it.
+  const shared = font.latin === font.ea ? (latin ?? ea) : undefined;
+  return {
+    family: font.family,
+    latin: latin ?? shared ?? font.latin,
+    ea: ea ?? shared ?? font.ea,
+  };
 }
 
 /** The value most of `values` are, by `key`; the first of them on a tie. */
@@ -93,6 +182,17 @@ export function slideBackground(
     return undefined;
   }
   return { kind: "linear", angle: (Math.round(turned) + 270) % 360, stops };
+}
+
+/**
+ * Whether a slide's picture is kept on nothing, the color under its background's pictures
+ * PowerPoint's, given the picture's bytes shot on the color and on nothing: not where that makes
+ * it more than a tenth larger, past the 8 kB an alpha channel costs a picture with little in
+ * it. A soft picture, a glow or a wash, packs up to several times worse on nothing than on its
+ * color, and a larger file is not worth a color no one sees but through it (ADR 102).
+ */
+export function colorLeavesPicture(onColor: number, onNothing: number): boolean {
+  return onNothing <= onColor * 1.1 + 8192;
 }
 
 /** A gradient's direction in CSS degrees, or none when the argument is not one. */

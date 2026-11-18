@@ -21,7 +21,7 @@ PowerPoint が修復を提案せずにファイルを開くことを確かめま
 | --- | --- | --- |
 | 「台本」から、（発表）まで。 | 行が帯の左端から始まり、右端で終わる。かっこが隣の文字に重ならない。 | PowerPoint は、ランの字間を各文字の後ろ（最後の文字の後ろも）に足していません。 |
 | 覚える書き方は三つだけです。… | 行が帯の右端で終わる。 | 長ければ同上。短ければ、PowerPoint はかなをカーニングしています。その分は字間にすでに入っています。 |
-| AVATAR To We Type 1,234.56 | 行が帯の右端で終わる。 | 帯より長ければ、PowerPoint は、カーニングを始める大きさを指定していないランをカーニングしていません。行を選び、書式 → フォント → 文字幅と間隔で「カーニングを行う」を 1 ポイント以上にして、行が帯の終わりで終わるようになるかを、PowerPoint のバージョンと OS と一緒に教えてください。その結果で、`dekc pptx` が `kern` を書くかどうかを決めます（[ADR 98](../../../adr/0098-space-a-pptx-s-characters-as-the-browser-s-features-did-name-a-face-a-script-and-deflate-the-file.md)）。 |
+| AVATAR To We Type 1,234.56 | 行が帯の右端で終わる。 | 帯より長ければ、PowerPoint は、カーニングを始める大きさを指定していないランをカーニングしていません。PowerPoint 16.115.1 for Mac はカーニングし、行は帯の終わりで終わります（[ADR 100](../../../adr/0100-name-the-face-that-drew-a-pptx-s-text-where-its-family-has-several-on-that-side-of-bold.md)）。ほかのバージョンや OS では、行を選び、書式 → フォント → 文字幅と間隔で「カーニングを行う」を 1 ポイント以上にして、行が帯の終わりで終わるようになるかを、PowerPoint のバージョンと OS と一緒に教えてください。その結果で、`dekc pptx` が `kern` を書くかどうかを決めます（[ADR 98](../../../adr/0098-space-a-pptx-s-characters-as-the-browser-s-features-did-name-a-face-a-script-and-deflate-the-file.md)）。 |
 | 字間をあけた行 SPACED | 行が帯いっぱいに広がる。 | 字間の付き方が `letter-spacing` と違います。 |
 | 右に寄せた行。 | 行が帯の右端で終わる。 | PowerPoint は、最後の文字の字間を行の幅に含めていません。 |
 | （中央に寄せた行） | 行が帯の中央にある。 | 同上か、始めかっこの左のアキの数え方が違います。 |
@@ -38,7 +38,8 @@ PowerPoint が修復を提案せずにファイルを開くことを確かめま
 ## 3 枚目: 文字種ごとのフォントと、ブラウザと同じ太さ
 
 - 1 行目の `code:` が Menlo、「台本」が Hiragino Sans で描かれ、ダッシュ、矢印、乗算記号が `dekc shot hand faces` の画像と同じ形に見える。
-- 「Weight 600」と「Weight 700」の行が、それぞれ帯の終わりで終わる。終わらない行があれば、PowerPoint がそのファミリーの太字を、ブラウザとは違うウェイトで描いています。Chromium は Hiragino Sans の 600 を W6、700 を W7 で描きます。
+- 「Medium 500」が Helvetica Neue Medium で描かれ、帯の終わりで終わる。
+- 「Weight 400」から「Weight 800」までの 5 行が、それぞれ帯の終わりで終わり、下の行ほど太い。行を選ぶと、フォント欄に書体名が出る（2 行目なら「Hiragino Sans W5」）。600 以上の行は太字がオンになっている。標準と太字のほかにも太さを持つファミリーは、描画ソフトが太字をどの太さとみなすかで描かれる太さが変わります。そのため、どのランも Chromium が描いた書体の名前を書きます（[ADR 100](../../../adr/0100-name-the-face-that-drew-a-pptx-s-text-where-its-family-has-several-on-that-side-of-bold.md)）。帯の終わりで終わらない行があれば、PowerPoint がその名前で書体を見つけられていません。どの行か、フォント欄の名前、PowerPoint のバージョンと OS を教えてください。
 
 ## 同じファイルを Quick Look で測る
 

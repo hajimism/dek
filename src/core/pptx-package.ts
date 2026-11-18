@@ -1,3 +1,4 @@
+import { drawnScriptOf } from "./pptx-type.ts";
 import { zipFiles } from "./zip.ts";
 
 // A PowerPoint file as dek writes it: the fewest OOXML parts PowerPoint opens without a repair,
@@ -272,6 +273,21 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
     "ppt/notesMasters/_rels/notesMaster1.xml.rels",
     relationships([[`${NS.rel}/theme`, "../theme/theme2.xml"]]),
   );
+  // A picture is in the file once, however many slides show it and however often: what a theme
+  // draws on every slide that stays a picture is the same picture on each (ADR 103). A file
+  // is found again by its bytes, among those of its kind, and answers the name it is stored by.
+  const stored = new Map<string, Array<{ path: string; data: Uint8Array }>>();
+  const store = (path: string, data: Uint8Array): string => {
+    const key = `${path.slice(path.lastIndexOf("."))} ${data.length} ${Bun.hash(data)}`;
+    const kept = stored.get(key) ?? [];
+    const same = kept.find((each) => each.data.every((byte, at) => byte === data[at]));
+    if (same) {
+      return same.path;
+    }
+    stored.set(key, [...kept, { path, data }]);
+    parts.push({ path: `ppt/media/${path}`, data });
+    return path;
+  };
   deck.slides.forEach((slide, index) => {
     const n = index + 1;
     const written = slides[index];
@@ -285,21 +301,20 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
         // A slide with a title is laid out as one: its title fills that layout's placeholder.
         [`${NS.rel}/slideLayout`, `../slideLayouts/slideLayout${titled(slide.layers) ? 2 : 1}.xml`],
         ...(slide.picture
-          ? [[`${NS.rel}/image`, `../media/image${n}.png`] as [string, string]]
+          ? [
+              [`${NS.rel}/image`, `../media/${store(`image${n}.png`, slide.picture)}`] as [
+                string,
+                string,
+              ],
+            ]
           : []),
         [`${NS.rel}/notesSlide`, `../notesSlides/notesSlide${n}.xml`],
         ...written.media.map((file): [string, string] => [
           `${NS.rel}/image`,
-          `../media/${file.path}`,
+          `../media/${store(file.path, file.data)}`,
         ]),
       ]),
     );
-    if (slide.picture) {
-      parts.push({ path: `ppt/media/image${n}.png`, data: slide.picture });
-    }
-    for (const file of written.media) {
-      parts.push({ path: `ppt/media/${file.path}`, data: file.data });
-    }
     add(`ppt/notesSlides/notesSlide${n}.xml`, notesSlide(slide.notes, deck.lang));
     add(
       `ppt/notesSlides/_rels/notesSlide${n}.xml.rels`,
@@ -728,14 +743,15 @@ function runProperties(run: PptxRun, style: Style): string {
     'dirty="0"',
   ].join(" ");
   // Text set in a font token is set in the theme's font, each script in its own face, as the
-  // browser set it; the body's wins when both tokens name one font.
+  // browser set it, where the theme's font is the face that drew it; the body's wins when both
+  // tokens name one font and one face.
   const fonts = style.theme?.fonts;
   const themed =
-    run.family === undefined
+    fonts === undefined
       ? undefined
-      : run.family === fonts?.body.family
+      : followsFont(run, fonts.body)
         ? "mn"
-        : run.family === fonts?.title.family
+        : followsFont(run, fonts.title)
           ? "mj"
           : undefined;
   const faces = (face: (script: "lt" | "ea" | "cs") => string) =>
@@ -748,6 +764,25 @@ function runProperties(run: PptxRun, style: Style): string {
       ? faces((script) => escapeXml((script === "ea" ? run.ea : undefined) ?? run.font ?? ""))
       : "";
   return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${font}</a:rPr>`;
+}
+
+/**
+ * Whether a run is set in a font of the theme: in its token, and drawn, for each script the run
+ * holds, in the face the theme names for it. A theme's font is one face a script, and a family
+ * has more: text set in the token at another weight names its own face (ADR 100).
+ */
+function followsFont(run: PptxRun, font: PptxThemeFont): boolean {
+  if (run.family === undefined || run.family !== font.family) {
+    return false;
+  }
+  if (run.font === undefined) {
+    return true;
+  }
+  const scripts = new Set([...run.text].map(drawnScriptOf));
+  return (
+    (!scripts.has("latin") || run.font === font.latin) &&
+    (!scripts.has("eastAsian") || (run.ea ?? run.font) === font.ea)
+  );
 }
 
 function emu(px: number): number {

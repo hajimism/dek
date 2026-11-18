@@ -14,6 +14,8 @@ import { readZip } from "../helpers/zip.ts";
 
 // A PNG's first bytes are enough for a part; nothing here decodes it.
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// Another picture: one byte more, so it is no copy of the first.
+const ICON = new Uint8Array([...PNG, 0x01]);
 
 const slide = (overrides: Partial<PptxSlide> = {}): PptxSlide => ({
   picture: PNG,
@@ -125,7 +127,7 @@ const card = (overrides: Partial<PptxShape> = {}): PptxShape => ({
       y: 224,
       width: 40,
       height: 40,
-      png: PNG,
+      png: ICON,
       svg: SVG,
       description: "a check mark",
     },
@@ -167,7 +169,7 @@ function open(slides: PptxSlide[], deck: Partial<PptxDeck> = {}) {
 
 describe("pptxPackage", () => {
   test("names every part in its content types, and every part parses", () => {
-    const { files, xml } = open([slide(), slide({ layers: [] })]);
+    const { files, xml } = open([slide(), slide({ picture: ICON, layers: [] })]);
     const types = xml("[Content_Types].xml");
     const overrides = [...types.getElementsByTagName("Override")].map((el) =>
       (el.getAttribute("PartName") ?? "").slice(1),
@@ -205,6 +207,56 @@ describe("pptxPackage", () => {
         expect({ name, target, there: files.has(target) }).toEqual({ name, target, there: true });
       }
     }
+  });
+
+  test("stores a picture once, however many slides and pictures show it", () => {
+    const icon = (png: Uint8Array) => ({
+      kind: "picture" as const,
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      description: "",
+      png,
+    });
+    // A rule a theme draws on every slide is the same picture on each; so is a mark set twice.
+    const { files, xml } = open([
+      slide({ layers: [icon(ICON)] }),
+      slide({ layers: [icon(ICON), icon(PNG)] }),
+      slide({ picture: ICON, layers: [] }),
+    ]);
+    const media = [...files.keys()].filter((name) => name.startsWith("ppt/media/"));
+    expect(media).toEqual(["ppt/media/image1.png", "ppt/media/image4.png"]);
+    expect(files.get("ppt/media/image1.png")).toEqual(PNG);
+    expect(files.get("ppt/media/image4.png")).toEqual(ICON);
+    // Each slide's relationships still number its pictures one by one, in the order it shows
+    // them: only where they point is shared.
+    const pictures = (n: number) =>
+      [...xml(`ppt/slides/_rels/slide${n}.xml.rels`).getElementsByTagName("Relationship")]
+        .filter((rel) => (rel.getAttribute("Type") ?? "").endsWith("/image"))
+        .map((rel) => [rel.getAttribute("Id"), rel.getAttribute("Target")]);
+    expect(pictures(1)).toEqual([
+      ["rId2", "../media/image1.png"],
+      ["rId4", "../media/image4.png"],
+    ]);
+    expect(pictures(2)).toEqual([
+      ["rId2", "../media/image1.png"],
+      ["rId4", "../media/image4.png"],
+      ["rId5", "../media/image1.png"],
+    ]);
+    expect(pictures(3)).toEqual([["rId2", "../media/image4.png"]]);
+
+    // The same bytes as a PNG and as an SVG are two files: each is read by its extension.
+    const both = open([
+      slide({
+        picture: undefined,
+        layers: [{ ...icon(new TextEncoder().encode(SVG)), svg: SVG }],
+      }),
+    ]);
+    expect([...both.files.keys()].filter((name) => name.startsWith("ppt/media/")).sort()).toEqual([
+      "ppt/media/image2.png",
+      "ppt/media/image3.svg",
+    ]);
   });
 
   test("lists the slides in order at the slide's logical size", () => {
@@ -377,7 +429,7 @@ describe("pptxPackage", () => {
                 y: 224,
                 width: 40,
                 height: 40,
-                png: PNG,
+                png: ICON,
                 description: "一行目\n二行目",
               },
             ],
@@ -475,7 +527,7 @@ describe("pptxPackage", () => {
     expect(svg).toMatch(/^\.\.\/media\/image\d+\.svg$/);
     expect(png).not.toBe("../media/image1.png");
     expect(decode(`ppt/media/${svg?.split("/").pop()}`)).toBe(SVG);
-    expect(files.get(`ppt/media/${png?.split("/").pop()}`)).toEqual(PNG);
+    expect(files.get(`ppt/media/${png?.split("/").pop()}`)).toEqual(ICON);
     const types = xml("[Content_Types].xml");
     expect(
       [...types.getElementsByTagName("Default")]
@@ -485,7 +537,22 @@ describe("pptxPackage", () => {
   });
 
   test("names every picture of every slide apart, and types and relates each", () => {
-    const { files, xml } = open([slide({ layers: [card()] }), slide({ layers: [card(), card()] })]);
+    // No two pictures alike, so each is a part of its own.
+    const iconed = (n: number): PptxShape => {
+      const base = card();
+      return {
+        ...base,
+        layers: base.layers.map((layer) =>
+          layer.kind === "picture"
+            ? { ...layer, png: new Uint8Array([...ICON, n]), svg: SVG.replace('r="4"', `r="${n}"`) }
+            : layer,
+        ),
+      };
+    };
+    const { files, xml } = open([
+      slide({ layers: [iconed(1)] }),
+      slide({ picture: ICON, layers: [iconed(2), iconed(3)] }),
+    ]);
     const media = [...files.keys()].filter((name) => name.startsWith("ppt/media/"));
     // Two slide pictures, then three icons with an SVG each.
     expect(media).toHaveLength(2 + 3 * 2);
@@ -653,7 +720,7 @@ describe("pptxPackage", () => {
 
     test("sets text in the theme's fonts when it was set in the theme's font tokens", () => {
       const runs = [
-        run("見出し", { family: '"Futura", sans-serif', font: "Futura" }),
+        run("見出し", { family: '"Futura", sans-serif', font: "Futura", ea: "Hiragino Sans" }),
         run("本文", { family: "sans-serif", font: "Hiragino Sans" }),
         run("別の字", { family: "serif", font: "Hiragino Mincho ProN" }),
       ];
@@ -676,7 +743,52 @@ describe("pptxPackage", () => {
         ["Hiragino Mincho ProN", "Hiragino Mincho ProN", "Hiragino Mincho ProN"],
       ]);
       // Without a theme, each run names the font it was drawn with, as ADR 8 has it.
-      expect(faces({})[0]).toEqual(["Futura", "Futura", "Futura"]);
+      expect(faces({})[0]).toEqual(["Futura", "Hiragino Sans", "Futura"]);
+    });
+
+    test("names a run's own faces where they are not the theme's for the scripts it holds", () => {
+      const SANS = '"Hiragino Sans", sans-serif';
+      const theme: PptxTheme = {
+        colors: {},
+        fonts: {
+          title: { family: SANS, latin: "Hiragino Sans W7", ea: "Hiragino Sans W7" },
+          body: { family: SANS, latin: "Helvetica Neue", ea: "Hiragino Sans W4" },
+        },
+      };
+      const runs = [
+        run("本文 body", { family: SANS, font: "Helvetica Neue", ea: "Hiragino Sans W4" }),
+        // No Latin in it: its East Asian face is the body's, which is all that is asked of it.
+        run("本文", { family: SANS, font: "Hiragino Sans W4" }),
+        run("Title 見出し", { family: SANS, font: "Hiragino Sans W7", bold: true }),
+        // Another weight of the family is in neither font of the theme: it names its face.
+        run("ラベル", { family: SANS, font: "Hiragino Sans W6", bold: true }),
+        run("label", { family: SANS, font: "Hiragino Sans W6", bold: true }),
+        // Nothing but spaces and an arrow, which is of neither script: no face to tell apart.
+        run(" → ", { family: SANS, font: "Hiragino Sans W6" }),
+        // A face that is not known follows the token it was set in, as before.
+        run("字", { family: SANS }),
+      ];
+      const layers = [
+        { kind: "text" as const, x: 0, y: 0, width: 10, height: 10, lineHeight: 10, runs },
+      ];
+      const faces = [
+        ...open([slide({ layers })], { theme })
+          .xml("ppt/slides/slide1.xml")
+          .getElementsByTagName("a:rPr"),
+      ].map((rPr) =>
+        ["a:latin", "a:ea"].map((script) =>
+          rPr.getElementsByTagName(script)[0]?.getAttribute("typeface"),
+        ),
+      );
+      expect(faces).toEqual([
+        ["+mn-lt", "+mn-ea"],
+        ["+mn-lt", "+mn-ea"],
+        ["+mj-lt", "+mj-ea"],
+        ["Hiragino Sans W6", "Hiragino Sans W6"],
+        ["Hiragino Sans W6", "Hiragino Sans W6"],
+        ["+mn-lt", "+mn-ea"],
+        ["+mn-lt", "+mn-ea"],
+      ]);
     });
 
     test("leaves a background the theme's own to the master, and writes any other on its slide", () => {
@@ -733,7 +845,7 @@ describe("pptxPackage", () => {
     const target = [...rels.getElementsByTagName("Relationship")]
       .find((rel) => rel.getAttribute("Id") === embed)
       ?.getAttribute("Target");
-    expect(decode(`ppt/media/${target?.split("/").pop()}`)).toBe(new TextDecoder().decode(PNG));
+    expect(decode(`ppt/media/${target?.split("/").pop()}`)).toBe(new TextDecoder().decode(ICON));
     expect(
       [...rels.getElementsByTagName("Relationship")].filter((rel) =>
         (rel.getAttribute("Type") ?? "").endsWith("/notesSlide"),
