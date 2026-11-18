@@ -666,6 +666,24 @@ describe("planPptxLayers", () => {
     expect(group?.layers.some((layer) => layer.kind === "prose" && layer.title)).toBe(false);
   });
 
+  test("leaves in lines text that is not where its alignment would put it", () => {
+    // A label whose style centers it, set after a dot the two side by side: its one line ends
+    // at the far edge of its 400px content box, and a paragraph would center it.
+    const set = (align: "center" | "right", x: number) =>
+      planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 500, 132) } as PptxPaintNode],
+          boxes: [line(0, 0, "ラベル", x, 103)],
+          blocks: [block(0, "ラベル", rect(100, 100, 500, 132), { align })],
+        }),
+      ).layers.map((layer) => layer.kind);
+    expect(set("center", 300)).toEqual(["text"]);
+    // Centered where centering puts it, and flush right where that does: a text box each.
+    expect(set("center", 200)).toEqual(["prose"]);
+    expect(set("right", 300)).toEqual(["prose"]);
+    expect(set("right", 200)).toEqual(["text"]);
+  });
+
   test("lets go of a box under a pseudo-element that draws only text the file carries", () => {
     const page = plainCard();
     const place = (bare: boolean, pseudos: string[]) =>

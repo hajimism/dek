@@ -763,6 +763,20 @@ function columnOf(
     if (moved && (aligns[index] === "left" || aligns[index] === "justify")) {
       return undefined;
     }
+    // So does text its style centers or sets to the right, where the browser put a line
+    // elsewhere: after something set before it, the two side by side, as a dot in a chip is.
+    const strayed = lines.some((line) => {
+      const left = Math.min(...line.boxes.map((box) => box.x));
+      const right = Math.max(...line.boxes.map((box) => box.x + box.width));
+      const before = left - block.content.left;
+      const after = block.content.right - right;
+      return aligns[index] === "center"
+        ? Math.abs(before - after) > NEAR * 2
+        : aligns[index] === "right" && Math.abs(after) > NEAR * 2;
+    });
+    if (strayed) {
+      return undefined;
+    }
     // Nor does one set another element in its lines: a badge or an icon the browser set beside
     // the words, whether it is laid over the picture or left in it, would lie under them.
     const worded = new Set<number>();
