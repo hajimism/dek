@@ -22,7 +22,7 @@ The three principles and the comparison with Slidev are in [Why dek](https://haj
 
 ## Quick start
 
-Requires [Bun](https://bun.sh) 1.4 or later. dek runs on Bun only: it does not run on Node, so use `bunx`, not `npx`.
+Requires [Bun](https://bun.sh) 1.4.3 or later. dek runs on Bun only: it does not run on Node, so use `bunx`, not `npx`.
 
 ```bash
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
