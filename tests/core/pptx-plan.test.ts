@@ -839,7 +839,15 @@ describe("planPptxLayers", () => {
       nodes: [],
       pseudos: [],
       described: [],
-      slide: { paint: BLACK, image: "none", plain, stacking: true, width: 1280, height: 720 },
+      slide: {
+        paint: BLACK,
+        image: "none",
+        plain,
+        flat: plain,
+        stacking: true,
+        width: 1280,
+        height: 720,
+      },
     });
     const texts = { boxes: [], blocks: [], drawn: [], uses: [], pseudos: [] };
     expect(pptxPageFacts(paint(true), texts, new Map()).slide).toEqual({
@@ -847,5 +855,58 @@ describe("planPptxLayers", () => {
       stacking: true,
     });
     expect(pptxPageFacts(paint(false), texts, new Map()).slide?.background).toBeUndefined();
+  });
+
+  test("takes the slide's color for PowerPoint's where its background's pictures stay in the slide's", () => {
+    // Rules a theme draws on every slide with gradients sized and placed: nothing PowerPoint's
+    // own background draws, over a color that is.
+    const RULES = "linear-gradient(rgb(20, 20, 20), rgb(20, 20, 20))";
+    const facts = (slide: {
+      paint?: typeof BLACK;
+      image?: string;
+      plain?: boolean;
+      flat?: boolean;
+    }) =>
+      pptxPageFacts(
+        {
+          origin: { left: 0, top: 0 },
+          nodes: [],
+          pseudos: [],
+          described: [],
+          slide: {
+            paint: BLACK,
+            image: RULES,
+            plain: false,
+            flat: true,
+            stacking: true,
+            width: 1280,
+            height: 720,
+            ...slide,
+          },
+        },
+        { boxes: [], blocks: [], drawn: [], uses: [], pseudos: [] },
+        new Map(),
+      );
+    expect(facts({}).slide).toEqual({
+      background: { kind: "solid", paint: BLACK },
+      image: true,
+      stacking: true,
+    });
+    expect(planPptxLayers(facts({}))).toMatchObject({
+      background: { kind: "solid", paint: BLACK },
+      backgroundImage: true,
+    });
+    // A color one can see through is not a slide's background, nor is one under a box that
+    // paints more than its background, or blends its pictures into the color.
+    expect(facts({ paint: { color: [0, 0, 0], alpha: 0.5 } }).slide?.background).toBeUndefined();
+    expect(facts({ flat: false }).slide?.background).toBeUndefined();
+    // A gradient PowerPoint draws as the browser did is the background whole, as before.
+    const whole = facts({
+      plain: true,
+      image: "linear-gradient(rgb(0, 0, 0), rgb(255, 255, 255))",
+    });
+    expect(whole.slide?.background?.kind).toBe("linear");
+    expect(whole.slide?.image).toBeUndefined();
+    expect(planPptxLayers(whole).backgroundImage).toBeUndefined();
   });
 });

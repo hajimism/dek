@@ -138,10 +138,12 @@ export type PptxPageFacts = {
   /** What the slide's pictures say they show, and the element that says it. */
   described: Array<{ node: number; text: string }>;
   /**
-   * The slide's background, when PowerPoint can paint it as the browser did, and whether the
-   * slide is a stacking context, so nothing a negative `z-index` puts beneath it is hidden by it.
+   * The slide's background, when PowerPoint can paint it as the browser did, or its color with
+   * `image` when the pictures the background draws over the color stay in the slide's picture;
+   * and whether the slide is a stacking context, so nothing a negative `z-index` puts beneath it
+   * is hidden by it.
    */
-  slide?: { background?: PptxFill; stacking: boolean };
+  slide?: { background?: PptxFill; image?: true; stacking: boolean };
   /** The slide's size, which a text box of its own stays inside. */
   size?: { width: number; height: number };
 };
@@ -157,6 +159,8 @@ export type PptxPlan = {
   description: string;
   /** The slide's background, taken out of its picture to be PowerPoint's. */
   background?: PptxFill;
+  /** Whether that is its color alone, the pictures it draws over the color left in the picture. */
+  backgroundImage?: true;
 };
 
 /**
@@ -210,10 +214,20 @@ export function pptxPageFacts(
     }
   }
   const { slide } = paint;
-  const background =
+  const whole =
     slide?.plain === true
       ? slideBackground(slide, { width: slide.width, height: slide.height })
       : undefined;
+  // Under pictures PowerPoint's background would not draw as the browser did, the color is
+  // PowerPoint's all the same, and the pictures stay in the slide's, over nothing (ADR 102).
+  const under =
+    whole === undefined &&
+    slide?.flat === true &&
+    slide.image.trim() !== "none" &&
+    slide.paint.alpha === 1
+      ? ({ kind: "solid", paint: slide.paint } as const)
+      : undefined;
+  const background = whole ?? under;
   return {
     nodes: paint.nodes,
     drawn,
@@ -223,7 +237,11 @@ export function pptxPageFacts(
     described: paint.described,
     ...(slide
       ? {
-          slide: { ...(background ? { background } : {}), stacking: slide.stacking },
+          slide: {
+            ...(background ? { background } : {}),
+            ...(under ? { image: true as const } : {}),
+            stacking: slide.stacking,
+          },
           size: { width: slide.width, height: slide.height },
         }
       : {}),
@@ -302,6 +320,7 @@ export function planPptxLayers(page: PptxPageFacts): PptxPlan {
     page.slide?.background && (page.slide.stacking || !beneath) ? page.slide.background : undefined;
   return {
     ...(background ? { background } : {}),
+    ...(background && page.slide?.image ? { backgroundImage: true as const } : {}),
     layers: assemble(page, tree, lifted, state).map(({ layer }) => layer),
     lifted: {
       shapes: sorted.filter((id) => page.nodes[id]?.paint?.kind === "shape"),

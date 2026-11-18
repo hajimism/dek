@@ -239,7 +239,7 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
       const { background } = plan;
       await page.evaluate(hidePptxLiftedInPage, {
         ...plan.lifted,
-        background: background !== undefined,
+        background: background === undefined ? "none" : plan.backgroundImage ? "color" : "all",
       });
       const shot = await page.screenshot({
         path: pageReq.screenshotPath,

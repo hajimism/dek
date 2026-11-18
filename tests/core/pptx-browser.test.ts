@@ -212,6 +212,10 @@ lang: ja
 ## fade
 
 背景の移り変わり。
+
+## ruled
+
+罫線のある地。
 `;
 
 const themedTheme = `.slide { --fg: rgb(20 20 20); --bg: rgb(250 248 240); --muted: rgb(225 225 215); --accent: rgb(200 60 0); --font-title: sans-serif; --font-body: serif; position: relative; width: 1280px; height: 720px; margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
@@ -220,6 +224,7 @@ const themedTheme = `.slide { --fg: rgb(20 20 20); --bg: rgb(250 248 240); --mut
 .slide .card p { margin: 0; font-size: 24px; line-height: 36px; }
 .slide.fade { background: linear-gradient(to right, rgb(250 248 240), rgb(200 220 255)); }
 .slide .drawn { position: absolute; left: 600px; top: 200px; width: 200px; height: 100px; background: linear-gradient(rgb(255 0 0), rgb(0 0 255)); }
+.slide.ruled { background-color: rgb(240 240 230); background-image: linear-gradient(rgb(20 20 20), rgb(20 20 20)); background-size: 1160px 2px; background-position: 60px 680px; background-repeat: no-repeat; }
 `;
 
 const themedCover = `<section class="slide">
@@ -231,6 +236,11 @@ const themedCover = `<section class="slide">
 const themedFade = `<section class="slide fade">
   <h2>移り変わる地</h2>
   <div class="drawn"></div>
+</section>
+`;
+
+const themedRuled = `<section class="slide ruled">
+  <h2>罫線のある地</h2>
 </section>
 `;
 
@@ -616,7 +626,7 @@ describe("pptxDeck in a browser", () => {
               name: "themed",
               script: themedScript,
               theme: themedTheme,
-              slides: { cover: themedCover, fade: themedFade },
+              slides: { cover: themedCover, fade: themedFade, ruled: themedRuled },
             },
           ],
         },
@@ -693,6 +703,27 @@ describe("pptxDeck in a browser", () => {
           expect((await pixel(picture, 2 * 700, 2 * 250))[3]).toBe(255);
           // The background's colors are PowerPoint's now, not the picture's.
           expect(seen[1]?.background?.kind).toBe("linear");
+
+          // The ruled slide: a rule its background draws with a gradient sized and placed is
+          // nothing PowerPoint's background draws, so it stays in the picture, on nothing, and
+          // the color under it is the slide's background all the same.
+          expect(seen[2]?.background).toEqual({
+            kind: "solid",
+            paint: { color: [240, 240, 230], alpha: 1 },
+          });
+          const ruled = read("ppt/slides/slide3.xml");
+          expect(
+            ruled
+              .getElementsByTagName("p:bg")[0]
+              ?.getElementsByTagName("a:srgbClr")[0]
+              ?.getAttribute("val"),
+          ).toBe("F0F0E6");
+          const target = /Target="\.\.\/media\/(image\d+\.png)"/.exec(
+            new TextDecoder().decode(files.get("ppt/slides/_rels/slide3.xml.rels")),
+          )?.[1];
+          const rules = files.get(`ppt/media/${target}`) ?? new Uint8Array();
+          expect((await pixel(rules, 2 * 640, 2 * 300))[3]).toBe(0);
+          expect(await pixel(rules, 2 * 640, 2 * 681)).toEqual([20, 20, 20, 255]);
         },
       );
     },

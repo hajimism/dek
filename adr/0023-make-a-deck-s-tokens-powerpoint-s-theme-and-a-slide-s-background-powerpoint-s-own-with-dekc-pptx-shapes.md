@@ -14,6 +14,8 @@ Amended by [98. Space a PPTX's characters as the browser's features did, name a 
 
 Amended by [100. Name the face that drew a PPTX's text where its family has several on that side of bold](0100-name-the-face-that-drew-a-pptx-s-text-where-its-family-has-several-on-that-side-of-bold.md)
 
+Amended by [102. Paint a PPTX slide's color as PowerPoint's own under background pictures that stay in the slide's picture](0102-paint-a-pptx-slide-s-color-as-powerpoint-s-own-under-background-pictures-that-stay-in-the-slide-s-picture.md)
+
 ## Context
 
 ADR 22 lays a slide's boxes, pictures, and text over its picture as PowerPoint's own. What it leaves is the picture under them, and the picture holds the slide's background, so a recipient who wants another background, or the deck in other colors, has a slide-sized image to replace, and every shape's color to change one by one. The file's theme is PowerPoint's default, which names Calibri and Office's blues, none of which the deck uses.
