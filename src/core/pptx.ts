@@ -33,7 +33,7 @@ export type PptxOptions = DistOptions & {
 /**
  * The deck as a PowerPoint file: each slide at its last beat, as the PDF prints it, its plain
  * boxes, pictures, and text as PowerPoint's own over a picture of the rest, in the deck's theme
- * (ADRs 20 to 22), and its script in the notes. A slide script that cannot run stops it, as it
+ * (ADRs 22 to 24, 98, and 99), and its script in the notes. A slide script that cannot run stops it, as it
  * stops the PDF.
  */
 export async function pptxDeck(dir: string, options?: PptxOptions): Promise<PptxResult>;

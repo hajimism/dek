@@ -1,9 +1,10 @@
-import { zipStored } from "./zip.ts";
+import { zipFiles } from "./zip.ts";
 
 // A PowerPoint file as dek writes it: the fewest OOXML parts PowerPoint opens without a repair,
 // as strings. Each slide is a picture of what the browser drew, with what is laid over it taken
-// out of it: boxes, pictures, and the text in them as PowerPoint's own shapes, other text in text
-// boxes line by line where the browser set it, in the deck's theme.
+// out of it: boxes, pictures, and the text in them as PowerPoint's own shapes, other text in a
+// text box a block, or a line where it is not plain lines, where the browser set it, in the
+// deck's theme.
 
 /** One run of text on one line, as the browser drew it. Sizes are in the slide's own pixels. */
 export type PptxRun = {
@@ -19,6 +20,8 @@ export type PptxRun = {
   letterSpacing: number;
   /** The font the browser drew it with; PowerPoint's default when none is known. */
   font?: string;
+  /** The font the browser drew its East Asian characters with, when it is another. */
+  ea?: string;
   /** The `font-family` it was set in, to find it in the theme's fonts. */
   family?: string;
 };
@@ -97,7 +100,23 @@ export type PptxRule = {
  */
 export type PptxPicture<I = PptxImage> = PptxRect & { kind: "picture"; description: string } & I;
 
-export type PptxLayer<I = PptxImage> = PptxTextLayer | PptxShape<I> | PptxRule | PptxPicture<I>;
+/**
+ * Text in a box of its own, in paragraphs: a block's, or a list's with an item a paragraph, in
+ * a box as wide as what the browser set it in, so text typed into it wraps where the block did.
+ */
+export type PptxProse = PptxRect & {
+  kind: "prose";
+  text: PptxShapeText;
+  /** Whether it is the slide's title: its highest heading, which PowerPoint lists the slide by. */
+  title?: boolean;
+};
+
+export type PptxLayer<I = PptxImage> =
+  | PptxTextLayer
+  | PptxProse
+  | PptxShape<I>
+  | PptxRule
+  | PptxPicture<I>;
 
 /** The same layers with each picture's embedding replaced. */
 export function mapPictures<A, B>(
@@ -232,19 +251,22 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
   );
   add("ppt/theme/theme1.xml", theme("dek", deck.theme));
   add("ppt/theme/theme2.xml", theme("dek notes"));
-  add("ppt/slideMasters/slideMaster1.xml", slideMaster());
+  add("ppt/slideMasters/slideMaster1.xml", slideMaster(deck.size));
   add(
     "ppt/slideMasters/_rels/slideMaster1.xml.rels",
     relationships([
       [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout1.xml"],
+      [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout2.xml"],
       [`${NS.rel}/theme`, "../theme/theme1.xml"],
     ]),
   );
-  add("ppt/slideLayouts/slideLayout1.xml", slideLayout());
-  add(
-    "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
-    relationships([[`${NS.rel}/slideMaster`, "../slideMasters/slideMaster1.xml"]]),
-  );
+  for (const [n, xml] of [slideLayout(), titleLayout()].entries()) {
+    add(`ppt/slideLayouts/slideLayout${n + 1}.xml`, xml);
+    add(
+      `ppt/slideLayouts/_rels/slideLayout${n + 1}.xml.rels`,
+      relationships([[`${NS.rel}/slideMaster`, "../slideMasters/slideMaster1.xml"]]),
+    );
+  }
   add("ppt/notesMasters/notesMaster1.xml", notesMaster());
   add(
     "ppt/notesMasters/_rels/notesMaster1.xml.rels",
@@ -260,7 +282,8 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
     add(
       `ppt/slides/_rels/slide${n}.xml.rels`,
       relationships([
-        [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout1.xml"],
+        // A slide with a title is laid out as one: its title fills that layout's placeholder.
+        [`${NS.rel}/slideLayout`, `../slideLayouts/slideLayout${titled(slide.layers) ? 2 : 1}.xml`],
         ...(slide.picture
           ? [[`${NS.rel}/image`, `../media/image${n}.png`] as [string, string]]
           : []),
@@ -286,7 +309,7 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
       ]),
     );
   });
-  return zipStored(parts);
+  return zipFiles(parts);
 }
 
 function contentTypes(numbers: number[], svg: boolean): string {
@@ -301,6 +324,7 @@ function contentTypes(numbers: number[], svg: boolean): string {
     override("ppt/theme/theme2.xml", `${CT}.theme+xml`),
     override("ppt/slideMasters/slideMaster1.xml", `${CT}.presentationml.slideMaster+xml`),
     override("ppt/slideLayouts/slideLayout1.xml", `${CT}.presentationml.slideLayout+xml`),
+    override("ppt/slideLayouts/slideLayout2.xml", `${CT}.presentationml.slideLayout+xml`),
     override("ppt/notesMasters/notesMaster1.xml", `${CT}.presentationml.notesMaster+xml`),
     ...numbers.flatMap((n) => [
       override(`ppt/slides/slide${n}.xml`, `${CT}.presentationml.slide+xml`),
@@ -343,12 +367,32 @@ const CLR_MAP =
 const LEVEL =
   '<a:lvl1pPr><a:defRPr sz="1800"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr>';
 
-function slideMaster(): string {
-  return `${DECL}<p:sldMaster ${PML}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${GROUP}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${LEVEL}</p:titleStyle><p:bodyStyle>${LEVEL}</p:bodyStyle><p:otherStyle>${LEVEL}</p:otherStyle></p:txStyles></p:sldMaster>`;
+/** What makes a shape a title placeholder: PowerPoint keeps it out of groups, as its own are. */
+const TITLE = '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr>';
+
+/**
+ * The master: the theme's background, and a title placeholder across the top for the title
+ * layout to take after. A slide's own title says where it lies and how it is set, so nothing
+ * of this one shows but in a slide someone adds.
+ */
+function slideMaster(size: { width: number; height: number }): string {
+  const title = `<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title Placeholder 1"/>${TITLE}</p:nvSpPr><p:spPr>${transform({ x: size.width * 0.05, y: size.height * 0.08, width: size.width * 0.9, height: size.height * 0.16 })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
+  return `${DECL}<p:sldMaster ${PML}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${GROUP}${title}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/><p:sldLayoutId id="2147483650" r:id="rId2"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${LEVEL}</p:titleStyle><p:bodyStyle>${LEVEL}</p:bodyStyle><p:otherStyle>${LEVEL}</p:otherStyle></p:txStyles></p:sldMaster>`;
 }
 
+/** The layout of a slide with no title: nothing of its own. */
 function slideLayout(): string {
   return `${DECL}<p:sldLayout ${PML} type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>${GROUP}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`;
+}
+
+/** The layout of a slide with a title: the master's title placeholder, and nothing else. */
+function titleLayout(): string {
+  return `${DECL}<p:sldLayout ${PML} type="titleOnly" preserve="1"><p:cSld name="Title Only"><p:spTree>${GROUP}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/>${TITLE}</p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`;
+}
+
+/** Whether a slide's layers hold its title, which is never in a group. */
+function titled(layers: PptxLayer[]): boolean {
+  return layers.some((layer) => layer.kind === "prose" && layer.title === true);
 }
 
 function notesMaster(): string {
@@ -442,6 +486,8 @@ function layerXml(layer: PptxLayer, writer: LayerWriter): string {
   switch (layer.kind) {
     case "text":
       return textBox(layer, writer.id(), writer.style);
+    case "prose":
+      return proseXml(layer, writer.id(), writer.style);
     case "shape":
       return shapeXml(layer, writer);
     case "rule":
@@ -486,15 +532,31 @@ function shapeSp(shape: PptxShape, id: number, style: Style): string {
   const line = shape.outline
     ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint, style.theme)}</a:ln>`
     : "<a:ln><a:noFill/></a:ln>";
-  const text = shape.text ? shapeText(shape.text, half, style) : "";
+  // A rounded rectangle's own text area starts inside its corners' curve, by the corner's
+  // radius less its reach at 45 degrees, on every side: the insets give that back, so the text
+  // is set where the browser set it.
+  const curve = Math.min(radius, shorter / 2) * (1 - Math.SQRT1_2);
+  const text = shape.text ? shapeText(shape.text, half + curve, style) : "";
   return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path)}${geometry}${fill}${line}</p:spPr>${text}</p:sp>`;
+}
+
+/**
+ * Text in a box of its own. The slide's title is a title placeholder that says everything of
+ * itself, where it lies and how each run is set, so the layout's and the master's give it
+ * nothing but its place in PowerPoint's outline.
+ */
+function proseXml(prose: PptxProse, id: number, style: Style): string {
+  const named = prose.title
+    ? `<p:cNvPr id="${id}" name="Title ${id - 2}"/>${TITLE}`
+    : `<p:cNvPr id="${id}" name="Text ${id - 2}"/><p:cNvSpPr txBox="1"/><p:nvPr/>`;
+  return `<p:sp><p:nvSpPr>${named}</p:nvSpPr><p:spPr>${transform(prose)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>${shapeText(prose.text, 0, style)}</p:sp>`;
 }
 
 const ALIGN = { left: "l", center: "ctr", right: "r", justify: "just" } as const;
 
-/** A shape's text, set inside its insets less what the path already took. */
-function shapeText(text: PptxShapeText, half: number, style: Style): string {
-  const inset = (px: number) => emu(Math.max(0, px - half));
+/** A shape's text, set inside its insets less what the shape's own path and text area took. */
+function shapeText(text: PptxShapeText, taken: number, style: Style): string {
+  const inset = (px: number) => emu(Math.max(0, px - taken));
   const paragraphs = text.paragraphs.map((paragraph) => paragraphXml(paragraph, style)).join("");
   return `<p:txBody><a:bodyPr wrap="${text.wrap ? "square" : "none"}" lIns="${inset(text.inset.left)}" tIns="${inset(text.inset.top)}" rIns="${inset(text.inset.right)}" bIns="${inset(text.inset.bottom)}" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs || "<a:p/>"}</p:txBody>`;
 }
@@ -551,6 +613,8 @@ function frameOf(layer: PptxLayer): PptxRect {
   switch (layer.kind) {
     case "text":
       return { x: layer.x, y: layer.y, width: layer.width + roomOf(layer), height: layer.height };
+    case "prose":
+      return { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
     case "rule":
       return {
         x: Math.min(layer.x1, layer.x2),
@@ -676,10 +740,12 @@ function runProperties(run: PptxRun, style: Style): string {
           : undefined;
   const faces = (face: (script: "lt" | "ea" | "cs") => string) =>
     `<a:latin typeface="${face("lt")}"/><a:ea typeface="${face("ea")}"/><a:cs typeface="${face("cs")}"/>`;
+  // Any other text names the face that drew its Latin and the one that drew its East Asian
+  // characters, as PowerPoint tells the two apart.
   const font = themed
     ? faces((script) => `+${themed}-${script}`)
     : run.font
-      ? faces(() => escapeXml(run.font ?? ""))
+      ? faces((script) => escapeXml((script === "ea" ? run.ea : undefined) ?? run.font ?? ""))
       : "";
   return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${font}</a:rPr>`;
 }

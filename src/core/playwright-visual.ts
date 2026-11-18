@@ -57,9 +57,17 @@ import {
   showOnlyPptxNodeInPage,
 } from "./pptx-paint.ts";
 import { planPptxLayers, pptxPageFacts } from "./pptx-plan.ts";
-import { measurePptxTextsInPage, PPTX_OWNER_ATTR } from "./pptx-text.ts";
+import {
+  measurePptxGlyphsInPage,
+  measurePptxPlainLinesInPage,
+  measurePptxTextsInPage,
+  PPTX_FACE_ATTR,
+  type PptxPageTexts,
+  pptxFaceProbesInPage,
+} from "./pptx-text.ts";
 import type { PptxPageTheme } from "./pptx-theme.ts";
-import { pseudoElementBoxes, pseudoTextBoxes } from "./pseudo-text.ts";
+import { type PptxTypeAnswers, pptxTypeRequests, setPptxTexts } from "./pptx-type.ts";
+import { pseudoElementBoxes, pseudoTextBoxes, pseudoTextPieces } from "./pseudo-text.ts";
 import { motionSheets } from "./sheet.ts";
 import {
   type Box,
@@ -157,6 +165,8 @@ async function printPdf(context: BrowserContext, request: PdfRequest): Promise<D
  * drawn alone, and the slide shot without what was laid over it, page by page.
  */
 async function shootPptx(context: BrowserContext, request: PptxRequest): Promise<PptxResponse> {
+  // The face a font stack draws a kind of character in is the same on every slide of a deck.
+  const faces = new Map<string, string>();
   const slides = await visitInPages(
     request.pages,
     () => context.newPage(),
@@ -167,22 +177,19 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
         ...(await page.evaluate(measurePptxPaintInPage)),
         described: await page.evaluate(describePptxPicturesInPage),
       };
-      const texts = await page.evaluate(measurePptxTextsInPage);
-      const fonts = await platformFonts(page);
+      // What the pseudo-elements write, as Chromium laid it out, each with where it paints.
+      const painted = new Map(paint.pseudos.map((each) => [`${each.host}::${each.pseudo}`, each]));
+      const pieces = (await pseudoTextPieces(page, PPTX_PSEUDO_ATTR)).flatMap((piece) => {
+        const key = painted.get(`${piece.host}::${piece.pseudo}`)?.key;
+        return key ? [{ ...piece, key }] : [];
+      });
+      const measured = await page.evaluate(measurePptxTextsInPage, pieces);
+      const texts = setPptxTexts(measured, await typeAnswers(page, measured, faces));
       const placed = await pseudoElementBoxes(page, PPTX_PSEUDO_ATTR, "border", [
         "before",
         "after",
         "marker",
       ]);
-      for (const run of [
-        ...texts.boxes.flatMap((box) => box.runs),
-        ...texts.blocks.flatMap((block) => block.runs),
-      ]) {
-        const font = fonts.get(run.owner);
-        if (font !== undefined) {
-          run.font = font;
-        }
-      }
       const plan = planPptxLayers(pptxPageFacts(paint, texts, placed));
 
       const files = new Map<number, PptxPictureFile>();
@@ -270,15 +277,44 @@ async function pageTheme(page: Page): Promise<PptxPageTheme> {
   return { colors, fonts };
 }
 
-/** The font Chromium drew each marked element's text with, by the element's number. */
-async function platformFonts(page: Page): Promise<Map<number, string>> {
-  const fonts = new Map<number, string>();
-  for (const [owner, face] of await platformFaces(page, PPTX_OWNER_ATTR)) {
-    if (Number.isInteger(Number(owner))) {
-      fonts.set(Number(owner), face);
+/**
+ * What the page says of the slide's text for it to be set again: the face that drew each kind of
+ * character in each font, asked once a deck, each character's width alone, with the text's
+ * features and without them, and each line set again plainly.
+ */
+async function typeAnswers(
+  page: Page,
+  texts: PptxPageTexts,
+  known: Map<string, string>,
+): Promise<PptxTypeAnswers> {
+  const requests = pptxTypeRequests(texts);
+  // A font's Latin, its East Asian text, or one character of another kind, whatever the slide.
+  const keyOf = (probe: (typeof requests.faces)[number]) =>
+    `${JSON.stringify(probe.use)} ${probe.id.slice(probe.id.indexOf(":") + 1)}`;
+  const asked = requests.faces.filter((probe) => !known.has(keyOf(probe)));
+  if (asked.length > 0) {
+    await page.evaluate(pptxFaceProbesInPage, asked);
+    const found = await platformFaces(page, PPTX_FACE_ATTR);
+    await page.evaluate(pptxFaceProbesInPage, null);
+    for (const probe of asked) {
+      const face = found.get(probe.id);
+      if (face !== undefined) {
+        known.set(keyOf(probe), face);
+      }
     }
   }
-  return fonts;
+  const faces = new Map<string, string>();
+  for (const probe of requests.faces) {
+    const face = known.get(keyOf(probe));
+    if (face !== undefined) {
+      faces.set(probe.id, face);
+    }
+  }
+  return {
+    faces,
+    glyphs: await page.evaluate(measurePptxGlyphsInPage, requests.glyphs),
+    lines: await page.evaluate(measurePptxPlainLinesInPage, requests.lines),
+  };
 }
 
 /**

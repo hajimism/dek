@@ -2,6 +2,7 @@ import { describe, expect } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Window } from "happy-dom";
+import { compareInPage } from "../../evals/pptx/compare.ts";
 import {
   type PlaywrightRunner,
   type PptxPictureFile,
@@ -11,8 +12,15 @@ import {
 } from "../../src/core/playwright.ts";
 import { runVisualRequest } from "../../src/core/playwright-visual.ts";
 import { pptxDeck } from "../../src/core/pptx.ts";
-import type { PptxLayer, PptxTextBox } from "../../src/core/pptx-package.ts";
-import { measurePptxTextsInPage } from "../../src/core/pptx-text.ts";
+import type { PptxLayer, PptxProse, PptxTextBox } from "../../src/core/pptx-package.ts";
+import { measurePptxPaintInPage, PPTX_PSEUDO_ATTR } from "../../src/core/pptx-paint.ts";
+import {
+  measurePptxGlyphsInPage,
+  measurePptxPlainLinesInPage,
+  measurePptxTextsInPage,
+} from "../../src/core/pptx-text.ts";
+import { pptxTypeRequests, scriptOf, setPptxTexts } from "../../src/core/pptx-type.ts";
+import { pseudoTextPieces } from "../../src/core/pseudo-text.ts";
 import { resolveDeck } from "../../src/core/resolve.ts";
 import { logicalSize } from "../../src/core/size.ts";
 import { lastStop } from "../../src/core/step.ts";
@@ -33,6 +41,20 @@ function textLayers(layers: PptxLayer<PptxPictureFile>[]): PptxTextBox[] {
   return layers.flatMap((layer) =>
     layer.kind === "text" ? [layer] : layer.kind === "shape" ? textLayers(layer.layers) : [],
   );
+}
+
+/** Every text box of a block's, those in shapes' groups included, in order. */
+function proseLayers(layers: PptxLayer<PptxPictureFile>[]): PptxProse[] {
+  return layers.flatMap((layer) =>
+    layer.kind === "prose" ? [layer] : layer.kind === "shape" ? proseLayers(layer.layers) : [],
+  );
+}
+
+/** What a text box of a block's says, its paragraphs joined by a line break. */
+function said(prose: PptxProse | undefined): string {
+  return (prose?.text.paragraphs ?? [])
+    .map((paragraph) => paragraph.runs.map((run) => run.text).join(""))
+    .join("\n");
 }
 
 /** The worker's work in one shared browser, recording what each slide came back as. */
@@ -131,8 +153,9 @@ const shapedSlide = `<section class="slide">
 </section>
 `;
 
+// What the slide says, the star its pseudo-element writes included.
 const SHAPED_TEXT =
-  "見出し本文は一行に収まらないほど長いので、二行目に折り返す。一つ目二つ目ここに蛍光ペンの字がある。星が描かれる箱。業務設計○移行△dek は台本を先に書く。";
+  "見出し本文は一行に収まらないほど長いので、二行目に折り返す。一つ目二つ目ここに蛍光ペンの字がある。星が描かれる箱。★業務設計○移行△dek は台本を先に書く。";
 
 const VENUE =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 8"><rect width="12" height="8" fill="#5b9bd5"/></svg>';
@@ -251,7 +274,14 @@ async function measuredInk(html: string, size: { width: number; height: number }
     await page.setViewportSize(size);
     await page.setContent(html, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
-    const { boxes } = await page.evaluate(measurePptxTextsInPage);
+    // As the worker measures it: what the pseudo-elements write is text too.
+    const paint = await page.evaluate(measurePptxPaintInPage);
+    const keys = new Map(paint.pseudos.map((each) => [`${each.host}::${each.pseudo}`, each.key]));
+    const pieces = (await pseudoTextPieces(page, PPTX_PSEUDO_ATTR)).flatMap((piece) => {
+      const key = keys.get(`${piece.host}::${piece.pseudo}`);
+      return key ? [{ ...piece, key }] : [];
+    });
+    const { boxes } = await page.evaluate(measurePptxTextsInPage, pieces);
     return [...ink(boxes.flatMap((box) => box.runs.map((run) => run.text)).join(""))]
       .sort()
       .join("");
@@ -282,13 +312,13 @@ describe("pptxDeck in a browser", () => {
           const [slide] = seen;
           const lines = (slide?.boxes ?? []).map((box) => box.runs.map((run) => run.text).join(""));
 
-          // The heading wraps in the browser; each of its lines is a box of its own.
-          const heading = (slide?.boxes ?? []).filter((box) => box.runs[0]?.size === 64);
-          expect(heading.length).toBeGreaterThan(1);
-          expect(heading.map((box) => box.runs.map((run) => run.text).join("")).join("")).toBe(
-            "台本から、発表まで書き切る道具",
-          );
-          expect(heading[1]?.y).toBeGreaterThan(heading[0]?.y ?? 0);
+          // The heading wraps in the browser: it is one text box, the slide's title, broken
+          // where the browser broke it.
+          const proses = proseLayers(slide?.layers ?? []);
+          const heading = proses.find((prose) => prose.title);
+          expect(said(heading).replace(/\n/g, "")).toBe("台本から、発表まで書き切る道具");
+          expect(said(heading)).toContain("\n");
+          expect(heading?.text.paragraphs[0]?.runs[0]?.size).toBe(64);
 
           // A chip's padding sets it apart; an ideographic space is kept as written.
           expect(lines).toContain("dek は　");
@@ -296,28 +326,25 @@ describe("pptxDeck in a browser", () => {
           const rest = (slide?.boxes ?? []).find((box) =>
             box.runs.some((run) => run.text === "太字"),
           );
-          expect(rest?.runs.map((run) => run.text)).toEqual([
-            "を先に書く。",
-            "太字",
-            "と",
-            "薄い字",
-            "と",
-            "LOUD",
-            "。",
-          ]);
-          expect(rest?.runs.find((run) => run.text === "太字")?.bold).toBe(true);
-          expect(rest?.runs.find((run) => run.text === "薄い字")?.alpha).toBe(0.5);
+          const joined = (runs: PptxTextBox["runs"] | undefined) =>
+            (runs ?? []).map((run) => run.text).join("");
+          expect(joined(rest?.runs)).toBe("を先に書く。太字と薄い字とLOUD。");
+          expect(joined(rest?.runs.filter((run) => run.bold))).toBe("太字");
+          expect(joined(rest?.runs.filter((run) => run.alpha === 0.5))).toBe("薄い字");
           expect(rest?.runs.every((run) => typeof run.font === "string" && run.font !== "")).toBe(
             true,
           );
 
-          // A uniform scale sets the size as drawn; a rotation, SVG, decoration, and a folio stay drawn.
+          // A uniform scale sets the size as drawn; a rotation, SVG, and decoration stay drawn.
+          const all = [...lines, ...proses.map(said)];
           expect(
-            (slide?.boxes ?? []).find((box) => box.runs[0]?.text === "倍の字")?.runs[0]?.size,
+            proses.find((prose) => said(prose) === "倍の字")?.text.paragraphs[0]?.runs[0]?.size,
           ).toBe(40);
-          for (const pictured of ["回った字", "図の字", "飾りの字", "01"]) {
-            expect(lines.join("|")).not.toContain(pictured);
+          for (const pictured of ["回った字", "図の字", "飾りの字"]) {
+            expect(all.join("|")).not.toContain(pictured);
           }
+          // What the slide's `::after` writes, a folio, is text too.
+          expect(lines).toContain("01");
 
           for (const box of slide?.boxes ?? []) {
             expect(box.x).toBeGreaterThanOrEqual(0);
@@ -397,14 +424,17 @@ describe("pptxDeck in a browser", () => {
             outline: { width: 2, paint: { color: [200, 200, 200], alpha: 1 } },
             radius: 12,
           });
-          expect(card?.text?.paragraphs.map((p) => p.runs.map((run) => run.text).join(""))).toEqual(
-            [
-              "見出し",
-              "本文は一行に収まらないほど長いので、二行目に折り返す。",
-              "一つ目",
-              "二つ目",
-            ],
+          const paragraphs = card?.text?.paragraphs.map((p) =>
+            p.runs.map((run) => run.text).join(""),
           );
+          expect(paragraphs?.map((text) => text.replace(/\n/g, ""))).toEqual([
+            "見出し",
+            "本文は一行に収まらないほど長いので、二行目に折り返す。",
+            "一つ目",
+            "二つ目",
+          ]);
+          // The paragraph the browser wrapped is broken where it broke it, and nowhere else.
+          expect(paragraphs?.map((text) => text.split("\n").length)).toEqual([1, 2, 1, 1]);
           expect(card?.text?.paragraphs.map((p) => p.bullet)).toEqual([
             undefined,
             undefined,
@@ -418,18 +448,23 @@ describe("pptxDeck in a browser", () => {
           expect(icon?.kind === "picture" && icon.svg).toContain('fill="rgb(26, 127, 55)"');
           expect(icon?.kind === "picture" && icon.svg).not.toContain("class=");
 
-          // A card with a gradient highlight inside, and one a pseudo-element draws in, stay drawn.
+          // A card with a gradient highlight inside stays drawn. One a pseudo-element only
+          // writes in is a shape: what it writes is text, laid over it.
           expect(shapes.find((shape) => shape.x === 560)).toBeUndefined();
-          expect(shapes.find((shape) => shape.x === 900)).toBeUndefined();
-          expect(slide?.boxes.map((box) => box.runs.map((run) => run.text).join(""))).toContain(
-            "ここに蛍光ペンの字がある。",
-          );
+          expect(shapes.find((shape) => shape.x === 900)).toMatchObject({
+            fill: { color: [255, 240, 230], alpha: 1 },
+          });
+          expect(
+            textLayers(layers).map((box) => box.runs.map((run) => run.text).join("")),
+          ).toContain("★");
+          expect(proseLayers(layers).map(said)).toContain("ここに蛍光ペンの字がある。");
 
           // A grid of cells is a shape a cell, each one line where the cell set it.
           const cells = shapes.filter((shape) => shape.y >= 420 && shape.x < 500);
           expect(cells).toHaveLength(4);
           for (const cell of cells) {
-            expect(cell.text?.wrap).toBe(false);
+            // A cell with room past its one line wraps what is typed into it.
+            expect(cell.text?.wrap).toBe(true);
             // Centered top to bottom by the flexbox: 64px of cell, a line box of 30px or so.
             expect(cell.text?.inset.top).toBeGreaterThan(14);
           }
@@ -439,16 +474,17 @@ describe("pptxDeck in a browser", () => {
             "left",
             "center",
           ]);
-          expect(cells.map((cell) => cell.text?.paragraphs[0]?.runs[0]?.text)).toEqual([
-            "業務設計",
-            "○",
-            "移行",
-            "△",
-          ]);
+          expect(
+            cells.map((cell) => cell.text?.paragraphs[0]?.runs.map((run) => run.text).join("")),
+          ).toEqual(["業務設計", "○", "移行", "△"]);
 
           // A chip is a shape of its own; the image a picture with its alternative text.
-          const chip = shapes.find((shape) => shape.text?.paragraphs[0]?.runs[0]?.text === "台本");
-          expect(chip?.radius).toBeGreaterThan(0);
+          const chip = allLayers(layers).find(
+            (layer) =>
+              layer.kind === "shape" &&
+              layer.text?.paragraphs[0]?.runs.map((run) => run.text).join("") === "台本",
+          );
+          expect(chip?.kind === "shape" && chip.radius).toBeGreaterThan(0);
           const venue = layers.find((layer) => layer.kind === "picture");
           expect(venue).toMatchObject({ description: "the venue" });
           expect(slide?.description).not.toContain("the venue");
@@ -662,6 +698,256 @@ describe("pptxDeck in a browser", () => {
     },
   );
 
+  browserTest(
+    "sets a block a text box: a code block's lines, a heading the title, a list, a folio",
+    async () => {
+      const typedScript = `---
+title: Typed
+lang: ja
+---
+
+## code
+
+コード。
+
+## list
+
+リスト。
+`;
+      const typedTheme = `.slide { position: relative; width: 1280px; height: 720px; font-family: sans-serif; color: rgb(20 20 20); background: rgb(250 250 250); counter-reset: n 7; }
+.slide h2 { position: absolute; left: 80px; top: 60px; margin: 0; font-size: 40px; line-height: 52px; }
+.slide pre { position: absolute; left: 80px; top: 160px; width: 600px; margin: 0; font-size: 20px; line-height: 32px; white-space: pre-wrap; }
+.slide .words { position: absolute; left: 80px; top: 400px; width: 600px; margin: 0; font-size: 24px; line-height: 36px; }
+.slide ul { position: absolute; left: 80px; top: 160px; width: 600px; margin: 0; padding-left: 28px; font-size: 24px; line-height: 36px; }
+.slide::after { content: counter(n, decimal-leading-zero) " / 12"; position: absolute; right: 60px; bottom: 40px; font-size: 18px; }
+`;
+      // Each line of the code ends in a text node that is a line break and nothing else.
+      const code = `<section class="slide">
+  <h2>コードの行</h2>
+<pre><span>$ run</span>
+<span>{</span>
+<span>"ok"</span>: true
+<span>}</span></pre>
+  <p class="words"><b>Bold</b> <i>Italic</i></p>
+</section>
+`;
+      const list = `<section class="slide">
+  <h2>リストは一つ</h2>
+  <ul><li>一つ目</li><li>二つ目</li><li>三つ目</li></ul>
+</section>
+`;
+      await withTempProject(
+        {
+          decks: [
+            { name: "typed", script: typedScript, theme: typedTheme, slides: { code, list } },
+          ],
+        },
+        async (root) => {
+          seen.length = 0;
+          const { outPath } = await pptxDeck(join(root, "decks", "typed"), { runner });
+          const [first, second] = seen;
+          const texts = proseLayers(first?.layers ?? []).map(said);
+          // The breaks `white-space` keeps are in the text, and so is the space between two
+          // elements set side by side.
+          expect(texts).toContain('$ run\n{\n"ok": true\n}');
+          expect(texts).toContain("Bold Italic");
+          // The heading is the slide's title; what `::after` writes is text, its counter counted.
+          expect(said(proseLayers(first?.layers ?? []).find((prose) => prose.title))).toBe(
+            "コードの行",
+          );
+          for (const slide of [first, second]) {
+            expect(slide?.boxes.map((box) => box.runs.map((run) => run.text).join(""))).toContain(
+              "07 / 12",
+            );
+          }
+          // A list is one text box, an item a paragraph, its markers PowerPoint's bullets.
+          const items = proseLayers(second?.layers ?? []).find((prose) =>
+            said(prose).startsWith("一つ目"),
+          );
+          expect(said(items)).toBe("一つ目\n二つ目\n三つ目");
+          expect(items?.text.paragraphs.map((paragraph) => paragraph.bullet)).toEqual([
+            { char: "•" },
+            { char: "•" },
+            { char: "•" },
+          ]);
+
+          const files = readZip(readFileSync(outPath));
+          const slide1 = new TextDecoder().decode(files.get("ppt/slides/slide1.xml"));
+          expect(slide1).toContain('<p:ph type="title"/>');
+          expect(slide1.match(/<a:br>/g)).toHaveLength(3);
+          expect(new TextDecoder().decode(files.get("ppt/slides/_rels/slide1.xml.rels"))).toContain(
+            "slideLayout2.xml",
+          );
+          // Nothing of the folio or the bullets is left for the picture to draw: none is kept.
+          expect(first?.picture).toBe(false);
+          expect(second?.picture).toBe(false);
+        },
+      );
+    },
+  );
+
+  browserTest(
+    "names the face that drew a run's Latin and the one that drew its East Asian text",
+    async () => {
+      const stack = 'Menlo, "DejaVu Sans Mono", "Courier New", monospace';
+      const facedTheme = `.slide { position: relative; width: 1280px; height: 720px; color: rgb(20 20 20); background: rgb(250 250 250); }
+.slide .mixed { position: absolute; left: 80px; top: 80px; margin: 0; font-family: ${stack}; font-size: 32px; line-height: 48px; }
+`;
+      const faced = `<section class="slide"><p class="mixed">code 台本</p></section>\n`;
+      // What Chromium draws each script in, asked on a page of its own, apart from the exporter.
+      const drawn = await withBrowser(async (browser) => {
+        const page = await browser.newPage();
+        try {
+          await page.setContent(
+            `<!doctype html><html lang="ja"><body style='font-family: ${stack}'><span id="latin">code</span><span id="east">台本</span></body></html>`,
+            { waitUntil: "load" },
+          );
+          const cdp = await page.context().newCDPSession(page);
+          await cdp.send("DOM.enable");
+          await cdp.send("CSS.enable");
+          const { root } = (await cdp.send("DOM.getDocument", { depth: -1 })) as {
+            root: { nodeId: number };
+          };
+          const face = async (selector: string) => {
+            const { nodeId } = (await cdp.send("DOM.querySelector", {
+              nodeId: root.nodeId,
+              selector,
+            })) as { nodeId: number };
+            const { fonts } = (await cdp.send("CSS.getPlatformFontsForNode", { nodeId })) as {
+              fonts: Array<{ familyName: string; glyphCount: number }>;
+            };
+            return [...fonts].sort((a, b) => b.glyphCount - a.glyphCount)[0]?.familyName;
+          };
+          return { latin: await face("#latin"), eastAsian: await face("#east") };
+        } finally {
+          await page.close();
+        }
+      });
+      await withTempProject(
+        { decks: [{ name: "faced", script, theme: facedTheme, slides: { cover: faced } }] },
+        async (root) => {
+          seen.length = 0;
+          await pptxDeck(join(root, "decks", "faced"), { runner });
+          const runs = [
+            ...(seen[0]?.boxes ?? []).flatMap((box) => box.runs),
+            ...proseLayers(seen[0]?.layers ?? []).flatMap((prose) =>
+              prose.text.paragraphs.flatMap((paragraph) => paragraph.runs),
+            ),
+          ];
+          expect(runs.map((run) => run.text).join("")).toBe("code 台本");
+          // Whatever fonts this machine has: the run's Latin face is the one that drew "code",
+          // and its East Asian face the one that drew "台本", the same one named once.
+          for (const run of runs) {
+            expect(run.font).toBe(drawn.latin);
+            expect(run.ea ?? run.font).toBe(drawn.eastAsian);
+          }
+          expect(typeof drawn.latin).toBe("string");
+        },
+      );
+    },
+  );
+
+  browserTest(
+    "sets text where the browser drew it when it is set again plainly, spaced as written",
+    async () => {
+      const lines = [
+        "「台本」から、（発表）まで。ト・リ",
+        "覚える書き方は三つだけです。",
+        "dek は、喋る台本を先に書き、そこから組み立てる道具です。",
+        "（かっこ）で始まる行と、「かぎ」。それに・なかぐろ：コロン！？",
+        "Markdown で書く Type AV To WA 1,234.56",
+      ];
+      // Whatever sans-serif the machine has: with `palt` where the font has it, and with the
+      // punctuation the browser trims where two marks meet and the pairs it kerns where not.
+      const html = `<!doctype html><html lang="ja"><head><style>body { margin: 0; background: #fff; } .slide { position: relative; width: 1280px; height: 720px; font-family: sans-serif; font-size: 36px; font-feature-settings: "palt"; color: #000; } p { position: absolute; left: 40px; margin: 0; white-space: nowrap; line-height: 60px; }</style></head><body><div id="deck"><section class="slide">${lines
+        .map(
+          (text, at) =>
+            `<p style="top: ${20 + at * 90}px;${at % 2 ? " font-weight: 700;" : ""}">${text}</p>`,
+        )
+        .join("")}</section></div></body></html>`;
+      const blank = '<!doctype html><html><body style="margin: 0; background: #fff"></body></html>';
+      const asHtml = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      const url = (png: Uint8Array) =>
+        `data:image/png;base64,${Buffer.from(png).toString("base64")}`;
+      const found = await withBrowser(async (browser) => {
+        const context = await browser.newContext({
+          viewport: { width: 1280, height: 720 },
+          deviceScaleFactor: 2,
+        });
+        try {
+          const page = await context.newPage();
+          await page.setContent(html, { waitUntil: "load" });
+          await page.evaluate(() => document.fonts.ready.then(() => undefined));
+          const full = await page.screenshot({});
+          // Measuring takes the text out of the page: the next shot is the slide without it.
+          const measured = await page.evaluate(measurePptxTextsInPage);
+          const bare = await page.screenshot({});
+          const requests = pptxTypeRequests(measured);
+          const set = setPptxTexts(measured, {
+            faces: new Map(),
+            glyphs: await page.evaluate(measurePptxGlyphsInPage, requests.glyphs),
+            lines: await page.evaluate(measurePptxPlainLinesInPage, requests.lines),
+          });
+          // The file's text as a renderer sets it: no feature of the text's own, each run at
+          // its written spacing, Latin kerned and East Asian text not, each box where it starts.
+          const pieces = (text: string) =>
+            [...text].reduce<Array<{ text: string; eastAsian: boolean }>>((all, char) => {
+              const eastAsian = scriptOf(char) === "eastAsian";
+              const last = all.at(-1);
+              if (last && last.eastAsian === eastAsian) {
+                last.text += char;
+              } else {
+                all.push({ text: char, eastAsian });
+              }
+              return all;
+            }, []);
+          const model = `<!doctype html><html lang="ja"><head><style>body { margin: 0; background: #fff; } div { position: absolute; white-space: pre; font-family: sans-serif; font-feature-settings: normal; font-variant: normal; text-spacing-trim: space-all; color: #000; }</style></head><body>${set.boxes
+            .map(
+              (box) =>
+                `<div style="left: ${box.x + (box.shift ?? 0)}px; top: ${box.y}px; line-height: ${box.height}px;">${box.runs
+                  .map((run) =>
+                    pieces(run.text)
+                      .map(
+                        (piece) =>
+                          `<span style="font-size: ${run.size}px; font-weight: ${run.bold ? 700 : 400}; letter-spacing: ${run.letterSpacing}px; font-kerning: ${piece.eastAsian ? "none" : "auto"};">${asHtml(piece.text)}</span>`,
+                      )
+                      .join(""),
+                  )
+                  .join("")}</div>`,
+            )
+            .join("")}</body></html>`;
+          const again = await context.newPage();
+          await again.setContent(model, { waitUntil: "load" });
+          const drawn = await again.screenshot({});
+          await again.setContent(blank, { waitUntil: "load" });
+          const empty = await again.screenshot({});
+          return await again.evaluate(compareInPage, {
+            width: 1280,
+            height: 720,
+            scale: 2,
+            browser: { full: url(full), bare: url(bare) },
+            renderer: { full: url(drawn), bare: url(empty) },
+            lines: measured.boxes.map((box) => ({
+              left: box.x,
+              top: box.y,
+              right: box.x + box.width,
+              bottom: box.y + box.height,
+            })),
+          });
+        } finally {
+          await context.close();
+        }
+      });
+      expect(found.lines).toHaveLength(lines.length);
+      for (const [at, line] of found.lines.entries()) {
+        expect({ line: lines[at], native: line.native }).toEqual({ line: lines[at], native: true });
+        expect(Math.abs(line.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(line.right)).toBeLessThanOrEqual(1);
+        expect(line.match).toBeGreaterThanOrEqual(0.97);
+      }
+    },
+  );
+
   // What CI keeps checking without PowerPoint: on every sample slide, the file carries the text
   // the page measures, line by line, each character once, in shapes' paragraphs or in text boxes
   // inside the frame.
@@ -678,7 +964,7 @@ describe("pptxDeck in a browser", () => {
         const sources = loadSlideSources(resolved.deck, { strict: true });
         expect(seen).toHaveLength(resolved.deck.deck.sections.length);
         for (const [index, slide] of seen.entries()) {
-          for (const box of slide.boxes) {
+          for (const box of [...slide.boxes, ...proseLayers(slide.layers)]) {
             expect({
               slide: slide.slug,
               inside:

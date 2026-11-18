@@ -1,0 +1,143 @@
+.slide {
+  --fg: rgb(20 20 20);
+  --bg: rgb(250 250 248);
+  --muted: rgb(110 110 110);
+  --accent: rgb(30 60 220);
+  --font-title: "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-body: "Hiragino Sans", "Noto Sans JP", sans-serif;
+  position: relative;
+  width: 1280px;
+  height: 720px;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-feature-settings: "palt";
+  word-break: auto-phrase;
+}
+
+.slide h2 {
+  position: absolute;
+  left: 64px;
+  top: 40px;
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 32px;
+  line-height: 44px;
+}
+
+/* A line over a bar exactly as wide as the browser set the line. */
+.slide .rows {
+  position: absolute;
+  left: 64px;
+  top: 120px;
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+}
+
+.slide .row {
+  display: grid;
+}
+
+.slide .row > * {
+  grid-area: 1 / 1;
+}
+
+.slide .bar {
+  background: rgb(255 228 120);
+}
+
+.slide .row p {
+  margin: 0;
+  font-size: 36px;
+  line-height: 52px;
+  white-space: nowrap;
+}
+
+.slide .row.wide {
+  width: 640px;
+}
+
+.slide .latin {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.slide .spaced {
+  letter-spacing: 0.2em;
+}
+
+.slide .right {
+  text-align: right;
+}
+
+.slide .center {
+  text-align: center;
+}
+
+.slide .mono {
+  font-family: Menlo, "DejaVu Sans Mono", "Hiragino Sans", "Noto Sans JP", monospace;
+  font-feature-settings: normal;
+}
+
+.slide .w600 {
+  font-weight: 600;
+}
+
+.slide .w700 {
+  font-weight: 700;
+}
+
+.slide .card {
+  position: absolute;
+  left: 64px;
+  top: 120px;
+  width: 460px;
+  padding: 24px 28px;
+  border-radius: 12px;
+  background: rgb(236 236 232);
+}
+
+.slide .card h3 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 40px;
+}
+
+.slide .card p,
+.slide .free {
+  margin: 12px 0 0;
+  font-size: 22px;
+  line-height: 36px;
+}
+
+.slide .card ul {
+  margin: 12px 0 0;
+  padding-left: 28px;
+  font-size: 22px;
+  line-height: 36px;
+}
+
+.slide .free {
+  position: absolute;
+  left: 640px;
+  top: 120px;
+  width: 520px;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.slide.folio {
+  counter-reset: page 2;
+}
+
+.slide.folio::after {
+  content: counter(page, decimal-leading-zero) " / 03";
+  position: absolute;
+  right: 64px;
+  bottom: 40px;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}

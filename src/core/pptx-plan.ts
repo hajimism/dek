@@ -4,6 +4,7 @@ import type {
   PptxPaint,
   PptxParagraph,
   PptxPicture,
+  PptxProse,
   PptxRule,
   PptxRun,
   PptxShape,
@@ -18,9 +19,9 @@ import type { Box } from "./slide-measure.ts";
 
 // What a PPTX lays over a slide's picture, decided from what the page measured: which boxes and
 // pictures become PowerPoint's own, what they are grouped with, which text becomes a shape's
-// paragraphs and which stays line by line, and whether the slide's background is PowerPoint's.
-// Nothing here touches a page, so every rule ADRs 20 and 21 write down is checked without a
-// browser.
+// paragraphs, which a text box of its own, and which stays line by line, and whether the slide's
+// background is PowerPoint's. Nothing here touches a page, so every rule ADRs 22, 23, and 99
+// write down is checked without a browser.
 
 /**
  * A place in the order the browser paints: a `[layer, index]` pair for each element from the
@@ -83,13 +84,32 @@ type PptxMarker = {
   bullet: { char: string } | { ordinal: number };
 };
 
-/** A run as the page measures it: the element whose text it is, for its font and its place. */
-export type PptxMeasuredRun = PptxRun & { owner: number };
+/**
+ * A run as the page measures it: the element whose text it is, for its place, and how it is set,
+ * by its place among the page's uses, for its faces and its characters' widths.
+ */
+export type PptxMeasuredRun = PptxRun & {
+  owner: number;
+  use: number;
+  /** Where it paints, when that is not where its element's text does: a pseudo-element's place. */
+  key?: PaintKey;
+};
 
 /** A line of text, or the part of one that sits together, in the block that sets it. */
 export type PptxMeasuredBox = Omit<PptxTextBox, "runs"> & {
   block: number;
   runs: PptxMeasuredRun[];
+  /**
+   * Where each character of its runs starts, in order, and where the last one ends: one more
+   * than its characters. None when the page could not place each.
+   */
+  stops?: number[];
+  /**
+   * How far its first character's ink starts from the box, below zero to the left: PowerPoint's
+   * glyph keeps the room the browser's feature took from its left, so the box starts that much
+   * earlier.
+   */
+  shift?: number;
 };
 
 /** A block's text as it is written: its runs in order, a `<br>` as `\n`, and how it is set. */
@@ -101,6 +121,10 @@ export type PptxBlockText = {
   lineHeight: number;
   content: Box;
   textIndent: number;
+  /** Its level, when it is a heading: 1 for `<h1>`. */
+  heading?: number;
+  /** The list it is an item of, by the list's element. */
+  list?: number;
 };
 
 /** Everything the page measured of a slide that the plan decides from. */
@@ -118,6 +142,8 @@ export type PptxPageFacts = {
    * slide is a stacking context, so nothing a negative `z-index` puts beneath it is hidden by it.
    */
   slide?: { background?: PptxFill; stacking: boolean };
+  /** The slide's size, which a text box of its own stays inside. */
+  size?: { width: number; height: number };
 };
 
 /** A picture as the plan has it: the element to draw alone. */
@@ -151,7 +177,12 @@ export function pptxPageFacts(
     extent,
   }));
   const markers: PptxMarker[] = [];
+  const set = new Set(texts.pseudos);
   for (const pseudo of paint.pseudos) {
+    // One that draws only its text, which was set again, leaves nothing in the picture.
+    if (pseudo.bare && set.has(`${pseudo.host}::${pseudo.pseudo}`)) {
+      continue;
+    }
     const box = placed.get(`${pseudo.host}::${pseudo.pseudo}`);
     if (!box) {
       const host = paint.nodes[pseudo.host]?.rect;
@@ -191,7 +222,10 @@ export function pptxPageFacts(
     blocks: texts.blocks,
     described: paint.described,
     ...(slide
-      ? { slide: { ...(background ? { background } : {}), stacking: slide.stacking } }
+      ? {
+          slide: { ...(background ? { background } : {}), stacking: slide.stacking },
+          size: { width: slide.width, height: slide.height },
+        }
       : {}),
   };
 }
@@ -466,12 +500,17 @@ type Settled = {
   owners: number[];
   /** The paragraphs of each shape whose text reads as a column. */
   columns: Map<number, ColumnText>;
+  /** Text no shape took that reads as paragraphs of its own: a block's, or a list's. */
+  prose: ProseText[];
   /** The markers set as bullets. */
   markers: Set<number>;
 };
 
-/** A shape's text as paragraphs, the boxes they replace, and the items whose marker is a bullet. */
+/** A column's text as paragraphs, the boxes they replace, and the items whose marker is a bullet. */
 type ColumnText = { text: PptxShapeText; boxes: Set<number>; bulleted: Set<number> };
+
+/** A column in a text box of its own: where the box lies, the shape it is in, and its heading's level. */
+type ProseText = ColumnText & { frame: Box; shape: number; heading?: number; title?: boolean };
 
 function settle(
   page: PptxPageFacts,
@@ -482,16 +521,93 @@ function settle(
   const shapes = new Set([...lifted].filter((id) => page.nodes[id]?.paint?.kind === "shape"));
   const owners = page.boxes.map((box) => boxShape(box, tree, shapes));
   const bullets = new Map(page.markers.map((marker) => [marker.node, marker]));
+  const blocksOf = (boxes: Iterable<number>): number[] => {
+    const order: number[] = [];
+    for (const index of boxes) {
+      const block = page.boxes[index]?.block ?? -1;
+      if (!order.includes(block)) {
+        order.push(block);
+      }
+    }
+    return order;
+  };
   const columns = new Map<number, ColumnText>();
   for (const shape of shapes) {
-    const text = columnOf(shape, page, tree, blocks, lifted, owners, bullets);
+    const paint = page.nodes[shape]?.paint;
+    const mine = new Set(owners.flatMap((owner, index) => (owner === shape ? [index] : [])));
+    if (paint?.kind !== "shape" || mine.size === 0) {
+      continue;
+    }
+    const text = columnOf(
+      { content: paint.content, rect: tree.rect(shape) },
+      blocksOf(mine),
+      mine,
+      [...lifted].filter((id) => id !== shape && tree.inside(id, shape)),
+      page,
+      blocks,
+      tree,
+      bullets,
+    );
     if (text) {
       columns.set(shape, text);
     }
   }
+
+  // What no shape took as its own is a text box a block where the block reads as plain lines,
+  // and one for a whole list where its items do, each item a paragraph; the rest stays in lines.
+  const taken = new Set([...columns.values()].flatMap((column) => [...column.boxes]));
+  const free = page.boxes.flatMap((_, index) => (taken.has(index) ? [] : [index]));
+  const order = blocksOf(free);
+  const prose: ProseText[] = [];
+  const proseOf = (group: number[]): ProseText | undefined => {
+    const mine = new Set(free.filter((index) => group.includes(page.boxes[index]?.block ?? -1)));
+    const [first] = mine;
+    const shape = first === undefined ? -1 : (owners[first] ?? -1);
+    if (first === undefined || [...mine].some((index) => owners[index] !== shape)) {
+      return undefined;
+    }
+    const text = columnOf(
+      undefined,
+      group,
+      mine,
+      [...lifted].filter((id) => group.some((block) => block >= 0 && tree.inside(id, block))),
+      page,
+      blocks,
+      tree,
+      bullets,
+    );
+    const heading = group.length === 1 ? blocks.get(group[0] ?? -1)?.heading : undefined;
+    return text ? { ...text, shape, ...(heading === undefined ? {} : { heading }) } : undefined;
+  };
+  for (let at = 0; at < order.length; ) {
+    const list = blocks.get(order[at] ?? -1)?.list;
+    let end = at + 1;
+    while (list !== undefined && blocks.get(order[end] ?? -1)?.list === list) {
+      end++;
+    }
+    const group = order.slice(at, end);
+    const whole = proseOf(group);
+    for (const each of whole ? [whole] : group.length > 1 ? group.map((id) => proseOf([id])) : []) {
+      if (each) {
+        prose.push(each);
+      }
+    }
+    at = end;
+  }
+  // The slide's title is its highest heading that is a text box of its own, the first of them,
+  // and in no group: PowerPoint keeps a placeholder out of one.
+  const title = prose
+    .filter((each) => each.heading !== undefined && each.shape === -1)
+    .sort((a, b) => (a.heading ?? 0) - (b.heading ?? 0))[0];
+  if (title) {
+    title.title = true;
+  }
+
   // A marker is a bullet only where its item is a paragraph of a column; elsewhere it is drawn.
-  const markers = new Set([...columns.values()].flatMap((column) => [...column.bulleted]));
-  return { shapes, owners, columns, markers };
+  const markers = new Set(
+    [...columns.values(), ...prose].flatMap((column) => [...column.bulleted]),
+  );
+  return { shapes, owners, columns, prose, markers };
 }
 
 /** The nearest lifted shape that holds every run of the box, or -1. */
@@ -508,37 +624,33 @@ function boxShape(box: PptxMeasuredBox, tree: Tree, shapes: ReadonlySet<number>)
 
 type Line = { top: number; bottom: number; boxes: PptxMeasuredBox[] };
 
+/** How much room, in pixels, a line needs past its end for PowerPoint not to break it again. */
+const FIT = 0.75;
+/** How much a wrapping text's far edge is moved out, so a line that just fit still fits. */
+const GIVE = 1.5;
+
 /**
- * A shape's text as paragraphs, when it reads as a column: its blocks one under another, no line
- * with pieces set apart, nothing else laid over in its lines, and each block's runs the text its
- * lines carry.
+ * Some blocks' text as paragraphs, when it reads as a column: the blocks one under another, no
+ * line with pieces set apart, nothing else laid over in its lines, each block's runs the text
+ * its lines carry, and each line where its alignment puts it. `holder` is the shape that holds
+ * the column, its content box and its own; without one the column is free, in a box of its own
+ * that covers its blocks. Every line the browser broke is broken in the paragraph too, so
+ * PowerPoint, which breaks a line where it is full and not by the phrase, breaks where the
+ * browser did; the box wraps what is typed into it where every line has room in it.
  */
 function columnOf(
-  shape: number,
+  holder: { content: Box; rect: Box } | undefined,
+  order: number[],
+  mine: ReadonlySet<number>,
+  others: number[],
   page: PptxPageFacts,
-  tree: Tree,
   blocks: Map<number, PptxBlockText>,
-  lifted: ReadonlySet<number>,
-  owners: number[],
+  tree: Tree,
   markers: ReadonlyMap<number, PptxMarker>,
-): ColumnText | undefined {
-  const paint = page.nodes[shape]?.paint;
-  if (paint?.kind !== "shape") {
-    return undefined;
-  }
-  const mine = new Set(owners.flatMap((owner, index) => (owner === shape ? [index] : [])));
+): (ColumnText & { frame: Box }) | undefined {
   if (mine.size === 0) {
     return undefined;
   }
-  const order: number[] = [];
-  for (const index of mine) {
-    const block = page.boxes[index]?.block ?? -1;
-    if (!order.includes(block)) {
-      order.push(block);
-    }
-  }
-  const others = [...lifted].filter((id) => id !== shape && tree.inside(id, shape));
-  const content = paint.content;
   const sets: Array<{ block: PptxBlockText; lines: Line[]; pitch: number }> = [];
   for (const id of order) {
     const block = blocks.get(id);
@@ -554,7 +666,11 @@ function columnOf(
     if (ink(block.runs) !== ink(carried)) {
       return undefined;
     }
-    if (block.content.left < content.left - NEAR || block.content.right > content.right + NEAR) {
+    if (
+      holder &&
+      (block.content.left < holder.content.left - NEAR ||
+        block.content.right > holder.content.right + NEAR)
+    ) {
       return undefined;
     }
     const glyphs = lines[0] ? lines[0].bottom - lines[0].top : 0;
@@ -579,6 +695,12 @@ function columnOf(
     }
     sets.push({ block, lines, pitch });
   }
+  const content = holder?.content ?? {
+    left: Math.min(...sets.map(({ block }) => block.content.left)),
+    top: Number.NEGATIVE_INFINITY,
+    right: Math.max(...sets.map(({ block }) => block.content.right)),
+    bottom: Number.POSITIVE_INFINITY,
+  };
   for (const { lines } of sets) {
     for (const line of lines) {
       const extent = {
@@ -627,9 +749,51 @@ function columnOf(
     return undefined;
   }
 
+  const aligns = sets.map(({ block, lines }) => alignOf(block, lines));
+  // A paragraph starts every line at its margin: lines the browser started elsewhere, around a
+  // float or after something set before them, would move. So would a line that starts with an
+  // indent `white-space` keeps: its spaces could be the paragraph's, but Quick Look drops one
+  // space from the start of every line, so such a line stays a box of its own, where it stood.
+  for (const [index, { block, lines }] of sets.entries()) {
+    const marker = markers.get(block.node);
+    const moved = lines.some((line, at) => {
+      const start = block.content.left + (at === 0 && !marker ? block.textIndent : 0);
+      return Math.abs((line.boxes[0]?.x ?? start) - start) > NEAR * 2;
+    });
+    if (moved && (aligns[index] === "left" || aligns[index] === "justify")) {
+      return undefined;
+    }
+    // Nor does one set another element in its lines: a badge or an icon the browser set beside
+    // the words, whether it is laid over the picture or left in it, would lie under them.
+    const worded = new Set<number>();
+    for (const run of block.runs) {
+      for (let at = run.owner; at >= 0 && at !== block.node; at = tree.parent(at)) {
+        worded.add(at);
+      }
+    }
+    const beside = page.nodes.some(
+      (node, id) =>
+        block.node >= 0 &&
+        id !== block.node &&
+        !worded.has(id) &&
+        tree.inside(id, block.node) &&
+        lines.some((line) =>
+          overlaps(node.rect, {
+            left: block.content.left,
+            top: line.top,
+            right: block.content.right,
+            bottom: line.bottom,
+          }),
+        ),
+    );
+    if (beside) {
+      return undefined;
+    }
+  }
+
   const bulleted = new Set<number>();
   let startAt: number | undefined;
-  const paragraphs = sets.map(({ block, pitch }, index): PptxParagraph => {
+  const paragraphs = sets.map(({ block, lines, pitch }, index): PptxParagraph => {
     const marker = markers.get(block.node);
     if (marker) {
       bulleted.add(block.node);
@@ -644,48 +808,154 @@ function columnOf(
       bullet = kind ? { char: kind.char } : undefined;
     }
     return {
-      align: alignOf(block, sets[index]?.lines ?? []),
+      align: aligns[index] ?? "left",
       lineHeight: pitch,
       spaceBefore: index === 0 ? 0 : Math.max(0, (tops[index] ?? 0) - (bottoms[index - 1] ?? 0)),
       marginLeft: block.content.left - content.left,
       marginRight: Math.max(0, content.right - block.content.right),
       indent: marker ? marker.extent.left - block.content.left : block.textIndent,
       ...(bullet ? { bullet } : {}),
-      runs: block.runs.map(written),
+      runs: pinned(block.runs, lines),
     };
   });
 
   // DrawingML has no margin below 0, and starts no line left of the text's inset: what starts
   // left of the content box, a bullet hung in its padding or a block a pixel out, moves the
-  // inset left, as far as the shape's own edge.
-  const rect = tree.rect(shape);
+  // inset left, as far as the shape's own edge; a free column's box starts there.
   const shift = Math.min(
     0,
     ...paragraphs.map((paragraph) => paragraph.marginLeft + Math.min(0, paragraph.indent)),
   );
-  if (content.left - rect.left + shift < -NEAR) {
+  if (holder && content.left - holder.rect.left + shift < -NEAR) {
     return undefined;
   }
   for (const paragraph of paragraphs) {
     paragraph.marginLeft -= shift;
   }
 
+  // PowerPoint breaks a line that does not fit: text wraps only where every line the browser
+  // set has room past its end, and a text all on one line only where it has room to spare, so
+  // that a chip drawn to its text's width never breaks it.
+  const rooms = sets.flatMap(({ block, lines }) =>
+    lines.map((line) => {
+      const width = line.boxes[0]?.width ?? 0;
+      return { room: block.content.right - block.content.left - width, width };
+    }),
+  );
+  const flush = aligns.every((align) => align === "left" || align === "justify");
+  const centered = aligns.every((align) => align === "center");
+  const right = aligns.every((align) => align === "right");
+  // How far the text's room can grow on the side its lines end on: into a shape's padding, or
+  // for a box of its own up to the slide's edge, on both sides alike for centered text.
+  const within = page.size ? page.size.width - content.right : Number.POSITIVE_INFINITY;
+  const reach = holder
+    ? flush
+      ? Math.max(0, holder.rect.right - content.right)
+      : 0
+    : Math.max(
+        0,
+        flush ? within : right ? content.left + shift : Math.min(within, content.left + shift),
+      );
+  const give = Math.min(GIVE, reach);
+  const multiline = sets.some(({ lines }) => lines.length > 1);
+  const wrap =
+    rooms.every(({ room }) => room + give >= FIT) &&
+    (multiline || rooms.every(({ room, width }) => room >= Math.max(2, width * 0.03)));
+
+  const top = tops[0] ?? content.top;
+  const bottom = bottoms.at(-1) ?? content.bottom;
+  if (!holder) {
+    // A box of its own: as wide as its blocks, and wider past where its lines end, by a little
+    // where it wraps and by a good part of a line where it does not, so a renderer that sets a
+    // line a hair longer, or wraps a text that says not to, has the room. The box grows on the
+    // side its lines end on, or on both for centered text, never by a margin: a renderer that
+    // skips a paragraph's right margin would center the text elsewhere. It stays on the slide.
+    if ((!flush && !centered && !right) || (centered && shift !== 0)) {
+      return undefined;
+    }
+    const widest = Math.max(...rooms.map(({ width }) => width));
+    const spare = wrap ? give : Math.min(reach, Math.max(widest * 0.25, (sets[0]?.pitch ?? 0) * 2));
+    // Lines that all begin with a character whose ink a feature moved left, as `palt` moves an
+    // opening bracket's, begin that much earlier: PowerPoint's glyph keeps the room on its left,
+    // so the box starts there, and for centered text is that much wider on the left.
+    const leads = sets.flatMap(({ lines }) => lines.map((line) => line.boxes[0]?.shift ?? 0));
+    const [first = 0] = leads;
+    const lead =
+      right || leads.some((each) => Math.abs(each - first) > NEAR / 4)
+        ? 0
+        : Math.max(first, -(content.left + shift - (flush ? 0 : spare)));
+    return {
+      text: { inset: { left: 0, top: 0, right: 0, bottom: 0 }, wrap, paragraphs },
+      boxes: new Set(mine),
+      bulleted,
+      frame: {
+        left: content.left + shift + lead - (flush ? 0 : spare),
+        top,
+        right: content.right + (right ? 0 : spare),
+        bottom,
+      },
+    };
+  }
+  // Text that starts above its shape, as a label set over a card's edge does, has no inset to
+  // start it there: its blocks are set each in a box of its own.
+  if (top < holder.rect.top - NEAR) {
+    return undefined;
+  }
+
   // Set from the top, where it starts, as PowerPoint's own text is: it grows down as it is edited,
-  // and lands where the browser set it in every renderer, which centering does not.
+  // and lands where the browser set it in every renderer, which centering does not. Text that
+  // wraps is given a little of the padding past its lines' ends, and text that does not, all of
+  // it: no line is broken for a hair's width.
+  const { rect } = holder;
   return {
     text: {
       inset: {
         left: Math.max(0, content.left - rect.left + shift),
-        top: (tops[0] ?? content.top) - rect.top,
-        right: rect.right - content.right,
+        top: top - rect.top,
+        right: wrap ? rect.right - content.right - give : flush ? 0 : rect.right - content.right,
         bottom: rect.bottom - content.bottom,
       },
-      wrap: sets.some(({ lines }) => lines.length > 1),
+      wrap,
       paragraphs,
     },
-    boxes: mine,
+    boxes: new Set(mine),
     bulleted,
+    frame: rect,
   };
+}
+
+const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/**
+ * A block's runs as they are written, with a line break wherever the browser broke a line: the
+ * break stands before the first character of the next line, after the space the line ended on.
+ */
+function pinned(runs: PptxMeasuredRun[], lines: Line[]): PptxRun[] {
+  const counts = lines.map(
+    (line) => [...segmenter.segment(ink(line.boxes.flatMap((box) => box.runs)))].length,
+  );
+  let line = 0;
+  let inked = 0;
+  // Whether a break already stands before the character to come, as a `<br>` puts one.
+  let broken = true;
+  return runs.map((run) => {
+    let text = "";
+    for (const { segment } of segmenter.segment(run.text)) {
+      if (segment === "\n") {
+        broken = true;
+      } else if (!/^\s+$/u.test(segment)) {
+        if (inked >= (counts[line] ?? Number.POSITIVE_INFINITY)) {
+          text += broken ? "" : "\n";
+          line++;
+          inked = 0;
+        }
+        inked++;
+        broken = false;
+      }
+      text += segment;
+    }
+    return { ...written(run), text };
+  });
 }
 
 /**
@@ -754,16 +1024,38 @@ function assemble(
     list.push(placed);
     held.set(shape, list);
   };
-  const inColumn = new Set([...state.columns.values()].flatMap((column) => [...column.boxes]));
+  const inColumn = new Set(
+    [...state.columns.values(), ...state.prose].flatMap((column) => [...column.boxes]),
+  );
+  // Text that holds more than one element's text paints as the latest of them, such as the
+  // text in a chip over the chip.
+  const keyOf = (boxes: PptxMeasuredBox[]): PaintKey =>
+    boxes
+      .flatMap((box) => box.runs.map((run) => run.key ?? textKey(tree.key(run.owner))))
+      .reduce((latest, each) => (comparePaint(each, latest, tree) > 0 ? each : latest));
+  for (const prose of state.prose) {
+    const boxes = [...prose.boxes].flatMap((index) => page.boxes[index] ?? []);
+    const key = keyOf(boxes);
+    const layer: PptxProse = {
+      kind: "prose",
+      ...rectOf(prose.frame),
+      text: prose.text,
+      ...(prose.title ? { title: true } : {}),
+    };
+    // What it covers is its lines, not the whole width its box is given.
+    const extent = {
+      left: Math.min(...boxes.map((box) => box.x)),
+      top: Math.min(...boxes.map((box) => box.y)),
+      right: Math.max(...boxes.map((box) => box.x + box.width)),
+      bottom: Math.max(...boxes.map((box) => box.y + box.height)),
+    };
+    place(prose.shape, { key, layer, item: { extent, key }, inner: [] });
+  }
   page.boxes.forEach((box, index) => {
     if (inColumn.has(index)) {
       return;
     }
-    // A line that holds more than one element's text paints as the latest of them, such as the
-    // text in a chip over the chip.
-    const key = box.runs
-      .map((run) => textKey(tree.key(run.owner)))
-      .reduce((latest, each) => (comparePaint(each, latest, tree) > 0 ? each : latest));
+    const key = keyOf([box]);
     const layer = textLayer(box);
     place(state.owners[index] ?? -1, {
       key,
@@ -849,13 +1141,19 @@ function rulesOf(rect: Box, paint: PptxBoxPaint): PptxRule[] {
 }
 
 function textLayer(box: PptxMeasuredBox): PptxTextLayer {
-  const { block: _block, runs, ...rest } = box;
-  return { kind: "text", ...rest, runs: runs.map(written) };
+  const { block: _block, runs, stops: _stops, shift = 0, ...rest } = box;
+  return {
+    kind: "text",
+    ...rest,
+    x: rest.x + shift,
+    width: rest.width - shift,
+    runs: runs.map(written),
+  };
 }
 
-/** A run as it is written: whose text it was is the page's to know, not the file's. */
+/** A run as it is written: whose text it was and how it was set is the page's to know, not the file's. */
 function written(run: PptxMeasuredRun): PptxRun {
-  const { owner: _owner, ...rest } = run;
+  const { owner: _owner, use: _use, key: _key, ...rest } = run;
   return rest;
 }
 

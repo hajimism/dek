@@ -10,6 +10,8 @@ Amends [22. Lay boxes, pictures, and the text in them over a PPTX's picture as P
 
 Amended by [24. Make every dekc pptx lay out what PowerPoint draws as its own, and drop --shapes](0024-make-every-dekc-pptx-lay-out-what-powerpoint-draws-as-its-own-and-drop-shapes.md)
 
+Amended by [98. Space a PPTX's characters as the browser's features did, name a face a script, and deflate the file](0098-space-a-pptx-s-characters-as-the-browser-s-features-did-name-a-face-a-script-and-deflate-the-file.md)
+
 ## Context
 
 ADR 22 lays a slide's boxes, pictures, and text over its picture as PowerPoint's own. What it leaves is the picture under them, and the picture holds the slide's background, so a recipient who wants another background, or the deck in other colors, has a slide-sized image to replace, and every shape's color to change one by one. The file's theme is PowerPoint's default, which names Calibri and Office's blues, none of which the deck uses.

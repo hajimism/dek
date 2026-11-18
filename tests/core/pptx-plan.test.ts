@@ -26,6 +26,7 @@ const rect = (left: number, top: number, right: number, bottom: number): Box => 
 const run = (text: string, owner: number, size = 20): PptxMeasuredRun => ({
   text,
   size,
+  use: 0,
   bold: false,
   italic: false,
   underline: false,
@@ -119,17 +120,76 @@ describe("planPptxLayers", () => {
       layers: [],
     });
     expect(shape?.text?.wrap).toBe(true);
-    // The heading's line box starts at the content box, so the text sits from its top.
-    expect(shape?.text?.inset).toEqual({ left: 20, top: 20, right: 20, bottom: 20 });
+    // The heading's line box starts at the content box, so the text sits from its top; text
+    // that wraps is given a pixel and a half of the padding past its lines' ends.
+    expect(shape?.text?.inset).toEqual({ left: 20, top: 20, right: 18.5, bottom: 20 });
+    // The paragraph is broken where the browser broke it.
     expect(
       shape?.text?.paragraphs.map((p) => [p.lineHeight, p.spaceBefore, p.runs[0]?.text]),
     ).toEqual([
       [36, 0, "見出し"],
-      [32, 14, "本文の一行目と二行目"],
+      [32, 14, "本文の一行目と\n二行目"],
     ]);
   });
 
-  test("keeps a box that would cover something left in the picture, and its text line by line", () => {
+  test("breaks a paragraph where the browser broke it, after the space, and a <br> only once", () => {
+    const page = plainCard();
+    page.boxes[1] = line(2, 2, "one two", 120, 173);
+    page.boxes[2] = line(2, 2, "three", 120, 205);
+    page.blocks[1] = block(2, "one two three", rect(120, 170, 480, 234));
+    expect(shapes(planPptxLayers(page).layers)[0]?.text?.paragraphs[1]?.runs[0]?.text).toBe(
+      "one two \nthree",
+    );
+    page.blocks[1] = block(2, "one two\nthree", rect(120, 170, 480, 234));
+    expect(shapes(planPptxLayers(page).layers)[0]?.text?.paragraphs[1]?.runs[0]?.text).toBe(
+      "one two\nthree",
+    );
+  });
+
+  test("wraps a text only where every line has room, and gives one that does not the padding", () => {
+    const tight = plainCard();
+    // The paragraph's first line fills the content box, and the card has no padding past it to
+    // give: PowerPoint would break the line again.
+    tight.nodes[0] = card(rect(120, 120, 500, 380), rect(100, 100, 500, 400));
+    tight.blocks[1] = block(2, "本文の一行目と二行目", rect(120, 170, 500, 234));
+    tight.boxes[1] = line(2, 2, "本文の一行目と", 120, 173, 380);
+    const text = shapes(planPptxLayers(tight).layers)[0]?.text;
+    expect(text?.wrap).toBe(false);
+    expect(text?.inset.right).toBe(0);
+    // With padding to give, the same line fits, and the text wraps.
+    const padded = plainCard();
+    padded.boxes[1] = line(2, 2, "本文の一行目と", 120, 173, 360);
+    expect(shapes(planPptxLayers(padded).layers)[0]?.text?.wrap).toBe(true);
+
+    // A text all on one line wraps only with room to spare: a chip drawn to its text does not.
+    const chip = (width: number) =>
+      facts({
+        nodes: [card(rect(112, 100, 168, 140), rect(100, 100, 180, 140))],
+        boxes: [line(0, 0, "タグ", 112, 107, width)],
+        blocks: [block(0, "タグ", rect(112, 100, 168, 140))],
+      });
+    expect(shapes(planPptxLayers(chip(56)).layers)[0]?.text?.wrap).toBe(false);
+    expect(shapes(planPptxLayers(chip(40)).layers)[0]?.text?.wrap).toBe(true);
+  });
+
+  test("sets text that starts above its shape, or off its margin, out of the shape's own", () => {
+    const above = plainCard();
+    // A label set over the card's top edge: an inset cannot start it there.
+    above.boxes[0] = { ...line(1, 1, "見出し", 120, 81), height: 34, lineHeight: 34 };
+    above.blocks[0] = block(1, "見出し", rect(120, 80, 480, 116), { lineHeight: 36 });
+    const [lifted] = shapes(planPptxLayers(above).layers);
+    expect(lifted?.text).toBeUndefined();
+    expect(lifted?.layers.map((layer) => layer.kind)).toEqual(["prose", "prose"]);
+
+    const moved = plainCard();
+    // A line the browser started after something else: a paragraph would start it at its margin.
+    moved.boxes[1] = line(2, 2, "本文の一行目と", 160, 173);
+    const [held] = shapes(planPptxLayers(moved).layers);
+    expect(held?.text).toBeUndefined();
+    expect(held?.layers.map((layer) => layer.kind)).toEqual(["prose", "text", "text"]);
+  });
+
+  test("keeps a box that would cover something left in the picture, and the text beside it in lines", () => {
     const page = plainCard();
     // A highlight with a gradient inside the paragraph stays drawn.
     page.nodes.push({
@@ -140,7 +200,8 @@ describe("planPptxLayers", () => {
     });
     const plan = planPptxLayers(page);
     expect(plan.lifted.shapes).toEqual([]);
-    expect(plan.layers.map((layer) => layer.kind)).toEqual(["text", "text", "text"]);
+    // The heading is a text box of its own; the paragraph the highlight is set in stays in lines.
+    expect(plan.layers.map((layer) => layer.kind)).toEqual(["prose", "text", "text"]);
   });
 
   test("keeps a box that something drawn later covers, and not one drawn over something earlier", () => {
@@ -196,9 +257,9 @@ describe("planPptxLayers", () => {
     expect(shape?.layers.map((layer) => layer.kind)).toEqual(["picture", "shape"]);
     expect(shape?.layers[0]).toMatchObject({ kind: "picture", node: 4, description: "an icon" });
     const chip = shape?.layers[1];
-    // One line, centered in its box: kept on one line, set from where its line box starts.
+    // One line, centered in its box with room to spare, set from where its line box starts.
     expect(chip?.kind === "shape" && chip.text).toMatchObject({
-      wrap: false,
+      wrap: true,
       inset: { left: 12, top: 4, right: 12, bottom: 0 },
     });
     expect(plan.lifted.pictures).toEqual([4]);
@@ -213,7 +274,8 @@ describe("planPptxLayers", () => {
     const plan = planPptxLayers(page);
     const [shape] = shapes(plan.layers);
     expect(shape?.text).toBeUndefined();
-    expect(shape?.layers.map((layer) => layer.kind)).toEqual(["text", "text", "text", "text"]);
+    // The heading is still plain lines, a text box of its own; the paragraph is line by line.
+    expect(shape?.layers.map((layer) => layer.kind)).toEqual(["prose", "text", "text", "text"]);
   });
 
   test("leaves a shape's text in lines when the page's runs say other than its lines", () => {
@@ -233,7 +295,7 @@ describe("planPptxLayers", () => {
     atFoot.paint.content = rect(120, 0, 480, 234);
     atFoot.rect = rect(100, -20, 500, 254);
     const [foot] = shapes(planPptxLayers(page).layers);
-    expect(foot?.text?.inset).toEqual({ left: 20, top: 140, right: 20, bottom: 20 });
+    expect(foot?.text?.inset).toEqual({ left: 20, top: 140, right: 18.5, bottom: 20 });
   });
 
   test("aligns a line as it sits in its block, centered or flush right though the CSS says left", () => {
@@ -368,7 +430,7 @@ describe("planPptxLayers", () => {
     page.boxes.push(line(3, 3, "上の字", 150, 385));
     page.blocks.push(block(3, "上の字", rect(150, 380, 300, 420)));
     const plan = planPptxLayers(page);
-    expect(plan.layers.map((layer) => layer.kind)).toEqual(["shape", "text"]);
+    expect(plan.layers.map((layer) => layer.kind)).toEqual(["shape", "prose"]);
   });
 
   test("lays the text of a line over a highlight in it, in the shape that holds both", () => {
@@ -449,7 +511,7 @@ describe("planPptxLayers", () => {
     // Text that runs into the next block is painted over its background, so it is laid over it.
     const plan = planPptxLayers(page);
     expect(plan.lifted.shapes).toEqual([1]);
-    expect(plan.layers.map((layer) => layer.kind)).toEqual(["shape", "text"]);
+    expect(plan.layers.map((layer) => layer.kind)).toEqual(["shape", "prose"]);
 
     // The same text with a shadow stays drawn, over the block: the block stays too.
     page.drawn.push({ within: 0, key: [0, 0, 0, 0.5], extent: rect(100, 108, 300, 142) });
@@ -477,7 +539,7 @@ describe("planPptxLayers", () => {
     expect(planPptxLayers(page).layers.map((layer) => layer.kind)).toEqual(["shape", "picture"]);
   });
 
-  test("keeps the box of two lists numbered apart, which PowerPoint would number as one", () => {
+  test("sets two lists numbered apart each in a text box, which one text would number as one", () => {
     const page = plainCard();
     page.markers.push(
       {
@@ -493,11 +555,135 @@ describe("planPptxLayers", () => {
         bullet: { ordinal: 1 },
       },
     );
-    expect(planPptxLayers(page).lifted).toEqual({
-      shapes: [],
-      pictures: [],
-      markers: [],
+    const plan = planPptxLayers(page);
+    expect(plan.lifted).toEqual({ shapes: [0], pictures: [], markers: [1, 2] });
+    const [shape] = shapes(plan.layers);
+    expect(shape?.text).toBeUndefined();
+    expect(
+      shape?.layers.map((layer) => layer.kind === "prose" && layer.text.paragraphs[0]?.bullet),
+    ).toEqual([{ startAt: 1 }, { startAt: 1 }]);
+  });
+
+  test("sets a block no shape takes in a text box as wide as the block, on the slide", () => {
+    const free = (more: Partial<PptxBlockText> = {}, x = 100, size?: PptxPageFacts["size"]) =>
+      facts({
+        nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 500, 132) }],
+        boxes: [line(0, 0, "本文", x, 103)],
+        blocks: [block(0, "本文", rect(100, 100, 500, 132), more)],
+        ...(size ? { size } : {}),
+      });
+    // Its line box starts where the glyphs, centered in a 32px line, put it; it wraps, and is
+    // a pixel and a half wider on the side its lines end on.
+    expect(planPptxLayers(free()).layers).toMatchObject([
+      {
+        kind: "prose",
+        x: 100,
+        y: 100,
+        width: 401.5,
+        height: 32,
+        text: { wrap: true, inset: { left: 0, top: 0, right: 0, bottom: 0 } },
+      },
+    ]);
+    // Centered text grows on both sides, by its box and by no margin; right-aligned on the left.
+    expect(planPptxLayers(free({ align: "center" }, 200)).layers).toMatchObject([
+      { x: 98.5, width: 403, text: { paragraphs: [{ marginLeft: 0, marginRight: 0 }] } },
+    ]);
+    expect(planPptxLayers(free({ align: "right" }, 300)).layers).toMatchObject([
+      { x: 98.5, width: 401.5 },
+    ]);
+    // Never past the slide's edge.
+    expect(planPptxLayers(free({}, 100, { width: 501, height: 720 })).layers).toMatchObject([
+      { x: 100, width: 401 },
+    ]);
+    // A line whose first character's ink a feature moved left starts that much earlier.
+    const led = free();
+    led.boxes[0] = { ...line(0, 0, "「本文", 100, 103), shift: -10 };
+    led.blocks[0] = block(0, "「本文", rect(100, 100, 500, 132));
+    expect(planPptxLayers(led).layers).toMatchObject([{ x: 90, width: 411.5 }]);
+  });
+
+  test("sets a list no shape takes in one text box, an item a paragraph with its bullet", () => {
+    const item = (node: number, top: number): PptxPaintNode => ({
+      parent: -1,
+      key: [0, node],
+      rect: rect(124, top, 500, top + 32),
     });
+    const page = facts({
+      nodes: [item(0, 100), item(1, 132)],
+      boxes: [line(0, 0, "一つ目", 124, 103), line(1, 1, "二つ目", 124, 135)],
+      blocks: [
+        block(0, "一つ目", rect(124, 100, 500, 132), { list: 9 }),
+        block(1, "二つ目", rect(124, 132, 500, 164), { list: 9 }),
+      ],
+      markers: [0, 1].map((node) => ({
+        node,
+        key: [0, node, 0, node + 0.1],
+        extent: rect(104, 103 + node * 32, 116, 129 + node * 32),
+        bullet: { char: "•" },
+      })),
+    });
+    const plan = planPptxLayers(page);
+    expect(plan.lifted.markers).toEqual([0, 1]);
+    expect(plan.layers).toHaveLength(1);
+    // The box starts where the bullets hang, and each item is hung from its margin.
+    expect(plan.layers[0]).toMatchObject({
+      kind: "prose",
+      x: 104,
+      text: {
+        paragraphs: [
+          { marginLeft: 20, indent: -20, bullet: { char: "•" }, runs: [{ text: "一つ目" }] },
+          { marginLeft: 20, indent: -20, bullet: { char: "•" }, runs: [{ text: "二つ目" }] },
+        ],
+      },
+    });
+  });
+
+  test("makes the slide's highest heading its title, the first of them, and none in a shape", () => {
+    const heading = (node: number, top: number, level: number) => ({
+      node: { parent: -1, key: [0, node], rect: rect(100, top, 500, top + 32) } as PptxPaintNode,
+      box: line(node, node, `見出し${node}`, 100, top + 3),
+      block: block(node, `見出し${node}`, rect(100, top, 500, top + 32), { heading: level }),
+    });
+    const parts = [heading(0, 100, 3), heading(1, 140, 2), heading(2, 180, 2)];
+    const plan = planPptxLayers(
+      facts({
+        nodes: parts.map((part) => part.node),
+        boxes: parts.map((part) => part.box),
+        blocks: parts.map((part) => part.block),
+      }),
+    );
+    expect(plan.layers.map((layer) => layer.kind === "prose" && layer.title === true)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+
+    // The card's heading is in the card's group, where PowerPoint keeps no title.
+    const carded = plainCard();
+    carded.boxes[0] = { ...line(1, 1, "見出し", 120, 81), height: 34, lineHeight: 34 };
+    carded.blocks[0] = block(1, "見出し", rect(120, 80, 480, 116), { lineHeight: 36, heading: 2 });
+    const [group] = shapes(planPptxLayers(carded).layers);
+    expect(group?.layers.some((layer) => layer.kind === "prose" && layer.title)).toBe(false);
+  });
+
+  test("lets go of a box under a pseudo-element that draws only text the file carries", () => {
+    const page = plainCard();
+    const place = (bare: boolean, pseudos: string[]) =>
+      pptxPageFacts(
+        {
+          origin: { left: 0, top: 0 },
+          nodes: page.nodes,
+          pseudos: [{ host: 0, pseudo: "after", key: [0, 0, 1, 2.75], reach: 0, bare }],
+          described: [],
+        },
+        { boxes: page.boxes, blocks: page.blocks, drawn: [], uses: [], pseudos },
+        new Map([["0::after", rect(440, 340, 480, 370)]]),
+      );
+    // Its text is a text box now: nothing of it is left in the picture for the card to cover.
+    expect(planPptxLayers(place(true, ["0::after"])).lifted.shapes).toEqual([0]);
+    // One whose text stayed drawn, or that draws a box of its own, still keeps the card.
+    expect(planPptxLayers(place(true, [])).lifted.shapes).toEqual([]);
+    expect(planPptxLayers(place(false, ["0::after"])).lifted.shapes).toEqual([]);
   });
 
   test("writes no margin below zero: what starts left of the content box moves the inset", () => {
@@ -527,7 +713,7 @@ describe("planPptxLayers", () => {
         pseudos: [{ host: 0, pseudo: "after", key: [0, 0, 1, 2.75], reach: 0 }],
         described: [],
       },
-      { boxes: page.boxes, blocks: page.blocks, drawn: [] },
+      { boxes: page.boxes, blocks: page.blocks, drawn: [], uses: [], pseudos: [] },
       new Map(),
     );
     expect(planPptxLayers(facts).lifted.shapes).toEqual([]);
@@ -578,7 +764,7 @@ describe("planPptxLayers", () => {
       described: [],
       slide: { paint: BLACK, image: "none", plain, stacking: true, width: 1280, height: 720 },
     });
-    const texts = { boxes: [], blocks: [], drawn: [] };
+    const texts = { boxes: [], blocks: [], drawn: [], uses: [], pseudos: [] };
     expect(pptxPageFacts(paint(true), texts, new Map()).slide).toEqual({
       background: { kind: "solid", paint: BLACK },
       stacking: true,

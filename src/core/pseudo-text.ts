@@ -87,3 +87,76 @@ async function boxOf(
     return undefined;
   }
 }
+
+/** One piece of what a pseudo-element writes, on one line, where Chromium laid it out. */
+export type PseudoTextPiece = {
+  /** The value of the attribute its element is marked with. */
+  host: string;
+  pseudo: "before" | "after";
+  /** The text as it is drawn: counters counted, `attr()` read. */
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** What `DOMSnapshot.captureSnapshot` answers, as far as this reads it. */
+type Snapshot = {
+  strings: string[];
+  documents: Array<{
+    nodes: {
+      parentIndex: number[];
+      attributes: number[][];
+      pseudoType?: { index: number[]; value: number[] };
+    };
+    layout: { nodeIndex: number[]; text: number[] };
+    textBoxes: { layoutIndex: number[]; bounds: number[][]; start: number[]; length: number[] };
+  }>;
+};
+
+/**
+ * The text `::before` and `::after` draw in every element marked with `attr`, piece by piece
+ * and line by line, in the viewport. The page can read a pseudo-element's `content` only as it
+ * is written, a `counter()` uncounted, and has no box for its text at all; Chromium's layout
+ * has both, and the DevTools protocol gives a snapshot of it.
+ */
+export async function pseudoTextPieces(page: Page, attr: string): Promise<PseudoTextPiece[]> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const snapshot = (await cdp.send("DOMSnapshot.captureSnapshot", {
+      computedStyles: [],
+    })) as Snapshot;
+    const pieces: PseudoTextPiece[] = [];
+    for (const doc of snapshot.documents) {
+      const types = new Map<number, string>();
+      doc.nodes.pseudoType?.index.forEach((node, at) => {
+        types.set(node, snapshot.strings[doc.nodes.pseudoType?.value[at] ?? -1] ?? "");
+      });
+      doc.textBoxes.layoutIndex.forEach((layout, at) => {
+        const node = doc.layout.nodeIndex[layout] ?? -1;
+        const pseudo = types.get(node);
+        if (pseudo !== "before" && pseudo !== "after") {
+          return;
+        }
+        const attributes = (doc.nodes.attributes[doc.nodes.parentIndex[node] ?? -1] ?? []).map(
+          (index) => snapshot.strings[index] ?? "",
+        );
+        const named = attributes.indexOf(attr);
+        const host = named >= 0 && named % 2 === 0 ? attributes[named + 1] : undefined;
+        const start = doc.textBoxes.start[at] ?? 0;
+        const text = (snapshot.strings[doc.layout.text[layout] ?? -1] ?? "").slice(
+          start,
+          start + (doc.textBoxes.length[at] ?? 0),
+        );
+        const [x = 0, y = 0, width = 0, height = 0] = doc.textBoxes.bounds[at] ?? [];
+        if (host !== undefined && text !== "" && width > 0 && height > 0) {
+          pieces.push({ host, pseudo, text, x, y, width, height });
+        }
+      });
+    }
+    return pieces;
+  } finally {
+    await cdp.detach();
+  }
+}

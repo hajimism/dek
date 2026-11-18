@@ -85,7 +85,7 @@ dek は Vue も UnoCSS も Monaco も Mermaid も依存に含めません。そ�
 - npm で配布されるテーマのギャラリー
 - CSS とシーク可能な `draw(t)` の外に出るアニメーション DSL
 
-WYSIWYG 編集や Keynote 形式のファイルが必要なら、PowerPoint か Keynote を使ってください。`dekc pptx` は単純な箱、画像、SVG、文字を PowerPoint の図形や画像にし、台本をノートに入れて渡せますが、グラデーション、影、疑似要素の描画は画像のままです。
+WYSIWYG 編集や Keynote 形式のファイルが必要なら、PowerPoint か Keynote を使ってください。`dekc pptx` は単純な箱、画像、SVG、文字を PowerPoint の図形や画像にし、台本をノートに入れて渡せますが、グラデーション、影、疑似要素が描く箱は画像のままです。
 
 dek は、ひとりで保守できる大きさを守り、喋りが主役のトークに集中します。細かい境界は [FAQ](./faq) にあります。
 

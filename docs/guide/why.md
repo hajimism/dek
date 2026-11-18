@@ -85,7 +85,7 @@ Use Slidev if you need any of the following.
 - A gallery of npm themes
 - An animation DSL beyond CSS and a seekable `draw(t)`
 
-Use PowerPoint or Keynote if you need a WYSIWYG editor or a Keynote file. `dekc pptx` hands a talk over with its plain boxes, images, SVGs, and text PowerPoint's own and its script in the notes, but a gradient, a shadow, or what a pseudo-element draws stays a picture.
+Use PowerPoint or Keynote if you need a WYSIWYG editor or a Keynote file. `dekc pptx` hands a talk over with its plain boxes, images, SVGs, and text PowerPoint's own and its script in the notes, but a gradient, a shadow, or a box a pseudo-element draws stays a picture.
 
 dek stays small enough for one person to maintain, and it stays focused on talks where the speaking is the point. See the [FAQ](./faq) for the edge cases.
 
