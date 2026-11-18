@@ -30,7 +30,8 @@ describe("the Bun dek runs on", () => {
   // Before 1.4.0, node:child_process closed a child's pipes past stdio[2] again when the finished
   // ChildProcess was collected, taking down whatever held the fd numbers by then. Playwright talks
   // to Chromium over stdio[3] and stdio[4], so a browser test closed dev servers' sockets in
-  // whichever test ran next: ECONNRESET, ConnectionRefused.
+  // whichever test ran next: ECONNRESET, ConnectionRefused. The floor is 1.4.3 (ADR 100): through
+  // 1.4.2, Bun.spawnSync can lose the child exit and never return.
   // A full collection crawls on a loaded machine: 0.4s alone, past 20s with every core busy.
   test("closes a finished child's extra stdio pipe once", async () => {
     const runChild = async (): Promise<void> => {

@@ -4,7 +4,7 @@ Thanks for helping. Bug reports, ideas, and pull requests are all welcome; for a
 
 ## Setup
 
-dek runs on [Bun](https://bun.sh) 1.4 or later (`mise install` picks the pinned version). CI also runs the latest Bun.
+dek runs on [Bun](https://bun.sh) 1.4.3 or later (`mise install` picks the pinned version). CI also runs the latest Bun.
 
 ```bash
 git clone https://github.com/hajimism/dek.git
