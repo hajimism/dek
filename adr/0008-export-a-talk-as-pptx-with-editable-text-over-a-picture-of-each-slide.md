@@ -14,6 +14,8 @@ Amended by [98. Space a PPTX's characters as the browser's features did, name a 
 
 Amended by [99. Set a PPTX's text a block a text box, broken where the browser broke it, its heading the slide's title](0099-set-a-pptx-s-text-a-block-a-text-box-broken-where-the-browser-broke-it-its-heading-the-slide-s-title.md)
 
+Amended by [103. Store a PPTX's picture once, however many slides show it](0103-store-a-pptx-s-picture-once-however-many-slides-show-it.md)
+
 ## Context
 
 A talk often has to reach people who work in PowerPoint or Keynote: an organizer who collects every speaker's slides, a co-presenter, a company that keeps decks in its own template. dek hands over a single HTML file, a PDF, and a video, none of which they can edit. Slidev and open-slide export PPTX with native shapes and text boxes; Marp exports pictures, with an experimental editable mode through LibreOffice. `docs/guide/why.md` and the FAQ listed PPTX export among what dek is not for.

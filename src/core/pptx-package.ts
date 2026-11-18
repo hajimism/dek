@@ -273,6 +273,21 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
     "ppt/notesMasters/_rels/notesMaster1.xml.rels",
     relationships([[`${NS.rel}/theme`, "../theme/theme2.xml"]]),
   );
+  // A picture is in the file once, however many slides show it and however often: what a theme
+  // draws on every slide that stays a picture is the same picture on each (ADR 103). A file
+  // is found again by its bytes, among those of its kind, and answers the name it is stored by.
+  const stored = new Map<string, Array<{ path: string; data: Uint8Array }>>();
+  const store = (path: string, data: Uint8Array): string => {
+    const key = `${path.slice(path.lastIndexOf("."))} ${data.length} ${Bun.hash(data)}`;
+    const kept = stored.get(key) ?? [];
+    const same = kept.find((each) => each.data.every((byte, at) => byte === data[at]));
+    if (same) {
+      return same.path;
+    }
+    stored.set(key, [...kept, { path, data }]);
+    parts.push({ path: `ppt/media/${path}`, data });
+    return path;
+  };
   deck.slides.forEach((slide, index) => {
     const n = index + 1;
     const written = slides[index];
@@ -286,21 +301,20 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
         // A slide with a title is laid out as one: its title fills that layout's placeholder.
         [`${NS.rel}/slideLayout`, `../slideLayouts/slideLayout${titled(slide.layers) ? 2 : 1}.xml`],
         ...(slide.picture
-          ? [[`${NS.rel}/image`, `../media/image${n}.png`] as [string, string]]
+          ? [
+              [`${NS.rel}/image`, `../media/${store(`image${n}.png`, slide.picture)}`] as [
+                string,
+                string,
+              ],
+            ]
           : []),
         [`${NS.rel}/notesSlide`, `../notesSlides/notesSlide${n}.xml`],
         ...written.media.map((file): [string, string] => [
           `${NS.rel}/image`,
-          `../media/${file.path}`,
+          `../media/${store(file.path, file.data)}`,
         ]),
       ]),
     );
-    if (slide.picture) {
-      parts.push({ path: `ppt/media/image${n}.png`, data: slide.picture });
-    }
-    for (const file of written.media) {
-      parts.push({ path: `ppt/media/${file.path}`, data: file.data });
-    }
     add(`ppt/notesSlides/notesSlide${n}.xml`, notesSlide(slide.notes, deck.lang));
     add(
       `ppt/notesSlides/_rels/notesSlide${n}.xml.rels`,
