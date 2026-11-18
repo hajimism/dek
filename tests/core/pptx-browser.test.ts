@@ -216,6 +216,10 @@ lang: ja
 ## ruled
 
 罫線のある地。
+
+## soft
+
+ぼかしのある地。
 `;
 
 const themedTheme = `.slide { --fg: rgb(20 20 20); --bg: rgb(250 248 240); --muted: rgb(225 225 215); --accent: rgb(200 60 0); --font-title: sans-serif; --font-body: serif; position: relative; width: 1280px; height: 720px; margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
@@ -225,6 +229,7 @@ const themedTheme = `.slide { --fg: rgb(20 20 20); --bg: rgb(250 248 240); --mut
 .slide.fade { background: linear-gradient(to right, rgb(250 248 240), rgb(200 220 255)); }
 .slide .drawn { position: absolute; left: 600px; top: 200px; width: 200px; height: 100px; background: linear-gradient(rgb(255 0 0), rgb(0 0 255)); }
 .slide.ruled { background-color: rgb(240 240 230); background-image: linear-gradient(rgb(20 20 20), rgb(20 20 20)); background-size: 1160px 2px; background-position: 60px 680px; background-repeat: no-repeat; }
+.slide.soft { background-color: rgb(20 30 60); background-image: radial-gradient(circle at 30% 30%, rgb(120 160 255 / 0.6), transparent 70%), radial-gradient(circle at 80% 70%, rgb(255 120 200 / 0.4), transparent 60%); }
 `;
 
 const themedCover = `<section class="slide">
@@ -241,6 +246,11 @@ const themedFade = `<section class="slide fade">
 
 const themedRuled = `<section class="slide ruled">
   <h2>罫線のある地</h2>
+</section>
+`;
+
+const themedSoft = `<section class="slide soft">
+  <h2>ぼかしのある地</h2>
 </section>
 `;
 
@@ -626,7 +636,12 @@ describe("pptxDeck in a browser", () => {
               name: "themed",
               script: themedScript,
               theme: themedTheme,
-              slides: { cover: themedCover, fade: themedFade, ruled: themedRuled },
+              slides: {
+                cover: themedCover,
+                fade: themedFade,
+                ruled: themedRuled,
+                soft: themedSoft,
+              },
             },
           ],
         },
@@ -724,6 +739,16 @@ describe("pptxDeck in a browser", () => {
           const rules = files.get(`ppt/media/${target}`) ?? new Uint8Array();
           expect((await pixel(rules, 2 * 640, 2 * 300))[3]).toBe(0);
           expect(await pixel(rules, 2 * 640, 2 * 681)).toEqual([20, 20, 20, 255]);
+
+          // The soft slide: two glows over its color. On nothing they are a picture several
+          // times the bytes of the same picture on the color, so the color stays in it, and
+          // the slide has no background of PowerPoint's.
+          expect(seen[3]?.background).toBeUndefined();
+          const soft = /Target="\.\.\/media\/(image\d+\.png)"/.exec(
+            new TextDecoder().decode(files.get("ppt/slides/_rels/slide4.xml.rels")),
+          )?.[1];
+          const glow = files.get(`ppt/media/${soft}`) ?? new Uint8Array();
+          expect((await pixel(glow, 2 * 1270, 2 * 10))[3]).toBe(255);
         },
       );
     },

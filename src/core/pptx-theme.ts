@@ -184,6 +184,17 @@ export function slideBackground(
   return { kind: "linear", angle: (Math.round(turned) + 270) % 360, stops };
 }
 
+/**
+ * Whether a slide's picture is kept on nothing, the color under its background's pictures
+ * PowerPoint's, given the picture's bytes shot on the color and on nothing: not where that makes
+ * it more than half again as large, past the 8 kB an alpha channel costs a picture with little
+ * in it. A soft picture, a glow or a wash, packs several times worse on nothing than on its
+ * color, and a file that doubles is not worth a color no one sees but through it (ADR 102).
+ */
+export function colorLeavesPicture(onColor: number, onNothing: number): boolean {
+  return onNothing <= onColor * 1.5 + 8192;
+}
+
 /** A gradient's direction in CSS degrees, or none when the argument is not one. */
 function cssAngle(arg: string): number | undefined {
   const sides: Record<string, number> = { top: 0, right: 90, bottom: 180, left: 270 };

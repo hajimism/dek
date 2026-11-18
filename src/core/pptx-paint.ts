@@ -1152,17 +1152,14 @@ ${alone}${over} { visibility: visible !important; }`;
 /**
  * Takes what was laid over the picture out of it, with no change to the layout: a shape's
  * background and borders made transparent, a picture hidden, a bullet's marker unpainted, and
- * the slide's background, or its color, when PowerPoint paints it.
+ * the slide's background, when PowerPoint paints all of it.
  */
 export function hidePptxLiftedInPage(lifted: {
   shapes: number[];
   pictures: number[];
   markers: number[];
-  /**
-   * What of the slide's background is PowerPoint's, so that the slide is shot on nothing: `all`
-   * of it, or its `color` alone, with the pictures it draws over the color left in the shot.
-   */
-  background: "none" | "color" | "all";
+  /** Whether the slide's background is PowerPoint's, all of it: the slide is shot on nothing. */
+  background: boolean;
 }): void {
   const over = ":not(#dek-pptx-0):not(#dek-pptx-1):not(#dek-pptx-2)";
   const select = (ids: number[], suffix = "") =>
@@ -1177,11 +1174,9 @@ export function hidePptxLiftedInPage(lifted: {
     lifted.markers.length > 0
       ? `${select(lifted.markers, "::marker")} { color: transparent !important; }`
       : "",
-    lifted.background === "all"
+    lifted.background
       ? `html${over}, body${over}, #deck${over}, #deck > .slide${over} { background: transparent !important; }`
-      : lifted.background === "color"
-        ? `html${over}, body${over}, #deck${over} { background: transparent !important; } #deck > .slide${over} { background-color: transparent !important; }`
-        : "",
+      : "",
   ].filter((rule) => rule !== "");
   if (rules.length === 0) {
     return;
@@ -1193,4 +1188,27 @@ export function hidePptxLiftedInPage(lifted: {
     ...rules,
   ].join("\n");
   document.head.append(style);
+}
+
+/**
+ * Takes the slide's background color out of the drawing, and what the page paints under the
+ * slide with it, leaving the pictures its background draws over the color; or, with `shown`,
+ * puts the color back. Either way nothing moves in a transition while it is shot.
+ */
+export function pptxSlideColorInPage(shown: boolean): void {
+  const over = ":not(#dek-pptx-0):not(#dek-pptx-1):not(#dek-pptx-2)";
+  const style =
+    document.getElementById("dek-pptx-slide-color") ??
+    document.head.appendChild(
+      Object.assign(document.createElement("style"), { id: "dek-pptx-slide-color" }),
+    );
+  style.textContent = [
+    "*, *::before, *::after, *::marker { transition: none !important; }",
+    ...(shown
+      ? []
+      : [
+          `html${over}, body${over}, #deck${over} { background: transparent !important; }`,
+          `#deck > .slide${over} { background-color: transparent !important; }`,
+        ]),
+  ].join("\n");
 }

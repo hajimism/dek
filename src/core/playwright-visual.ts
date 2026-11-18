@@ -51,6 +51,7 @@ import {
   PPTX_PSEUDO_ATTR,
   pptxFontProbesInPage,
   pptxPictureEmptyInPage,
+  pptxSlideColorInPage,
   pptxSvgInPage,
   SVG_CHECKED,
   SVG_PAINT,
@@ -66,7 +67,7 @@ import {
   type PptxPageTexts,
   pptxFaceProbesInPage,
 } from "./pptx-text.ts";
-import type { PptxPageTheme } from "./pptx-theme.ts";
+import { colorLeavesPicture, type PptxPageTheme } from "./pptx-theme.ts";
 import {
   type PptxFace,
   type PptxTypeAnswers,
@@ -236,16 +237,35 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
       }));
       // With the background PowerPoint's, the slide is shot on nothing, and a picture with
       // nothing left in it is no picture.
-      const { background } = plan;
+      let { background } = plan;
+      const under = background !== undefined && plan.backgroundImage === true;
       await page.evaluate(hidePptxLiftedInPage, {
         ...plan.lifted,
-        background: background === undefined ? "none" : plan.backgroundImage ? "color" : "all",
+        background: background !== undefined && !under,
       });
-      const shot = await page.screenshot({
-        path: pageReq.screenshotPath,
-        fullPage: false,
-        ...(background ? { omitBackground: true } : {}),
-      });
+      let shot: Buffer;
+      if (under) {
+        // The color under pictures that stay drawn is PowerPoint's unless the picture packs
+        // much worse without it: it is shot both ways, and on its color again where it does.
+        const onColor = await page.screenshot({ fullPage: false });
+        await page.evaluate(pptxSlideColorInPage, false);
+        shot = await page.screenshot({
+          path: pageReq.screenshotPath,
+          fullPage: false,
+          omitBackground: true,
+        });
+        if (!colorLeavesPicture(onColor.length, shot.length)) {
+          await page.evaluate(pptxSlideColorInPage, true);
+          shot = await page.screenshot({ path: pageReq.screenshotPath, fullPage: false });
+          background = undefined;
+        }
+      } else {
+        shot = await page.screenshot({
+          path: pageReq.screenshotPath,
+          fullPage: false,
+          ...(background ? { omitBackground: true } : {}),
+        });
+      }
       const empty =
         background !== undefined &&
         (await page.evaluate(

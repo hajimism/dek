@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PptxLayer, PptxParagraph, PptxRun } from "../../src/core/pptx-package.ts";
-import { deckTheme, slideBackground } from "../../src/core/pptx-theme.ts";
+import { colorLeavesPicture, deckTheme, slideBackground } from "../../src/core/pptx-theme.ts";
 
 // What becomes of a slide's background and the deck's theme, decided from the computed values
 // a page reports: no browser here.
@@ -94,6 +94,18 @@ describe("slideBackground", () => {
         fill: undefined,
       });
     }
+  });
+});
+
+describe("colorLeavesPicture", () => {
+  test("keeps the color in a picture that would pack much worse without it", () => {
+    // Two rules on nothing: an alpha channel's worth more than on their paper.
+    expect(colorLeavesPicture(14_304, 18_015)).toBe(true);
+    // A glow over the whole slide: three times the bytes on nothing.
+    expect(colorLeavesPicture(560_000, 1_700_000)).toBe(false);
+    // Half again as large and 8 kB is the most it may grow by.
+    expect(colorLeavesPicture(100_000, 158_192)).toBe(true);
+    expect(colorLeavesPicture(100_000, 158_193)).toBe(false);
   });
 });
 
