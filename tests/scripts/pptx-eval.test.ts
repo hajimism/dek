@@ -12,6 +12,8 @@ import { zipFiles } from "../../src/core/zip.ts";
 // Quick Look runs only by hand, with scripts/pptx-eval.ts.
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// Another picture: one byte more, so the file holds it apart from the first.
+const ICON = new Uint8Array([...PNG, 0x01]);
 
 const run = (text: string, over: Partial<PptxRun> = {}): PptxRun => ({
   text,
@@ -53,7 +55,7 @@ const layers: PptxLayer[] = [
       ],
     },
     layers: [
-      { kind: "picture", x: 100, y: 240, width: 40, height: 40, description: "An icon", png: PNG },
+      { kind: "picture", x: 100, y: 240, width: 40, height: 40, description: "An icon", png: ICON },
     ],
   },
   {
