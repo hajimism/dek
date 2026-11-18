@@ -59,6 +59,13 @@ import {
 } from "./pptx-paint.ts";
 import { planPptxLayers, pptxPageFacts } from "./pptx-plan.ts";
 import {
+  measurePptxSpecInPage,
+  SPEC_NODE_ATTR,
+  type SpecPage,
+  type SpecPageNode,
+  showPptxSpecNodeInPage,
+} from "./pptx-spec-page.ts";
+import {
   measurePptxGlyphsInPage,
   measurePptxPlainLinesInPage,
   measurePptxTextsInPage,
@@ -183,6 +190,8 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
     async (page, pageReq) => {
       await page.setContent(pageReq.html, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      // The spec is read first, while the page is as the browser drew it.
+      const spec = pageReq.spec ? await shootPptxSpec(page, pageReq.spec) : undefined;
       const paint = {
         ...(await page.evaluate(measurePptxPaintInPage)),
         described: await page.evaluate(describePptxPicturesInPage),
@@ -279,10 +288,58 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
         picture: !empty,
         ...(background ? { background } : {}),
         theme: await pageTheme(page),
+        ...(spec ?? {}),
       };
     },
   );
   return { slides };
+}
+
+/**
+ * The slide as the browser drew it, what it is made of, and each part a shape cannot draw, alone
+ * and without its text: what an agent needs to build the slide again (`dekc pptx spec`).
+ */
+async function shootPptxSpec(
+  page: Page,
+  { shot, parts: prefix }: { shot: string; parts: string },
+): Promise<{ outline?: SpecPage; parts: Array<{ node: number; png: string }> }> {
+  await page.screenshot({ path: shot, fullPage: false });
+  const outline = await page.evaluate(measurePptxSpecInPage);
+  const parts: Array<{ node: number; png: string }> = [];
+  if (!outline) {
+    return { parts };
+  }
+  const drawn: SpecPageNode[] = [];
+  const walk = (node: SpecPageNode) => {
+    if (node.picture === "drawn" || node.picture === "background") {
+      drawn.push(node);
+    }
+    node.children.forEach(walk);
+  };
+  walk(outline.slide);
+  for (const node of drawn) {
+    const { rect } = node;
+    if (rect.width < 1 || rect.height < 1) {
+      continue;
+    }
+    const png = `${prefix}${node.index}.png`;
+    await page.evaluate(showPptxSpecNodeInPage, { index: node.index, alone: true });
+    const left = Math.max(0, outline.origin.left + rect.x);
+    const top = Math.max(0, outline.origin.top + rect.y);
+    await page.screenshot({
+      path: png,
+      omitBackground: true,
+      clip: { x: left, y: top, width: rect.width, height: rect.height },
+    });
+    parts.push({ node: node.index, png });
+  }
+  await page.evaluate(showPptxSpecNodeInPage, null);
+  await page.evaluate((attr) => {
+    for (const element of document.querySelectorAll(`[${attr}]`)) {
+      element.removeAttribute(attr);
+    }
+  }, SPEC_NODE_ATTR);
+  return { outline, parts };
 }
 
 /**

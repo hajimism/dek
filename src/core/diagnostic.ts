@@ -114,7 +114,8 @@ export function hasErrors(diagnostics: Diagnostic[]): boolean {
  */
 export type SkippedCheck = {
   /** `preview` is a build's link preview image, which needs a URL and Playwright. */
-  check: "lint" | "plugin" | "preview" | "rumdl" | "visual" | "voice";
+  /** `pptx` is `dekc pptx --from`'s check against the deck, which needs a spec.json as new as it. */
+  check: "lint" | "plugin" | "pptx" | "preview" | "rumdl" | "visual" | "voice";
   /** The plugin, for a `plugin` check: its name in dek.toml `[plugins]`. */
   plugin?: string;
   reason: string;

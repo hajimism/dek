@@ -80,6 +80,8 @@ export type EvalReport = {
   startedAt: string;
   /** The renderer the lines were measured in; none where there was none to ask. */
   renderer: string | null;
+  /** The file measured, when it is not one `dekc pptx` wrote: its export time is then none. */
+  producer?: string;
   decks: DeckReport[];
 };
 
@@ -327,6 +329,12 @@ export function markdown(report: EvalReport): string {
     "# PPTX eval",
     "",
     `Started ${report.startedAt}. Renderer: ${report.renderer ?? "none, so no line was measured"}.`,
+    ...(report.producer
+      ? [
+          "",
+          `Measured ${report.producer}, not a file \`dekc pptx\` wrote. Its lines were set where PowerPoint breaks them, so a line's drift says where it wrapped, not that it is wrong; read the picture's difference instead.`,
+        ]
+      : []),
     "",
     "## What the file holds",
     "",

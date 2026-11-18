@@ -3,8 +3,14 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DistOptions, distFile } from "./path.ts";
-import { type PlaywrightRunner, requirePlaywright } from "./playwright.ts";
-import { mapPictures, type PptxLayer, pptxPackage } from "./pptx-package.ts";
+import { type PlaywrightRunner, type PptxResponse, requirePlaywright } from "./playwright.ts";
+import {
+  mapPictures,
+  type PptxDeck,
+  type PptxLayer,
+  type PptxTheme,
+  pptxPackage,
+} from "./pptx-package.ts";
 import { deckTheme } from "./pptx-theme.ts";
 import { presenterSlides } from "./presenter.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
@@ -44,57 +50,12 @@ export async function pptxDeck(
 ): Promise<PptxResult> {
   const { project, deck } = asResolvedDeck(input);
   const outPath = distFile(project, deck, "pptx", options);
-  const size = logicalSize(deck.deck.ratio);
-  const sources = loadSlideSources(deck, { strict: true });
-  const { sections } = deck.deck;
-  // Rendered before Chromium starts, so a slide that cannot be drawn stops it with nothing written.
-  const pages = sections.map((section, index) => ({
-    html: renderSlideHtml(sources, section.slug, lastStop(section.beats)),
-    slug: section.slug,
-    index,
-  }));
   const shots = mkdtempSync(join(tmpdir(), "dek-pptx-"));
   try {
-    const answer = await requirePlaywright(
-      {
-        kind: "pptx",
-        viewport: size,
-        pages: pages.map(({ html, slug, index }) => ({
-          html,
-          slug,
-          screenshotPath: join(shots, `${index + 1}.png`),
-        })),
-      },
-      options.runner,
-    );
-    const scripts = presenterSlides(deck, options.public ? "audience" : "speaker");
-    // The deck's tokens are PowerPoint's theme, as most slides have them.
-    const theme = deckTheme(
-      answer.slides.flatMap((slide) => (slide.theme ? [slide.theme] : [])),
-      answer.slides.map((slide) => slide.layers),
-    );
-    const bytes = pptxPackage({
-      title: deck.deck.title,
-      lang: deck.deck.lang,
-      size,
-      theme,
-      slides: answer.slides.map((slide, index) => ({
-        ...(slide.picture === false
-          ? {}
-          : { picture: readFileSync(join(shots, `${index + 1}.png`)) }),
-        ...(slide.background ? { background: slide.background } : {}),
-        description: slide.description || (sections[index]?.title ?? slide.slug),
-        layers: mapPictures(slide.layers, ({ png, svg, ...picture }) => ({
-          ...picture,
-          png: readFileSync(png),
-          ...(svg === undefined ? {} : { svg }),
-        })),
-        notes: scripts[index]?.script ?? "",
-      })),
-    });
-    writeInside(outPath, bytes, project.root);
+    const captured = await capturePptx({ project, deck }, shots, options);
+    writeInside(outPath, pptxPackage(packagedDeck(captured)), project.root);
     const lifted: PptxLifted = { shapes: 0, pictures: 0, untouched: [] };
-    for (const slide of answer.slides) {
+    for (const slide of captured.answer.slides) {
       const counts = countLifted(slide.layers);
       lifted.shapes += counts.shapes;
       lifted.pictures += counts.pictures;
@@ -106,6 +67,99 @@ export async function pptxDeck(
   } finally {
     rmSync(shots, { recursive: true, force: true });
   }
+}
+
+/** What the browser answered for a deck's PPTX, and what the deck says beside it. */
+export type PptxCapture = {
+  deck: ResolvedDeck["deck"]["deck"];
+  size: { width: number; height: number };
+  answer: PptxResponse;
+  theme: PptxTheme;
+  scripts: Array<{ script: string }>;
+  /** Each slide's picture, the slide without what is laid over it, where one is left. */
+  pictures: Array<string | undefined>;
+};
+
+/**
+ * Each slide at its last beat measured in the browser, its pictures written into `shots`, and,
+ * with `spec`, each slide as drawn and its parts too, for `dekc pptx spec`.
+ */
+export async function capturePptx(
+  { project, deck }: ResolvedDeck,
+  shots: string,
+  options: PptxOptions & { spec?: { shots: string; parts: string } } = {},
+): Promise<PptxCapture> {
+  const size = logicalSize(deck.deck.ratio);
+  const sources = loadSlideSources(deck, { strict: true });
+  const { sections } = deck.deck;
+  // Rendered before Chromium starts, so a slide that cannot be drawn stops it with nothing written.
+  const pages = sections.map((section, index) => ({
+    html: renderSlideHtml(sources, section.slug, lastStop(section.beats)),
+    slug: section.slug,
+    index,
+  }));
+  const { spec } = options;
+  const answer = await requirePlaywright(
+    {
+      kind: "pptx",
+      viewport: size,
+      pages: pages.map(({ html, slug, index }) => ({
+        html,
+        slug,
+        screenshotPath: join(shots, `${index + 1}.png`),
+        ...(spec
+          ? {
+              spec: {
+                shot: join(spec.shots, `${index + 1}-${slug}.png`),
+                parts: join(spec.parts, `${index + 1}-`),
+              },
+            }
+          : {}),
+      })),
+    },
+    options.runner,
+  );
+  const scripts = presenterSlides(deck, options.public ? "audience" : "speaker");
+  // The deck's tokens are PowerPoint's theme, as most slides have them.
+  const theme = deckTheme(
+    answer.slides.flatMap((slide) => (slide.theme ? [slide.theme] : [])),
+    answer.slides.map((slide) => slide.layers),
+  );
+  return {
+    deck: deck.deck,
+    size,
+    answer,
+    theme,
+    scripts,
+    pictures: answer.slides.map((slide, index) =>
+      slide.picture === false ? undefined : join(shots, `${index + 1}.png`),
+    ),
+  };
+}
+
+/** The captured deck as the package has it, its pictures read from their files. */
+function packagedDeck({ deck, size, answer, theme, scripts, pictures }: PptxCapture): PptxDeck {
+  const { sections } = deck;
+  return {
+    title: deck.title,
+    lang: deck.lang,
+    size,
+    theme,
+    slides: answer.slides.map((slide, index) => {
+      const picture = pictures[index];
+      return {
+        ...(picture === undefined ? {} : { picture: readFileSync(picture) }),
+        ...(slide.background ? { background: slide.background } : {}),
+        description: slide.description || (sections[index]?.title ?? slide.slug),
+        layers: mapPictures(slide.layers, ({ png, svg, ...rest }) => ({
+          ...rest,
+          png: readFileSync(png),
+          ...(svg === undefined ? {} : { svg }),
+        })),
+        notes: scripts[index]?.script ?? "",
+      };
+    }),
+  };
 }
 
 function countLifted<I>(layers: PptxLayer<I>[]): { shapes: number; pictures: number } {

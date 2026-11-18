@@ -55,7 +55,7 @@ const Diagnostic = z
 
 const SkippedCheck = z
   .strictObject({
-    check: z.enum(["lint", "plugin", "preview", "rumdl", "visual", "voice"]),
+    check: z.enum(["lint", "plugin", "pptx", "preview", "rumdl", "visual", "voice"]),
     plugin: z.string().optional().describe("For a plugin's check, its name in dek.toml [plugins]."),
     reason: z.string(),
     hint: z.string().optional().describe("What to do so that the check runs."),
@@ -714,7 +714,25 @@ export const RESULT_FIELDS = {
     unsandboxed,
   }),
   pdf: z.strictObject({ outs: paths, unsandboxed }),
-  pptx: z.strictObject({ outs: paths, unsandboxed }),
+  pptx: z.union([
+    z.strictObject({ outs: paths, unsandboxed }),
+    z.strictObject({
+      action: z.literal("spec"),
+      spec: z.string().describe("spec.json: what each slide is made of, as the browser drew it."),
+      start: z
+        .string()
+        .describe("deck.pptx.json: the file dekc pptx would write, as JSON to edit for --from."),
+      slides: z.number().int(),
+      parts: z.number().int().describe("The parts drawn alone that spec.json names."),
+      unsandboxed,
+    }),
+    z.strictObject({
+      action: z.literal("from"),
+      outs: paths,
+      diagnostics,
+      skipped,
+    }),
+  ]),
   pack: z.strictObject({
     outs: paths,
     warnings: z.array(z.string()).describe("Once per project: the packs carry no license."),
@@ -732,6 +750,7 @@ export const FAILS_ON_FINDINGS = [
   "lint",
   "check",
   "pub",
+  "pptx",
 ] as const satisfies readonly ResultCommand[];
 
 /** What any command line prints when it cannot run. */
