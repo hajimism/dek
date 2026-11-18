@@ -624,6 +624,27 @@ function boxShape(box: PptxMeasuredBox, tree: Tree, shapes: ReadonlySet<number>)
 
 type Line = { top: number; bottom: number; boxes: PptxMeasuredBox[] };
 
+/**
+ * A heading whose lines all start at one place past its content box's edge, with that place as
+ * its edge: what a pseudo-element sets before its words, a number or a mark, the two side by
+ * side, starts every line of the words that far in. The words are then lines at one margin, a
+ * text box of their own, which the slide's title has to be (ADR 101). Only a heading: lines
+ * that anything else starts off their edge stay where they stand, as ADR 99 has them.
+ */
+function headingFromItsLines(block: PptxBlockText, lines: Line[]): PptxBlockText {
+  if (block.heading === undefined || (block.align !== "left" && block.align !== "justify")) {
+    return block;
+  }
+  const starts = lines.flatMap((line) => (line.boxes[0] ? [line.boxes[0].x] : []));
+  const start = Math.min(...starts);
+  const off = start - block.content.left - block.textIndent;
+  return starts.length > 0 &&
+    off > NEAR * 2 &&
+    starts.every((each) => Math.abs(each - start) <= NEAR * 2)
+    ? { ...block, content: { ...block.content, left: start }, textIndent: 0 }
+    : block;
+}
+
 /** How much room, in pixels, a line needs past its end for PowerPoint not to break it again. */
 const FIT = 0.75;
 /** How much a wrapping text's far edge is moved out, so a line that just fit still fits. */
@@ -653,15 +674,16 @@ function columnOf(
   }
   const sets: Array<{ block: PptxBlockText; lines: Line[]; pitch: number }> = [];
   for (const id of order) {
-    const block = blocks.get(id);
+    const measured = blocks.get(id);
     const all = page.boxes.flatMap((box, index) => (box.block === id ? [index] : []));
-    if (!block || block.runs.length === 0 || all.some((index) => !mine.has(index))) {
+    if (!measured || measured.runs.length === 0 || all.some((index) => !mine.has(index))) {
       return undefined;
     }
     const lines = linesOf(all.map((index) => page.boxes[index] as PptxMeasuredBox));
     if (lines.some((line) => line.boxes.length > 1)) {
       return undefined;
     }
+    const block = holder ? measured : headingFromItsLines(measured, lines);
     const carried = lines.flatMap((line) => line.boxes.flatMap((box) => box.runs));
     if (ink(block.runs) !== ink(carried)) {
       return undefined;

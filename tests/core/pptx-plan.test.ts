@@ -666,6 +666,65 @@ describe("planPptxLayers", () => {
     expect(group?.layers.some((layer) => layer.kind === "prose" && layer.title)).toBe(false);
   });
 
+  test("starts a heading where its lines start, when something set before it starts them all off its edge", () => {
+    // A number a pseudo-element draws before the heading's words, the two side by side: every
+    // line of the words starts 70px in, at 170, and the heading's own box starts at 100.
+    const numbered = (starts: Array<[x: number, y: number]>, more: Partial<PptxBlockText> = {}) => {
+      const bottom = 100 + 32 * starts.length;
+      return planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 900, bottom) } as PptxPaintNode],
+          boxes: starts.map(([x, y], at) => line(0, 0, `見出し${at}`, x, y)),
+          blocks: [
+            block(0, starts.map((_, at) => `見出し${at}`).join(""), rect(100, 100, 900, bottom), {
+              heading: 2,
+              ...more,
+            }),
+          ],
+        }),
+      ).layers;
+    };
+    // The words are a text box from where they start to the heading's far edge, and the title.
+    for (const starts of [
+      [[170, 103]],
+      [
+        [170, 103],
+        [170, 135],
+      ],
+    ] as Array<Array<[number, number]>>) {
+      const [title, ...rest] = numbered(starts);
+      expect(rest).toEqual([]);
+      expect(title).toMatchObject({ kind: "prose", title: true, x: 170 });
+      expect(title?.kind === "prose" && title.x + title.width).toBeGreaterThanOrEqual(900);
+      expect(title?.kind === "prose" && title.text.paragraphs[0]).toMatchObject({
+        marginLeft: 0,
+        indent: 0,
+      });
+    }
+    // Lines that start in two places are around a float, or after an indent: they stay lines.
+    expect(
+      numbered([
+        [170, 103],
+        [100, 135],
+      ]).map((layer) => layer.kind),
+    ).toEqual(["text", "text"]);
+    // Text that is no heading stays in lines too: it is no title, and what moved it is not known.
+    const { heading: _heading, ...plain } = block(0, "", rect(0, 0, 0, 0), { heading: 2 });
+    expect(
+      planPptxLayers(
+        facts({
+          nodes: [{ parent: -1, key: [0, 0], rect: rect(100, 100, 900, 132) } as PptxPaintNode],
+          boxes: [line(0, 0, "見出し0", 170, 103)],
+          blocks: [{ ...plain, runs: [run("見出し0", 0)], content: rect(100, 100, 900, 132) }],
+        }),
+      ).layers.map((layer) => layer.kind),
+    ).toEqual(["text"]);
+    // Centered text is where its alignment put it, not moved: nothing changes for it.
+    expect(numbered([[400, 103]], { align: "center" }).map((layer) => layer.kind)).toEqual([
+      "prose",
+    ]);
+  });
+
   test("leaves in lines text that is not where its alignment would put it", () => {
     // A label whose style centers it, set after a dot the two side by side: its one line ends
     // at the far edge of its 400px content box, and a paragraph would center it.
