@@ -720,6 +720,9 @@ lang: ja
 .slide .words { position: absolute; left: 80px; top: 400px; width: 600px; margin: 0; font-size: 24px; line-height: 36px; }
 .slide ul { position: absolute; left: 80px; top: 160px; width: 600px; margin: 0; padding-left: 28px; font-size: 24px; line-height: 36px; }
 .slide::after { content: counter(n, decimal-leading-zero) " / 12"; position: absolute; right: 60px; bottom: 40px; font-size: 18px; }
+.slide .words::after { content: "\\3000 注記"; }
+.slide .plain { position: absolute; left: 80px; top: 480px; margin: 0; font-size: 24px; line-height: 36px; }
+.slide .plain::after { content: "注記"; }
 `;
       // Each line of the code ends in a text node that is a line break and nothing else.
       const code = `<section class="slide">
@@ -729,6 +732,7 @@ lang: ja
 <span>"ok"</span>: true
 <span>}</span></pre>
   <p class="words"><b>Bold</b> <i>Italic</i></p>
+  <p class="plain">Plain</p>
 </section>
 `;
       const list = `<section class="slide">
@@ -760,6 +764,13 @@ lang: ja
               "07 / 12",
             );
           }
+          // A space of any width that starts what a pseudo-element writes is room before its
+          // text, not text: the box starts at the first character, and is as wide without it.
+          const notes = (first?.boxes ?? []).filter(
+            (box) => box.runs.map((run) => run.text).join("") === "注記",
+          );
+          expect(notes).toHaveLength(2);
+          expect(Math.abs((notes[0]?.width ?? 0) - (notes[1]?.width ?? 1))).toBeLessThan(0.5);
           // A list is one text box, an item a paragraph, its markers PowerPoint's bullets.
           const items = proseLayers(second?.layers ?? []).find((prose) =>
             said(prose).startsWith("一つ目"),

@@ -630,8 +630,10 @@ export function measurePptxTextsInPage(pieces?: PptxPseudoPiece[]): PptxPageText
     }
     for (const line of lines) {
       const text = transformText(line.text.replace(/[\t\n\r\f]/g, " "), style.textTransform, lang);
-      const before = graphemes(text) - graphemes(text.replace(/^ +/, ""));
-      const after = graphemes(text) - graphemes(text.replace(/ +$/, ""));
+      // White space at either end is room, whatever its width: an ideographic space as much
+      // as a plain one. The box starts at the first character drawn and ends at the last.
+      const before = graphemes(text) - graphemes(text.trimStart());
+      const after = graphemes(text) - graphemes(text.trimEnd());
       const kept = text.trim();
       if (kept === "") {
         continue;
