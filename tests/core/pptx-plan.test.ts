@@ -719,10 +719,25 @@ describe("planPptxLayers", () => {
         }),
       ).layers.map((layer) => layer.kind),
     ).toEqual(["text"]);
-    // Centered text is where its alignment put it, not moved: nothing changes for it.
-    expect(numbered([[400, 103]], { align: "center" }).map((layer) => layer.kind)).toEqual([
-      "prose",
-    ]);
+    // Centered text where centering puts it is not touched: its 200px line in the middle.
+    const [centered] = numbered([[400, 103]], { align: "center" });
+    expect(centered).toMatchObject({ kind: "prose", title: true });
+    expect(centered?.kind === "prose" && centered.text.paragraphs[0]?.align).toBe("center");
+    // One line its style centers that stands after a mark, at the far edge, is set from where
+    // it starts, and is the title; two such lines have no one place to start from.
+    const [after, ...none] = numbered([[700, 103]], { align: "center" });
+    expect(none).toEqual([]);
+    expect(after).toMatchObject({ kind: "prose", title: true, x: 700 });
+    expect(after?.kind === "prose" && after.text.paragraphs[0]?.align).toBe("left");
+    expect(
+      numbered(
+        [
+          [700, 103],
+          [700, 135],
+        ],
+        { align: "center" },
+      ).map((layer) => layer.kind),
+    ).toEqual(["text", "text"]);
   });
 
   test("leaves in lines text that is not where its alignment would put it", () => {
@@ -741,6 +756,9 @@ describe("planPptxLayers", () => {
     expect(set("center", 200)).toEqual(["prose"]);
     expect(set("right", 300)).toEqual(["prose"]);
     expect(set("right", 200)).toEqual(["text"]);
+    // Two pixels either way is where it would be set: a tag's own padding, a letter's spacing.
+    expect(set("center", 202)).toEqual(["prose"]);
+    expect(set("center", 203)).toEqual(["text"]);
   });
 
   test("lets go of a box under a pseudo-element that draws only text the file carries", () => {

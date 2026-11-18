@@ -22,9 +22,11 @@ The words in such a heading are in a box of their own all the same: the one the 
 
 **Only a heading, and only out of a shape.** Other text that starts off its edge stays in lines, as ADR 99 has it: a terminal's line after its prompt, a line of code after its indent. Such text is set a line a block, and a box that wraps would not be what its `white-space` says. A heading in a card is no title, since PowerPoint keeps a title out of a group, so nothing changes for it.
 
-**Lines that start in two places stay lines.** A heading beside a float, or one whose first line alone is indented or follows an inline mark, has lines at two places, and no one margin sets them both.
+**One line its style centers, or sets to the right, that stands elsewhere is set from where it starts.** A heading centered with a mark before it has the two centered together, so its words stand right of where a centered paragraph would put them; ADR 99 has a block be a paragraph only where each line is where its alignment puts it, within two pixels. Such a heading of one line is a text box from where its words start, set from the left. A recipient who types more into it sees it grow to the right, not from its middle.
 
-**What CI checks.** On the plan, with measurements made up: a heading of one line and of two that start 70 pixels in is one text box from where they start to its far edge, the slide's title, its paragraph with no margin and no indent; one whose lines start in two places stays in lines; text that is no heading stays in lines; centered text is not touched.
+**Lines that start in two places stay lines.** A heading beside a float, or one whose first line alone is indented or follows an inline mark, has lines at two places, and no one margin sets them both. So does a centered heading of two lines that stand off their middle.
+
+**What CI checks.** On the plan, with measurements made up: a heading of one line and of two that start 70 pixels in is one text box from where they start to its far edge, the slide's title, its paragraph with no margin and no indent; one whose lines start in two places stays in lines; text that is no heading stays in lines; a centered heading where centering puts it is not touched, one of one line that stands at the far edge is the title, set from the left, and one of two such lines stays in lines.
 
 ## Consequences
 

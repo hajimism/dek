@@ -651,17 +651,40 @@ type Line = { top: number; bottom: number; boxes: PptxMeasuredBox[] };
  * that anything else starts off their edge stay where they stand, as ADR 99 has them.
  */
 function headingFromItsLines(block: PptxBlockText, lines: Line[]): PptxBlockText {
-  if (block.heading === undefined || (block.align !== "left" && block.align !== "justify")) {
+  if (block.heading === undefined) {
     return block;
   }
   const starts = lines.flatMap((line) => (line.boxes[0] ? [line.boxes[0].x] : []));
   const start = Math.min(...starts);
-  const off = start - block.content.left - block.textIndent;
-  return starts.length > 0 &&
-    off > NEAR * 2 &&
-    starts.every((each) => Math.abs(each - start) <= NEAR * 2)
-    ? { ...block, content: { ...block.content, left: start }, textIndent: 0 }
+  const from = { ...block, content: { ...block.content, left: start }, textIndent: 0 };
+  if (block.align === "left" || block.align === "justify") {
+    const off = start - block.content.left - block.textIndent;
+    return starts.length > 0 &&
+      off > NEAR * 2 &&
+      starts.every((each) => Math.abs(each - start) <= NEAR * 2)
+      ? from
+      : block;
+  }
+  // One line its style centers or sets to the right, which stands elsewhere for what is set
+  // before it, is set from where it starts: there is no other line for a margin to be wrong for.
+  const [line] = lines;
+  return lines.length === 1 && line && strays(block.align, block, line)
+    ? { ...from, align: "left" }
     : block;
+}
+
+/**
+ * Whether a line stands more than two pixels from where a paragraph aligned as `align` would
+ * set it in the block's content box: for centered text, half of what its two margins differ by.
+ */
+function strays(align: PptxParagraph["align"], block: PptxBlockText, line: Line): boolean {
+  const left = Math.min(...line.boxes.map((box) => box.x));
+  const right = Math.max(...line.boxes.map((box) => box.x + box.width));
+  const before = left - block.content.left;
+  const after = block.content.right - right;
+  return align === "center"
+    ? Math.abs(before - after) / 2 > NEAR * 2
+    : align === "right" && Math.abs(after) > NEAR * 2;
 }
 
 /** How much room, in pixels, a line needs past its end for PowerPoint not to break it again. */
@@ -806,16 +829,7 @@ function columnOf(
     }
     // So does text its style centers or sets to the right, where the browser put a line
     // elsewhere: after something set before it, the two side by side, as a dot in a chip is.
-    const strayed = lines.some((line) => {
-      const left = Math.min(...line.boxes.map((box) => box.x));
-      const right = Math.max(...line.boxes.map((box) => box.x + box.width));
-      const before = left - block.content.left;
-      const after = block.content.right - right;
-      return aligns[index] === "center"
-        ? Math.abs(before - after) > NEAR * 2
-        : aligns[index] === "right" && Math.abs(after) > NEAR * 2;
-    });
-    if (strayed) {
+    if (lines.some((line) => strays(aligns[index] ?? "left", block, line))) {
       return undefined;
     }
     // Nor does one set another element in its lines: a badge or an icon the browser set beside
