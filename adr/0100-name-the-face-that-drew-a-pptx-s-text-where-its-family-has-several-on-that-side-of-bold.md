@@ -50,7 +50,7 @@ So a file was right in one renderer where it was wrong in the other. "Weight 700
 
 **What CI checks.** With answers made up for each: the weights asked on each side of bold, and none for italic text or an axis; which probes ask for a name, and the names tried; the family where one face is on that side, the first name that finds the face where there are several, and the family where none does or the page brought the font; the theme's faces from the text set, a script at a time and the titles apart; and which runs follow the theme. In Chromium: text at five weights in a family with a face a weight, where the machine has one, is written under names that each find the face that drew it, and no two weights on one side of bold share a name.
 
-**What was checked by hand, and how.** `evals/pptx/hand-check/` has a line at each of 400, 500, 600, 700, and 800, and one in Helvetica Neue Medium. In PowerPoint 16.115.1 for Mac, by its scripting as above, and in Quick Look, each ends within half a pixel of the browser's. Other versions of PowerPoint, Keynote, and Google Slides were not asked; the README says what to look for.
+**What was checked by hand, and how.** `evals/pptx/hand-check/` has a line at each of 400, 500, 600, 700, and 800, and one in Helvetica Neue Medium. In PowerPoint 16.115.1 for Mac, by its scripting as above, each ends within half a pixel of the browser's. In Quick Look the five lines in Hiragino Sans end where the browser's do, and the one in Helvetica Neue Medium 2 pixels long, half a hundredth of its width, as the same words in Helvetica Neue's regular face do. Other versions of PowerPoint, Keynote, and Google Slides were not asked; the README says what to look for.
 
 ## Consequences
 
@@ -58,10 +58,12 @@ Over the sample decks' 42 slides, the lines Quick Look ends off fell from 46 to 
 
 A recipient sees the face in the font box: "Hiragino Sans W6", with Bold on. That is how PowerPoint for Mac names these faces itself. Turning Bold off does not make such text lighter; choosing another face does.
 
+Pressing Bold on text in a named face that is not bold no longer gives the family's bold. PowerPoint thickens the face itself: with the theme's body font "Hiragino Sans W4", a word made bold in a paragraph is W4 drawn heavier, 472 pixels where W6 is 478 and W7 493, and not a face of the family. Before, the family's name gave W6. To have the face, a recipient chooses it in the font menu, as they do in a deck PowerPoint for Mac made with this family. This is the cost of regular text in the weight the browser drew, and it falls on what a recipient types, not on what the file holds: the file's own bold text names bold faces.
+
 A machine without the face shows a substitute, as before, regular or bold as the run says. Only the name it could not find is another: the family's name was as absent as the face's. A machine with another version of the family, whose faces go by other names, now misses where it matched: Hiragino Sans is only Apple's, but a family that ships with both macOS and Windows under different face names would be found by its family and not by its face.
 
 Text at another weight than its token's main one does not follow the theme. A recipient who changes the theme's body font changes the paragraphs and not the bold words in them. Before, they changed together and neither was the weight the browser drew.
 
-The export asks the page for more: four or five more probes for each way text is set, once a deck, and a few names for each face that needs one. The three sample decks took 9.7 seconds to write, and 9.8 in the record made on the same machine before: no more than one run differs from the next.
+The export asks the page for more: four or five more probes for each way text is set, once a deck, and a few names for each face that needs one. The three sample decks took 9.7 seconds to write in a run of their own, and 9.8 in the record made on the same machine before: no more than one run differs from the next. The record made with this decision ran beside another measurement, and says 12.1.
 
 A slide's own stroke weight is still not measured. Where a line ends says which face drew Latin, whose width changes with weight; it says nothing of kana set in a lighter or heavier face of the same width. That the named face is the one drawn was read from Latin and taken for the rest.

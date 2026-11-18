@@ -1006,7 +1006,9 @@ lang: ja
             const own = found?.postScriptName === face?.postScriptName;
             expect(own || name === face?.familyName).toBe(true);
             // Two weights on one side of bold that one family drew in two faces are told
-            // apart in the file, which `b` alone could not do.
+            // apart in the file, which `b` alone could not do: always in Hiragino Sans on a
+            // Mac, whose faces' names are known to find them, and elsewhere wherever the page
+            // found a name for the face. Where it found none, both keep the family's.
             weights.forEach((other, to) => {
               const beside = drawn.get(`w${other}`);
               if (
@@ -1015,8 +1017,12 @@ lang: ja
                 beside?.familyName === face?.familyName &&
                 beside?.postScriptName !== face?.postScriptName
               ) {
-                expect(own).toBe(true);
-                expect(written[to]?.name).not.toBe(name);
+                if (process.platform === "darwin" && face?.familyName === "Hiragino Sans") {
+                  expect(own).toBe(true);
+                }
+                if (own) {
+                  expect(written[to]?.name).not.toBe(name);
+                }
               }
             });
           });
