@@ -143,7 +143,7 @@ export type PptxProse = PptxRect & {
 };
 
 /** One side of a table cell's border, on the grid's line, dashed or dotted. */
-export type PptxCellBorder = { width: number; paint: PptxPaint; dash?: "dash" | "dot" };
+type PptxCellBorder = { width: number; paint: PptxPaint; dash?: "dash" | "dot" };
 
 /**
  * A cell of a table, where it starts on the grid: the columns and rows it takes from there, what
