@@ -8,6 +8,8 @@ Accepted
 
 Amends [104. Build a PPTX again from JSON an agent writes, with dekc pptx spec and dekc pptx --from](0104-build-a-pptx-again-from-json-an-agent-writes-with-dekc-pptx-spec-and-dekc-pptx-from.md)
 
+Amended by [108. Build a table again as PowerPoint's own table, its cells' text editable and wrapped in them](0108-build-a-table-again-as-powerpoint-s-own-table-its-cells-text-editable-and-wrapped-in-them.md)
+
 ## Context
 
 ADR 104's trials rebuilt one deck, `with-agents`, and its table had nothing to set them against: the rebuild as people do it now, with no spec and no check, was not run. A fourth round ran it, and the skill's flow on the two other sample decks, each a fresh agent:
