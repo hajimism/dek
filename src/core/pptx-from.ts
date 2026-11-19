@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import type { Diagnostic, SkippedCheck } from "./diagnostic.ts";
+import type { Diagnostic } from "./diagnostic.ts";
 import { DekError } from "./error.ts";
 import { type DistOptions, distFile } from "./path.ts";
 import { askPlaywright, PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "./playwright.ts";
@@ -16,6 +16,12 @@ import { zipFiles } from "./zip.ts";
 // `dekc pptx --from <file>`: a PPTX as an agent built it again, from JSON in the shape
 // deck.pptx.json has, written as `dekc pptx` writes its own and checked against the deck.
 
+/**
+ * A check `dekc pptx --from` did not run: against the deck, which needs a spec.json as new as
+ * the deck, or the shots, which need Quick Look and Playwright.
+ */
+export type PptxSkipped = { check: "pptx"; reason: string; hint?: string };
+
 export type PptxFromResult = {
   outPath: string;
   diagnostics: Diagnostic[];
@@ -23,7 +29,7 @@ export type PptxFromResult = {
    * The checks that did not run: against the deck, with no spec.json or one older than it, and
    * the shots, with no renderer.
    */
-  skipped?: SkippedCheck[];
+  skipped?: PptxSkipped[];
   /** With `shot`, each slide as Quick Look draws the file, in the deck's order. */
   shots?: PptxShot[];
 };
@@ -85,7 +91,7 @@ export async function pptxFromFile(
   const parts = pptxParts(pptxFromJson(json, read, (name) => read(name).toString("utf8")));
   const outPath = distFile(project, deck, "pptx", options);
   writeInside(outPath, zipFiles(parts), project.root);
-  const skipped: SkippedCheck[] = [];
+  const skipped: PptxSkipped[] = [];
   const specPath = join(deck.dir, PPTX_SPEC_DIR, PPTX_SPEC_FILE);
   const spec = existsSync(specPath)
     ? (JSON.parse(readFileSync(specPath, "utf8")) as PptxSpec)
@@ -143,7 +149,7 @@ async function drawPptx(
   json: PptxJson,
   parts: Array<{ path: string; data: Uint8Array }>,
   spec: PptxSpec | undefined,
-  skipped: SkippedCheck[],
+  skipped: PptxSkipped[],
   options: { runner?: PlaywrightRunner },
 ): Promise<PptxShot[] | undefined> {
   if ((await quickLookName()) === undefined) {

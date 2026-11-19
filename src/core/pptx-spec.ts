@@ -266,6 +266,7 @@ function facesOf<I>(layers: PptxLayer<I>[]): FaceOf {
       return (
         Math.abs(each.size - run.size) < 0.5 &&
         each.bold === run.weight >= 600 &&
+        (each.family === undefined || sameFamily(each.family, run.family)) &&
         ink !== "" &&
         (text.includes(ink) || ink.includes(text))
       );

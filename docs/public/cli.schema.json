@@ -2580,7 +2580,7 @@
               "description": "Absent when every check ran.",
               "type": "array",
               "items": {
-                "$ref": "#/$defs/SkippedCheck"
+                "$ref": "#/$defs/PptxSkipped"
               }
             },
             "shots": {
@@ -2729,7 +2729,7 @@
               "description": "Absent when every check ran.",
               "type": "array",
               "items": {
-                "$ref": "#/$defs/SkippedCheck"
+                "$ref": "#/$defs/PptxSkipped"
               }
             },
             "shots": {
@@ -5916,7 +5916,6 @@
           "enum": [
             "lint",
             "plugin",
-            "pptx",
             "preview",
             "rumdl",
             "visual",
@@ -6010,6 +6009,28 @@
         "beatIndex"
       ],
       "additionalProperties": false
+    },
+    "PptxSkipped": {
+      "type": "object",
+      "properties": {
+        "check": {
+          "type": "string",
+          "const": "pptx"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "hint": {
+          "description": "What to do so that the check runs.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "description": "A check dekc pptx --from did not run: against the deck, with no spec.json as new as it, or the shots, with no Quick Look or Playwright."
     }
   }
 }

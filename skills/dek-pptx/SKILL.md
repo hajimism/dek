@@ -26,7 +26,7 @@ description: Build a finished dek deck again as a PowerPoint file the recipient 
 - `deck.pptx.json`: the file `dekc pptx` would write, as JSON, with the theme's colors and faces in `theme`. Its text is broken where the browser broke it: take text from the outline, and faces from here.
 - `deck.pptx.schema.json`: every field the JSON may have. Read it before writing any.
 
-Sizes are the slide's own pixels (1280 by 720 for 16:9), a color is `#rrggbb`, a font size is in pixels. Layers paint in order, the first at the back. What a layer leaves out takes its default.
+Sizes are the slide's own pixels (1280 by 720 for 16:9), from the slide's top left corner, inside a group as well as outside; a color is `#rrggbb`; a font size and a radius are in pixels. Layers paint in order, the first at the back. What a layer leaves out takes its default. A shape's text is set from its top.
 
 ## The loop
 
@@ -49,12 +49,12 @@ Run `dekc pptx spec` again after any change to the deck, and on a fresh checkout
 - **A picture is a `picture` of its node's `part`**, at the node's box: images, SVGs, and what a shape cannot draw. A part has no text in it; set the text over it as its own layer.
 - **The slide's background is its `backdrop`**: the slide node's part, as the slide's background picture, not a picture laid over the slide. Without one, keep `background`.
 - **Leave out the slide's `picture`**: everything it showed is now laid over the slide.
-- **Faces:** a run's `font` and `ea` are its `face` in the outline, `latin` and `ea`; where a run has none, take a run's of the same font token and weight. Colors are the outline's.
-- **Width:** PowerPoint sets the text `widen` times as wide. A box that wraps keeps its width; a box sized to its text, such as a pill, a chip, a one-line label, or a heading that must stay on its lines, is `widen` times as wide, and what follows it on its row moves along by the difference.
+- **Faces:** a run's `font` and `ea` are its `face` in the outline, `latin` and `ea`, and `ea` is `latin` when the face has none of its own; where a run has no `face`, take a run's of the same font token and weight. Colors are the outline's; a run's `background` is its `highlight`.
+- **Width:** PowerPoint sets the text `widen` times as wide. A box that wraps keeps its width; a box sized to its text is `widen` times as wide, and what follows it on its row moves along by the difference. A box is sized to its text when its `text.lines` is 1 and its width is about its text's, as a pill's, a chip's, a label's, or a heading's that must keep its lines are.
 - Keep every slide, in the deck's order, with its `slug`, and its `notes` from `spec.json`. Keep the words as the slide has them: the recipient rewrites them; you do not.
 
 ## When to stop
 
 - `--from` reports no errors, and no warning you cannot name a reason for. A check in `skipped` did not run: run what its hint says.
-- You have looked at every slide's `compare`. Quick Look is not PowerPoint, and draws some of the file other than PowerPoint does: in a group it paints pictures above shapes, whatever their order; it drops the spaces that start a line and empty lines; it draws no `highlight`. Do not change the file for these.
+- You have looked at every slide's `compare`. Quick Look is not PowerPoint, and draws some of the file other than PowerPoint does: in a group it paints pictures above shapes, whatever their order; a picture in a group covers what is under it there; it drops the spaces that start a line and empty lines; it draws no `highlight`; it wraps text the file says not to; its colors come out a little lighter. Do not change the file for these.
 - Report what is left as a picture and why, and that the file was not opened in PowerPoint if it was not.

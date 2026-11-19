@@ -55,7 +55,7 @@ const Diagnostic = z
 
 const SkippedCheck = z
   .strictObject({
-    check: z.enum(["lint", "plugin", "pptx", "preview", "rumdl", "visual", "voice"]),
+    check: z.enum(["lint", "plugin", "preview", "rumdl", "visual", "voice"]),
     plugin: z.string().optional().describe("For a plugin's check, its name in dek.toml [plugins]."),
     reason: z.string(),
     hint: z.string().optional().describe("What to do so that the check runs."),
@@ -730,7 +730,22 @@ export const RESULT_FIELDS = {
       action: z.literal("from"),
       outs: paths,
       diagnostics,
-      skipped,
+      skipped: z
+        .array(
+          z
+            .strictObject({
+              check: z.literal("pptx"),
+              reason: z.string(),
+              hint: z.string().optional().describe("What to do so that the check runs."),
+            })
+            .meta({
+              id: "PptxSkipped",
+              description:
+                "A check dekc pptx --from did not run: against the deck, with no spec.json as new as it, or the shots, with no Quick Look or Playwright.",
+            }),
+        )
+        .optional()
+        .describe("Absent when every check ran."),
       shots: z
         .array(
           z.strictObject({
