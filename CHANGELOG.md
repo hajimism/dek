@@ -2,6 +2,50 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.8.0](https://github.com/hajimism/dek/compare/v0.7.0...v0.8.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* require Bun 1.4.3, where a synchronous spawn returns
+
+### Features
+
+* **pptx:** build a PPTX again from JSON an agent writes, with dekc pptx spec and --from ([#158](https://github.com/hajimism/dek/issues/158)) ([95517f3](https://github.com/hajimism/dek/commit/95517f3bb2a120c93178560996c7b98d912b0fa6))
+* **pptx:** build a table again as PowerPoint's own with --from ([#159](https://github.com/hajimism/dek/issues/159)) ([b7fac95](https://github.com/hajimism/dek/commit/b7fac959ed20bb53b1d222e34cf53f010cb107a4))
+* **pptx:** name each weight's face, title headings after a number, lift a slide's color, store pictures once ([cdda4bb](https://github.com/hajimism/dek/commit/cdda4bb63b6c9e8baca24601fe40c98d0273390c))
+* **pptx:** name the face that drew a run where its family has several weights on that side of bold ([5db9e38](https://github.com/hajimism/dek/commit/5db9e38e70796075a382f08f21f546e886a0bc04))
+* **pptx:** paint a slide's color as PowerPoint's own under background pictures that stay drawn ([e51054c](https://github.com/hajimism/dek/commit/e51054c7b72f3c3080b9ee5b38b19809524d06d3))
+* **pptx:** set text where the browser set it, as whole blocks PowerPoint can edit ([528b681](https://github.com/hajimism/dek/commit/528b681c661eefc5858f4c98989aebe679c661bd))
+* **pptx:** set text where the browser set it, as whole blocks PowerPoint can edit ([dcfb766](https://github.com/hajimism/dek/commit/dcfb766550b017d24598970f1258cc25b58733bc))
+* **pptx:** start a heading where its lines start, so one set after a number is the slide's title ([9b5ffb4](https://github.com/hajimism/dek/commit/9b5ffb4846831f9ccc2650c1c86d9a9136376585))
+* **pptx:** store a picture once, however many slides show it ([4caf848](https://github.com/hajimism/dek/commit/4caf8484384bf007779ed15fb7e551efd1711e1c))
+* search every slide of a deck with / ([f2fc87a](https://github.com/hajimism/dek/commit/f2fc87a7dc71674bdaf55b87a5bd1ee92ad0caf5))
+* search every slide of a deck with /, and name the key in the hint ([ceb5c0e](https://github.com/hajimism/dek/commit/ceb5c0ebb79328b979c3b211cc45de59ca2fef13))
+
+
+### Bug Fixes
+
+* centre the key hint on the page on a narrow screen, where the rail is hidden ([43dd112](https://github.com/hajimism/dek/commit/43dd112437626df22010866f880b506f5ea9fbae))
+* **pptx:** hold a centered line to a hundredth of its width, where that is more than two pixels ([a89f05f](https://github.com/hajimism/dek/commit/a89f05f97a54f68b400d8945985d395c399d0c73))
+* **pptx:** judge centered text by where a paragraph would set it, and keep a heading after a mark the title ([28c92a3](https://github.com/hajimism/dek/commit/28c92a3222c8a9ee24692d2004d0c6adafc7674f))
+* **pptx:** keep a slide's color in its picture where the picture would pack much worse without it ([1349529](https://github.com/hajimism/dek/commit/13495299c258c436df481964acc88a0435d8ba8f))
+* **pptx:** leave in lines text its style centers that the browser set elsewhere ([5a3c52c](https://github.com/hajimism/dek/commit/5a3c52ce10aa3d0d6d530f86986e018458418546))
+* **pptx:** start a pseudo-element's text at its first character, whatever space comes before it ([2af0f83](https://github.com/hajimism/dek/commit/2af0f834beddd965119560136ab253ed616c119d))
+* **pptx:** take a slide's color out only where its picture grows by no more than a tenth ([081d535](https://github.com/hajimism/dek/commit/081d535c61c39fc44c6a6dac703911d57c6d429c))
+* **pub:** align the Vite alias with vite-plus 1.6 ([266b4f6](https://github.com/hajimism/dek/commit/266b4f67f2e9054357c210e7068821b471555cef))
+* **pub:** serve security.txt from a route ([50f78b1](https://github.com/hajimism/dek/commit/50f78b130c1f611d4d5e5b6c2c191fda5990bb0e))
+* **pub:** type runtime redirects for void 1.8 ([e033f1c](https://github.com/hajimism/dek/commit/e033f1c00fd49fbd9ad9fe68593eae4638ac8967))
+* require Bun 1.4.3, where a synchronous spawn returns ([c7bf8f3](https://github.com/hajimism/dek/commit/c7bf8f371d6498881ee2c1830fe32cb4c1f5f6b9))
+
+
+### Documentation
+
+* **adr:** give the slash-key search's decision its number 97 in its title too ([2e8123a](https://github.com/hajimism/dek/commit/2e8123a1eaeec7d8051678418a679065624d2b33))
+* **adr:** number the slash-key search's decision 97, after the ADRs main took 94 to 96 for ([ab7fc3f](https://github.com/hajimism/dek/commit/ab7fc3f4bb2b8dc33e7ec85e3884f05f66d21bf9))
+* **adr:** space a PPTX's characters as the browser did, and set its text a block a text box ([3e52a92](https://github.com/hajimism/dek/commit/3e52a92526e97c6ff36c34ddf23aff70bf9f264b))
+* **pptx:** say what Bold does to text in a named face, and correct two figures of ADR 100 ([6770b8b](https://github.com/hajimism/dek/commit/6770b8b064b429e6e037de89382c7fa413c2c06c))
+
 ## [0.7.0](https://github.com/hajimism/dek/compare/v0.6.4...v0.7.0) (2026-11-15)
 
 
