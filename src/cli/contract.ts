@@ -714,7 +714,65 @@ export const RESULT_FIELDS = {
     unsandboxed,
   }),
   pdf: z.strictObject({ outs: paths, unsandboxed }),
-  pptx: z.strictObject({ outs: paths, unsandboxed }),
+  pptx: z.union([
+    z.strictObject({ outs: paths, unsandboxed }),
+    z.strictObject({
+      action: z.literal("spec"),
+      spec: z.string().describe("spec.json: what each slide is made of, as the browser drew it."),
+      start: z
+        .string()
+        .describe("deck.pptx.json: the file dekc pptx would write, as JSON to edit for --from."),
+      slides: z.number().int(),
+      parts: z.number().int().describe("The parts drawn alone that spec.json names."),
+      unsandboxed,
+    }),
+    z.strictObject({
+      action: z.literal("from"),
+      outs: paths,
+      diagnostics,
+      skipped: z
+        .array(
+          z
+            .strictObject({
+              check: z.literal("pptx"),
+              reason: z.string(),
+              hint: z.string().optional().describe("What to do so that the check runs."),
+            })
+            .meta({
+              id: "PptxSkipped",
+              description:
+                "A check dekc pptx --from did not run: against the deck, with no spec.json as new as it, or the shots, with no Quick Look or Playwright.",
+            }),
+        )
+        .optional()
+        .describe("Absent when every check ran."),
+      shots: z
+        .array(
+          z.strictObject({
+            slug: z.string(),
+            png: z.string().describe("The slide as Quick Look draws the file."),
+            compare: z
+              .string()
+              .optional()
+              .describe(
+                "The browser's shot on the left, Quick Look's on the right, what differs tinted red.",
+              ),
+            difference: z
+              .number()
+              .optional()
+              .describe("The mean difference of the two pictures, 0 to 255."),
+            differing: z
+              .number()
+              .optional()
+              .describe(
+                "The share of the slide's pixels that differ by more than a glance would miss.",
+              ),
+          }),
+        )
+        .optional()
+        .describe("With --shot, each slide as Quick Look draws the file, in the deck's order."),
+    }),
+  ]),
   pack: z.strictObject({
     outs: paths,
     warnings: z.array(z.string()).describe("Once per project: the packs carry no license."),
@@ -732,6 +790,7 @@ export const FAILS_ON_FINDINGS = [
   "lint",
   "check",
   "pub",
+  "pptx",
 ] as const satisfies readonly ResultCommand[];
 
 /** What any command line prints when it cannot run. */

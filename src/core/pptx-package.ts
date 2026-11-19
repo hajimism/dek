@@ -25,6 +25,8 @@ export type PptxRun = {
   ea?: string;
   /** The `font-family` it was set in, to find it in the theme's fonts. */
   family?: string;
+  /** The color marked behind it, as a highlighter would. */
+  highlight?: [number, number, number];
 };
 
 /** One line of text, or the part of one that sits together, at its box on the slide. */
@@ -71,14 +73,37 @@ export type PptxTextLayer = PptxTextBox & { kind: "text" };
 /** What a picture embeds: the PNG every renderer shows, and the SVG one that draws SVG prefers. */
 type PptxImage = { png: Uint8Array; svg?: string };
 
+/** PowerPoint's preset shapes a slide may draw beside rectangles, by their names in DrawingML. */
+export const PPTX_GEOMETRIES = [
+  "ellipse",
+  "triangle",
+  "diamond",
+  "chevron",
+  "homePlate",
+  "rightArrow",
+  "leftArrow",
+  "upArrow",
+  "downArrow",
+  "round2SameRect",
+  "wedgeRoundRectCallout",
+] as const;
+
+export type PptxGeometry = (typeof PPTX_GEOMETRIES)[number];
+
 /** A box the browser drew with no more than a color, a solid border, and round corners. */
 export type PptxShape<I = PptxImage> = PptxRect & {
   kind: "shape";
   fill?: PptxPaint;
-  /** A border the same on every side, inside the box as CSS draws it. */
-  outline?: { width: number; paint: PptxPaint };
+  /** A border the same on every side, inside the box as CSS draws it, dashed or dotted. */
+  outline?: { width: number; paint: PptxPaint; dash?: "dash" | "dot" };
+  /** A shadow beneath it, offset by `x` and `y` and blurred by `blur`, in pixels. */
+  shadow?: { x: number; y: number; blur: number; paint: PptxPaint };
+  /** Degrees clockwise it is turned about its center. */
+  rotate?: number;
   /** The border box's corner radius; PowerPoint draws half the shorter side at most. */
   radius: number;
+  /** One of PowerPoint's own shapes in place of a rectangle, which then has no radius. */
+  geometry?: PptxGeometry;
   text?: PptxShapeText;
   /** What the shape holds, in the order the browser painted it, grouped with it. */
   layers: PptxLayer<I>[];
@@ -99,7 +124,12 @@ export type PptxRule = {
  * An image, a canvas, or an SVG, drawn alone. What it embeds is `I`: the files in a package,
  * where to find them on the way there.
  */
-export type PptxPicture<I = PptxImage> = PptxRect & { kind: "picture"; description: string } & I;
+export type PptxPicture<I = PptxImage> = PptxRect & {
+  kind: "picture";
+  description: string;
+  /** Degrees clockwise it is turned about its center. */
+  rotate?: number;
+} & I;
 
 /**
  * Text in a box of its own, in paragraphs: a block's, or a list's with an item a paragraph, in
@@ -164,6 +194,11 @@ export type PptxParagraph = {
 export type PptxSlide = {
   /** The slide drawn without what is laid over it, as a PNG; none when nothing is left in it. */
   picture?: Uint8Array;
+  /**
+   * A picture as the slide's background, in place of its color: under everything, and not a
+   * shape a recipient selects, as a template's texture is.
+   */
+  backdrop?: Uint8Array;
   /** The slide's background as PowerPoint's own, when it is not in the picture. */
   background?: PptxFill;
   /** What the picture shows, for a screen reader: the slide's own alternative texts. */
@@ -202,6 +237,11 @@ const CT = "application/vnd.openxmlformats-officedocument";
 
 /** The whole `.pptx`, ready to write. */
 export function pptxPackage(deck: PptxDeck): Uint8Array {
+  return zipFiles(pptxParts(deck));
+}
+
+/** The package's parts, each at its path in the ZIP, for a reader that needs them unzipped. */
+export function pptxParts(deck: PptxDeck): Array<{ path: string; data: Uint8Array }> {
   const encoder = new TextEncoder();
   const parts: Array<{ path: string; data: Uint8Array }> = [];
   const add = (path: string, xml: string) => parts.push({ path, data: encoder.encode(xml) });
@@ -210,7 +250,17 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
 
   // Each slide's own pictures are numbered after the slides' pictures, across the deck.
   const media = { next: count + 1 };
-  const slides = deck.slides.map((slide) => slideParts(slide, deck, media));
+  // A backdrop every slide has, the same picture on each, is the master's: a recipient changes
+  // it once, in the slide master, and a slide's own background stays theirs to set.
+  const shared = sharedBackdrop(deck.slides);
+  const backdrop = shared ? `image${media.next++}.png` : undefined;
+  const slides = deck.slides.map((slide) =>
+    slideParts(
+      shared ? { ...slide, backdrop: undefined, background: undefined } : slide,
+      deck,
+      media,
+    ),
+  );
   add(
     "[Content_Types].xml",
     contentTypes(
@@ -252,13 +302,14 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
   );
   add("ppt/theme/theme1.xml", theme("dek", deck.theme));
   add("ppt/theme/theme2.xml", theme("dek notes"));
-  add("ppt/slideMasters/slideMaster1.xml", slideMaster(deck.size));
+  add("ppt/slideMasters/slideMaster1.xml", slideMaster(deck.size, backdrop !== undefined));
   add(
     "ppt/slideMasters/_rels/slideMaster1.xml.rels",
     relationships([
       [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout1.xml"],
       [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout2.xml"],
       [`${NS.rel}/theme`, "../theme/theme1.xml"],
+      ...(backdrop ? [[`${NS.rel}/image`, `../media/${backdrop}`] as [string, string]] : []),
     ]),
   );
   for (const [n, xml] of [slideLayout(), titleLayout()].entries()) {
@@ -288,6 +339,9 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
     parts.push({ path: `ppt/media/${path}`, data });
     return path;
   };
+  if (backdrop && shared) {
+    store(backdrop, shared);
+  }
   deck.slides.forEach((slide, index) => {
     const n = index + 1;
     const written = slides[index];
@@ -324,7 +378,7 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
       ]),
     );
   });
-  return zipFiles(parts);
+  return parts;
 }
 
 function contentTypes(numbers: number[], svg: boolean): string {
@@ -390,9 +444,28 @@ const TITLE = '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="
  * layout to take after. A slide's own title says where it lies and how it is set, so nothing
  * of this one shows but in a slide someone adds.
  */
-function slideMaster(size: { width: number; height: number }): string {
+function slideMaster(size: { width: number; height: number }, backdrop = false): string {
   const title = `<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title Placeholder 1"/>${TITLE}</p:nvSpPr><p:spPr>${transform({ x: size.width * 0.05, y: size.height * 0.08, width: size.width * 0.9, height: size.height * 0.16 })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
-  return `${DECL}<p:sldMaster ${PML}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${GROUP}${title}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/><p:sldLayoutId id="2147483650" r:id="rId2"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${LEVEL}</p:titleStyle><p:bodyStyle>${LEVEL}</p:bodyStyle><p:otherStyle>${LEVEL}</p:otherStyle></p:txStyles></p:sldMaster>`;
+  const background = backdrop
+    ? `<p:bg><p:bgPr><a:blipFill dpi="0" rotWithShape="1"><a:blip r:embed="rId4"/><a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>`
+    : '<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>';
+  return `${DECL}<p:sldMaster ${PML}><p:cSld>${background}<p:spTree>${GROUP}${title}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/><p:sldLayoutId id="2147483650" r:id="rId2"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${LEVEL}</p:titleStyle><p:bodyStyle>${LEVEL}</p:bodyStyle><p:otherStyle>${LEVEL}</p:otherStyle></p:txStyles></p:sldMaster>`;
+}
+
+/** The backdrop every slide has, when it is the same picture on each of two or more. */
+function sharedBackdrop(slides: PptxSlide[]): Uint8Array | undefined {
+  const [first] = slides;
+  const backdrop = first?.backdrop;
+  return slides.length > 1 &&
+    backdrop !== undefined &&
+    slides.every(
+      (slide) =>
+        slide.backdrop !== undefined &&
+        slide.backdrop.length === backdrop.length &&
+        slide.backdrop.every((byte, at) => byte === backdrop[at]),
+    )
+    ? backdrop
+    : undefined;
 }
 
 /** The layout of a slide with no title: nothing of its own. */
@@ -453,9 +526,12 @@ function slideParts(
   const picture = slide.picture
     ? `<p:pic><p:nvPicPr><p:cNvPr id="2" name="Slide" descr="${escapeAttribute(slide.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform({ x: 0, y: 0, ...deck.size })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`
     : "";
+  const background = slide.backdrop
+    ? `<p:bg><p:bgPr><a:blipFill dpi="0" rotWithShape="1"><a:blip r:embed="${writer.embed(slide.backdrop, "png")}"/><a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>`
+    : backgroundXml(slide.background, deck.theme);
   const layers = slide.layers.map((layer) => layerXml(layer, writer)).join("");
   return {
-    xml: `${DECL}<p:sld ${PML}><p:cSld>${backgroundXml(slide.background, deck.theme)}<p:spTree>${GROUP}${picture}${layers}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`,
+    xml: `${DECL}<p:sld ${PML}><p:cSld>${background}<p:spTree>${GROUP}${picture}${layers}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`,
     media: files,
   };
 }
@@ -539,20 +615,42 @@ function shapeSp(shape: PptxShape, id: number, style: Style): string {
   const path = pathOf(shape);
   const radius = Math.max(0, shape.radius - half);
   const shorter = Math.min(path.width, path.height);
-  const geometry =
-    radius > 0 && shorter > 0
+  // A rectangle rounded on its top side is rounded by the shape's radius, as a rounded one is,
+  // and by PowerPoint's own sixth of its shorter side without one.
+  const top = shape.geometry === "round2SameRect";
+  const rounded = top && radius === 0 ? shorter / 6 : radius;
+  const rounding = shorter > 0 ? Math.min(50000, Math.round((rounded / shorter) * 100000)) : 0;
+  const geometry = shape.geometry
+    ? top
+      ? `<a:prstGeom prst="round2SameRect"><a:avLst><a:gd name="adj1" fmla="val ${rounding}"/><a:gd name="adj2" fmla="val 0"/></a:avLst></a:prstGeom>`
+      : `<a:prstGeom prst="${shape.geometry}"><a:avLst/></a:prstGeom>`
+    : radius > 0 && shorter > 0
       ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.min(50000, Math.round((radius / shorter) * 100000))}"/></a:avLst></a:prstGeom>`
       : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
   const fill = shape.fill ? solidFill(shape.fill, style.theme) : "<a:noFill/>";
+  const dash = shape.outline?.dash
+    ? `<a:prstDash val="${shape.outline.dash === "dot" ? "sysDot" : "dash"}"/>`
+    : "";
   const line = shape.outline
-    ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint, style.theme)}</a:ln>`
+    ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint, style.theme)}${dash}</a:ln>`
     : "<a:ln><a:noFill/></a:ln>";
+  const { shadow } = shape;
+  const effects = shadow
+    ? `<a:effectLst><a:outerShdw blurRad="${emu(shadow.blur)}" dist="${emu(Math.hypot(shadow.x, shadow.y))}" dir="${Math.round((((((Math.atan2(shadow.y, shadow.x) * 180) / Math.PI) % 360) + 360) % 360) * 60000)}" algn="ctr" rotWithShape="0">${colorXml(shadow.paint, style.theme)}</a:outerShdw></a:effectLst>`
+    : "";
   // A rounded rectangle's own text area starts inside its corners' curve, by the corner's
-  // radius less its reach at 45 degrees, on every side: the insets give that back, so the text
-  // is set where the browser set it.
-  const curve = Math.min(radius, shorter / 2) * (1 - Math.SQRT1_2);
-  const text = shape.text ? shapeText(shape.text, half + curve, style) : "";
-  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path)}${geometry}${fill}${line}</p:spPr>${text}</p:sp>`;
+  // radius less its reach at 45 degrees, on every side, and one rounded on its top side's on
+  // every side but the bottom: the insets give that back, so the text is set where the browser
+  // set it.
+  const curve = !shape.geometry || top ? Math.min(rounded, shorter / 2) * (1 - Math.SQRT1_2) : 0;
+  const taken = {
+    left: half + curve,
+    top: half + curve,
+    right: half + curve,
+    bottom: half + (top ? 0 : curve),
+  };
+  const text = shape.text ? shapeText(shape.text, taken, style) : "";
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path, shape.rotate)}${geometry}${fill}${line}${effects}</p:spPr>${text}</p:sp>`;
 }
 
 /**
@@ -564,16 +662,18 @@ function proseXml(prose: PptxProse, id: number, style: Style): string {
   const named = prose.title
     ? `<p:cNvPr id="${id}" name="Title ${id - 2}"/>${TITLE}`
     : `<p:cNvPr id="${id}" name="Text ${id - 2}"/><p:cNvSpPr txBox="1"/><p:nvPr/>`;
-  return `<p:sp><p:nvSpPr>${named}</p:nvSpPr><p:spPr>${transform(prose)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>${shapeText(prose.text, 0, style)}</p:sp>`;
+  return `<p:sp><p:nvSpPr>${named}</p:nvSpPr><p:spPr>${transform(prose)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>${shapeText(prose.text, { left: 0, top: 0, right: 0, bottom: 0 }, style)}</p:sp>`;
 }
 
 const ALIGN = { left: "l", center: "ctr", right: "r", justify: "just" } as const;
 
+type Sides = { left: number; top: number; right: number; bottom: number };
+
 /** A shape's text, set inside its insets less what the shape's own path and text area took. */
-function shapeText(text: PptxShapeText, taken: number, style: Style): string {
-  const inset = (px: number) => emu(Math.max(0, px - taken));
+function shapeText(text: PptxShapeText, taken: Sides, style: Style): string {
+  const inset = (side: keyof Sides) => emu(Math.max(0, text.inset[side] - taken[side]));
   const paragraphs = text.paragraphs.map((paragraph) => paragraphXml(paragraph, style)).join("");
-  return `<p:txBody><a:bodyPr wrap="${text.wrap ? "square" : "none"}" lIns="${inset(text.inset.left)}" tIns="${inset(text.inset.top)}" rIns="${inset(text.inset.right)}" bIns="${inset(text.inset.bottom)}" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs || "<a:p/>"}</p:txBody>`;
+  return `<p:txBody><a:bodyPr wrap="${text.wrap ? "square" : "none"}" lIns="${inset("left")}" tIns="${inset("top")}" rIns="${inset("right")}" bIns="${inset("bottom")}" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs || "<a:p/>"}</p:txBody>`;
 }
 
 function paragraphXml(paragraph: PptxParagraph, style: Style): string {
@@ -616,7 +716,7 @@ function pictureXml(picture: PptxPicture, writer: LayerWriter): string {
     picture.svg === undefined
       ? ""
       : `<a:extLst><a:ext uri="${SVG_BLIP}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${writer.embed(writer.encode(picture.svg), "svg")}"/></a:ext></a:extLst>`;
-  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id - 2}" descr="${escapeAttribute(picture.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${png}">${svg}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform(picture)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id - 2}" descr="${escapeAttribute(picture.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${png}">${svg}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform(picture, picture.rotate)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 }
 
 /**
@@ -665,8 +765,9 @@ function pathOf(shape: PptxShape): PptxRect {
   };
 }
 
-function transform(box: PptxRect): string {
-  return `<a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width)}" cy="${emu(box.height)}"/></a:xfrm>`;
+function transform(box: PptxRect, rotate?: number): string {
+  const rot = rotate ? ` rot="${Math.round((((rotate % 360) + 360) % 360) * 60000)}"` : "";
+  return `<a:xfrm${rot}><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width)}" cy="${emu(box.height)}"/></a:xfrm>`;
 }
 
 function solidFill(paint: PptxPaint, theme: PptxTheme | undefined): string {
@@ -763,7 +864,10 @@ function runProperties(run: PptxRun, style: Style): string {
     : run.font
       ? faces((script) => escapeXml((script === "ea" ? run.ea : undefined) ?? run.font ?? ""))
       : "";
-  return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${font}</a:rPr>`;
+  const highlight = run.highlight
+    ? `<a:highlight>${colorXml({ color: run.highlight, alpha: 1 }, style.theme)}</a:highlight>`
+    : "";
+  return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${highlight}${font}</a:rPr>`;
 }
 
 /**

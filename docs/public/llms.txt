@@ -18,7 +18,7 @@ The official skill teaches an agent the loop: script first, then one slide at a 
 - Claude Code: `/plugin marketplace add hajimism/dek`, then `/plugin install dek@dek`
 - In a project: `node_modules/@hajimism/dek/skills/dek/SKILL.md`, the copy for the dek installed there
 
-An optional skill, `dek-design`, is for slides that read at a glance; it installs the same way under its own name.
+Two optional skills install the same way under their own names: `dek-design`, for slides that read at a glance, and `dek-pptx`, for building a finished deck again as a PowerPoint file the recipient edits as their own.
 
 ## Guide
 
@@ -89,6 +89,8 @@ dekc build [--root-dist] [--url <url>] [--public] [--no-script]
 dekc video [slug] [--fps N] [--root-dist]
 dekc pdf [--root-dist]
 dekc pptx [--root-dist] [--public]   boxes, pictures, and text editable over a picture of the rest; script in notes
+dekc pptx spec   .cache/pptx/: deck.pptx.json (the PPTX as JSON) + spec.json (each slide's elements, shot, parts)
+dekc pptx --from <file> [--shot]   write the edited JSON as dist/<deck>.pptx; diagnostics pptx-* against spec.json; --shot: Quick Look shots
 dekc pub login [--server <url>] --json   {status:pending,url,code}: show both to the human, run it again to wait
 dekc pub whoami | logout [--all]   --all revokes every key of the account, DEK_TOKEN's too, as after a leak
 dekc pub publish [--message <text>] [--slug <slug>]   lint errors stop it; commit script.md when it writes pub:

@@ -903,25 +903,68 @@ export const COMMANDS = {
   pptx: result({
     scope: "decks",
     args: [],
-    flags: ["root-dist", "public"],
-    usage: ["dekc pptx [deck] [--root-dist] [--public]"],
+    flags: ["root-dist", "public", "from", "shot"],
+    usage: [
+      "dekc pptx [deck] [--root-dist] [--public]",
+      "dekc pptx [deck] --from <file> [--shot] [--root-dist]",
+    ],
     summary:
-      "Write dist/<deck>.pptx, one slide per slide at its last beat: its plain boxes, pictures, and\ntext as PowerPoint's own over a picture of the rest, in the deck's theme, and its script in\nthe notes. Needs Playwright.",
+      "Write dist/<deck>.pptx, one slide per slide at its last beat: its plain boxes, pictures, and\ntext as PowerPoint's own over a picture of the rest, in the deck's theme, and its script in\nthe notes. Needs Playwright.\n\nTo build it again as a file the recipient edits as their own: `spec` writes that file as JSON,\n.cache/pptx/deck.pptx.json, beside spec.json, what each slide is made of with its parts drawn\nalone; `--from` writes the JSON as edited and checks it against the deck.",
     group: "Output",
     overview: [
       [
         "dekc pptx [--root-dist] [--public]",
         "write a PowerPoint file with editable shapes and text",
       ],
+      ["dekc pptx spec", "write the PPTX as JSON to edit, and what each slide is made of"],
+      [
+        "dekc pptx --from <file> [--shot]",
+        "write the PPTX that edited JSON says, and check it; --shot draws its slides (macOS)",
+      ],
     ],
     agent: [
       "dekc pptx [--root-dist] [--public]   boxes, pictures, and text editable over a picture of the rest; script in notes",
+      "dekc pptx spec   .cache/pptx/: deck.pptx.json (the PPTX as JSON) + spec.json (each slide's elements, shot, parts)",
+      "dekc pptx --from <file> [--shot]   write the edited JSON as dist/<deck>.pptx; diagnostics pptx-* against spec.json; --shot: Quick Look shots",
     ],
     run: async ({ target, flags }) => {
       const { pptxCommand } = await import("./pptx.ts");
-      return pptxCommand(target, { rootDist: flags["root-dist"], public: flags.public });
+      return pptxCommand(target, {
+        rootDist: flags["root-dist"],
+        public: flags.public,
+        ...(flags.from === undefined ? {} : { from: flags.from }),
+        shot: flags.shot,
+      });
     },
-    output: { text: formatPptx, json: ({ lifted: _lifted, ...data }) => data },
+    subcommands: {
+      spec: {
+        args: [],
+        flags: ["public"],
+        usage: ["dekc pptx [deck] spec [--public]"],
+        run: async ({ target, flags }) => {
+          const { pptxSpecCommand } = await import("./pptx.ts");
+          return pptxSpecCommand(target, { public: flags.public });
+        },
+      },
+    },
+    output: {
+      text: formatPptx,
+      json: (data) => {
+        if (data.action === undefined) {
+          const { lifted: _lifted, ...rest } = data;
+          return rest;
+        }
+        return data;
+      },
+      failure: (data, flags) =>
+        data.action === "from"
+          ? diagnosticFailure(
+              "dekc pptx --from",
+              data,
+              `dekc pptx --from ${shellQuote(String(flags.from))}${flags.shot ? " --shot" : ""}`,
+            )
+          : undefined,
+    },
   }),
   pub: result({
     args: [],

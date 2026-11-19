@@ -9,6 +9,7 @@ import type { LineBreakKind } from "./line-break.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
 import type { PptxFill, PptxLayer, PptxTextBox } from "./pptx-package.ts";
+import type { PptxSpecPart, SpecPage } from "./pptx-spec-page.ts";
 import type { PptxPageTheme } from "./pptx-theme.ts";
 import { chromiumFailure, launchFailure, runDrawingWorker, type SandboxMode } from "./sandbox.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
@@ -95,7 +96,16 @@ export type MotionRequest = {
 export type PptxRequest = {
   kind: "pptx";
   viewport: Viewport;
-  pages: Array<{ html: string; slug: string; screenshotPath: string }>;
+  pages: Array<{
+    html: string;
+    slug: string;
+    screenshotPath: string;
+    /**
+     * For `dekc pptx spec`: where to write the slide as the browser drew it, and the prefix of
+     * the files its parts are drawn alone to, each its node's index and `.png` after it.
+     */
+    spec?: { shot: string; parts: string };
+  }>;
 };
 
 /** A picture on its way to the package: the PNG the worker wrote, and the SVG it read. */
@@ -113,11 +123,36 @@ export type PptxResponse = {
     background?: PptxFill;
     /** What the slide says of the deck's theme. */
     theme?: PptxPageTheme;
+    /** What the slide is made of, when the request asked for its spec. */
+    outline?: SpecPage;
+    /** Each part drawn alone: its node's index and the PNG it was drawn to. */
+    parts?: PptxSpecPart[];
   }>;
 };
 
+/**
+ * Each slide as the browser drew it beside the same slide as a renderer drew a PPTX, written to
+ * `out` with where they differ marked, for `dekc pptx --from --shot`.
+ */
+export type PptxCompareRequest = {
+  kind: "pptx-compare";
+  viewport: Viewport;
+  pairs: Array<{ browser: string; renderer: string; out: string }>;
+};
+
+export type PptxCompareResponse = {
+  /** Each pair's difference, 0 to 255, and the share of its pixels that differ, in order. */
+  compared: Array<{ difference: number; differing: number }>;
+};
+
 /** What the Playwright worker is asked; the kind says which payload comes with it. */
-export type VisualRequest = PagesRequest | PdfRequest | MorphRequest | MotionRequest | PptxRequest;
+export type VisualRequest =
+  | PagesRequest
+  | PdfRequest
+  | MorphRequest
+  | MotionRequest
+  | PptxRequest
+  | PptxCompareRequest;
 
 type OverflowFinding = Overflow & { slug: string; step: string };
 
@@ -223,6 +258,7 @@ type VisualResponses = {
   morph: DoneResponse;
   motion: MotionResponse;
   pptx: PptxResponse;
+  "pptx-compare": PptxCompareResponse;
 };
 
 /** The answer to a request of `R`'s kind. */
@@ -443,6 +479,16 @@ const RESPONSE_PARSERS: {
   motion: ({ motion, sheets }) =>
     isArrayOf(motion, isMotionBeat) && isArrayOf(sheets, isString) ? { motion, sheets } : null,
   pptx: ({ slides }) => (isArrayOf(slides, isPptxSlide) ? { slides } : null),
+  "pptx-compare": ({ compared }) =>
+    isArrayOf(
+      compared,
+      (each): each is { difference: number; differing: number } =>
+        Boolean(each) &&
+        typeof (each as { difference?: unknown }).difference === "number" &&
+        typeof (each as { differing?: unknown }).differing === "number",
+    )
+      ? { compared }
+      : null,
 };
 
 /** The worker's JSON as the answer to a `kind` request, or null when it is not one. */
@@ -597,7 +643,7 @@ function isPptxSlide(value: unknown): value is PptxResponse["slides"][number] {
   if (!value || typeof value !== "object") {
     return false;
   }
-  const { slug, description, layers, picture, background, theme } = value as Record<
+  const { slug, description, layers, picture, background, theme, outline, parts } = value as Record<
     string,
     unknown
   >;
@@ -607,7 +653,9 @@ function isPptxSlide(value: unknown): value is PptxResponse["slides"][number] {
     isArrayOf(layers, isPptxLayer) &&
     (picture === undefined || typeof picture === "boolean") &&
     (background === undefined || isFill(background)) &&
-    (theme === undefined || (Boolean(theme) && typeof theme === "object"))
+    (theme === undefined || (Boolean(theme) && typeof theme === "object")) &&
+    (outline === undefined || (Boolean(outline) && typeof outline === "object")) &&
+    (parts === undefined || Array.isArray(parts))
   );
 }
 
