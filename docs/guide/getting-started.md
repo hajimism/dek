@@ -14,7 +14,7 @@ You will not write HTML, and you will not touch voice or video. The goal is a pr
 
 ## Prerequisites
 
-[Bun](https://bun.sh) 1.4 or later. dek runs on Bun only, so use `bunx`, not `npx`.
+[Bun](https://bun.sh) 1.4.3 or later. dek runs on Bun only, so use `bunx`, not `npx`.
 
 ## Create a project
 

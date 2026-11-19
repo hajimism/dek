@@ -22,7 +22,7 @@ dek は、ビルドシステムがコードを扱うように発表を扱う CLI
 
 ## クイックスタート
 
-[Bun](https://bun.sh) 1.4 以上が必要です。dek は Bun でだけ動き、Node では動きません。`npx` ではなく `bunx` を使ってください。
+[Bun](https://bun.sh) 1.4.3 以上が必要です。dek は Bun でだけ動き、Node では動きません。`npx` ではなく `bunx` を使ってください。
 
 ```bash
 bunx @hajimism/dek init my-talks --deck 2026-04-vite
