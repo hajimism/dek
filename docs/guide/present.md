@@ -199,7 +199,7 @@ The file `dekc pptx` writes looks like the deck, and keeps a picture of what Pow
 | `pptx-lines` | warning | text set a line a box |
 | `pptx-notes` | warning | empty notes on a slide the script speaks to |
 
-An error fails it, as lint's do, and the file is written all the same. When `spec.json` is missing or older than the deck, nothing is checked and `skipped` says to run `dekc pptx spec` again. `--shot` draws each slide of the file with Quick Look, on a Mac, to set beside the browser's shot; Quick Look is not PowerPoint, so open the file before you hand it over.
+An error fails it, as lint's do, and the file is written all the same. When `spec.json` is missing or older than the deck, nothing is checked and `skipped` says to run `dekc pptx spec` again. `--shot` draws each slide of the file with Quick Look, on a Mac, and sets it beside the browser's shot in one picture, what differs tinted red, with how far apart the two are; Quick Look is not PowerPoint, so open the file before you hand it over.
 
 ## Next
 

@@ -199,7 +199,7 @@ dekc pptx --from decks/talk/pptx.json --shot
 | `pptx-lines` | warning | 1 行ずつボックスに分かれた文字 |
 | `pptx-notes` | warning | 台本があるのに空のノート |
 
-error があると lint と同じく失敗しますが、ファイルは書きます。`spec.json` がないか、デッキより古いときは何も点検せず、`skipped` が `dekc pptx spec` をもう一度実行するよう伝えます。`--shot` は、Mac で Quick Look にファイルの各スライドを描かせ、ブラウザのショットと並べて見られるようにします。Quick Look は PowerPoint ではないので、渡す前にファイルを開いて確かめてください。
+error があると lint と同じく失敗しますが、ファイルは書きます。`spec.json` がないか、デッキより古いときは何も点検せず、`skipped` が `dekc pptx spec` をもう一度実行するよう伝えます。`--shot` は、Mac で Quick Look にファイルの各スライドを描かせ、ブラウザのショットと 1 枚の画像に並べて、違うところを赤く塗り、どれだけ違うかの数値を添えます。Quick Look は PowerPoint ではないので、渡す前にファイルを開いて確かめてください。
 
 ## 次
 
