@@ -4,6 +4,7 @@
 // sent to choose one before any page but that (ADR 77).
 
 import { defineMiddleware } from "void";
+import type { Href } from "void/routes";
 import { handleGate } from "../src/shell/handle-gate.ts";
 import { sharedOf } from "../src/shell/shared.server.ts";
 import type { Shared } from "../src/shell/type.ts";
@@ -34,7 +35,8 @@ export default defineMiddleware(async (c, next) => {
     pageData: c.req.header("x-voidpages") === "true",
   });
   if (welcome) {
-    return c.redirect(welcome);
+    // welcomeHref builds this, query and all, so it is not a route literal.
+    return c.redirect(welcome as Href);
   }
   const { lang, theme } = shared;
   c.set("shared", shared);
