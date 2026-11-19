@@ -309,9 +309,22 @@ async function shootPptxSpec(
   if (!outline) {
     return { parts };
   }
+  // What a pseudo-element writes with a counter, as Chromium laid it out.
+  const pieces = await pseudoTextPieces(page, SPEC_NODE_ATTR);
   const drawn: SpecPageNode[] = [];
   const walk = (node: SpecPageNode) => {
-    if (node.picture === "drawn" || node.picture === "background") {
+    if (node.counted) {
+      for (const pseudo of ["before", "after"] as const) {
+        const text = pieces
+          .filter((piece) => piece.host === String(node.index) && piece.pseudo === pseudo)
+          .map((piece) => piece.text)
+          .join("");
+        if (text) {
+          node[pseudo] = text;
+        }
+      }
+    }
+    if (node.picture) {
       drawn.push(node);
     }
     node.children.forEach(walk);
@@ -323,7 +336,9 @@ async function shootPptxSpec(
       continue;
     }
     const png = `${prefix}${node.index}.png`;
-    await page.evaluate(showPptxSpecNodeInPage, { index: node.index, alone: true });
+    // A picture is drawn whole; paint a shape cannot draw is drawn without what it holds.
+    const alone = node.picture === "drawn" || node.picture === "background";
+    await page.evaluate(showPptxSpecNodeInPage, { index: node.index, alone });
     const left = Math.max(0, outline.origin.left + rect.x);
     const top = Math.max(0, outline.origin.top + rect.y);
     await page.screenshot({

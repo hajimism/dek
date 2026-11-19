@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
-import { zipFiles } from "../../src/core/zip.ts";
+import { outputDir, writeInside } from "./safe-fs.ts";
+import { runPiped } from "./spawn.ts";
+import { zipFiles } from "./zip.ts";
 
 // macOS Quick Look as a renderer of the file: it is on every Mac, draws a `.pptx` without
 // PowerPoint, and is not Chromium, so it says how the file's own text and shapes come out where
@@ -25,12 +27,16 @@ const QLMANAGE = "/usr/bin/qlmanage";
 const MAGNIFIED = 32;
 
 /** The renderer's name for a report, or nothing where there is none: off macOS. */
-export function quickLookName(): string | undefined {
+export async function quickLookName(): Promise<string | undefined> {
   if (process.platform !== "darwin" || !existsSync(QLMANAGE)) {
     return undefined;
   }
-  const version = Bun.spawnSync(["sw_vers", "-productVersion"]).stdout.toString().trim();
-  return `Quick Look (macOS ${version})`;
+  const { stdout } = await runPiped(["sw_vers", "-productVersion"], {
+    label: "could not read the macOS version",
+    hint: "sw_vers is part of macOS",
+    timeoutMs: 10_000,
+  });
+  return `Quick Look (macOS ${stdout.trim()})`;
 }
 
 /**
@@ -38,11 +44,11 @@ export function quickLookName(): string | undefined {
  * the PNG's path; with `bare`, the slide is drawn with its text taken out. Nothing where Quick
  * Look drew none.
  */
-export function quickLookSlide(
+export async function quickLookSlide(
   files: ReadonlyMap<string, Uint8Array>,
   slide: number,
-  options: { bare: boolean; width: number; dir: string },
-): string | undefined {
+  options: { bare: boolean; width: number; dir: string; root: string },
+): Promise<string | undefined> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   const read = (path: string) => decoder.decode(files.get(path) ?? new Uint8Array());
@@ -75,12 +81,17 @@ export function quickLookSlide(
         .replace(/<a:bu(Char|AutoNum)[^>]*\/>/g, "<a:buNone/>")
     : read(path);
   copy.set(path, encoder.encode(magnified(xml)));
-  mkdirSync(options.dir, { recursive: true });
+  outputDir(options.dir, options.root);
   const file = join(options.dir, `slide-${slide + 1}${options.bare ? "-bare" : ""}.pptx`);
-  writeFileSync(file, zipFiles([...copy].map(([name, data]) => ({ path: name, data }))));
-  Bun.spawnSync([QLMANAGE, "-t", "-s", String(options.width), "-o", options.dir, file], {
-    stdout: "ignore",
-    stderr: "ignore",
+  writeInside(
+    file,
+    zipFiles([...copy].map(([name, data]) => ({ path: name, data }))),
+    options.root,
+  );
+  await runPiped([QLMANAGE, "-t", "-s", String(options.width), "-o", options.dir, file], {
+    label: "Quick Look could not draw the slide",
+    hint: "qlmanage is part of macOS",
+    timeoutMs: 60_000,
   });
   const png = join(options.dir, `${basename(file)}.png`);
   return existsSync(png) ? png : undefined;
@@ -138,7 +149,7 @@ export function magnified(xml: string, by = MAGNIFIED): string {
     there(/\bsz="\d/g) !== counted.size;
   if (missed) {
     throw new Error(
-      "evals/pptx/quicklook.ts no longer reads every length dekc pptx writes: teach magnified() the new form",
+      "src/core/pptx-quicklook.ts no longer reads every length dekc pptx writes: teach magnified() the new form",
     );
   }
   return out;

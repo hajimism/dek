@@ -1,14 +1,16 @@
 import { z } from "zod";
-import type {
-  PptxDeck,
-  PptxFill,
-  PptxLayer,
-  PptxPaint,
-  PptxParagraph,
-  PptxRun,
-  PptxShapeText,
-  PptxSlide,
-  PptxTheme,
+import {
+  PPTX_GEOMETRIES,
+  type PptxDeck,
+  type PptxFill,
+  type PptxGeometry,
+  type PptxLayer,
+  type PptxPaint,
+  type PptxParagraph,
+  type PptxRun,
+  type PptxShapeText,
+  type PptxSlide,
+  type PptxTheme,
 } from "./pptx-package.ts";
 
 // A PPTX as a file an agent edits: what `dekc pptx` would write, in JSON, for `dekc pptx --from`
@@ -47,6 +49,7 @@ const runJson = z.strictObject({
   font: z.string().optional().describe("the face; the theme's font when left out"),
   ea: z.string().optional().describe("the face for East Asian characters"),
   family: z.string().optional().describe("the font-family, to find it among the theme's fonts"),
+  highlight: hex.optional().describe("a color marked behind the run"),
 });
 
 const paragraphJson = z.strictObject({
@@ -105,6 +108,7 @@ type LayerJson =
       fill?: z.infer<typeof paintJson>;
       outline?: { width: number; paint: z.infer<typeof paintJson> };
       radius?: number;
+      geometry?: PptxGeometry;
       text?: z.infer<typeof shapeTextJson>;
       layers?: LayerJson[];
     }
@@ -148,6 +152,10 @@ const layerJson: z.ZodType<LayerJson> = z.lazy(() =>
       fill: paintJson.optional(),
       outline: z.strictObject({ width: z.number().positive(), paint: paintJson }).optional(),
       radius: length.nonnegative().optional(),
+      geometry: z
+        .enum(PPTX_GEOMETRIES)
+        .optional()
+        .describe("one of PowerPoint's own shapes in place of a rectangle"),
       text: shapeTextJson.optional(),
       layers: z.array(layerJson).optional(),
     }),
@@ -196,6 +204,10 @@ export const pptxJsonSchema = z.strictObject({
         .optional()
         .describe("a picture under everything, the size of the slide; none for none"),
       background: fillJson.optional(),
+      backdrop: z
+        .string()
+        .optional()
+        .describe("a picture as the slide's background, for decoration nobody edits"),
       description: z
         .string()
         .optional()
@@ -266,6 +278,7 @@ function runToJson(run: PptxRun): z.infer<typeof runJson> {
     ...(run.font === undefined ? {} : { font: run.font }),
     ...(run.ea === undefined ? {} : { ea: run.ea }),
     ...(run.family === undefined ? {} : { family: run.family }),
+    ...(run.highlight === undefined ? {} : { highlight: hexOf(run.highlight) }),
   };
 }
 
@@ -283,6 +296,7 @@ function runFromJson(run: z.infer<typeof runJson>): PptxRun {
     ...(run.font === undefined ? {} : { font: run.font }),
     ...(run.ea === undefined ? {} : { ea: run.ea }),
     ...(run.family === undefined ? {} : { family: run.family }),
+    ...(run.highlight === undefined ? {} : { highlight: rgbOf(run.highlight) }),
   };
 }
 
@@ -384,6 +398,7 @@ export function layersToJson<I>(
               }
             : {}),
           ...(layer.radius ? { radius: round(layer.radius) } : {}),
+          ...(layer.geometry ? { geometry: layer.geometry } : {}),
           ...(layer.text ? { text: shapeTextToJson(layer.text) } : {}),
           ...(layer.layers.length > 0 ? { layers: layersToJson(layer.layers, refOf) } : {}),
         };
@@ -454,6 +469,7 @@ export function layersFromJson(
             ? { outline: { width: layer.outline.width, paint: paintFromJson(layer.outline.paint) } }
             : {}),
           radius: layer.radius ?? 0,
+          ...(layer.geometry ? { geometry: layer.geometry } : {}),
           ...(layer.text ? { text: shapeTextFromJson(layer.text) } : {}),
           layers: layersFromJson(layer.layers ?? [], read, readText),
         };
@@ -523,6 +539,7 @@ export function pptxFromJson(
     slides: json.slides.map(
       (slide): PptxSlide => ({
         ...(slide.picture ? { picture: read(slide.picture) } : {}),
+        ...(slide.backdrop ? { backdrop: read(slide.backdrop) } : {}),
         ...(slide.background ? { background: fillFromJson(slide.background) } : {}),
         description: slide.description ?? "",
         layers: layersFromJson(slide.layers, read, readText),
@@ -552,6 +569,9 @@ export function pptxJsonFiles(json: PptxJson): Array<{ path: string; where: stri
     const where = `slides[${index}]`;
     if (slide.picture) {
       files.push({ path: slide.picture, where: `${where}.picture` });
+    }
+    if (slide.backdrop) {
+      files.push({ path: slide.backdrop, where: `${where}.backdrop` });
     }
     walk(slide.layers, where);
   });

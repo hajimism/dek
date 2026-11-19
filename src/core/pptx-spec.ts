@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { z } from "zod";
 import { capturePptx, type PptxOptions } from "./pptx.ts";
 import {
   backgroundToJson,
@@ -8,6 +9,7 @@ import {
   layersToJson,
   type PptxJson,
   type PptxPictureRef,
+  pptxJsonSchema,
   themeToJson,
 } from "./pptx-json.ts";
 import type { SpecPageNode, SpecPageRun, SpecPageText } from "./pptx-spec-page.ts";
@@ -22,6 +24,8 @@ import { outputDir, removeInside, writeInside } from "./safe-fs.ts";
 export const PPTX_SPEC_DIR = join(".cache", "pptx");
 export const PPTX_SPEC_FILE = "spec.json";
 const PPTX_START_FILE = "deck.pptx.json";
+/** The JSON Schema of deck.pptx.json, for an editor and an agent to read its fields from. */
+const PPTX_SCHEMA_FILE = "deck.pptx.schema.json";
 
 /**
  * A run of an element's text: its color as `#rrggbb`, its font as the theme's token where it is
@@ -53,15 +57,22 @@ export type PptxSpecNode = {
   border?: { width: number; color: string };
   sides?: Record<string, { width: number; color: string }>;
   radius?: number;
+  outline?: { width: number; color: string; offset: number };
   shadow?: string;
   opacity?: number;
+  rotate?: number;
   heading?: number;
   decoration?: true;
   alt?: string;
   /** What a shape cannot draw of it: a picture, or paint such as a clip-path or a gradient. */
   picture?: SpecPageNode["picture"];
-  /** It drawn alone, without its text, by its path from the deck's folder. */
+  /**
+   * It drawn alone, by its path from the deck's folder: a picture whole, and paint a shape
+   * cannot draw without the elements and text inside it.
+   */
   part?: string;
+  /** An image's source, as the slide's HTML has it. */
+  src?: string;
   before?: string;
   after?: string;
   /** Its text: all of it in `content`, and each run where they are set differently. */
@@ -122,6 +133,8 @@ export async function pptxSpecDeck(
   const fromDeck = (path: string) => relative(deck.dir, path).split("\\").join("/");
   const { sections } = captured.deck;
   const start: PptxJson = {
+    // From the deck's folder, where the edited copy is kept.
+    $schema: `./${PPTX_SPEC_DIR.split("\\").join("/")}/${PPTX_SCHEMA_FILE}`,
     title: captured.deck.title,
     lang: captured.deck.lang,
     size: captured.size,
@@ -174,6 +187,11 @@ export async function pptxSpecDeck(
       };
     }),
   };
+  writeInside(
+    join(dir, PPTX_SCHEMA_FILE),
+    `${JSON.stringify(z.toJSONSchema(pptxJsonSchema, { io: "input" }), null, 2)}\n`,
+    project.root,
+  );
   const specPath = join(dir, PPTX_SPEC_FILE);
   const startPath = join(dir, PPTX_START_FILE);
   writeInside(specPath, `${JSON.stringify(spec, null, 2)}\n`, project.root);
@@ -238,13 +256,16 @@ function specNode(
         }
       : {}),
     ...(node.radius ? { radius: round(node.radius) } : {}),
+    ...(node.outline ? { outline: { ...node.outline, color: hexOfCss(node.outline.color) } } : {}),
     ...(node.shadow ? { shadow: node.shadow } : {}),
     ...(node.opacity === undefined ? {} : { opacity: node.opacity }),
+    ...(node.rotate === undefined ? {} : { rotate: node.rotate }),
     ...(node.heading ? { heading: node.heading } : {}),
     ...(node.decoration ? { decoration: true as const } : {}),
     ...(node.alt ? { alt: node.alt } : {}),
     ...(node.picture ? { picture: node.picture } : {}),
     ...(part ? { part } : {}),
+    ...(node.src ? { src: node.src } : {}),
     ...(node.before ? { before: node.before } : {}),
     ...(node.after ? { after: node.after } : {}),
     ...(node.text

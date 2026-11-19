@@ -66,7 +66,7 @@ describe("checkPptxJson", () => {
     {
       slug: "cover",
       title: "表紙",
-      texts: [node("表紙", { tag: "h2", heading: 2 }), node("本文です")],
+      texts: [node("表紙", { tag: "h2", heading: 2 }), node("本文です", { y: 200 })],
     },
   ]);
 
@@ -105,6 +105,76 @@ describe("checkPptxJson", () => {
       },
     ]);
     expect(ids(json, reference)).toEqual(["pptx-lines cover"]);
+  });
+
+  test("text set away from where the slide shows it is in the wrong place", () => {
+    const json = file([
+      {
+        slug: "cover",
+        notes: "n",
+        layers: [prose("表紙", { title: true }), prose("本文です", { y: 500 })],
+      },
+    ]);
+    const [moved] = checkPptxJson(json, reference);
+    expect(moved).toMatchObject({
+      id: "pptx-place",
+      severity: "warning",
+      slug: "cover",
+      data: { texts: ["本文です"] },
+    });
+  });
+
+  test("a text lost is named alone, though another text holds its characters", () => {
+    const json = file([
+      {
+        slug: "cover",
+        notes: "n",
+        layers: [prose("表紙", { title: true }), prose("本文", { y: 200 })],
+      },
+    ]);
+    expect(checkPptxJson(json, reference)[0]).toMatchObject({
+      id: "pptx-text",
+      data: { missing: ["本文です"] },
+    });
+  });
+
+  test("a picture the size of the slide is a picture of the slide, unless the slide shows one", () => {
+    const backdrop: PptxJsonLayer = {
+      kind: "picture",
+      x: 0,
+      y: 0,
+      width: 1280,
+      height: 720,
+      file: ".cache/pptx/parts/1-0.png",
+    };
+    const json = file([
+      {
+        slug: "cover",
+        notes: "n",
+        layers: [backdrop, prose("表紙", { title: true }), prose("本文です", { y: 200 })],
+      },
+    ]);
+    expect(ids(json, reference)).toEqual(["pptx-picture cover"]);
+    const photo = spec([
+      {
+        slug: "cover",
+        title: "表紙",
+        texts: [
+          node("", {
+            tag: "img",
+            picture: "image",
+            x: 0,
+            y: 0,
+            width: 1280,
+            height: 720,
+            text: undefined,
+          }),
+          node("表紙", { tag: "h2", heading: 2 }),
+          node("本文です", { y: 200 }),
+        ],
+      },
+    ]);
+    expect(ids(json, photo)).toEqual([]);
   });
 
   test("decoration is not text the file must hold", () => {
@@ -159,10 +229,13 @@ describe("checkPptxJson", () => {
       {
         slug: "cover",
         notes: "n",
-        layers: [prose("表紙", { title: true }), prose("本文です", { x: 1200, width: 200 })],
+        layers: [
+          prose("表紙", { title: true }),
+          prose("本文です", { y: 200, x: 1200, width: 200 }),
+        ],
       },
     ]);
-    const [off] = checkPptxJson(json, reference);
+    const off = checkPptxJson(json, reference).find((each) => each.id === "pptx-bounds");
     expect(off).toMatchObject({ id: "pptx-bounds", severity: "error", slug: "cover" });
   });
 

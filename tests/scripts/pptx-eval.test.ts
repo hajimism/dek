@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { SlideCensus } from "../../evals/pptx/census.ts";
 import type { LineFinding } from "../../evals/pptx/compare.ts";
 import { readPackage, readZip } from "../../evals/pptx/package.ts";
-import { magnified } from "../../evals/pptx/quicklook.ts";
 import { type DeckReport, markdown, slideReport, summarize } from "../../evals/pptx/report.ts";
 import { type PptxLayer, type PptxRun, pptxPackage } from "../../src/core/pptx-package.ts";
+import { magnified } from "../../src/core/pptx-quicklook.ts";
 import { zipFiles } from "../../src/core/zip.ts";
 
 // The PPTX eval without a browser or a renderer: what it reads from a file, how it counts what

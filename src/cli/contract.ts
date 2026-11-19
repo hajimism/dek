@@ -731,6 +731,10 @@ export const RESULT_FIELDS = {
       outs: paths,
       diagnostics,
       skipped,
+      shots: z
+        .array(z.string())
+        .optional()
+        .describe("With --shot, each slide as Quick Look draws the file, in the deck's order."),
     }),
   ]),
   pack: z.strictObject({

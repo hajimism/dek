@@ -53,17 +53,25 @@ export type SpecPageNode = {
   /** Borders that differ per side. */
   sides?: Partial<Record<"top" | "right" | "bottom" | "left", { width: number; color: string }>>;
   radius?: number;
+  /** A CSS outline: drawn outside the border, by `offset` more. */
+  outline?: { width: number; color: string; offset: number };
   shadow?: string;
   opacity?: number;
+  /** How far a transform turns it, in degrees clockwise. */
+  rotate?: number;
   /** Its heading level, for `<h1>` to `<h6>`. */
   heading?: number;
   /** Under `aria-hidden="true"`: decoration. */
   decoration?: true;
   alt?: string;
   picture?: SpecPagePicture;
-  /** What its `::before` and `::after` write. */
+  /** What its `::before` and `::after` write, counters counted. */
   before?: string;
   after?: string;
+  /** Whether a pseudo-element writes what the page cannot read alone, such as a counter. */
+  counted?: true;
+  /** An image's source, as the page has it. */
+  src?: string;
   text?: SpecPageText;
   children: SpecPageNode[];
 };
@@ -161,6 +169,21 @@ export function measurePptxSpecInPage(): SpecPage | null {
       );
     });
 
+  /**
+   * An inline element that draws a box of its own around its text, a chip or a pill: a node of
+   * its own, not runs of its block's text. A plain marker behind words stays a run's highlight.
+   */
+  const boxy = (style: CSSStyleDeclaration): boolean =>
+    inline(style) &&
+    ((visible(style.backgroundColor) &&
+      (style.display !== "inline" || Number.parseFloat(style.borderTopLeftRadius) > 0)) ||
+      ["top", "right", "bottom", "left"].some(
+        (side) =>
+          Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0 &&
+          visible(style.getPropertyValue(`border-${side}-color`)) &&
+          style.getPropertyValue(`border-${side}-style`) !== "none",
+      ));
+
   /** The text an element sets as one block, with what its inline elements paint. */
   const textOf = (element: HTMLElement, style: CSSStyleDeclaration): SpecPageText | undefined => {
     const pre = /^(pre|pre-wrap|break-spaces|pre-line)$/.test(style.whiteSpace);
@@ -210,7 +233,7 @@ export function measurePptxSpecInPage(): SpecPage | null {
           }
           if (child.tagName === "BR") {
             push("\n", element, background);
-          } else if (inline(own) && !(child.tagName.toLowerCase() in REPLACED)) {
+          } else if (inline(own) && !boxy(own) && !(child.tagName.toLowerCase() in REPLACED)) {
             const before = pseudoText(child, "::before");
             if (before) {
               push(before, child, background);
@@ -242,14 +265,27 @@ export function measurePptxSpecInPage(): SpecPage | null {
     if (!kept.some((run) => run.text.trim() !== "")) {
       return undefined;
     }
-    const range = document.createRange();
-    range.selectNodeContents(element);
+    // Lines are counted from the text's own boxes, not those of what sits beside it.
     const tops: number[] = [];
-    for (const box of range.getClientRects()) {
-      if (box.width > 0 && !tops.some((top) => Math.abs(top - box.top) < box.height / 2)) {
-        tops.push(box.top);
+    const count = (node: Node) => {
+      for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE && (child.textContent ?? "").trim() !== "") {
+          const range = document.createRange();
+          range.selectNodeContents(child);
+          for (const box of range.getClientRects()) {
+            if (box.width > 0 && !tops.some((top) => Math.abs(top - box.top) < box.height / 2)) {
+              tops.push(box.top);
+            }
+          }
+        } else if (child instanceof HTMLElement) {
+          const own = getComputedStyle(child);
+          if (inline(own) && !boxy(own)) {
+            count(child);
+          }
+        }
       }
-    }
+    };
+    count(element);
     return {
       runs: kept,
       align:
@@ -333,6 +369,22 @@ export function measurePptxSpecInPage(): SpecPage | null {
     if (style.boxShadow !== "none") {
       node.shadow = style.boxShadow;
     }
+    const outlineWidth = Number.parseFloat(style.outlineWidth);
+    if (outlineWidth > 0 && style.outlineStyle !== "none" && visible(style.outlineColor)) {
+      node.outline = {
+        width: outlineWidth,
+        color: style.outlineColor,
+        offset: Number.parseFloat(style.outlineOffset) || 0,
+      };
+    }
+    const turn = /^matrix\(([-\d.e]+), ([-\d.e]+),/.exec(style.transform);
+    if (turn) {
+      const degrees =
+        Math.round(((Math.atan2(Number(turn[2]), Number(turn[1])) * 180) / Math.PI) * 10) / 10;
+      if (degrees !== 0) {
+        node.rotate = degrees;
+      }
+    }
     if (Number(style.opacity) < 1) {
       node.opacity = Number(style.opacity);
     }
@@ -344,9 +396,20 @@ export function measurePptxSpecInPage(): SpecPage | null {
     if (after) {
       node.after = after;
     }
+    const counted = (["::before", "::after"] as const).some((pseudo) => {
+      const content = getComputedStyle(element, pseudo).content;
+      return content !== "none" && content !== "normal" && !/^"(.*)"$/s.test(content);
+    });
+    if (counted) {
+      node.counted = true;
+    }
     const replaced = REPLACED[tag];
     if (replaced) {
       node.picture = replaced;
+      const src = element.getAttribute("src");
+      if (src && !src.startsWith("data:")) {
+        node.src = src;
+      }
       const alt =
         element.getAttribute("alt") ??
         element.getAttribute("aria-label") ??
@@ -382,6 +445,7 @@ export function measurePptxSpecInPage(): SpecPage | null {
       if (
         node.text &&
         inline(own) &&
+        !boxy(own) &&
         !(child.tagName.toLowerCase() in REPLACED) &&
         (setsText(child) || child.tagName === "BR")
       ) {
@@ -395,6 +459,8 @@ export function measurePptxSpecInPage(): SpecPage | null {
       node.border !== undefined ||
       node.sides !== undefined ||
       node.shadow !== undefined ||
+      node.outline !== undefined ||
+      node.counted !== undefined ||
       node.picture !== undefined ||
       node.text !== undefined ||
       node.before !== undefined ||
@@ -468,7 +534,8 @@ export function showPptxSpecNodeInPage(target: { index: number; alone: boolean }
     "body * { visibility: hidden !important; }",
     `[${CROP_ATTR}]${target.alone ? "" : `, [${CROP_ATTR}] *`} { visibility: visible !important; }`,
     target.alone
-      ? `[${CROP_ATTR}] { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; }`
+      ? // The text's fill alone: currentColor, which a pseudo-element's dot may paint in, stays.
+        `[${CROP_ATTR}] { -webkit-text-fill-color: transparent !important; text-shadow: none !important; }`
       : "",
   ].join("\n");
   document.head.append(style);

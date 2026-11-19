@@ -75,7 +75,7 @@ The official skill teaches an agent the loop: script first, then one slide at a 
 - Claude Code: \`/plugin marketplace add hajimism/dek\`, then \`/plugin install dek@dek\`
 - In a project: \`node_modules/${pkg.name}/skills/dek/SKILL.md\`, the copy for the dek installed there
 
-An optional skill, \`dek-design\`, is for slides that read at a glance; it installs the same way under its own name.
+Two optional skills install the same way under their own names: \`dek-design\`, for slides that read at a glance, and \`dek-pptx\`, for building a finished deck again as a PowerPoint file the recipient edits as their own.
 
 ## Guide
 

@@ -2515,6 +2515,224 @@
         {
           "type": "object",
           "properties": {
+            "action": {
+              "type": "string",
+              "const": "spec"
+            },
+            "spec": {
+              "type": "string",
+              "description": "spec.json: what each slide is made of, as the browser drew it."
+            },
+            "start": {
+              "type": "string",
+              "description": "deck.pptx.json: the file dekc pptx would write, as JSON to edit for --from."
+            },
+            "slides": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "parts": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "The parts drawn alone that spec.json names."
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "spec",
+            "start",
+            "slides",
+            "parts",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "from"
+            },
+            "outs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Diagnostic"
+              }
+            },
+            "skipped": {
+              "description": "Absent when every check ran.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SkippedCheck"
+              }
+            },
+            "shots": {
+              "description": "With --shot, each slide as Quick Look draws the file, in the deck's order.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "action",
+            "outs",
+            "diagnostics",
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "outs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "outs",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "spec"
+            },
+            "spec": {
+              "type": "string",
+              "description": "spec.json: what each slide is made of, as the browser drew it."
+            },
+            "start": {
+              "type": "string",
+              "description": "deck.pptx.json: the file dekc pptx would write, as JSON to edit for --from."
+            },
+            "slides": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "parts": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "The parts drawn alone that spec.json names."
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "spec",
+            "start",
+            "slides",
+            "parts",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "from"
+            },
+            "outs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "diagnostics": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Diagnostic"
+              }
+            },
+            "skipped": {
+              "description": "Absent when every check ran.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SkippedCheck"
+              }
+            },
+            "shots": {
+              "description": "With --shot, each slide as Quick Look draws the file, in the deck's order.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ok": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "required": [
+            "action",
+            "outs",
+            "diagnostics",
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
             "ok": {
               "type": "boolean",
               "const": false
@@ -5646,6 +5864,7 @@
           "enum": [
             "lint",
             "plugin",
+            "pptx",
             "preview",
             "rumdl",
             "visual",

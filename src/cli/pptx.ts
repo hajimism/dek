@@ -12,11 +12,17 @@ import type { DecksTarget } from "./scope.ts";
 export type PptxCliResult =
   | { action?: undefined; outs: string[]; lifted?: PptxLifted[] }
   | { action: "spec"; spec: string; start: string; slides: number; parts: number }
-  | { action: "from"; outs: string[]; diagnostics: Diagnostic[]; skipped?: SkippedCheck[] };
+  | {
+      action: "from";
+      outs: string[];
+      diagnostics: Diagnostic[];
+      skipped?: SkippedCheck[];
+      shots?: string[];
+    };
 
 export async function pptxCommand(
   { project, decks }: DecksTarget,
-  options: { rootDist?: boolean; public?: boolean; from?: string } = {},
+  options: { rootDist?: boolean; public?: boolean; from?: string; shot?: boolean } = {},
 ): Promise<Exclude<PptxCliResult, { action: "spec" }>> {
   if (options.from !== undefined) {
     const [deck, ...more] = decks;
@@ -25,12 +31,16 @@ export async function pptxCommand(
         hint: "name the deck: dekc pptx <deck> --from <file>",
       });
     }
-    const done = pptxFromFile({ project, deck }, options.from, { rootDist: options.rootDist });
+    const done = await pptxFromFile({ project, deck }, options.from, {
+      rootDist: options.rootDist,
+      shot: options.shot,
+    });
     return {
       action: "from",
       outs: [done.outPath],
       diagnostics: done.diagnostics,
       ...(done.skipped ? { skipped: done.skipped } : {}),
+      ...(done.shots ? { shots: done.shots } : {}),
     };
   }
   const outs: string[] = [];

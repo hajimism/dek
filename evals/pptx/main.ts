@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import pkg from "../../package.json";
 import { importPlaywright } from "../../src/core/playwright.ts";
 import { pptxDeck } from "../../src/core/pptx.ts";
+import { quickLookName, quickLookSlide } from "../../src/core/pptx-quicklook.ts";
 import { asResolvedDeck } from "../../src/core/resolve.ts";
 import { logicalSize } from "../../src/core/size.ts";
 import { lastStop } from "../../src/core/step.ts";
@@ -11,7 +12,6 @@ import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts"
 import { censusSlide } from "./census.ts";
 import { compareInPage, coverageInPage } from "./compare.ts";
 import { readPackage } from "./package.ts";
-import { quickLookName, quickLookSlide } from "./quicklook.ts";
 import { type DeckReport, type EvalReport, markdown, slideReport, summarize } from "./report.ts";
 
 const USAGE =
@@ -74,7 +74,7 @@ export async function main(argv: string[]): Promise<number> {
   const out = resolve(
     values.out ?? join(root, ".cache/pptx-eval", startedAt.replace(/[:.]/g, "-")),
   );
-  const renderer = values["no-render"] ? undefined : quickLookName();
+  const renderer = values["no-render"] ? undefined : await quickLookName();
 
   const playwright = await importPlaywright();
   const browser = await playwright.chromium.launch({ headless: true });
@@ -132,18 +132,20 @@ export async function main(argv: string[]): Promise<number> {
         }
         let compared: Awaited<ReturnType<typeof compareInPage>> | undefined;
         if (renderer) {
-          const drawn = [false, true].map((bare) => {
-            const png = quickLookSlide(files, index, {
+          const drawn: Array<string | undefined> = [];
+          for (const bare of [false, true]) {
+            const png = await quickLookSlide(files, index, {
               bare,
               width: size.width * SCALE,
               dir: join(folder, "renderer"),
+              root: out,
             });
             const kept = `${stem}-renderer${bare ? "-bare" : ""}.png`;
             if (png) {
               renameSync(png, kept);
             }
-            return png ? kept : undefined;
-          });
+            drawn.push(png ? kept : undefined);
+          }
           const [full, bare] = drawn;
           if (full && bare) {
             compared = await lab.evaluate(compareInPage, {

@@ -85,7 +85,7 @@ export type PptxCapture = {
  * with `spec`, each slide as drawn and its parts too, for `dekc pptx spec`.
  */
 export async function capturePptx(
-  { project, deck }: ResolvedDeck,
+  { deck }: ResolvedDeck,
   shots: string,
   options: PptxOptions & { spec?: { shots: string; parts: string } } = {},
 ): Promise<PptxCapture> {

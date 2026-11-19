@@ -55,9 +55,19 @@ const SKILL_FLOOR = new Set([
 ]);
 
 /** Each skill in skills/: the official one, then the optional ones, as the marketplace lists them. */
-const SKILLS = ["dek", "dek-design"] as const;
+const SKILLS = ["dek", "dek-design", "dek-pptx"] as const;
 const skillText = (name: string): string => read(`skills/${name}/SKILL.md`);
 const skill = skillText("dek");
+
+/**
+ * The commands each skill may name. A skill for work a newer dek added names that command too,
+ * and first has the agent ask the installed dek whether it has that work (ADR 105).
+ */
+const SKILL_FLOORS: Record<(typeof SKILLS)[number], ReadonlySet<string>> = {
+  dek: SKILL_FLOOR,
+  "dek-design": SKILL_FLOOR,
+  "dek-pptx": new Set([...SKILL_FLOOR, "pptx"]),
+};
 
 describe("agent guidance", () => {
   test("llms.txt is what the docs, the rule table, and the commands say now", () => {
@@ -95,12 +105,15 @@ describe("agent guidance", () => {
     expect(readdirSync(join(repoRoot, "skills")).sort()).toEqual([...SKILLS].sort());
     for (const name of SKILLS) {
       expect(skillText(name)).toMatch(new RegExp(`^---\nname: ${name}\ndescription: .+\n---\n`));
+      const floor = SKILL_FLOORS[name];
       expect({
         name,
-        newer: named(skillText(name)).commands.filter((command) => !SKILL_FLOOR.has(command)),
+        newer: named(skillText(name)).commands.filter((command) => !floor.has(command)),
       }).toEqual({ name, newer: [] });
     }
     expect(skill).toContain("dek 0.2.2 or newer");
+    // A skill for one command's newer work asks the installed dek for it before anything else.
+    expect(skillText("dek-pptx")).toContain("`bunx dekc help pptx` lists `spec` and `--from`");
   });
 
   test("the skill runs dek the one way that works", () => {

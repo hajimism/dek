@@ -25,6 +25,8 @@ export type PptxRun = {
   ea?: string;
   /** The `font-family` it was set in, to find it in the theme's fonts. */
   family?: string;
+  /** The color marked behind it, as a highlighter would. */
+  highlight?: [number, number, number];
 };
 
 /** One line of text, or the part of one that sits together, at its box on the slide. */
@@ -71,6 +73,23 @@ export type PptxTextLayer = PptxTextBox & { kind: "text" };
 /** What a picture embeds: the PNG every renderer shows, and the SVG one that draws SVG prefers. */
 type PptxImage = { png: Uint8Array; svg?: string };
 
+/** PowerPoint's preset shapes a slide may draw beside rectangles, by their names in DrawingML. */
+export const PPTX_GEOMETRIES = [
+  "ellipse",
+  "triangle",
+  "diamond",
+  "chevron",
+  "homePlate",
+  "rightArrow",
+  "leftArrow",
+  "upArrow",
+  "downArrow",
+  "round2SameRect",
+  "wedgeRoundRectCallout",
+] as const;
+
+export type PptxGeometry = (typeof PPTX_GEOMETRIES)[number];
+
 /** A box the browser drew with no more than a color, a solid border, and round corners. */
 export type PptxShape<I = PptxImage> = PptxRect & {
   kind: "shape";
@@ -79,6 +98,8 @@ export type PptxShape<I = PptxImage> = PptxRect & {
   outline?: { width: number; paint: PptxPaint };
   /** The border box's corner radius; PowerPoint draws half the shorter side at most. */
   radius: number;
+  /** One of PowerPoint's own shapes in place of a rectangle, which then has no radius. */
+  geometry?: PptxGeometry;
   text?: PptxShapeText;
   /** What the shape holds, in the order the browser painted it, grouped with it. */
   layers: PptxLayer<I>[];
@@ -164,6 +185,11 @@ export type PptxParagraph = {
 export type PptxSlide = {
   /** The slide drawn without what is laid over it, as a PNG; none when nothing is left in it. */
   picture?: Uint8Array;
+  /**
+   * A picture as the slide's background, in place of its color: under everything, and not a
+   * shape a recipient selects, as a template's texture is.
+   */
+  backdrop?: Uint8Array;
   /** The slide's background as PowerPoint's own, when it is not in the picture. */
   background?: PptxFill;
   /** What the picture shows, for a screen reader: the slide's own alternative texts. */
@@ -202,6 +228,11 @@ const CT = "application/vnd.openxmlformats-officedocument";
 
 /** The whole `.pptx`, ready to write. */
 export function pptxPackage(deck: PptxDeck): Uint8Array {
+  return zipFiles(pptxParts(deck));
+}
+
+/** The package's parts, each at its path in the ZIP, for a reader that needs them unzipped. */
+export function pptxParts(deck: PptxDeck): Array<{ path: string; data: Uint8Array }> {
   const encoder = new TextEncoder();
   const parts: Array<{ path: string; data: Uint8Array }> = [];
   const add = (path: string, xml: string) => parts.push({ path, data: encoder.encode(xml) });
@@ -324,7 +355,7 @@ export function pptxPackage(deck: PptxDeck): Uint8Array {
       ]),
     );
   });
-  return zipFiles(parts);
+  return parts;
 }
 
 function contentTypes(numbers: number[], svg: boolean): string {
@@ -453,9 +484,12 @@ function slideParts(
   const picture = slide.picture
     ? `<p:pic><p:nvPicPr><p:cNvPr id="2" name="Slide" descr="${escapeAttribute(slide.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform({ x: 0, y: 0, ...deck.size })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`
     : "";
+  const background = slide.backdrop
+    ? `<p:bg><p:bgPr><a:blipFill dpi="0" rotWithShape="1"><a:blip r:embed="${writer.embed(slide.backdrop, "png")}"/><a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>`
+    : backgroundXml(slide.background, deck.theme);
   const layers = slide.layers.map((layer) => layerXml(layer, writer)).join("");
   return {
-    xml: `${DECL}<p:sld ${PML}><p:cSld>${backgroundXml(slide.background, deck.theme)}<p:spTree>${GROUP}${picture}${layers}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`,
+    xml: `${DECL}<p:sld ${PML}><p:cSld>${background}<p:spTree>${GROUP}${picture}${layers}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`,
     media: files,
   };
 }
@@ -539,8 +573,9 @@ function shapeSp(shape: PptxShape, id: number, style: Style): string {
   const path = pathOf(shape);
   const radius = Math.max(0, shape.radius - half);
   const shorter = Math.min(path.width, path.height);
-  const geometry =
-    radius > 0 && shorter > 0
+  const geometry = shape.geometry
+    ? `<a:prstGeom prst="${shape.geometry}"><a:avLst/></a:prstGeom>`
+    : radius > 0 && shorter > 0
       ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.min(50000, Math.round((radius / shorter) * 100000))}"/></a:avLst></a:prstGeom>`
       : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
   const fill = shape.fill ? solidFill(shape.fill, style.theme) : "<a:noFill/>";
@@ -550,7 +585,7 @@ function shapeSp(shape: PptxShape, id: number, style: Style): string {
   // A rounded rectangle's own text area starts inside its corners' curve, by the corner's
   // radius less its reach at 45 degrees, on every side: the insets give that back, so the text
   // is set where the browser set it.
-  const curve = Math.min(radius, shorter / 2) * (1 - Math.SQRT1_2);
+  const curve = shape.geometry ? 0 : Math.min(radius, shorter / 2) * (1 - Math.SQRT1_2);
   const text = shape.text ? shapeText(shape.text, half + curve, style) : "";
   return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path)}${geometry}${fill}${line}</p:spPr>${text}</p:sp>`;
 }
@@ -763,7 +798,10 @@ function runProperties(run: PptxRun, style: Style): string {
     : run.font
       ? faces((script) => escapeXml((script === "ea" ? run.ea : undefined) ?? run.font ?? ""))
       : "";
-  return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${font}</a:rPr>`;
+  const highlight = run.highlight
+    ? `<a:highlight>${colorXml({ color: run.highlight, alpha: 1 }, style.theme)}</a:highlight>`
+    : "";
+  return `<a:rPr ${attributes}>${solidFill(run, style.theme)}${highlight}${font}</a:rPr>`;
 }
 
 /**

@@ -11,6 +11,12 @@ import type { PptxSpec, PptxSpecNode } from "./pptx-spec.ts";
 /** A slide that keeps a picture of the rest of itself, which the rebuild is for. */
 const PICTURE = "pptx-picture";
 
+/** A picture this share of the slide or more is a picture of the slide. */
+const SLIDE_SIZED = 0.9;
+
+/** How far a layer may lie from the box the slide shows its text in, in pixels. */
+const NEAR = 12;
+
 /** How much of the slide a layer may pass its edge by, in pixels, as a shadow or a bleed. */
 const BLEED = 2;
 
@@ -52,7 +58,20 @@ export function checkPptxJson(json: PptxJson, spec: PptxSpec): Diagnostic[] {
         hint: 'set the heading as a prose layer with "title": true, outside any shape',
       });
     }
-    const missing = lostText(reference.outline, layers);
+    const { missing, moved } = findText(reference.outline, layers);
+    if (moved.length > 0) {
+      diagnostics.push({
+        id: "pptx-place",
+        severity: "warning",
+        slug,
+        message: `${moved.length} of the slide's texts are in a layer away from where the slide shows them: ${moved
+          .slice(0, 3)
+          .map((text) => `"${clip(text)}"`)
+          .join(", ")}${moved.length > 3 ? ", …" : ""}`,
+        hint: "set each in a layer over the box the outline gives it",
+        data: { texts: moved },
+      });
+    }
     if (missing.length > 0) {
       diagnostics.push({
         id: "pptx-text",
@@ -83,6 +102,21 @@ export function checkPptxJson(json: PptxJson, spec: PptxSpec): Diagnostic[] {
         message: `${off.length} layer${off.length === 1 ? " lies" : "s lie"} past the slide's edge (${width}×${height})`,
         hint: "move or shrink each into the slide",
         data: { boxes: off.map((layer) => boxOf(layer)) },
+      });
+    }
+    const covers = layers.filter(
+      (layer) =>
+        layer.kind === "picture" &&
+        layer.width * layer.height >= SLIDE_SIZED * width * height &&
+        !shownPicture(reference.outline, layer, width * height),
+    );
+    if (covers.length > 0) {
+      diagnostics.push({
+        id: PICTURE,
+        severity: "warning",
+        slug,
+        message: `a picture covers the slide (${covers.map((layer) => (layer.kind === "picture" ? layer.file : "")).join(", ")})`,
+        hint: "set it as the slide's backdrop if it is decoration, or draw what it shows as shapes",
       });
     }
     if (slide.picture) {
@@ -153,16 +187,45 @@ function inkOf(layer: PptxJsonLayer): string {
     .replace(/\s+/g, "");
 }
 
-/**
- * The texts the slide shows that the layers do not hold: each block's characters taken, in
- * order, from those the layers hold, so a block split across boxes or runs is still found.
- */
-function lostText(outline: PptxSpecNode | undefined, layers: PptxJsonLayer[]): string[] {
-  const held = new Map<string, number>();
-  for (const char of layers.map(inkOf).join("")) {
-    held.set(char, (held.get(char) ?? 0) + 1);
+type Box = { x: number; y: number; width: number; height: number };
+
+const overlaps = (a: Box, b: Box, margin: number): boolean =>
+  a.x < b.x + b.width + margin &&
+  b.x < a.x + a.width + margin &&
+  a.y < b.y + b.height + margin &&
+  b.y < a.y + a.height + margin;
+
+/** Whether every character of `ink` is among those of `held`, as often as `ink` has it. */
+function holds(held: string, ink: string): boolean {
+  const left = new Map<string, number>();
+  for (const char of held) {
+    left.set(char, (left.get(char) ?? 0) + 1);
   }
-  const lost: string[] = [];
+  for (const char of ink) {
+    const count = left.get(char) ?? 0;
+    if (count === 0) {
+      return false;
+    }
+    left.set(char, count - 1);
+  }
+  return true;
+}
+
+/**
+ * The texts the slide shows that no layer holds, and those a layer holds away from where the
+ * slide shows them. A text is found when the layers over its box hold its characters, however
+ * they are split across boxes and runs; the characters of one text never count for another's.
+ */
+function findText(
+  outline: PptxSpecNode | undefined,
+  layers: PptxJsonLayer[],
+): { missing: string[]; moved: string[] } {
+  const inked = layers
+    .map((layer) => ({ box: boxOf(layer), ink: inkOf(layer) }))
+    .filter((each) => each.ink !== "");
+  const all = inked.map((each) => each.ink).join("");
+  const missing: string[] = [];
+  const moved: string[] = [];
   const visit = (node: PptxSpecNode) => {
     if (node.decoration) {
       return;
@@ -171,24 +234,31 @@ function lostText(outline: PptxSpecNode | undefined, layers: PptxJsonLayer[]): s
       .filter((each): each is string => Boolean(each))
       .join("");
     const ink = shown.replace(/\s+/g, "");
-    let short = false;
-    for (const char of ink) {
-      const left = held.get(char) ?? 0;
-      if (left > 0) {
-        held.set(char, left - 1);
-      } else {
-        short = true;
+    if (ink !== "") {
+      const near = inked
+        .filter((each) => overlaps(each.box, node, NEAR))
+        .map((each) => each.ink)
+        .join("");
+      if (!holds(near, ink)) {
+        (holds(all, ink) ? moved : missing).push(shown.trim());
       }
-    }
-    if (short) {
-      lost.push(shown.trim());
     }
     node.children?.forEach(visit);
   };
   if (outline) {
     visit(outline);
   }
-  return lost;
+  return { missing, moved };
+}
+
+/** Whether the slide shows a picture as large as `layer` where it lies: a photo, not the slide. */
+function shownPicture(outline: PptxSpecNode | undefined, layer: Box, area: number): boolean {
+  const found = (node: PptxSpecNode): boolean =>
+    ((node.picture === "image" || node.picture === "canvas" || node.picture === "video") &&
+      node.width * node.height >= SLIDE_SIZED * area &&
+      overlaps(node, layer, 0)) ||
+    (node.children ?? []).some(found);
+  return outline !== undefined && found(outline);
 }
 
 function clip(text: string): string {
