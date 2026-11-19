@@ -257,6 +257,139 @@ describe("checkPptxJson", () => {
     expect(ids(unwrapped, wide)).toEqual([]);
   });
 
+  test("a table's texts are found in its cells, and a cell narrower than its line wraps it", () => {
+    // Three cells in a row, each the browser set on one line, 180 px set 10% wider in each.
+    const cell = (content: string, x: number) =>
+      node(content, {
+        tag: "td",
+        x,
+        y: 300,
+        width: 200,
+        height: 30,
+        text: {
+          align: "left",
+          lines: 1,
+          lineHeight: 24,
+          content,
+          widen: 1.1,
+          runs: [],
+          pieces: [{ text: content, x, y: 303, width: 180, height: 24 }],
+        },
+      });
+    const reference = spec([
+      {
+        slug: "files",
+        title: "表紙",
+        texts: [
+          node("表紙", { tag: "h2", heading: 2 }),
+          node("script台本のその節8 行", {
+            tag: "table",
+            x: 100,
+            y: 300,
+            width: 600,
+            height: 30,
+            text: undefined,
+            children: [cell("script", 100), cell("台本のその節", 300), cell("8 行", 500)],
+          }),
+        ],
+      },
+    ]);
+    const table = (texts: string[], columns = [200, 200, 200]): PptxJsonLayer => ({
+      kind: "table",
+      x: 100,
+      y: 300,
+      columns,
+      rows: [
+        {
+          height: 30,
+          cells: texts.map((text) => ({ paragraphs: [{ runs: [run(text)] }] })),
+        },
+      ],
+    });
+    const at = (layer: PptxJsonLayer) =>
+      file([{ slug: "files", notes: "n", layers: [prose("表紙", { title: true }), layer] }]);
+    const texts = ["script", "台本のその節", "8 行"];
+    expect(ids(at(table(texts)), reference)).toEqual([]);
+    // A text in another cell of the table is away from where the slide shows it.
+    expect(ids(at(table(["8 行", "台本のその節", "script"])), reference)).toEqual([
+      "pptx-place files",
+    ]);
+    expect(ids(at(table(["script", "台本のその節", ""])), reference)).toEqual(["pptx-text files"]);
+    // A cell's text is looked for in the cell it lies in, not in the one beside it.
+    expect(ids(at(table(["台本のその節", "script", "8 行"])), reference)).toEqual([
+      "pptx-place files",
+    ]);
+    // A cell's text always wraps, inside its column less its insets: 198 px in 184 wraps.
+    const inset = at(table(texts));
+    const row = inset.slides[0]?.layers[1];
+    if (row?.kind === "table") {
+      for (const each of row.rows[0]?.cells ?? []) {
+        each.inset = { left: 8, top: 0, right: 8, bottom: 0 };
+      }
+    }
+    const [fit, ...rest] = checkPptxJson(inset, reference);
+    expect(rest).toEqual([]);
+    expect(fit).toMatchObject({
+      id: "pptx-fit",
+      data: { texts: [{ text: "script", width: 184, needs: 198 }, {}, {}] },
+    });
+    expect(ids(at(table(texts, [200, 200, 900])), reference)).toEqual(["pptx-bounds files"]);
+  });
+
+  test("a cell's text is measured against its own cell, not a narrower one beside it", () => {
+    // "台本" needs 150 px in a cell 300 wide; the cell beside it, 100 wide, says more.
+    const reference = spec([
+      {
+        slug: "files",
+        title: "表紙",
+        texts: [
+          node("表紙", { tag: "h2", heading: 2 }),
+          node("台本", {
+            tag: "td",
+            x: 100,
+            y: 300,
+            width: 300,
+            height: 30,
+            text: {
+              align: "left",
+              lines: 1,
+              lineHeight: 24,
+              content: "台本",
+              runs: [],
+              pieces: [{ text: "台本", x: 100, y: 303, width: 150, height: 24 }],
+            },
+          }),
+          node("台本のその節", { tag: "td", x: 400, y: 300, width: 100, height: 30 }),
+        ],
+      },
+    ]);
+    const json = file([
+      {
+        slug: "files",
+        notes: "n",
+        layers: [
+          prose("表紙", { title: true }),
+          {
+            kind: "table",
+            x: 100,
+            y: 300,
+            columns: [300, 100],
+            rows: [
+              {
+                height: 30,
+                cells: [
+                  { paragraphs: [{ runs: [run("台本")] }] },
+                  { paragraphs: [{ runs: [run("台本のその節")] }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    expect(ids(json, reference)).toEqual([]);
+  });
+
   test("a picture of the rest of the slide is what the rebuild is for", () => {
     const json = file([
       {

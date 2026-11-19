@@ -15,6 +15,8 @@ import {
 import type { PptxLayer, PptxRun } from "./pptx-package.ts";
 import type {
   PptxSpecPart,
+  SpecPageCell,
+  SpecPageGrid,
   SpecPageNode,
   SpecPagePiece,
   SpecPageRun,
@@ -90,6 +92,17 @@ export type PptxSpecNode = {
   part?: string;
   /** An image's source, as the slide's HTML has it. */
   src?: string;
+  /**
+   * A `<table>`'s grid as the browser laid it out: where its first cell's corner lies, and each
+   * column's width and each row's height, what a `table` layer's `columns` and `rows` are.
+   */
+  grid?: SpecPageGrid;
+  /**
+   * A table cell's place on its table's grid, from 0: the row it starts in, its column, how many
+   * rows and columns it takes where it takes more than one, and where its text sits, its
+   * layer cell's `anchor`. Every cell is a node, an empty one too.
+   */
+  cell?: SpecPageCell;
   /**
    * Its text: all of it in `content`, each run where they are set differently, and in `pieces`
    * each stretch of a line as the browser placed it.
@@ -382,6 +395,17 @@ function specNode(
     ...(node.inline ? { inline: true as const } : {}),
     ...(part ? { part } : {}),
     ...(node.src ? { src: node.src } : {}),
+    ...(node.grid
+      ? {
+          grid: {
+            x: round(node.grid.x),
+            y: round(node.grid.y),
+            columns: node.grid.columns.map(round),
+            rows: node.grid.rows.map(round),
+          },
+        }
+      : {}),
+    ...(node.cell ? { cell: node.cell } : {}),
     ...(node.text
       ? {
           text: {

@@ -113,6 +113,50 @@ describe("reading a file back", () => {
     expect(slide?.fields).toEqual([]);
   });
 
+  test("a table is a shape, and each of its cells with text a body that wraps", () => {
+    const paragraph = (text: string) => ({
+      align: "left" as const,
+      lineHeight: 30,
+      spaceBefore: 0,
+      marginLeft: 0,
+      marginRight: 0,
+      indent: 0,
+      runs: [run(text)],
+    });
+    const cell = (text?: string) => ({
+      columnSpan: 1,
+      rowSpan: 1,
+      borders: {},
+      inset: { left: 0, top: 0, right: 0, bottom: 0 },
+      anchor: "top" as const,
+      paragraphs: text === undefined ? [] : [paragraph(text)],
+    });
+    const { facts } = readPackage(
+      pptxPackage(
+        deckOf([
+          {
+            description: "",
+            notes: "",
+            layers: [
+              {
+                kind: "table",
+                x: 80,
+                y: 80,
+                columns: [200, 200],
+                rows: [{ height: 40, cells: [cell("script"), cell()] }],
+              },
+            ],
+          },
+        ]),
+      ),
+    );
+    const [slide] = facts.slides;
+    expect(slide?.bodies).toEqual([
+      { wrap: true, paragraphs: [{ ink: "script", lines: 1, runs: 1, bullet: false }] },
+    ]);
+    expect(slide?.shapes).toBe(1);
+  });
+
   test("a part the file points at and does not hold is a problem", () => {
     const whole = readZip(file());
     whole.delete("ppt/media/image1.png");

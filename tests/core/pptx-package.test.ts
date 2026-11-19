@@ -7,6 +7,7 @@ import {
   type PptxRun,
   type PptxShape,
   type PptxSlide,
+  type PptxTable,
   type PptxTheme,
   pptxPackage,
 } from "../../src/core/pptx-package.ts";
@@ -142,6 +143,68 @@ const card = (overrides: Partial<PptxShape> = {}): PptxShape => ({
     },
   ],
   ...overrides,
+});
+
+const paragraph = (text: string, size = 16) => ({
+  align: "left" as const,
+  lineHeight: size * 1.5,
+  spaceBefore: 0,
+  marginLeft: 0,
+  marginRight: 0,
+  indent: 0,
+  runs: [run(text, { size })],
+});
+
+const line = (width: number, color: [number, number, number]) => ({
+  width,
+  paint: { color, alpha: 1 },
+});
+
+const NO_INSET = { left: 0, top: 0, right: 0, bottom: 0 };
+
+// Three columns and two rows: A two by two at the left, B above C at the right.
+const table = (): PptxTable => ({
+  kind: "table",
+  x: 40,
+  y: 60,
+  columns: [100, 200, 100],
+  rows: [
+    {
+      height: 30,
+      cells: [
+        {
+          columnSpan: 2,
+          rowSpan: 2,
+          fill: { color: [241, 245, 249], alpha: 1 },
+          borders: { right: line(1, [0, 0, 255]), bottom: line(1, [128, 128, 128]) },
+          inset: { left: 8, top: 4, right: 8, bottom: 4 },
+          anchor: "middle",
+          paragraphs: [paragraph("A")],
+        },
+        {
+          columnSpan: 1,
+          rowSpan: 1,
+          borders: { bottom: line(2, [0, 0, 0]) },
+          inset: NO_INSET,
+          anchor: "top",
+          paragraphs: [paragraph("B")],
+        },
+      ],
+    },
+    {
+      height: 30,
+      cells: [
+        {
+          columnSpan: 1,
+          rowSpan: 1,
+          borders: { top: line(1, [255, 0, 0]), left: line(1, [0, 255, 0]) },
+          inset: NO_INSET,
+          anchor: "bottom",
+          paragraphs: [paragraph("C", 14)],
+        },
+      ],
+    },
+  ],
 });
 
 function open(slides: PptxSlide[], deck: Partial<PptxDeck> = {}) {
@@ -489,6 +552,95 @@ describe("pptxPackage", () => {
     expect(read("a:chExt")).toEqual(read("a:ext"));
     const ids = [...doc.getElementsByTagName("p:cNvPr")].map((el) => el.getAttribute("id"));
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test("writes a table as PowerPoint's own, its grid's columns and rows, its merged cells spread", () => {
+    const { xml } = open([slide({ layers: [table()] })]);
+    type Element = ReturnType<ReturnType<typeof xml>["getElementsByTagName"]>[number];
+    const doc = xml("ppt/slides/slide1.xml");
+    const frame = doc.getElementsByTagName("p:graphicFrame")[0];
+    expect([...(frame?.children ?? [])].map((el) => el.tagName)).toEqual([
+      "p:nvGraphicFramePr",
+      "p:xfrm",
+      "a:graphic",
+    ]);
+    expect(frame?.getElementsByTagName("a:graphicFrameLocks")[0]?.getAttribute("noGrp")).toBe("1");
+    const off = frame?.getElementsByTagName("a:off")[0];
+    const ext = frame?.getElementsByTagName("a:ext")[0];
+    expect([off?.getAttribute("x"), off?.getAttribute("y")]).toEqual(["381000", "571500"]);
+    expect([ext?.getAttribute("cx"), ext?.getAttribute("cy")]).toEqual(["3810000", "571500"]);
+    expect(frame?.getElementsByTagName("a:graphicData")[0]?.getAttribute("uri")).toBe(
+      "http://schemas.openxmlformats.org/drawingml/2006/table",
+    );
+    const tbl = frame?.getElementsByTagName("a:tbl")[0];
+    // No table style: what each cell paints is what the JSON says, and nothing is banded.
+    expect(tbl?.getElementsByTagName("a:tableStyleId")).toHaveLength(0);
+    expect(
+      [...(tbl?.getElementsByTagName("a:gridCol") ?? [])].map((el) => el.getAttribute("w")),
+    ).toEqual(["952500", "1905000", "952500"]);
+    const rows = [...(tbl?.getElementsByTagName("a:tr") ?? [])];
+    expect(rows.map((el) => el.getAttribute("h"))).toEqual(["285750", "285750"]);
+    // Every place on the grid is a cell; one a merged cell covers says so, as PowerPoint's do.
+    const cells = rows.map((row) => [...row.getElementsByTagName("a:tc")]);
+    const merged = (cell: Element | undefined) =>
+      ["gridSpan", "rowSpan", "hMerge", "vMerge"]
+        .filter((name) => cell?.hasAttribute(name))
+        .map((name) => `${name}=${cell?.getAttribute(name)}`)
+        .join(" ");
+    expect(cells.map((row) => row.map(merged))).toEqual([
+      ["gridSpan=2 rowSpan=2", "hMerge=1", ""],
+      ["vMerge=1", "hMerge=1 vMerge=1", ""],
+    ]);
+    const text = (cell: Element | undefined) =>
+      [...(cell?.getElementsByTagName("a:t") ?? [])].map((el) => el.textContent).join("");
+    expect(cells.map((row) => row.map(text))).toEqual([
+      ["A", "", "B"],
+      ["", "", "C"],
+    ]);
+    const [a, , b] = cells[0] ?? [];
+    const [covered, , c] = cells[1] ?? [];
+    // A cell holds a body with a paragraph, a covered one an empty paragraph as small as the
+    // table's smallest text, so it makes no row taller than its text does.
+    expect(covered?.getElementsByTagName("a:txBody")).toHaveLength(1);
+    expect(covered?.getElementsByTagName("a:endParaRPr")[0]?.getAttribute("sz")).toBe("1050");
+    const properties = a?.getElementsByTagName("a:tcPr")[0];
+    expect([...(properties?.children ?? [])].map((el) => el.tagName)).toEqual([
+      "a:lnL",
+      "a:lnR",
+      "a:lnT",
+      "a:lnB",
+      "a:solidFill",
+    ]);
+    expect(
+      ["marL", "marT", "marR", "marB", "anchor"].map((name) => properties?.getAttribute(name)),
+    ).toEqual(["76200", "38100", "76200", "38100", "ctr"]);
+    expect(b?.getElementsByTagName("a:tcPr")[0]?.getAttribute("anchor")).toBe("t");
+    expect(c?.getElementsByTagName("a:tcPr")[0]?.getAttribute("anchor")).toBe("b");
+    expect(b?.getElementsByTagName("a:tcPr")[0]?.lastElementChild?.tagName).toBe("a:noFill");
+    const side = (cell: Element | undefined, tag: string) => {
+      const el = cell?.getElementsByTagName(tag)[0];
+      return el?.getElementsByTagName("a:noFill").length
+        ? "none"
+        : `${el?.getAttribute("w")} ${el?.getElementsByTagName("a:srgbClr")[0]?.getAttribute("val")}`;
+    };
+    // A border two cells share is the wider of their two, written on both: B's 2 px over C's 1.
+    expect([side(b, "a:lnB"), side(c, "a:lnT")]).toEqual(["19050 000000", "19050 000000"]);
+    // As wide, the one to the left wins: A's blue over C's green, and over B's none.
+    expect([side(cells[1]?.[1], "a:lnR"), side(c, "a:lnL")]).toEqual([
+      "9525 0000FF",
+      "9525 0000FF",
+    ]);
+    expect([side(cells[0]?.[1], "a:lnR"), side(b, "a:lnL")]).toEqual([
+      "9525 0000FF",
+      "9525 0000FF",
+    ]);
+    // A merged cell's own side is drawn along each place it covers.
+    expect([side(covered, "a:lnB"), side(cells[1]?.[1], "a:lnB")]).toEqual([
+      "9525 808080",
+      "9525 808080",
+    ]);
+    // The cell where it starts carries its far sides too, as PowerPoint writes a merge it made.
+    expect([side(a, "a:lnB"), side(a, "a:lnR")]).toEqual(["9525 808080", "9525 0000FF"]);
   });
 
   test("draws a rule as a straight line on its midline, flat at the ends", () => {

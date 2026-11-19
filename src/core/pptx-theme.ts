@@ -87,6 +87,12 @@ function* runsOf<I>(
       if (layer.kind === "shape") {
         yield* runsOf(layer.layers);
       }
+    } else if (layer.kind === "table") {
+      for (const cell of layer.rows.flatMap((row) => row.cells)) {
+        for (const run of cell.paragraphs.flatMap((paragraph) => paragraph.runs)) {
+          yield { run, title: false };
+        }
+      }
     }
   }
 }

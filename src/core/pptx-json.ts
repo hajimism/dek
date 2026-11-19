@@ -10,7 +10,10 @@ import {
   type PptxRun,
   type PptxShapeText,
   type PptxSlide,
+  type PptxTable,
+  type PptxTableCell,
   type PptxTheme,
+  tableGrid,
 } from "./pptx-package.ts";
 
 // A PPTX as a file an agent edits: what `dekc pptx` would write, in JSON, for `dekc pptx --from`
@@ -72,10 +75,66 @@ const paragraphJson = z.strictObject({
   runs: z.array(runJson).min(1),
 });
 
+const insetJson = z.strictObject({ left: length, top: length, right: length, bottom: length });
+
 const shapeTextJson = z.strictObject({
-  inset: z.strictObject({ left: length, top: length, right: length, bottom: length }).optional(),
+  inset: insetJson.optional(),
   wrap: z.boolean().optional().describe("whether PowerPoint wraps it; true when left out"),
   paragraphs: z.array(paragraphJson).min(1),
+});
+
+const cellBorderJson = z.strictObject({
+  width: z.number().positive(),
+  paint: paintJson,
+  dash: z.enum(["dash", "dot"]).optional(),
+});
+
+const cellJson = z.strictObject({
+  columnSpan: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe("the columns it takes from where it starts; 1 when left out"),
+  rowSpan: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe("the rows it takes from where it starts; 1 when left out"),
+  fill: paintJson.optional(),
+  borders: z
+    .strictObject({
+      top: cellBorderJson.optional(),
+      right: cellBorderJson.optional(),
+      bottom: cellBorderJson.optional(),
+      left: cellBorderJson.optional(),
+    })
+    .optional()
+    .describe(
+      "on the grid's lines; a line two cells share is the wider of their two, the one above or to the left where they are as wide",
+    ),
+  inset: insetJson.optional().describe("px from the cell's edges to its text; 0 when left out"),
+  anchor: z
+    .enum(["top", "middle", "bottom"])
+    .optional()
+    .describe("where its text sits between its top and bottom insets; top when left out"),
+  paragraphs: z
+    .array(paragraphJson)
+    .optional()
+    .describe("its text, which PowerPoint wraps; an empty cell when left out"),
+});
+
+const rowJson = z.strictObject({
+  height: z
+    .number()
+    .positive()
+    .describe("px; PowerPoint makes a row taller where its text needs more"),
+  cells: z
+    .array(cellJson)
+    .describe(
+      "the cells that start in the row, from the left, past those of rows above that reach into it",
+    ),
 });
 
 const rect = { x: length, y: length, width: length.nonnegative(), height: length.nonnegative() };
@@ -122,6 +181,13 @@ type LayerJson =
       y2: number;
       width: number;
       paint: z.infer<typeof paintJson>;
+    }
+  | {
+      kind: "table";
+      x: number;
+      y: number;
+      columns: number[];
+      rows: z.infer<typeof rowJson>[];
     }
   | {
       kind: "picture";
@@ -182,6 +248,28 @@ const layerJson: z.ZodType<LayerJson> = z.lazy(() =>
       width: z.number().positive(),
       paint: paintJson,
     }),
+    z
+      .strictObject({
+        kind: z.literal("table"),
+        x: length,
+        y: length,
+        columns: z
+          .array(z.number().positive())
+          .min(1)
+          .describe("each column's width, px, from the left"),
+        rows: z.array(rowJson).min(1),
+      })
+      .describe("a table PowerPoint's own, its cells' text editable and wrapped in them")
+      .superRefine((table, context) => {
+        const placed = tableGrid(table.columns.length, table.rows);
+        if ("error" in placed) {
+          context.addIssue({
+            code: "custom",
+            message: `the cells do not fill the table's grid: ${placed.error}`,
+            path: ["rows"],
+          });
+        }
+      }),
     z.strictObject({
       kind: z.literal("picture"),
       ...rect,
@@ -373,6 +461,82 @@ function shapeTextFromJson(text: z.infer<typeof shapeTextJson>): PptxShapeText {
   };
 }
 
+function cellToJson(cell: PptxTableCell): z.infer<typeof cellJson> {
+  const borders = Object.fromEntries(
+    Object.entries(cell.borders).map(([side, border]) => [
+      side,
+      {
+        width: round(border.width),
+        paint: paintToJson(border.paint),
+        ...(border.dash ? { dash: border.dash } : {}),
+      },
+    ]),
+  );
+  const inset = Object.values(cell.inset).some((side) => side !== 0)
+    ? {
+        left: round(cell.inset.left),
+        top: round(cell.inset.top),
+        right: round(cell.inset.right),
+        bottom: round(cell.inset.bottom),
+      }
+    : undefined;
+  return {
+    ...(cell.columnSpan > 1 ? { columnSpan: cell.columnSpan } : {}),
+    ...(cell.rowSpan > 1 ? { rowSpan: cell.rowSpan } : {}),
+    ...(cell.fill ? { fill: paintToJson(cell.fill) } : {}),
+    ...(Object.keys(borders).length > 0 ? { borders } : {}),
+    ...(inset ? { inset } : {}),
+    ...(cell.anchor === "top" ? {} : { anchor: cell.anchor }),
+    ...(cell.paragraphs.length > 0 ? { paragraphs: cell.paragraphs.map(paragraphToJson) } : {}),
+  };
+}
+
+function cellFromJson(cell: z.infer<typeof cellJson>): PptxTableCell {
+  const borders: PptxTableCell["borders"] = {};
+  for (const side of ["top", "right", "bottom", "left"] as const) {
+    const border = cell.borders?.[side];
+    if (border) {
+      borders[side] = {
+        width: border.width,
+        paint: paintFromJson(border.paint),
+        ...(border.dash ? { dash: border.dash } : {}),
+      };
+    }
+  }
+  return {
+    columnSpan: cell.columnSpan ?? 1,
+    rowSpan: cell.rowSpan ?? 1,
+    ...(cell.fill ? { fill: paintFromJson(cell.fill) } : {}),
+    borders,
+    inset: cell.inset ?? NO_INSET,
+    anchor: cell.anchor ?? "top",
+    paragraphs: (cell.paragraphs ?? []).map(paragraphFromJson),
+  };
+}
+
+function tableToJson(table: PptxTable): PptxJsonLayer {
+  return {
+    kind: "table",
+    x: round(table.x),
+    y: round(table.y),
+    columns: table.columns.map(round),
+    rows: table.rows.map((row) => ({
+      height: round(row.height),
+      cells: row.cells.map(cellToJson),
+    })),
+  };
+}
+
+function tableFromJson(table: Extract<PptxJsonLayer, { kind: "table" }>): PptxTable {
+  return {
+    kind: "table",
+    x: table.x,
+    y: table.y,
+    columns: table.columns,
+    rows: table.rows.map((row) => ({ height: row.height, cells: row.cells.map(cellFromJson) })),
+  };
+}
+
 const rectToJson = (layer: { x: number; y: number; width: number; height: number }) => ({
   x: round(layer.x),
   y: round(layer.y),
@@ -444,6 +608,8 @@ export function layersToJson<I>(
           width: round(layer.width),
           paint: paintToJson(layer.paint),
         };
+      case "table":
+        return tableToJson(layer);
       case "picture": {
         const { kind: _kind, x, y, width, height, description, rotate, ...image } = layer;
         return {
@@ -518,6 +684,8 @@ export function layersFromJson(
         };
       case "rule":
         return { ...layer, paint: paintFromJson(layer.paint) };
+      case "table":
+        return tableFromJson(layer);
       case "picture":
         return {
           kind: "picture",
