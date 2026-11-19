@@ -9,7 +9,7 @@ import type { LineBreakKind } from "./line-break.ts";
 import { type Collision, EDGES, type Overflow } from "./overflow.ts";
 import { moduleFilePath } from "./path.ts";
 import type { PptxFill, PptxLayer, PptxTextBox } from "./pptx-package.ts";
-import type { SpecPage } from "./pptx-spec-page.ts";
+import type { PptxSpecPart, SpecPage } from "./pptx-spec-page.ts";
 import type { PptxPageTheme } from "./pptx-theme.ts";
 import { chromiumFailure, launchFailure, runDrawingWorker, type SandboxMode } from "./sandbox.ts";
 import type { MotionBeat, SheetSpec } from "./sheet.ts";
@@ -126,7 +126,7 @@ export type PptxResponse = {
     /** What the slide is made of, when the request asked for its spec. */
     outline?: SpecPage;
     /** Each part drawn alone: its node's index and the PNG it was drawn to. */
-    parts?: Array<{ node: number; png: string }>;
+    parts?: PptxSpecPart[];
   }>;
 };
 

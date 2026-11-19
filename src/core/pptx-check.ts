@@ -20,6 +20,9 @@ const SLIDE_SIZED = 0.9;
 /** How far a layer may lie from the box the slide shows its text in, in pixels. */
 const NEAR = 12;
 
+/** How much wider than its box a line may be set before PowerPoint wraps it, in pixels. */
+const FIT = 2;
+
 /** How much of the slide a layer may pass its edge by, in pixels, as a shadow or a bleed. */
 const BLEED = 2;
 
@@ -52,13 +55,30 @@ export function checkPptxJson(json: PptxJson, spec: PptxSpec): Diagnostic[] {
     }
     const { slug } = slide;
     const layers = flatten(slide.layers);
-    if (!layers.some((layer) => layer.kind === "prose" && layer.title === true)) {
+    const titles = layers.filter((layer) => layer.kind === "prose" && layer.title === true);
+    if (titles.length === 0) {
       diagnostics.push({
         id: "pptx-title",
         severity: "error",
         slug,
         message: `no layer is the slide's title "${reference.title}"`,
         hint: 'set the heading as a prose layer with "title": true, outside any shape',
+      });
+    } else if (titles.length > 1) {
+      diagnostics.push({
+        id: "pptx-title",
+        severity: "error",
+        slug,
+        message: `${titles.length} layers are the slide's title; PowerPoint lists a slide by one`,
+        hint: 'keep "title": true on the heading alone',
+      });
+    } else if (titles.some((layer) => inkOf(layer) === "")) {
+      diagnostics.push({
+        id: "pptx-title",
+        severity: "error",
+        slug,
+        message: `the slide's title holds no text, so PowerPoint shows its prompt there instead of "${reference.title}"`,
+        hint: "set the heading's text in the title layer",
       });
     }
     const { missing, moved } = findText(reference.outline, layers);
@@ -86,6 +106,20 @@ export function checkPptxJson(json: PptxJson, spec: PptxSpec): Diagnostic[] {
           .join(", ")}${missing.length > 3 ? ", …" : ""}`,
         hint: "set each as text in a prose, text, or shape layer, as it reads on the slide",
         data: { missing },
+      });
+    }
+    const unfit = findUnfit(reference.outline, layers);
+    if (unfit.length > 0) {
+      diagnostics.push({
+        id: "pptx-fit",
+        severity: "warning",
+        slug,
+        message: `${unfit.length} of the slide's one-line texts will wrap in PowerPoint, which sets them wider than the browser: ${unfit
+          .slice(0, 3)
+          .map((each) => `"${clip(each.text)}" needs ${each.needs} px of ${each.width}`)
+          .join(", ")}${unfit.length > 3 ? ", …" : ""}`,
+        hint: "widen each box to what it needs and move what follows it on its row, or let it wrap where the box below leaves room",
+        data: { texts: unfit },
       });
     }
     const off = layers.filter((layer) => {
@@ -260,6 +294,56 @@ function findText(
     visit(outline);
   }
   return { missing, moved };
+}
+
+/**
+ * The texts the browser set on one line whose box in the file, wrapping, is narrower than the
+ * line PowerPoint sets: its width in the browser times its `widen`, as PowerPoint does not space
+ * it with the font's features. The box is the smallest layer over the text that holds it.
+ */
+function findUnfit(
+  outline: PptxSpecNode | undefined,
+  layers: PptxJsonLayer[],
+): Array<{ text: string; width: number; needs: number }> {
+  const held = layers
+    .map((layer) => ({ layer, box: boxOf(layer), ink: inkOf(layer) }))
+    .filter((each) => each.ink !== "");
+  const unfit: Array<{ text: string; width: number; needs: number }> = [];
+  const visit = (node: PptxSpecNode) => {
+    node.children?.forEach(visit);
+    const { text } = node;
+    const pieces = text?.pieces ?? [];
+    const ink = text?.content.replace(/\s+/g, "") ?? "";
+    if (
+      node.decoration ||
+      node.inline ||
+      !text ||
+      text.lines !== 1 ||
+      pieces.length === 0 ||
+      !ink
+    ) {
+      return;
+    }
+    const holder = held
+      .filter((each) => overlaps(each.box, node, NEAR) && holds(each.ink, ink))
+      .sort((a, b) => a.box.width * a.box.height - b.box.width * b.box.height)[0]?.layer;
+    const body =
+      holder?.kind === "prose" ? holder.text : holder?.kind === "shape" ? holder.text : undefined;
+    if (!holder || !body || body.wrap === false || holder.kind === "rule") {
+      return;
+    }
+    const left = Math.min(...pieces.map((piece) => piece.x));
+    const right = Math.max(...pieces.map((piece) => piece.x + piece.width));
+    const needs = Math.round((right - left) * (text.widen ?? 1) * 100) / 100;
+    const width = holder.width - (body.inset?.left ?? 0) - (body.inset?.right ?? 0);
+    if (needs > width + Math.max(FIT, needs * 0.005)) {
+      unfit.push({ text: text.content.trim(), width: Math.round(width * 100) / 100, needs });
+    }
+  };
+  if (outline) {
+    visit(outline);
+  }
+  return unfit;
 }
 
 /** Whether the slide shows a picture as large as `layer` where it lies: a photo, not the slide. */

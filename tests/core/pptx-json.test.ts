@@ -151,4 +151,28 @@ describe("deck.pptx.json", () => {
         .success,
     ).toBe(false);
   });
+
+  test("a color may carry its alpha as #rrggbbaa, as spec.json writes a see-through one", () => {
+    const [shape] = layersFromJson(
+      [
+        {
+          kind: "shape",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 40,
+          fill: { color: "#0f172a40" },
+          text: {
+            paragraphs: [{ runs: [{ text: "a", size: 20, color: "#00000080", alpha: 0.5 }] }],
+          },
+        },
+      ],
+      () => png,
+      () => "",
+    );
+    expect(shape).toMatchObject({
+      fill: { color: [15, 23, 42], alpha: 64 / 255 },
+      text: { paragraphs: [{ runs: [{ color: [0, 0, 0], alpha: (0.5 * 128) / 255 }] }] },
+    });
+  });
 });

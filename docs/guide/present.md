@@ -184,17 +184,18 @@ dekc pptx --from decks/talk/pptx.json --shot
 
 The file `dekc pptx` writes looks like the deck, and keeps a picture of what PowerPoint cannot draw under its shapes and text. A recipient who reworks the deck in their own PowerPoint, in their own template, wants none of it there: each block of text one box that wraps, each box a shape with its text in it, nothing behind them. Building that takes judgment about each slide, so dek leaves it to an agent, gives it what dek measured, and checks what it built. The optional skill `dek-pptx` teaches an agent the loop ([Working with AI Agents](/guide/ai)).
 
-`dekc pptx spec` writes `.cache/pptx/` in the deck's folder: `deck.pptx.json`, the file `dekc pptx` would write as JSON, with its schema beside it; `spec.json`, each slide's elements in reading order with their boxes, paint, and text, its shot, and its notes; and `parts/`, each image and each part no shape can draw, such as a gradient or a clip-path, drawn alone without its text. The agent writes the deck as that JSON, usually with a script that reads `spec.json`.
+`dekc pptx spec` writes `.cache/pptx/` in the deck's folder: `deck.pptx.json`, the file `dekc pptx` would write as JSON, with its schema beside it; `spec.json`, each slide's elements in reading order with their boxes, paint, and text, where each stretch of each line lies, its shot, and its notes; and `parts/`, each image and each part no shape can draw, such as a gradient or a clip-path, drawn alone without its text. The agent writes the deck as that JSON, usually with a script that reads `spec.json`.
 
-`dekc pptx --from <file>` writes the JSON as `dist/<deck>.pptx`, in the deck's theme, its slides' titles PowerPoint's, and checks it against `spec.json`:
+`dekc pptx --from <file>` writes the JSON as `dist/<deck>.pptx`, in the deck's theme, its slides' titles PowerPoint's, a background picture every slide shares on the slide master, and checks it against `spec.json`:
 
 | id | severity | finds |
 | --- | --- | --- |
 | `pptx-slides` | error | slides missing, added, or out of order |
-| `pptx-title` | error | a slide with no title |
+| `pptx-title` | error | a slide with no title, with two, or with one that holds no text |
 | `pptx-text` | error | a text the slide shows that the file does not hold |
 | `pptx-bounds` | error | a layer past the slide's edge |
 | `pptx-place` | warning | a text set away from where the slide shows it |
+| `pptx-fit` | warning | a one-line text in a box narrower than PowerPoint, setting it wider, needs |
 | `pptx-picture` | warning | a picture of the slide left behind, or one over most of it |
 | `pptx-lines` | warning | text set a line a box |
 | `pptx-notes` | warning | empty notes on a slide the script speaks to |

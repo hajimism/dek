@@ -196,6 +196,67 @@ describe("checkPptxJson", () => {
     expect(ids(json, reference)).toEqual(["pptx-title cover"]);
   });
 
+  test("a second title, or one with nothing in it, is a title PowerPoint shows as a prompt", () => {
+    const twice = file([
+      {
+        slug: "cover",
+        notes: "n",
+        layers: [prose("表紙", { title: true }), prose("本文です", { y: 200, title: true })],
+      },
+    ]);
+    expect(ids(twice, reference)).toEqual(["pptx-title cover"]);
+    const empty = file([
+      {
+        slug: "cover",
+        notes: "n",
+        layers: [prose("表紙"), prose("", { title: true, y: 300 }), prose("本文です", { y: 200 })],
+      },
+    ]);
+    expect(checkPptxJson(empty, reference)[0]?.message).toContain("holds no text");
+  });
+
+  test("a line the browser set on one line that PowerPoint, setting it wider, wraps", () => {
+    // 300 px of text set 10% wider needs 330 px; a box of 320 px wraps it.
+    const line = node("一行の見出し", {
+      tag: "h2",
+      heading: 2,
+      width: 320,
+      text: {
+        align: "left",
+        lines: 1,
+        lineHeight: 48,
+        content: "一行の見出し",
+        widen: 1.1,
+        runs: [],
+        pieces: [{ text: "一行の見出し", x: 72, y: 80, width: 300, height: 40 }],
+      },
+    });
+    const wide = spec([{ slug: "cover", title: "一行の見出し", texts: [line] }]);
+    const at = (width: number) =>
+      file([
+        {
+          slug: "cover",
+          notes: "n",
+          layers: [prose("一行の見出し", { title: true, width })],
+        },
+      ]);
+    const [fit] = checkPptxJson(at(320), wide);
+    expect(fit).toMatchObject({
+      id: "pptx-fit",
+      severity: "warning",
+      slug: "cover",
+      data: { texts: [{ text: "一行の見出し", width: 320, needs: 330 }] },
+    });
+    expect(ids(at(332), wide)).toEqual([]);
+    // A box that does not wrap is not wrapped, whatever its width.
+    const unwrapped = at(320);
+    const title = unwrapped.slides[0]?.layers[0];
+    if (title?.kind === "prose") {
+      title.text.wrap = false;
+    }
+    expect(ids(unwrapped, wide)).toEqual([]);
+  });
+
   test("a picture of the rest of the slide is what the rebuild is for", () => {
     const json = file([
       {

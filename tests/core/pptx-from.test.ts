@@ -262,6 +262,73 @@ describe("what the writer says for a rebuilt deck", () => {
     expect(xml).toContain('<a:xfrm rot="5400000">');
   });
 
+  test("a backdrop every slide shares is the master's, and no slide's own", () => {
+    const slide = deck.slides[0];
+    if (!slide) {
+      throw new Error("no slide");
+    }
+    const two = new Map(
+      pptxParts({ ...deck, slides: [slide, { ...slide, layers: [] }] }).map((part) => [
+        part.path,
+        part.data,
+      ]),
+    );
+    const text = (path: string) => new TextDecoder().decode(two.get(path));
+    expect(text("ppt/slideMasters/slideMaster1.xml")).toContain('<a:blip r:embed="rId4"/>');
+    expect(text("ppt/slideMasters/_rels/slideMaster1.xml.rels")).toMatch(
+      /Id="rId4"[^>]*Target="..\/media\/image\d+.png"/,
+    );
+    expect(text("ppt/slides/slide1.xml")).not.toContain("<p:bg>");
+    expect(text("ppt/slides/slide2.xml")).not.toContain("<p:bg>");
+    // A picture each slide shows apart is each slide's.
+    const apart = new Map(
+      pptxParts({
+        ...deck,
+        slides: [slide, { ...slide, backdrop: new Uint8Array([...PNG, 1]) }],
+      }).map((part) => [part.path, part.data]),
+    );
+    expect(new TextDecoder().decode(apart.get("ppt/slides/slide2.xml"))).toContain("<p:bg>");
+  });
+
+  test("a box rounded on its top side by its radius, its text where the browser set it", () => {
+    const bar: PptxDeck = {
+      ...deck,
+      slides: [
+        {
+          description: "",
+          notes: "",
+          layers: [
+            {
+              kind: "shape",
+              x: 0,
+              y: 0,
+              width: 400,
+              height: 40,
+              radius: 12,
+              geometry: "round2SameRect",
+              text: {
+                inset: { left: 16, top: 10, right: 16, bottom: 10 },
+                wrap: true,
+                paragraphs: [],
+              },
+              layers: [],
+            },
+          ],
+        },
+      ],
+    };
+    const slide = new TextDecoder().decode(
+      new Map(pptxParts(bar).map((part) => [part.path, part.data])).get("ppt/slides/slide1.xml"),
+    );
+    expect(slide).toContain('<a:gd name="adj1" fmla="val 30000"/><a:gd name="adj2" fmla="val 0"/>');
+    // PowerPoint sets its text 12 × (1 − √½) inside its top, left, and right, and the insets give
+    // that back: 10 − 3.51 px at the top, the whole 10 px at the bottom.
+    expect(slide).toMatch(/lIns="(\d+)" tIns="(\d+)" rIns="\1" bIns="95250"/);
+    expect(/tIns="(\d+)"/.exec(slide)?.[1]).toBe(
+      String(Math.round((10 - 12 * (1 - Math.SQRT1_2)) * 9525)),
+    );
+  });
+
   test("a highlighted run, and a picture as the slide's background", () => {
     expect(xml).toContain('<a:highlight><a:srgbClr val="FEF3C7"></a:srgbClr></a:highlight>');
     const embed = /<p:bg><p:bgPr><a:blipFill[^>]*><a:blip r:embed="(rId\d+)"/.exec(xml)?.[1];

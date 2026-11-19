@@ -250,7 +250,17 @@ export function pptxParts(deck: PptxDeck): Array<{ path: string; data: Uint8Arra
 
   // Each slide's own pictures are numbered after the slides' pictures, across the deck.
   const media = { next: count + 1 };
-  const slides = deck.slides.map((slide) => slideParts(slide, deck, media));
+  // A backdrop every slide has, the same picture on each, is the master's: a recipient changes
+  // it once, in the slide master, and a slide's own background stays theirs to set.
+  const shared = sharedBackdrop(deck.slides);
+  const backdrop = shared ? `image${media.next++}.png` : undefined;
+  const slides = deck.slides.map((slide) =>
+    slideParts(
+      shared ? { ...slide, backdrop: undefined, background: undefined } : slide,
+      deck,
+      media,
+    ),
+  );
   add(
     "[Content_Types].xml",
     contentTypes(
@@ -292,13 +302,14 @@ export function pptxParts(deck: PptxDeck): Array<{ path: string; data: Uint8Arra
   );
   add("ppt/theme/theme1.xml", theme("dek", deck.theme));
   add("ppt/theme/theme2.xml", theme("dek notes"));
-  add("ppt/slideMasters/slideMaster1.xml", slideMaster(deck.size));
+  add("ppt/slideMasters/slideMaster1.xml", slideMaster(deck.size, backdrop !== undefined));
   add(
     "ppt/slideMasters/_rels/slideMaster1.xml.rels",
     relationships([
       [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout1.xml"],
       [`${NS.rel}/slideLayout`, "../slideLayouts/slideLayout2.xml"],
       [`${NS.rel}/theme`, "../theme/theme1.xml"],
+      ...(backdrop ? [[`${NS.rel}/image`, `../media/${backdrop}`] as [string, string]] : []),
     ]),
   );
   for (const [n, xml] of [slideLayout(), titleLayout()].entries()) {
@@ -328,6 +339,9 @@ export function pptxParts(deck: PptxDeck): Array<{ path: string; data: Uint8Arra
     parts.push({ path: `ppt/media/${path}`, data });
     return path;
   };
+  if (backdrop && shared) {
+    store(backdrop, shared);
+  }
   deck.slides.forEach((slide, index) => {
     const n = index + 1;
     const written = slides[index];
@@ -430,9 +444,28 @@ const TITLE = '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="
  * layout to take after. A slide's own title says where it lies and how it is set, so nothing
  * of this one shows but in a slide someone adds.
  */
-function slideMaster(size: { width: number; height: number }): string {
+function slideMaster(size: { width: number; height: number }, backdrop = false): string {
   const title = `<p:sp><p:nvSpPr><p:cNvPr id="2" name="Title Placeholder 1"/>${TITLE}</p:nvSpPr><p:spPr>${transform({ x: size.width * 0.05, y: size.height * 0.08, width: size.width * 0.9, height: size.height * 0.16 })}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
-  return `${DECL}<p:sldMaster ${PML}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${GROUP}${title}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/><p:sldLayoutId id="2147483650" r:id="rId2"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${LEVEL}</p:titleStyle><p:bodyStyle>${LEVEL}</p:bodyStyle><p:otherStyle>${LEVEL}</p:otherStyle></p:txStyles></p:sldMaster>`;
+  const background = backdrop
+    ? `<p:bg><p:bgPr><a:blipFill dpi="0" rotWithShape="1"><a:blip r:embed="rId4"/><a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>`
+    : '<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>';
+  return `${DECL}<p:sldMaster ${PML}><p:cSld>${background}<p:spTree>${GROUP}${title}</p:spTree></p:cSld>${CLR_MAP}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/><p:sldLayoutId id="2147483650" r:id="rId2"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle>${LEVEL}</p:titleStyle><p:bodyStyle>${LEVEL}</p:bodyStyle><p:otherStyle>${LEVEL}</p:otherStyle></p:txStyles></p:sldMaster>`;
+}
+
+/** The backdrop every slide has, when it is the same picture on each of two or more. */
+function sharedBackdrop(slides: PptxSlide[]): Uint8Array | undefined {
+  const [first] = slides;
+  const backdrop = first?.backdrop;
+  return slides.length > 1 &&
+    backdrop !== undefined &&
+    slides.every(
+      (slide) =>
+        slide.backdrop !== undefined &&
+        slide.backdrop.length === backdrop.length &&
+        slide.backdrop.every((byte, at) => byte === backdrop[at]),
+    )
+    ? backdrop
+    : undefined;
 }
 
 /** The layout of a slide with no title: nothing of its own. */
@@ -582,8 +615,15 @@ function shapeSp(shape: PptxShape, id: number, style: Style): string {
   const path = pathOf(shape);
   const radius = Math.max(0, shape.radius - half);
   const shorter = Math.min(path.width, path.height);
+  // A rectangle rounded on its top side is rounded by the shape's radius, as a rounded one is,
+  // and by PowerPoint's own sixth of its shorter side without one.
+  const top = shape.geometry === "round2SameRect";
+  const rounded = top && radius === 0 ? shorter / 6 : radius;
+  const rounding = shorter > 0 ? Math.min(50000, Math.round((rounded / shorter) * 100000)) : 0;
   const geometry = shape.geometry
-    ? `<a:prstGeom prst="${shape.geometry}"><a:avLst/></a:prstGeom>`
+    ? top
+      ? `<a:prstGeom prst="round2SameRect"><a:avLst><a:gd name="adj1" fmla="val ${rounding}"/><a:gd name="adj2" fmla="val 0"/></a:avLst></a:prstGeom>`
+      : `<a:prstGeom prst="${shape.geometry}"><a:avLst/></a:prstGeom>`
     : radius > 0 && shorter > 0
       ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.min(50000, Math.round((radius / shorter) * 100000))}"/></a:avLst></a:prstGeom>`
       : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
@@ -599,10 +639,17 @@ function shapeSp(shape: PptxShape, id: number, style: Style): string {
     ? `<a:effectLst><a:outerShdw blurRad="${emu(shadow.blur)}" dist="${emu(Math.hypot(shadow.x, shadow.y))}" dir="${Math.round((((((Math.atan2(shadow.y, shadow.x) * 180) / Math.PI) % 360) + 360) % 360) * 60000)}" algn="ctr" rotWithShape="0">${colorXml(shadow.paint, style.theme)}</a:outerShdw></a:effectLst>`
     : "";
   // A rounded rectangle's own text area starts inside its corners' curve, by the corner's
-  // radius less its reach at 45 degrees, on every side: the insets give that back, so the text
-  // is set where the browser set it.
-  const curve = shape.geometry ? 0 : Math.min(radius, shorter / 2) * (1 - Math.SQRT1_2);
-  const text = shape.text ? shapeText(shape.text, half + curve, style) : "";
+  // radius less its reach at 45 degrees, on every side, and one rounded on its top side's on
+  // every side but the bottom: the insets give that back, so the text is set where the browser
+  // set it.
+  const curve = !shape.geometry || top ? Math.min(rounded, shorter / 2) * (1 - Math.SQRT1_2) : 0;
+  const taken = {
+    left: half + curve,
+    top: half + curve,
+    right: half + curve,
+    bottom: half + (top ? 0 : curve),
+  };
+  const text = shape.text ? shapeText(shape.text, taken, style) : "";
   return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path, shape.rotate)}${geometry}${fill}${line}${effects}</p:spPr>${text}</p:sp>`;
 }
 
@@ -615,16 +662,18 @@ function proseXml(prose: PptxProse, id: number, style: Style): string {
   const named = prose.title
     ? `<p:cNvPr id="${id}" name="Title ${id - 2}"/>${TITLE}`
     : `<p:cNvPr id="${id}" name="Text ${id - 2}"/><p:cNvSpPr txBox="1"/><p:nvPr/>`;
-  return `<p:sp><p:nvSpPr>${named}</p:nvSpPr><p:spPr>${transform(prose)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>${shapeText(prose.text, 0, style)}</p:sp>`;
+  return `<p:sp><p:nvSpPr>${named}</p:nvSpPr><p:spPr>${transform(prose)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>${shapeText(prose.text, { left: 0, top: 0, right: 0, bottom: 0 }, style)}</p:sp>`;
 }
 
 const ALIGN = { left: "l", center: "ctr", right: "r", justify: "just" } as const;
 
+type Sides = { left: number; top: number; right: number; bottom: number };
+
 /** A shape's text, set inside its insets less what the shape's own path and text area took. */
-function shapeText(text: PptxShapeText, taken: number, style: Style): string {
-  const inset = (px: number) => emu(Math.max(0, px - taken));
+function shapeText(text: PptxShapeText, taken: Sides, style: Style): string {
+  const inset = (side: keyof Sides) => emu(Math.max(0, text.inset[side] - taken[side]));
   const paragraphs = text.paragraphs.map((paragraph) => paragraphXml(paragraph, style)).join("");
-  return `<p:txBody><a:bodyPr wrap="${text.wrap ? "square" : "none"}" lIns="${inset(text.inset.left)}" tIns="${inset(text.inset.top)}" rIns="${inset(text.inset.right)}" bIns="${inset(text.inset.bottom)}" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs || "<a:p/>"}</p:txBody>`;
+  return `<p:txBody><a:bodyPr wrap="${text.wrap ? "square" : "none"}" lIns="${inset("left")}" tIns="${inset("top")}" rIns="${inset("right")}" bIns="${inset("bottom")}" rtlCol="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs || "<a:p/>"}</p:txBody>`;
 }
 
 function paragraphXml(paragraph: PptxParagraph, style: Style): string {

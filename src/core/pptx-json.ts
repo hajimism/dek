@@ -20,8 +20,8 @@ import {
 
 const hex = z
   .string()
-  .regex(/^#[0-9a-fA-F]{6}$/, "a color is #rrggbb")
-  .describe("#rrggbb");
+  .regex(/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/, "a color is #rrggbb, or #rrggbbaa")
+  .describe("#rrggbb, or #rrggbbaa with its alpha, which multiplies an alpha beside it");
 const unit = z.number().min(0).max(1);
 const length = z.number().finite();
 
@@ -244,8 +244,13 @@ export function hexOf([r, g, b]: Rgb): string {
 }
 
 export function rgbOf(color: string): Rgb {
-  const value = Number.parseInt(color.slice(1), 16);
+  const value = Number.parseInt(color.slice(1, 7), 16);
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
+/** The alpha a `#rrggbbaa` color carries, 1 for `#rrggbb`. */
+function alphaOf(color: string): number {
+  return color.length === 9 ? Number.parseInt(color.slice(7), 16) / 255 : 1;
 }
 
 /** Two decimals are a hundredth of a pixel: closer than any renderer places anything. */
@@ -256,7 +261,7 @@ function paintToJson({ color, alpha }: PptxPaint): z.infer<typeof paintJson> {
 }
 
 function paintFromJson({ color, alpha }: z.infer<typeof paintJson>): PptxPaint {
-  return { color: rgbOf(color), alpha: alpha ?? 1 };
+  return { color: rgbOf(color), alpha: (alpha ?? 1) * alphaOf(color) };
 }
 
 function fillToJson(fill: PptxFill): z.infer<typeof fillJson> {
@@ -306,7 +311,7 @@ function runFromJson(run: z.infer<typeof runJson>): PptxRun {
     underline: run.underline ?? false,
     strike: run.strike ?? false,
     color: rgbOf(run.color),
-    alpha: run.alpha ?? 1,
+    alpha: (run.alpha ?? 1) * alphaOf(run.color),
     letterSpacing: run.letterSpacing ?? 0,
     ...(run.font === undefined ? {} : { font: run.font }),
     ...(run.ea === undefined ? {} : { ea: run.ea }),

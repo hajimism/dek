@@ -28,6 +28,9 @@ export type SpecPageRun = {
   letterSpacing?: number;
 };
 
+/** A stretch of a line set without a gap, and where the browser set it. */
+export type SpecPagePiece = SpecPageRect & { text: string };
+
 /** A block's text: its runs in order, a line break as `\n`, and how the browser set it. */
 export type SpecPageText = {
   runs: SpecPageRun[];
@@ -36,6 +39,11 @@ export type SpecPageText = {
   lineHeight: number;
   /** How many lines the browser broke it into. */
   lines: number;
+  /**
+   * Its own characters as the browser placed them: each stretch of a line set without a gap, in
+   * reading order. A gutter, a swatch, or a margin between words starts a stretch of its own.
+   */
+  pieces: SpecPagePiece[];
   /** Whether the browser keeps its spaces and breaks, as in `<pre>`. */
   pre: boolean;
   /**
@@ -48,11 +56,37 @@ export type SpecPageText = {
 /** Why a node is offered as a picture: what it shows that a shape and its text cannot say. */
 type SpecPagePicture = "image" | "svg" | "canvas" | "video" | "background" | "drawn";
 
-/** A pseudo-element's text: how it is set, and, once read, what it says and where. */
+/** A border, as one side or all four draw it. */
+type SpecPageBorder = { width: number; color: string; style?: "dashed" | "dotted" };
+
+/** One of a box's shadows, as CSS casts it: its color, offset, blur, and spread. */
+export type SpecPageShadow = {
+  x: number;
+  y: number;
+  blur: number;
+  spread: number;
+  color: string;
+  inset?: true;
+};
+
+/**
+ * A pseudo-element that writes text or paints: how it is set, what it paints, and, once read from
+ * Chromium's layout, what it says and where its box lies.
+ */
 type SpecPageMark = {
   pseudo: "before" | "after";
   run: Omit<SpecPageRun, "text">;
+  lineHeight: number;
+  paint?: {
+    fill?: string;
+    border?: SpecPageBorder;
+    radius?: number;
+    rotate?: number;
+    /** What a shape cannot draw of it, as a node's `drawn`. */
+    drawn?: string[];
+  };
   text?: string;
+  lines?: number;
   rect?: SpecPageRect;
 };
 
@@ -64,15 +98,15 @@ export type SpecPageNode = {
   rect: SpecPageRect;
   /** Its background color, when it paints one. */
   fill?: string;
-  border?: { width: number; color: string; style?: "dashed" | "dotted" };
+  border?: SpecPageBorder;
   /** Borders that differ per side. */
-  sides?: Partial<Record<"top" | "right" | "bottom" | "left", { width: number; color: string }>>;
+  sides?: Partial<Record<"top" | "right" | "bottom" | "left", SpecPageBorder>>;
   radius?: number;
   /** From the border to the content, where it has any. */
   padding?: { top: number; right: number; bottom: number; left: number };
   /** A CSS outline: drawn outside the border, by `offset` more. */
   outline?: { width: number; color: string; offset: number };
-  shadow?: string;
+  shadow?: SpecPageShadow[];
   opacity?: number;
   /** How far a transform turns it, in degrees clockwise. */
   rotate?: number;
@@ -87,8 +121,8 @@ export type SpecPageNode = {
   /** An inline box in its block's line, such as a chip, whose text is in the block's text too. */
   inline?: true;
   /**
-   * Its `::before` and `::after` that write text, as they are set; what each writes, counters
-   * counted, and where, are read from Chromium's layout after the walk.
+   * Its `::before` and `::after` that write text or paint, as they are set; what each writes,
+   * counters counted, and where its box lies are read from Chromium's layout after the walk.
    */
   marks?: SpecPageMark[];
   /** An image's source, as the page has it. */
@@ -108,6 +142,9 @@ export type SpecPage = {
   /** Each `--font-*` custom property, as the `font-family` it is. */
   fonts: Record<string, string>;
 };
+
+/** A part drawn alone: a node's, or one of its pseudo-elements'. */
+export type PptxSpecPart = { node: number; pseudo?: "before" | "after"; png: string };
 
 export const SPEC_NODE_ATTR = "data-dek-spec";
 
@@ -158,8 +195,9 @@ export function measurePptxSpecInPage(): SpecPage | null {
     if (!color || color === "transparent") {
       return false;
     }
-    const alpha = /rgba?\([^)]*[,/]\s*([\d.]+)\s*\)/.exec(color);
-    return !alpha || Number(alpha[1]) > 0;
+    // Its alpha is rgba()'s fourth number, or what follows a slash: `rgb(255, 0, 0)` is red.
+    const alpha = /^rgba\(.*,\s*([\d.]+)\s*\)$|\/\s*([\d.]+)%?\s*\)$/.exec(color.trim());
+    return !alpha || Number(alpha[1] ?? alpha[2]) > 0;
   };
   const rectOf = (box: DOMRect): SpecPageRect => ({
     x: box.left - origin.left,
@@ -168,6 +206,56 @@ export function measurePptxSpecInPage(): SpecPage | null {
     height: box.height,
   });
   const inline = (style: CSSStyleDeclaration): boolean => style.display.startsWith("inline");
+  const borderOf = (
+    style: CSSStyleDeclaration,
+    side: "top" | "right" | "bottom" | "left",
+  ): SpecPageBorder | undefined => {
+    const width = Number.parseFloat(style.getPropertyValue(`border-${side}-width`));
+    const color = style.getPropertyValue(`border-${side}-color`);
+    const line = style.getPropertyValue(`border-${side}-style`);
+    return width > 0 && visible(color) && line !== "none" && line !== "hidden"
+      ? { width, color, ...(line === "dashed" || line === "dotted" ? { style: line } : {}) }
+      : undefined;
+  };
+  /** Each of a `box-shadow`'s shadows, as Chromium computes it: a color, then its lengths. */
+  const shadowsOf = (value: string): SpecPageShadow[] => {
+    if (value === "none") {
+      return [];
+    }
+    const shadows: SpecPageShadow[] = [];
+    for (const each of value.split(/,(?![^(]*\))/)) {
+      const color = /(rgba?\([^)]*\)|#[0-9a-f]+|[a-z]+)(?=\s|$)/i.exec(each.trim())?.[1] ?? "";
+      const lengths = [...each.replace(color, "").matchAll(/(-?[\d.]+)px/g)].map((match) =>
+        Number(match[1]),
+      );
+      if (!visible(color) || lengths.length < 2) {
+        continue;
+      }
+      shadows.push({
+        x: lengths[0] ?? 0,
+        y: lengths[1] ?? 0,
+        blur: lengths[2] ?? 0,
+        spread: lengths[3] ?? 0,
+        color,
+        ...(/\binset\b/.test(each) ? { inset: true as const } : {}),
+      });
+    }
+    return shadows;
+  };
+  /** The color a gradient paints where it paints: a marker drawn under part of a line. */
+  const gradientColor = (image: string): string | undefined =>
+    image.includes("gradient(")
+      ? (image.match(/rgba?\([^)]*\)/g) ?? []).find((color) => visible(color))
+      : undefined;
+  const turnOf = (transform: string): number | undefined => {
+    const turn = /^matrix\(([-\d.e]+), ([-\d.e]+),/.exec(transform);
+    if (!turn) {
+      return undefined;
+    }
+    const degrees =
+      Math.round(((Math.atan2(Number(turn[2]), Number(turn[1])) * 180) / Math.PI) * 10) / 10;
+    return degrees === 0 ? undefined : degrees;
+  };
   const pseudoText = (element: Element, pseudo: "::before" | "::after"): string | undefined => {
     const content = getComputedStyle(element, pseudo).content;
     const quoted = /^"(.*)"$/s.exec(content);
@@ -209,8 +297,13 @@ export function measurePptxSpecInPage(): SpecPage | null {
   const textOf = (element: HTMLElement, style: CSSStyleDeclaration): SpecPageText | undefined => {
     const pre = /^(pre|pre-wrap|break-spaces|pre-line)$/.test(style.whiteSpace);
     const runs: SpecPageRun[] = [];
-    const push = (text: string, owner: Element, background?: string) => {
-      const own = getComputedStyle(owner);
+    const push = (
+      text: string,
+      owner: Element,
+      background?: string,
+      pseudo?: "::before" | "::after",
+    ) => {
+      const own = getComputedStyle(owner, pseudo);
       const link = owner.closest("a[href]")?.getAttribute("href") ?? undefined;
       const run: SpecPageRun = {
         text,
@@ -260,12 +353,17 @@ export function measurePptxSpecInPage(): SpecPage | null {
           } else if (inline(own) && !(child.tagName.toLowerCase() in REPLACED)) {
             const before = pseudoText(child, "::before");
             if (before) {
-              push(before, child, background);
+              push(before, child, background, "::before");
             }
-            walk(child, visible(own.backgroundColor) ? own.backgroundColor : background);
+            walk(
+              child,
+              visible(own.backgroundColor)
+                ? own.backgroundColor
+                : (gradientColor(own.backgroundImage) ?? background),
+            );
             const after = pseudoText(child, "::after");
             if (after) {
-              push(after, child, background);
+              push(after, child, background, "::after");
             }
           }
         }
@@ -286,37 +384,103 @@ export function measurePptxSpecInPage(): SpecPage | null {
       }
     }
     const kept = runs.filter((run) => run.text !== "");
-    if (!kept.some((run) => run.text.trim() !== "")) {
+    // A blank line of preformatted text, as a terminal's, is a line all the same.
+    const blank = pre && element.children.length === 0 && kept.length > 0;
+    if (!blank && !kept.some((run) => run.text.trim() !== "")) {
       return undefined;
     }
-    // Lines are counted from the text's own boxes, not those of what sits beside it.
-    const lines: Array<{ top: number; height: number; left: number; right: number }> = [];
+    // Where each of its own characters lies: lines are what share a height, and a stretch of
+    // a line ends where a gap opens, as a gutter, a swatch, or a margin leaves one.
+    type Line = { top: number; bottom: number; left: number; right: number; pieces: Piece[] };
+    type Piece = { text: string; left: number; right: number; top: number; bottom: number };
+    const lines: Line[] = [];
+    const range = document.createRange();
+    const place = (char: string, box: DOMRect, size: number) => {
+      const overlap = (line: Line) =>
+        Math.min(line.bottom, box.bottom) - Math.max(line.top, box.top);
+      const line = lines
+        .filter((each) => overlap(each) > Math.min(each.bottom - each.top, box.height) / 2)
+        .sort((a, b) => overlap(b) - overlap(a))[0];
+      if (!line) {
+        const piece = {
+          text: char,
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        };
+        lines.push({
+          top: box.top,
+          bottom: box.bottom,
+          left: box.left,
+          right: box.right,
+          pieces: [piece],
+        });
+        return;
+      }
+      line.top = Math.min(line.top, box.top);
+      line.bottom = Math.max(line.bottom, box.bottom);
+      line.left = Math.min(line.left, box.left);
+      line.right = Math.max(line.right, box.right);
+      const last = line.pieces.at(-1);
+      if (last && box.left >= last.right - 1 && box.left - last.right <= size * 0.4) {
+        last.text += char;
+        last.right = Math.max(last.right, box.right);
+        last.top = Math.min(last.top, box.top);
+        last.bottom = Math.max(last.bottom, box.bottom);
+      } else {
+        line.pieces.push({
+          text: char,
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        });
+      }
+    };
     const count = (node: Node) => {
       for (const child of node.childNodes) {
-        if (child.nodeType === Node.TEXT_NODE && (child.textContent ?? "").trim() !== "") {
-          const range = document.createRange();
-          range.selectNodeContents(child);
-          for (const box of range.getClientRects()) {
-            if (box.width <= 0) {
-              continue;
-            }
-            const line = lines.find((each) => Math.abs(each.top - box.top) < box.height / 2);
-            if (line) {
-              line.left = Math.min(line.left, box.left);
-              line.right = Math.max(line.right, box.right);
-            } else {
-              lines.push({ top: box.top, height: box.height, left: box.left, right: box.right });
+        if (child.nodeType === Node.TEXT_NODE) {
+          const data = child.textContent ?? "";
+          const size = Number.parseFloat(getComputedStyle(child.parentElement ?? element).fontSize);
+          for (let i = 0; i < data.length; ) {
+            const step = (data.codePointAt(i) ?? 0) > 0xffff ? 2 : 1;
+            const char = data.slice(i, i + step);
+            range.setStart(child, i);
+            range.setEnd(child, i + step);
+            i += step;
+            const box = [...range.getClientRects()].find((each) => each.height > 0);
+            // A space the browser collapsed, or one it hangs past a line's end, takes no room.
+            if (box && (box.width > 0 || char.trim() !== "")) {
+              place(/\s/.test(char) ? " " : char, box, size);
             }
           }
         } else if (child instanceof HTMLElement) {
           const own = getComputedStyle(child);
-          if (inline(own)) {
+          if (inline(own) && !(child.tagName.toLowerCase() in REPLACED)) {
             count(child);
           }
         }
       }
     };
     count(element);
+    lines.sort((a, b) => a.top - b.top);
+    const pieces = lines.flatMap((line) =>
+      line.pieces.flatMap((piece): SpecPagePiece[] => {
+        const text = pre ? piece.text.replace(/\s+$/, "") : piece.text.trim();
+        return text === ""
+          ? []
+          : [
+              {
+                text,
+                x: piece.left - origin.left,
+                y: piece.top - origin.top,
+                width: piece.right - piece.left,
+                height: piece.bottom - piece.top,
+              },
+            ];
+      }),
+    );
     // Where the lines sit in the content box says how they are set, a flexbox's centering too.
     const outer = element.getBoundingClientRect();
     const px = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0;
@@ -370,6 +534,7 @@ export function measurePptxSpecInPage(): SpecPage | null {
       align,
       lineHeight: Number.parseFloat(style.lineHeight),
       lines: Math.max(1, lines.length),
+      pieces,
       pre,
       ...(widen > 1 ? { widen } : {}),
     };
@@ -379,7 +544,13 @@ export function measurePptxSpecInPage(): SpecPage | null {
   const setsText = (element: Element): boolean =>
     [...element.childNodes].some((child) => {
       if (child.nodeType === Node.TEXT_NODE) {
-        return (child.textContent ?? "").trim() !== "";
+        const text = child.textContent ?? "";
+        return (
+          text.trim() !== "" ||
+          (text !== "" &&
+            element.children.length === 0 &&
+            /^(pre|pre-wrap|break-spaces)$/.test(getComputedStyle(element).whiteSpace))
+        );
       }
       if (!(child instanceof HTMLElement)) {
         return false;
@@ -392,6 +563,17 @@ export function measurePptxSpecInPage(): SpecPage | null {
           (inline(own) &&
             (pseudoText(child, "::before") ?? pseudoText(child, "::after")) !== undefined))
       );
+    });
+
+  /** What paints inside an inline run of a block's text without being text of it. */
+  const painted = (element: Element, hidden: boolean): SpecPageNode[] =>
+    [...element.children].flatMap((child) => {
+      const own = getComputedStyle(child);
+      return inline(own) &&
+        !(child.tagName.toLowerCase() in REPLACED) &&
+        (setsText(child) || child.tagName === "BR")
+        ? painted(child, hidden)
+        : visit(child, hidden, false);
     });
 
   const visit = (element: Element, hidden: boolean, root: boolean): SpecPageNode[] => {
@@ -421,23 +603,14 @@ export function measurePptxSpecInPage(): SpecPage | null {
       node.fill = style.backgroundColor;
     }
     const sides = (["top", "right", "bottom", "left"] as const).flatMap((side) => {
-      const width = Number.parseFloat(style.getPropertyValue(`border-${side}-width`));
-      const color = style.getPropertyValue(`border-${side}-color`);
-      return width > 0 &&
-        visible(color) &&
-        style.getPropertyValue(`border-${side}-style`) !== "none"
-        ? [[side, { width, color }] as const]
-        : [];
+      const border = borderOf(style, side);
+      return border ? [[side, border] as const] : [];
     });
     if (
       sides.length === 4 &&
       sides.every(([, side]) => JSON.stringify(side) === JSON.stringify(sides[0]?.[1]))
     ) {
-      const line = style.borderTopStyle;
-      node.border = {
-        ...(sides[0]?.[1] ?? { width: 0, color: "" }),
-        ...(line === "dashed" || line === "dotted" ? { style: line } : {}),
-      };
+      node.border = sides[0]?.[1] ?? { width: 0, color: "" };
     } else if (sides.length > 0) {
       node.sides = Object.fromEntries(sides);
     }
@@ -454,8 +627,9 @@ export function measurePptxSpecInPage(): SpecPage | null {
     if (Object.values(padding).some((side) => side > 0)) {
       node.padding = padding;
     }
-    if (style.boxShadow !== "none") {
-      node.shadow = style.boxShadow;
+    const shadows = shadowsOf(style.boxShadow);
+    if (shadows.length > 0) {
+      node.shadow = shadows;
     }
     const outlineWidth = Number.parseFloat(style.outlineWidth);
     if (outlineWidth > 0 && style.outlineStyle !== "none" && visible(style.outlineColor)) {
@@ -465,23 +639,38 @@ export function measurePptxSpecInPage(): SpecPage | null {
         offset: Number.parseFloat(style.outlineOffset) || 0,
       };
     }
-    const turn = /^matrix\(([-\d.e]+), ([-\d.e]+),/.exec(style.transform);
-    if (turn) {
-      const degrees =
-        Math.round(((Math.atan2(Number(turn[2]), Number(turn[1])) * 180) / Math.PI) * 10) / 10;
-      if (degrees !== 0) {
-        node.rotate = degrees;
-      }
+    const rotate = turnOf(style.transform);
+    if (rotate !== undefined) {
+      node.rotate = rotate;
     }
     if (Number(style.opacity) < 1) {
       node.opacity = Number(style.opacity);
     }
+    // What the slide's own pseudo-elements paint is its backdrop, drawn into its part; another
+    // element's is a node of its own, which may reach past its host's box.
+    const painting = pseudoPaints(element);
     const marks = (["before", "after"] as const).flatMap((pseudo): SpecPageMark[] => {
       const own = getComputedStyle(element, `::${pseudo}`);
-      if (own.content === "none" || own.content === "normal" || own.content === '""') {
+      const paints = !root && painting.includes(`::${pseudo}`);
+      if (own.content === "none" || own.content === "normal" || (own.content === '""' && !paints)) {
         return [];
       }
       const spacing = Number.parseFloat(own.letterSpacing);
+      const sides = (["top", "right", "bottom", "left"] as const).map((side) =>
+        borderOf(own, side),
+      );
+      const border = sides.every((side) => JSON.stringify(side) === JSON.stringify(sides[0]))
+        ? sides[0]
+        : undefined;
+      const radius = Number.parseFloat(own.borderTopLeftRadius);
+      const turn = turnOf(own.transform);
+      const drawn = [
+        ...(own.backgroundImage !== "none" ? ["gradient"] : []),
+        ...(own.clipPath !== "none" ? ["clip-path"] : []),
+        ...(own.maskImage !== "none" ? ["mask"] : []),
+        ...(own.filter !== "none" ? ["filter"] : []),
+        ...(sides.some(Boolean) && !border ? ["sides"] : []),
+      ];
       return [
         {
           pseudo,
@@ -495,6 +684,18 @@ export function measurePptxSpecInPage(): SpecPage | null {
             family: own.fontFamily,
             ...(spacing ? { letterSpacing: spacing } : {}),
           },
+          lineHeight: Number.parseFloat(own.lineHeight),
+          ...(paints
+            ? {
+                paint: {
+                  ...(visible(own.backgroundColor) ? { fill: own.backgroundColor } : {}),
+                  ...(border ? { border } : {}),
+                  ...(radius > 0 ? { radius } : {}),
+                  ...(turn === undefined ? {} : { rotate: turn }),
+                  ...(drawn.length > 0 ? { drawn } : {}),
+                },
+              }
+            : {}),
         },
       ];
     });
@@ -526,7 +727,7 @@ export function measurePptxSpecInPage(): SpecPage | null {
         ? ["transform"]
         : []),
       ...(style.filter !== "none" ? ["filter"] : []),
-      ...pseudoPaints(element),
+      ...(root ? painting : []),
     ];
     if (/url\(/.test(style.backgroundImage)) {
       node.picture = "background";
@@ -550,12 +751,16 @@ export function measurePptxSpecInPage(): SpecPage | null {
         !(child.tagName.toLowerCase() in REPLACED) &&
         (setsText(child) || child.tagName === "BR")
       ) {
-        // A chip in the line is a node of its own too, for its box; its text stays the block's.
-        if (boxy(own)) {
+        // A chip in the line is a node of its own too, for its box, as is a box set to a width
+        // of its own, a gutter's; its text stays the block's. What paints inside the line's
+        // words and says nothing, such as a strike drawn by an empty element, is a node.
+        if (boxy(own) || /^inline-(block|flex|grid)$/.test(own.display)) {
           for (const inner of visit(child, decoration, false)) {
             inner.inline = true;
             node.children.push(inner);
           }
+        } else {
+          node.children.push(...painted(child, decoration));
         }
         continue;
       }
@@ -615,9 +820,13 @@ export function measurePptxSpecInPage(): SpecPage | null {
 
 /**
  * Shows one node alone for its picture: everything else hidden, and for a node drawn of its own
- * paint, the elements and text inside it too, which are nodes of their own. `null` shows all.
+ * paint, the elements and text inside it too, which are nodes of their own, and its
+ * pseudo-elements unless they are its paint, as the slide's are; or one of its pseudo-elements
+ * alone. `null` shows all.
  */
-export function showPptxSpecNodeInPage(target: { index: number; alone: boolean } | null): void {
+export function showPptxSpecNodeInPage(
+  target: { index: number; alone: boolean; marks?: boolean; pseudo?: "before" | "after" } | null,
+): void {
   const NODE_ATTR = "data-dek-spec";
   const CROP_ATTR = "data-dek-spec-crop";
   const STYLE_ID = "dek-spec-crop-style";
@@ -635,14 +844,21 @@ export function showPptxSpecNodeInPage(target: { index: number; alone: boolean }
   element.setAttribute(CROP_ATTR, "");
   const style = document.createElement("style");
   style.id = STYLE_ID;
+  const crop = `[${CROP_ATTR}]`;
+  const other = target.pseudo === "before" ? "after" : "before";
   style.textContent = [
     "html, body { background: transparent !important; }",
     "body * { visibility: hidden !important; }",
-    `[${CROP_ATTR}]${target.alone ? "" : `, [${CROP_ATTR}] *`} { visibility: visible !important; }`,
+    `${crop}${target.alone ? "" : `, ${crop} *`} { visibility: visible !important; }`,
     target.alone
       ? // The text's fill alone: currentColor, which a pseudo-element's dot may paint in, stays.
-        `[${CROP_ATTR}] { -webkit-text-fill-color: transparent !important; text-shadow: none !important; }`
+        `${crop} { -webkit-text-fill-color: transparent !important; text-shadow: none !important; }`
       : "",
+    target.pseudo
+      ? `${crop} { background: none !important; border-color: transparent !important; box-shadow: none !important; outline: none !important; } ${crop}::${other} { visibility: hidden !important; }`
+      : target.alone && target.marks
+        ? `${crop}::before, ${crop}::after { visibility: hidden !important; }`
+        : "",
   ].join("\n");
   document.head.append(style);
 }

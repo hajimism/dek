@@ -13,7 +13,14 @@ import {
   themeToJson,
 } from "./pptx-json.ts";
 import type { PptxLayer, PptxRun } from "./pptx-package.ts";
-import type { SpecPageNode, SpecPageRun, SpecPageText } from "./pptx-spec-page.ts";
+import type {
+  PptxSpecPart,
+  SpecPageNode,
+  SpecPagePiece,
+  SpecPageRun,
+  SpecPageShadow,
+  SpecPageText,
+} from "./pptx-spec-page.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { outputDir, removeInside, writeInside } from "./safe-fs.ts";
 
@@ -59,11 +66,12 @@ export type PptxSpecNode = {
   height: number;
   fill?: string;
   border?: { width: number; color: string; style?: "dashed" | "dotted" };
-  sides?: Record<string, { width: number; color: string }>;
+  sides?: Record<string, { width: number; color: string; style?: "dashed" | "dotted" }>;
   radius?: number;
   padding?: { top: number; right: number; bottom: number; left: number };
   outline?: { width: number; color: string; offset: number };
-  shadow?: string;
+  /** Each of its shadows, the first drawn on top, its color as `#rrggbbaa` where it is see-through. */
+  shadow?: SpecPageShadow[];
   opacity?: number;
   rotate?: number;
   heading?: number;
@@ -82,8 +90,16 @@ export type PptxSpecNode = {
   part?: string;
   /** An image's source, as the slide's HTML has it. */
   src?: string;
-  /** Its text: all of it in `content`, and each run where they are set differently. */
-  text?: Omit<SpecPageText, "runs" | "pre"> & { pre?: true; content: string; runs: PptxSpecRun[] };
+  /**
+   * Its text: all of it in `content`, each run where they are set differently, and in `pieces`
+   * each stretch of a line as the browser placed it.
+   */
+  text?: Omit<SpecPageText, "runs" | "pre" | "pieces"> & {
+    pre?: true;
+    content: string;
+    runs: PptxSpecRun[];
+    pieces?: SpecPagePiece[];
+  };
   children?: PptxSpecNode[];
 };
 
@@ -179,7 +195,9 @@ export async function pptxSpecDeck(
     },
     slides: captured.answer.slides.map((slide, index) => {
       const section = sections[index];
-      const partOf = new Map((slide.parts ?? []).map((part) => [part.node, fromDeck(part.png)]));
+      const partOf = new Map(
+        (slide.parts ?? []).map((part) => [partKey(part), fromDeck(part.png)]),
+      );
       partCount += partOf.size;
       return {
         index: index + 1,
@@ -219,6 +237,10 @@ export async function pptxSpecDeck(
 }
 
 const round = (value: number): number => Math.round(value * 100) / 100;
+
+/** A part's key: its node's index, and its pseudo-element's name where it is one's. */
+const partKey = ({ node, pseudo }: Omit<PptxSpecPart, "png">): string =>
+  pseudo ? `${node}::${pseudo}` : String(node);
 
 /** A computed CSS color as `#rrggbb`, with its alpha as two more digits below 1. */
 function hexOfCss(color: string): string {
@@ -277,36 +299,46 @@ function facesOf<I>(layers: PptxLayer<I>[]): FaceOf {
   };
 }
 
-/** A node of the page's walk as spec.json has it, its pseudo-elements' text as nodes in it. */
+/** A node of the page's walk as spec.json has it, its pseudo-elements as nodes in it. */
 function specNode(
   node: SpecPageNode,
-  parts: ReadonlyMap<number, string>,
+  parts: ReadonlyMap<string, string>,
   fonts: Readonly<Record<string, string>> = {},
   faceOf: FaceOf = () => undefined,
 ): PptxSpecNode {
-  const part = parts.get(node.index);
+  const part = parts.get(partKey({ node: node.index }));
   const mark = (pseudo: "before" | "after"): PptxSpecNode[] =>
-    (node.marks ?? []).flatMap((each) =>
-      each.pseudo === pseudo && each.text && each.rect
-        ? [
-            {
-              tag: `::${pseudo}`,
-              x: round(each.rect.x),
-              y: round(each.rect.y),
-              width: round(each.rect.width),
-              height: round(each.rect.height),
-              ...(node.decoration ? { decoration: true as const } : {}),
-              text: {
-                align: "left",
-                lines: 1,
-                content: each.text,
-                lineHeight: 0,
-                runs: [specRun({ ...each.run, text: each.text }, fonts, faceOf)],
-              },
-            },
-          ]
-        : [],
-    );
+    (node.marks ?? []).flatMap((each): PptxSpecNode[] => {
+      if (each.pseudo !== pseudo || !each.rect || (!each.text && !each.paint)) {
+        return [];
+      }
+      const { paint } = each;
+      const own = parts.get(partKey({ node: node.index, pseudo }));
+      return [
+        {
+          tag: `::${pseudo}`,
+          ...box(each.rect),
+          ...(paint?.fill ? { fill: hexOfCss(paint.fill) } : {}),
+          ...(paint?.border ? { border: borderOf(paint.border) } : {}),
+          ...(paint?.radius ? { radius: round(paint.radius) } : {}),
+          ...(paint?.rotate === undefined ? {} : { rotate: paint.rotate }),
+          ...(node.decoration ? { decoration: true as const } : {}),
+          ...(paint?.drawn ? { picture: "drawn" as const, drawn: paint.drawn } : {}),
+          ...(own ? { part: own } : {}),
+          ...(each.text
+            ? {
+                text: {
+                  align: "left",
+                  lines: each.lines ?? 1,
+                  content: each.text,
+                  lineHeight: Number.isFinite(each.lineHeight) ? round(each.lineHeight) : 0,
+                  runs: [specRun({ ...each.run, text: each.text }, fonts, faceOf)],
+                },
+              }
+            : {}),
+        },
+      ];
+    });
   const children = [
     ...mark("before"),
     ...node.children.map((child) => specNode(child, parts, fonts, faceOf)),
@@ -315,26 +347,31 @@ function specNode(
   return {
     tag: node.tag,
     ...(node.classes.length > 0 ? { class: node.classes.join(" ") } : {}),
-    x: round(node.rect.x),
-    y: round(node.rect.y),
-    width: round(node.rect.width),
-    height: round(node.rect.height),
+    ...box(node.rect),
     ...(node.fill ? { fill: hexOfCss(node.fill) } : {}),
-    ...(node.border ? { border: { ...node.border, color: hexOfCss(node.border.color) } } : {}),
+    ...(node.border ? { border: borderOf(node.border) } : {}),
     ...(node.sides
       ? {
           sides: Object.fromEntries(
-            Object.entries(node.sides).map(([side, each]) => [
-              side,
-              { width: each.width, color: hexOfCss(each.color) },
-            ]),
+            Object.entries(node.sides).map(([side, each]) => [side, borderOf(each)]),
           ),
         }
       : {}),
     ...(node.radius ? { radius: round(node.radius) } : {}),
     ...(node.padding ? { padding: node.padding } : {}),
     ...(node.outline ? { outline: { ...node.outline, color: hexOfCss(node.outline.color) } } : {}),
-    ...(node.shadow ? { shadow: node.shadow } : {}),
+    ...(node.shadow
+      ? {
+          shadow: node.shadow.map((each) => ({
+            ...each,
+            x: round(each.x),
+            y: round(each.y),
+            blur: round(each.blur),
+            spread: round(each.spread),
+            color: hexOfCss(each.color),
+          })),
+        }
+      : {}),
     ...(node.opacity === undefined ? {} : { opacity: node.opacity }),
     ...(node.rotate === undefined ? {} : { rotate: node.rotate }),
     ...(node.heading ? { heading: node.heading } : {}),
@@ -355,11 +392,29 @@ function specNode(
             lineHeight: Number.isFinite(node.text.lineHeight) ? round(node.text.lineHeight) : 0,
             ...(node.text.widen ? { widen: node.text.widen } : {}),
             runs: node.text.runs.map((run) => specRun(run, fonts, faceOf)),
+            ...(node.text.pieces.length > 0
+              ? {
+                  pieces: node.text.pieces.map((piece) => ({ text: piece.text, ...box(piece) })),
+                }
+              : {}),
           },
         }
       : {}),
     ...(children.length > 0 ? { children } : {}),
   };
+}
+
+function box(rect: { x: number; y: number; width: number; height: number }) {
+  return {
+    x: round(rect.x),
+    y: round(rect.y),
+    width: round(rect.width),
+    height: round(rect.height),
+  };
+}
+
+function borderOf(border: { width: number; color: string; style?: "dashed" | "dotted" }) {
+  return { ...border, color: hexOfCss(border.color) };
 }
 
 const sameFamily = (a: string, b: string): boolean =>

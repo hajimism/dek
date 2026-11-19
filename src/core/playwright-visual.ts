@@ -64,6 +64,7 @@ import {
 import { planPptxLayers, pptxPageFacts } from "./pptx-plan.ts";
 import {
   measurePptxSpecInPage,
+  type PptxSpecPart,
   SPEC_NODE_ATTR,
   type SpecPage,
   type SpecPageNode,
@@ -335,16 +336,22 @@ async function comparePptx(
 async function shootPptxSpec(
   page: Page,
   { shot, parts: prefix }: { shot: string; parts: string },
-): Promise<{ outline?: SpecPage; parts: Array<{ node: number; png: string }> }> {
+): Promise<{ outline?: SpecPage; parts: PptxSpecPart[] }> {
   await page.screenshot({ path: shot, fullPage: false });
   const outline = await page.evaluate(measurePptxSpecInPage);
-  const parts: Array<{ node: number; png: string }> = [];
+  const parts: PptxSpecPart[] = [];
   if (!outline) {
     return { parts };
   }
-  // What a pseudo-element writes with a counter, as Chromium laid it out.
+  // What a pseudo-element writes with a counter, and where its box lies, as Chromium laid it out.
   const pieces = await pseudoTextPieces(page, SPEC_NODE_ATTR);
-  const drawn: SpecPageNode[] = [];
+  const boxes = await pseudoElementBoxes(page, SPEC_NODE_ATTR, "border", ["before", "after"]);
+  const crops: Array<{
+    index: number;
+    pseudo?: "before" | "after";
+    rect: SpecPageNode["rect"];
+    alone: boolean;
+  }> = [];
   const walk = (node: SpecPageNode) => {
     for (const mark of node.marks ?? []) {
       const own = pieces.filter(
@@ -354,6 +361,7 @@ async function shootPptxSpec(
         const left = Math.min(...own.map((piece) => piece.x));
         const top = Math.min(...own.map((piece) => piece.y));
         mark.text = own.map((piece) => piece.text).join("");
+        mark.lines = new Set(own.map((piece) => Math.round(piece.y))).size;
         mark.rect = {
           x: left - outline.origin.left,
           y: top - outline.origin.top,
@@ -361,22 +369,41 @@ async function shootPptxSpec(
           height: Math.max(...own.map((piece) => piece.y + piece.height)) - top,
         };
       }
+      // What it paints lies in its own box, which may reach past its host's.
+      const box = boxes.get(`${node.index}::${mark.pseudo}`);
+      if (mark.paint && box) {
+        mark.rect = {
+          x: box.left - outline.origin.left,
+          y: box.top - outline.origin.top,
+          width: box.right - box.left,
+          height: box.bottom - box.top,
+        };
+        if (mark.paint.drawn) {
+          crops.push({ index: node.index, pseudo: mark.pseudo, rect: mark.rect, alone: true });
+        }
+      }
     }
     if (node.picture) {
-      drawn.push(node);
+      // A picture is drawn whole; paint a shape cannot draw is drawn without what it holds.
+      const alone = node.picture === "drawn" || node.picture === "background";
+      crops.push({ index: node.index, rect: node.rect, alone });
     }
     node.children.forEach(walk);
   };
   walk(outline.slide);
-  for (const node of drawn) {
-    const { rect } = node;
+  for (const { index, pseudo, rect, alone } of crops) {
     if (rect.width < 1 || rect.height < 1) {
       continue;
     }
-    const png = `${prefix}${node.index}.png`;
-    // A picture is drawn whole; paint a shape cannot draw is drawn without what it holds.
-    const alone = node.picture === "drawn" || node.picture === "background";
-    await page.evaluate(showPptxSpecNodeInPage, { index: node.index, alone });
+    const png = `${prefix}${index}${pseudo ? `-${pseudo}` : ""}.png`;
+    // The slide's own pseudo-elements are its backdrop's paint; another node's are nodes.
+    const marks = index !== outline.slide.index;
+    await page.evaluate(showPptxSpecNodeInPage, {
+      index,
+      alone,
+      marks,
+      ...(pseudo ? { pseudo } : {}),
+    });
     const left = Math.max(0, outline.origin.left + rect.x);
     const top = Math.max(0, outline.origin.top + rect.y);
     await page.screenshot({
@@ -384,7 +411,7 @@ async function shootPptxSpec(
       omitBackground: true,
       clip: { x: left, y: top, width: rect.width, height: rect.height },
     });
-    parts.push({ node: node.index, png });
+    parts.push({ node: index, ...(pseudo ? { pseudo } : {}), png });
   }
   await page.evaluate(showPptxSpecNodeInPage, null);
   await page.evaluate((attr) => {
