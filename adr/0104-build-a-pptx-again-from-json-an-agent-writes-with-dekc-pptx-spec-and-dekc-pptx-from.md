@@ -55,7 +55,21 @@ A text is found when the layers over its box, 12 px around it, hold its characte
 
 ## Consequences
 
-The rebuild an agent did by hand now starts from what dek measured and ends in a check. On `with-agents`, a first trial agent given only the skill and the deck reached no diagnostics; the eval read its file as 0.68 MB against `dekc pptx`'s 7.41, all its text PowerPoint's own against 96.6%, 0.112 runs a character against 0.286, and 378 shapes against 34. Its slides drew 8.4 of 255 apart from the browser's on average, against 1.7, mostly where PowerPoint sets Japanese wider than the browser, which spaced it with the font's features. That trial's report is what the outline, the writer, and the checks above learned from.
+The rebuild an agent did by hand now starts from what dek measured and ends in a check. It was built over three trials on `with-agents`, each a fresh agent given only the skill and the deck, each reaching no diagnostics; what each one's report found missing is what the next round of the outline, the writer, the checks, and the skill above added. The PPTX eval read their files against `dekc pptx`'s:
+
+| | `dekc pptx` | trial 1 | trial 2 | trial 3 |
+| --- | ---: | ---: | ---: | ---: |
+| MB | 7.41 | 0.68 | 0.81 | 0.81 |
+| text PowerPoint's own | 96.6% | 100% | 100% | 100% |
+| text in boxes that wrap | 28.1% | 32.3% | 44.5% | 46.4% |
+| editability | 0.614 | 0.634 | 0.672 | 0.678 |
+| runs a character | 0.286 | 0.112 | 0.104 | 0.112 |
+| slides keeping a picture of the slide | 13 | 13 | 0 | 0 |
+| drawn apart from the browser, of 255 | 1.67 | 8.44 | 9.45 | 9.26 |
+| tool calls | | 114 | 146 | 111 |
+| tokens | | 294k | 522k | 366k |
+
+The rebuilt files are what a recipient edits: no slide keeps a picture of itself, a block is a box that wraps, a card is a group. They are further from the browser's drawing than `dekc pptx`'s, by design: PowerPoint sets the text again, and sets Japanese wider than the browser, which spaced it with the font's features, and Quick Look, which measured them, misdraws some of what the files say. Trial 1 spent about 50 of its calls learning the formats from dek's source, which the schema and the skill now give; trials 2 and 3 spent most of theirs fitting boxes to text PowerPoint sets wider, which `widen` and the shots beside the browser's now measure.
 
 The JSON is a second way into dek's writer, and its shape is a contract: a field dek renames is a breaking change to every script that writes it, as a `--json` field is. The writer's types stay its own; the JSON is converted at the edge, and a test holds that layers written out and read back are the same layers.
 
