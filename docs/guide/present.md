@@ -174,6 +174,33 @@ wrote dist/talk.pptx
 
 Each text names the fonts Chromium drew it with, one for its Latin and one for its East Asian characters, or the theme's fonts for a font token; the file embeds none. A recipient without a font sees PowerPoint's substitute in the same place, spaced for the font it stands in for: a line in a text box of its own runs a little longer or shorter, and a paragraph that wraps can break a line again. Where a family has more weights than a regular and a bold, as Hiragino Sans has W0 to W9, the name is the face's own, "Hiragino Sans W6": PowerPoint and Quick Look take such a family's regular and bold to be different faces, and neither takes them to be the ones Chromium drew. Text set in a font token at another weight than most of it, a bold word in a paragraph, names its face too and does not change with the theme's font. Bold pressed in PowerPoint on text in such a face thickens that face; the family's heavier face is chosen in the font menu. Text meant to be edited belongs in HTML, not in an SVG. The alternative text of each picture is its own `alt`, `aria-label`, or `<title>`, which `DEK034` asks for, and the slide's picture carries those of what stays in it.
 
+
+### Build it again to edit
+
+```bash
+dekc pptx spec
+dekc pptx --from decks/talk/pptx.json --shot
+```
+
+The file `dekc pptx` writes looks like the deck, and keeps a picture of what PowerPoint cannot draw under its shapes and text. A recipient who reworks the deck in their own PowerPoint, in their own template, wants none of it there: each block of text one box that wraps, each box a shape with its text in it, nothing behind them. Building that takes judgment about each slide, so dek leaves it to an agent, gives it what dek measured, and checks what it built. The optional skill `dek-pptx` teaches an agent the loop ([Working with AI Agents](/guide/ai)).
+
+`dekc pptx spec` writes `.cache/pptx/` in the deck's folder: `deck.pptx.json`, the file `dekc pptx` would write as JSON, with its schema beside it; `spec.json`, each slide's elements in reading order with their boxes, paint, and text, its shot, and its notes; and `parts/`, each image and each part no shape can draw, such as a gradient or a clip-path, drawn alone without its text. The agent writes the deck as that JSON, usually with a script that reads `spec.json`.
+
+`dekc pptx --from <file>` writes the JSON as `dist/<deck>.pptx`, in the deck's theme, its slides' titles PowerPoint's, and checks it against `spec.json`:
+
+| id | severity | finds |
+| --- | --- | --- |
+| `pptx-slides` | error | slides missing, added, or out of order |
+| `pptx-title` | error | a slide with no title |
+| `pptx-text` | error | a text the slide shows that the file does not hold |
+| `pptx-bounds` | error | a layer past the slide's edge |
+| `pptx-place` | warning | a text set away from where the slide shows it |
+| `pptx-picture` | warning | a picture of the slide left behind, or one over most of it |
+| `pptx-lines` | warning | text set a line a box |
+| `pptx-notes` | warning | empty notes on a slide the script speaks to |
+
+An error fails it, as lint's do, and the file is written all the same. When `spec.json` is missing or older than the deck, nothing is checked and `skipped` says to run `dekc pptx spec` again. `--shot` draws each slide of the file with Quick Look, on a Mac, to set beside the browser's shot; Quick Look is not PowerPoint, so open the file before you hand it over.
+
 ## Next
 
 Add narration and turn the deck into a video: [Voice and Video](./voice). If a live talk is all you need, skip to [Working with AI Agents](./ai).

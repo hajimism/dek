@@ -37,7 +37,9 @@ One more skill is optional. `dek-design` is for slides that read at a glance: a 
 npx skills add hajimism/dek --skill dek-design
 ```
 
-In Claude Code, `/plugin install dek-design@dek`. The npm package ships the same file, so a project always has the copy for its own dek at `node_modules/@hajimism/dek/skills/dek/SKILL.md`. There is no MCP server; the skill teaches the CLI. Both are in English, like `AGENTS.md`; an agent answers in whatever language you write to it.
+In Claude Code, `/plugin install dek-design@dek`. The npm package ships the same file, so a project always has the copy for its own dek at `node_modules/@hajimism/dek/skills/dek/SKILL.md`. There is no MCP server; the skills teach the CLI. They are in English, like `AGENTS.md`; an agent answers in whatever language you write to it.
+
+`dek-pptx` is optional too: it teaches an agent to build a finished deck again as a PowerPoint file the recipient edits as their own, with `dekc pptx spec` and `dekc pptx --from` ([Build it again to edit](/guide/present#build-it-again-to-edit)). Install it with `npx skills add hajimism/dek --skill dek-pptx`, or in Claude Code `/plugin install dek-pptx@dek`.
 
 ## What the CLI promises
 
