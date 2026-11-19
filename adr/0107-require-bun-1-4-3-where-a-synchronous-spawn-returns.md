@@ -1,4 +1,4 @@
-# 100. Require Bun 1.4.3, where a synchronous spawn returns
+# 107. Require Bun 1.4.3, where a synchronous spawn returns
 
 Date: 2026-11-18
 

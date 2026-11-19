@@ -17,7 +17,7 @@ const runner: PlaywrightRunner = (request) =>
 
 const html = `<section class="slide" data-layout="default">
   <p class="kicker"><span class="badge"></span>Setup</p>
-  <h2 class="slide-title">準備は、何もいらない</h2>
+  <h2 class="slide-title">準備は、何もいらない AVATAR To We</h2>
   <p class="line">打つのは <span class="chip">dekc init</span> だけ。</p>
   <div class="glow"></div>
 </section>`;
@@ -105,7 +105,8 @@ describe("pptxSpecDeck in a browser", () => {
         expect(chip).toMatchObject({ inline: true, fill: "#f8fafc", radius: 6 });
         expect(chip?.padding).toEqual({ top: 2, right: 6, bottom: 2, left: 6 });
 
-        // Proportional kana come out wider where nothing spaces them.
+        // Proportional kana and kerned pairs come out wider where nothing spaces them: the pairs
+        // in any font that kerns them, as CI's Linux has no kana with `palt`.
         const title = all.find((node) => node.heading === 2);
         expect(title?.text?.widen).toBeGreaterThan(1);
 
