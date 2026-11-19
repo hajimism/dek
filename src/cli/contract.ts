@@ -732,7 +732,28 @@ export const RESULT_FIELDS = {
       diagnostics,
       skipped,
       shots: z
-        .array(z.string())
+        .array(
+          z.strictObject({
+            slug: z.string(),
+            png: z.string().describe("The slide as Quick Look draws the file."),
+            compare: z
+              .string()
+              .optional()
+              .describe(
+                "The browser's shot on the left, Quick Look's on the right, what differs tinted red.",
+              ),
+            difference: z
+              .number()
+              .optional()
+              .describe("The mean difference of the two pictures, 0 to 255."),
+            differing: z
+              .number()
+              .optional()
+              .describe(
+                "The share of the slide's pixels that differ by more than a glance would miss.",
+              ),
+          }),
+        )
         .optional()
         .describe("With --shot, each slide as Quick Look draws the file, in the deck's order."),
     }),

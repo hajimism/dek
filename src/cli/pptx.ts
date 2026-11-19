@@ -1,7 +1,7 @@
 import type { Diagnostic, SkippedCheck } from "../core/diagnostic.ts";
 import { DekError } from "../core/error.ts";
 import { type PptxLifted, pptxDeck } from "../core/pptx.ts";
-import { pptxFromFile } from "../core/pptx-from.ts";
+import { type PptxShot, pptxFromFile } from "../core/pptx-from.ts";
 import { pptxSpecDeck } from "../core/pptx-spec.ts";
 import type { DecksTarget } from "./scope.ts";
 
@@ -17,7 +17,7 @@ export type PptxCliResult =
       outs: string[];
       diagnostics: Diagnostic[];
       skipped?: SkippedCheck[];
-      shots?: string[];
+      shots?: PptxShot[];
     };
 
 export async function pptxCommand(

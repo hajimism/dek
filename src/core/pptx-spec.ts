@@ -12,6 +12,7 @@ import {
   pptxJsonSchema,
   themeToJson,
 } from "./pptx-json.ts";
+import type { PptxLayer, PptxRun } from "./pptx-package.ts";
 import type { SpecPageNode, SpecPageRun, SpecPageText } from "./pptx-spec-page.ts";
 import { asResolvedDeck, type ResolvedDeck } from "./resolve.ts";
 import { outputDir, removeInside, writeInside } from "./safe-fs.ts";
@@ -40,6 +41,9 @@ type PptxSpecRun = {
   strike?: true;
   color: string;
   font: string;
+  /** The faces the browser drew it in, as `dekc pptx` names them, for a run's `font` and `ea`. */
+  face?: { latin: string; ea?: string };
+  letterSpacing?: number;
   background?: string;
   code?: true;
   link?: string;
@@ -54,9 +58,10 @@ export type PptxSpecNode = {
   width: number;
   height: number;
   fill?: string;
-  border?: { width: number; color: string };
+  border?: { width: number; color: string; style?: "dashed" | "dotted" };
   sides?: Record<string, { width: number; color: string }>;
   radius?: number;
+  padding?: { top: number; right: number; bottom: number; left: number };
   outline?: { width: number; color: string; offset: number };
   shadow?: string;
   opacity?: number;
@@ -66,6 +71,10 @@ export type PptxSpecNode = {
   alt?: string;
   /** What a shape cannot draw of it: a picture, or paint such as a clip-path or a gradient. */
   picture?: SpecPageNode["picture"];
+  /** Why a shape cannot draw it, for `picture: "drawn"`: `gradient`, `::before`, and the like. */
+  drawn?: string[];
+  /** A box in its block's line, such as a chip: its text is in the block's text too. */
+  inline?: true;
   /**
    * It drawn alone, by its path from the deck's folder: a picture whole, and paint a shape
    * cannot draw without the elements and text inside it.
@@ -73,8 +82,6 @@ export type PptxSpecNode = {
   part?: string;
   /** An image's source, as the slide's HTML has it. */
   src?: string;
-  before?: string;
-  after?: string;
   /** Its text: all of it in `content`, and each run where they are set differently. */
   text?: Omit<SpecPageText, "runs" | "pre"> & { pre?: true; content: string; runs: PptxSpecRun[] };
   children?: PptxSpecNode[];
@@ -182,7 +189,14 @@ export async function pptxSpecDeck(
         notes: captured.scripts[index]?.script ?? "",
         shot: fromDeck(join(shots, `${index + 1}-${slide.slug}.png`)),
         ...(slide.outline
-          ? { outline: specNode(slide.outline.slide, partOf, slide.outline.fonts) }
+          ? {
+              outline: specNode(
+                slide.outline.slide,
+                partOf,
+                slide.outline.fonts,
+                facesOf(slide.layers),
+              ),
+            }
           : {}),
       };
     }),
@@ -226,14 +240,77 @@ function hexOfCss(color: string): string {
     : rgb;
 }
 
-/** A node of the page's walk as spec.json has it. */
+/** The faces a run was drawn in, found among the runs `dekc pptx` set on the same slide. */
+type FaceOf = (run: Omit<SpecPageRun, "text"> & { text: string }) => PptxSpecRun["face"];
+
+function facesOf<I>(layers: PptxLayer<I>[]): FaceOf {
+  const runs: PptxRun[] = [];
+  const walk = (each: PptxLayer<I>[]) => {
+    for (const layer of each) {
+      if (layer.kind === "text") {
+        runs.push(...layer.runs);
+      } else if (layer.kind === "prose") {
+        runs.push(...layer.text.paragraphs.flatMap((paragraph) => paragraph.runs));
+      } else if (layer.kind === "shape") {
+        runs.push(...(layer.text?.paragraphs.flatMap((paragraph) => paragraph.runs) ?? []));
+        walk(layer.layers);
+      }
+    }
+  };
+  walk(layers);
+  const drawn = runs.filter((run) => run.font !== undefined && run.text.trim() !== "");
+  return (run) => {
+    const text = run.text.replace(/\s+/g, "");
+    const found = drawn.find((each) => {
+      const ink = each.text.replace(/\s+/g, "");
+      return (
+        Math.abs(each.size - run.size) < 0.5 &&
+        each.bold === run.weight >= 600 &&
+        ink !== "" &&
+        (text.includes(ink) || ink.includes(text))
+      );
+    });
+    return found?.font === undefined
+      ? undefined
+      : { latin: found.font, ...(found.ea && found.ea !== found.font ? { ea: found.ea } : {}) };
+  };
+}
+
+/** A node of the page's walk as spec.json has it, its pseudo-elements' text as nodes in it. */
 function specNode(
   node: SpecPageNode,
   parts: ReadonlyMap<number, string>,
   fonts: Readonly<Record<string, string>> = {},
+  faceOf: FaceOf = () => undefined,
 ): PptxSpecNode {
   const part = parts.get(node.index);
-  const children = node.children.map((child) => specNode(child, parts, fonts));
+  const mark = (pseudo: "before" | "after"): PptxSpecNode[] =>
+    (node.marks ?? []).flatMap((each) =>
+      each.pseudo === pseudo && each.text && each.rect
+        ? [
+            {
+              tag: `::${pseudo}`,
+              x: round(each.rect.x),
+              y: round(each.rect.y),
+              width: round(each.rect.width),
+              height: round(each.rect.height),
+              ...(node.decoration ? { decoration: true as const } : {}),
+              text: {
+                align: "left",
+                lines: 1,
+                content: each.text,
+                lineHeight: 0,
+                runs: [specRun({ ...each.run, text: each.text }, fonts, faceOf)],
+              },
+            },
+          ]
+        : [],
+    );
+  const children = [
+    ...mark("before"),
+    ...node.children.map((child) => specNode(child, parts, fonts, faceOf)),
+    ...mark("after"),
+  ];
   return {
     tag: node.tag,
     ...(node.classes.length > 0 ? { class: node.classes.join(" ") } : {}),
@@ -242,9 +319,7 @@ function specNode(
     width: round(node.rect.width),
     height: round(node.rect.height),
     ...(node.fill ? { fill: hexOfCss(node.fill) } : {}),
-    ...(node.border
-      ? { border: { width: node.border.width, color: hexOfCss(node.border.color) } }
-      : {}),
+    ...(node.border ? { border: { ...node.border, color: hexOfCss(node.border.color) } } : {}),
     ...(node.sides
       ? {
           sides: Object.fromEntries(
@@ -256,6 +331,7 @@ function specNode(
         }
       : {}),
     ...(node.radius ? { radius: round(node.radius) } : {}),
+    ...(node.padding ? { padding: node.padding } : {}),
     ...(node.outline ? { outline: { ...node.outline, color: hexOfCss(node.outline.color) } } : {}),
     ...(node.shadow ? { shadow: node.shadow } : {}),
     ...(node.opacity === undefined ? {} : { opacity: node.opacity }),
@@ -264,10 +340,10 @@ function specNode(
     ...(node.decoration ? { decoration: true as const } : {}),
     ...(node.alt ? { alt: node.alt } : {}),
     ...(node.picture ? { picture: node.picture } : {}),
+    ...(node.drawn ? { drawn: node.drawn } : {}),
+    ...(node.inline ? { inline: true as const } : {}),
     ...(part ? { part } : {}),
     ...(node.src ? { src: node.src } : {}),
-    ...(node.before ? { before: node.before } : {}),
-    ...(node.after ? { after: node.after } : {}),
     ...(node.text
       ? {
           text: {
@@ -276,7 +352,8 @@ function specNode(
             ...(node.text.pre ? { pre: true as const } : {}),
             content: node.text.runs.map((run) => run.text).join(""),
             lineHeight: Number.isFinite(node.text.lineHeight) ? round(node.text.lineHeight) : 0,
-            runs: node.text.runs.map((run) => specRun(run, fonts)),
+            ...(node.text.widen ? { widen: node.text.widen } : {}),
+            runs: node.text.runs.map((run) => specRun(run, fonts, faceOf)),
           },
         }
       : {}),
@@ -287,8 +364,13 @@ function specNode(
 const sameFamily = (a: string, b: string): boolean =>
   a.replace(/["'\s]/g, "").toLowerCase() === b.replace(/["'\s]/g, "").toLowerCase();
 
-function specRun(run: SpecPageRun, fonts: Readonly<Record<string, string>>): PptxSpecRun {
+function specRun(
+  run: SpecPageRun,
+  fonts: Readonly<Record<string, string>>,
+  faceOf: FaceOf,
+): PptxSpecRun {
   const token = Object.entries(fonts).find(([, family]) => sameFamily(family, run.family))?.[0];
+  const face = faceOf(run);
   return {
     text: run.text,
     size: round(run.size),
@@ -298,6 +380,8 @@ function specRun(run: SpecPageRun, fonts: Readonly<Record<string, string>>): Ppt
     ...(run.strike ? { strike: true as const } : {}),
     color: hexOfCss(run.color),
     font: token ?? run.family,
+    ...(face ? { face } : {}),
+    ...(run.letterSpacing ? { letterSpacing: round(run.letterSpacing) } : {}),
     ...(run.background ? { background: hexOfCss(run.background) } : {}),
     ...(run.code ? { code: true as const } : {}),
     ...(run.link ? { link: run.link } : {}),

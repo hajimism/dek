@@ -24,6 +24,8 @@ export type SpecPageRun = {
   code?: true;
   /** Where its link goes. */
   link?: string;
+  /** In pixels, where it is set apart. */
+  letterSpacing?: number;
 };
 
 /** A block's text: its runs in order, a line break as `\n`, and how the browser set it. */
@@ -36,10 +38,23 @@ export type SpecPageText = {
   lines: number;
   /** Whether the browser keeps its spaces and breaks, as in `<pre>`. */
   pre: boolean;
+  /**
+   * How much wider its lines are set without the font's features and the browser's spacing of
+   * punctuation, as PowerPoint sets them: 1.08 is 8% wider. Absent when it is no wider.
+   */
+  widen?: number;
 };
 
 /** Why a node is offered as a picture: what it shows that a shape and its text cannot say. */
 type SpecPagePicture = "image" | "svg" | "canvas" | "video" | "background" | "drawn";
+
+/** A pseudo-element's text: how it is set, and, once read, what it says and where. */
+type SpecPageMark = {
+  pseudo: "before" | "after";
+  run: Omit<SpecPageRun, "text">;
+  text?: string;
+  rect?: SpecPageRect;
+};
 
 export type SpecPageNode = {
   /** Its place in the page's walk, to find its element again. */
@@ -49,10 +64,12 @@ export type SpecPageNode = {
   rect: SpecPageRect;
   /** Its background color, when it paints one. */
   fill?: string;
-  border?: { width: number; color: string };
+  border?: { width: number; color: string; style?: "dashed" | "dotted" };
   /** Borders that differ per side. */
   sides?: Partial<Record<"top" | "right" | "bottom" | "left", { width: number; color: string }>>;
   radius?: number;
+  /** From the border to the content, where it has any. */
+  padding?: { top: number; right: number; bottom: number; left: number };
   /** A CSS outline: drawn outside the border, by `offset` more. */
   outline?: { width: number; color: string; offset: number };
   shadow?: string;
@@ -65,11 +82,15 @@ export type SpecPageNode = {
   decoration?: true;
   alt?: string;
   picture?: SpecPagePicture;
-  /** What its `::before` and `::after` write, counters counted. */
-  before?: string;
-  after?: string;
-  /** Whether a pseudo-element writes what the page cannot read alone, such as a counter. */
-  counted?: true;
+  /** For paint a shape cannot draw: what it is, such as `gradient` or `::before`. */
+  drawn?: string[];
+  /** An inline box in its block's line, such as a chip, whose text is in the block's text too. */
+  inline?: true;
+  /**
+   * Its `::before` and `::after` that write text, as they are set; what each writes, counters
+   * counted, and where, are read from Chromium's layout after the walk.
+   */
+  marks?: SpecPageMark[];
   /** An image's source, as the page has it. */
   src?: string;
   text?: SpecPageText;
@@ -152,8 +173,8 @@ export function measurePptxSpecInPage(): SpecPage | null {
     const quoted = /^"(.*)"$/s.exec(content);
     return quoted?.[1] ? quoted[1] : undefined;
   };
-  const pseudoPaints = (element: Element): boolean =>
-    (["::before", "::after"] as const).some((pseudo) => {
+  const pseudoPaints = (element: Element): string[] =>
+    (["::before", "::after"] as const).filter((pseudo) => {
       const style = getComputedStyle(element, pseudo);
       if (style.content === "none" || style.content === "normal") {
         return false;
@@ -200,6 +221,9 @@ export function measurePptxSpecInPage(): SpecPage | null {
         strike: own.textDecorationLine.includes("line-through"),
         color: own.color,
         family: own.fontFamily,
+        ...(Number.parseFloat(own.letterSpacing)
+          ? { letterSpacing: Number.parseFloat(own.letterSpacing) }
+          : {}),
         ...(background ? { background } : {}),
         ...(owner.closest("code, kbd") ? { code: true as const } : {}),
         ...(link ? { link } : {}),
@@ -233,7 +257,7 @@ export function measurePptxSpecInPage(): SpecPage | null {
           }
           if (child.tagName === "BR") {
             push("\n", element, background);
-          } else if (inline(own) && !boxy(own) && !(child.tagName.toLowerCase() in REPLACED)) {
+          } else if (inline(own) && !(child.tagName.toLowerCase() in REPLACED)) {
             const before = pseudoText(child, "::before");
             if (before) {
               push(before, child, background);
@@ -266,37 +290,88 @@ export function measurePptxSpecInPage(): SpecPage | null {
       return undefined;
     }
     // Lines are counted from the text's own boxes, not those of what sits beside it.
-    const tops: number[] = [];
+    const lines: Array<{ top: number; height: number; left: number; right: number }> = [];
     const count = (node: Node) => {
       for (const child of node.childNodes) {
         if (child.nodeType === Node.TEXT_NODE && (child.textContent ?? "").trim() !== "") {
           const range = document.createRange();
           range.selectNodeContents(child);
           for (const box of range.getClientRects()) {
-            if (box.width > 0 && !tops.some((top) => Math.abs(top - box.top) < box.height / 2)) {
-              tops.push(box.top);
+            if (box.width <= 0) {
+              continue;
+            }
+            const line = lines.find((each) => Math.abs(each.top - box.top) < box.height / 2);
+            if (line) {
+              line.left = Math.min(line.left, box.left);
+              line.right = Math.max(line.right, box.right);
+            } else {
+              lines.push({ top: box.top, height: box.height, left: box.left, right: box.right });
             }
           }
         } else if (child instanceof HTMLElement) {
           const own = getComputedStyle(child);
-          if (inline(own) && !boxy(own)) {
+          if (inline(own)) {
             count(child);
           }
         }
       }
     };
     count(element);
+    // Where the lines sit in the content box says how they are set, a flexbox's centering too.
+    const outer = element.getBoundingClientRect();
+    const px = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0;
+    const contentLeft = outer.left + px("border-left-width") + px("padding-left");
+    const contentRight = outer.right - px("border-right-width") - px("padding-right");
+    const css =
+      style.textAlign === "start" ? "left" : style.textAlign === "end" ? "right" : style.textAlign;
+    const gaps = lines.map((line) => ({
+      before: line.left - contentLeft,
+      after: contentRight - line.right,
+    }));
+    const align =
+      gaps.length > 0 &&
+      gaps.every((gap) => gap.before > 2 && Math.abs(gap.before - gap.after) <= 3)
+        ? "center"
+        : gaps.length > 0 && gaps.every((gap) => gap.before > 2 && gap.after <= 2)
+          ? "right"
+          : css;
+    // The same text on one line, as the page sets it and as PowerPoint would: no font features,
+    // no kerning, and punctuation spaced whole.
+    const measure = (plain: boolean): number => {
+      const probe = element.cloneNode(true) as HTMLElement;
+      probe.removeAttribute(NODE_ATTR);
+      Object.assign(probe.style, {
+        position: "absolute",
+        left: "0",
+        top: "0",
+        width: "max-content",
+        maxWidth: "none",
+        whiteSpace: pre ? "pre" : "nowrap",
+        visibility: "hidden",
+        padding: "0",
+        border: "0",
+      });
+      if (plain) {
+        for (const each of [probe, ...probe.querySelectorAll<HTMLElement>("*")]) {
+          each.style.setProperty("font-feature-settings", "normal", "important");
+          each.style.setProperty("font-kerning", "none", "important");
+          each.style.setProperty("text-spacing-trim", "space-all", "important");
+        }
+      }
+      element.parentElement?.append(probe);
+      const width = probe.getBoundingClientRect().width;
+      probe.remove();
+      return width;
+    };
+    const set = measure(false);
+    const widen = set > 0 ? Math.round((measure(true) / set) * 100) / 100 : 1;
     return {
       runs: kept,
-      align:
-        style.textAlign === "start"
-          ? "left"
-          : style.textAlign === "end"
-            ? "right"
-            : style.textAlign,
+      align,
       lineHeight: Number.parseFloat(style.lineHeight),
-      lines: Math.max(1, tops.length),
+      lines: Math.max(1, lines.length),
       pre,
+      ...(widen > 1 ? { widen } : {}),
     };
   };
 
@@ -358,13 +433,26 @@ export function measurePptxSpecInPage(): SpecPage | null {
       sides.length === 4 &&
       sides.every(([, side]) => JSON.stringify(side) === JSON.stringify(sides[0]?.[1]))
     ) {
-      node.border = sides[0]?.[1];
+      const line = style.borderTopStyle;
+      node.border = {
+        ...(sides[0]?.[1] ?? { width: 0, color: "" }),
+        ...(line === "dashed" || line === "dotted" ? { style: line } : {}),
+      };
     } else if (sides.length > 0) {
       node.sides = Object.fromEntries(sides);
     }
     const radius = Number.parseFloat(style.borderTopLeftRadius);
     if (radius > 0) {
       node.radius = radius;
+    }
+    const padding = {
+      top: Number.parseFloat(style.paddingTop) || 0,
+      right: Number.parseFloat(style.paddingRight) || 0,
+      bottom: Number.parseFloat(style.paddingBottom) || 0,
+      left: Number.parseFloat(style.paddingLeft) || 0,
+    };
+    if (Object.values(padding).some((side) => side > 0)) {
+      node.padding = padding;
     }
     if (style.boxShadow !== "none") {
       node.shadow = style.boxShadow;
@@ -388,20 +476,30 @@ export function measurePptxSpecInPage(): SpecPage | null {
     if (Number(style.opacity) < 1) {
       node.opacity = Number(style.opacity);
     }
-    const before = pseudoText(element, "::before");
-    const after = pseudoText(element, "::after");
-    if (before) {
-      node.before = before;
-    }
-    if (after) {
-      node.after = after;
-    }
-    const counted = (["::before", "::after"] as const).some((pseudo) => {
-      const content = getComputedStyle(element, pseudo).content;
-      return content !== "none" && content !== "normal" && !/^"(.*)"$/s.test(content);
+    const marks = (["before", "after"] as const).flatMap((pseudo): SpecPageMark[] => {
+      const own = getComputedStyle(element, `::${pseudo}`);
+      if (own.content === "none" || own.content === "normal" || own.content === '""') {
+        return [];
+      }
+      const spacing = Number.parseFloat(own.letterSpacing);
+      return [
+        {
+          pseudo,
+          run: {
+            size: Number.parseFloat(own.fontSize),
+            weight: Number(own.fontWeight) || 400,
+            italic: own.fontStyle === "italic",
+            underline: own.textDecorationLine.includes("underline"),
+            strike: own.textDecorationLine.includes("line-through"),
+            color: own.color,
+            family: own.fontFamily,
+            ...(spacing ? { letterSpacing: spacing } : {}),
+          },
+        },
+      ];
     });
-    if (counted) {
-      node.counted = true;
+    if (marks.length > 0) {
+      node.marks = marks;
     }
     const replaced = REPLACED[tag];
     if (replaced) {
@@ -420,17 +518,21 @@ export function measurePptxSpecInPage(): SpecPage | null {
       }
       return [node];
     }
+    const drawn = [
+      ...(style.backgroundImage.includes("gradient(") ? ["gradient"] : []),
+      ...(style.clipPath !== "none" ? ["clip-path"] : []),
+      ...(style.maskImage !== "none" ? ["mask"] : []),
+      ...(style.transform !== "none" && !/^matrix\(1, 0, 0, 1,/.test(style.transform)
+        ? ["transform"]
+        : []),
+      ...(style.filter !== "none" ? ["filter"] : []),
+      ...pseudoPaints(element),
+    ];
     if (/url\(/.test(style.backgroundImage)) {
       node.picture = "background";
-    } else if (
-      style.backgroundImage !== "none" ||
-      style.clipPath !== "none" ||
-      style.maskImage !== "none" ||
-      (style.transform !== "none" && !/^matrix\(1, 0, 0, 1,/.test(style.transform)) ||
-      style.filter !== "none" ||
-      pseudoPaints(element)
-    ) {
+    } else if (drawn.length > 0) {
       node.picture = "drawn";
+      node.drawn = drawn;
     }
     if (setsText(element)) {
       const text = textOf(element as HTMLElement, style);
@@ -445,10 +547,16 @@ export function measurePptxSpecInPage(): SpecPage | null {
       if (
         node.text &&
         inline(own) &&
-        !boxy(own) &&
         !(child.tagName.toLowerCase() in REPLACED) &&
         (setsText(child) || child.tagName === "BR")
       ) {
+        // A chip in the line is a node of its own too, for its box; its text stays the block's.
+        if (boxy(own)) {
+          for (const inner of visit(child, decoration, false)) {
+            inner.inline = true;
+            node.children.push(inner);
+          }
+        }
         continue;
       }
       node.children.push(...visit(child, decoration, false));
@@ -460,11 +568,9 @@ export function measurePptxSpecInPage(): SpecPage | null {
       node.sides !== undefined ||
       node.shadow !== undefined ||
       node.outline !== undefined ||
-      node.counted !== undefined ||
+      node.marks !== undefined ||
       node.picture !== undefined ||
       node.text !== undefined ||
-      node.before !== undefined ||
-      node.after !== undefined ||
       (SEMANTIC.has(tag) && node.children.length > 0) ||
       node.children.length >= 2;
     return kept ? [node] : node.children;

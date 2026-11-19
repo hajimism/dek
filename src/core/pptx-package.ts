@@ -94,8 +94,12 @@ export type PptxGeometry = (typeof PPTX_GEOMETRIES)[number];
 export type PptxShape<I = PptxImage> = PptxRect & {
   kind: "shape";
   fill?: PptxPaint;
-  /** A border the same on every side, inside the box as CSS draws it. */
-  outline?: { width: number; paint: PptxPaint };
+  /** A border the same on every side, inside the box as CSS draws it, dashed or dotted. */
+  outline?: { width: number; paint: PptxPaint; dash?: "dash" | "dot" };
+  /** A shadow beneath it, offset by `x` and `y` and blurred by `blur`, in pixels. */
+  shadow?: { x: number; y: number; blur: number; paint: PptxPaint };
+  /** Degrees clockwise it is turned about its center. */
+  rotate?: number;
   /** The border box's corner radius; PowerPoint draws half the shorter side at most. */
   radius: number;
   /** One of PowerPoint's own shapes in place of a rectangle, which then has no radius. */
@@ -120,7 +124,12 @@ export type PptxRule = {
  * An image, a canvas, or an SVG, drawn alone. What it embeds is `I`: the files in a package,
  * where to find them on the way there.
  */
-export type PptxPicture<I = PptxImage> = PptxRect & { kind: "picture"; description: string } & I;
+export type PptxPicture<I = PptxImage> = PptxRect & {
+  kind: "picture";
+  description: string;
+  /** Degrees clockwise it is turned about its center. */
+  rotate?: number;
+} & I;
 
 /**
  * Text in a box of its own, in paragraphs: a block's, or a list's with an item a paragraph, in
@@ -579,15 +588,22 @@ function shapeSp(shape: PptxShape, id: number, style: Style): string {
       ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${Math.min(50000, Math.round((radius / shorter) * 100000))}"/></a:avLst></a:prstGeom>`
       : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
   const fill = shape.fill ? solidFill(shape.fill, style.theme) : "<a:noFill/>";
+  const dash = shape.outline?.dash
+    ? `<a:prstDash val="${shape.outline.dash === "dot" ? "sysDot" : "dash"}"/>`
+    : "";
   const line = shape.outline
-    ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint, style.theme)}</a:ln>`
+    ? `<a:ln w="${emu(shape.outline.width)}">${solidFill(shape.outline.paint, style.theme)}${dash}</a:ln>`
     : "<a:ln><a:noFill/></a:ln>";
+  const { shadow } = shape;
+  const effects = shadow
+    ? `<a:effectLst><a:outerShdw blurRad="${emu(shadow.blur)}" dist="${emu(Math.hypot(shadow.x, shadow.y))}" dir="${Math.round((((((Math.atan2(shadow.y, shadow.x) * 180) / Math.PI) % 360) + 360) % 360) * 60000)}" algn="ctr" rotWithShape="0">${colorXml(shadow.paint, style.theme)}</a:outerShdw></a:effectLst>`
+    : "";
   // A rounded rectangle's own text area starts inside its corners' curve, by the corner's
   // radius less its reach at 45 degrees, on every side: the insets give that back, so the text
   // is set where the browser set it.
   const curve = shape.geometry ? 0 : Math.min(radius, shorter / 2) * (1 - Math.SQRT1_2);
   const text = shape.text ? shapeText(shape.text, half + curve, style) : "";
-  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path)}${geometry}${fill}${line}</p:spPr>${text}</p:sp>`;
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id - 2}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${transform(path, shape.rotate)}${geometry}${fill}${line}${effects}</p:spPr>${text}</p:sp>`;
 }
 
 /**
@@ -651,7 +667,7 @@ function pictureXml(picture: PptxPicture, writer: LayerWriter): string {
     picture.svg === undefined
       ? ""
       : `<a:extLst><a:ext uri="${SVG_BLIP}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${writer.embed(writer.encode(picture.svg), "svg")}"/></a:ext></a:extLst>`;
-  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id - 2}" descr="${escapeAttribute(picture.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${png}">${svg}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform(picture)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  return `<p:pic><p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id - 2}" descr="${escapeAttribute(picture.description)}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${png}">${svg}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform(picture, picture.rotate)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
 }
 
 /**
@@ -700,8 +716,9 @@ function pathOf(shape: PptxShape): PptxRect {
   };
 }
 
-function transform(box: PptxRect): string {
-  return `<a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width)}" cy="${emu(box.height)}"/></a:xfrm>`;
+function transform(box: PptxRect, rotate?: number): string {
+  const rot = rotate ? ` rot="${Math.round((((rotate % 360) + 360) % 360) * 60000)}"` : "";
+  return `<a:xfrm${rot}><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width)}" cy="${emu(box.height)}"/></a:xfrm>`;
 }
 
 function solidFill(paint: PptxPaint, theme: PptxTheme | undefined): string {

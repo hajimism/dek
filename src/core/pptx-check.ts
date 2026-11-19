@@ -227,12 +227,11 @@ function findText(
   const missing: string[] = [];
   const moved: string[] = [];
   const visit = (node: PptxSpecNode) => {
+    // Decoration is not text the file must hold; a chip's text is its block's.
     if (node.decoration) {
       return;
     }
-    const shown = [node.before, node.text?.content, node.after]
-      .filter((each): each is string => Boolean(each))
-      .join("");
+    const shown = node.inline ? "" : (node.text?.content ?? "");
     const ink = shown.replace(/\s+/g, "");
     if (ink !== "") {
       const near = inked

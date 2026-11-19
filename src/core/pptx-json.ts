@@ -106,7 +106,9 @@ type LayerJson =
       width: number;
       height: number;
       fill?: z.infer<typeof paintJson>;
-      outline?: { width: number; paint: z.infer<typeof paintJson> };
+      outline?: { width: number; paint: z.infer<typeof paintJson>; dash?: "dash" | "dot" };
+      shadow?: { x: number; y: number; blur: number; paint: z.infer<typeof paintJson> };
+      rotate?: number;
       radius?: number;
       geometry?: PptxGeometry;
       text?: z.infer<typeof shapeTextJson>;
@@ -128,6 +130,7 @@ type LayerJson =
       width: number;
       height: number;
       description?: string;
+      rotate?: number;
       file: string;
       svg?: string;
     };
@@ -150,7 +153,18 @@ const layerJson: z.ZodType<LayerJson> = z.lazy(() =>
       kind: z.literal("shape"),
       ...rect,
       fill: paintJson.optional(),
-      outline: z.strictObject({ width: z.number().positive(), paint: paintJson }).optional(),
+      outline: z
+        .strictObject({
+          width: z.number().positive(),
+          paint: paintJson,
+          dash: z.enum(["dash", "dot"]).optional(),
+        })
+        .optional(),
+      shadow: z
+        .strictObject({ x: length, y: length, blur: length.nonnegative(), paint: paintJson })
+        .optional()
+        .describe("one shadow beneath the shape, as CSS box-shadow's first"),
+      rotate: length.optional().describe("degrees clockwise about its center"),
       radius: length.nonnegative().optional(),
       geometry: z
         .enum(PPTX_GEOMETRIES)
@@ -172,6 +186,7 @@ const layerJson: z.ZodType<LayerJson> = z.lazy(() =>
       kind: z.literal("picture"),
       ...rect,
       description: z.string().optional(),
+      rotate: length.optional().describe("degrees clockwise about its center"),
       file: z.string().min(1).describe("a PNG or JPEG, from the deck's folder"),
       svg: z.string().min(1).optional().describe("an SVG of the same, from the deck's folder"),
     }),
@@ -394,9 +409,21 @@ export function layersToJson<I>(
                 outline: {
                   width: round(layer.outline.width),
                   paint: paintToJson(layer.outline.paint),
+                  ...(layer.outline.dash ? { dash: layer.outline.dash } : {}),
                 },
               }
             : {}),
+          ...(layer.shadow
+            ? {
+                shadow: {
+                  x: round(layer.shadow.x),
+                  y: round(layer.shadow.y),
+                  blur: round(layer.shadow.blur),
+                  paint: paintToJson(layer.shadow.paint),
+                },
+              }
+            : {}),
+          ...(layer.rotate ? { rotate: round(layer.rotate) } : {}),
           ...(layer.radius ? { radius: round(layer.radius) } : {}),
           ...(layer.geometry ? { geometry: layer.geometry } : {}),
           ...(layer.text ? { text: shapeTextToJson(layer.text) } : {}),
@@ -413,11 +440,12 @@ export function layersToJson<I>(
           paint: paintToJson(layer.paint),
         };
       case "picture": {
-        const { kind: _kind, x, y, width, height, description, ...image } = layer;
+        const { kind: _kind, x, y, width, height, description, rotate, ...image } = layer;
         return {
           kind: "picture",
           ...rectToJson({ x, y, width, height }),
           ...(description ? { description } : {}),
+          ...(rotate ? { rotate: round(rotate) } : {}),
           ...refOf(image as unknown as I),
         };
       }
@@ -466,8 +494,18 @@ export function layersFromJson(
           height: layer.height,
           ...(layer.fill ? { fill: paintFromJson(layer.fill) } : {}),
           ...(layer.outline
-            ? { outline: { width: layer.outline.width, paint: paintFromJson(layer.outline.paint) } }
+            ? {
+                outline: {
+                  width: layer.outline.width,
+                  paint: paintFromJson(layer.outline.paint),
+                  ...(layer.outline.dash ? { dash: layer.outline.dash } : {}),
+                },
+              }
             : {}),
+          ...(layer.shadow
+            ? { shadow: { ...layer.shadow, paint: paintFromJson(layer.shadow.paint) } }
+            : {}),
+          ...(layer.rotate ? { rotate: layer.rotate } : {}),
           radius: layer.radius ?? 0,
           ...(layer.geometry ? { geometry: layer.geometry } : {}),
           ...(layer.text ? { text: shapeTextFromJson(layer.text) } : {}),
@@ -483,6 +521,7 @@ export function layersFromJson(
           width: layer.width,
           height: layer.height,
           description: layer.description ?? "",
+          ...(layer.rotate ? { rotate: layer.rotate } : {}),
           png: read(layer.file),
           ...(layer.svg === undefined ? {} : { svg: readText(layer.svg) }),
         };

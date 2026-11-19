@@ -2587,7 +2587,33 @@
               "description": "With --shot, each slide as Quick Look draws the file, in the deck's order.",
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string"
+                  },
+                  "png": {
+                    "type": "string",
+                    "description": "The slide as Quick Look draws the file."
+                  },
+                  "compare": {
+                    "description": "The browser's shot on the left, Quick Look's on the right, what differs tinted red.",
+                    "type": "string"
+                  },
+                  "difference": {
+                    "description": "The mean difference of the two pictures, 0 to 255.",
+                    "type": "number"
+                  },
+                  "differing": {
+                    "description": "The share of the slide's pixels that differ by more than a glance would miss.",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "slug",
+                  "png"
+                ],
+                "additionalProperties": false
               }
             },
             "ok": {
@@ -2710,7 +2736,33 @@
               "description": "With --shot, each slide as Quick Look draws the file, in the deck's order.",
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string"
+                  },
+                  "png": {
+                    "type": "string",
+                    "description": "The slide as Quick Look draws the file."
+                  },
+                  "compare": {
+                    "description": "The browser's shot on the left, Quick Look's on the right, what differs tinted red.",
+                    "type": "string"
+                  },
+                  "difference": {
+                    "description": "The mean difference of the two pictures, 0 to 255.",
+                    "type": "number"
+                  },
+                  "differing": {
+                    "description": "The share of the slide's pixels that differ by more than a glance would miss.",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "slug",
+                  "png"
+                ],
+                "additionalProperties": false
               }
             },
             "ok": {
