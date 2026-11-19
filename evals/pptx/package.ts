@@ -73,6 +73,8 @@ export type PackageSlide = {
   groups: number;
   /** The slide-sized pictures: what was not laid out as PowerPoint's own. */
   rasters: string[];
+  /** The picture its background is, where it is one rather than a color. */
+  backdrop?: string;
   /** The fields its text holds, by type, such as `slidenum`. */
   fields: string[];
   links: number;
@@ -130,6 +132,10 @@ export function readPackage(bytes: Uint8Array): {
     ),
   );
   for (const [path, data] of files) {
+    // A folder's own entry, as some zip writers add, is no part of the package.
+    if (path.endsWith("/")) {
+      continue;
+    }
     if (path.startsWith("ppt/media/")) {
       mediaBytes += data.length;
     } else {
@@ -184,6 +190,24 @@ export function readPackage(bytes: Uint8Array): {
       each.getAttribute("Target") ?? "",
     ]),
   );
+  // A picture as the master's background is the backdrop of every slide that sets none.
+  const masterPath = "ppt/slideMasters/slideMaster1.xml";
+  const masterEmbed = files.has(masterPath)
+    ? parse(masterPath)
+        .getElementsByTagName("p:bg")[0]
+        ?.getElementsByTagName("a:blip")[0]
+        ?.getAttribute("r:embed")
+    : undefined;
+  const masterRels = "ppt/slideMasters/_rels/slideMaster1.xml.rels";
+  const masterTarget =
+    masterEmbed && files.has(masterRels)
+      ? [...parse(masterRels).getElementsByTagName("Relationship")]
+          .find((each) => each.getAttribute("Id") === masterEmbed)
+          ?.getAttribute("Target")
+      : undefined;
+  const inherited = masterTarget
+    ? posix.normalize(posix.join("ppt/slideMasters", masterTarget))
+    : undefined;
   const slides: PackageSlide[] = [];
   // Read from the text: happy-dom keeps one of `id` and `r:id` where an element has both.
   for (const [, relation] of text("ppt/presentation.xml").matchAll(
@@ -195,7 +219,7 @@ export function readPackage(bytes: Uint8Array): {
       problems.push(`presentation.xml lists a slide that is not in the file`);
       continue;
     }
-    slides.push(readSlide(path, parse, size, problems));
+    slides.push(readSlide(path, parse, size, problems, inherited));
   }
 
   const core = files.has("docProps/core.xml") ? parse("docProps/core.xml") : undefined;
@@ -225,6 +249,7 @@ function readSlide(
   parse: (path: string) => Parsed,
   size: { width: number; height: number },
   problems: string[],
+  inherited?: string,
 ): PackageSlide {
   const doc = parse(path);
   const relsPath = posix.join(posix.dirname(path), "_rels", `${posix.basename(path)}.rels`);
@@ -254,6 +279,17 @@ function readSlide(
       doc.getElementsByTagName("a:glow").length,
   };
 
+  const own = doc.getElementsByTagName("p:bg")[0];
+  const backdrop = own?.getElementsByTagName("a:blip")[0]?.getAttribute("r:embed");
+  const backdropFile = backdrop
+    ? targets.get(backdrop)?.target
+    : own === undefined
+      ? inherited
+      : undefined;
+  if (backdropFile !== undefined) {
+    slide.backdrop = backdropFile;
+  }
+
   const ids = new Set<string>();
   for (const each of doc.getElementsByTagName("p:cNvPr")) {
     const id = each.getAttribute("id") ?? "";
@@ -281,6 +317,33 @@ function readSlide(
     }
   }
   slide.shapes += doc.getElementsByTagName("p:cxnSp").length;
+  // PowerPoint shows a placeholder with no text in it as its prompt, "Click to add title".
+  let prompts = 0;
+  let titles = 0;
+  for (const sp of doc.getElementsByTagName("p:sp")) {
+    const ph = sp.getElementsByTagName("p:ph")[0];
+    if (ph === undefined) {
+      continue;
+    }
+    const type = ph.getAttribute("type") ?? "body";
+    if (type === "title" || type === "ctrTitle") {
+      titles++;
+    }
+    const said = [...sp.getElementsByTagName("a:t")].some(
+      (each) => (each.textContent ?? "") !== "",
+    );
+    if (!said && !["dt", "ftr", "sldNum", "hdr"].includes(type)) {
+      prompts++;
+    }
+  }
+  if (prompts > 0) {
+    problems.push(
+      `${path} has ${prompts === 1 ? "a placeholder" : `${prompts} placeholders`} with no text, which PowerPoint shows as its prompt`,
+    );
+  }
+  if (titles > 1) {
+    problems.push(`${path} has ${titles} title placeholders`);
+  }
   for (const sp of doc.getElementsByTagName("p:sp")) {
     const body = sp.getElementsByTagName("p:txBody")[0];
     const paragraphs = body ? [...body.getElementsByTagName("a:p")].map(readParagraph) : [];

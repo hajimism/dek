@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { findMisalignments } from "./alignment.ts";
 import { freezeTransition, loadVideoDoc } from "./capture-go.ts";
@@ -33,6 +34,8 @@ import type {
   PagesRequest,
   PagesResponse,
   PdfRequest,
+  PptxCompareRequest,
+  PptxCompareResponse,
   PptxPictureFile,
   PptxRequest,
   PptxResponse,
@@ -42,6 +45,7 @@ import type {
 } from "./playwright.ts";
 import { captureMotion } from "./playwright-motion.ts";
 import { renderSheets } from "./playwright-sheet.ts";
+import { comparePptxInPage } from "./pptx-compare-page.ts";
 import { mapPictures } from "./pptx-package.ts";
 import {
   describePptxPicturesInPage,
@@ -58,6 +62,14 @@ import {
   showOnlyPptxNodeInPage,
 } from "./pptx-paint.ts";
 import { planPptxLayers, pptxPageFacts } from "./pptx-plan.ts";
+import {
+  measurePptxSpecInPage,
+  type PptxSpecPart,
+  SPEC_NODE_ATTR,
+  type SpecPage,
+  type SpecPageNode,
+  showPptxSpecNodeInPage,
+} from "./pptx-spec-page.ts";
 import {
   measurePptxGlyphsInPage,
   measurePptxPlainLinesInPage,
@@ -78,6 +90,7 @@ import {
   setPptxTexts,
 } from "./pptx-type.ts";
 import { pseudoElementBoxes, pseudoTextBoxes, pseudoTextPieces } from "./pseudo-text.ts";
+import { replaceFile } from "./safe-fs.ts";
 import { motionSheets } from "./sheet.ts";
 import {
   type Box,
@@ -124,6 +137,8 @@ function answer(context: BrowserContext, request: VisualRequest) {
       return shootMotion(context, request);
     case "pptx":
       return shootPptx(context, request);
+    case "pptx-compare":
+      return comparePptx(context, request);
     default: {
       const unknown: never = request;
       throw new Error(`unknown visual request ${JSON.stringify(unknown)}`);
@@ -183,6 +198,8 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
     async (page, pageReq) => {
       await page.setContent(pageReq.html, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      // The spec is read first, while the page is as the browser drew it.
+      const spec = pageReq.spec ? await shootPptxSpec(page, pageReq.spec) : undefined;
       const paint = {
         ...(await page.evaluate(measurePptxPaintInPage)),
         described: await page.evaluate(describePptxPicturesInPage),
@@ -279,10 +296,130 @@ async function shootPptx(context: BrowserContext, request: PptxRequest): Promise
         picture: !empty,
         ...(background ? { background } : {}),
         theme: await pageTheme(page),
+        ...(spec ?? {}),
       };
     },
   );
   return { slides };
+}
+
+/** Each pair of pictures side by side, with where they differ marked, and how far apart. */
+async function comparePptx(
+  context: BrowserContext,
+  request: PptxCompareRequest,
+): Promise<PptxCompareResponse> {
+  const page = await context.newPage();
+  const compared: PptxCompareResponse["compared"] = [];
+  try {
+    for (const pair of request.pairs) {
+      const url = (path: string) =>
+        `data:image/png;base64,${readFileSync(path).toString("base64")}`;
+      const answer = await page.evaluate(comparePptxInPage, {
+        ...request.viewport,
+        browser: url(pair.browser),
+        renderer: url(pair.renderer),
+      });
+      // The folder is one the caller made inside the project.
+      replaceFile(pair.out, Buffer.from(answer.png.slice(answer.png.indexOf(",") + 1), "base64"));
+      compared.push({ difference: answer.difference, differing: answer.differing });
+    }
+  } finally {
+    await page.close();
+  }
+  return { compared };
+}
+
+/**
+ * The slide as the browser drew it, what it is made of, and each part a shape cannot draw, alone
+ * and without its text: what an agent needs to build the slide again (`dekc pptx spec`).
+ */
+async function shootPptxSpec(
+  page: Page,
+  { shot, parts: prefix }: { shot: string; parts: string },
+): Promise<{ outline?: SpecPage; parts: PptxSpecPart[] }> {
+  await page.screenshot({ path: shot, fullPage: false });
+  const outline = await page.evaluate(measurePptxSpecInPage);
+  const parts: PptxSpecPart[] = [];
+  if (!outline) {
+    return { parts };
+  }
+  // What a pseudo-element writes with a counter, and where its box lies, as Chromium laid it out.
+  const pieces = await pseudoTextPieces(page, SPEC_NODE_ATTR);
+  const boxes = await pseudoElementBoxes(page, SPEC_NODE_ATTR, "border", ["before", "after"]);
+  const crops: Array<{
+    index: number;
+    pseudo?: "before" | "after";
+    rect: SpecPageNode["rect"];
+    alone: boolean;
+  }> = [];
+  const walk = (node: SpecPageNode) => {
+    for (const mark of node.marks ?? []) {
+      const own = pieces.filter(
+        (piece) => piece.host === String(node.index) && piece.pseudo === mark.pseudo,
+      );
+      if (own.length > 0) {
+        const left = Math.min(...own.map((piece) => piece.x));
+        const top = Math.min(...own.map((piece) => piece.y));
+        mark.text = own.map((piece) => piece.text).join("");
+        mark.lines = new Set(own.map((piece) => Math.round(piece.y))).size;
+        mark.rect = {
+          x: left - outline.origin.left,
+          y: top - outline.origin.top,
+          width: Math.max(...own.map((piece) => piece.x + piece.width)) - left,
+          height: Math.max(...own.map((piece) => piece.y + piece.height)) - top,
+        };
+      }
+      // What it paints lies in its own box, which may reach past its host's.
+      const box = boxes.get(`${node.index}::${mark.pseudo}`);
+      if (mark.paint && box) {
+        mark.rect = {
+          x: box.left - outline.origin.left,
+          y: box.top - outline.origin.top,
+          width: box.right - box.left,
+          height: box.bottom - box.top,
+        };
+        if (mark.paint.drawn) {
+          crops.push({ index: node.index, pseudo: mark.pseudo, rect: mark.rect, alone: true });
+        }
+      }
+    }
+    if (node.picture) {
+      // A picture is drawn whole; paint a shape cannot draw is drawn without what it holds.
+      const alone = node.picture === "drawn" || node.picture === "background";
+      crops.push({ index: node.index, rect: node.rect, alone });
+    }
+    node.children.forEach(walk);
+  };
+  walk(outline.slide);
+  for (const { index, pseudo, rect, alone } of crops) {
+    if (rect.width < 1 || rect.height < 1) {
+      continue;
+    }
+    const png = `${prefix}${index}${pseudo ? `-${pseudo}` : ""}.png`;
+    // The slide's own pseudo-elements are its backdrop's paint; another node's are nodes.
+    const marks = index !== outline.slide.index;
+    await page.evaluate(showPptxSpecNodeInPage, {
+      index,
+      alone,
+      marks,
+      ...(pseudo ? { pseudo } : {}),
+    });
+    const left = Math.max(0, outline.origin.left + rect.x);
+    const top = Math.max(0, outline.origin.top + rect.y);
+    await page.screenshot({
+      path: png,
+      omitBackground: true,
+      clip: { x: left, y: top, width: rect.width, height: rect.height },
+    });
+    parts.push({ node: index, ...(pseudo ? { pseudo } : {}), png });
+  }
+  await page.evaluate(showPptxSpecNodeInPage, null);
+  await page.evaluate((attr) => {
+    for (const element of document.querySelectorAll(`[${attr}]`)) {
+      element.removeAttribute(attr);
+    }
+  }, SPEC_NODE_ATTR);
+  return { outline, parts };
 }
 
 /**

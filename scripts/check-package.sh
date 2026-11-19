@@ -37,7 +37,7 @@ cd talks
 bun add -d "$tarball" > /dev/null
 # The skill ships with the version it describes, wherever the install put the package.
 installed="$(bun -e 'console.log(require.resolve("@hajimism/dek/package.json"))')"
-for skill in dek dek-design; do test -f "$(dirname "$installed")/skills/$skill/SKILL.md"; done
+for skill in dek dek-design dek-pptx; do test -f "$(dirname "$installed")/skills/$skill/SKILL.md"; done
 # The plugins dek ships run from the installed package, with nothing on PATH for them (ADR 34).
 printf '\n[plugins.study]\n[plugins.words]\n' >> dek.toml
 bunx dekc sync > /dev/null 2>&1

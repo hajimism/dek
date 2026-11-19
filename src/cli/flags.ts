@@ -95,6 +95,11 @@ export const FLAGS = {
     text: "frames per second",
   },
   "root-dist": { type: "boolean", text: "write to <root>/dist/ instead of the deck's dist/" },
+  from: {
+    type: "string",
+    value: "FILE",
+    text: "write the PPTX that JSON says, edited from dekc pptx spec's deck.pptx.json, and check it",
+  },
   url: {
     type: "string",
     value: "<url>",

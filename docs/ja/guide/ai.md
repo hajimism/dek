@@ -37,7 +37,9 @@ skills CLI が、対応するエージェントにスキルを入れます。Cla
 npx skills add hajimism/dek --skill dek-design
 ```
 
-Claude Code では `/plugin install dek-design@dek` です。npm パッケージにも同じファイルが入っているので、プロジェクトには必ず、その dek に合った版が `node_modules/@hajimism/dek/skills/dek/SKILL.md` にあります。MCP サーバはなく、スキルは CLI の使い方を教えるものです。どちらも `AGENTS.md` と同じく英語です。エージェントは、あなたが話しかけた言語で答えます。
+Claude Code では `/plugin install dek-design@dek` です。npm パッケージにも同じファイルが入っているので、プロジェクトには必ず、その dek に合った版が `node_modules/@hajimism/dek/skills/dek/SKILL.md` にあります。MCP サーバはなく、スキルは CLI の使い方を教えるものです。スキルはどれも `AGENTS.md` と同じく英語です。エージェントは、あなたが話しかけた言語で答えます。
+
+`dek-pptx` も入れるかどうかを選べます。仕上がったデッキを、受け取った人が自分のものとして編集できる PowerPoint ファイルに、`dekc pptx spec` と `dekc pptx --from` で作り直す手順をエージェントに教えます（[編集するために作り直す](/ja/guide/present#編集するために作り直す)）。`npx skills add hajimism/dek --skill dek-pptx` で、Claude Code では `/plugin install dek-pptx@dek` で入れます。
 
 ## CLI が約束すること
 

@@ -16,7 +16,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # The pinned version is the oldest Bun dek runs on (ADR 100). latest catches drift in Bun
+    # The pinned version is the oldest Bun dek runs on (ADR 107). latest catches drift in Bun
     # itself (its TOML parser, for one) before a user on a newer Bun does.
     strategy:
       fail-fast: false

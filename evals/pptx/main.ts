@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import pkg from "../../package.json";
 import { importPlaywright } from "../../src/core/playwright.ts";
 import { pptxDeck } from "../../src/core/pptx.ts";
+import { quickLookName, quickLookSlide } from "../../src/core/pptx-quicklook.ts";
 import { asResolvedDeck } from "../../src/core/resolve.ts";
 import { logicalSize } from "../../src/core/size.ts";
 import { lastStop } from "../../src/core/step.ts";
@@ -11,11 +12,10 @@ import { loadSlideSources, renderSlideHtml } from "../../src/core/still-page.ts"
 import { censusSlide } from "./census.ts";
 import { compareInPage, coverageInPage } from "./compare.ts";
 import { readPackage } from "./package.ts";
-import { quickLookName, quickLookSlide } from "./quicklook.ts";
 import { type DeckReport, type EvalReport, markdown, slideReport, summarize } from "./report.ts";
 
 const USAGE =
-  "bun scripts/pptx-eval.ts [--deck <dir>]... [--out <dir>] [--record <dir>] [--no-render]";
+  "bun scripts/pptx-eval.ts [--deck <dir>]... [--out <dir>] [--record <dir>] [--no-render]\n       bun scripts/pptx-eval.ts --deck <dir> --pptx <file> [--out <dir>] [--no-render]";
 
 /** How many pixels of a comparison stand for one of the slide's: the scale `dekc pptx` shoots at. */
 const SCALE = 2;
@@ -30,6 +30,7 @@ export async function main(argv: string[]): Promise<number> {
     deck?: string[];
     out?: string;
     record?: string;
+    pptx?: string;
     "no-render"?: boolean;
     help?: boolean;
   };
@@ -40,6 +41,7 @@ export async function main(argv: string[]): Promise<number> {
         deck: { type: "string", multiple: true },
         out: { type: "string" },
         record: { type: "string" },
+        pptx: { type: "string" },
         "no-render": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
@@ -51,6 +53,14 @@ export async function main(argv: string[]): Promise<number> {
   if (values.help) {
     console.log(`usage: ${USAGE}`);
     return 0;
+  }
+  // A file made elsewhere, such as one an agent built again, measured against its deck. It is
+  // no record of dek's exporter, so it is never recorded.
+  if (values.pptx !== undefined && (values.deck?.length !== 1 || values.record !== undefined)) {
+    console.error(
+      `--pptx measures one file against one --deck, and is not recorded\nusage: ${USAGE}`,
+    );
+    return 2;
   }
   const root = resolve(import.meta.dir, "../..");
   const samples = join(root, "sample/decks");
@@ -64,11 +74,16 @@ export async function main(argv: string[]): Promise<number> {
   const out = resolve(
     values.out ?? join(root, ".cache/pptx-eval", startedAt.replace(/[:.]/g, "-")),
   );
-  const renderer = values["no-render"] ? undefined : quickLookName();
+  const renderer = values["no-render"] ? undefined : await quickLookName();
 
   const playwright = await importPlaywright();
   const browser = await playwright.chromium.launch({ headless: true });
-  const report: EvalReport = { startedAt, renderer: renderer ?? null, decks: [] };
+  const report: EvalReport = {
+    startedAt,
+    renderer: renderer ?? null,
+    ...(values.pptx === undefined ? {} : { producer: resolve(values.pptx) }),
+    decks: [],
+  };
   try {
     const lab = await (await browser.newContext()).newPage();
     for (const dir of dirs) {
@@ -76,7 +91,8 @@ export async function main(argv: string[]): Promise<number> {
       const folder = join(out, name);
       mkdirSync(folder, { recursive: true });
       const began = performance.now();
-      const { outPath } = await pptxDeck(dir);
+      const { outPath } =
+        values.pptx === undefined ? await pptxDeck(dir) : { outPath: resolve(values.pptx) };
       const exportMs = performance.now() - began;
       const bytes = new Uint8Array(readFileSync(outPath));
       const { facts, files } = readPackage(bytes);
@@ -116,18 +132,20 @@ export async function main(argv: string[]): Promise<number> {
         }
         let compared: Awaited<ReturnType<typeof compareInPage>> | undefined;
         if (renderer) {
-          const drawn = [false, true].map((bare) => {
-            const png = quickLookSlide(files, index, {
+          const drawn: Array<string | undefined> = [];
+          for (const bare of [false, true]) {
+            const png = await quickLookSlide(files, index, {
               bare,
               width: size.width * SCALE,
               dir: join(folder, "renderer"),
+              root: out,
             });
             const kept = `${stem}-renderer${bare ? "-bare" : ""}.png`;
             if (png) {
               renameSync(png, kept);
             }
-            return png ? kept : undefined;
-          });
+            drawn.push(png ? kept : undefined);
+          }
           const [full, bare] = drawn;
           if (full && bare) {
             compared = await lab.evaluate(compareInPage, {

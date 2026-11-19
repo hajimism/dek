@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { SlideCensus } from "../../evals/pptx/census.ts";
 import type { LineFinding } from "../../evals/pptx/compare.ts";
 import { readPackage, readZip } from "../../evals/pptx/package.ts";
-import { magnified } from "../../evals/pptx/quicklook.ts";
 import { type DeckReport, markdown, slideReport, summarize } from "../../evals/pptx/report.ts";
 import { type PptxLayer, type PptxRun, pptxPackage } from "../../src/core/pptx-package.ts";
+import { magnified } from "../../src/core/pptx-quicklook.ts";
 import { zipFiles } from "../../src/core/zip.ts";
 
 // The PPTX eval without a browser or a renderer: what it reads from a file, how it counts what
@@ -69,6 +69,13 @@ const layers: PptxLayer[] = [
   },
 ];
 
+const deckOf = (slides: Parameters<typeof pptxPackage>[0]["slides"]) => ({
+  title: "Talk",
+  lang: "ja",
+  size: { width: 1280, height: 720 },
+  slides,
+});
+
 const file = () =>
   pptxPackage({
     title: "Talk",
@@ -113,6 +120,46 @@ describe("reading a file back", () => {
     expect(facts.problems).toEqual([
       "ppt/slides/_rels/slide1.xml.rels points at ../media/image1.png, which is not in the file",
     ]);
+  });
+});
+
+describe("what PowerPoint shows that a file did not mean", () => {
+  const slideWith = (shapes: string) =>
+    new TextEncoder().encode(
+      new TextDecoder()
+        .decode(readZip(file()).get("ppt/slides/slide1.xml"))
+        .replace("</p:spTree>", `${shapes}</p:spTree>`),
+    );
+  const placeholder = (id: number, text: string) =>
+    `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Title ${id}"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p>${text ? `<a:r><a:t>${text}</a:t></a:r>` : ""}</a:p></p:txBody></p:sp>`;
+  const read = (shapes: string) => {
+    const whole = readZip(file());
+    whole.set("ppt/slides/slide1.xml", slideWith(shapes));
+    // A folder's own entry, as some zip writers add, is no part and needs no content type.
+    whole.set("ppt/media/", new Uint8Array());
+    return readPackage(zipFiles([...whole].map(([path, data]) => ({ path, data })))).facts.problems;
+  };
+
+  test("a placeholder with nothing in it shows its prompt, and two titles are one too many", () => {
+    expect(read(placeholder(90, "見出し"))).toEqual([]);
+    expect(read(`${placeholder(90, "見出し")}${placeholder(91, "")}`)).toEqual([
+      "ppt/slides/slide1.xml has a placeholder with no text, which PowerPoint shows as its prompt",
+      "ppt/slides/slide1.xml has 2 title placeholders",
+    ]);
+  });
+});
+
+describe("a backdrop", () => {
+  test("is a slide's own, or the master's on every slide that sets none", () => {
+    const slide = { description: "", layers: [], notes: "", backdrop: PNG };
+    const own = readPackage(
+      pptxPackage({ ...deckOf([slide, { ...slide, backdrop: ICON }]) }),
+    ).facts.slides.map((each) => each.backdrop);
+    expect(own).toEqual(["ppt/media/image3.png", "ppt/media/image4.png"]);
+    const shared = readPackage(pptxPackage(deckOf([slide, slide]))).facts.slides.map(
+      (each) => each.backdrop,
+    );
+    expect(shared).toEqual(["ppt/media/image3.png", "ppt/media/image3.png"]);
   });
 });
 

@@ -8,6 +8,8 @@ Accepted
 
 Amended by [18. Ship an optional design skill and raise the official skill's floor to 0.2.2](0018-ship-an-optional-design-skill-and-raise-the-official-skill-s-floor-to-0-2-2.md)
 
+Amended by [105. Let a skill for newer work name its command, and ask the installed dek for it first](0105-let-a-skill-for-newer-work-name-its-command-and-ask-the-installed-dek-for-it-first.md)
+
 ## Context
 
 An agent meets dek in three places today: dek's block in `AGENTS.md`, which `dekc sync` writes for the installed version; `dekc help --agent`, printed from the command specs; and `docs/public/llms.txt`, written by hand for agents outside any project. The hand-written one had drifted: it said "DEK001 to DEK044" while `DEK045` existed, and it knew nothing of `dekc marks` or annotate mode. Slidev publishes `llms.txt`, an official skill, and a Claude Code plugin; open-slide and HyperFrames ship skills too. dek's way in was thinner, and the one entry it had was wrong.

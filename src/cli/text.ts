@@ -302,6 +302,17 @@ export function formatPdf(data: PdfCliResult): string {
  * in the picture, which are the ones to rewrite toward shapes.
  */
 export function formatPptx(data: PptxCliResult): string {
+  if (data.action === "spec") {
+    return [
+      `wrote ${data.start}`,
+      `wrote ${data.spec}: ${data.slides} slides, ${data.parts} parts drawn alone`,
+    ].join("\n");
+  }
+  if (data.action === "from") {
+    return [...data.outs.map((path) => `wrote ${path}`), formatDiagnostics(data.diagnostics)]
+      .filter(Boolean)
+      .join("\n");
+  }
   return data.outs
     .flatMap((path, index) => {
       const lifted = data.lifted?.[index];

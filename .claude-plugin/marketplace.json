@@ -4,7 +4,7 @@
     "name": "Hajime Nakagawa",
     "url": "https://github.com/hajimism"
   },
-  "description": "The official dek skill, and an optional design skill.",
+  "description": "The official dek skill, and optional skills for design and for an editable PPTX.",
   "plugins": [
     {
       "name": "dek",
@@ -18,6 +18,11 @@
       "name": "dek-design",
       "source": "./skills/dek-design/",
       "description": "Make dek slides that read at a glance: a claim for a heading, one focal point, no difference without a meaning."
+    },
+    {
+      "name": "dek-pptx",
+      "source": "./skills/dek-pptx/",
+      "description": "Build a finished dek deck again as a PowerPoint file the recipient edits as their own, checked by dekc pptx --from."
     }
   ]
 }
