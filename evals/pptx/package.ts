@@ -363,6 +363,25 @@ function readSlide(
     }
   }
 
+  // A table is a shape, and each of its cells with text a body PowerPoint wraps.
+  for (const frame of doc.getElementsByTagName("p:graphicFrame")) {
+    const cells = frame.getElementsByTagName("a:tc");
+    if (cells.length === 0) {
+      continue;
+    }
+    slide.shapes++;
+    for (const cell of cells) {
+      const body = cell.getElementsByTagName("a:txBody")[0];
+      const paragraphs = body ? [...body.getElementsByTagName("a:p")].map(readParagraph) : [];
+      if (paragraphs.some((paragraph) => paragraph.ink !== "")) {
+        slide.bodies.push({
+          wrap: true,
+          paragraphs: paragraphs.filter((paragraph) => paragraph.ink !== ""),
+        });
+      }
+    }
+  }
+
   const notes = [...targets.values()].find((each) => each.type.endsWith("/notesSlide"));
   if (notes) {
     const said = [...parse(notes.target).getElementsByTagName("a:t")]

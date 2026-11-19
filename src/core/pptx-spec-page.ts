@@ -90,6 +90,24 @@ type SpecPageMark = {
   rect?: SpecPageRect;
 };
 
+/**
+ * A table's grid as the browser laid it out: where its first cell's corner lies, and each
+ * column's width and each row's height, from one cell's edge to the next.
+ */
+export type SpecPageGrid = { x: number; y: number; columns: number[]; rows: number[] };
+
+/**
+ * A table cell's place on its table's grid, from 0, as HTML places it: the row it starts in, the
+ * column, how far it reaches where it takes more than one, and where its text sits.
+ */
+export type SpecPageCell = {
+  row: number;
+  column: number;
+  rowSpan?: number;
+  columnSpan?: number;
+  anchor: "top" | "middle" | "bottom";
+};
+
 export type SpecPageNode = {
   /** Its place in the page's walk, to find its element again. */
   index: number;
@@ -127,6 +145,10 @@ export type SpecPageNode = {
   marks?: SpecPageMark[];
   /** An image's source, as the page has it. */
   src?: string;
+  /** For a `<table>`: its grid. */
+  grid?: SpecPageGrid;
+  /** For a table's cell: its place on the grid. A cell is a node, empty or not. */
+  cell?: SpecPageCell;
   text?: SpecPageText;
   children: SpecPageNode[];
 };
@@ -540,6 +562,104 @@ export function measurePptxSpecInPage(): SpecPage | null {
     };
   };
 
+  /** Each table's grid, and each of its cells' places on it, as HTML places them. */
+  const grids = new Map<
+    HTMLTableElement,
+    { grid: SpecPageGrid; cells: Map<HTMLTableCellElement, SpecPageCell> }
+  >();
+  const gridOf = (table: HTMLTableElement) => {
+    const known = grids.get(table);
+    if (known) {
+      return known;
+    }
+    // The rows the browser lays out, in its order: the head's, the bodies', the foot's.
+    const shown = (element: Element) => element.getClientRects().length > 0;
+    const rows = [...table.rows].filter(shown);
+    // Where each row's group ends: a span stops there, as HTML stops it, rowspan="0" too.
+    const ends = rows.map((tr, r) => {
+      let end = r;
+      while (rows[end + 1]?.parentElement === tr.parentElement) {
+        end++;
+      }
+      return end;
+    });
+    const taken: boolean[][] = rows.map(() => []);
+    const cells = new Map<HTMLTableCellElement, SpecPageCell>();
+    const lefts: number[] = [];
+    const tops: number[] = [];
+    let right = Number.NEGATIVE_INFINITY;
+    let bottom = Number.NEGATIVE_INFINITY;
+    for (const [r, tr] of rows.entries()) {
+      let c = 0;
+      // A cell the browser does not lay out takes no place on the grid.
+      for (const td of [...tr.cells].filter(shown)) {
+        while (taken[r]?.[c]) {
+          c++;
+        }
+        const across = Math.max(1, td.colSpan);
+        const room = (ends[r] ?? r) - r + 1;
+        const down = Math.max(1, Math.min(td.rowSpan || room, room));
+        for (const line of taken.slice(r, r + down)) {
+          for (let x = c; x < c + across; x++) {
+            line[x] = true;
+          }
+        }
+        const valign = getComputedStyle(td).verticalAlign;
+        cells.set(td, {
+          row: r,
+          column: c,
+          ...(down > 1 ? { rowSpan: down } : {}),
+          ...(across > 1 ? { columnSpan: across } : {}),
+          anchor: valign === "middle" ? "middle" : valign === "bottom" ? "bottom" : "top",
+        });
+        const box = td.getBoundingClientRect();
+        lefts[c] = Math.min(lefts[c] ?? box.left, box.left);
+        tops[r] = Math.min(tops[r] ?? box.top, box.top);
+        right = Math.max(right, box.right);
+        bottom = Math.max(bottom, box.bottom);
+        c += across;
+      }
+    }
+    // A row no cell starts in starts where the browser laid it out.
+    for (const [r, tr] of rows.entries()) {
+      tops[r] ??= tr.getBoundingClientRect().top;
+    }
+    const count = Math.max(0, ...taken.map((row) => row.length));
+    // A column or row no cell starts in shares the room its neighbours leave it.
+    const edges = (starts: number[], length: number, end: number): number[] => {
+      const all = Array.from({ length }, (_, at) => starts[at]);
+      return all.map((edge, at) => {
+        if (edge !== undefined) {
+          return edge;
+        }
+        const before = all.slice(0, at).findLastIndex((each) => each !== undefined);
+        const after = all.findIndex((each, index) => index > at && each !== undefined);
+        const stop = after < 0 ? end : (all[after] ?? end);
+        if (before < 0) {
+          return stop;
+        }
+        const start = all[before] ?? stop;
+        const to = after < 0 ? length : after;
+        return start + ((stop - start) * (at - before)) / (to - before);
+      });
+    };
+    const xs = edges(lefts, count, right);
+    const ys = edges(tops, rows.length, bottom);
+    const spans = (starts: number[], end: number) =>
+      starts.map((start, at) => (starts[at + 1] ?? end) - start);
+    const found = {
+      grid: {
+        x: (xs[0] ?? 0) - origin.left,
+        y: (ys[0] ?? 0) - origin.top,
+        columns: spans(xs, right),
+        rows: spans(ys, bottom),
+      },
+      cells,
+    };
+    grids.set(table, found);
+    return found;
+  };
+
   /** Whether an element sets text of its own, beside or instead of blocks inside it. */
   const setsText = (element: Element): boolean =>
     [...element.childNodes].some((child) => {
@@ -702,6 +822,16 @@ export function measurePptxSpecInPage(): SpecPage | null {
     if (marks.length > 0) {
       node.marks = marks;
     }
+    if (element instanceof HTMLTableElement && element.rows.length > 0) {
+      node.grid = gridOf(element).grid;
+    }
+    if (element instanceof HTMLTableCellElement) {
+      const table = element.closest("table");
+      const cell = table ? gridOf(table).cells.get(element) : undefined;
+      if (cell) {
+        node.cell = cell;
+      }
+    }
     const replaced = REPLACED[tag];
     if (replaced) {
       node.picture = replaced;
@@ -776,6 +906,7 @@ export function measurePptxSpecInPage(): SpecPage | null {
       node.marks !== undefined ||
       node.picture !== undefined ||
       node.text !== undefined ||
+      node.cell !== undefined ||
       (SEMANTIC.has(tag) && node.children.length > 0) ||
       node.children.length >= 2;
     return kept ? [node] : node.children;

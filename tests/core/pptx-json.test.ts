@@ -6,7 +6,7 @@ import {
   pptxJsonSchema,
   rgbOf,
 } from "../../src/core/pptx-json.ts";
-import type { PptxLayer, PptxRun } from "../../src/core/pptx-package.ts";
+import type { PptxLayer, PptxParagraph, PptxRun } from "../../src/core/pptx-package.ts";
 
 // deck.pptx.json is what `dekc pptx` would write, as JSON: written out and read back it is the
 // same deck, and a layer written by hand needs say only what it sets.
@@ -25,6 +25,16 @@ const run = (text: string, extra: Partial<PptxRun> = {}): PptxRun => ({
 });
 
 const png = new Uint8Array([1, 2, 3]);
+
+const paragraph = (text: string): PptxParagraph => ({
+  align: "left",
+  lineHeight: 28,
+  spaceBefore: 0,
+  marginLeft: 0,
+  marginRight: 0,
+  indent: 0,
+  runs: [run(text, { size: 20 })],
+});
 
 const layers: PptxLayer[] = [
   { kind: "text", x: 10, y: 20, width: 100, height: 30, lineHeight: 28.8, runs: [run("一行")] },
@@ -88,6 +98,57 @@ const layers: PptxLayer[] = [
       ],
     },
     layers: [],
+  },
+  {
+    kind: "table",
+    x: 40,
+    y: 440,
+    columns: [120, 200, 160],
+    rows: [
+      {
+        height: 32,
+        cells: [
+          {
+            columnSpan: 2,
+            rowSpan: 1,
+            fill: { color: [241, 245, 249], alpha: 1 },
+            borders: { bottom: { width: 1, paint: { color: [226, 232, 240], alpha: 1 } } },
+            inset: { left: 8, top: 4, right: 8, bottom: 4 },
+            anchor: "middle",
+            paragraphs: [paragraph("見出し")],
+          },
+          {
+            columnSpan: 1,
+            rowSpan: 2,
+            borders: { left: { width: 2, paint: { color: [0, 0, 0], alpha: 1 }, dash: "dot" } },
+            inset: { left: 0, top: 0, right: 0, bottom: 0 },
+            anchor: "bottom",
+            paragraphs: [paragraph("42 行")],
+          },
+        ],
+      },
+      {
+        height: 28,
+        cells: [
+          {
+            columnSpan: 1,
+            rowSpan: 1,
+            borders: {},
+            inset: { left: 0, top: 0, right: 0, bottom: 0 },
+            anchor: "top",
+            paragraphs: [],
+          },
+          {
+            columnSpan: 1,
+            rowSpan: 1,
+            borders: {},
+            inset: { left: 0, top: 0, right: 0, bottom: 0 },
+            anchor: "top",
+            paragraphs: [paragraph("slides/timing.html")],
+          },
+        ],
+      },
+    ],
   },
   {
     kind: "rule",
@@ -174,5 +235,76 @@ describe("deck.pptx.json", () => {
       fill: { color: [15, 23, 42], alpha: 64 / 255 },
       text: { paragraphs: [{ runs: [{ color: [0, 0, 0], alpha: (0.5 * 128) / 255 }] }] },
     });
+  });
+
+  test("a table's cells say only what they set: one column and row, no borders, top, no insets", () => {
+    const [table] = layersFromJson(
+      [
+        {
+          kind: "table",
+          x: 0,
+          y: 0,
+          columns: [100, 100],
+          rows: [
+            {
+              height: 30,
+              cells: [{ paragraphs: [{ runs: [{ text: "a", size: 20, color: "#000000" }] }] }, {}],
+            },
+          ],
+        },
+      ],
+      () => png,
+      () => "",
+    );
+    expect(table).toMatchObject({
+      kind: "table",
+      rows: [
+        {
+          cells: [
+            {
+              columnSpan: 1,
+              rowSpan: 1,
+              borders: {},
+              inset: { left: 0, top: 0, right: 0, bottom: 0 },
+              anchor: "top",
+              paragraphs: [{ align: "left", runs: [{ text: "a" }] }],
+            },
+            { paragraphs: [] },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("a table's cells must fill its grid, each row's from the left past what spans into it", () => {
+    const base = { title: "t", lang: "ja", size: { width: 1280, height: 720 } };
+    const parse = (rows: unknown, columns = [100, 100]) =>
+      pptxJsonSchema.safeParse({
+        ...base,
+        slides: [{ slug: "a", layers: [{ kind: "table", x: 0, y: 0, columns, rows }] }],
+      });
+    // A cell two rows high leaves its column taken in the row below.
+    expect(
+      parse([
+        { height: 30, cells: [{ rowSpan: 2 }, {}] },
+        { height: 30, cells: [{}] },
+      ]).success,
+    ).toBe(true);
+    expect(
+      parse([
+        { height: 30, cells: [{ columnSpan: 2 }] },
+        { height: 30, cells: [] },
+      ]).success,
+    ).toBe(false);
+    const short = parse([{ height: 30, cells: [{}] }]);
+    expect(short.success).toBe(false);
+    expect(JSON.stringify(short.error?.issues)).toContain("row 1 has 1 of 2 columns");
+    const over = parse([
+      { height: 30, cells: [{ rowSpan: 2 }, {}] },
+      { height: 30, cells: [{}, {}] },
+    ]);
+    expect(JSON.stringify(over.error?.issues)).toContain("row 2 has a cell past its last column");
+    const below = parse([{ height: 30, cells: [{ rowSpan: 2 }, {}] }]);
+    expect(JSON.stringify(below.error?.issues)).toContain("past the table's last row");
   });
 });

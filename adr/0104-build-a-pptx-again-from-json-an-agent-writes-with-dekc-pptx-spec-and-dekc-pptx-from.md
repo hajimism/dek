@@ -10,6 +10,8 @@ Amends [8. Export a talk as PPTX with editable text over a picture of each slide
 
 Amended by [106. Say where text lies and what PowerPoint will wrap when a PPTX is built again, and keep a shared backdrop on the master](0106-say-where-text-lies-and-what-powerpoint-will-wrap-when-a-pptx-is-built-again-and-keep-a-shared-backdrop-on-the-master.md)
 
+Amended by [108. Build a table again as PowerPoint's own table, its cells' text editable and wrapped in them](0108-build-a-table-again-as-powerpoint-s-own-table-its-cells-text-editable-and-wrapped-in-them.md)
+
 ## Context
 
 `dekc pptx` writes a file that looks like the deck: what PowerPoint can draw exactly comes out of the browser's drawing as PowerPoint's own, and the rest stays a picture of the slide beneath it (ADRs 8, 22, 24, 99). On `with-agents` every one of its 13 slides keeps that picture, over 64% of the slide on average, and half its text is set a line a box. That is the right trade for a file that must look as the deck does, and the wrong one for the people dek's PPTX most often reaches: consultants who hand a deck to a client to rework in PowerPoint. They take the finished deck and have an agent build the file again from nothing, with a library such as pptxgenjs, using the deck as a reference.

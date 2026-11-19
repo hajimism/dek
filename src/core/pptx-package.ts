@@ -142,11 +142,93 @@ export type PptxProse = PptxRect & {
   title?: boolean;
 };
 
+/** One side of a table cell's border, on the grid's line, dashed or dotted. */
+type PptxCellBorder = { width: number; paint: PptxPaint; dash?: "dash" | "dot" };
+
+/**
+ * A cell of a table, where it starts on the grid: the columns and rows it takes from there, what
+ * it paints, and its text, which PowerPoint wraps inside its insets and grows its row to hold.
+ */
+export type PptxTableCell = {
+  columnSpan: number;
+  rowSpan: number;
+  fill?: PptxPaint;
+  borders: Partial<Record<"top" | "right" | "bottom" | "left", PptxCellBorder>>;
+  /** From the cell's edges, the grid's lines, to where its text is set. */
+  inset: { left: number; top: number; right: number; bottom: number };
+  /** Where its text sits between its top and bottom insets. */
+  anchor: "top" | "middle" | "bottom";
+  /** Its paragraphs; none for an empty cell. */
+  paragraphs: PptxParagraph[];
+};
+
+/**
+ * A table as PowerPoint's own: its columns' widths from the left, and its rows, each as high as
+ * PowerPoint makes it at least, with the cells that start in it from the left, past those of
+ * the rows above that reach into it, as HTML places them.
+ */
+export type PptxTable = {
+  kind: "table";
+  x: number;
+  y: number;
+  columns: number[];
+  rows: Array<{ height: number; cells: PptxTableCell[] }>;
+};
+
+/** A cell where it starts: its row, its place among the row's cells, and its column. */
+type TablePlace = { row: number; cell: number; column: number };
+
+/**
+ * Each place on a table's grid as the cell that covers it, where the cell starts; or why the
+ * cells do not cover the grid once each.
+ */
+export function tableGrid(
+  columns: number,
+  rows: ReadonlyArray<{ cells: ReadonlyArray<{ columnSpan?: number; rowSpan?: number }> }>,
+): { grid: TablePlace[][] } | { error: string } {
+  const grid: Array<Array<TablePlace | undefined>> = rows.map(() =>
+    Array.from({ length: columns }, () => undefined),
+  );
+  for (const [r, row] of rows.entries()) {
+    let c = 0;
+    for (const [index, cell] of row.cells.entries()) {
+      while (c < columns && grid[r]?.[c]) {
+        c++;
+      }
+      const across = cell.columnSpan ?? 1;
+      const down = cell.rowSpan ?? 1;
+      if (c + across > columns) {
+        return { error: `row ${r + 1} has a cell past its last column` };
+      }
+      if (r + down > rows.length) {
+        return { error: `row ${r + 1}'s cell ${index + 1} reaches past the table's last row` };
+      }
+      const place = { row: r, cell: index, column: c };
+      for (let y = r; y < r + down; y++) {
+        for (let x = c; x < c + across; x++) {
+          const line = grid[y];
+          if (!line || line[x]) {
+            return { error: `row ${y + 1}'s column ${x + 1} is in two cells` };
+          }
+          line[x] = place;
+        }
+      }
+      c += across;
+    }
+    const filled = grid[r]?.filter(Boolean).length ?? 0;
+    if (filled < columns) {
+      return { error: `row ${r + 1} has ${filled} of ${columns} columns in a cell` };
+    }
+  }
+  return { grid: grid as TablePlace[][] };
+}
+
 export type PptxLayer<I = PptxImage> =
   | PptxTextLayer
   | PptxProse
   | PptxShape<I>
   | PptxRule
+  | PptxTable
   | PptxPicture<I>;
 
 /** The same layers with each picture's embedding replaced. */
@@ -585,6 +667,8 @@ function layerXml(layer: PptxLayer, writer: LayerWriter): string {
       return ruleXml(layer, writer.id(), writer.style.theme);
     case "picture":
       return pictureXml(layer, writer);
+    case "table":
+      return tableXml(layer, writer.id(), writer.style);
     default: {
       const unknown: never = layer;
       throw new Error(`unknown layer ${JSON.stringify(unknown)}`);
@@ -706,6 +790,106 @@ function ruleXml(rule: PptxRule, id: number, theme: PptxTheme | undefined): stri
   return `<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="${id}" name="Line ${id - 2}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm${flips}><a:off x="${emu(frame.x)}" y="${emu(frame.y)}"/><a:ext cx="${emu(frame.width)}" cy="${emu(frame.height)}"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom><a:ln w="${emu(rule.width)}" cap="flat">${solidFill(rule.paint, theme)}</a:ln></p:spPr></p:cxnSp>`;
 }
 
+/** A table's box: its grid's, the rows as high as they are at least. */
+export function tableBox(
+  table: Pick<PptxTable, "x" | "y" | "columns"> & { rows: ReadonlyArray<{ height: number }> },
+): PptxRect {
+  const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+  return {
+    x: table.x,
+    y: table.y,
+    width: sum(table.columns),
+    height: sum(table.rows.map((row) => row.height)),
+  };
+}
+
+const ANCHOR = { top: "t", middle: "ctr", bottom: "b" } as const;
+
+const TABLE = "http://schemas.openxmlformats.org/drawingml/2006/table";
+
+/**
+ * A table as PowerPoint's own, every place on its grid a cell: where a merged cell starts it
+ * says how far it reaches, and each place it covers says it is covered, from the left, from
+ * above, or both. A border two cells share is one line, so it is the wider of their two, the
+ * one above or to the left where they are as wide, as CSS collapses borders, written on both;
+ * a merged cell's sides are written along each place it covers, and its far sides where it
+ * starts as well.
+ * The table has no style, so it paints what its cells say and no banding of its own.
+ */
+function tableXml(table: PptxTable, id: number, style: Style): string {
+  const placed = tableGrid(table.columns.length, table.rows);
+  if ("error" in placed) {
+    throw new Error(`a table's cells do not fill its grid: ${placed.error}`);
+  }
+  const { grid } = placed;
+  const originOf = (r: number, c: number) => {
+    const at = grid[r]?.[c];
+    const cell = at && table.rows[at.row]?.cells[at.cell];
+    return at && cell ? { ...at, cell } : undefined;
+  };
+  // The smallest text the table sets, for its empty paragraphs.
+  const runs = table.rows.flatMap((row) =>
+    row.cells.flatMap((cell) => cell.paragraphs.flatMap((paragraph) => paragraph.runs)),
+  );
+  const smallest = runs.length > 0 ? Math.min(...runs.map((run) => run.size)) : undefined;
+  const empty = `<a:p><a:endParaRPr lang="${escapeXml(style.lang)}"${smallest === undefined ? "" : ` sz="${points(smallest)}"`} dirty="0"/></a:p>`;
+  const lineXml = (tag: string, border: PptxCellBorder | undefined) =>
+    border
+      ? `<a:${tag} w="${emu(border.width)}" cap="flat" cmpd="sng" algn="ctr">${solidFill(border.paint, style.theme)}<a:prstDash val="${border.dash === "dot" ? "sysDot" : (border.dash ?? "solid")}"/></a:${tag}>`
+      : `<a:${tag} w="0"><a:noFill/></a:${tag}>`;
+  const wider = (first: PptxCellBorder | undefined, second: PptxCellBorder | undefined) =>
+    !second ? first : !first || second.width > first.width ? second : first;
+  const rows = table.rows
+    .map((row, r) => {
+      const cells = table.columns
+        .map((_, c) => {
+          const origin = originOf(r, c);
+          if (!origin) {
+            return "";
+          }
+          const { cell } = origin;
+          const top = r === origin.row;
+          const left = c === origin.column;
+          const starts = top && left;
+          const last = origin.column + cell.columnSpan - 1;
+          const lowest = origin.row + cell.rowSpan - 1;
+          // The side of its own the neighbour at a place on the grid faces this cell with.
+          const at = (y: number, x: number) => originOf(y, x)?.cell.borders;
+          // Each place is drawn with the sides of the cell it lies on; the place a merged cell
+          // starts at carries the cell's far sides too, as PowerPoint writes a merge it made.
+          const sides = {
+            lnL: left ? wider(at(r, c - 1)?.right, cell.borders.left) : undefined,
+            lnR:
+              c === last || starts ? wider(cell.borders.right, at(r, last + 1)?.left) : undefined,
+            lnT: top ? wider(at(r - 1, c)?.bottom, cell.borders.top) : undefined,
+            lnB:
+              r === lowest || starts
+                ? wider(cell.borders.bottom, at(lowest + 1, c)?.top)
+                : undefined,
+          };
+          const lines = Object.entries(sides)
+            .map(([tag, border]) => lineXml(tag, border))
+            .join("");
+          const fill = cell.fill ? solidFill(cell.fill, style.theme) : "<a:noFill/>";
+          const { inset } = cell;
+          const properties = `<a:tcPr marL="${emu(inset.left)}" marR="${emu(inset.right)}" marT="${emu(inset.top)}" marB="${emu(inset.bottom)}" anchor="${ANCHOR[cell.anchor]}">${lines}${fill}</a:tcPr>`;
+          const span = starts
+            ? `${cell.columnSpan > 1 ? ` gridSpan="${cell.columnSpan}"` : ""}${cell.rowSpan > 1 ? ` rowSpan="${cell.rowSpan}"` : ""}`
+            : `${left ? "" : ' hMerge="1"'}${top ? "" : ' vMerge="1"'}`;
+          const paragraphs = starts
+            ? cell.paragraphs.map((paragraph) => paragraphXml(paragraph, style)).join("")
+            : "";
+          return `<a:tc${span}><a:txBody><a:bodyPr/><a:lstStyle/>${paragraphs || empty}</a:txBody>${properties}</a:tc>`;
+        })
+        .join("");
+      return `<a:tr h="${emu(row.height)}">${cells}</a:tr>`;
+    })
+    .join("");
+  const columns = table.columns.map((width) => `<a:gridCol w="${emu(width)}"/>`).join("");
+  const box = tableBox(table);
+  return `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="Table ${id - 2}"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.width)}" cy="${emu(box.height)}"/></p:xfrm><a:graphic><a:graphicData uri="${TABLE}"><a:tbl><a:tblPr/><a:tblGrid>${columns}</a:tblGrid>${rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
+}
+
 /** The extension PowerPoint 2016 and later read an SVG from; the PNG is for any other. */
 const SVG_BLIP = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
@@ -739,6 +923,8 @@ function frameOf(layer: PptxLayer): PptxRect {
       };
     case "picture":
       return { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+    case "table":
+      return tableBox(layer);
     case "shape": {
       const frames = [pathOf(layer), ...layer.layers.map(frameOf)];
       const left = Math.min(...frames.map((frame) => frame.x));

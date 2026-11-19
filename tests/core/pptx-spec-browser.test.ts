@@ -66,6 +66,51 @@ const terminalCss = `
 .key { display: inline-block; width: 40px; height: 10px; margin: 0 30px; background: #22c55e; }
 `;
 
+// A table with a cell across two columns, one down two rows, and an empty cell.
+const table = `<section class="slide" data-layout="default">
+  <h2 class="slide-title">表</h2>
+  <table class="bundle">
+    <thead><tr><th colspan="2">部分</th><th>行数</th></tr></thead>
+    <tbody>
+      <tr><td>script</td><td>台本のその節</td><td rowspan="2" class="lines">8 行</td></tr>
+      <tr><td></td><td>slides/timing.html</td></tr>
+    </tbody>
+  </table>
+</section>`;
+
+const tableCss = `
+.bundle { position: absolute; left: 100px; top: 200px; border-collapse: collapse; font-size: 20px; }
+.bundle th, .bundle td { padding: 4px 8px; border-bottom: 1px solid #cbd5e1; }
+.bundle th { width: 120px; vertical-align: bottom; }
+.bundle td { height: 40px; }
+.bundle .lines { vertical-align: top; }
+`;
+
+// A span stops at the end of its row group, rowspan="0" too; a hidden cell takes no column.
+const groups = `<section class="slide" data-layout="default">
+  <h2 class="slide-title">表</h2>
+  <table class="grouped">
+    <thead><tr><th rowspan="2">H</th><th>B</th></tr></thead>
+    <tbody>
+      <tr><td>C</td><td>D</td></tr>
+      <tr><td rowspan="0">E</td><td>F</td></tr>
+      <tr><td>G</td></tr>
+    </tbody>
+    <tfoot><tr><td>X</td><td>Y</td></tr></tfoot>
+  </table>
+  <table class="hidden">
+    <tr><td>a</td><td style="display: none">z</td><td>b</td></tr>
+    <tr><td>c</td><td>d</td></tr>
+  </table>
+</section>`;
+
+const groupsCss = `
+table { position: absolute; left: 100px; border-collapse: collapse; font-size: 20px; }
+.grouped { top: 200px; }
+.hidden { top: 500px; }
+td, th { padding: 4px; border: 1px solid #000000; }
+`;
+
 /** Every node of the outline, depth first. */
 function nodes(node: PptxSpecNode | undefined): PptxSpecNode[] {
   return node ? [node, ...(node.children ?? []).flatMap(nodes)] : [];
@@ -189,6 +234,111 @@ describe("pptxSpecDeck in a browser", () => {
           // Words either side of a swatch are stretches apart, each where the browser set it.
           const split = byClass("split")[0]?.text?.pieces ?? [];
           expect(split.map((piece) => piece.text)).toEqual(["左", "右"]);
+        },
+      );
+    },
+  );
+
+  browserTest(
+    "writes a table's grid, and each cell's place on it, its empty ones too",
+    async () => {
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              script: "---\ntitle: Demo\nlang: ja\n---\n\n## 表 {#table}\n\nhello\n",
+              slides: { table },
+              styles: { table: tableCss },
+            },
+          ],
+        },
+        async (root) => {
+          const deck = join(root, "decks", "demo");
+          const done = await pptxSpecDeck(deck, { runner });
+          const spec = JSON.parse(readFileSync(done.spec, "utf8")) as PptxSpec;
+          const all = nodes(spec.slides[0]?.outline);
+          const grid = all.find((node) => node.tag === "table")?.grid;
+          // Three columns, three rows, from the first cell's corner, as wide as the cells laid out.
+          expect(grid?.columns).toHaveLength(3);
+          expect(grid?.rows).toHaveLength(3);
+          const cells = all.filter((node) => node.cell !== undefined);
+          expect(cells.map((node) => [node.text?.content ?? "", node.cell])).toEqual([
+            ["部分", { row: 0, column: 0, columnSpan: 2, anchor: "bottom" }],
+            ["行数", { row: 0, column: 2, anchor: "bottom" }],
+            ["script", { row: 1, column: 0, anchor: "middle" }],
+            ["台本のその節", { row: 1, column: 1, anchor: "middle" }],
+            ["8 行", { row: 1, column: 2, rowSpan: 2, anchor: "top" }],
+            ["", { row: 2, column: 0, anchor: "middle" }],
+            ["slides/timing.html", { row: 2, column: 1, anchor: "middle" }],
+          ]);
+          const [head, , script, , lines, empty] = cells;
+          expect(grid?.x).toBe(head?.x);
+          expect(grid?.y).toBe(head?.y);
+          const sum = (values: number[] = []) => values.reduce((total, value) => total + value, 0);
+          expect(sum(grid?.columns.slice(0, 2))).toBeCloseTo(head?.width ?? 0, 0);
+          expect(grid?.columns[0]).toBeCloseTo(script?.width ?? 0, 0);
+          expect(sum(grid?.rows.slice(1))).toBeCloseTo(lines?.height ?? 0, 0);
+          expect(empty?.sides?.bottom).toEqual({ width: 1, color: "#cbd5e1" });
+        },
+      );
+    },
+  );
+
+  browserTest(
+    "ends a cell's span with its row group, and gives a hidden cell no column",
+    async () => {
+      await withTempProject(
+        {
+          decks: [
+            {
+              name: "demo",
+              script: "---\ntitle: Demo\nlang: ja\n---\n\n## 表 {#groups}\n\nhello\n",
+              slides: { groups },
+              styles: { groups: groupsCss },
+            },
+          ],
+        },
+        async (root) => {
+          const deck = join(root, "decks", "demo");
+          const done = await pptxSpecDeck(deck, { runner });
+          const spec = JSON.parse(readFileSync(done.spec, "utf8")) as PptxSpec;
+          const all = nodes(spec.slides[0]?.outline);
+          const [grouped, hidden] = all.filter((node) => node.tag === "table");
+          const places = (table: PptxSpecNode | undefined) =>
+            nodes(table)
+              .filter((node) => node.cell !== undefined)
+              .map((node) => {
+                const { anchor: _anchor, ...place } = node.cell ?? { anchor: "top" };
+                return [node.text?.content, place];
+              });
+          expect(places(grouped)).toEqual([
+            ["H", { row: 0, column: 0 }],
+            ["B", { row: 0, column: 1 }],
+            ["C", { row: 1, column: 0 }],
+            ["D", { row: 1, column: 1 }],
+            ["E", { row: 2, column: 0, rowSpan: 2 }],
+            ["F", { row: 2, column: 1 }],
+            ["G", { row: 3, column: 1 }],
+            ["X", { row: 4, column: 0 }],
+            ["Y", { row: 4, column: 1 }],
+          ]);
+          expect(places(hidden)).toEqual([
+            ["a", { row: 0, column: 0 }],
+            ["b", { row: 0, column: 1 }],
+            ["c", { row: 1, column: 0 }],
+            ["d", { row: 1, column: 1 }],
+          ]);
+          for (const table of [grouped, hidden]) {
+            const grid = table?.grid;
+            expect(grid?.columns).toHaveLength(2);
+            expect(grid?.columns.every((width) => width > 0)).toBe(true);
+            expect(grid?.rows.every((height) => height > 0)).toBe(true);
+            const first = nodes(table).find(
+              (node) => node.cell?.row === 0 && node.cell.column === 0,
+            );
+            expect([grid?.x, grid?.y]).toEqual([first?.x, first?.y]);
+          }
         },
       );
     },

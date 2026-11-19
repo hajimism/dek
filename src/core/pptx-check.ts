@@ -1,5 +1,6 @@
 import type { Diagnostic } from "./diagnostic.ts";
 import type { PptxJson, PptxJsonLayer } from "./pptx-json.ts";
+import { tableBox, tableGrid } from "./pptx-package.ts";
 import type { PptxSpec, PptxSpecNode } from "./pptx-spec.ts";
 
 // What `dekc pptx --from` says of a PPTX an agent built again, against what the deck showed:
@@ -19,6 +20,12 @@ const SLIDE_SIZED = 0.9;
 
 /** How far a layer may lie from the box the slide shows its text in, in pixels. */
 const NEAR = 12;
+
+/**
+ * How far a text must reach into a table's cell to be in it, in pixels: cells meet, so a cell
+ * is near the text of the cells beside it only by the rounding of their edges.
+ */
+const INSIDE = 2;
 
 /** How much wider than its box a line may be set before PowerPoint wraps it, in pixels. */
 const FIT = 2;
@@ -104,7 +111,7 @@ export function checkPptxJson(json: PptxJson, spec: PptxSpec): Diagnostic[] {
           .slice(0, 3)
           .map((text) => `"${clip(text)}"`)
           .join(", ")}${missing.length > 3 ? ", …" : ""}`,
-        hint: "set each as text in a prose, text, or shape layer, as it reads on the slide",
+        hint: "set each as text in a prose, text, or shape layer, or a table's cell, as it reads on the slide",
         data: { missing },
       });
     }
@@ -118,7 +125,7 @@ export function checkPptxJson(json: PptxJson, spec: PptxSpec): Diagnostic[] {
           .slice(0, 3)
           .map((each) => `"${clip(each.text)}" needs ${each.needs} px of ${each.width}`)
           .join(", ")}${unfit.length > 3 ? ", …" : ""}`,
-        hint: "widen each box to what it needs and move what follows it on its row, or let it wrap where the box below leaves room",
+        hint: "widen each box, or a table cell's column, to what it needs and move what follows it on its row, or let it wrap where the box below leaves room",
         data: { texts: unfit },
       });
     }
@@ -214,10 +221,13 @@ function boxOf(layer: PptxJsonLayer): { x: number; y: number; width: number; hei
       height: Math.abs(layer.y2 - layer.y1),
     };
   }
+  if (layer.kind === "table") {
+    return tableBox(layer);
+  }
   return { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
 }
 
-/** What a layer says, without white space. */
+/** What a layer says, without white space; a table's is in its cells. */
 function inkOf(layer: PptxJsonLayer): string {
   const runs =
     layer.kind === "text"
@@ -227,10 +237,82 @@ function inkOf(layer: PptxJsonLayer): string {
         : layer.kind === "shape" && layer.text
           ? layer.text.paragraphs.flatMap((paragraph) => paragraph.runs)
           : [];
-  return runs
+  return inkOfRuns(runs);
+}
+
+const inkOfRuns = (runs: Array<{ text: string }>): string =>
+  runs
     .map((run) => run.text)
     .join("")
     .replace(/\s+/g, "");
+
+/**
+ * A box the file sets text in: a layer's, or a table cell's, what it says, and, where PowerPoint
+ * wraps it, the width it wraps at, inside its insets. A cell's text always wraps; its box is its
+ * columns and rows on the grid, the rows as high as they are at least.
+ */
+type Holder = { box: Box; ink: string; wraps?: number; near: number };
+
+function holdersOf(layers: PptxJsonLayer[]): Holder[] {
+  return layers.flatMap((layer): Holder[] => {
+    if (layer.kind === "table") {
+      return cellsOf(layer);
+    }
+    const ink = inkOf(layer);
+    if (ink === "") {
+      return [];
+    }
+    const box = boxOf(layer);
+    const body = layer.kind === "prose" || layer.kind === "shape" ? layer.text : undefined;
+    return [
+      {
+        box,
+        ink,
+        near: NEAR,
+        ...(body && body.wrap !== false
+          ? { wraps: box.width - (body.inset?.left ?? 0) - (body.inset?.right ?? 0) }
+          : {}),
+      },
+    ];
+  });
+}
+
+function cellsOf(table: Extract<PptxJsonLayer, { kind: "table" }>): Holder[] {
+  const placed = tableGrid(table.columns.length, table.rows);
+  if ("error" in placed) {
+    return [];
+  }
+  const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+  const heights = table.rows.map((row) => row.height);
+  const holders: Holder[] = [];
+  for (const [r, places] of placed.grid.entries()) {
+    for (const [c, place] of places.entries()) {
+      const cell = table.rows[place.row]?.cells[place.cell];
+      // A cell once, where it starts.
+      if (!cell || place.row !== r || place.column !== c) {
+        continue;
+      }
+      const ink = inkOfRuns((cell.paragraphs ?? []).flatMap((paragraph) => paragraph.runs));
+      if (ink === "") {
+        continue;
+      }
+      const across = cell.columnSpan ?? 1;
+      const down = cell.rowSpan ?? 1;
+      const box = {
+        x: table.x + sum(table.columns.slice(0, c)),
+        y: table.y + sum(heights.slice(0, r)),
+        width: sum(table.columns.slice(c, c + across)),
+        height: sum(heights.slice(r, r + down)),
+      };
+      holders.push({
+        box,
+        ink,
+        near: -INSIDE,
+        wraps: box.width - (cell.inset?.left ?? 0) - (cell.inset?.right ?? 0),
+      });
+    }
+  }
+  return holders;
 }
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -266,9 +348,7 @@ function findText(
   outline: PptxSpecNode | undefined,
   layers: PptxJsonLayer[],
 ): { missing: string[]; moved: string[] } {
-  const inked = layers
-    .map((layer) => ({ box: boxOf(layer), ink: inkOf(layer) }))
-    .filter((each) => each.ink !== "");
+  const inked = holdersOf(layers);
   const all = inked.map((each) => each.ink).join("");
   const missing: string[] = [];
   const moved: string[] = [];
@@ -281,7 +361,7 @@ function findText(
     const ink = shown.replace(/\s+/g, "");
     if (ink !== "") {
       const near = inked
-        .filter((each) => overlaps(each.box, node, NEAR))
+        .filter((each) => overlaps(each.box, node, each.near))
         .map((each) => each.ink)
         .join("");
       if (!holds(near, ink)) {
@@ -305,9 +385,7 @@ function findUnfit(
   outline: PptxSpecNode | undefined,
   layers: PptxJsonLayer[],
 ): Array<{ text: string; width: number; needs: number }> {
-  const held = layers
-    .map((layer) => ({ layer, box: boxOf(layer), ink: inkOf(layer) }))
-    .filter((each) => each.ink !== "");
+  const held = holdersOf(layers);
   const unfit: Array<{ text: string; width: number; needs: number }> = [];
   const visit = (node: PptxSpecNode) => {
     node.children?.forEach(visit);
@@ -325,17 +403,15 @@ function findUnfit(
       return;
     }
     const holder = held
-      .filter((each) => overlaps(each.box, node, NEAR) && holds(each.ink, ink))
-      .sort((a, b) => a.box.width * a.box.height - b.box.width * b.box.height)[0]?.layer;
-    const body =
-      holder?.kind === "prose" ? holder.text : holder?.kind === "shape" ? holder.text : undefined;
-    if (!holder || !body || body.wrap === false || holder.kind === "rule") {
+      .filter((each) => overlaps(each.box, node, each.near) && holds(each.ink, ink))
+      .sort((a, b) => a.box.width * a.box.height - b.box.width * b.box.height)[0];
+    if (holder?.wraps === undefined) {
       return;
     }
     const left = Math.min(...pieces.map((piece) => piece.x));
     const right = Math.max(...pieces.map((piece) => piece.x + piece.width));
     const needs = Math.round((right - left) * (text.widen ?? 1) * 100) / 100;
-    const width = holder.width - (body.inset?.left ?? 0) - (body.inset?.right ?? 0);
+    const width = holder.wraps;
     if (needs > width + Math.max(FIT, needs * 0.005)) {
       unfit.push({ text: text.content.trim(), width: Math.round(width * 100) / 100, needs });
     }

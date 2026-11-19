@@ -99,12 +99,12 @@ export async function quickLookSlide(
 
 /**
  * A slide's or a presentation's XML with every length in it multiplied: places and extents,
- * line widths, insets, margins, type sizes, and spacings, as `dekc pptx` writes them. What is a
- * share of something else, an angle, or a color stays.
+ * line widths, insets, margins, type sizes, spacings, and a table's columns and rows, as dek's
+ * writer writes them. What is a share of something else, an angle, or a color stays.
  */
 export function magnified(xml: string, by = MAGNIFIED): string {
   const times = (value: string) => String(Math.round(Number(value) * by));
-  const counted = { place: 0, extent: 0, size: 0 };
+  const counted = { place: 0, extent: 0, size: 0, grid: 0 };
   const out = xml
     .replace(
       /<(a:off|a:chOff) x="(-?\d+)" y="(-?\d+)"\/>/g,
@@ -120,9 +120,16 @@ export function magnified(xml: string, by = MAGNIFIED): string {
         return `<${tag} cx="${times(cx)}" cy="${times(cy)}"/>`;
       },
     )
-    .replace(/<a:ln w="(\d+)"/g, (_, w: string) => `<a:ln w="${times(w)}"`)
     .replace(
-      /\b(lIns|tIns|rIns|bIns|marL|marR|indent|blurRad|dist|rad)="(-?\d+)"/g,
+      /<(a:ln|a:lnL|a:lnR|a:lnT|a:lnB) w="(\d+)"/g,
+      (_, tag: string, w: string) => `<${tag} w="${times(w)}"`,
+    )
+    .replace(/<(a:gridCol w|a:tr h)="(\d+)"/g, (_, tag: string, value: string) => {
+      counted.grid++;
+      return `<${tag}="${times(value)}"`;
+    })
+    .replace(
+      /\b(lIns|tIns|rIns|bIns|marL|marR|marT|marB|indent|blurRad|dist|rad)="(-?\d+)"/g,
       (_, name: string, value: string) => `${name}="${times(value)}"`,
     )
     .replace(
@@ -146,7 +153,8 @@ export function magnified(xml: string, by = MAGNIFIED): string {
   const missed =
     there(/<a:(off|chOff)\b/g) !== counted.place ||
     there(/<(a:ext|a:chExt|p:sldSz)\b(?! uri=)/g) !== counted.extent ||
-    there(/\bsz="\d/g) !== counted.size;
+    there(/\bsz="\d/g) !== counted.size ||
+    there(/<a:(gridCol|tr)\b/g) !== counted.grid;
   if (missed) {
     throw new Error(
       "src/core/pptx-quicklook.ts no longer reads every length dekc pptx writes: teach magnified() the new form",
