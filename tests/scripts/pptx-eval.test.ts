@@ -231,6 +231,17 @@ describe("the copy Quick Look draws", () => {
     expect(large).toContain('sz="3600"');
   });
 
+  test("a table's columns, rows, cell margins, and cell borders are magnified", () => {
+    const xml =
+      '<a:tblGrid><a:gridCol w="100"/></a:tblGrid><a:tr h="200"><a:tc><a:tcPr marL="1" marR="2" marT="3" marB="4" anchor="t">' +
+      '<a:lnL w="5" cap="flat"><a:noFill/></a:lnL><a:lnR w="6"/><a:lnT w="7"/><a:lnB w="8"/></a:tcPr></a:tc></a:tr>';
+    expect(magnified(xml, 2)).toBe(
+      '<a:tblGrid><a:gridCol w="200"/></a:tblGrid><a:tr h="400"><a:tc><a:tcPr marL="2" marR="4" marT="6" marB="8" anchor="t">' +
+        '<a:lnL w="10" cap="flat"><a:noFill/></a:lnL><a:lnR w="12"/><a:lnT w="14"/><a:lnB w="16"/></a:tcPr></a:tc></a:tr>',
+    );
+    expect(() => magnified('<a:tr x="1" h="2">')).toThrow("teach magnified()");
+  });
+
   test("a length written in a form it does not know stops it", () => {
     expect(() => magnified('<a:off y="1" x="2"/>')).toThrow("teach magnified()");
     expect(() => magnified('<a:tab sz="1200"/>')).toThrow("teach magnified()");
