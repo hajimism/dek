@@ -70,8 +70,9 @@ export async function pptxFromFile(
     });
   }
   const json: PptxJson = parsed.data;
+  // A picture the file embeds is the deck's own, and goes where the deck goes.
   const fromDeck = (name: string) => {
-    const at = followInside(join(deck.dir, name), project.root);
+    const at = followInside(join(deck.dir, name), deck.dir);
     return at !== undefined && existsSync(at) ? at : undefined;
   };
   const missing = pptxJsonFiles(json).filter((each) => fromDeck(each.path) === undefined);
@@ -83,7 +84,7 @@ export async function pptxFromFile(
         .join("; ")}`,
       {
         path: file,
-        hint: "name each by its path from the deck's folder; run dekc pptx spec again for its parts",
+        hint: `name each by its path from the deck's folder; run \`dekc pptx ${deck.name} spec\` again for its parts`,
       },
     );
   }
@@ -101,25 +102,20 @@ export async function pptxFromFile(
     skipped.push({
       check: "pptx",
       reason: "there is no spec.json to check it against",
-      hint: "run `dekc pptx spec`, then this again",
+      hint: `run \`dekc pptx ${deck.name} spec\`, then this again`,
     });
   } else if (!current) {
     skipped.push({
       check: "pptx",
       reason: "spec.json is older than the deck's script, slides, or theme",
-      hint: "run `dekc pptx spec` again, then this again",
+      hint: `run \`dekc pptx ${deck.name} spec\` again, then this again`,
     });
   }
   const shots = options.shot
-    ? await drawPptx(
-        project.root,
-        deck.dir,
-        json,
-        parts,
-        current ? spec : undefined,
-        skipped,
-        options,
-      )
+    ? await drawPptx(project.root, deck.dir, json, parts, current ? spec : undefined, skipped, {
+        ...options,
+        out: outPath,
+      })
     : undefined;
   return {
     outPath,
@@ -150,13 +146,13 @@ async function drawPptx(
   parts: Array<{ path: string; data: Uint8Array }>,
   spec: PptxSpec | undefined,
   skipped: PptxSkipped[],
-  options: { runner?: PlaywrightRunner },
+  options: { runner?: PlaywrightRunner; out: string },
 ): Promise<PptxShot[] | undefined> {
   if ((await quickLookName()) === undefined) {
     skipped.push({
       check: "pptx",
       reason: "no renderer to draw the file: --shot draws it with Quick Look, on macOS",
-      hint: "open dist/<deck>.pptx in PowerPoint or Keynote to look at it",
+      hint: `open ${options.out} in PowerPoint or Keynote to look at it`,
     });
     return undefined;
   }

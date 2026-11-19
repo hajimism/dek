@@ -51,7 +51,9 @@ A text is found when the layers over its box, 12 px around it, hold its characte
 
 **The skill `dek-pptx` teaches the rebuild** ([ADR 105](0105-let-a-skill-for-newer-work-name-its-command-and-ask-the-installed-dek-for-it-first.md)): a script beside the deck that writes the JSON from `spec.json`, one block a `prose` layer, a box a shape with its text and what it holds grouped, parts as pictures and the slide's own part as its backdrop, then `--from --shot` until no error is left and every slide has been looked at.
 
-**The PPTX eval measures a file made elsewhere**: `--pptx <file>` with one `--deck`, never recorded, its report naming the file and saying that a line's drift there says where PowerPoint wrapped it, not that it is wrong.
+**The PPTX eval measures a file made elsewhere**: `--pptx <file>` with one `--deck`, never recorded, its report naming the file and saying that a line's drift there says where PowerPoint wrapped it, not that it is wrong. It counts `backdropSlides` too, the slides whose background is a picture.
+
+**What CI checks.** In Chromium, for a slide made for it: a counter's text is counted and is a node with its box, a chip's text stays its line's while the chip is a node with its fill, radius, and padding, a heading set with proportional kana has a `widen` above 1, a gradient is a part on disk that says why, and `deck.pptx.json` is a file the schema takes. Without a browser: layers written out as JSON and read back are the same layers; each diagnostic above on a slide made to raise it, and none on one that is right; `--from` refusing a field the schema lacks, a picture outside the deck's folder or missing, and what is not JSON, writing the file and saying why nothing was checked without a current `spec.json`; `--shot` without `--from` and `--public` with it refused; and the writer's preset shape, dashes, shadow, turn, highlight, and background picture in the slide's XML. A rebuilt file was opened in PowerPoint for Mac, which opened its 13 slides without a repair; Quick Look's drawing of it is what `--shot` returns.
 
 ## Consequences
 
@@ -61,15 +63,17 @@ The rebuild an agent did by hand now starts from what dek measured and ends in a
 | --- | ---: | ---: | ---: | ---: |
 | MB | 7.41 | 0.68 | 0.81 | 0.81 |
 | text PowerPoint's own | 96.6% | 100% | 100% | 100% |
+| text whole in one block | 47.7% | 45.8% | 46.0% | 46.4% |
 | text in boxes that wrap | 28.1% | 32.3% | 44.5% | 46.4% |
 | editability | 0.614 | 0.634 | 0.672 | 0.678 |
 | runs a character | 0.286 | 0.112 | 0.104 | 0.112 |
 | slides keeping a picture of the slide | 13 | 13 | 0 | 0 |
+| slides with a background picture | 0 | 0 | 13 | 13 |
 | drawn apart from the browser, of 255 | 1.67 | 8.44 | 9.45 | 9.26 |
 | tool calls | | 114 | 146 | 111 |
 | tokens | | 294k | 522k | 366k |
 
-The rebuilt files are what a recipient edits: no slide keeps a picture of itself, a block is a box that wraps, a card is a group. They are further from the browser's drawing than `dekc pptx`'s, by design: PowerPoint sets the text again, and sets Japanese wider than the browser, which spaced it with the font's features, and Quick Look, which measured them, misdraws some of what the files say. Trial 1 spent about 50 of its calls learning the formats from dek's source, which the schema and the skill now give; trials 2 and 3 spent most of theirs fitting boxes to text PowerPoint sets wider, which `widen` and the shots beside the browser's now measure.
+The rebuilt files are what a recipient edits: no slide keeps a picture of what it shows, a block is a box that wraps, a card is a group. Each still carries the theme's glow and dot grid as its background picture, which a recipient's own template replaces. A text is whole a little less often than in `dekc pptx`'s files, since a code block is a paragraph a line there. They are further from the browser's drawing than `dekc pptx`'s, by design: PowerPoint sets the text again, and sets Japanese wider than the browser, which spaced it with the font's features, and Quick Look, which measured them, misdraws some of what the files say. Trial 1 spent about 50 of its calls learning the formats from dek's source, which the schema and the skill now give; trials 2 and 3 spent most of theirs fitting boxes to text PowerPoint sets wider, which `widen` and the shots beside the browser's now measure. One trial a round is no measure of effort: what three rounds show is a file that gets better, not an agent that gets there in fewer calls, and the rebuild as people do it now, with no spec and no check, was not run beside them. None of the checks caught the faults trials 2 and 3 fixed by looking: a line PowerPoint wraps where the browser did not, and boxes that overlap. A check that compares a box's width with its text's times `widen` would, and is a decision of its own.
 
 The JSON is a second way into dek's writer, and its shape is a contract: a field dek renames is a breaking change to every script that writes it, as a `--json` field is. The writer's types stay its own; the JSON is converted at the edge, and a test holds that layers written out and read back are the same layers.
 

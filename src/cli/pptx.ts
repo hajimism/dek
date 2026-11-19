@@ -24,6 +24,16 @@ export async function pptxCommand(
   { project, decks }: DecksTarget,
   options: { rootDist?: boolean; public?: boolean; from?: string; shot?: boolean } = {},
 ): Promise<Exclude<PptxCliResult, { action: "spec" }>> {
+  if (options.shot && options.from === undefined) {
+    throw new DekError("--shot draws the file --from writes", {
+      hint: "dekc pptx <deck> --from <file> --shot",
+    });
+  }
+  if (options.public && options.from !== undefined) {
+    throw new DekError("--public has no say in --from: the notes are the JSON's", {
+      hint: "set each slide's notes in the JSON, from spec.json, written with dekc pptx <deck> spec --public",
+    });
+  }
   if (options.from !== undefined) {
     const [deck, ...more] = decks;
     if (!deck || more.length > 0) {

@@ -55,6 +55,8 @@ export type SlideReport = {
   effects: number;
   /** Slide-sized pictures left under or over what is PowerPoint's own, and the share they cover. */
   rasters: number;
+  /** Whether its background is a picture, decoration the recipient changes in Format Background. */
+  backdrop: boolean;
   coverage: number;
   title: boolean;
   numbered: boolean;
@@ -131,6 +133,7 @@ export function slideReport(
     groups: slide.groups,
     effects: slide.effects,
     rasters: slide.rasters.length,
+    backdrop: slide.backdrop !== undefined,
     coverage: measured.coverage,
     title: slide.bodies.some((body) => /^(ctrTitle|title)$/.test(body.placeholder ?? "")),
     numbered: slide.fields.includes("slidenum"),
@@ -198,6 +201,8 @@ export type Summary = {
   /** Slides that keep a slide-sized picture, and the mean share of the slide it covers. */
   rasterSlides: number;
   coverage: number;
+  /** Slides whose background is a picture. */
+  backdropSlides: number;
   /** Slides with a heading whose file has a title placeholder, of those with a heading. */
   titled: number | null;
   /** Slides whose file numbers itself with a field. */
@@ -263,6 +268,7 @@ export function summarize(decks: DeckReport[], name: string): Summary {
     effects: sum((slide) => slide.effects),
     rasterSlides: slides.filter((slide) => slide.rasters > 0).length,
     coverage: round(sum((slide) => slide.coverage) / Math.max(1, slides.length)),
+    backdropSlides: slides.filter((slide) => slide.backdrop).length,
     titled:
       headed.length === 0
         ? null
@@ -340,11 +346,11 @@ export function markdown(report: EvalReport): string {
     "",
     "Shares are of the characters each slide shows, white space and `aria-hidden` decoration left out.",
     "",
-    "| deck | slides | MB | export s | text native | whole blocks | wrapping | editability | runs/char | shapes | pictures | effects | raster slides | raster cover | titled | numbered | links | problems |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| deck | slides | MB | export s | text native | whole blocks | wrapping | editability | runs/char | shapes | pictures | effects | raster slides | raster cover | backdrop slides | titled | numbered | links | problems |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ...summaries.map(
       (each) =>
-        `| ${each.deck} | ${each.slides} | ${each.megabytes} | ${each.exportSeconds} | ${percent(each.native)} | ${percent(each.whole)} | ${percent(each.wrapping)} | ${each.editability.toFixed(3)} | ${each.runsPerChar.toFixed(3)} | ${each.shapes} | ${each.pictures} | ${each.effects} | ${each.rasterSlides} | ${percent(each.coverage)} | ${percent(each.titled)} | ${each.numbered} | ${percent(each.links)} | ${each.problems} |`,
+        `| ${each.deck} | ${each.slides} | ${each.megabytes} | ${each.exportSeconds} | ${percent(each.native)} | ${percent(each.whole)} | ${percent(each.wrapping)} | ${each.editability.toFixed(3)} | ${each.runsPerChar.toFixed(3)} | ${each.shapes} | ${each.pictures} | ${each.effects} | ${each.rasterSlides} | ${percent(each.coverage)} | ${each.backdropSlides} | ${percent(each.titled)} | ${each.numbered} | ${percent(each.links)} | ${each.problems} |`,
     ),
     "",
   ];

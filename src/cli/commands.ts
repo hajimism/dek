@@ -956,9 +956,13 @@ export const COMMANDS = {
         }
         return data;
       },
-      failure: (data) =>
+      failure: (data, flags) =>
         data.action === "from"
-          ? diagnosticFailure("dekc pptx --from", data, "dekc pptx --from <file>")
+          ? diagnosticFailure(
+              "dekc pptx --from",
+              data,
+              `dekc pptx --from ${shellQuote(String(flags.from))}${flags.shot ? " --shot" : ""}`,
+            )
           : undefined,
     },
   }),

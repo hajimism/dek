@@ -73,6 +73,8 @@ export type PackageSlide = {
   groups: number;
   /** The slide-sized pictures: what was not laid out as PowerPoint's own. */
   rasters: string[];
+  /** The picture its background is, where it is one rather than a color. */
+  backdrop?: string;
   /** The fields its text holds, by type, such as `slidenum`. */
   fields: string[];
   links: number;
@@ -253,6 +255,15 @@ function readSlide(
       doc.getElementsByTagName("a:innerShdw").length +
       doc.getElementsByTagName("a:glow").length,
   };
+
+  const backdrop = doc
+    .getElementsByTagName("p:bg")[0]
+    ?.getElementsByTagName("a:blip")[0]
+    ?.getAttribute("r:embed");
+  const backdropFile = backdrop ? targets.get(backdrop)?.target : undefined;
+  if (backdropFile !== undefined) {
+    slide.backdrop = backdropFile;
+  }
 
   const ids = new Set<string>();
   for (const each of doc.getElementsByTagName("p:cNvPr")) {

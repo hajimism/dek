@@ -22,6 +22,7 @@ For each deck, and for all of them together, with no paths and no pictures:
   - `runsPerChar`: runs for each character of text. Many small runs make a paragraph harder to restyle, which `editability` does not see.
   - `shapes`, `pictures`, `effects`: what is PowerPoint's own besides text.
   - `rasterSlides`, `coverage`: slides that keep a slide-sized picture, and the mean share of the slide it covers.
+  - `backdropSlides`: slides whose background is a picture, such as a texture, which a recipient changes in Format Background rather than finds on the slide. `dekc pptx` writes none; a file built again with `dekc pptx --from` may.
   - `titled`, `numbered`, `links`: slides with a heading whose file has a title placeholder, slides numbered by a field, and links kept of those shown.
   - `problems`: parts that do not parse, relationships that point nowhere, parts with no content type, shape ids used twice.
 - **How the renderer drew it** (`render`, absent where there was no renderer). The ink of text is what differs between a slide drawn with its text and without, in the browser and in the renderer alike, so a line is found whatever it is drawn on.

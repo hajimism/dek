@@ -11,6 +11,9 @@ import type { PptxSpec, PptxSpecNode } from "./pptx-spec.ts";
 /** A slide that keeps a picture of the rest of itself, which the rebuild is for. */
 const PICTURE = "pptx-picture";
 
+/** Where `dekc pptx spec` writes the pictures `dekc pptx` would lay, the slide's own among them. */
+const SPEC_PICTURES = ".cache/pptx/pictures";
+
 /** A picture this share of the slide or more is a picture of the slide. */
 const SLIDE_SIZED = 0.9;
 
@@ -117,6 +120,15 @@ export function checkPptxJson(json: PptxJson, spec: PptxSpec): Diagnostic[] {
         slug,
         message: `a picture covers the slide (${covers.map((layer) => (layer.kind === "picture" ? layer.file : "")).join(", ")})`,
         hint: "set it as the slide's backdrop if it is decoration, or draw what it shows as shapes",
+      });
+    }
+    if (slide.backdrop?.startsWith(`${SPEC_PICTURES}/`)) {
+      diagnostics.push({
+        id: PICTURE,
+        severity: "warning",
+        slug,
+        message: `the slide's backdrop is a picture dekc pptx drew of it (${slide.backdrop})`,
+        hint: "set the slide node's part as the backdrop, and lay what the picture showed over it",
       });
     }
     if (slide.picture) {
