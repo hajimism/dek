@@ -155,8 +155,9 @@ async function readUntilReady(
 }
 
 /**
- * Runs the CLI in this process, with what it writes captured. The capture swaps the global
- * stdout and stderr, so a test that uses it is test.serial.
+ * Runs the CLI in this process, with what it writes captured and, with --json, every line held
+ * to the contract, as `runDek` holds a subprocess's. The capture swaps the global stdout and
+ * stderr, so a test that uses it is test.serial.
  */
 export async function runMain(argv: string[], cwd: string): Promise<RunResult> {
   const out: string[] = [];
@@ -181,21 +182,21 @@ export async function runMain(argv: string[], cwd: string): Promise<RunResult> {
     stdout.mockRestore();
     stderr.mockRestore();
   }
-  return { stdout: out.join(""), stderr: err.join(""), exitCode };
-}
-
-/**
- * `runMain` with `env` applied and, with --json, every line held to the contract, as `runDek`
- * holds a subprocess's: a command's own tests run it in this process, and leave subprocesses to
- * the wiring checks the spawn budget counts. Its test is test.serial, as runMain's is.
- */
-export async function runInProcess(
-  argv: string[],
-  options: { cwd: string; env?: Record<string, string | undefined> },
-): Promise<RunResult> {
-  const result = await withEnv(options.env ?? {}, () => runMain(argv, options.cwd));
+  const result = { stdout: out.join(""), stderr: err.join(""), exitCode };
   if (argv.includes("--json")) {
     holdToContract(argv, result.stdout);
   }
   return result;
+}
+
+/**
+ * `runMain` with `env` applied: a command's own tests run it in this process, and leave
+ * subprocesses to the wiring checks the spawn budget counts. Its test is test.serial, as
+ * runMain's is.
+ */
+export function runInProcess(
+  argv: string[],
+  options: { cwd: string; env?: Record<string, string | undefined> },
+): Promise<RunResult> {
+  return withEnv(options.env ?? {}, () => runMain(argv, options.cwd));
 }
