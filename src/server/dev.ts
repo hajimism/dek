@@ -25,6 +25,7 @@ import {
   devServerUrl,
   removeDevServerLock,
   type ServerScope,
+  type ServerWishes,
   writeDevServerLock,
 } from "./lock.ts";
 import { createDevPages } from "./pages.ts";
@@ -58,6 +59,11 @@ export type DevServerOptions = {
   password?: string;
   /** How long a pairing code stays good; see PAIRING_TTL_MS. */
   pairingTtlMs?: number;
+  /**
+   * The page of the deck the caller shows, given the deck's own, as `dekc rehearse` shows it in
+   * rehearsal: where a start refused because the deck is served already sends its caller.
+   */
+  page?: (deck: string) => string;
   /** How often the project and each deck are re-scanned for edits fs.watch missed. */
   pollIntervalMs?: number;
 };
@@ -87,8 +93,15 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const scope: ServerScope = scopedDeckName
     ? { deck: scopedDeckName }
     : { decks: project.decks.map((deck) => deck.name) };
+  // What a server that already serves these decks may lack, which the refusal then says.
+  const asked: ServerWishes = {
+    visual: options.visual === true,
+    remote: options.remote === true,
+    ...(options.port ? { port: options.port } : {}),
+    ...(options.page ? { page: options.page } : {}),
+  };
   // Before the port and the watchers; writing the lock checks again, for a server that raced us.
-  assertNoDevServer(project.root, scope);
+  assertNoDevServer(project.root, scope, asked);
   const access = accessFor(options);
   const embed = {
     playerScript: await livePlayerScript(),
@@ -139,10 +152,16 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const url = devServerUrl(port);
   const remoteUrls = [...new Set([url, ...(access.remote ? lanUrls(port) : [])])];
   try {
-    writeDevServerLock(project.root, scope, {
-      url,
-      ...(access.password ? { password: access.password } : {}),
-    });
+    writeDevServerLock(
+      project.root,
+      scope,
+      {
+        url,
+        ...(access.password ? { password: access.password } : {}),
+        ...(options.visual === true ? { visual: true } : {}),
+      },
+      asked,
+    );
   } catch (error) {
     watch.close();
     await server.stop(true);

@@ -10,6 +10,20 @@ export type DevServerLock = {
   password?: string;
   /** The one deck a server started for a deck serves; absent when it serves the project. */
   deck?: string;
+  /** Set when the server measures each saved slide, as `--visual` has it. */
+  visual?: boolean;
+};
+
+/**
+ * What a start asked for beyond the decks to serve, which a server that already runs may lack:
+ * `--visual`, `--remote`, a port, and `page`, the page of the deck the caller shows, given the
+ * deck's own.
+ */
+export type ServerWishes = {
+  visual?: boolean;
+  remote?: boolean;
+  port?: number;
+  page?: (deck: string) => string;
 };
 
 /**
@@ -101,6 +115,7 @@ function readLockFile(path: string, root: string): DevServerLock | undefined {
         pid: parsed.pid,
         ...(typeof parsed.password === "string" ? { password: parsed.password } : {}),
         ...(typeof parsed.deck === "string" ? { deck: parsed.deck } : {}),
+        ...(parsed.visual === true ? { visual: true } : {}),
       };
     }
   } catch {
@@ -119,15 +134,16 @@ export function readDevServerLock(root: string, deck?: string): DevServerLock | 
   return lock && deck !== undefined ? { ...lock, deck } : lock;
 }
 
-/** A server that runs, and the lock that says so. */
-type Running = Omit<DevServerLock, "password"> & { path: string };
+/** A server that runs, the lock that says so, and whether it answers beyond this machine. */
+type Running = Omit<DevServerLock, "password"> & { path: string; remote: boolean };
 
 function live(lock: DevServerLock | undefined, path: string): Running | undefined {
   if (!lock || !isPidAlive(lock.pid)) {
     return undefined;
   }
-  const { password: _password, ...running } = lock;
-  return { ...running, path };
+  // Only a server started with --remote makes a password.
+  const { password, ...running } = lock;
+  return { ...running, path, remote: password !== undefined };
 }
 
 /** The key of a server for the project among the servers this process holds. */
@@ -191,44 +207,87 @@ export function devServerFor(
  * Throw when a live server, in this process or another, already serves a deck that the server
  * about to start for `scope` would serve.
  */
-export function assertNoDevServer(root: string, scope: ServerScope): void {
+export function assertNoDevServer(
+  root: string,
+  scope: ServerScope,
+  asked: ServerWishes = {},
+): void {
   const running = serversHolding(root, scope);
   if (running.length > 0) {
-    throw alreadyRunning(root, running, scope);
+    throw alreadyRunning(root, running, scope, asked);
   }
 }
 
-function alreadyRunning(root: string, running: Running[], scope: ServerScope): DekError {
+function alreadyRunning(
+  root: string,
+  running: Running[],
+  scope: ServerScope,
+  asked: ServerWishes,
+): DekError {
   const [first] = running as [Running, ...Running[]];
   return new DekError(`dev server already running at ${first.url}`, {
     path: first.path,
-    hint: runningServerHint(root, running, scope),
+    hint: runningServerHint(root, running, scope, asked),
   });
 }
 
 /**
- * Where the running server shows what was asked for, or, when the project was asked for and
- * servers for single decks run, how to add a deck beside them and how to get one server for all.
+ * Where the running server shows what was asked for, and what it lacks of it; or, when the project
+ * was asked for and servers for single decks run, how to add a deck beside them and how to get one
+ * server for all.
  */
-function runningServerHint(root: string, running: Running[], scope: ServerScope): string {
+function runningServerHint(
+  root: string,
+  running: Running[],
+  scope: ServerScope,
+  asked: ServerWishes,
+): string {
   const [first] = running as [Running, ...Running[]];
   if ("deck" in scope) {
-    return first.deck === undefined
-      ? `open ${first.url}decks/${encodeURIComponent(scope.deck)}/`
-      : `open ${first.url}`;
+    const deck =
+      first.deck === undefined ? `${first.url}decks/${encodeURIComponent(scope.deck)}/` : first.url;
+    return servedHint(first, asked.page?.(deck) ?? deck, asked);
   }
   if (first.deck === undefined) {
-    return `open ${first.url}`;
+    return servedHint(first, first.url, asked);
   }
-  const beside = "run `dekc` inside another deck's folder to serve that deck beside";
   const atRoot = "run `dekc` at the project root, which serves every deck";
+  // A deck to serve beside them is left only while some deck of the project has no server.
+  const served = new Set(running.map((server) => server.deck));
+  const beside = scope.decks.some((deck) => !served.has(deck))
+    ? "run `dekc` inside another deck's folder to serve that deck beside"
+    : undefined;
   if (running.length === 1) {
-    return `it serves only ${named(root, first)}; ${beside} it, or stop it (pid ${first.pid}) and ${atRoot}`;
+    const other = beside ? `; ${beside} it` : `: open ${first.url} for that deck`;
+    return `it serves only ${named(root, first)}${other}, or stop it (pid ${first.pid}) and ${atRoot}`;
   }
   const each = running.map(
     (server) => `${named(root, server)} at ${server.url} (pid ${server.pid})`,
   );
-  return `${running.length} servers serve one deck each: ${each.join(", ")}; ${beside} them, or stop them and ${atRoot}`;
+  const other = beside ? `${beside} them` : "open a deck where it is served";
+  return `${running.length} servers serve one deck each: ${each.join(", ")}; ${other}, or stop them and ${atRoot}`;
+}
+
+/**
+ * The hint for a start whose decks `server` already serves, at `page`. A server takes `--visual`,
+ * `--remote`, and its port when it starts, so what it lacks of them only a restart gives.
+ */
+function servedHint(server: Running, page: string, asked: ServerWishes): string {
+  const port = Number(new URL(server.url).port || 80);
+  const lacks = [
+    asked.visual === true && server.visual !== true ? "without --visual" : undefined,
+    asked.remote === true && !server.remote ? "without --remote" : undefined,
+    asked.port !== undefined && asked.port !== port
+      ? `on port ${port}, not ${asked.port}`
+      : undefined,
+  ].filter((lack) => lack !== undefined);
+  if (lacks.length === 0) {
+    return `open ${page}`;
+  }
+  const last = lacks.pop();
+  const list =
+    lacks.length > 1 ? `${lacks.join(", ")}, and ${last}` : [...lacks, last].join(" and ");
+  return `it runs ${list}; open ${page} as it is, or stop it (pid ${server.pid}) and run this command again`;
 }
 
 /** The deck a server serves, as a hint names it. */
@@ -248,9 +307,10 @@ function named(root: string, server: Running): string {
 export function writeDevServerLock(
   root: string,
   scope: ServerScope,
-  server: { url: string; password?: string },
+  server: { url: string; password?: string; visual?: boolean },
+  asked: ServerWishes = {},
 ): void {
-  assertNoDevServer(root, scope);
+  assertNoDevServer(root, scope, asked);
   const deck = "deck" in scope ? scope.deck : undefined;
   const path = lockPath(root, deck);
   const claims = claimed.get(root) ?? new Map<string | typeof PROJECT, Running>();
@@ -259,10 +319,12 @@ export function writeDevServerLock(
     url: server.url,
     pid: process.pid,
     ...(deck !== undefined ? { deck } : {}),
+    ...(server.visual === true ? { visual: true } : {}),
     path,
+    remote: server.password !== undefined,
   });
   try {
-    createLock(root, path, scope, server);
+    createLock(root, path, scope, server, asked);
     // A server for the project and one for a deck keep different files, so two that started at
     // once each passed the check above. Each sees the other's lock now, and gives way.
     const others = serversHolding(root, scope).filter(
@@ -270,7 +332,7 @@ export function writeDevServerLock(
     );
     if (others.length > 0) {
       removeInside(path, root);
-      throw alreadyRunning(root, others, scope);
+      throw alreadyRunning(root, others, scope, asked);
     }
   } catch (error) {
     unclaim(root, deck);
@@ -285,7 +347,8 @@ function createLock(
   root: string,
   path: string,
   scope: ServerScope,
-  server: { url: string; password?: string },
+  server: { url: string; password?: string; visual?: boolean },
+  asked: ServerWishes,
 ): void {
   // Makes the folders, and refuses a lock a repository linked to a file elsewhere.
   outputPath(path, root);
@@ -293,8 +356,13 @@ function createLock(
     // A project made before dek kept these locks does not ignore them, and one may hold a password.
     createInside(join(deckLocksDir(root), ".gitignore"), IGNORE_ALL, root);
   }
-  const { url, password } = server;
-  const text = `${JSON.stringify({ url, pid: process.pid, ...(password ? { password } : {}) })}\n`;
+  const { url, password, visual } = server;
+  const text = `${JSON.stringify({
+    url,
+    pid: process.pid,
+    ...(password ? { password } : {}),
+    ...(visual === true ? { visual } : {}),
+  })}\n`;
   // The file may hold the --remote password: its owner's only.
   const create = (): boolean => createInside(path, text, root, { mode: 0o600 });
   if (create()) {
@@ -304,7 +372,7 @@ function createLock(
   // behind, or a file that does not read. Unless a server took the lock since, it goes.
   const taken = (): DekError | undefined => {
     const holder = live(readLockFile(path, root), path);
-    return holder && alreadyRunning(root, [holder], scope);
+    return holder && alreadyRunning(root, [holder], scope, asked);
   };
   const before = taken();
   if (before) {

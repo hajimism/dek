@@ -1159,6 +1159,36 @@ body
     );
   });
 
+  test("says what a second start asked for that the running server lacks", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const cwd = join(root, "decks", "demo");
+        await withDevServer({ cwd }, async (server) => {
+          const port = Number(new URL(server.url).port);
+          const stop = `open ${server.url} as it is, or stop it (pid ${process.pid}) and run this command again`;
+          await expect(startDevServer({ cwd, visual: true })).rejects.toMatchObject({
+            hint: `it runs without --visual; ${stop}`,
+          });
+          await expect(startDevServer({ cwd, remote: true })).rejects.toMatchObject({
+            hint: `it runs without --remote; ${stop}`,
+          });
+          await expect(startDevServer({ cwd, port: port + 1 })).rejects.toMatchObject({
+            hint: `it runs on port ${port}, not ${port + 1}; ${stop}`,
+          });
+          await expect(startDevServer({ cwd, port })).rejects.toMatchObject({
+            hint: `open ${server.url}`,
+          });
+        });
+        await withDevServer({ cwd, visual: true, remote: true }, async (server) => {
+          await expect(startDevServer({ cwd, visual: true, remote: true })).rejects.toMatchObject({
+            hint: `open ${server.url}`,
+          });
+        });
+      },
+    );
+  });
+
   test("stops one at least when a server for the project and one for a deck race", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

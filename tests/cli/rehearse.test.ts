@@ -65,6 +65,34 @@ describe("dekc rehearse", () => {
       },
     );
   });
+
+  // Any server for the deck serves its rehearsal, so the page to open is that one.
+  test("sends a deck that is served already to its rehearsal on the running server", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const target = requireDeckFromCwd(join(root, "decks", "demo"));
+        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
+          await expect(rehearseCommand(target, { slug: "intro" })).rejects.toMatchObject({
+            message: `dev server already running at ${server.url}`,
+            hint: `open ${server.url}?rehearse=#intro`,
+          });
+          await expect(rehearseCommand(target, { remote: true })).rejects.toMatchObject({
+            hint: expect.stringMatching(
+              new RegExp(
+                `^it runs without --remote; open ${server.url.replaceAll(".", "\\.")}\\?rehearse= as it is, or stop it \\(pid \\d+\\) and run this command again$`,
+              ),
+            ),
+          });
+        });
+        await withDevServer({ cwd: root }, async (server) => {
+          await expect(rehearseCommand(target, {})).rejects.toMatchObject({
+            hint: `open ${server.url}decks/demo/?rehearse=`,
+          });
+        });
+      },
+    );
+  });
 });
 
 describe("voice timeline route", () => {

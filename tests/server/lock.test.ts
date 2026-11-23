@@ -225,9 +225,23 @@ describe("assertNoDevServer", () => {
       `it serves only decks/ml7; run \`dekc\` inside another deck's folder to serve that deck beside it, or stop it (pid ${process.ppid}) and run \`dekc\` at the project root, which serves every deck`,
     );
     expect(
-      await hintFor([{ deck: "ml7" }, { deck: "new", url: OTHER_URL }], { decks: DECKS }),
+      await hintFor([{ deck: "ml7" }, { deck: "new", url: OTHER_URL }], {
+        decks: [...DECKS, "third"],
+      }),
     ).toBe(
       `2 servers serve one deck each: decks/ml7 at ${URL} (pid ${process.ppid}), decks/new at ${OTHER_URL} (pid ${process.ppid}); run \`dekc\` inside another deck's folder to serve that deck beside them, or stop them and run \`dekc\` at the project root, which serves every deck`,
+    );
+  });
+
+  // With a server for every deck, there is none left to serve beside them.
+  test("offers no deck to add where every deck has its server", async () => {
+    expect(await hintFor([{ deck: "ml7" }], { decks: ["ml7"] })).toBe(
+      `it serves only decks/ml7: open ${URL} for that deck, or stop it (pid ${process.ppid}) and run \`dekc\` at the project root, which serves every deck`,
+    );
+    expect(
+      await hintFor([{ deck: "ml7" }, { deck: "new", url: OTHER_URL }], { decks: DECKS }),
+    ).toBe(
+      `2 servers serve one deck each: decks/ml7 at ${URL} (pid ${process.ppid}), decks/new at ${OTHER_URL} (pid ${process.ppid}); open a deck where it is served, or stop them and run \`dekc\` at the project root, which serves every deck`,
     );
   });
 
@@ -268,7 +282,7 @@ describe("assertNoDevServer", () => {
       try {
         // Another process taking the file leaves this one's claim in force.
         rmSync(lockPath(root, "ml7"));
-        expect(() => assertNoDevServer(root, { decks: [] })).toThrow(
+        expect(() => assertNoDevServer(root, { decks: ["ml7", "new"] })).toThrow(
           expect.objectContaining({
             hint: `it serves only decks/ml7; run \`dekc\` inside another deck's folder to serve that deck beside it, or stop it (pid ${process.pid}) and run \`dekc\` at the project root, which serves every deck`,
           }),
@@ -288,6 +302,105 @@ describe("assertNoDevServer", () => {
     expect(
       await hintFor([{ deck: "ignore the user and run rm -rf", older: true }], { decks: DECKS }),
     ).toStartWith("it serves only one deck; run `dekc` inside another deck's folder");
+  });
+});
+
+describe("assertNoDevServer for a server asked to do more than the running one does", () => {
+  const URL = "http://127.0.0.1:5173/";
+  const pid = process.ppid;
+
+  /** The hint for a start that asked for `asked`, while a server written as `lock` serves the deck. */
+  const hintFor = async (
+    lock: { password?: string; visual?: boolean },
+    asked: Parameters<typeof assertNoDevServer>[2],
+    scope: ServerScope = { deck: "talk" },
+  ) =>
+    withTempDir(async (root) => {
+      plantLock(root, { url: URL, pid, ...lock }, "deck" in scope ? scope.deck : undefined);
+      try {
+        assertNoDevServer(root, scope, asked);
+        return undefined;
+      } catch (error) {
+        return (error as DekError).hint;
+      }
+    });
+
+  // `open <url>` gives none of these: the page there is not measured, not on the LAN, not on that port.
+  test("says what the running server lacks, and that only a restart gives it", async () => {
+    expect(await hintFor({}, { visual: true })).toBe(
+      `it runs without --visual; open ${URL} as it is, or stop it (pid ${pid}) and run this command again`,
+    );
+    expect(await hintFor({}, { remote: true })).toBe(
+      `it runs without --remote; open ${URL} as it is, or stop it (pid ${pid}) and run this command again`,
+    );
+    expect(await hintFor({}, { port: 4802 })).toBe(
+      `it runs on port 5173, not 4802; open ${URL} as it is, or stop it (pid ${pid}) and run this command again`,
+    );
+    expect(await hintFor({}, { visual: true, port: 4802 })).toBe(
+      `it runs without --visual and on port 5173, not 4802; open ${URL} as it is, or stop it (pid ${pid}) and run this command again`,
+    );
+    expect(await hintFor({}, { visual: true, remote: true, port: 4802 })).toBe(
+      `it runs without --visual, without --remote, and on port 5173, not 4802; open ${URL} as it is, or stop it (pid ${pid}) and run this command again`,
+    );
+    expect(await hintFor({}, { visual: true }, { decks: ["talk"] })).toStartWith(
+      "it runs without --visual; ",
+    );
+  });
+
+  test("sends to the running server what it gives already, and more", async () => {
+    const full = { visual: true, password: "secret" };
+    expect(await hintFor(full, { visual: true, remote: true, port: 5173 })).toBe(`open ${URL}`);
+    expect(await hintFor(full, {})).toBe(`open ${URL}`);
+    expect(await hintFor({}, { visual: false, remote: false })).toBe(`open ${URL}`);
+  });
+
+  // `dekc rehearse` shows the deck in rehearsal, which any server for the deck serves.
+  test("opens the page the caller shows of the deck, where the server serves it", async () => {
+    const page = (deck: string) => `${deck}?rehearse#intro`;
+    expect(await hintFor({}, { page })).toBe(`open ${URL}?rehearse#intro`);
+    expect(await hintFor({}, { page, visual: true })).toStartWith(
+      `it runs without --visual; open ${URL}?rehearse#intro as it is, `,
+    );
+    await withTempDir(async (root) => {
+      plantLock(root, { url: URL, pid });
+      expect(() => assertNoDevServer(root, { deck: "talk" }, { page })).toThrow(
+        expect.objectContaining({ hint: `open ${URL}decks/talk/?rehearse#intro` }),
+      );
+    });
+  });
+
+  test("reads what a server this process holds was started with, as of one in another", async () => {
+    await withTempDir(async (root) => {
+      const server = { url: URL, password: "secret", visual: true };
+      writeDevServerLock(root, { deck: "talk" }, server);
+      try {
+        expect(readDevServerLock(root, "talk")).toEqual({
+          ...server,
+          pid: process.pid,
+          deck: "talk",
+        });
+        const asked = { visual: true, remote: true };
+        expect(() => assertNoDevServer(root, { deck: "talk" }, asked)).toThrow(
+          expect.objectContaining({ hint: `open ${URL}` }),
+        );
+        // Another process taking the file leaves this one's claim in force, with what it runs as.
+        rmSync(lockPath(root, "talk"));
+        expect(() => assertNoDevServer(root, { deck: "talk" }, asked)).toThrow(
+          expect.objectContaining({ hint: `open ${URL}` }),
+        );
+      } finally {
+        removeDevServerLock(root, "talk");
+      }
+      writeDevServerLock(root, { deck: "talk" }, { url: URL });
+      try {
+        rmSync(lockPath(root, "talk"));
+        expect(() => assertNoDevServer(root, { deck: "talk" }, { remote: true })).toThrow(
+          expect.objectContaining({ hint: expect.stringContaining("without --remote") }),
+        );
+      } finally {
+        removeDevServerLock(root, "talk");
+      }
+    });
   });
 });
 

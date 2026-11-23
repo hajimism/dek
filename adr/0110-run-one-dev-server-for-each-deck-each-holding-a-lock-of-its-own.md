@@ -14,6 +14,8 @@ Amends [28. Let a project's code run only as a page, a ref's only in an offline 
 
 A project runs one dev server at a time. No record decided that. The first dev server wrote `.dek/server.json` so that `dekc goto` could find it, and one file made one server.
 
+A second `dekc` for a deck that is served is refused with `open <url>`, whatever it asked for. Started with `--visual`, `--remote`, or `--port` against a server that has none of them, it is sent to a page that is not measured, not on the LAN, and not on that port. `dekc rehearse` is sent to the deck's plain page.
+
 A server started with a deck, or inside a deck's folder, serves that deck alone, at `/`. A second `dekc` for another deck is refused whatever port it names, and told to stop the first server, by pid, and start one at the project root. An agent that follows the hint stops a server a person, or another agent, is using, and the deck it wanted moves from `/` to `/decks/<deck>/`. The launch configs of this repository list the three sample decks on three ports; they have never run together.
 
 What one deck cannot have is two servers:
@@ -35,7 +37,7 @@ The port is no reason either: without `--port` the OS picks a free one.
 - **A lock is taken by making its file only where none is.** The finished file is linked to its name, so of two servers that race for one deck, one gets the lock and the other is refused. A lock whose server is gone is removed first. A server for the project and one for a deck keep different files, so each looks once more after taking its lock, and gives way to a server it then sees.
 - **A lock an older dek wrote still counts.** A dek older than this keeps every server's lock in `.dek/server.json`, with `deck` in it for a server started for one deck. That lock holds that deck, and holds the project against a server for all of it.
 - **`dekc goto` and `dekc current` ask the server started for the deck, else the one for the project.** With neither, they say `no dev server serves deck "<deck>"`, and the hint is `dekc <deck>`, which starts one beside whatever else runs.
-- **What a refused start is told.** For a deck already served: the running server's URL, with `open <url>`, or `open <url>decks/<deck>/` when the server for the project serves it. For the project while servers for single decks run: which decks they serve, that `dekc` inside another deck's folder serves that deck beside them, and that stopping them, by pid, and running `dekc` at the root serves every deck from one.
+- **What a refused start is told.** For a deck already served: the running server's URL, with `open <url>`, or `open <url>decks/<deck>/` when the server for the project serves it. `dekc rehearse` is sent to the deck in rehearsal there, `?rehearse`, which any server for the deck serves. When the start asked for `--visual`, `--remote`, or a port and the running server lacks it, the hint says which, and that the page is there as it is, or the server can be stopped, by pid, and the command run again: a server takes all three as it starts. A lock records `visual` for this; a password in it says `--remote`, and the port is in its URL. For the project while servers for single decks run: which decks they serve, that `dekc` inside another deck's folder serves that deck beside them, and that stopping them, by pid, and running `dekc` at the root serves every deck from one. Where every deck has its server there is none to add, and the hint sends to the decks where they are served.
 
 **Rejected:**
 
