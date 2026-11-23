@@ -83,17 +83,18 @@ describe("gotoCommand", () => {
   test("goto from a deck directory talks to a project-root server", async () => {
     await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
-      await withDevServer({ cwd: root }, async () => {
+      await withDevServer({ cwd: root }, async (server) => {
         const gotoResult = await gotoCommand(requireDeckFromCwd(deckDir), "architecture");
-        expect(gotoResult).toMatchObject({
+        expect(gotoResult).toEqual({
           slug: "architecture",
           slideIndex: 1,
           beatIndex: 0,
           viewers: 0,
+          url: `${server.url}decks/demo/`,
         });
         // With no page open, the position is where the next one lands, and dek says so.
         expect(outputOf("goto").notes?.(gotoResult, false)).toBe(
-          "no browser shows the deck: the next page opened on the dev server shows architecture",
+          `no browser shows the deck: the next page opened at ${server.url}decks/demo/ shows architecture`,
         );
         const current = await currentCommand(requireDeckFromCwd(deckDir));
         expect(current).toMatchObject({
@@ -101,6 +102,25 @@ describe("gotoCommand", () => {
           slideIndex: 1,
           beatIndex: 0,
         });
+      });
+    });
+  });
+
+  test("gives the deck's page: the root of a server started for that deck alone", async () => {
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await withDevServer({ cwd: root, deck: "demo" }, async (server) => {
+        const current = await currentCommand(requireDeckFromCwd(root, "demo"));
+        expect(current.url).toBe(server.url);
+      });
+    });
+  });
+
+  test("gives a page with no password in it, whatever the server asks of a presenter", async () => {
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await withDevServer({ cwd: root, remote: true, password: "s3cretpass" }, async (server) => {
+        const current = await currentCommand(requireDeckFromCwd(root, "demo"));
+        expect(current.url).toBe(`${server.url}decks/demo/`);
+        expect(JSON.stringify(current)).not.toContain("s3cretpass");
       });
     });
   });

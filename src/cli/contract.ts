@@ -136,6 +136,11 @@ const nav = z.strictObject({
     .number()
     .int()
     .describe("The pages that show the deck; with none, where the next one opened lands."),
+  url: z
+    .string()
+    .describe(
+      "The deck's page on the dev server that answered, on this machine: what a browser opens to show the deck. Never holds the --remote password.",
+    ),
 });
 
 const shotFile = z.strictObject({

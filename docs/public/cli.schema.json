@@ -1323,6 +1323,10 @@
               "maximum": 9007199254740991,
               "description": "The pages that show the deck; with none, where the next one opened lands."
             },
+            "url": {
+              "type": "string",
+              "description": "The deck's page on the dev server that answered, on this machine: what a browser opens to show the deck. Never holds the --remote password."
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -1333,6 +1337,7 @@
             "slideIndex",
             "beatIndex",
             "viewers",
+            "url",
             "ok"
           ],
           "additionalProperties": false
@@ -1380,6 +1385,10 @@
               "maximum": 9007199254740991,
               "description": "The pages that show the deck; with none, where the next one opened lands."
             },
+            "url": {
+              "type": "string",
+              "description": "The deck's page on the dev server that answered, on this machine: what a browser opens to show the deck. Never holds the --remote password."
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -1390,6 +1399,7 @@
             "slideIndex",
             "beatIndex",
             "viewers",
+            "url",
             "ok"
           ],
           "additionalProperties": false

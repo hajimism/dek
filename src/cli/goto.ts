@@ -11,6 +11,8 @@ export type NavResult = {
   beatIndex: number;
   /** The pages that show the deck; with none, the position is where the next one lands. */
   viewers: number;
+  /** The deck's page on the dev server that answered: what a browser opens to show the deck. */
+  url: string;
 };
 
 type NavOptions = {
@@ -106,7 +108,18 @@ async function requestDevServer(
     slideIndex: json.slideIndex ?? 0,
     beatIndex: json.beatIndex ?? 0,
     viewers: json.viewers ?? 0,
+    url: deckPage(lock, deckName),
   };
+}
+
+/**
+ * Where a browser opens `deckName` on the server `lock` names: its root when it was started for
+ * that deck alone, the deck's place under it otherwise. The password is never part of it.
+ */
+function deckPage(lock: { url: string; deck?: string }, deckName: string): string {
+  return lock.deck === deckName
+    ? lock.url
+    : new URL(deckRoutePath(deckName, { kind: "player" }), lock.url).href;
 }
 
 /** Why the server turned the request away before a nav route saw it. */

@@ -201,7 +201,7 @@ function diagnosticFailure(
 function navNotes(data: NavResult): string | undefined {
   return data.viewers > 0
     ? undefined
-    : `no browser shows the deck: the next page opened on the dev server shows ${data.slug}`;
+    : `no browser shows the deck: the next page opened at ${data.url} shows ${data.slug}`;
 }
 
 function withDisplayDiagnostics<D extends { diagnostics: CheckCliResult["diagnostics"] }>(
