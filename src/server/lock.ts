@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { createConnection } from "node:net";
 import { join } from "node:path";
 import { DekError } from "../core/error.ts";
 import { isDeckName } from "../core/path.ts";
@@ -182,6 +183,61 @@ function serversHolding(root: string, scope: ServerScope): Running[] {
   return [project, ...decks.map((deck) => serverAt(root, deck))].filter(
     (server) => server !== undefined,
   );
+}
+
+/** How long a lock's port is given to take or refuse a connection. */
+const PORT_ANSWER_MS = 1000;
+
+/**
+ * Whether the port a lock's URL names turns a connection away. Only that says nothing listens
+ * there: a connection that opens, or that neither opens nor fails in time, is no refusal.
+ */
+function refusesConnection(url: string): Promise<boolean> {
+  const { hostname, port } = new URL(url);
+  return new Promise((resolve) => {
+    const socket = createConnection({
+      host: hostname.replace(/^\[|\]$/g, ""),
+      port: Number(port || 80),
+    });
+    const answer = (refused: boolean): void => {
+      socket.destroy();
+      resolve(refused);
+    };
+    socket.setTimeout(PORT_ANSWER_MS, () => answer(false));
+    socket.once("connect", () => answer(false));
+    socket.once("error", (error) => answer((error as { code?: string }).code === "ECONNREFUSED"));
+  });
+}
+
+/**
+ * Remove each lock that would refuse a server about to start for `scope` although its server is
+ * gone. A server killed outright leaves its lock, and its pid goes to whatever process starts
+ * next: by its pid alone such a lock reads as live for good. A server listens before it takes its
+ * lock and gives the lock up before it stops listening, so a port that refuses says it is gone.
+ */
+export async function dropLocksOfGoneServers(
+  root: string,
+  scope: ServerScope,
+  refuses: (url: string) => Promise<boolean> = refusesConnection,
+): Promise<void> {
+  const claims = claimed.get(root);
+  const decks = "deck" in scope ? [scope.deck] : scope.decks;
+  for (const deck of [undefined, ...decks]) {
+    // A server this process holds is no lock left behind, whatever its file says.
+    if (claims?.has(deck ?? PROJECT)) {
+      continue;
+    }
+    const path = lockPath(root, deck);
+    const lock = readLockFile(path, root);
+    if (!lock || !isPidAlive(lock.pid) || !(await refuses(lock.url))) {
+      continue;
+    }
+    // Unless a server took the lock while the port was asked.
+    const now = readLockFile(path, root);
+    if (now?.url === lock.url && now.pid === lock.pid) {
+      removeInside(path, root);
+    }
+  }
 }
 
 /**

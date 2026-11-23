@@ -1159,6 +1159,26 @@ body
     );
   });
 
+  // A server killed outright leaves its lock, and its pid may be another process by now.
+  test("starts over a lock whose pid lives on as another process, where nothing listens", async () => {
+    const gone = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("") });
+    const url = `http://127.0.0.1:${gone.port}/`;
+    await gone.stop(true);
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const lock = join(root, ".dek", "servers", "demo.json");
+        await mkdir(join(root, ".dek", "servers"), { recursive: true });
+        await writeFile(lock, `${JSON.stringify({ url, pid: process.ppid })}\n`);
+        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
+          expect(server.url).not.toBe(url);
+          const data = JSON.parse(await readFile(lock, "utf8")) as { url: string; pid: number };
+          expect(data).toEqual({ url: server.url, pid: process.pid });
+        });
+      },
+    );
+  });
+
   test("says what a second start asked for that the running server lacks", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

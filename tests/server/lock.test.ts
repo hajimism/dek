@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import fc from "fast-check";
@@ -9,6 +10,7 @@ import {
   assertNoDevServer,
   devServerFor,
   devServerUrl,
+  dropLocksOfGoneServers,
   isPidAlive,
   readDevServerLock,
   removeDevServerLock,
@@ -397,6 +399,86 @@ describe("assertNoDevServer for a server asked to do more than the running one d
         expect(() => assertNoDevServer(root, { deck: "talk" }, { remote: true })).toThrow(
           expect.objectContaining({ hint: expect.stringContaining("without --remote") }),
         );
+      } finally {
+        removeDevServerLock(root, "talk");
+      }
+    });
+  });
+});
+
+describe("dropLocksOfGoneServers", () => {
+  /** A port of this machine nothing listens on: one a server held a moment ago. */
+  const closedUrl = async (): Promise<string> => {
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    await new Promise((resolve) => server.close(resolve));
+    return devServerUrl(port);
+  };
+
+  // A server killed outright leaves its lock, and its pid goes to whatever starts next.
+  test("drops a lock whose pid lives on as another process, where nothing listens", async () => {
+    const url = await closedUrl();
+    await withTempDir(async (root) => {
+      plantLock(root, { url, pid: process.ppid });
+      plantLock(root, { url, pid: process.pid }, "talk");
+      expect(() => assertNoDevServer(root, { decks: ["talk"] })).toThrow(DekError);
+      await dropLocksOfGoneServers(root, { decks: ["talk"] });
+      expect(readDevServerLock(root)).toBeUndefined();
+      expect(readDevServerLock(root, "talk")).toBeUndefined();
+      expect(() => assertNoDevServer(root, { decks: ["talk"] })).not.toThrow();
+    });
+  });
+
+  test("looks only at the locks that would refuse the server about to start", async () => {
+    const url = await closedUrl();
+    await withTempDir(async (root) => {
+      plantLock(root, { url, pid: process.ppid }, "talk");
+      plantLock(root, { url, pid: process.ppid }, "other");
+      await dropLocksOfGoneServers(root, { deck: "talk" });
+      expect(readDevServerLock(root, "talk")).toBeUndefined();
+      expect(readDevServerLock(root, "other")?.url).toBe(url);
+    });
+  });
+
+  test("keeps the lock of a server that listens", async () => {
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const url = devServerUrl((server.address() as AddressInfo).port);
+      await withTempDir(async (root) => {
+        plantLock(root, { url, pid: process.ppid }, "talk");
+        await dropLocksOfGoneServers(root, { deck: "talk" });
+        expect(readDevServerLock(root, "talk")?.url).toBe(url);
+      });
+    } finally {
+      server.close();
+    }
+  });
+
+  // Only a refusal says nothing listens: a server too busy to answer still holds its deck.
+  test("keeps a lock when the port neither answers nor refuses", async () => {
+    await withTempDir(async (root) => {
+      plantLock(root, { url: "http://127.0.0.1:5173/", pid: process.ppid }, "talk");
+      const asked: string[] = [];
+      await dropLocksOfGoneServers(root, { deck: "talk" }, async (url) => {
+        asked.push(url);
+        return false;
+      });
+      expect(asked).toEqual(["http://127.0.0.1:5173/"]);
+      expect(readDevServerLock(root, "talk")?.pid).toBe(process.ppid);
+    });
+  });
+
+  test("asks nothing of a lock whose pid is gone, or of a server this process holds", async () => {
+    await withTempDir(async (root) => {
+      plantLock(root, { url: "http://127.0.0.1:5173/", pid: 2_147_483_647 });
+      writeDevServerLock(root, { deck: "talk" }, { url: "http://127.0.0.1:5174/" });
+      try {
+        await dropLocksOfGoneServers(root, { decks: ["talk"] }, async (url) => {
+          throw new Error(`asked ${url}`);
+        });
+        expect(readDevServerLock(root, "talk")?.pid).toBe(process.pid);
       } finally {
         removeDevServerLock(root, "talk");
       }

@@ -23,6 +23,7 @@ import { generateRemotePassword, lanUrls } from "./lan.ts";
 import {
   assertNoDevServer,
   devServerUrl,
+  dropLocksOfGoneServers,
   removeDevServerLock,
   type ServerScope,
   type ServerWishes,
@@ -100,6 +101,8 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     ...(options.port ? { port: options.port } : {}),
     ...(options.page ? { page: options.page } : {}),
   };
+  // A lock a killed server left reads as live once another process has its pid.
+  await dropLocksOfGoneServers(project.root, scope);
   // Before the port and the watchers; writing the lock checks again, for a server that raced us.
   assertNoDevServer(project.root, scope, asked);
   const access = accessFor(options);
