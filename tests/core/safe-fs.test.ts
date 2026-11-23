@@ -200,6 +200,21 @@ describe("createInside", () => {
     });
   });
 
+  // exFAT and FAT32, as on a memory stick, give a file one name only.
+  test("still takes the name only where none is on a disk that links no file", async () => {
+    await withProject(async (root) => {
+      const noLinks = () => {
+        throw Object.assign(new Error("operation not supported"), { code: "ENOTSUP" });
+      };
+      const path = join(root, ".dek", "server.json");
+      expect(createInside(path, "first", root, { mode: 0o600, link: noLinks })).toBe(true);
+      expect(createInside(path, "second", root, { link: noLinks })).toBe(false);
+      expect(await readFile(path, "utf8")).toBe("first");
+      expect(statSync(path).mode & 0o777).toBe(0o600);
+      expect(readdirSync(join(root, ".dek"))).toEqual(["server.json"]);
+    });
+  });
+
   test("refuses a folder that leads out of the project", async () => {
     await withProject(async (root, outside) => {
       await symlink(join(outside, ".."), join(root, ".dek"));

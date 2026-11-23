@@ -154,27 +154,53 @@ export function createInside(
   path: string,
   data: string | NodeJS.ArrayBufferView,
   root: string,
-  options: { mode?: number } = {},
+  options: { mode?: number; link?: (from: string, to: string) => void } = {},
 ): boolean {
   const target = join(outputDir(dirname(path), root), basename(path));
   const temp = join(dirname(target), `.${basename(target)}.${randomUUID().slice(0, 8)}.tmp`);
-  writeFileSync(temp, data, {
-    flag: "wx",
-    ...(options.mode !== undefined ? { mode: options.mode } : {}),
-  });
+  const mode = options.mode !== undefined ? { mode: options.mode } : {};
+  const isTaken = (error: unknown): boolean =>
+    (error as { code?: string } | null)?.code === "EEXIST";
+  writeFileSync(temp, data, { flag: "wx", ...mode });
   try {
     // A second name for the finished file: unlike a rename, it never takes a name in use.
-    linkSync(temp, target);
+    (options.link ?? linkSync)(temp, target);
     return true;
   } catch (error) {
-    if ((error as { code?: string } | null)?.code === "EEXIST") {
+    if (isTaken(error)) {
       return false;
     }
-    throw error;
+    if (!NO_LINKS.has((error as { code?: string } | null)?.code ?? "")) {
+      throw error;
+    }
   } finally {
     rmSync(temp, { force: true });
   }
+  // A disk that gives a file one name only: the name is still taken only where none is, and what
+  // is given up is that a reader may catch the file before all of it is written. One that did,
+  // and took the file for broken, may have replaced it: the name is this writer's only if what is
+  // under it now is what it wrote.
+  try {
+    writeFileSync(target, data, { flag: "wx", ...mode });
+  } catch (error) {
+    if (isTaken(error)) {
+      return false;
+    }
+    throw error;
+  }
+  try {
+    return Buffer.from(readFileSync(target)).equals(
+      typeof data === "string"
+        ? Buffer.from(data)
+        : Buffer.from(data.buffer, data.byteOffset, data.byteLength),
+    );
+  } catch {
+    return false;
+  }
 }
+
+/** What linking a file fails with where the disk has no hard links, as exFAT and FAT32 have none. */
+const NO_LINKS = new Set(["ENOTSUP", "EOPNOTSUPP", "EPERM", "ENOSYS"]);
 
 /**
  * Write `data` as a new file at `path`, in a folder already known to be inside the project: a

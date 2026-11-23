@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
 import { type AddressInfo, createServer, type Server as NetServer, type Socket } from "node:net";
 import { join } from "node:path";
@@ -207,6 +207,55 @@ describe("gotoCommand against a lock whose server is gone", () => {
         name: "DekError",
         message: 'no dev server serves deck "demo"',
         hint: "run `dekc demo`",
+      });
+    });
+  });
+});
+
+describe("gotoCommand past a deck's lock that names no server for the deck", () => {
+  // A deck's server killed outright leaves its lock, and a server for the project may start over it.
+  test("asks the server for the project when nothing listens where the deck's lock points", async () => {
+    const closed = createServer();
+    const url = await listening(closed);
+    await new Promise((resolve) => closed.close(resolve));
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await withDevServer({ cwd: root }, async (server) => {
+        await mkdir(join(root, ".dek", "servers"), { recursive: true });
+        await writeFile(
+          join(root, ".dek", "servers", "demo.json"),
+          JSON.stringify({ url, pid: process.pid }),
+        );
+        expect(await currentCommand(requireDeckFromCwd(root, "demo"))).toMatchObject({
+          slug: "intro",
+          url: `${server.url}decks/demo/`,
+        });
+      });
+    });
+  });
+
+  // The port a deck's server had may be another deck's by now. A start reads such a lock as a
+  // live server's, since something listens there, so only removing it lets the deck have one.
+  test("names a deck's lock whose port another deck's server has, and what clears it", async () => {
+    const other = { ...twoSlideDeck, name: "other" };
+    await withTempProject({ decks: [twoSlideDeck, other] }, async (root) => {
+      await withDevServer({ cwd: root, deck: "other" }, async (server) => {
+        const lock = join(root, ".dek", "servers", "demo.json");
+        await writeFile(lock, JSON.stringify({ url: server.url, pid: process.pid }));
+        const target = requireDeckFromCwd(root, "demo");
+        await expect(currentCommand(target)).rejects.toMatchObject({
+          message: `the lock of deck "demo" names ${server.url}, which serves no such deck`,
+          path: lock,
+          hint: "its server is gone and another program has its port: remove the file, then run `dekc demo`",
+        });
+        // As the hint says: with the file gone, the deck is one no server serves, and may start.
+        await rm(lock);
+        await expect(currentCommand(target)).rejects.toMatchObject({
+          message: 'no dev server serves deck "demo"',
+          hint: "run `dekc demo`",
+        });
+        await withDevServer({ cwd: root, deck: "demo" }, async (demo) => {
+          expect(await currentCommand(target)).toMatchObject({ url: demo.url });
+        });
       });
     });
   });

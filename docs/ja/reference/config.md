@@ -47,7 +47,7 @@ my-talks/
     ├── schema.json
     ├── slide.d.ts
     ├── server.json                # プロジェクト全体の開発サーバの起動中だけ
-    └── servers/
+    └── servers/                   # dek が .gitignore を置き、フォルダごと無視させる
         └── 2026-04-vite.json      # そのデッキ専用の開発サーバの起動中だけ
 ```
 

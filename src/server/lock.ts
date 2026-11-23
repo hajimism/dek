@@ -1,9 +1,15 @@
-import { existsSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createConnection } from "node:net";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { DekError } from "../core/error.ts";
 import { isDeckName } from "../core/path.ts";
-import { createInside, outputPath, readSourceIfExists, removeInside } from "../core/safe-fs.ts";
+import {
+  createInside,
+  outputPath,
+  readSourceIfExists,
+  removeInside,
+  requireInside,
+} from "../core/safe-fs.ts";
 
 export type DevServerLock = {
   url: string;
@@ -29,7 +35,9 @@ export type ServerWishes = {
 
 /**
  * What a server serves: one deck alone, or the project, whose decks are each named. A deck has
- * one server at most, so a server for the project holds every deck in it.
+ * one server at most, so a server for the project holds every deck in it, and is kept out by
+ * every server for a deck, one for a deck that is not among `decks` too: a deck whose script
+ * does not parse is no deck of the project until it does, and its server serves it meanwhile.
  */
 export type ServerScope = { deck: string } | { decks: readonly string[] };
 
@@ -135,6 +143,25 @@ export function readDevServerLock(root: string, deck?: string): DevServerLock | 
   return lock && deck !== undefined ? { ...lock, deck } : lock;
 }
 
+const LOCK_SUFFIX = ".json";
+
+/**
+ * The decks that have a lock under `.dek/servers/`, live or not, by name. The folder is read, not
+ * asked for the decks someone names: a server may serve a deck the project does not list.
+ */
+function decksWithLock(root: string): string[] {
+  const dir = requireInside(deckLocksDir(root), root);
+  // Nothing there, or something that is no folder, holds no deck's lock.
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    return [];
+  }
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(LOCK_SUFFIX))
+    .map((name) => name.slice(0, -LOCK_SUFFIX.length))
+    .filter(isDeckName)
+    .sort();
+}
+
 /** A server that runs, the lock that says so, and whether it answers beyond this machine. */
 type Running = Omit<DevServerLock, "password"> & { path: string; remote: boolean };
 
@@ -179,7 +206,7 @@ function serversHolding(root: string, scope: ServerScope): Running[] {
     );
   }
   const held = [...(claimed.get(root)?.keys() ?? [])].filter((key) => typeof key === "string");
-  const decks = [...new Set([...scope.decks, ...held])];
+  const decks = [...new Set([...decksWithLock(root), ...held])].sort();
   return [project, ...decks.map((deck) => serverAt(root, deck))].filter(
     (server) => server !== undefined,
   );
@@ -221,7 +248,7 @@ export async function dropLocksOfGoneServers(
   refuses: (url: string) => Promise<boolean> = refusesConnection,
 ): Promise<void> {
   const claims = claimed.get(root);
-  const decks = "deck" in scope ? [scope.deck] : scope.decks;
+  const decks = "deck" in scope ? [scope.deck] : decksWithLock(root);
   for (const deck of [undefined, ...decks]) {
     // A server this process holds is no lock left behind, whatever its file says.
     if (claims?.has(deck ?? PROJECT)) {
@@ -232,31 +259,30 @@ export async function dropLocksOfGoneServers(
     if (!lock || !isPidAlive(lock.pid) || !(await refuses(lock.url))) {
       continue;
     }
-    // Unless a server took the lock while the port was asked.
-    const now = readLockFile(path, root);
-    if (now?.url === lock.url && now.pid === lock.pid) {
-      removeInside(path, root);
-    }
+    // Thrown on when another start holds the lock's `.taking` and does not let go: left to the
+    // check that follows, this lock would send its caller to an address where nothing listens.
+    replacing(root, path, () => {
+      // Unless a server took the lock while the port was asked.
+      const now = readLockFile(path, root);
+      if (now?.url === lock.url && now.pid === lock.pid) {
+        removeInside(path, root);
+      }
+    });
   }
 }
 
 /**
- * The live server that serves `deck`, with what its lock holds: the one started for that deck,
- * else the one for the project. Nothing when no server shows the deck.
+ * The servers whose locks say they serve `deck`, each with what its lock holds: the one started
+ * for that deck, then the one for the project. A lock is live by its pid here, so the first may
+ * be a lock its server left behind, which only asking it tells.
  */
-export function devServerFor(
-  root: string,
-  deck: string,
-): (DevServerLock & { path: string }) | undefined {
-  for (const at of [deck, undefined]) {
+export function devServersFor(root: string, deck: string): Array<DevServerLock & { path: string }> {
+  return [deck, undefined].flatMap((at) => {
     const lock = readDevServerLock(root, at);
     const path = lockPath(root, at);
     const running = live(lock, path);
-    if (lock && running && serves(running, deck)) {
-      return { ...lock, path };
-    }
-  }
-  return undefined;
+    return lock && running && serves(running, deck) ? [{ ...lock, path }] : [];
+  });
 }
 
 /**
@@ -307,7 +333,8 @@ function runningServerHint(
   if (first.deck === undefined) {
     return servedHint(first, first.url, asked);
   }
-  const atRoot = "run `dekc` at the project root, which serves every deck";
+  // The start was for the project, so the command to run again is the one refused, options and all.
+  const atRoot = `run this command again, which serves every deck${onlyARestartGives(running, asked)}`;
   // A deck to serve beside them is left only while some deck of the project has no server.
   const served = new Set(running.map((server) => server.deck));
   const beside = scope.decks.some((deck) => !served.has(deck))
@@ -322,6 +349,28 @@ function runningServerHint(
   );
   const other = beside ? `${beside} them` : "open a deck where it is served";
   return `${running.length} servers serve one deck each: ${each.join(", ")}; ${other}, or stop them and ${atRoot}`;
+}
+
+/**
+ * What of the options a start for the project asked for only that start gives, as the end of its
+ * hint: `--visual` and `--remote` where a running server lacks them, and the port, which is the
+ * project's on no server for a deck.
+ */
+function onlyARestartGives(running: Running[], asked: ServerWishes): string {
+  const only = [
+    asked.visual === true && running.some((server) => server.visual !== true)
+      ? "--visual"
+      : undefined,
+    asked.remote === true && running.some((server) => !server.remote) ? "--remote" : undefined,
+    asked.port !== undefined ? `port ${asked.port}` : undefined,
+  ].filter((option) => option !== undefined);
+  return only.length > 0 ? `; only that gives ${listOf(only)}` : "";
+}
+
+/** `a`, `a and b`, or `a, b, and c`. */
+function listOf(items: string[]): string {
+  const last = items.at(-1) ?? "";
+  return items.length > 2 ? `${items.slice(0, -1).join(", ")}, and ${last}` : items.join(" and ");
 }
 
 /**
@@ -340,10 +389,7 @@ function servedHint(server: Running, page: string, asked: ServerWishes): string 
   if (lacks.length === 0) {
     return `open ${page}`;
   }
-  const last = lacks.pop();
-  const list =
-    lacks.length > 1 ? `${lacks.join(", ")}, and ${last}` : [...lacks, last].join(" and ");
-  return `it runs ${list}; open ${page} as it is, or stop it (pid ${server.pid}) and run this command again`;
+  return `it runs ${listOf(lacks)}; open ${page} as it is, or stop it (pid ${server.pid}) and run this command again`;
 }
 
 /** The deck a server serves, as a hint names it. */
@@ -399,6 +445,41 @@ export function writeDevServerLock(
 /** Git ignores a folder that holds this, itself included, whatever the project's .gitignore says. */
 const IGNORE_ALL = "*\n";
 
+/**
+ * Make `.dek/servers/` ignore itself: a project made before dek kept these locks does not ignore
+ * them, and one may hold a password. A .gitignore a repository brought there is replaced unless
+ * it is that file: an empty one ignores nothing, and git reads none that is a link.
+ */
+function ignoreDeckLocks(root: string): void {
+  const path = join(deckLocksDir(root), ".gitignore");
+  if (createInside(path, IGNORE_ALL, root)) {
+    return;
+  }
+  const isOurs = (): boolean => {
+    try {
+      return lstatSync(path).isFile() && readFileSync(path, "utf8") === IGNORE_ALL;
+    } catch {
+      return false;
+    }
+  };
+  if (!isOurs()) {
+    clear(root, path);
+    createInside(path, IGNORE_ALL, root);
+  }
+}
+
+/** Remove what is at `path`, where a file of the dev server's goes; a folder there is not dek's to empty. */
+function clear(root: string, path: string): void {
+  try {
+    removeInside(path, root);
+  } catch {
+    throw new DekError(`${relative(root, path)} is in the way of the dev server's lock`, {
+      path,
+      hint: "remove it and run this command again",
+    });
+  }
+}
+
 function createLock(
   root: string,
   path: string,
@@ -409,8 +490,7 @@ function createLock(
   // Makes the folders, and refuses a lock a repository linked to a file elsewhere.
   outputPath(path, root);
   if ("deck" in scope) {
-    // A project made before dek kept these locks does not ignore them, and one may hold a password.
-    createInside(join(deckLocksDir(root), ".gitignore"), IGNORE_ALL, root);
+    ignoreDeckLocks(root);
   }
   const { url, password, visual } = server;
   const text = `${JSON.stringify({
@@ -430,13 +510,54 @@ function createLock(
     const holder = live(readLockFile(path, root), path);
     return holder && alreadyRunning(root, [holder], scope, asked);
   };
-  const before = taken();
-  if (before) {
-    throw before;
+  replacing(root, path, () => {
+    const holder = taken();
+    if (holder) {
+      throw holder;
+    }
+    clear(root, path);
+    // A start that found the name free took it in between: it holds the lock.
+    if (!create()) {
+      throw (
+        taken() ??
+        new DekError("another dev server took the lock as this one did", {
+          path,
+          hint: "run this command again",
+        })
+      );
+    }
+  });
+}
+
+/** How often, and how long apart, a start looks again for another to finish replacing a lock. */
+const REPLACING_TRIES = 40;
+const REPLACING_PAUSE_MS = 5;
+
+/**
+ * Run `replace`, which removes the lock at `path`, as the only start doing so. A lock is taken by
+ * making its file where none is, which settles any race for a free name. Removing a lock left
+ * behind is where two starts could undo each other: each judges the old lock gone, the first
+ * replaces it, and the second removes the first's. So a start replaces a lock only while it
+ * holds `<lock>.taking`, made the same way, and judges the lock again once it does.
+ */
+function replacing(root: string, path: string, replace: () => void): void {
+  const guard = `${path}.taking`;
+  const take = (): boolean => createInside(guard, `${process.pid}\n`, root);
+  // Whoever holds it is a few lines from done: wait that out, without leaving the caller's turn.
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  for (let tries = 0; !take(); tries += 1) {
+    if (tries === REPLACING_TRIES) {
+      throw new DekError(`${relative(root, guard)} says another dev server is taking this lock`, {
+        path: guard,
+        hint: "run this command again; if it says the same, the start that made the file died: remove it",
+      });
+    }
+    Atomics.wait(pause, 0, 0, REPLACING_PAUSE_MS);
   }
-  removeInside(path, root);
-  if (!create()) {
-    throw taken() ?? new DekError(`could not take the dev server's lock`, { path });
+  try {
+    replace();
+  } finally {
+    removeInside(guard, root);
   }
 }
 

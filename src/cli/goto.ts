@@ -1,6 +1,6 @@
 import { DekError } from "../core/error.ts";
 import { deckRoutePath } from "../runtime/routes.ts";
-import { type DevServerLock, devServerFor } from "../server/lock.ts";
+import { type DevServerLock, devServersFor } from "../server/lock.ts";
 import { deckFlag, deckWord } from "./address.ts";
 import { isTypedCommand } from "./commands.ts";
 import { type DeckTarget, requireSection } from "./scope.ts";
@@ -49,16 +49,47 @@ export async function currentCommand(
 
 async function requestDevServer(
   { project, deck }: DeckTarget,
-  request: { method: "GET" | "POST"; path: "goto" | "current"; body?: { slug: string } },
+  request: NavRequest,
   timeoutMs: number,
 ): Promise<NavResult> {
-  const deckName = deck.name;
-  // The server started for this deck, else the one that serves the project.
-  const lock = devServerFor(project.root, deckName);
-  if (!lock) {
-    throw notRunning(deckName);
+  // The server started for this deck, then the one that serves the project. The first may be a
+  // lock its server left behind, with a pid that is some other process by now.
+  let taken: (DevServerLock & { path: string }) | undefined;
+  for (const lock of devServersFor(project.root, deck.name)) {
+    const answer = await askDevServer(lock, deck.name, request, timeoutMs);
+    if (typeof answer === "object") {
+      return answer;
+    }
+    if (answer === "another's") {
+      taken = lock;
+    }
   }
+  // A start would take that lock for a live server's, since something listens there: only
+  // removing it lets `dekc` start one for the deck.
+  throw taken
+    ? new DekError(
+        `the lock of deck "${deck.name}" names ${taken.url}, which serves no such deck`,
+        {
+          path: taken.path,
+          hint: `its server is gone and another program has its port: remove the file, then ${startHint(deck.name)}`,
+        },
+      )
+    : notRunning(deck.name);
+}
 
+type NavRequest = { method: "GET" | "POST"; path: "goto" | "current"; body?: { slug: string } };
+
+/**
+ * What the server `lock` names answers for `deckName`, or why it is not that deck's server after
+ * all: `gone` when nothing listens where the lock points, `another's` when what listens there
+ * knows no such deck, as a server that took the port since does not.
+ */
+async function askDevServer(
+  lock: DevServerLock & { path: string },
+  deckName: string,
+  request: NavRequest,
+  timeoutMs: number,
+): Promise<NavResult | "gone" | "another's"> {
   // Under /decks/<name> whether or not the server is scoped to this deck; a scoped one takes both.
   const url = new URL(deckRoutePath(deckName, { kind: request.path }), lock.url);
   const headers: Record<string, string> = {};
@@ -71,14 +102,11 @@ async function requestDevServer(
   // A server that takes the connection but never answers is stuck; say so instead of waiting.
   const signal = AbortSignal.timeout(timeoutMs);
   const unlessStuck = (error: unknown): never => {
-    if (signal.aborted) {
-      throw new DekError(
-        `the dev server at ${lock.url} did not answer within ${timeoutMs / 1000}s`,
-        { hint: "restart it: stop `dekc` and run it again" },
-      );
-    }
-    // The lock outlived its server, and its pid is some other process by now.
-    throw isConnectionRefused(error) ? notRunning(deckName) : error;
+    throw signal.aborted
+      ? new DekError(`the dev server at ${lock.url} did not answer within ${timeoutMs / 1000}s`, {
+          hint: "restart it: stop `dekc` and run it again",
+        })
+      : error;
   };
   // biome-ignore lint/style/noRestrictedGlobals: signal, an AbortSignal.timeout, bounds the request and the read of its answer.
   const response = await fetch(url, {
@@ -86,9 +114,16 @@ async function requestDevServer(
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: request.body ? JSON.stringify(request.body) : undefined,
     signal,
-  }).catch(unlessStuck);
+  }).catch((error: unknown) => (isConnectionRefused(error) ? undefined : unlessStuck(error)));
+  if (!response) {
+    return "gone";
+  }
   // Only the nav routes answer JSON; a 404, 401, or 405 from the server itself is plain text.
   if (!response.headers.get("content-type")?.includes("application/json")) {
+    // The lock is this deck's own, and the server there has no such deck: not the one it names.
+    if (response.status === 404 && lock.deck === deckName) {
+      return "another's";
+    }
     throw refusal(response.status, lock, request.path);
   }
   const json = (await response.json().catch(unlessStuck)) as {
@@ -138,9 +173,12 @@ function refusal(status: number, lock: DevServerLock & { path: string }, path: s
 
 /** No live server shows `deckName`, whatever serves the project's other decks. */
 function notRunning(deckName: string): DekError {
-  return new DekError(`no dev server serves deck "${deckName}"`, {
-    hint: `run \`dekc ${isTypedCommand(deckName) ? deckFlag(deckName) : deckWord(deckName)}\``,
-  });
+  return new DekError(`no dev server serves deck "${deckName}"`, { hint: startHint(deckName) });
+}
+
+/** The command that starts a server for `deckName` alone, beside whatever else runs. */
+function startHint(deckName: string): string {
+  return `run \`dekc ${isTypedCommand(deckName) ? deckFlag(deckName) : deckWord(deckName)}\``;
 }
 
 /** Whether a request failed because nothing listens at the address, as Bun and Node name it. */

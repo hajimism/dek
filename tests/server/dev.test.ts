@@ -1144,6 +1144,27 @@ body
     );
   });
 
+  // A deck whose script does not parse is not among the project's decks, yet a server serves it.
+  test("starts no server for the project beside one for a deck whose script does not parse", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", slides: { intro: introHtml } },
+          { name: "broken", script: "---\ntitle: [unclosed\n---\n\n## intro\n\nhello\n" },
+        ],
+      },
+      async (root) => {
+        await withDevServer({ cwd: root, deck: "broken" }, async (broken) => {
+          expect(broken.decks).toEqual(["demo"]);
+          await expect(startDevServer({ cwd: root })).rejects.toMatchObject({
+            message: `dev server already running at ${broken.url}`,
+          });
+          expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
+        });
+      },
+    );
+  });
+
   test("starts no server for a deck while one serves the project, and says where the deck is", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },

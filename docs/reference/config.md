@@ -47,7 +47,7 @@ my-talks/
     ├── schema.json
     ├── slide.d.ts
     ├── server.json                # while a dev server for the project runs
-    └── servers/
+    └── servers/                   # ignores itself: dek writes a .gitignore into it
         └── 2026-04-vite.json      # while a dev server for that deck alone runs
 ```
 

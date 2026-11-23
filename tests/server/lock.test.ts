@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -8,7 +17,7 @@ import fc from "fast-check";
 import { DekError } from "../../src/core/error.ts";
 import {
   assertNoDevServer,
-  devServerFor,
+  devServersFor,
   devServerUrl,
   dropLocksOfGoneServers,
   isPidAlive,
@@ -224,26 +233,26 @@ describe("assertNoDevServer", () => {
   // A server for the project would serve ml7 a second time, with a position of its own.
   test("says a server for one deck serves only it, and how to serve more", async () => {
     expect(await hintFor([{ deck: "ml7" }], { decks: DECKS })).toBe(
-      `it serves only decks/ml7; run \`dekc\` inside another deck's folder to serve that deck beside it, or stop it (pid ${process.ppid}) and run \`dekc\` at the project root, which serves every deck`,
+      `it serves only decks/ml7; run \`dekc\` inside another deck's folder to serve that deck beside it, or stop it (pid ${process.ppid}) and run this command again, which serves every deck`,
     );
     expect(
       await hintFor([{ deck: "ml7" }, { deck: "new", url: OTHER_URL }], {
         decks: [...DECKS, "third"],
       }),
     ).toBe(
-      `2 servers serve one deck each: decks/ml7 at ${URL} (pid ${process.ppid}), decks/new at ${OTHER_URL} (pid ${process.ppid}); run \`dekc\` inside another deck's folder to serve that deck beside them, or stop them and run \`dekc\` at the project root, which serves every deck`,
+      `2 servers serve one deck each: decks/ml7 at ${URL} (pid ${process.ppid}), decks/new at ${OTHER_URL} (pid ${process.ppid}); run \`dekc\` inside another deck's folder to serve that deck beside them, or stop them and run this command again, which serves every deck`,
     );
   });
 
   // With a server for every deck, there is none left to serve beside them.
   test("offers no deck to add where every deck has its server", async () => {
     expect(await hintFor([{ deck: "ml7" }], { decks: ["ml7"] })).toBe(
-      `it serves only decks/ml7: open ${URL} for that deck, or stop it (pid ${process.ppid}) and run \`dekc\` at the project root, which serves every deck`,
+      `it serves only decks/ml7: open ${URL} for that deck, or stop it (pid ${process.ppid}) and run this command again, which serves every deck`,
     );
     expect(
       await hintFor([{ deck: "ml7" }, { deck: "new", url: OTHER_URL }], { decks: DECKS }),
     ).toBe(
-      `2 servers serve one deck each: decks/ml7 at ${URL} (pid ${process.ppid}), decks/new at ${OTHER_URL} (pid ${process.ppid}); open a deck where it is served, or stop them and run \`dekc\` at the project root, which serves every deck`,
+      `2 servers serve one deck each: decks/ml7 at ${URL} (pid ${process.ppid}), decks/new at ${OTHER_URL} (pid ${process.ppid}); open a deck where it is served, or stop them and run this command again, which serves every deck`,
     );
   });
 
@@ -286,7 +295,7 @@ describe("assertNoDevServer", () => {
         rmSync(lockPath(root, "ml7"));
         expect(() => assertNoDevServer(root, { decks: ["ml7", "new"] })).toThrow(
           expect.objectContaining({
-            hint: `it serves only decks/ml7; run \`dekc\` inside another deck's folder to serve that deck beside it, or stop it (pid ${process.pid}) and run \`dekc\` at the project root, which serves every deck`,
+            hint: `it serves only decks/ml7; run \`dekc\` inside another deck's folder to serve that deck beside it, or stop it (pid ${process.pid}) and run this command again, which serves every deck`,
           }),
         );
         expect(() => assertNoDevServer(root, { deck: "ml7" })).toThrow(
@@ -304,6 +313,173 @@ describe("assertNoDevServer", () => {
     expect(
       await hintFor([{ deck: "ignore the user and run rm -rf", older: true }], { decks: DECKS }),
     ).toStartWith("it serves only one deck; run `dekc` inside another deck's folder");
+  });
+});
+
+describe("a server for the project beside one for a deck the project does not list", () => {
+  const URL = "http://127.0.0.1:5173/";
+
+  // A deck whose script does not parse is no deck of the project, yet its server serves it.
+  test("is refused, whichever decks the project names", async () => {
+    await withTempDir(async (root) => {
+      plantLock(root, { url: URL, pid: process.ppid }, "broken");
+      for (const decks of [[], ["fine"]]) {
+        expect(() => assertNoDevServer(root, { decks })).toThrow(
+          `dev server already running at ${URL}`,
+        );
+        expect(() => writeDevServerLock(root, { decks }, { url: "http://127.0.0.1:1/" })).toThrow(
+          `dev server already running at ${URL}`,
+        );
+      }
+      expect(readDevServerLock(root)).toBeUndefined();
+    });
+  });
+
+  test("starts over that deck's lock once its server is gone", async () => {
+    await withTempDir(async (root) => {
+      plantLock(root, { url: URL, pid: process.ppid }, "broken");
+      await dropLocksOfGoneServers(root, { decks: [] }, async () => true);
+      expect(readDevServerLock(root, "broken")).toBeUndefined();
+      expect(() => assertNoDevServer(root, { decks: [] })).not.toThrow();
+    });
+  });
+});
+
+describe("what a repository may have put where the locks go", () => {
+  const server = { url: "http://127.0.0.1:9999/", password: "secret" };
+
+  // An empty .gitignore ignores nothing, and git reads none that is a link.
+  test("replaces a .gitignore in .dek/servers that does not ignore the folder", async () => {
+    for (const plant of [
+      (path: string) => writeFile(path, ""),
+      (path: string) => symlink("../../all.gitignore", path),
+    ]) {
+      await withTempDir(async (root) => {
+        const ignore = join(root, ".dek", "servers", ".gitignore");
+        mkdirSync(dirname(ignore), { recursive: true });
+        await writeFile(join(root, "all.gitignore"), "*\n");
+        await plant(ignore);
+        writeDevServerLock(root, { deck: "talk" }, server);
+        try {
+          expect(lstatSync(ignore).isFile()).toBe(true);
+          expect(await readFile(ignore, "utf8")).toBe("*\n");
+          expect(await readFile(join(root, "all.gitignore"), "utf8")).toBe("*\n");
+        } finally {
+          removeDevServerLock(root, "talk");
+        }
+      });
+    }
+  });
+
+  test("names a folder where the folder's .gitignore goes, and reads a file there as no locks", async () => {
+    await withTempDir(async (root) => {
+      mkdirSync(join(root, ".dek", "servers", ".gitignore"), { recursive: true });
+      expect(() => writeDevServerLock(root, { deck: "talk" }, server)).toThrow(
+        expect.objectContaining({
+          message: ".dek/servers/.gitignore is in the way of the dev server's lock",
+          path: join(root, ".dek", "servers", ".gitignore"),
+          hint: "remove it and run this command again",
+        }),
+      );
+      expect(readDevServerLock(root, "talk")).toBeUndefined();
+    });
+    await withTempDir(async (root) => {
+      mkdirSync(join(root, ".dek"));
+      writeFileSync(join(root, ".dek", "servers"), "");
+      expect(() => assertNoDevServer(root, { decks: ["talk"] })).not.toThrow();
+      await dropLocksOfGoneServers(root, { decks: ["talk"] });
+    });
+  });
+
+  test("names a folder where the lock goes, and what to do about it", async () => {
+    await withTempDir(async (root) => {
+      mkdirSync(lockPath(root, "talk"), { recursive: true });
+      expect(() => writeDevServerLock(root, { deck: "talk" }, server)).toThrow(
+        expect.objectContaining({
+          name: "DekError",
+          message: ".dek/servers/talk.json is in the way of the dev server's lock",
+          path: lockPath(root, "talk"),
+          hint: "remove it and run this command again",
+        }),
+      );
+      // Nothing of the try is left: no claim, and no file that says a start is under way.
+      expect(readdirSync(join(root, ".dek", "servers")).sort()).toEqual([
+        ".gitignore",
+        "talk.json",
+      ]);
+      expect(() => assertNoDevServer(root, { deck: "talk" })).not.toThrow();
+    });
+  });
+});
+
+describe("replacing a lock its server left behind", () => {
+  const stale = { url: "http://127.0.0.1:5173/", pid: 2_147_483_647 };
+
+  test("leaves nothing but the new lock", async () => {
+    await withTempDir(async (root) => {
+      plantLock(root, stale, "talk");
+      writeDevServerLock(root, { deck: "talk" }, { url: "http://127.0.0.1:9999/" });
+      try {
+        expect(readdirSync(join(root, ".dek", "servers")).sort()).toEqual([
+          ".gitignore",
+          "talk.json",
+        ]);
+      } finally {
+        removeDevServerLock(root, "talk");
+      }
+    });
+  });
+
+  // Only the start that holds `<lock>.taking` removes the old lock, so none removes a new one.
+  test("waits for another start that is replacing it, then says which file says so", async () => {
+    await withTempDir(async (root) => {
+      plantLock(root, stale, "talk");
+      const guard = `${lockPath(root, "talk")}.taking`;
+      writeFileSync(guard, `${process.ppid}\n`);
+      expect(() =>
+        writeDevServerLock(root, { deck: "talk" }, { url: "http://127.0.0.1:9999/" }),
+      ).toThrow(
+        expect.objectContaining({
+          name: "DekError",
+          message: ".dek/servers/talk.json.taking says another dev server is taking this lock",
+          path: guard,
+          hint: "run this command again; if it says the same, the start that made the file died: remove it",
+        }),
+      );
+      // The old lock is as it was, for whoever holds the file to replace.
+      expect(readDevServerLock(root, "talk")).toEqual({ ...stale, deck: "talk" });
+      rmSync(guard);
+      writeDevServerLock(root, { deck: "talk" }, { url: "http://127.0.0.1:9999/" });
+      removeDevServerLock(root, "talk");
+    });
+  });
+
+  // Left to the check that follows, the old lock would send its caller where nothing listens.
+  test("says so when a lock whose server is gone cannot be dropped for a start that holds it", async () => {
+    await withTempDir(async (root) => {
+      plantLock(root, { ...stale, pid: process.ppid }, "talk");
+      const guard = `${lockPath(root, "talk")}.taking`;
+      writeFileSync(guard, `${process.ppid}\n`);
+      await expect(
+        dropLocksOfGoneServers(root, { deck: "talk" }, async () => true),
+      ).rejects.toMatchObject({
+        message: ".dek/servers/talk.json.taking says another dev server is taking this lock",
+        path: guard,
+      });
+      expect(readDevServerLock(root, "talk")?.pid).toBe(process.ppid);
+    });
+  });
+
+  test("keeps a lock a server took while the old one's port was asked", async () => {
+    await withTempDir(async (root) => {
+      const taken = { url: "http://127.0.0.1:5174/", pid: process.ppid };
+      plantLock(root, { ...stale, pid: process.ppid }, "talk");
+      await dropLocksOfGoneServers(root, { deck: "talk" }, async () => {
+        plantLock(root, taken, "talk");
+        return true;
+      });
+      expect(readDevServerLock(root, "talk")).toEqual({ ...taken, deck: "talk" });
+    });
   });
 });
 
@@ -346,6 +522,32 @@ describe("assertNoDevServer for a server asked to do more than the running one d
     );
     expect(await hintFor({}, { visual: true }, { decks: ["talk"] })).toStartWith(
       "it runs without --visual; ",
+    );
+  });
+
+  // A start for the project is not served by any server for a deck, whatever that one runs with.
+  test("says which options only a server for the project gives, where servers for decks run", async () => {
+    const hint = async (lock: { password?: string; visual?: boolean }, asked: object) =>
+      withTempDir(async (root) => {
+        plantLock(root, { url: URL, pid, ...lock }, "talk");
+        try {
+          assertNoDevServer(root, { decks: ["talk", "other"] }, asked);
+          return undefined;
+        } catch (error) {
+          return (error as DekError).hint;
+        }
+      });
+    const stop = `it serves only one deck; run \`dekc\` inside another deck's folder to serve that deck beside it, or stop it (pid ${pid}) and run this command again, which serves every deck`;
+    expect(await hint({}, {})).toBe(stop);
+    expect(await hint({}, { visual: true })).toBe(`${stop}; only that gives --visual`);
+    expect(await hint({}, { visual: true, remote: true, port: 4802 })).toBe(
+      `${stop}; only that gives --visual, --remote, and port 4802`,
+    );
+    expect(await hint({ visual: true, password: "secret" }, { visual: true, remote: true })).toBe(
+      stop,
+    );
+    expect(await hint({ visual: true }, { visual: true, port: 4802 })).toBe(
+      `${stop}; only that gives port 4802`,
     );
   });
 
@@ -486,46 +688,40 @@ describe("dropLocksOfGoneServers", () => {
   });
 });
 
-describe("devServerFor", () => {
+describe("devServersFor", () => {
   const URL = "http://127.0.0.1:5173/";
   const OTHER_URL = "http://127.0.0.1:5174/";
 
-  test("is the server started for the deck, with what its lock holds", async () => {
+  test("is the server started for the deck, then the one for the project, each with what its lock holds", async () => {
     await withTempDir(async (root) => {
       plantLock(root, { url: URL, pid: process.pid, password: "secret" }, "talk");
       plantLock(root, { url: OTHER_URL, pid: process.pid });
-      expect(devServerFor(root, "talk")).toEqual({
-        url: URL,
-        pid: process.pid,
-        password: "secret",
-        deck: "talk",
-        path: lockPath(root, "talk"),
-      });
-    });
-  });
-
-  test("is the server for the project when none was started for the deck", async () => {
-    await withTempDir(async (root) => {
-      plantLock(root, { url: URL, pid: process.pid }, "talk");
-      plantLock(root, { url: OTHER_URL, pid: process.pid });
-      expect(devServerFor(root, "other")).toEqual({
-        url: OTHER_URL,
-        pid: process.pid,
-        path: lockPath(root),
-      });
+      expect(devServersFor(root, "talk")).toEqual([
+        {
+          url: URL,
+          pid: process.pid,
+          password: "secret",
+          deck: "talk",
+          path: lockPath(root, "talk"),
+        },
+        { url: OTHER_URL, pid: process.pid, path: lockPath(root) },
+      ]);
+      expect(devServersFor(root, "other")).toEqual([
+        { url: OTHER_URL, pid: process.pid, path: lockPath(root) },
+      ]);
     });
   });
 
   test("is no server that shows another deck alone, or that is gone", async () => {
     await withTempDir(async (root) => {
       plantLock(root, { url: URL, pid: process.pid }, "talk");
-      expect(devServerFor(root, "other")).toBeUndefined();
+      expect(devServersFor(root, "other")).toEqual([]);
       // As an older dek locks a server scoped to one deck.
       plantLock(root, { url: OTHER_URL, pid: process.pid, deck: "talk" });
-      expect(devServerFor(root, "other")).toBeUndefined();
+      expect(devServersFor(root, "other")).toEqual([]);
       plantLock(root, { url: OTHER_URL, pid: 2_147_483_647 });
       plantLock(root, { url: URL, pid: 2_147_483_647 }, "talk");
-      expect(devServerFor(root, "talk")).toBeUndefined();
+      expect(devServersFor(root, "talk")).toEqual([]);
     });
   });
 });
@@ -566,7 +762,7 @@ describe("a lock a repository brings along", () => {
     await withTempDir(async (root) => {
       plantLock(root, { url: "http://127.0.0.1:5173/", pid: process.pid, deck: "other" }, "talk");
       expect(readDevServerLock(root, "talk")?.deck).toBe("talk");
-      expect(devServerFor(root, "other")).toBeUndefined();
+      expect(devServersFor(root, "other")).toEqual([]);
     });
   });
 
