@@ -28,7 +28,8 @@ export function loadSlideSources(
 ): SlideSources {
   return {
     deck,
-    styles: readDeckStyles(deck.dir, false),
+    // The page is drawn from a string, with no folder to load from: its files come along in it.
+    styles: readDeckStyles(deck.dir, true),
     slides: deckSlides(deck),
     scripts: loadSlideScripts(deck.dir),
     strict: options.strict ?? true,

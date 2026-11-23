@@ -955,6 +955,40 @@ body
     );
   });
 
+  test("GET /current is pulled back to the last slide left when script.md loses the one it stood on", async () => {
+    const script = (...slugs: string[]) =>
+      `---\ntitle: Demo\n---\n\n${slugs.map((slug) => `## ${slug}\n\nbody\n`).join("\n")}`;
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            script: script("intro", "architecture", "end"),
+            slides: { intro: introHtml, architecture: leftoverHtml, end: leftoverHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await withDevServer({ cwd: deckDir }, async (server) => {
+          const gotoRes = await fetch(new URL("/goto", server.url), {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ slug: "end" }),
+          });
+          expect(await gotoRes.json()).toMatchObject({ slug: "end", slideIndex: 2 });
+
+          const pending = waitForEvent(server.events, (event) => event.type === "sync");
+          await writeEdit(join(deckDir, "script.md"), script("intro", "architecture"));
+          await pending;
+
+          const after = await fetch(new URL("/current", server.url));
+          expect(await after.json()).toMatchObject({ slug: "architecture", slideIndex: 1 });
+        });
+      },
+    );
+  });
+
   test("GET /current follows the last websocket position", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
