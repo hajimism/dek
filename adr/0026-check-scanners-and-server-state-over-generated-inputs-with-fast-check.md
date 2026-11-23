@@ -6,6 +6,8 @@ Date: 2026-10-27
 
 Accepted
 
+Amended by [110. Run one dev server for each deck, each holding a lock of its own](0110-run-one-dev-server-for-each-deck-each-holding-a-lock-of-its-own.md)
+
 ## Context
 
 Every test in dek was an example someone wrote by hand. The defects found so far clustered where examples reach least: text scanning (CSS, TOML, character references in attribute values, URLs), the hints a diagnostic or an error gives, and the dev server's state across a sequence of joins, moves, and restarts. Each fix added the input that broke, and the next defect was the input beside it: a string cut short by CR after one cut short by LF, a `url()` holding `/*` after one holding a quote.

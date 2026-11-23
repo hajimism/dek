@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   chmodSync,
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readdirSync,
@@ -142,6 +143,37 @@ export function writeInside(
   options: { mode?: number } = {},
 ): void {
   replaceFile(outputPath(path, root), data, options);
+}
+
+/**
+ * Write `data` to `path` inside `root` only where nothing is, and say whether it did. The file
+ * shows under its name whole or not at all, and of two writers that race for the name one gets
+ * it: what a lock needs. A link at `path` is something there, wherever it points.
+ */
+export function createInside(
+  path: string,
+  data: string | NodeJS.ArrayBufferView,
+  root: string,
+  options: { mode?: number } = {},
+): boolean {
+  const target = join(outputDir(dirname(path), root), basename(path));
+  const temp = join(dirname(target), `.${basename(target)}.${randomUUID().slice(0, 8)}.tmp`);
+  writeFileSync(temp, data, {
+    flag: "wx",
+    ...(options.mode !== undefined ? { mode: options.mode } : {}),
+  });
+  try {
+    // A second name for the finished file: unlike a rename, it never takes a name in use.
+    linkSync(temp, target);
+    return true;
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code === "EEXIST") {
+      return false;
+    }
+    throw error;
+  } finally {
+    rmSync(temp, { force: true });
+  }
 }
 
 /**

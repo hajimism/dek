@@ -1,6 +1,6 @@
 import { DekError } from "../core/error.ts";
 import { deckRoutePath } from "../runtime/routes.ts";
-import { isPidAlive, readDevServerLock } from "../server/lock.ts";
+import { type DevServerLock, devServerFor } from "../server/lock.ts";
 import { deckFlag, deckWord } from "./address.ts";
 import { isTypedCommand } from "./commands.ts";
 import { type DeckTarget, requireSection } from "./scope.ts";
@@ -53,9 +53,10 @@ async function requestDevServer(
   timeoutMs: number,
 ): Promise<NavResult> {
   const deckName = deck.name;
-  const lock = readDevServerLock(project.root);
-  if (!lock || !isPidAlive(lock.pid)) {
-    throw notRunning();
+  // The server started for this deck, else the one that serves the project.
+  const lock = devServerFor(project.root, deckName);
+  if (!lock) {
+    throw notRunning(deckName);
   }
 
   // Under /decks/<name> whether or not the server is scoped to this deck; a scoped one takes both.
@@ -77,7 +78,7 @@ async function requestDevServer(
       );
     }
     // The lock outlived its server, and its pid is some other process by now.
-    throw isConnectionRefused(error) ? notRunning() : error;
+    throw isConnectionRefused(error) ? notRunning(deckName) : error;
   };
   // biome-ignore lint/style/noRestrictedGlobals: signal, an AbortSignal.timeout, bounds the request and the read of its answer.
   const response = await fetch(url, {
@@ -88,7 +89,7 @@ async function requestDevServer(
   }).catch(unlessStuck);
   // Only the nav routes answer JSON; a 404, 401, or 405 from the server itself is plain text.
   if (!response.headers.get("content-type")?.includes("application/json")) {
-    throw refusal(response.status, lock, deckName, request.path);
+    throw refusal(response.status, lock, request.path);
   }
   const json = (await response.json().catch(unlessStuck)) as {
     ok?: boolean;
@@ -123,19 +124,10 @@ function deckPage(lock: { url: string; deck?: string }, deckName: string): strin
 }
 
 /** Why the server turned the request away before a nav route saw it. */
-function refusal(
-  status: number,
-  lock: { url: string; deck?: string },
-  deckName: string,
-  path: string,
-): DekError {
-  if (status === 404 && lock.deck !== undefined && lock.deck !== deckName) {
-    return new DekError(`the running dev server serves deck "${lock.deck}", not "${deckName}"`, {
-      hint: `pass ${deckFlag(lock.deck)}, or stop the server at ${lock.url} and run \`dekc ${isTypedCommand(deckName) ? deckFlag(deckName) : deckWord(deckName)}\``,
-    });
-  }
+function refusal(status: number, lock: DevServerLock & { path: string }, path: string): DekError {
   if (status === 401) {
-    return new DekError(`the dev server at ${lock.url} refused the password in .dek/server.json`, {
+    return new DekError(`the dev server at ${lock.url} refused the password in its lock`, {
+      path: lock.path,
       hint: "restart it: stop `dekc` and run it again",
     });
   }
@@ -144,8 +136,11 @@ function refusal(
   });
 }
 
-function notRunning(): DekError {
-  return new DekError("dev server is not running", { hint: "run `dekc`" });
+/** No live server shows `deckName`, whatever serves the project's other decks. */
+function notRunning(deckName: string): DekError {
+  return new DekError(`no dev server serves deck "${deckName}"`, {
+    hint: `run \`dekc ${isTypedCommand(deckName) ? deckFlag(deckName) : deckWord(deckName)}\``,
+  });
 }
 
 /** Whether a request failed because nothing listens at the address, as Bun and Node name it. */

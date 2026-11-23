@@ -1005,18 +1005,22 @@ body
     );
   });
 
-  test("writes .dek/server.json while running and removes it on close", async () => {
+  test("keeps its lock while running, its deck's or the project's, and removes it on close", async () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const lock = join(root, ".dek", "server.json");
-        await withDevServer({ cwd: join(root, "decks", "demo") }, async (server) => {
-          expect(existsSync(lock)).toBe(true);
-          const data = JSON.parse(await readFile(lock, "utf8")) as { url: string; pid: number };
-          expect(data.url).toBe(server.url);
-          expect(data.pid).toBe(process.pid);
-        });
-        expect(existsSync(lock)).toBe(false);
+        for (const [cwd, lock] of [
+          [join(root, "decks", "demo"), join(root, ".dek", "servers", "demo.json")],
+          [root, join(root, ".dek", "server.json")],
+        ] as const) {
+          await withDevServer({ cwd }, async (server) => {
+            expect(existsSync(lock)).toBe(true);
+            const data = JSON.parse(await readFile(lock, "utf8")) as { url: string; pid: number };
+            expect(data.url).toBe(server.url);
+            expect(data.pid).toBe(process.pid);
+          });
+          expect(existsSync(lock)).toBe(false);
+        }
       },
     );
   });
@@ -1050,6 +1054,7 @@ body
           hint: "run `dekc ls`",
         });
         expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
+        expect(existsSync(join(root, ".dek", "servers"))).toBe(false);
       },
     );
   });
@@ -1103,6 +1108,81 @@ body
             message: expect.stringContaining(server.url),
           });
         });
+      },
+    );
+  });
+
+  test("serves each deck from a server of its own, one beside the other", async () => {
+    await withTempProject(
+      {
+        decks: [
+          { name: "demo", slides: { intro: introHtml } },
+          { name: "other", slides: { intro: introHtml } },
+        ],
+      },
+      async (root) => {
+        await withDevServer({ cwd: root, deck: "demo" }, async (demo) => {
+          await withDevServer({ cwd: join(root, "decks", "other") }, async (other) => {
+            expect(other.url).not.toBe(demo.url);
+            for (const server of [demo, other]) {
+              expect((await fetch(server.url)).ok).toBe(true);
+            }
+            // A deck has one server: neither a second for it, nor one for the project, starts.
+            await expect(startDevServer({ cwd: root, deck: "other" })).rejects.toMatchObject({
+              message: `dev server already running at ${other.url}`,
+              hint: `open ${other.url}`,
+            });
+            await expect(startDevServer({ cwd: root })).rejects.toMatchObject({
+              message: `dev server already running at ${demo.url}`,
+              hint: expect.stringContaining("2 servers serve one deck each: decks/demo at "),
+            });
+          });
+          expect(existsSync(join(root, ".dek", "servers", "other.json"))).toBe(false);
+          expect(existsSync(join(root, ".dek", "servers", "demo.json"))).toBe(true);
+        });
+      },
+    );
+  });
+
+  test("starts no server for a deck while one serves the project, and says where the deck is", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        await withDevServer({ cwd: root }, async (server) => {
+          await expect(startDevServer({ cwd: join(root, "decks", "demo") })).rejects.toMatchObject({
+            message: `dev server already running at ${server.url}`,
+            hint: `open ${server.url}decks/demo/`,
+          });
+          expect(existsSync(join(root, ".dek", "servers"))).toBe(false);
+        });
+      },
+    );
+  });
+
+  test("stops one at least when a server for the project and one for a deck race", async () => {
+    await withTempProject(
+      { decks: [{ name: "demo", slides: { intro: introHtml } }] },
+      async (root) => {
+        const results = await Promise.allSettled([
+          startDevServer({ cwd: root, port: 0 }),
+          startDevServer({ cwd: root, deck: "demo", port: 0 }),
+        ]);
+        const won = results.flatMap((result) =>
+          result.status === "fulfilled" ? [result.value] : [],
+        );
+        try {
+          // The deck never has two servers; which of the two holds it is the race's to say.
+          expect(won.length).toBeLessThanOrEqual(1);
+          for (const result of results) {
+            if (result.status === "rejected") {
+              expect(result.reason).toBeInstanceOf(DekError);
+            }
+          }
+        } finally {
+          await Promise.all(won.map((server) => server.close()));
+        }
+        expect(existsSync(join(root, ".dek", "server.json"))).toBe(false);
+        expect(existsSync(join(root, ".dek", "servers", "demo.json"))).toBe(false);
       },
     );
   });
@@ -1193,7 +1273,7 @@ describe("startDevServer --remote", () => {
     await withTempProject(
       { decks: [{ name: "demo", slides: { intro: introHtml } }] },
       async (root) => {
-        const lock = join(root, ".dek", "server.json");
+        const lock = join(root, ".dek", "servers", "demo.json");
         await withDevServer({ cwd: join(root, "decks", "demo"), remote: true }, async (server) => {
           const remote = asRemote(server);
           expect(server.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);

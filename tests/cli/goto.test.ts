@@ -22,7 +22,7 @@ const architectureHtml = slideDocument(`<section class="slide" data-layout="titl
 
 type ErrorJson = {
   ok: false;
-  error: { hint?: string };
+  error: { message: string; hint?: string };
 };
 
 const twoSlideDeck = {
@@ -50,7 +50,10 @@ describe("dekc goto / current", () => {
         const result = await runDek(["current", "--json"], { cwd: join(root, "decks", "demo") });
         expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<ErrorJson>(result);
-        expect(json.error.hint).toContain("run `dekc`");
+        expect(json.error).toMatchObject({
+          message: 'no dev server serves deck "demo"',
+          hint: "run `dekc demo`",
+        });
       },
     );
   });
@@ -126,8 +129,26 @@ describe("gotoCommand", () => {
   });
 });
 
-describe("gotoCommand against a server for another deck", () => {
-  test("says which deck the running server serves instead of failing to parse", async () => {
+describe("gotoCommand with a server for each deck", () => {
+  test("reaches the server started for the deck, beside another deck's", async () => {
+    const other = { ...twoSlideDeck, name: "other" };
+    await withTempProject({ decks: [twoSlideDeck, other] }, async (root) => {
+      await withDevServer({ cwd: root, deck: "demo" }, async (demo) => {
+        await withDevServer({ cwd: root, deck: "other" }, async (others) => {
+          expect(demo.url).not.toBe(others.url);
+          const moved = await gotoCommand(requireDeckFromCwd(root, "other"), "architecture");
+          expect(moved).toMatchObject({ slug: "architecture", url: others.url });
+          // Each server keeps its own deck's position: moving one leaves the other where it was.
+          expect(await currentCommand(requireDeckFromCwd(root, "demo"))).toMatchObject({
+            slug: "intro",
+            url: demo.url,
+          });
+        });
+      });
+    });
+  });
+
+  test("says no server shows a deck while one serves another deck alone, and how to start one", async () => {
     const other = { ...twoSlideDeck, name: "other" };
     await withTempProject({ decks: [twoSlideDeck, other] }, async (root) => {
       await withDevServer({ cwd: root, deck: "demo" }, async () => {
@@ -135,10 +156,10 @@ describe("gotoCommand against a server for another deck", () => {
           (caught: unknown) => caught,
         );
         expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toBe(
-          'the running dev server serves deck "demo", not "other"',
-        );
-        expect((error as DekError).hint).toContain("--deck demo");
+        expect(error).toMatchObject({
+          message: 'no dev server serves deck "other"',
+          hint: "run `dekc other`",
+        });
       });
     });
   });
@@ -184,8 +205,8 @@ describe("gotoCommand against a lock whose server is gone", () => {
       const target = requireDeckFromCwd(join(root, "decks", "demo"));
       await expect(currentCommand(target)).rejects.toMatchObject({
         name: "DekError",
-        message: "dev server is not running",
-        hint: "run `dekc`",
+        message: 'no dev server serves deck "demo"',
+        hint: "run `dekc demo`",
       });
     });
   });
