@@ -23,7 +23,10 @@ import { generateRemotePassword, lanUrls } from "./lan.ts";
 import {
   assertNoDevServer,
   devServerUrl,
+  dropLocksOfGoneServers,
   removeDevServerLock,
+  type ServerScope,
+  type ServerWishes,
   writeDevServerLock,
 } from "./lock.ts";
 import { createDevPages } from "./pages.ts";
@@ -57,6 +60,11 @@ export type DevServerOptions = {
   password?: string;
   /** How long a pairing code stays good; see PAIRING_TTL_MS. */
   pairingTtlMs?: number;
+  /**
+   * The page of the deck the caller shows, given the deck's own, as `dekc rehearse` shows it in
+   * rehearsal: where a start refused because the deck is served already sends its caller.
+   */
+  page?: (deck: string) => string;
   /** How often the project and each deck are re-scanned for edits fs.watch missed. */
   pollIntervalMs?: number;
 };
@@ -82,8 +90,21 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     throw refReadOnlyError(options.deck);
   }
   const { scopedDeckName, deckDir } = serverScope(project, options);
+  // A deck has one server: this one would serve its own, or every deck the project has.
+  const scope: ServerScope = scopedDeckName
+    ? { deck: scopedDeckName }
+    : { decks: project.decks.map((deck) => deck.name) };
+  // What a server that already serves these decks may lack, which the refusal then says.
+  const asked: ServerWishes = {
+    visual: options.visual === true,
+    remote: options.remote === true,
+    ...(options.port ? { port: options.port } : {}),
+    ...(options.page ? { page: options.page } : {}),
+  };
+  // A lock a killed server left reads as live once another process has its pid.
+  await dropLocksOfGoneServers(project.root, scope);
   // Before the port and the watchers; writing the lock checks again, for a server that raced us.
-  assertNoDevServer(project.root, scopedDeckName);
+  assertNoDevServer(project.root, scope, asked);
   const access = accessFor(options);
   const embed = {
     playerScript: await livePlayerScript(),
@@ -134,7 +155,16 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   const url = devServerUrl(port);
   const remoteUrls = [...new Set([url, ...(access.remote ? lanUrls(port) : [])])];
   try {
-    writeDevServerLock(project.root, url, access.password, scopedDeckName);
+    writeDevServerLock(
+      project.root,
+      scope,
+      {
+        url,
+        ...(access.password ? { password: access.password } : {}),
+        ...(options.visual === true ? { visual: true } : {}),
+      },
+      asked,
+    );
   } catch (error) {
     watch.close();
     await server.stop(true);
@@ -151,7 +181,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     events: { listen: watch.hub.listen },
     ...(pairings ? { pair: () => pairings.issue() } : {}),
     async close() {
-      removeDevServerLock(project.root);
+      removeDevServerLock(project.root, scopedDeckName);
       // Connections first: Bun never finishes stopping once two or more SSE streams were closed.
       await server.stop(true);
       watch.close();

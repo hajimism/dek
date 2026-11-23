@@ -232,26 +232,31 @@ describe("other commands a hint names", () => {
     }
   });
 
-  hintTest("a server for another deck names both decks as words a shell reads", async () => {
-    const deck = (name: string) => ({
-      name,
-      slides: { intro: '<section class="slide"><h2>intro</h2></section>\n' },
-    });
-    const decks = [deck("a`b"), deck("it's"), deck("build")];
-    await withTempProject({ decks }, async (root) => {
-      const refusal = async (target: string) => {
-        const error = await gotoCommand(requireDeckFromCwd(root, target), "intro").catch(
-          (caught: unknown) => caught,
-        );
-        expect(error).toBeInstanceOf(DekError);
-        return (error as DekError).hint;
-      };
-      await withDevServer({ cwd: root, deck: "a`b" }, async () => {
-        const hint = await refusal("build");
-        expect(hint).toStartWith(`pass --deck 'a'"$(printf '\\140')"'b', or stop the server at `);
-        expect(hintCommands(hint)).toEqual([["dekc", "--deck", "build"]]);
-        expect(await refusal("it's")).toEndWith("and run `dekc <deck>`");
+  hintTest(
+    "a deck no server shows names the command that starts one, as words a shell reads",
+    async () => {
+      const deck = (name: string) => ({
+        name,
+        slides: { intro: '<section class="slide"><h2>intro</h2></section>\n' },
       });
-    });
-  });
+      const decks = [deck("a`b"), deck("it's"), deck("build")];
+      await withTempProject({ decks }, async (root) => {
+        const refusal = async (target: string) => {
+          const error = await gotoCommand(requireDeckFromCwd(root, target), "intro").catch(
+            (caught: unknown) => caught,
+          );
+          expect(error).toBeInstanceOf(DekError);
+          return (error as DekError).hint;
+        };
+        // A server for one deck is no server for the others, and stays as it is beside theirs.
+        await withDevServer({ cwd: root, deck: "it's" }, async () => {
+          // `build` is a command, so only --deck names the deck of that name.
+          expect(hintCommands(await refusal("build"))).toEqual([["dekc", "--deck", "build"]]);
+          expect(hintCommands(await refusal("a`b"))).toEqual([["dekc", "a`b"]]);
+        });
+        // A name no hint can hold between its backticks is left for the reader to fill in.
+        expect(await refusal("it's")).toBe("run `dekc <deck>`");
+      });
+    },
+  );
 });

@@ -12,9 +12,21 @@ export async function rehearseCommand(
   if (slug) {
     requireSection(deck, slug);
   }
-  await runDevSession({ cwd: deck.dir, remote: options.remote === true }, (server, password) =>
-    rehearseSessionView(server, password, slug),
+  await runDevSession(
+    // A server that already serves the deck serves its rehearsal too: a refusal opens that.
+    { cwd: deck.dir, remote: options.remote === true, page: (base) => rehearsalPage(base, slug) },
+    (server, password) => rehearseSessionView(server, password, slug),
   );
+}
+
+/** The deck at `base` in rehearsal, at `slug` when one is named. */
+function rehearsalPage(base: string, slug?: string): string {
+  const url = new URL(base);
+  url.searchParams.set("rehearse", "");
+  if (slug) {
+    url.hash = slug;
+  }
+  return url.toString();
 }
 
 /** What `dekc rehearse` prints once up: the deck in rehearsal, at `slug` when one is named. */
@@ -24,14 +36,7 @@ export function rehearseSessionView(
   slug?: string,
 ): { banner: string; pairPath: string } {
   // Every address opens the rehearsal, so the loopback one is not listed again as the plain deck.
-  const rehearsal = (base: string): string => {
-    const url = new URL(base);
-    url.searchParams.set("rehearse", "");
-    if (slug) {
-      url.hash = slug;
-    }
-    return url.toString();
-  };
+  const rehearsal = (base: string): string => rehearsalPage(base, slug);
   return {
     banner: remoteBanner(rehearsal(server.url), server.remoteUrls.map(rehearsal), {
       password,

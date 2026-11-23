@@ -30,7 +30,7 @@ On every save:
 - **`voice/voice.toml`** — the deck is re-timed from cached clips.
 - With `--visual` and Playwright installed, the saved slide is also measured for overflow, contrast, line breaks, and alignment.
 
-Only one server runs per project. A second `dekc` finds the first one's lock in `.dek/server.json` and tells you where it is.
+A deck has one server at a time. `dekc` for another deck starts beside the first, each at its own address. A server started at the project root serves every deck, so it runs only while no other server does. A second `dekc` for a deck that is already served is refused, and tells you where that deck is. The server for the project keeps its lock in `.dek/server.json`, and a server for one deck in `.dek/servers/<deck>.json`.
 
 ## The presenter view
 

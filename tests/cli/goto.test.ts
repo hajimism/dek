@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
 import { type AddressInfo, createServer, type Server as NetServer, type Socket } from "node:net";
 import { join } from "node:path";
@@ -22,7 +22,7 @@ const architectureHtml = slideDocument(`<section class="slide" data-layout="titl
 
 type ErrorJson = {
   ok: false;
-  error: { hint?: string };
+  error: { message: string; hint?: string };
 };
 
 const twoSlideDeck = {
@@ -50,7 +50,10 @@ describe("dekc goto / current", () => {
         const result = await runDek(["current", "--json"], { cwd: join(root, "decks", "demo") });
         expect(result).toMatchObject({ exitCode: 1 });
         const json = jsonStdout<ErrorJson>(result);
-        expect(json.error.hint).toContain("run `dekc`");
+        expect(json.error).toMatchObject({
+          message: 'no dev server serves deck "demo"',
+          hint: "run `dekc demo`",
+        });
       },
     );
   });
@@ -83,17 +86,18 @@ describe("gotoCommand", () => {
   test("goto from a deck directory talks to a project-root server", async () => {
     await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
       const deckDir = join(root, "decks", "demo");
-      await withDevServer({ cwd: root }, async () => {
+      await withDevServer({ cwd: root }, async (server) => {
         const gotoResult = await gotoCommand(requireDeckFromCwd(deckDir), "architecture");
-        expect(gotoResult).toMatchObject({
+        expect(gotoResult).toEqual({
           slug: "architecture",
           slideIndex: 1,
           beatIndex: 0,
           viewers: 0,
+          url: `${server.url}decks/demo/`,
         });
         // With no page open, the position is where the next one lands, and dek says so.
         expect(outputOf("goto").notes?.(gotoResult, false)).toBe(
-          "no browser shows the deck: the next page opened on the dev server shows architecture",
+          `no browser shows the deck: the next page opened at ${server.url}decks/demo/ shows architecture`,
         );
         const current = await currentCommand(requireDeckFromCwd(deckDir));
         expect(current).toMatchObject({
@@ -104,10 +108,49 @@ describe("gotoCommand", () => {
       });
     });
   });
+
+  test("gives the deck's page: the root of a server started for that deck alone", async () => {
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await withDevServer({ cwd: root, deck: "demo" }, async (server) => {
+        const current = await currentCommand(requireDeckFromCwd(root, "demo"));
+        expect(current.url).toBe(server.url);
+      });
+    });
+  });
+
+  test("gives a page with no password in it, whatever the server asks of a presenter", async () => {
+    // Made here rather than written out, so no scanner takes it for a leaked secret.
+    const password = crypto.randomUUID();
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await withDevServer({ cwd: root, remote: true, password }, async (server) => {
+        const current = await currentCommand(requireDeckFromCwd(root, "demo"));
+        expect(current.url).toBe(`${server.url}decks/demo/`);
+        expect(JSON.stringify(current)).not.toContain(password);
+      });
+    });
+  });
 });
 
-describe("gotoCommand against a server for another deck", () => {
-  test("says which deck the running server serves instead of failing to parse", async () => {
+describe("gotoCommand with a server for each deck", () => {
+  test("reaches the server started for the deck, beside another deck's", async () => {
+    const other = { ...twoSlideDeck, name: "other" };
+    await withTempProject({ decks: [twoSlideDeck, other] }, async (root) => {
+      await withDevServer({ cwd: root, deck: "demo" }, async (demo) => {
+        await withDevServer({ cwd: root, deck: "other" }, async (others) => {
+          expect(demo.url).not.toBe(others.url);
+          const moved = await gotoCommand(requireDeckFromCwd(root, "other"), "architecture");
+          expect(moved).toMatchObject({ slug: "architecture", url: others.url });
+          // Each server keeps its own deck's position: moving one leaves the other where it was.
+          expect(await currentCommand(requireDeckFromCwd(root, "demo"))).toMatchObject({
+            slug: "intro",
+            url: demo.url,
+          });
+        });
+      });
+    });
+  });
+
+  test("says no server shows a deck while one serves another deck alone, and how to start one", async () => {
     const other = { ...twoSlideDeck, name: "other" };
     await withTempProject({ decks: [twoSlideDeck, other] }, async (root) => {
       await withDevServer({ cwd: root, deck: "demo" }, async () => {
@@ -115,10 +158,10 @@ describe("gotoCommand against a server for another deck", () => {
           (caught: unknown) => caught,
         );
         expect(error).toBeInstanceOf(DekError);
-        expect((error as DekError).message).toBe(
-          'the running dev server serves deck "demo", not "other"',
-        );
-        expect((error as DekError).hint).toContain("--deck demo");
+        expect(error).toMatchObject({
+          message: 'no dev server serves deck "other"',
+          hint: "run `dekc other`",
+        });
       });
     });
   });
@@ -148,6 +191,101 @@ describe("gotoCommand against a server that never answers", () => {
     } finally {
       stalled.closeAllConnections();
       stalled.close();
+    }
+  });
+});
+
+describe("gotoCommand against a lock whose server is gone", () => {
+  test("says the server is not running when nothing listens where the lock points", async () => {
+    // A lock a killed server left, whose pid another process has since taken: this one's.
+    const closed = createServer();
+    const url = await listening(closed);
+    await new Promise((resolve) => closed.close(resolve));
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await mkdir(join(root, ".dek"), { recursive: true });
+      await writeFile(join(root, ".dek", "server.json"), JSON.stringify({ url, pid: process.pid }));
+      const target = requireDeckFromCwd(join(root, "decks", "demo"));
+      await expect(currentCommand(target)).rejects.toMatchObject({
+        name: "DekError",
+        message: 'no dev server serves deck "demo"',
+        hint: "run `dekc demo`",
+      });
+    });
+  });
+});
+
+describe("gotoCommand past a deck's lock that names no server for the deck", () => {
+  // A deck's server killed outright leaves its lock, and a server for the project may start over it.
+  test("asks the server for the project when nothing listens where the deck's lock points", async () => {
+    const closed = createServer();
+    const url = await listening(closed);
+    await new Promise((resolve) => closed.close(resolve));
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await withDevServer({ cwd: root }, async (server) => {
+        await mkdir(join(root, ".dek", "servers"), { recursive: true });
+        await writeFile(
+          join(root, ".dek", "servers", "demo.json"),
+          JSON.stringify({ url, pid: process.pid }),
+        );
+        expect(await currentCommand(requireDeckFromCwd(root, "demo"))).toMatchObject({
+          slug: "intro",
+          url: `${server.url}decks/demo/`,
+        });
+      });
+    });
+  });
+
+  // The port a deck's server had may be another deck's by now. A start reads such a lock as a
+  // live server's, since something listens there, so only removing it lets the deck have one.
+  test("names a deck's lock whose port another deck's server has, and what clears it", async () => {
+    const other = { ...twoSlideDeck, name: "other" };
+    await withTempProject({ decks: [twoSlideDeck, other] }, async (root) => {
+      await withDevServer({ cwd: root, deck: "other" }, async (server) => {
+        const lock = join(root, ".dek", "servers", "demo.json");
+        await writeFile(lock, JSON.stringify({ url: server.url, pid: process.pid }));
+        const target = requireDeckFromCwd(root, "demo");
+        await expect(currentCommand(target)).rejects.toMatchObject({
+          message: `the lock of deck "demo" names ${server.url}, which serves no such deck`,
+          path: lock,
+          hint: "its server is gone and another program has its port: remove the file, then run `dekc demo`",
+        });
+        // As the hint says: with the file gone, the deck is one no server serves, and may start.
+        await rm(lock);
+        await expect(currentCommand(target)).rejects.toMatchObject({
+          message: 'no dev server serves deck "demo"',
+          hint: "run `dekc demo`",
+        });
+        await withDevServer({ cwd: root, deck: "demo" }, async (demo) => {
+          expect(await currentCommand(target)).toMatchObject({ url: demo.url });
+        });
+      });
+    });
+  });
+});
+
+describe("gotoCommand against a server that answers with neither a deck nor a refusal", () => {
+  test("names the command to restart, dekc", async () => {
+    const broken = createHttpServer((_req, res) => {
+      res.writeHead(500, { "content-type": "text/plain" });
+      res.end("no");
+    });
+    const url = await listening(broken);
+    try {
+      await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+        await mkdir(join(root, ".dek"), { recursive: true });
+        await writeFile(
+          join(root, ".dek", "server.json"),
+          JSON.stringify({ url, pid: process.pid }),
+        );
+        const target = requireDeckFromCwd(join(root, "decks", "demo"));
+        await expect(currentCommand(target)).rejects.toMatchObject({
+          message: "dev server current failed with HTTP 500",
+          hint: `restart the server at ${url}: stop \`dekc\` and run it again`,
+        });
+      });
+    } finally {
+      broken.closeAllConnections();
+      broken.close();
     }
   });
 });

@@ -46,7 +46,9 @@ my-talks/
 └── .dek/
     ├── schema.json
     ├── slide.d.ts
-    └── server.json                # 開発サーバの起動中だけ
+    ├── server.json                # プロジェクト全体の開発サーバの起動中だけ
+    └── servers/                   # dek が .gitignore を置き、フォルダごと無視させる
+        └── 2026-04-vite.json      # そのデッキ専用の開発サーバの起動中だけ
 ```
 
 プロジェクトとデッキの境界は[プロジェクトとデッキ](/ja/guide/structure)で説明しています。

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { lstatSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import {
+  createInside,
   followInside,
   outputPath,
   readSourceIfExists,
@@ -163,6 +164,61 @@ describe("writeInside", () => {
       writeInside(link, "<html>", root);
       expect(lstatSync(link).isFile()).toBe(true);
       expect(() => statSync(target)).toThrow();
+    });
+  });
+});
+
+describe("createInside", () => {
+  test("creates the folders and the file, with its mode", async () => {
+    await withProject(async (root) => {
+      const path = join(root, ".dek", "servers", "talk.json");
+      expect(createInside(path, "{}", root, { mode: 0o600 })).toBe(true);
+      expect(await readFile(path, "utf8")).toBe("{}");
+      expect(statSync(path).mode & 0o777).toBe(0o600);
+      expect(readdirSync(join(root, ".dek", "servers"))).toEqual(["talk.json"]);
+    });
+  });
+
+  test("leaves what is there, and says it wrote nothing", async () => {
+    await withProject(async (root) => {
+      const path = join(root, "dek.toml");
+      await writeFile(path, "first");
+      expect(createInside(path, "second", root)).toBe(false);
+      expect(await readFile(path, "utf8")).toBe("first");
+      expect(readdirSync(root).sort()).toEqual(["decks", "dek.toml"]);
+    });
+  });
+
+  test("takes a link for something there, and writes neither it nor where it points", async () => {
+    await withProject(async (root, outside) => {
+      await mkdir(join(root, ".dek"));
+      const link = join(root, ".dek", "schema.css");
+      await symlink(outside, link);
+      expect(createInside(link, "{}", root)).toBe(false);
+      expect(lstatSync(link).isSymbolicLink()).toBe(true);
+      expect(readFileSync(outside, "utf8")).toBe("SECRET");
+    });
+  });
+
+  // exFAT and FAT32, as on a memory stick, give a file one name only.
+  test("still takes the name only where none is on a disk that links no file", async () => {
+    await withProject(async (root) => {
+      const noLinks = () => {
+        throw Object.assign(new Error("operation not supported"), { code: "ENOTSUP" });
+      };
+      const path = join(root, ".dek", "server.json");
+      expect(createInside(path, "first", root, { mode: 0o600, link: noLinks })).toBe(true);
+      expect(createInside(path, "second", root, { link: noLinks })).toBe(false);
+      expect(await readFile(path, "utf8")).toBe("first");
+      expect(statSync(path).mode & 0o777).toBe(0o600);
+      expect(readdirSync(join(root, ".dek"))).toEqual(["server.json"]);
+    });
+  });
+
+  test("refuses a folder that leads out of the project", async () => {
+    await withProject(async (root, outside) => {
+      await symlink(join(outside, ".."), join(root, ".dek"));
+      expect(() => createInside(join(root, ".dek", "server.json"), "{}", root)).toThrow(DekError);
     });
   });
 });

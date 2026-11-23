@@ -46,7 +46,9 @@ my-talks/
 └── .dek/
     ├── schema.json
     ├── slide.d.ts
-    └── server.json                # while the dev server runs
+    ├── server.json                # while a dev server for the project runs
+    └── servers/                   # ignores itself: dek writes a .gitignore into it
+        └── 2026-04-vite.json      # while a dev server for that deck alone runs
 ```
 
 The boundary between project and deck is explained in [Projects and Decks](/guide/structure).
