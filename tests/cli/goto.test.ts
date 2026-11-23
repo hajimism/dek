@@ -119,11 +119,13 @@ describe("gotoCommand", () => {
   });
 
   test("gives a page with no password in it, whatever the server asks of a presenter", async () => {
+    // Made here rather than written out, so no scanner takes it for a leaked secret.
+    const password = crypto.randomUUID();
     await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
-      await withDevServer({ cwd: root, remote: true, password: "s3cretpass" }, async (server) => {
+      await withDevServer({ cwd: root, remote: true, password }, async (server) => {
         const current = await currentCommand(requireDeckFromCwd(root, "demo"));
         expect(current.url).toBe(`${server.url}decks/demo/`);
-        expect(JSON.stringify(current)).not.toContain("s3cretpass");
+        expect(JSON.stringify(current)).not.toContain(password);
       });
     });
   });
