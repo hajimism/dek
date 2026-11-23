@@ -152,6 +152,52 @@ describe("gotoCommand against a server that never answers", () => {
   });
 });
 
+describe("gotoCommand against a lock whose server is gone", () => {
+  test("says the server is not running when nothing listens where the lock points", async () => {
+    // A lock a killed server left, whose pid another process has since taken: this one's.
+    const closed = createServer();
+    const url = await listening(closed);
+    await new Promise((resolve) => closed.close(resolve));
+    await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+      await mkdir(join(root, ".dek"), { recursive: true });
+      await writeFile(join(root, ".dek", "server.json"), JSON.stringify({ url, pid: process.pid }));
+      const target = requireDeckFromCwd(join(root, "decks", "demo"));
+      await expect(currentCommand(target)).rejects.toMatchObject({
+        name: "DekError",
+        message: "dev server is not running",
+        hint: "run `dekc`",
+      });
+    });
+  });
+});
+
+describe("gotoCommand against a server that answers with neither a deck nor a refusal", () => {
+  test("names the command to restart, dekc", async () => {
+    const broken = createHttpServer((_req, res) => {
+      res.writeHead(500, { "content-type": "text/plain" });
+      res.end("no");
+    });
+    const url = await listening(broken);
+    try {
+      await withTempProject({ decks: [twoSlideDeck] }, async (root) => {
+        await mkdir(join(root, ".dek"), { recursive: true });
+        await writeFile(
+          join(root, ".dek", "server.json"),
+          JSON.stringify({ url, pid: process.pid }),
+        );
+        const target = requireDeckFromCwd(join(root, "decks", "demo"));
+        await expect(currentCommand(target)).rejects.toMatchObject({
+          message: "dev server current failed with HTTP 500",
+          hint: `restart the server at ${url}: stop \`dekc\` and run it again`,
+        });
+      });
+    } finally {
+      broken.closeAllConnections();
+      broken.close();
+    }
+  });
+});
+
 /** The URL of `server`, listening on a free port of 127.0.0.1. */
 async function listening(server: NetServer | HttpServer): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

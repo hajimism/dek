@@ -53,7 +53,7 @@ async function requestDevServer(
   const deckName = deck.name;
   const lock = readDevServerLock(project.root);
   if (!lock || !isPidAlive(lock.pid)) {
-    throw new DekError("dev server is not running", { hint: "run `dekc`" });
+    throw notRunning();
   }
 
   // Under /decks/<name> whether or not the server is scoped to this deck; a scoped one takes both.
@@ -68,11 +68,14 @@ async function requestDevServer(
   // A server that takes the connection but never answers is stuck; say so instead of waiting.
   const signal = AbortSignal.timeout(timeoutMs);
   const unlessStuck = (error: unknown): never => {
-    throw signal.aborted
-      ? new DekError(`the dev server at ${lock.url} did not answer within ${timeoutMs / 1000}s`, {
-          hint: "restart it: stop `dekc` and run it again",
-        })
-      : error;
+    if (signal.aborted) {
+      throw new DekError(
+        `the dev server at ${lock.url} did not answer within ${timeoutMs / 1000}s`,
+        { hint: "restart it: stop `dekc` and run it again" },
+      );
+    }
+    // The lock outlived its server, and its pid is some other process by now.
+    throw isConnectionRefused(error) ? notRunning() : error;
   };
   // biome-ignore lint/style/noRestrictedGlobals: signal, an AbortSignal.timeout, bounds the request and the read of its answer.
   const response = await fetch(url, {
@@ -124,6 +127,15 @@ function refusal(
     });
   }
   return new DekError(`dev server ${path} failed with HTTP ${status}`, {
-    hint: `restart the server at ${lock.url}: stop \`dek\` and run it again`,
+    hint: `restart the server at ${lock.url}: stop \`dekc\` and run it again`,
   });
+}
+
+function notRunning(): DekError {
+  return new DekError("dev server is not running", { hint: "run `dekc`" });
+}
+
+/** Whether a request failed because nothing listens at the address, as Bun and Node name it. */
+function isConnectionRefused(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === "ECONNREFUSED";
 }
