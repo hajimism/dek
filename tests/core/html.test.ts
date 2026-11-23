@@ -869,6 +869,31 @@ hello
       },
     );
   });
+
+  // The page is drawn from a string, with no folder to load a file from: a url() left as written
+  // draws nothing, and the shot is then not a picture of the deck the build shows.
+  test("inlines the files theme.css and the slide's own stylesheet load", async () => {
+    await withTempProject(
+      {
+        decks: [
+          {
+            name: "demo",
+            theme: `.slide { background: url(assets/pixel.png); }\n`,
+            styles: { intro: `.slide-title { background: url(../assets/pixel.png); }\n` },
+            slides: { intro: introHtml },
+          },
+        ],
+      },
+      async (root) => {
+        const deckDir = join(root, "decks", "demo");
+        await copyFile(join(assetFixturesDir, "pixel.png"), join(deckDir, "assets", "pixel.png"));
+        const { deck } = resolveDeck(deckDir);
+        const html = renderSlideHtml(loadSlideSources(deck), "intro", 0);
+        expect(html.split("data:image/png;base64,")).toHaveLength(3);
+        expect(html).not.toContain("assets/pixel.png");
+      },
+    );
+  });
 });
 
 describe("renderDeckHtml live", () => {
