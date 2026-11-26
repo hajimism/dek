@@ -9,10 +9,10 @@
     "deploy": "wrangler deploy --config wrangler.jsonc"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "1.8.0",
+    "@cloudflare/vitest-plugin": "1.8.5",
     "@cloudflare/workers-types": "^5.20261102.1",
     "esbuild": "0.28.2",
-    "vitest": "5.1.0",
-    "wrangler": "4.160.1"
+    "vitest": "5.1.1",
+    "wrangler": "4.165.0"
   }
 }
