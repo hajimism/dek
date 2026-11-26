@@ -12,6 +12,8 @@ Amends [47. Put a talk on dek.pub with the dekc pub commands](0047-put-a-talk-on
 
 Amends [43. Build dek.pub as a Void app and a serve Worker, checked on Miniflare](0043-build-dek-pub-as-a-void-app-and-a-serve-worker-checked-on-miniflare.md)
 
+Amended by [112. Tighten dek.pub protocol negotiation and return invited from POST grants](0112-tighten-dek-pub-protocol-negotiation-and-return-invited-from-post-grants.md)
+
 ## Context
 
 ADR 47 gave `dekc pub share` the comment policy `--comments off|signed-in|guests`, and ADR 56 kept `guests` for the public comments at the bottom of a talk: a reader with no account posted under a name they typed, after Cloudflare Turnstile's human check. ADR 43 lists `TURNSTILE_SECRET` among the production settings. `dekc` v0.6.4 shipped the `guests` value.

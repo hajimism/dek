@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { getTableConfig, type SQLiteTable } from "void/schema-d1";
-import { CreateDeckRequest, DeckId, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
+import {
+  CreateDeckRequest,
+  DeckId,
+  PROTOCOL_MIN_VERSION,
+  PROTOCOL_VERSION,
+} from "../../../../src/pub/protocol.ts";
 import * as schema from "../../db/schema.ts";
 import { newDeckId, newLinkKey, sameKey } from "../../src/common/ids.ts";
 import {
@@ -773,6 +778,15 @@ describe("publishing", () => {
   it("refuses a form with no manifest, or one that is not JSON", () => {
     expect(() => readManifest("{")).toThrow("not JSON");
     expect(() => readManifest(undefined)).toThrow("no manifest");
+  });
+
+  it("refuses an older or newer manifest protocol before checking the rest of the schema", () => {
+    expect(() =>
+      readManifest(JSON.stringify({ protocol: PROTOCOL_MIN_VERSION - 1, legacy: true })),
+    ).toThrow(`at least protocol ${PROTOCOL_MIN_VERSION}`);
+    expect(() =>
+      readManifest(JSON.stringify({ protocol: PROTOCOL_VERSION + 1, future: true })),
+    ).toThrow(`protocol ${PROTOCOL_VERSION}, not ${PROTOCOL_VERSION + 1}`);
   });
 
   it("refuses a title, a description or a message longer than a page can show", () => {

@@ -3,10 +3,26 @@
 import type { Context } from "hono";
 import { env } from "void/env";
 import type { z } from "zod";
-import type { ErrorBody } from "../../../../src/pub/protocol.ts";
+import { type ErrorBody, PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
 import { ApiError } from "./api-error.ts";
 import { refusal } from "./http.ts";
 import { log } from "./log.ts";
+
+function withProtocolHeader(response: Response): Response {
+  const value = String(PROTOCOL_VERSION);
+  try {
+    response.headers.set(PROTOCOL_HEADER, value);
+    return response;
+  } catch {
+    const headers = new Headers(response.headers);
+    headers.set(PROTOCOL_HEADER, value);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+}
 
 function errorResponse(error: ApiError): Response {
   const body: ErrorBody = {
@@ -16,7 +32,10 @@ function errorResponse(error: ApiError): Response {
       ...(error.hint ? { hint: error.hint } : {}),
     },
   };
-  return Response.json(body, { status: error.status, headers: { "cache-control": "no-store" } });
+  return Response.json(body, {
+    status: error.status,
+    headers: { "cache-control": "no-store", [PROTOCOL_HEADER]: String(PROTOCOL_VERSION) },
+  });
 }
 
 /**
@@ -34,7 +53,8 @@ export async function api(
       throw refused;
     }
     const result = await fn();
-    return result instanceof Response ? result : Response.json(result);
+    const response = result instanceof Response ? result : Response.json(result);
+    return withProtocolHeader(response);
   } catch (error) {
     if (error instanceof ApiError) {
       return errorResponse(error);
@@ -43,7 +63,10 @@ export async function api(
     const body: ErrorBody = {
       error: { code: "internal", message: "something went wrong on dek.pub's side" },
     };
-    return Response.json(body, { status: 500, headers: { "cache-control": "no-store" } });
+    return Response.json(body, {
+      status: 500,
+      headers: { "cache-control": "no-store", [PROTOCOL_HEADER]: String(PROTOCOL_VERSION) },
+    });
   }
 }
 

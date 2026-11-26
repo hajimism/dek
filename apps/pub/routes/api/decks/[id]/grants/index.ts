@@ -1,5 +1,5 @@
 import { defineHandler } from "void";
-import { NewGrant } from "../../../../../../../src/pub/protocol.ts";
+import { type GrantAdded, NewGrant } from "../../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../../../src/common/api-error.ts";
 import { afterAnswer, api, appUrl, jsonBody } from "../../../../../src/common/http.server.ts";
 import { sendMail } from "../../../../../src/common/mail.server.ts";
@@ -49,6 +49,7 @@ export const POST = defineHandler((c) =>
         ),
       );
     }
-    return Response.json(grant, { status: 201 });
+    const answer: GrantAdded = { ...grant, invited: invite !== null };
+    return Response.json(answer, { status: 201 });
   }, c.req.raw),
 );

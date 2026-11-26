@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDb, sql } from "void/db";
 import { sendEmail } from "void/email";
-import { PROTOCOL_HEADER, PROTOCOL_VERSION } from "../../../../src/pub/protocol.ts";
+import {
+  PROTOCOL_HEADER,
+  PROTOCOL_MIN_VERSION,
+  PROTOCOL_VERSION,
+} from "../../../../src/pub/protocol.ts";
+import { ApiError } from "../../src/common/api-error.ts";
 import { chunks, IDS_PER_QUERY } from "../../src/common/chunks.ts";
 import { docsUrl } from "../../src/common/docs.ts";
+import { api } from "../../src/common/http.server.ts";
 import { refusal } from "../../src/common/http.ts";
 import {
   formatDate,
@@ -112,16 +118,42 @@ describe("refusal", () => {
     return new Request(APP, { method, headers });
   }
 
-  it("lets a client through that speaks this protocol, an older one, or says nothing", () => {
+  it("lets a client through that speaks a supported protocol or sends no header", () => {
     expect(refusal(request("GET"))).toBeNull();
     expect(refusal(request("GET", { [PROTOCOL_HEADER]: String(PROTOCOL_VERSION) }))).toBeNull();
-    expect(refusal(request("GET", { [PROTOCOL_HEADER]: "0" }))).toBeNull();
-    expect(refusal(request("GET", { [PROTOCOL_HEADER]: "soon" }))).toBeNull();
   });
 
-  it("tells a client that speaks a newer protocol, before anything runs", () => {
-    const refused = refusal(request("POST", { [PROTOCOL_HEADER]: String(PROTOCOL_VERSION + 1) }));
-    expect(refused).toMatchObject({ status: 400, code: "protocol" });
+  it("refuses a malformed, older, or newer protocol header before anything runs", () => {
+    const newer = refusal(request("POST", { [PROTOCOL_HEADER]: String(PROTOCOL_VERSION + 1) }));
+    expect(newer).toMatchObject({ status: 400, code: "protocol" });
+
+    const older = refusal(request("GET", { [PROTOCOL_HEADER]: String(PROTOCOL_MIN_VERSION - 1) }));
+    expect(older).toMatchObject({ status: 400, code: "protocol", hint: "update dekc" });
+
+    for (const bad of ["0", "-1", "1.5", "soon", ""]) {
+      expect(refusal(request("GET", { [PROTOCOL_HEADER]: bad }))).toMatchObject({
+        status: 400,
+        code: "protocol",
+      });
+    }
+  });
+
+  it("attaches dek-protocol to every API response", async () => {
+    const ok = await api(async () => ({ ok: true }), request("GET"));
+    expect(ok.headers.get(PROTOCOL_HEADER)).toBe(String(PROTOCOL_VERSION));
+
+    const refused = await api(
+      async () => ({ ok: true }),
+      request("GET", { [PROTOCOL_HEADER]: String(PROTOCOL_VERSION + 1) }),
+    );
+    expect(refused.status).toBe(400);
+    expect(refused.headers.get(PROTOCOL_HEADER)).toBe(String(PROTOCOL_VERSION));
+
+    const apiErr = await api(async () => {
+      throw new ApiError(404, "not_found", "gone");
+    }, request("GET"));
+    expect(apiErr.status).toBe(404);
+    expect(apiErr.headers.get(PROTOCOL_HEADER)).toBe(String(PROTOCOL_VERSION));
   });
 
   it("refuses a change made with a cookie from another origin, or from none", () => {

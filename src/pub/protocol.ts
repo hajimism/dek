@@ -9,8 +9,11 @@
 
 import { z } from "zod";
 
-/** Bumped when a shape changes in a way an older side cannot read; the server reads one back. */
+/** Bumped when a shape changes in a way an older side cannot read. */
 export const PROTOCOL_VERSION = 2;
+
+/** The oldest protocol version the server still accepts. */
+export const PROTOCOL_MIN_VERSION = 2;
 
 /**
  * `schema` as a reader takes an answer: every object in it, however deep, drops the fields it does
@@ -40,6 +43,19 @@ function loosened(schema: z.ZodType): z.ZodType {
   if (schema instanceof z.ZodArray) {
     const checks = (schema._zod.def.checks ?? []) as z.core.$ZodCheck<unknown[]>[];
     return z.array(loosened(schema.element as z.ZodType)).check(...checks);
+  }
+  if (schema instanceof z.ZodRecord) {
+    const def = schema._zod.def as unknown as {
+      keyType: z.core.$ZodRecordKey;
+      valueType: z.ZodType;
+      partial?: boolean;
+      checks?: z.core.$ZodCheck<Record<string, unknown>>[];
+    };
+    const value = loosened(def.valueType);
+    const rebuilt = def.partial
+      ? z.partialRecord(def.keyType, value)
+      : z.record(def.keyType, value);
+    return def.checks?.length ? rebuilt.check(...def.checks) : rebuilt;
   }
   if (schema instanceof z.ZodDiscriminatedUnion) {
     const options = (schema.options as z.ZodType[]).map(loosened) as [
@@ -134,6 +150,11 @@ export type Rename = z.infer<typeof Rename>;
  */
 export const VERSION_FILES = ["full", "public", "bare", "source", "cover"] as const;
 export type VersionFile = (typeof VERSION_FILES)[number];
+
+/** The filename a version file is uploaded and stored as: its extension says its type. */
+export function fileName(file: VersionFile): string {
+  return file === "source" ? "source.tar" : file === "cover" ? "cover.png" : `${file}.html`;
+}
 
 const Sha256 = z.string().regex(/^[0-9a-f]{64}$/);
 
@@ -422,6 +443,9 @@ export const Grant = z.strictObject({
   createdAt: z.string(),
 });
 export type Grant = z.infer<typeof Grant>;
+/** What POST on `paths.grants` answers: the grant, and whether it was newly created and mailed. */
+export const GrantAdded = Grant.extend({ invited: z.boolean() });
+export type GrantAdded = z.infer<typeof GrantAdded>;
 export const GrantList = z.strictObject({ grants: z.array(Grant) });
 export const NewGrant = z.strictObject({
   who: z.string().min(1).max(254),
@@ -495,6 +519,10 @@ export type CliKeyInfo = z.infer<typeof CliKeyInfo>;
 export const CliKeys = z.strictObject({ keys: z.array(CliKeyInfo) });
 export type CliKeys = z.infer<typeof CliKeys>;
 
+/** What revoking the caller's own API key answers: DELETE on `paths.revokeKey`. */
+export const RevokedKey = z.strictObject({ revoked: z.boolean() });
+export type RevokedKey = z.infer<typeof RevokedKey>;
+
 /** What revoking keys answers: DELETE on `paths.myKeys` revokes them all, on `paths.myKey` one. */
 export const KeysRevoked = z.strictObject({ revoked: z.number().int() });
 export type KeysRevoked = z.infer<typeof KeysRevoked>;
@@ -550,11 +578,17 @@ export const HANDLE_NEEDED = "handle_needed";
  */
 export const SESSION_NEEDED = "session_needed";
 
+/** The code of the 409 when a publish was built on a version that is no longer current. */
+export const STALE_BASE = "stale_base";
+
+/** The code of the 409 when creating a deck under a slug the account already uses. */
+export const SLUG_TAKEN = "slug_taken";
+
 /** Whether the signed-in person is mailed of a deck's comments; PUT mutes it, DELETE unmutes. */
 export const MuteState = z.strictObject({ muted: z.boolean() });
 export type MuteState = z.infer<typeof MuteState>;
 
-export { paths } from "./paths.ts";
+export { paths, TALK_PATH } from "./paths.ts";
 
 /** The client ID the CLI names itself by in the device flow. */
 export const CLI_CLIENT_ID = "dekc";

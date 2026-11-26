@@ -1,15 +1,13 @@
 // Where a deck lives: /@handle/slug, which a `link` deck opens at only with ?key=.
 
+import { talkPath } from "../../../../../src/pub/paths.ts";
 import type { ShareRequest } from "../../../../../src/pub/protocol.ts";
 import { newLinkKey } from "../../common/ids.ts";
-import { profilePath } from "../person/profile-path.ts";
 import type { Deck, DeckPatch } from "./type.ts";
 
 type Keyed = Pick<Deck, "visibility" | "linkKey">;
 
-export function talkPath(handle: string, slug: string): string {
-  return `${profilePath(handle)}/${slug}`;
-}
+export { talkPath };
 
 /** The key a `link` deck's URLs carry; none for any other visibility, which opens without it. */
 export function linkKeyOf(deck: Keyed): string | null {

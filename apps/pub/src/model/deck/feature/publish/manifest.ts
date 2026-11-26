@@ -3,6 +3,7 @@
 // without building it.
 
 import {
+  PROTOCOL_MIN_VERSION,
   PROTOCOL_VERSION,
   type Rename,
   type VersionFile,
@@ -31,19 +32,32 @@ export function readManifest(value: unknown): VersionManifest {
   } catch {
     throw new ApiError(400, "bad_json", "the manifest is not JSON");
   }
+  if (typeof json === "object" && json !== null && !Array.isArray(json)) {
+    const protocol = (json as { protocol?: unknown }).protocol;
+    if (typeof protocol === "number" && Number.isInteger(protocol)) {
+      if (protocol > PROTOCOL_VERSION) {
+        throw new ApiError(
+          400,
+          "protocol",
+          `this server reads protocol ${PROTOCOL_VERSION}, not ${protocol}`,
+        );
+      }
+      if (protocol < PROTOCOL_MIN_VERSION) {
+        throw new ApiError(
+          400,
+          "protocol",
+          `this server reads at least protocol ${PROTOCOL_MIN_VERSION}, not ${protocol}`,
+          "update dekc",
+        );
+      }
+    }
+  }
   const parsed = VersionManifest.safeParse(json);
   if (!parsed.success) {
     throw new ApiError(
       422,
       "invalid_manifest",
       parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
-    );
-  }
-  if (parsed.data.protocol > PROTOCOL_VERSION) {
-    throw new ApiError(
-      400,
-      "protocol",
-      `this server reads protocol ${PROTOCOL_VERSION}, not ${parsed.data.protocol}`,
     );
   }
   return parsed.data;
@@ -71,11 +85,6 @@ export function checkContents(manifest: VersionManifest): void {
       );
     }
   }
-}
-
-/** The name a file of the version has in R2. */
-export function fileName(file: VersionFile): string {
-  return file === "source" ? "source.tar" : file === "cover" ? "cover.png" : `${file}.html`;
 }
 
 const renameKey = (rename: Rename) => `${rename.from}\u0000${rename.to}\u0000${rename.at}`;

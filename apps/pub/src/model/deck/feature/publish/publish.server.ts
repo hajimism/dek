@@ -5,6 +5,7 @@
 
 import type { Context } from "hono";
 import {
+  fileName,
   MAX_VERSION_BYTES,
   type PublishResult,
   shotField,
@@ -25,7 +26,7 @@ import {
   recordVersion,
   renamesOf,
 } from "../../version/store.server.ts";
-import { checkContents, fileName, isPng, KINDS, newRenames, readManifest } from "./manifest.ts";
+import { checkContents, isPng, KINDS, newRenames, readManifest } from "./manifest.ts";
 import { slideChanges } from "./slide-diff.ts";
 
 /** What the multipart framing and the manifest may add to the files. */

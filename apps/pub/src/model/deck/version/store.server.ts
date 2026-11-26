@@ -6,7 +6,11 @@
 import { decks, renames, versions } from "@schema";
 import { and, asc, db, eq, isNull, lt, sql } from "void/db";
 import { storage } from "void/storage";
-import type { Rename, VersionManifest } from "../../../../../../src/pub/protocol.ts";
+import {
+  type Rename,
+  STALE_BASE,
+  type VersionManifest,
+} from "../../../../../../src/pub/protocol.ts";
 import { ApiError } from "../../../common/api-error.ts";
 import { now } from "../../../common/db.server.ts";
 import { versionKey, versionsPrefix } from "../serving/origin.ts";
@@ -44,7 +48,7 @@ export async function renamesOf(deckId: string): Promise<RenameRow[]> {
 function staleBase(message: string): ApiError {
   return new ApiError(
     409,
-    "stale_base",
+    STALE_BASE,
     message,
     "someone published since; run `dekc pub status` and publish again",
   );

@@ -3,7 +3,12 @@
 // holds.
 
 import type { Context } from "hono";
-import { API_KEY_HEADER, type CliKey, NewCliKey } from "../../../../../../../src/pub/protocol.ts";
+import {
+  API_KEY_HEADER,
+  type CliKey,
+  NewCliKey,
+  type RevokedKey,
+} from "../../../../../../../src/pub/protocol.ts";
 import { signedOut } from "../../../../common/api-error.ts";
 import { jsonBody } from "../../../../common/http.server.ts";
 import { authOf } from "../../../../common/void-auth.server.ts";
@@ -32,7 +37,7 @@ export async function tradeSessionForKey(c: Context): Promise<CliKey> {
 }
 
 /** Revoke the key the request carries, and only that one. */
-export async function revokeCallersKey(c: Context): Promise<{ revoked: boolean }> {
+export async function revokeCallersKey(c: Context): Promise<RevokedKey> {
   const key = c.req.header(API_KEY_HEADER);
   if (!key) {
     throw signedOut("send the key to revoke");
