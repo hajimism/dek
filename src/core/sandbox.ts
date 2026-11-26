@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { DekError } from "./error.ts";
 import { runJsonWorker } from "./spawn.ts";
 
@@ -15,7 +16,7 @@ const ALLOW_UNSANDBOXED = "DEK_ALLOW_UNSANDBOXED";
 export type SandboxMode = "required" | "preferred";
 
 /** Chromium drew without its sandbox: why, in Chromium's words, and how to have it back. */
-type Unsandboxed = { reason: string; hint: string };
+export type Unsandboxed = { reason: string; hint: string };
 
 function accepted(): boolean {
   return process.env[ALLOW_UNSANDBOXED] === "1";
@@ -107,34 +108,62 @@ function unsandboxedHint(reason: string): string {
   return accepted() ? help : `${help}; or set ${ALLOW_UNSANDBOXED}=1 to accept drawing without it`;
 }
 
-/** Why Chromium drew without its sandbox in this run, once it has; see `takeUnsandboxed`. */
-let drewUnsandboxed: string | undefined;
+/**
+ * Records whether Chromium drew without its sandbox within one command run or dev-server session,
+ * warning on stderr the first time a worker falls back. Scoped per run via `AsyncLocalStorage` so
+ * concurrent runs do not interfere and each drawing command carries `unsandboxed` in its own type.
+ */
+export class DrawTracker {
+  private reason: string | undefined;
+
+  /**
+   * Says on stderr that Chromium drew without its sandbox, once per tracker, as `lint --visual`
+   * starts a worker or two per deck and the dev server one per pass; and keeps why, for the
+   * result. The project's own pages go unsaid once the user accepted it, a ref's never: it is
+   * someone else's code.
+   */
+  note(reason: string, ref: boolean): void {
+    if (this.reason === undefined && (ref || !accepted())) {
+      process.stderr.write(
+        ref
+          ? `warning: Chromium drew a ref without its sandbox, as ${ALLOW_UNSANDBOXED}=1 lets it: ${reason}\n  help: ${sandboxHelp(reason)}\n`
+          : `warning: Chromium drew without its sandbox, which did not start here: ${reason}\n  help: ${unsandboxedHint(reason)}\n`,
+      );
+    }
+    this.reason = reason;
+  }
+
+  /**
+   * `{ unsandboxed }` when Chromium drew without its sandbox during this run, for the result's
+   * `--json`, and nothing otherwise, as `skipped` is absent when every check ran.
+   */
+  result(): { unsandboxed?: Unsandboxed } {
+    return this.reason === undefined
+      ? {}
+      : { unsandboxed: { reason: this.reason, hint: unsandboxedHint(this.reason) } };
+  }
+}
+
+const currentDraw = new AsyncLocalStorage<DrawTracker>();
 
 /**
- * Says on stderr that Chromium drew without its sandbox, once a run, as lint --visual starts a
- * worker or two per deck and the dev server one per pass; and keeps why, for the result. The
- * project's own pages go unsaid once the user accepted it, a ref's never: it is someone else's code.
+ * Run `fn` with a fresh, async-scoped `DrawTracker`, returning its value alongside `{ unsandboxed }`
+ * when any Chromium worker inside `fn` fell back to drawing without its sandbox.
  */
-function noteUnsandboxed(reason: string, ref: boolean): void {
-  if (drewUnsandboxed === undefined && (ref || !accepted())) {
-    process.stderr.write(
-      ref
-        ? `warning: Chromium drew a ref without its sandbox, as ${ALLOW_UNSANDBOXED}=1 lets it: ${reason}\n  help: ${sandboxHelp(reason)}\n`
-        : `warning: Chromium drew without its sandbox, which did not start here: ${reason}\n  help: ${unsandboxedHint(reason)}\n`,
-    );
-  }
-  drewUnsandboxed = reason;
+export async function trackDrawing<T>(
+  fn: () => Promise<T>,
+): Promise<{ value: T; unsandboxed?: Unsandboxed }> {
+  const tracker = new DrawTracker();
+  const value = await currentDraw.run(tracker, fn);
+  return { value, ...tracker.result() };
 }
 
 /**
- * `{ unsandboxed }` when Chromium drew without its sandbox since the last call, for the result's
- * `--json`, and nothing otherwise, as `skipped` is absent when every check ran. Each call starts
- * the next run afresh.
+ * Run `fn` under an existing `DrawTracker`, so repeated passes (such as the dev server's visual
+ * watch) share one deduplicated stderr warning without process-global state.
  */
-export function takeUnsandboxed(): { unsandboxed?: Unsandboxed } {
-  const reason = drewUnsandboxed;
-  drewUnsandboxed = undefined;
-  return reason === undefined ? {} : { unsandboxed: { reason, hint: unsandboxedHint(reason) } };
+export function withDrawTracker<T>(tracker: DrawTracker, fn: () => T): T {
+  return currentDraw.run(tracker, fn);
 }
 
 /**
@@ -211,7 +240,7 @@ export async function runDrawingWorker<T>(
     );
   }
   if (drawn.unsandboxed !== undefined) {
-    noteUnsandboxed(drawn.unsandboxed, ref);
+    (currentDraw.getStore() ?? new DrawTracker()).note(drawn.unsandboxed, ref);
   }
   return drawn.answer;
 }

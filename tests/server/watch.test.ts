@@ -3,7 +3,6 @@ import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DekError } from "../../src/core/error.ts";
 import type { LiveEvent } from "../../src/core/live-protocol.ts";
-import { takeUnsandboxed } from "../../src/core/sandbox.ts";
 import { syncDeck } from "../../src/core/sync.ts";
 import { createEventHub, type EventHub } from "../../src/server/hub.ts";
 import { voiceFailureLine, watchDeck, watchErrorDiagnostic } from "../../src/server/watch.ts";
@@ -345,7 +344,6 @@ describe("watchDeck where Chromium's sandbox cannot start", () => {
   test.serial(
     "says once on stderr that Chromium drew without its sandbox, pass after pass",
     async () => {
-      takeUnsandboxed();
       await withTempProject(
         { decks: [{ name: "demo", slides: { intro: introHtml } }] },
         async (root) => {
@@ -385,7 +383,6 @@ describe("watchDeck where Chromium's sandbox cannot start", () => {
           } finally {
             stderr.mockRestore();
             hub.close();
-            takeUnsandboxed();
           }
         },
       );

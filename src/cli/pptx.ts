@@ -3,6 +3,7 @@ import { DekError } from "../core/error.ts";
 import { type PptxLifted, pptxDeck } from "../core/pptx.ts";
 import { type PptxShot, type PptxSkipped, pptxFromFile } from "../core/pptx-from.ts";
 import { pptxSpecDeck } from "../core/pptx-spec.ts";
+import { trackDrawing, type Unsandboxed } from "../core/sandbox.ts";
 import type { DecksTarget } from "./scope.ts";
 
 /**
@@ -10,14 +11,22 @@ import type { DecksTarget } from "./scope.ts";
  * over its pictures, for the text output alone (`--json` is `outs`).
  */
 export type PptxCliResult =
-  | { action?: undefined; outs: string[]; lifted?: PptxLifted[] }
-  | { action: "spec"; spec: string; start: string; slides: number; parts: number }
+  | { action?: undefined; outs: string[]; lifted?: PptxLifted[]; unsandboxed?: Unsandboxed }
+  | {
+      action: "spec";
+      spec: string;
+      start: string;
+      slides: number;
+      parts: number;
+      unsandboxed?: Unsandboxed;
+    }
   | {
       action: "from";
       outs: string[];
       diagnostics: Diagnostic[];
       skipped?: PptxSkipped[];
       shots?: PptxShot[];
+      unsandboxed?: Unsandboxed;
     };
 
 export async function pptxCommand(
@@ -41,29 +50,36 @@ export async function pptxCommand(
         hint: "name the deck: dekc pptx <deck> --from <file>",
       });
     }
-    const done = await pptxFromFile({ project, deck }, options.from, {
-      rootDist: options.rootDist,
-      shot: options.shot,
-    });
+    const from = options.from;
+    const { value: done, unsandboxed } = await trackDrawing(() =>
+      pptxFromFile({ project, deck }, from, {
+        rootDist: options.rootDist,
+        shot: options.shot,
+      }),
+    );
     return {
       action: "from",
       outs: [done.outPath],
       diagnostics: done.diagnostics,
       ...(done.skipped ? { skipped: done.skipped } : {}),
       ...(done.shots ? { shots: done.shots } : {}),
+      ...(unsandboxed ? { unsandboxed } : {}),
     };
   }
-  const outs: string[] = [];
-  const lifted: PptxLifted[] = [];
-  for (const entry of decks) {
-    const done = await pptxDeck(
-      { project, deck: entry },
-      { rootDist: options.rootDist, public: options.public },
-    );
-    outs.push(done.outPath);
-    lifted.push(done.lifted);
-  }
-  return { outs, lifted };
+  const { value, unsandboxed } = await trackDrawing(async () => {
+    const outs: string[] = [];
+    const lifted: PptxLifted[] = [];
+    for (const entry of decks) {
+      const done = await pptxDeck(
+        { project, deck: entry },
+        { rootDist: options.rootDist, public: options.public },
+      );
+      outs.push(done.outPath);
+      lifted.push(done.lifted);
+    }
+    return { outs, lifted };
+  });
+  return { ...value, ...(unsandboxed ? { unsandboxed } : {}) };
 }
 
 /** `dekc pptx spec`: what an agent needs to build the deck again, for `--from`. */
@@ -77,6 +93,8 @@ export async function pptxSpecCommand(
       hint: "name the deck: dekc pptx <deck> spec",
     });
   }
-  const done = await pptxSpecDeck({ project, deck }, { public: options.public });
-  return { action: "spec", ...done };
+  const { value: done, unsandboxed } = await trackDrawing(() =>
+    pptxSpecDeck({ project, deck }, { public: options.public }),
+  );
+  return { action: "spec", ...done, ...(unsandboxed ? { unsandboxed } : {}) };
 }

@@ -15,13 +15,17 @@ import { forgetKey, type Key, readKey, readStoredKey, tokenFor } from "../core/p
 import {
   deckSource,
   fileName,
+  type PreparedVersion,
   prepareVersion,
+  refreshPreparedSource,
   requireUploadable,
   sha256,
+  writePreparedFiles,
 } from "../core/pub/version.ts";
 import { readRenames } from "../core/renames.ts";
 import { resolveProject } from "../core/resolve.ts";
 import { readSourceIfExists, writeInside } from "../core/safe-fs.ts";
+import { trackDrawing } from "../core/sandbox.ts";
 import {
   CommentList,
   CommentPolicy,
@@ -40,6 +44,7 @@ import {
   PublishResult,
   paths,
   Reply,
+  SlideMapSlide,
   shotField,
   VersionManifest,
   Visibility,
@@ -279,8 +284,8 @@ function newSlug({ deck }: ReadableDeck, flags: FlagValues): string {
 }
 
 /**
- * Refuse, before anything is built or sent, a title, a description or a message longer than
- * dek.pub keeps: the bounds are the manifest's own.
+ * Refuse, before anything is built or sent, frontmatter, slide metadata, or a message outside the
+ * bounds dek.pub keeps: the constraints are the manifest's own.
  */
 function requireSendable({ deck }: ReadableDeck, flags: FlagValues): void {
   const fields: Array<[string, string | undefined, z.ZodString, string]> = [
@@ -290,6 +295,12 @@ function requireSendable({ deck }: ReadableDeck, flags: FlagValues): void {
       deck.deck.description,
       VersionManifest.shape.description.unwrap(),
       "shorten description: in the frontmatter",
+    ],
+    [
+      "event",
+      deck.deck.event,
+      VersionManifest.shape.event.unwrap(),
+      "shorten event: in the frontmatter",
     ],
     ["message", flags.message, VersionManifest.shape.message.unwrap(), "shorten --message"],
   ];
@@ -305,6 +316,105 @@ function requireSendable({ deck }: ReadableDeck, flags: FlagValues): void {
       );
     }
   }
+  const formatted: Array<[string, unknown, z.ZodType, string]> = [
+    ["date", deck.deck.date, VersionManifest.shape.date, "write date: as YYYY-MM-DD in script.md"],
+    [
+      "duration",
+      deck.deck.duration,
+      VersionManifest.shape.duration,
+      "write duration: in minutes like 12m in script.md",
+    ],
+    [
+      "lang",
+      deck.deck.lang,
+      VersionManifest.shape.lang,
+      "write lang: as a BCP 47 tag like ja or en-US in script.md",
+    ],
+  ];
+  for (const [name, value, schema, fix] of formatted) {
+    if (value !== undefined && !schema.safeParse(value).success) {
+      throw new DekError(`invalid ${name} "${String(value)}" for dek.pub`, {
+        path: deck.scriptPath,
+        hint: `${fix}, then publish again`,
+      });
+    }
+  }
+  const maxSlug = SlideMapSlide.shape.slug.maxLength;
+  const maxSlideTitle = SlideMapSlide.shape.title.maxLength;
+  for (const section of deck.deck.sections) {
+    if (maxSlug !== null && section.slug.length > maxSlug) {
+      throw new DekError(
+        `the slug "${section.slug}" is ${section.slug.length} characters, and dek.pub keeps ${maxSlug} at most`,
+        {
+          path: deck.scriptPath,
+          line: section.line,
+          hint: "shorten the slide's slug in script.md, then publish again",
+        },
+      );
+    }
+    if (!SlideMapSlide.shape.slug.safeParse(section.slug).success) {
+      throw new DekError(`invalid slide slug "${section.slug}" for dek.pub`, {
+        path: deck.scriptPath,
+        line: section.line,
+        hint: "use lowercase letters, digits, and hyphens with at least one letter, then publish again",
+      });
+    }
+    if (maxSlideTitle !== null && section.title.length > maxSlideTitle) {
+      throw new DekError(
+        `the title of slide "${section.slug}" is ${section.title.length} characters, and dek.pub keeps ${maxSlideTitle} at most`,
+        {
+          path: deck.scriptPath,
+          line: section.line,
+          hint: "shorten the slide's heading in script.md, then publish again",
+        },
+      );
+    }
+  }
+}
+
+function buildManifest(input: {
+  project: ReadableDeck["project"];
+  deck: ReadableDeck["deck"];
+  version: PreparedVersion;
+  warnings: number;
+  base: number | null;
+  message: string | undefined;
+}): VersionManifest {
+  const { project, deck, version, warnings, base, message } = input;
+  const { description, event, date, duration, lang } = deck.deck;
+  return {
+    protocol: PROTOCOL_VERSION,
+    dekVersion: pkg.version,
+    deck: deck.name,
+    title: deck.deck.title,
+    ...(description !== undefined ? { description } : {}),
+    ...(event !== undefined ? { event } : {}),
+    ...(date !== undefined ? { date } : {}),
+    ...(duration !== undefined ? { duration } : {}),
+    lang,
+    base,
+    slideMap: version.slideMap,
+    lint: { errors: 0, warnings },
+    // Every rename recorded: the server takes each once, by its from, to, and time.
+    renames: readRenames(project.root, deck.name),
+    ...(message !== undefined ? { message } : {}),
+    files: Object.fromEntries(version.files.map((file) => [file.field, file.sha256])),
+    shots: Object.fromEntries((version.shots ?? []).map((shot) => [shot.slug, shot.sha256])),
+  };
+}
+
+function requireValidManifest(manifest: VersionManifest, scriptPath: string): void {
+  const parsed = VersionManifest.safeParse(manifest);
+  if (parsed.success) {
+    return;
+  }
+  const issue = parsed.error.issues[0];
+  const field = issue && issue.path.length > 0 ? `${issue.path.join(".")}: ` : "";
+  const reason = issue ? issue.message : "does not match the dek.pub manifest";
+  throw new DekError(`cannot publish: manifest ${field}${reason}`, {
+    path: scriptPath,
+    hint: "fix the deck metadata in script.md, then publish again",
+  });
 }
 
 /**
@@ -334,7 +444,33 @@ export async function publishCommand(
       ...(skippedLint.length > 0 ? { skipped: skippedLint } : {}),
     };
   }
+
+  // Build, check size, and validate the manifest before touching dek.pub or script.md.
+  const { playerScript, pluginPageScripts } = await import("../runtime/player.ts");
+  const prepared = await trackDrawing(async () =>
+    prepareVersion(
+      { project, deck },
+      {
+        playerScript: await playerScript(),
+        pluginScripts: await pluginPageScripts(),
+        ...(options.runner ? { runner: options.runner } : {}),
+      },
+    ),
+  );
+  let version = prepared.value;
+  const { unsandboxed } = prepared;
   let id = deck.deck.pub;
+  requireUploadable(version, deck.dir, id === undefined ? 512 : 0);
+  let manifest = buildManifest({
+    project,
+    deck,
+    version,
+    warnings: lint.diagnostics.length,
+    base: null,
+    message: flags.message,
+  });
+  requireValidManifest(manifest, deck.scriptPath);
+
   let base: number | null = null;
   let frontmatterWritten = false;
   if (id === undefined) {
@@ -343,8 +479,20 @@ export async function publishCommand(
     // Before the upload, so a failed one leaves the next publish on the same deck.
     writePubId(target, id);
     frontmatterWritten = true;
-    // The line pub: added moves every heading below it; the slide map must say where they are now.
+    // The line pub: added moves every heading below it and changes script.md; refresh source.tar
+    // and slideMap from disk so the upload matches what `dekc pub status` compares against.
     deck = reread(target);
+    version = refreshPreparedSource({ project, deck }, version);
+    requireUploadable(version, deck.dir);
+    manifest = buildManifest({
+      project,
+      deck,
+      version,
+      warnings: lint.diagnostics.length,
+      base: null,
+      message: flags.message,
+    });
+    requireValidManifest(manifest, deck.scriptPath);
   } else {
     const status = await request(
       origin,
@@ -352,40 +500,11 @@ export async function publishCommand(
       DeckStatus,
     );
     base = status.current;
+    manifest = { ...manifest, base };
+    requireValidManifest(manifest, deck.scriptPath);
   }
 
-  // After pub: is written, so the source sent is the one status compares with.
-  const { playerScript, pluginPageScripts } = await import("../runtime/player.ts");
-  const version = await prepareVersion(
-    { project, deck },
-    {
-      playerScript: await playerScript(),
-      pluginScripts: await pluginPageScripts(),
-      ...(options.runner ? { runner: options.runner } : {}),
-    },
-  );
-
-  const { description, event, date, duration, lang } = deck.deck;
-  const manifest: VersionManifest = {
-    protocol: PROTOCOL_VERSION,
-    dekVersion: pkg.version,
-    deck: deck.name,
-    title: deck.deck.title,
-    ...(description !== undefined ? { description } : {}),
-    ...(event !== undefined ? { event } : {}),
-    ...(date !== undefined ? { date } : {}),
-    ...(duration !== undefined ? { duration } : {}),
-    lang,
-    base,
-    slideMap: version.slideMap,
-    lint: { errors: 0, warnings: lint.diagnostics.length },
-    // Every rename recorded: the server takes each once, by its from, to, and time.
-    renames: readRenames(project.root, deck.name),
-    ...(flags.message !== undefined ? { message: flags.message } : {}),
-    files: Object.fromEntries(version.files.map((file) => [file.field, file.sha256])),
-    shots: Object.fromEntries((version.shots ?? []).map((shot) => [shot.slug, shot.sha256])),
-  };
-  requireUploadable(version, deck.dir);
+  writePreparedFiles({ project, deck }, version);
   const form = new FormData();
   form.append("manifest", JSON.stringify(manifest));
   for (const file of version.files) {
@@ -449,6 +568,7 @@ export async function publishCommand(
     shots: version.shots?.length ?? 0,
     diagnostics: lint.diagnostics,
     ...(skipped.length > 0 ? { skipped } : {}),
+    ...(unsandboxed ? { unsandboxed } : {}),
     frontmatterWritten,
     changed: frontmatterWritten ? [deck.scriptPath] : [],
   };

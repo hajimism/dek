@@ -16,7 +16,7 @@ import {
   resolvePlaywrightModule,
   type VisualRequest,
 } from "../../src/core/playwright.ts";
-import { type SandboxMode, takeUnsandboxed } from "../../src/core/sandbox.ts";
+import { type SandboxMode, trackDrawing } from "../../src/core/sandbox.ts";
 import { withEnv } from "../helpers/env.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import {
@@ -408,39 +408,47 @@ describe("drawing where Chromium's sandbox cannot start", () => {
 
   // The spy holds stderr while the test runs.
   test.serial("draws the user's own pages, warns once, and keeps why for --json", async () => {
-    takeUnsandboxed();
     const warn = spyOn(process.stderr, "write").mockImplementation(() => true);
     try {
-      await withEnv({ DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: undefined }, async () => {
-        expect(await defaultPlaywrightRunner(request)).toMatchObject({ overflows: [] });
-        expect(await defaultPlaywrightRunner(request)).toMatchObject({ overflows: [] });
-      });
+      const tracked = await withEnv(
+        { DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: undefined },
+        () =>
+          trackDrawing(async () => {
+            expect(await defaultPlaywrightRunner(request)).toMatchObject({ overflows: [] });
+            expect(await defaultPlaywrightRunner(request)).toMatchObject({ overflows: [] });
+            return "ok";
+          }),
+      );
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0]?.[0])).toContain(
         `warning: Chromium drew without its sandbox, which did not start here: ${SANDBOX_REASON}`,
       );
-      expect(takeUnsandboxed()).toEqual({
+      expect(tracked).toEqual({
+        value: "ok",
         unsandboxed: {
           reason: SANDBOX_REASON,
           hint: expect.stringContaining("DEK_ALLOW_UNSANDBOXED=1"),
         },
       });
-      expect(takeUnsandboxed()).toEqual({});
+      // A subsequent tracked run starts fresh with no leaked state.
+      const clean = await trackDrawing(async () => "clean");
+      expect(clean).toEqual({ value: "clean" });
     } finally {
       warn.mockRestore();
     }
   });
 
   test.serial("refuses a ref's pages, which it never drew", async () => {
-    takeUnsandboxed();
     await withTempDir(async (dir) => {
       const screenshotPath = join(dir, "intro.png");
       await withEnv({ DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: undefined }, async () => {
         await expect(
-          refPlaywrightRunner({
-            ...request,
-            pages: [{ html: "<html></html>", slug: "intro", step: "1", screenshotPath }],
-          }),
+          trackDrawing(() =>
+            refPlaywrightRunner({
+              ...request,
+              pages: [{ html: "<html></html>", slug: "intro", step: "1", screenshotPath }],
+            }),
+          ),
         ).rejects.toMatchObject({
           name: "DekError",
           message: `Chromium did not start with its sandbox here, and a ref is drawn only inside it: ${SANDBOX_REASON}`,
@@ -450,7 +458,27 @@ describe("drawing where Chromium's sandbox cannot start", () => {
         });
       });
       expect(await Bun.file(screenshotPath).exists()).toBe(false);
-      expect(takeUnsandboxed()).toEqual({});
     });
+  });
+
+  test.serial("isolates unsandboxed state across concurrent tracked runs", async () => {
+    const warn = spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const [drawn, undrawn] = await withEnv(
+        { DEK_PLAYWRIGHT: sandboxless, DEK_ALLOW_UNSANDBOXED: undefined },
+        () =>
+          Promise.all([
+            trackDrawing(() => defaultPlaywrightRunner(request)),
+            trackDrawing(async () => {
+              await Bun.sleep(20);
+              return "no-browser";
+            }),
+          ]),
+      );
+      expect(drawn.unsandboxed?.reason).toBe(SANDBOX_REASON);
+      expect(undrawn).toEqual({ value: "no-browser" });
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

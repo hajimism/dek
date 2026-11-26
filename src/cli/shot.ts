@@ -5,6 +5,7 @@ import { shellName, shellQuote } from "../core/escape.ts";
 import { foreignLine, type HiddenText, MESSAGE_MAX } from "../core/foreign-text.ts";
 import { refPlaywrightRunner } from "../core/playwright.ts";
 import { SLIDE_SIDECARS } from "../core/resolve.ts";
+import { trackDrawing, type Unsandboxed } from "../core/sandbox.ts";
 import { parseMorphAt, shotMorph } from "../core/shot/morph.ts";
 import { type ShotMotion, shotMotion } from "../core/shot/motion.ts";
 import { type ShotFile, shotDeck, shotSheet } from "../core/shot/still.ts";
@@ -23,6 +24,7 @@ export type ShotCliResult = {
    * person cannot see.
    */
   hidden?: HiddenText[];
+  unsandboxed?: Unsandboxed;
 };
 
 type ShotCommandOptions = {
@@ -47,10 +49,12 @@ export async function shotCommand(
 ): Promise<ShotCliResult> {
   const mode = parseShotMode(options);
   try {
-    const result = await shoot(target, mode);
-    return target.ref
-      ? { ...result, ...hiddenField(target.ref, drawnHidden(target, mode)) }
-      : result;
+    const { value: result, unsandboxed } = await trackDrawing(() => shoot(target, mode));
+    return {
+      ...result,
+      ...(target.ref ? hiddenField(target.ref, drawnHidden(target, mode)) : {}),
+      ...(unsandboxed ? { unsandboxed } : {}),
+    };
   } catch (error) {
     throw refShotError(error, target);
   }

@@ -4,6 +4,7 @@ import { DekError } from "../core/error.ts";
 import { lintDeck, lintProject } from "../core/lint.ts";
 import { parsePublicUrl } from "../core/ogp.ts";
 import { PLAYWRIGHT_INSTALL, type PlaywrightRunner } from "../core/playwright.ts";
+import { trackDrawing, type Unsandboxed } from "../core/sandbox.ts";
 import { slideMap } from "../core/slide-map.ts";
 import type { SlideMap } from "../pub/protocol.ts";
 import { playerScript, pluginPageScripts } from "../runtime/player.ts";
@@ -28,6 +29,7 @@ export type BuildCliResult = {
   slideMaps: SlideMap[];
   /** Why some deck has no preview image, said once per reason. */
   skipped?: SkippedCheck[];
+  unsandboxed?: Unsandboxed;
 };
 
 const PREVIEW_SKIPPED = {
@@ -62,22 +64,24 @@ export async function buildCommand(
   const script = await playerScript();
   const pluginScripts = await pluginPageScripts();
   const reader = options.public ? "audience" : "speaker";
-  const results = await Promise.all(
-    decks.map(async (entry) => ({
-      entry,
-      ...(await buildDeck(
-        { project, deck: entry },
-        {
-          playerScript: script,
-          pluginScripts,
-          rootDist: options.rootDist,
-          ...(url ? { url } : {}),
-          ...(options.public ? { public: true } : {}),
-          ...(options.script === false ? { script: false as const } : {}),
-          ...(options.runner ? { runner: options.runner } : {}),
-        },
-      )),
-    })),
+  const { value: results, unsandboxed } = await trackDrawing(() =>
+    Promise.all(
+      decks.map(async (entry) => ({
+        entry,
+        ...(await buildDeck(
+          { project, deck: entry },
+          {
+            playerScript: script,
+            pluginScripts,
+            rootDist: options.rootDist,
+            ...(url ? { url } : {}),
+            ...(options.public ? { public: true } : {}),
+            ...(options.script === false ? { script: false as const } : {}),
+            ...(options.runner ? { runner: options.runner } : {}),
+          },
+        )),
+      })),
+    ),
   );
   const diagnostics = [
     ...lintProject(project),
@@ -100,5 +104,6 @@ export async function buildCommand(
         ...(options.runner ? { runner: options.runner } : {}),
       }),
     ]),
+    ...(unsandboxed ? { unsandboxed } : {}),
   };
 }

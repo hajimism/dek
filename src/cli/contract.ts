@@ -776,6 +776,7 @@ export const RESULT_FIELDS = {
         )
         .optional()
         .describe("With --shot, each slide as Quick Look draws the file, in the deck's order."),
+      unsandboxed,
     }),
   ]),
   pack: z.strictObject({
