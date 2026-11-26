@@ -8,7 +8,7 @@ Create a project with `bunx @hajimism/dek init`, which also installs dek into it
 
 ## Conventions
 
-- **Scope follows the working directory.** The project root means every deck; a deck directory means that deck. From anywhere, name a deck as the first argument or with `--deck <name>`: `dekc lint why-dek`, `dekc show why-dek intro`, `dek why-dek`. Details in [Projects and Decks](/guide/structure#where-you-run-a-command-decides-its-scope).
+- **Scope follows the working directory.** The project root means every deck; a deck directory means that deck. From anywhere, name a deck as the first argument or with `--deck <name>`: `dekc lint why-dek`, `dekc show why-dek intro`, `dekc why-dek`. Details in [Projects and Decks](/guide/structure#where-you-run-a-command-decides-its-scope).
 - **Result commands accept `--json`, with one envelope.** Success is `{ "ok": true, ... }`. Failure is `{ "ok": false, "error": { "message", "hint", "path", "line" }, ... }` with exit code 1, both when a command cannot run and when `lint` or `check` finds an error; `hint` is there whenever dek knows the next step, `path` and `line` when the failure has a place. Commands that report diagnostics (`lint`, `check`, `build`, `ls`, `cues`) carry `diagnostics` pass or fail, so a reader branches on `ok`, reads `error`, and then the diagnostics. `dekc` and `dekc rehearse` stay running and do not take `--json`. See [The JSON contract](/guide/ai#the-json-contract).
 - **Each command's shape is a JSON Schema**, published at [`cli.schema.json`](https://hajimism.github.io/dek/cli.schema.json) with one entry under `$defs` per command.
 - **The shape is not frozen yet.** While dek is 0.x, the `--json` shape and the rule ids may change between releases. A rule id is never reused for another rule.
