@@ -1,8 +1,8 @@
 <section class="slide" data-layout="split">
   <div class="col">
     <p class="numeral"></p>
-    <h2 class="slide-title">エージェントとも、同じループを回す</h2>
-    <p class="lede">完成の基準がはっきりしているので、AI エージェントも人と同じ手順で、一枚ずつ仕上げられます。</p>
+    <h2 class="slide-title">エージェントとも同じループを回す</h2>
+    <p class="lede">合否の基準がはっきりしているので、AI エージェントも人と同じ手順で一枚ずつ仕上げられます。</p>
     <svg class="loop" viewBox="0 0 480 200">
       <path class="track" d="M 40 70 H 440" />
       <path class="arrow" d="M 99 64 l 10 6 l -10 6 M 229 64 l 10 6 l -10 6 M 359 64 l 10 6 l -10 6" />
@@ -25,11 +25,11 @@
   </div>
   <div class="stage">
     <figure class="step" data-step="agents-read">
-      <p class="label"><span class="signal">1</span>一枚ぶんを、まとめて読む</p>
+      <p class="label"><span class="signal">1</span>一枚ぶんをまとめて読む</p>
       <p class="cmdline">$ dekc show why-dek timing</p>
       <table class="bundle">
         <tbody>
-          <tr><th>script</th><td>台本のその節</td><td class="lines" data-real="show-script">8 行</td></tr>
+          <tr><th>script</th><td>台本の該当セクション</td><td class="lines" data-real="show-script">8 行</td></tr>
           <tr><th>html</th><td>slides/timing.html</td><td class="lines" data-real="show-html">42 行</td></tr>
           <tr><th>css</th><td>slides/timing.css</td><td class="lines" data-real="show-css">171 行</td></tr>
           <tr><th>ts</th><td>slides/timing.ts</td><td class="lines" data-real="show-ts">32 行</td></tr>
@@ -39,7 +39,7 @@
     </figure>
     <figure class="step" data-step="agents-check">
       <p class="label"><span class="signal">2</span>描いて、測って、直す</p>
-      <pre class="code"><span class="code-head"><span>$ dekc check objection --shot --json</span><span>捨てデッキ</span></span>{
+      <pre class="code"><span class="code-head"><span>$ dekc check objection --shot --json</span><span>検証用デッキ</span></span>{
   "ok": false,
   "slug": "objection",
   "diagnostics": [{
