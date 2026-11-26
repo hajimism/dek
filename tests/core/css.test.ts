@@ -565,6 +565,91 @@ describe("nested rules", () => {
   });
 });
 
+describe("url() and image-set() scanning and rewriting", () => {
+  test("parses and rewrites image-set(url(...)) without overlapping edits", () => {
+    const css =
+      '.slide .a { background-image: image-set(url("assets/a.png") 1x, url("assets/b.png") 2x); }';
+    const sheet = parseCss(css);
+    expect(cssUrls(sheet)).toEqual([
+      { value: "assets/a.png", line: 1 },
+      { value: "assets/b.png", line: 1 },
+    ]);
+    expect(
+      rewriteCss(
+        sheet,
+        replaceUrls((v) => `data:${v}`),
+      ),
+    ).toBe(
+      '.slide .a { background-image: image-set(url("data:assets/a.png") 1x, url("data:assets/b.png") 2x); }',
+    );
+  });
+
+  test("parses and rewrites bare string addresses in image-set() and ignores type() strings", () => {
+    const css =
+      '.slide .a { background-image: -webkit-image-set("assets/a.avif" type("image/avif"), url("assets/a.png") 2x type("image/png")); }';
+    const sheet = parseCss(css);
+    expect(cssUrls(sheet)).toEqual([
+      { value: "assets/a.avif", line: 1 },
+      { value: "assets/a.png", line: 1 },
+    ]);
+    expect(
+      rewriteCss(
+        sheet,
+        replaceUrls((v) => `inlined:${v}`),
+      ),
+    ).toBe(
+      '.slide .a { background-image: -webkit-image-set(url("inlined:assets/a.avif") type("image/avif"), url("inlined:assets/a.png") 2x type("image/png")); }',
+    );
+  });
+
+  test("parses and rewrites quoted url() values containing parentheses", () => {
+    const css = [
+      '.slide .a { background: url("assets/photo (1).png"); }',
+      `.slide .b { background: url('data:image/svg+xml,<svg transform="translate(1,2)"/>'); }`,
+      '.slide .c { background-image: image-set(url("assets/shot (1).png") 1x, "assets/shot (2).png" 2x); }',
+    ].join("\n");
+    const sheet = parseCss(css);
+    expect(cssUrls(sheet)).toEqual([
+      { value: "assets/photo (1).png", line: 1 },
+      { value: 'data:image/svg+xml,<svg transform="translate(1,2)"/>', line: 2 },
+      { value: "assets/shot (1).png", line: 3 },
+      { value: "assets/shot (2).png", line: 3 },
+    ]);
+    expect(
+      rewriteCss(
+        sheet,
+        replaceUrls((v) => (v.startsWith("assets/") ? `inlined:${v}` : undefined)),
+      ),
+    ).toBe(
+      [
+        '.slide .a { background: url("inlined:assets/photo (1).png"); }',
+        `.slide .b { background: url('data:image/svg+xml,<svg transform="translate(1,2)"/>'); }`,
+        '.slide .c { background-image: image-set(url("inlined:assets/shot (1).png") 1x, url("inlined:assets/shot (2).png") 2x); }',
+      ].join("\n"),
+    );
+  });
+
+  test("handles braces inside comments and strings within image-set()", () => {
+    const css =
+      '.slide .a { background-image: image-set(/* } */ url("assets/a{1}.png") 1x, "assets/b}2.png" 2x); }';
+    const sheet = parseCss(css);
+    expect(cssUrls(sheet)).toEqual([
+      { value: "assets/a{1}.png", line: 1 },
+      { value: "assets/b}2.png", line: 1 },
+    ]);
+  });
+
+  test("rewriteCss throws when editors emit overlapping spans", () => {
+    const sheet = parseCss(".slide { color: red; }");
+    expect(() =>
+      rewriteCss(sheet, () => [
+        { start: 0, end: 6, text: ".a" },
+        { start: 3, end: 8, text: ".b" },
+      ]),
+    ).toThrow(/overlapping CSS edits/);
+  });
+});
+
 describe("isScopedThemeSelector", () => {
   test("keeps a list inside :is() whole", () => {
     expect(isScopedThemeSelector(".slide :is(.a, .b)")).toBe(true);

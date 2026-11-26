@@ -16,6 +16,11 @@ export function rewriteCss(sheet: Stylesheet, ...editors: CssEditor[]): string {
   let out = "";
   let from = 0;
   for (const edit of edits) {
+    if (edit.start < from) {
+      throw new Error(
+        `overlapping CSS edits: [${edit.start}, ${edit.end}) starts before previous edit end ${from}`,
+      );
+    }
     out += sheet.source.slice(from, edit.start) + edit.text;
     from = edit.end;
   }

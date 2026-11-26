@@ -229,6 +229,164 @@ export function matchBrace(source: string, open: number, end = source.length): n
   return end;
 }
 
+const IMAGE_SET_RE = /^(?:-webkit-)?image-set$/i;
+
+/** The index of the `)` that closes the `(` opening at `open`, or `end` when it never closes. */
+function matchParen(source: string, open: number, end = source.length): number {
+  let depth = 0;
+  let i = open;
+  while (i < end) {
+    const ch = source[i];
+    if (ch === "(") {
+      depth++;
+      i++;
+    } else if (ch === ")") {
+      depth--;
+      if (depth === 0) {
+        return i;
+      }
+      i++;
+    } else {
+      i = consumeToken(source, i, end);
+    }
+  }
+  return end;
+}
+
+function skipSpaceAndComments(source: string, from: number, end: number): number {
+  let i = from;
+  while (i < end) {
+    if (isWhitespace(source[i])) {
+      i = skipWhitespace(source, i, end);
+    } else if (isCommentStart(source, i)) {
+      i = consumeComment(source, i, end);
+    } else {
+      break;
+    }
+  }
+  return i;
+}
+
+/**
+ * Reads a `url(...)` starting at `start` whose `(` is at `open`. Returns the parsed address and
+ * span when well-formed, plus `next` where scanning resumes.
+ */
+function readUrlCall(
+  source: string,
+  start: number,
+  open: number,
+  end: number,
+): { found?: { value: string; start: number; end: number }; next: number } {
+  const inner = skipSpaceAndComments(source, open + 1, end);
+  const quote = source[inner];
+  if (quote === '"' || quote === "'") {
+    const strEnd = consumeString(source, inner, end);
+    if (strEnd > inner + 1 && source[strEnd - 1] === quote) {
+      const close = skipSpaceAndComments(source, strEnd, end);
+      if (close < end && source[close] === ")") {
+        return {
+          found: {
+            value: source.slice(inner + 1, strEnd - 1).trim(),
+            start,
+            end: close + 1,
+          },
+          next: close + 1,
+        };
+      }
+    }
+    const close = matchParen(source, open, end);
+    return { next: close < end ? close + 1 : end };
+  }
+  const rawStart = skipWhitespace(source, open + 1, end);
+  let j = rawStart;
+  let valid = true;
+  while (j < end) {
+    const ch = source[j] ?? "";
+    if (ch === ")") {
+      return {
+        found: valid ? { value: source.slice(rawStart, j).trim(), start, end: j + 1 } : undefined,
+        next: j + 1,
+      };
+    }
+    if (startsEscape(source, j, end)) {
+      j = consumeEscape(source, j, end);
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "(" || isNewline(ch) || isNonPrintable(ch)) {
+      valid = false;
+    }
+    j++;
+  }
+  return { next: end };
+}
+
+/**
+ * Every `url(...)` and top-level `image-set("...")` address in `source.slice(start, end)`, in
+ * source order, with non-overlapping spans covering each whole token.
+ */
+export function scanCssUrls(
+  source: string,
+  start: number,
+  end: number,
+): Array<{ value: string; start: number; end: number }> {
+  const urls: Array<{ value: string; start: number; end: number }> = [];
+  const scan = (from: number, to: number, bareStrings: boolean): void => {
+    let i = from;
+    while (i < to) {
+      const ch = source[i];
+      if (ch === '"' || ch === "'") {
+        const stop = consumeString(source, i, to);
+        if (bareStrings && stop > i + 1 && source[stop - 1] === ch) {
+          urls.push({
+            value: source.slice(i + 1, stop - 1).trim(),
+            start: i,
+            end: stop,
+          });
+        }
+        i = stop;
+        continue;
+      }
+      if (isCommentStart(source, i)) {
+        i = consumeComment(source, i, to);
+        continue;
+      }
+      if (ch === "(") {
+        const close = matchParen(source, i, to);
+        scan(i + 1, close, false);
+        i = close < to ? close + 1 : to;
+        continue;
+      }
+      if (!startsEscape(source, i, to) && !isNameChar(ch)) {
+        i++;
+        continue;
+      }
+      const nameEnd = consumeName(source, i, to);
+      if (
+        nameEnd < to &&
+        source[nameEnd] === "(" &&
+        (i === 0 || (source[i - 1] !== "#" && source[i - 1] !== "@"))
+      ) {
+        const name = source.slice(i, nameEnd);
+        if (isUrlName(name)) {
+          const result = readUrlCall(source, i, nameEnd, to);
+          if (result.found) {
+            urls.push(result.found);
+          }
+          i = result.next;
+          continue;
+        }
+        const close = matchParen(source, nameEnd, to);
+        scan(nameEnd + 1, close, IMAGE_SET_RE.test(name));
+        i = close < to ? close + 1 : to;
+        continue;
+      }
+      i = nameEnd;
+    }
+  };
+  scan(start, end, false);
+  return urls;
+}
+
 /** The text with each comment removed, strings and `url()`s kept byte for byte. */
 export function stripComments(source: string): string {
   return replaceOpaque(source, { comment: () => "" });
