@@ -99,7 +99,7 @@ dek finds the project root by walking up from the current directory until it fin
 | Inside a deck | That deck |
 | Anywhere, with a deck name or `--deck <name>` | The named deck |
 
-From the project root, `dekc lint` lints every deck and `dekc build` builds every deck. Commands that need exactly one deck, such as `dekc show intro`, ask you to name it. The deck name can be a positional argument: `dekc show 2026-04-vite intro`, `dekc lint 2026-04-vite`, `dek 2026-04-vite`.
+From the project root, `dekc lint` lints every deck and `dekc build` builds every deck. Commands that need exactly one deck, such as `dekc show intro`, ask you to name it. The deck name can be a positional argument: `dekc show 2026-04-vite intro`, `dekc lint 2026-04-vite`, `dekc 2026-04-vite`.
 
 Running `dekc new` outside any project stops and points you at `dekc init`. A command run inside `refs/` stops too, and points you back at your project.
 

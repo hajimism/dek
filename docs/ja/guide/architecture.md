@@ -1,10 +1,10 @@
 ---
-description: 'CLI と開発サーバが共有するコア。任意の依存。'
+description: 'CLI と開発サーバーが共有する core、任意の外部依存、信頼できないプロジェクトに対する防御。'
 ---
 
 # アーキテクチャ
 
-いちばん重要な設計判断は、**core** を独立したモジュールにしたことです。CLI と開発サーバは同じパーサ、同じルールセット、同じプロジェクト解決を共有します。パーサが 2 つあれば必ず挙動がズレます。
+最も重要な設計判断は、**core** を独立したモジュールに切り出したことです。CLI と開発サーバーは同じパーサー、同じ lint ルール、同じプロジェクト解決ロジックを共有します。パーサーが 2 つあれば、いずれ必ず挙動が食い違います。
 
 ```
                  ┌─────────────────┐
@@ -19,13 +19,19 @@ description: 'CLI と開発サーバが共有するコア。任意の依存。'
                   └──── HTTP ─────┘   goto / current
 ```
 
-CLI はファイルを直接扱います。ブラウザが何を表示しているかを知る、あるいは変える必要のある 2 つのコマンド、`goto` と `current` だけが、起動中の開発サーバに HTTP で問い合わせます。サーバがなければ hint 付きで失敗します。ネットワークに出るコマンドは 2 つです。`dekc ref` は固定したコミットを GitHub から取ってきます。ref のスナップショットがなければ `ls`・`show`・`theme`・`shot` も取り直します。`dekc pub` は [dek.pub](./publish)、または `--server` や `DEK_PUB_SERVER` が指すサーバーと、HTTPS か、このマシンへの平文の HTTP でだけ話します。リダイレクトには従わないので、キーはそのオリジンにしか届きません。`dekc pub login` が得た API キーはサーバーごとに、`Bun.secrets` を通して OS のキーチェーン（サービス `dek.pub`、名前はサーバーのオリジン）に保存します。キーチェーンがなければ、持ち主だけが読める `$XDG_CONFIG_HOME/dek/credentials.json`（既定は `~/.config/dek/`）に保存します。`DEK_TOKEN` はどこにも保存しない CI 向けのキーで、送るのは `https://dek.pub` か `DEK_TOKEN_SERVER` が指すサーバーだけです。ほかのアカウントのもの、またはほかの人が読み書きできる資格情報のファイルは読みません。lint、build、sync はネットワークに出ません。
+CLI は原則としてファイルを直接読み書きします。ブラウザの表示状態を取得・変更する必要がある `goto` と `current` の 2 コマンドだけが、起動中の開発サーバーへ HTTP で問い合わせます（サーバーが動いていなければ hint 付きで失敗します）。
 
-ビルドしたファイルもサーバに接続しにいきません。player は 2 通りにコンパイルされます。build・動画・shot に埋め込まれる player には、位置を同期するソケット、ライブ更新、マーク、リハーサルが入っていません。これらは annotate モードと同じく、開発サーバのページだけが持ちます。
+ネットワーク通信が発生するコマンドも限られています。
+
+- **`dekc ref`**（およびスナップショット未取得時の `ls`・`show`・`theme`・`shot`）：固定されたコミットを GitHub から取得します。
+- **`dekc pub`**：[dek.pub](./publish)（または `--server` / `DEK_PUB_SERVER` で指定したサーバー）と通信します。許可されるのは HTTPS とローカルホストへの平文 HTTP だけで、リダイレクトには追従しないため API キーが別オリジンへ漏れることはありません。`dekc pub login` で得た API キーはサーバーごとに `Bun.secrets` 経由で OS のキーチェーン（サービス名 `dek.pub`、キー名はサーバーのオリジン）へ保存され、キーチェーンがない環境では所有者のみ読み取り可能な `$XDG_CONFIG_HOME/dek/credentials.json`（既定 `~/.config/dek/`）に保存されます。他ユーザー所有または他者から読み書き可能な資格情報ファイルは読み込みません。CI 用の `DEK_TOKEN` はディスクに保存せず、`https://dek.pub` か `DEK_TOKEN_SERVER` へだけ送信します。
+- `lint`・`build`・`sync` はネットワークへ一切アクセスしません。
+
+ビルドした単一 HTML もサーバーへ接続しません。プレイヤーのランタイムは 2 通りにコンパイルされており、`build`・`video`・`shot` に埋め込む側には同期用 WebSocket、ライブリロード、マーク、リハーサル、注釈モードを含めません。これらは開発サーバーのページ専用です。
 
 ## 声と動画
 
-声と動画は同じ core の上に、別のドライバとして載ります。core が知っているのは Cue、Timeline、スケジュールだけで、音声エンジン、ffmpeg、ブラウザはアダプタです。
+音声と動画は、同じ core の上に独立したドライバーとして載っています。core が扱うのは Cue・Timeline・スケジュールだけで、音声エンジン・ffmpeg・ブラウザはすべてアダプター層に分離しています。
 
 ```
 script.md → Deck → Cue → Synth → Timeline → schedule
@@ -33,22 +39,41 @@ script.md → Deck → Cue → Synth → Timeline → schedule
                                       └→ VideoDriver    → player.go() + frames → mux
 ```
 
-動画の撮影はトークを実時間で再生しません。各ビートは静止フレーム 1 枚と遷移に必要なフレームだけを作るので、描画時間はトークの長さではなく動きの量に比例します。スライドのスクリプトも同じ時計で動きます。動画モードのプレイヤーは各スクリプトを `t = 0` で止めておき、worker が `window.dekMotion` を通して同じ位置へシークします。
+動画生成はトークを実時間で録画しません。各ビートについて静止フレーム 1 枚と遷移・アニメーションに必要なフレームだけを描画するため、処理時間はトークの総尺ではなく動きの量に比例します。スライドスクリプトも同じ時計で制御しており、動画モードのプレイヤーは各スクリプトを `t = 0` で止めた状態にし、ワーカーが `window.dekMotion` 経由で同じ時刻へシークします。
 
 ## 任意依存
 
-Playwright、ffmpeg、音声エンジンは任意です。欠けているときは、それを必要とするコマンドだけが失敗し、hint が何を入れるべきかを伝えます。CLI 自体は常に起動します。
+Playwright・ffmpeg・音声合成エンジンはいずれも任意です。入っていない場合はそれを必要とするコマンドだけが失敗し、導入手順の hint を表示します。CLI 本体自体は常に起動できます。
 
-Bun の Node 互換は部分的なので、Playwright は実行時に `node_modules` から解決し、別のワーカープロセスで動かします。`DEK_PLAYWRIGHT` で代わりのワーカーを指定でき、テストはこれでブラウザなしに動いています。rumdl は `DEK_RUMDL`、`PATH`、dek 本体のインストール先の `node_modules/.bin` の順に探します。どちらもカレントディレクトリからは探しません。clone したリポジトリが中身を決められるからです。
+Bun の Node.js 互換機能には未対応の部分があるため、Playwright は実行時に `node_modules` から解決して別ワーカープロセスで動かしています。`DEK_PLAYWRIGHT` で代替ワーカーを指定できる設計になっており、自動テストではこれを使ってブラウザなしで検証しています。rumdl は `DEK_RUMDL`、`PATH`、dek 本体がある `node_modules/.bin` の順で探します。clone したリポジトリが任意バイナリを仕込めるため、どちらもカレントディレクトリからは探しません。
 
 ## 自分が書いていないプロジェクト
 
-dek はプロジェクトをビルドしますが、dek を動かす Bun の設定はプロジェクトには決めさせません。`dekc` の bin は Bun を `--no-env-file --config=/dev/null` で動かし、dek が起動する bun にも同じフラグを付けます。そのため、カレントディレクトリの `.env` や `bunfig.toml` で変数を設定したり、コードを preload したりはできません。パッケージには dek 自身の `tsconfig.json` が入っているので、プロジェクトの `paths` で dek の import を差し替えることもできません。`dekc ref` がトークンを送るのは `api.github.com` だけで、送るのは `GITHUB_TOKEN` か `GH_TOKEN` に設定されたものだけです。dek が `gh` にトークンを尋ねることはありません。ref のタイトルは、人には見えない文字をコードポイントで表した 80 文字までの 1 行として `AGENTS.md` に入るので、そこに見出しや指示を、見える形でも見えない形でも足すことはできません。hint は dek 自身の言葉で、ref を引用しません。テキスト出力には、デッキや ref が書いた色のコードを出しません。`dekc show` は ref のスライドであることを示し、ファイルの中身が部分の始まりを装うことはできません。ref を読むコマンドは、ref の中の人には見えない文字を報告します。ref の slide script は `dekc shot` で撮るときに動きますが、Chromium の sandbox を有効にし、ネットワークを切った状態で動かします。
+dek はプロジェクトをビルドしますが、dek 自身を動かす Bun の設定はプロジェクト側に委ねません。`dekc` のエントリポイントでは Bun を `--no-env-file --config=/dev/null` 付きで起動し、dek が内部から起動する bun プロセスにも同じフラグを渡します。これにより、カレントディレクトリの `.env` や `bunfig.toml` による環境変数の注入やコードの preload を防ぎます。パッケージ内には dek 自身の `tsconfig.json` を同梱しているため、プロジェクト側の `paths` で dek の import を乗っ取ることもできません。
 
-コンテナを root で動かしているとき、Ubuntu 23.10 以降（GitHub Actions の `ubuntu-24.04` ランナーを含む）で AppArmor の規則が Chromium に user namespace を作らせないとき、Docker の既定の seccomp プロファイルの下のように Chromium の sandbox が起動しない環境では、dek はプロジェクト自身のデッキを sandbox なしで描き、実行のたびにそう伝えます。標準エラーには Chromium が述べたことを添えて `warning: Chromium drew without its sandbox, which did not start here` と出し、`--json` には `unsandboxed` を載せます。そのデッキの script はデッキの作者のもので、どのみちあなたのブラウザでも動くからです。ref の script は他人のものなので、その環境では `dekc shot <ref>` は描かずに失敗します。sandbox を使うには、root 以外のユーザーで dekc を動かしてください。Ubuntu では `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` で user namespace を許すか、Chromium に AppArmor のプロファイルを与えます。コンテナでは user namespace を許す seccomp プロファイルを使います。sandbox なしで描くことを受け入れるなら、コンテナのイメージなどの環境に `DEK_ALLOW_UNSANDBOXED=1` を設定します。ref も描くようになり（警告は出続けます）、プロジェクト自身のデッキでは警告を出さなくなります。`--json` にはそれでも `unsandboxed` が載ります。dek はどの環境でもまず sandbox を求めます。プロジェクト自身のデッキでは、sandbox ありの起動がどんな理由で失敗しても sandbox なしで 1 度だけ起動し直し、そのことを伝えます。どちらでも Chromium が起動しないときは、両方の失敗を伝えます。
+外部入力や ref に対しても以下の境界を設けています。
 
-dek をどう起動するかは、dek には確かめられません。`bun ./node_modules/.bin/dekc` は bin のフラグを飛ばすので、dek が動く前に Bun がプロジェクトの `bunfig.toml` を読みます（`.env` が設定した `DEK_` の変数は、この場合も dek が無視します）。プロジェクトの `package.json` の scripts や、`node_modules` の下にコミットされたものは、そのプロジェクト自身のコードです。自分が書いていないプロジェクトで dekc を実行する前に、実行する `dekc` が自分でインストールしたものか確かめてください。どの報告が対象になるかは [SECURITY.md](https://github.com/hajimism/dek/blob/main/SECURITY.md) にあります。
+- `dekc ref` が認証トークンを送るのは `api.github.com` だけで、参照するのは `GITHUB_TOKEN` または `GH_TOKEN` のみです（`gh` CLI からトークンを自動取得することはありません）。
+- ref のタイトルは不可視文字をコードポイント表記へ置換した 80 文字以内の 1 行として `AGENTS.md` に記録するため、見出しや指示を紛れ込ませられません。hint にも ref の文字列を引用しません。
+- テキスト出力からはデッキや ref 由来の ANSI エスケープコードを除去します。`dekc show` ではファイル内容が区切り行を偽装できないようエスケープし、ref を読むコマンドはファイル内の不可視文字を警告します。
+- `dekc shot` で ref のスライドスクリプトを動かす際は、Chromium の sandbox を有効にし、ネットワークを遮断した状態で実行します。
+
+### Chromium の sandbox が起動しない環境
+
+次のような環境では Chromium の sandbox が起動できません。
+
+- コンテナを `root` で実行している場合
+- Ubuntu 23.10 以降（GitHub Actions の `ubuntu-24.04` ランナーを含む）で AppArmor が Chromium による user namespace 作成を制限している場合
+- Docker の既定 seccomp プロファイルの下で動かしている場合
+
+こうした環境でも、プロジェクト自身のデッキ（作者自身のスクリプト）については sandbox なしで 1 度だけ再起動して描画し、毎回その旨を通知します。標準エラーに Chromium のエラーメッセージを添えて `warning: Chromium drew without its sandbox, which did not start here` と出力し、`--json` には `unsandboxed` を含めます。一方、他人のコードを含む ref に対しては、`dekc shot <ref>` は描画せず失敗します。
+
+sandbox を有効にするには、`root` 以外のユーザーで実行するほか、Ubuntu では `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` または Chromium 用の AppArmor プロファイルを、コンテナでは user namespace を許可する seccomp プロファイルを設定してください。sandbox なしの描画を明示的に許容する場合は環境変数 `DEK_ALLOW_UNSANDBOXED=1` を設定します。これにより ref も描画されるようになり（警告は毎回出力）、プロジェクト自身のデッキでは標準エラーの警告を抑止します（`--json` の `unsandboxed` は引き続き出力されます）。なお dek はどの環境でもまず sandbox 有効で起動を試み、両方で起動できない場合は両方の失敗理由を報告します。
+
+### 起動方法に関する注意
+
+dek 自身の起動方法までは dek 側で強制できません。たとえば `bun ./node_modules/.bin/dekc` のように直接実行すると bin のフラグが効かず、dek が動き出す前に Bun がプロジェクトの `bunfig.toml` を読み込みます（`.env` に書かれた `DEK_` 変数はこの場合も dek 側で無視します）。また、プロジェクトの `package.json` の scripts や `node_modules` 下にコミットされたファイルはそのプロジェクト自身のコードです。信頼していないプロジェクトで実行する前に、呼ぼうとしている `dekc` が自分でインストールしたものか確認してください。脆弱性報告の対象範囲は [SECURITY.md](https://github.com/hajimism/dek/blob/main/SECURITY.md) に記載しています。
 
 ## エージェントの接点
 
-エージェントとの接点は CLI です。結果を返すコマンドはすべて `--json` を受け、診断は SARIF、`dekc help --agent` が圧縮リファレンスです。[AI エージェントと作る](./ai)と [CLI リファレンス](/ja/reference/cli)を参照してください。
+エージェントとのインターフェースは CLI です。結果を返すコマンドはすべて `--json` に対応し、診断は SARIF、`dekc help --agent` が圧縮リファレンスを提供します。詳しくは[AI エージェントと作る](./ai)と [CLI リファレンス](/ja/reference/cli)を参照してください。

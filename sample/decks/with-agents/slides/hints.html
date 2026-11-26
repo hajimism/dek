@@ -1,9 +1,9 @@
 <section class="slide" data-layout="default">
   <p class="kicker"><span class="badge"></span>Errors</p>
-  <h2 class="slide-title">失敗しても、<span class="hl">次の一手</span>を返す</h2>
+  <h2 class="slide-title">失敗しても<span class="hl">次の一手</span>を返す</h2>
   <div class="stage grid">
     <article class="side">
-      <p class="side-head"><span class="pill pill-err">ok: false</span><span class="side-title">何が起きたかと、次のコマンド</span></p>
+      <p class="side-head"><span class="pill pill-err">ok: false</span><span class="side-title">何が起きたかと次のコマンド</span></p>
       <figure class="window">
         <div class="window-bar"><p class="window-title">terminal</p></div>
 <pre class="code"><span class="tok-c">$ dekc show nope --json</span>
@@ -16,10 +16,10 @@
   }
 <span class="tok-p">}</span></pre>
       </figure>
-      <p class="note">hint はそのまま実行できるコマンド。エージェントは、次に何をすればよいか迷わない。</p>
+      <p class="note">hint はそのまま実行できるコマンド。エージェントは次に何をすべきか迷わない。</p>
     </article>
     <article class="side">
-      <p class="side-head"><span class="pill pill-skip">skipped</span><span class="side-title">測れなかった検査は、合格にしない</span></p>
+      <p class="side-head"><span class="pill pill-skip">skipped</span><span class="side-title">測れなかった検査は合格にしない</span></p>
       <figure class="window">
         <div class="window-bar"><p class="window-title">terminal</p></div>
 <pre class="code"><span class="tok-c">$ dekc check how-it-works --voice --json</span>
@@ -32,8 +32,8 @@
   }]
 <span class="tok-p">}</span></pre>
       </figure>
-      <p class="note">声の検査は飛ばしたと明記される。飛ばした検査を、合格と取り違えることはない。</p>
+      <p class="note">音声の検査は飛ばしたと明記される。飛ばした検査を合格と取り違えることはない。</p>
     </article>
   </div>
-  <p class="meta"><span>スライドを、エージェントに任せる</span></p>
+  <p class="meta"><span>スライドをエージェントに任せる</span></p>
 </section>

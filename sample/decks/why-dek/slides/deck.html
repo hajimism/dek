@@ -1,9 +1,9 @@
 <section class="slide" data-layout="split">
   <div class="col">
     <p class="numeral"></p>
-    <h2 class="slide-title">ひとつの発表は、ひとつのディレクトリ</h2>
+    <h2 class="slide-title">ひとつの発表はひとつのディレクトリ</h2>
     <p class="lede">dek では、ひとつの発表をデッキと呼び、ひとつのディレクトリにまとめます。</p>
-    <p class="note"><strong>デッキの外にあるものは、何も参照しない。</strong>リモートの URL も、<span class="chip">../</span> で親を指す道も lint が止めます。ディレクトリごとコピーすれば、何年後に開いても同じように描画されます。</p>
+    <p class="note"><strong>デッキの外にあるものは何も参照しない。</strong>リモート URL も、<span class="chip">../</span> で親をたどるパスも lint が止めます。ディレクトリごとコピーすれば、何年後に開いても同じように描画されます。</p>
   </div>
   <div class="stage">
     <p class="label boundary-label">decks/why-dek/</p>
@@ -11,7 +11,7 @@
       <li><span class="name" data-morph="script-md">script.md</span><span class="role">台本</span><span class="detail">喋る言葉、順番、尺。いちばん上。</span></li>
       <li><span class="name">slides/</span><span class="role">スライド</span><span class="detail" data-count="slides">18 枚ぶんの HTML と、必要な CSS・TS</span></li>
       <li><span class="name">theme.css</span><span class="role">見た目</span><span class="detail">クラスとトークン。このデッキ専用のコピー</span></li>
-      <li><span class="name">assets/</span><span class="role">画像</span><span class="detail">スライドが読むファイルはすべてここ</span></li>
+      <li><span class="name">assets/</span><span class="role">画像</span><span class="detail">スライドから参照するファイルはすべてここ</span></li>
       <li class="is-optional"><span class="name">voice/</span><span class="role">音声</span><span class="detail">読み上げを付けるときだけ</span></li>
     </ul>
     <dl class="counts">

@@ -1,10 +1,10 @@
 <section class="slide" data-layout="page">
   <p class="numeral"></p>
-  <h2 class="slide-title">見た目は、描画して測る</h2>
-  <p class="lede">見た目の確認も、目に頼りません。<span class="chip">dekc lint --visual</span> は、スライドを実際のブラウザで描画し、すべてのビートで測って、答えを数字で返します。</p>
+  <h2 class="slide-title">見た目は描画して測る</h2>
+  <p class="lede">見た目の確認も目に頼りません。<span class="chip">dekc lint --visual</span> はスライドを実際のブラウザで描画し、すべてのビートで測って答えを数字で返します。</p>
   <div class="stage">
     <figure class="case" data-step="measure-overflow">
-      <p class="label"><span class="rule-id">DEK030</span>はみ出しは、何ピクセルかまで</p>
+      <p class="label"><span class="rule-id">DEK030</span>はみ出しは何ピクセルかまで</p>
       <svg class="sketch" viewBox="0 0 520 84">
         <rect class="frame" x="1" y="1" width="420" height="82" />
         <rect class="line-box" x="24" y="30" width="438" height="14" />
@@ -26,7 +26,7 @@
 }</pre>
     </figure>
     <figure class="case" data-step="measure-contrast">
-      <p class="label"><span class="rule-id">DEK031</span>読みにくい色は、比で返す</p>
+      <p class="label"><span class="rule-id">DEK031</span>読みにくい色は比で返す</p>
       <div class="sketch swatches">
         <p class="sample" aria-hidden="true"></p>
         <p class="ratio"><span class="stat">1.5</span><span class="unit">: 1</span></p>
@@ -47,5 +47,5 @@
 }</pre>
     </figure>
   </div>
-  <p class="source">捨てデッキに dekc lint --visual --json をかけた実際の出力から、id と data を抜粋（severity・message・path・slug・hint は省略）。</p>
+  <p class="source">検証用デッキに dekc lint --visual --json をかけた実際の出力から、id と data を抜粋（severity・message・path・slug・hint は省略）。</p>
 </section>
