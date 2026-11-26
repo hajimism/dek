@@ -6,6 +6,7 @@ import { lintDeck, lintProject, unreadableScriptDiagnostics } from "../core/lint
 import { playwrightMissingError } from "../core/playwright.ts";
 import { checkDeck, onProjectData, pluginChecks } from "../core/plugin-host.ts";
 import { type RumdlRunner, type RumdlSkip, resolveRumdlBin, runRumdl } from "../core/rumdl.ts";
+import { DrawTracker, type Unsandboxed, withDrawTracker } from "../core/sandbox.ts";
 import { mergeSarif, pluginSarif, type SarifLog } from "../core/sarif.ts";
 import { syncDeck } from "../core/sync.ts";
 import { lintVisualDeck } from "../core/visual.ts";
@@ -19,6 +20,7 @@ export type LintCliResult = {
   rumdlSarif?: SarifLog;
   /** A run per plugin that ran, for `--format sarif`. */
   pluginSarif?: SarifLog;
+  unsandboxed?: Unsandboxed;
 };
 
 /** `cwd` is where a skipped rumdl's hint says to run it from; `rumdl` runs it, dek's by default. */
@@ -37,6 +39,7 @@ export async function lintCommand(
   let rumdlHung = false;
   // The plugins as the project accepted them; one that hung is run on no deck after, as rumdl.
   const plugins = await pluginChecks(project);
+  const draw = new DrawTracker();
   diagnostics.push(...plugins.diagnostics);
   const pluginRuns = plugins.ready.map((plugin) => ({
     ...plugin,
@@ -89,7 +92,7 @@ export async function lintCommand(
       }
     }
     if (options.visual) {
-      const visual = await lintVisualDeck({ project, deck });
+      const visual = await withDrawTracker(draw, () => lintVisualDeck({ project, deck }));
       if (visual === null) {
         throw playwrightMissingError();
       }
@@ -124,6 +127,7 @@ export async function lintCommand(
     ]),
     ...(rumdlSarif ? { rumdlSarif } : {}),
     ...(pluginRuns.length > 0 ? { pluginSarif: pluginSarif(pluginRuns) } : {}),
+    ...draw.result(),
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { jsonStdout, runInProcess } from "../helpers/cli.ts";
 import { type FakePub, withFakePub } from "../helpers/fake-pub.ts";
@@ -360,4 +360,115 @@ describe("dekc pub publish", () => {
       });
     });
   });
+
+  test.serial(
+    "leaves dek.pub and script.md untouched when event or slide metadata exceeds manifest bounds",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        const longEvent = SCRIPT.replace("event: Meetup #42", `event: ${"e".repeat(501)}`);
+        await withTempProject(spec(longEvent), async (root) => {
+          const scriptPath = join(root, "decks", "Why_Dek", "script.md");
+          const result = await publish(fake, root);
+          expect(result.exitCode).toBe(1);
+          expect(jsonStdout<Json>(result)).toMatchObject({
+            ok: false,
+            error: {
+              message: "the event is 501 characters, and dek.pub keeps 500 at most",
+              path: "decks/Why_Dek/script.md",
+              hint: "shorten event: in the frontmatter, then publish again",
+            },
+          });
+          expect(fake.requests).toEqual([]);
+          expect(fake.decks.size).toBe(0);
+          expect(readFileSync(scriptPath, "utf8")).toBe(longEvent);
+        });
+
+        const longHeading = SCRIPT.replace("## intro", `## ${"t".repeat(501)} {#intro}`);
+        await withTempProject(spec(longHeading), async (root) => {
+          const scriptPath = join(root, "decks", "Why_Dek", "script.md");
+          const result = await publish(fake, root);
+          expect(result.exitCode).toBe(1);
+          expect(jsonStdout<Json>(result)).toMatchObject({
+            ok: false,
+            error: {
+              message:
+                'the title of slide "intro" is 501 characters, and dek.pub keeps 500 at most',
+              path: "decks/Why_Dek/script.md",
+              line: 8,
+              hint: "shorten the slide's heading in decks/Why_Dek/script.md, then publish again",
+            },
+          });
+          expect(fake.requests).toEqual([]);
+          expect(fake.decks.size).toBe(0);
+          expect(readFileSync(scriptPath, "utf8")).toBe(longHeading);
+        });
+      });
+    },
+  );
+
+  test.serial(
+    "leaves dek.pub and script.md untouched on first publish when the prepared version exceeds 50 MiB",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        // 13 MiB PNG is under 50 MiB on disk, but base64-inlined into 3 HTML builds plus source.tar
+        // exceeds the 50 MiB upload limit checked by requireUploadable().
+        const withImage = spec();
+        withImage.decks[0] = {
+          ...withImage.decks[0],
+          slides: {
+            intro:
+              '<section class="slide" data-layout="title">\n  <h2 class="slide-title">intro</h2>\n  <img src="assets/big.png" alt="big" />\n</section>\n',
+            speed: slide("speed"),
+          },
+        } as never;
+        await withTempProject(withImage, async (root) => {
+          const deckDir = join(root, "decks", "Why_Dek");
+          const scriptPath = join(deckDir, "script.md");
+          mkdirSync(join(deckDir, "assets"), { recursive: true });
+          writeFileSync(join(deckDir, "assets", "big.png"), new Uint8Array(13 * 1024 * 1024));
+          const result = await publish(fake, root);
+          expect(result.exitCode).toBe(1);
+          expect(jsonStdout<Json>(result)).toMatchObject({
+            ok: false,
+            error: {
+              message: expect.stringContaining("dek.pub takes 50 MiB at most"),
+              path: "decks/Why_Dek",
+            },
+          });
+          expect(fake.requests).toEqual([]);
+          expect(fake.decks.size).toBe(0);
+          expect(readFileSync(scriptPath, "utf8")).toBe(SCRIPT);
+          expect(existsSync(join(deckDir, ".cache", "pub"))).toBe(false);
+        });
+      });
+    },
+  );
+
+  test.serial(
+    "leaves dek.pub and script.md untouched on first publish when prepareVersion fails",
+    async () => {
+      await withFakePub(async (fake) => {
+        signIn(fake);
+        await withTempProject(spec(), async (root) => {
+          const deckDir = join(root, "decks", "Why_Dek");
+          const scriptPath = join(deckDir, "script.md");
+          // A broken symlink inside the deck causes deckSource() inside prepareVersion() to throw.
+          symlinkSync(join(deckDir, "does-not-exist.txt"), join(deckDir, "dangling.txt"));
+          const result = await publish(fake, root);
+          expect(result.exitCode).toBe(1);
+          expect(jsonStdout<Json>(result)).toMatchObject({
+            ok: false,
+            error: {
+              message: expect.stringContaining("dangling.txt is missing"),
+            },
+          });
+          expect(fake.requests).toEqual([]);
+          expect(fake.decks.size).toBe(0);
+          expect(readFileSync(scriptPath, "utf8")).toBe(SCRIPT);
+        });
+      });
+    },
+  );
 });

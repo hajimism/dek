@@ -8,6 +8,7 @@ import type { LiveEvent } from "../core/live-protocol.ts";
 import { ScriptError } from "../core/parse.ts";
 import type { PlaywrightRunner } from "../core/playwright.ts";
 import { resolveDeck } from "../core/resolve.ts";
+import { DrawTracker, withDrawTracker } from "../core/sandbox.ts";
 import { type SyncResult, syncDeck } from "../core/sync.ts";
 import { lintVisualDeck } from "../core/visual.ts";
 import {
@@ -160,14 +161,17 @@ function createDiagnose(
 ): (scope: DiagnoseScope) => Promise<Diagnostic[]> {
   // A browser that is not installed turns the visual pass off until one is found again.
   let visualEnabled = options.visual === true;
+  const draw = new DrawTracker();
   return async (scope) => {
     const { diagnostics, resolved } = await lintPass(deckDir);
     if (visualEnabled && resolved) {
       try {
-        const visual = await lintVisualDeck(resolved, {
-          ...(scope.slug !== undefined ? { slug: scope.slug } : {}),
-          ...(options.visualRunner ? { runner: options.visualRunner } : {}),
-        });
+        const visual = await withDrawTracker(draw, () =>
+          lintVisualDeck(resolved, {
+            ...(scope.slug !== undefined ? { slug: scope.slug } : {}),
+            ...(options.visualRunner ? { runner: options.visualRunner } : {}),
+          }),
+        );
         visualEnabled = visual !== null;
         diagnostics.push(...(visual ?? []));
       } catch (error) {

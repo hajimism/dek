@@ -45,7 +45,6 @@ export async function prepareVersion(
     runner?: PlaywrightRunner;
   },
 ): Promise<PreparedVersion> {
-  const scratch = join(deck.dir, ".cache", "pub");
   const script = options.playerScript;
   const plugins = pluginPages(project.root, deck.dir, options.pluginScripts);
   const page = (target: { public?: true; script?: false }) =>
@@ -67,9 +66,6 @@ export async function prepareVersion(
     files.push(prepared("cover", new Uint8Array(readFileSync(cover)), "image/png"));
   }
   const arrived = await slideShots(deck, options.runner);
-  for (const file of files) {
-    writeInside(join(scratch, fileName(file.field)), file.bytes, project.root);
-  }
   return {
     files,
     shots: arrived?.map((shot) => {
@@ -78,6 +74,27 @@ export async function prepareVersion(
     }),
     slideMap: slideMap(deck, "public", "audience"),
   };
+}
+
+/**
+ * Rebuild only `source.tar` and `slideMap` after `script.md` was updated (for example with `pub:`),
+ * reusing the already-built HTML pages and screenshots.
+ */
+export function refreshPreparedSource(target: Target, version: PreparedVersion): PreparedVersion {
+  const source = prepared("source", deckSource(target), "application/x-tar");
+  return {
+    ...version,
+    files: version.files.map((file) => (file.field === "source" ? source : file)),
+    slideMap: slideMap(target.deck, "public", "audience"),
+  };
+}
+
+/** Keep each prepared file under the deck's `.cache/pub/`, as it is sent. */
+export function writePreparedFiles({ project, deck }: Target, version: PreparedVersion): void {
+  const scratch = join(deck.dir, ".cache", "pub");
+  for (const file of version.files) {
+    writeInside(join(scratch, fileName(file.field)), file.bytes, project.root);
+  }
 }
 
 /** The file a field is kept as, and sent as: its extension says its type. */
@@ -146,6 +163,7 @@ export function deckSource({ project, deck }: Target): Uint8Array<ArrayBuffer> {
 export function requireUploadable(
   version: Pick<PreparedVersion, "files" | "shots">,
   deckDir: string,
+  reserveBytes = 0,
 ): void {
   const parts = [
     ...version.files.map((file) => ({ name: fileName(file.field), bytes: file.bytes.byteLength })),
@@ -155,12 +173,12 @@ export function requireUploadable(
     })),
   ];
   const total = parts.reduce((sum, part) => sum + part.bytes, 0);
-  if (total <= MAX_VERSION_BYTES) {
+  if (total + reserveBytes <= MAX_VERSION_BYTES) {
     return;
   }
   const largest = [...parts].sort((a, b) => b.bytes - a.bytes).slice(0, 3);
   throw new DekError(
-    `the version is ${mebibytes(total)} MiB, and dek.pub takes ${mebibytes(MAX_VERSION_BYTES)} MiB at most`,
+    `the version is ${mebibytes(total + reserveBytes)} MiB, and dek.pub takes ${mebibytes(MAX_VERSION_BYTES)} MiB at most`,
     {
       path: deckDir,
       hint: `make the deck's assets smaller, such as its pictures and videos, which each build carries; the largest parts are ${largest.map((part) => `${part.name} (${mebibytes(part.bytes)} MiB)`).join(", ")}`,

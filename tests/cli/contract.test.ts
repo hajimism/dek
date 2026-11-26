@@ -96,4 +96,28 @@ describe("the --json contract", () => {
     expect(schema.$defs.Diagnostic).toBeDefined();
     expect(JSON.stringify(schema.$defs.lint)).toContain('"#/$defs/Diagnostic"');
   });
+
+  test("accepts unsandboxed on pptx --from --shot results (pass and failure)", () => {
+    const pptxFrom = printedBy(["pptx", "demo", "--from", "deck.pptx.json", "--shot", "--json"]);
+    const unsandboxed = { reason: "No usable sandbox!", hint: "let Chromium make user namespaces" };
+    expect(
+      contractIssues(pptxFrom, {
+        ok: true,
+        action: "from",
+        outs: ["/tmp/demo.pptx"],
+        diagnostics: [],
+        unsandboxed,
+      }),
+    ).toEqual([]);
+    expect(
+      contractIssues(pptxFrom, {
+        ok: false,
+        error: { message: "dekc pptx --from found 1 error" },
+        action: "from",
+        outs: ["/tmp/demo.pptx"],
+        diagnostics: [diagnostic],
+        unsandboxed,
+      }),
+    ).toEqual([]);
+  });
 });

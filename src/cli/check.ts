@@ -5,6 +5,7 @@ import type { Fill } from "../core/fill.ts";
 import { lintDeck } from "../core/lint.ts";
 import { type PlaywrightRunner, playwrightMissingError } from "../core/playwright.ts";
 import { checkSlide } from "../core/plugin-host.ts";
+import { trackDrawing, type Unsandboxed } from "../core/sandbox.ts";
 import { runVisualDeck } from "../core/visual.ts";
 import { hasVoice, loadCachedTimeline, VOICE_SETUP_HINT } from "../core/voice.ts";
 import { type SkippedCheck, skippedChecks, visualSkipped } from "./result.ts";
@@ -26,6 +27,7 @@ export type CheckCliResult = {
   /** How much of the frame the slide fills at `step`, its last beat; absent when not measured. */
   fill?: Fill & { step: string };
   voice?: { beats: VoiceCheckBeat[] };
+  unsandboxed?: Unsandboxed;
 };
 
 export async function checkCommand(
@@ -37,14 +39,16 @@ export async function checkCommand(
 
   const diagnostics = lintDeck({ project, deck }, { slug });
   // The plugins run in processes of their own while the browser measures the slide.
-  const [visual, plugins] = await Promise.all([
-    runVisualDeck(
-      { project, deck },
-      {
-        slug,
-        screenshot: options.shot === true,
-        ...(options.runner ? { runner: options.runner } : {}),
-      },
+  const [{ value: visual, unsandboxed }, plugins] = await Promise.all([
+    trackDrawing(() =>
+      runVisualDeck(
+        { project, deck },
+        {
+          slug,
+          screenshot: options.shot === true,
+          ...(options.runner ? { runner: options.runner } : {}),
+        },
+      ),
     ),
     checkSlide(project, deck, slug),
   ]);
@@ -103,5 +107,6 @@ export async function checkCommand(
     ...(shot ? { shot } : {}),
     ...("step" in fill ? { fill } : {}),
     ...(voice ? { voice } : {}),
+    ...(unsandboxed ? { unsandboxed } : {}),
   };
 }

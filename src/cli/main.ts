@@ -5,7 +5,6 @@ import { shellQuote } from "../core/escape.ts";
 import { either } from "../core/prose.ts";
 import { isRefName } from "../core/ref-name.ts";
 import { type ProjectDeck, readDeckFile, resolveProject } from "../core/resolve.ts";
-import { takeUnsandboxed } from "../core/sandbox.ts";
 import { themeFacts } from "../core/theme-facts.ts";
 import { addressCommands, deckWord, type HintDeck, withPlaceholderNote } from "./address.ts";
 import {
@@ -189,9 +188,7 @@ async function run(cwd: string, line: CommandLine): Promise<void> {
   const ctx = { cwd, flags: line.values, args: call.args, target };
   const data = await form.run?.(ctx);
   if (spec.kind === "result") {
-    // Said on stderr as Chromium drew without its sandbox, and kept here for --json.
-    const drawn = { ...(data as object), ...takeUnsandboxed() };
-    writeSuccess({ command: call.name, data: drawn } as CliResult, {
+    writeSuccess({ command: call.name, data } as CliResult, {
       json: line.values.json === true,
       format: line.values.format,
       cwd,
@@ -268,8 +265,6 @@ function sessionJsonError(name: string): DekError {
  * prints once, here: as JSON when the line asks for it, even a line too broken to parse.
  */
 export async function main(argv: string[], cwd: string): Promise<void> {
-  // What a run before this one in the process drew is its own, even one that failed.
-  takeUnsandboxed();
   let json = wantsJson(argv);
   try {
     const line = parseCommandLine(argv);

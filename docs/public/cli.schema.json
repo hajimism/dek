@@ -2626,6 +2626,10 @@
                 "additionalProperties": false
               }
             },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
+            },
             "ok": {
               "type": "boolean",
               "const": true
@@ -2774,6 +2778,10 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "unsandboxed": {
+              "description": "Absent when every page drawn was drawn in Chromium's sandbox, or none was.",
+              "$ref": "#/$defs/Unsandboxed"
             },
             "ok": {
               "type": "boolean",
