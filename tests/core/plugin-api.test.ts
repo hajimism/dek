@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { CheckOutput, CheckResult, PluginManifest } from "@hajimism/dek/plugin";
+import type { CheckOutput, CheckResult, PluginManifest, PluginRules } from "@hajimism/dek/plugin";
 import { type PluginManifest as Pinned, readManifest } from "../../src/core/plugin.ts";
 
 test("a manifest written to the published type is one dek reads, and pins as that type", () => {
@@ -11,6 +11,7 @@ test("a manifest written to the published type is one dek reads, and pins as tha
       protocol: 1,
       rules: { STUDY001: { severity: "error", summary: "a sticker's words are not on its slide" } },
     },
+    page: { api: 1, keys: ["r"] },
     data: [{ path: "study.yaml" }],
   } satisfies PluginManifest<"STUDY">;
   const reading = readManifest(manifest, "study");
@@ -20,6 +21,21 @@ test("a manifest written to the published type is one dek reads, and pins as tha
     ? (reading.manifest satisfies Pinned)
     : undefined;
   expect(pinned).toEqual(manifest);
+});
+
+test("PluginRules requires the plugin prefix and exactly three digits", () => {
+  const valid: PluginRules<"STUDY"> = {
+    STUDY001: { severity: "error", summary: "x" },
+  };
+  const tooShort: PluginRules<"STUDY"> = {
+    // @ts-expect-error only one digit, not three
+    STUDY1: { severity: "error", summary: "x" },
+  };
+  const tooLong: PluginRules<"STUDY"> = {
+    // @ts-expect-error four digits, not three
+    STUDY0001: { severity: "error", summary: "x" },
+  };
+  expect([valid, tooShort, tooLong]).toHaveLength(3);
 });
 
 test("a check's output names only the rules its manifest declares", () => {

@@ -97,7 +97,11 @@ export type ManifestReading =
  * dek ran, that every rule id has the plugin's prefix, and that each data file is the deck's own
  * and not dek's. Only what this dek knows is kept, so the lock pins what it can act on.
  */
-export function readManifest(value: unknown, name: string): ManifestReading {
+export function readManifest(
+  value: unknown,
+  name: string,
+  options: { allowPage?: boolean } = {},
+): ManifestReading {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return { ok: false, reason: "the manifest is not a JSON object" };
   }
@@ -118,6 +122,13 @@ export function readManifest(value: unknown, name: string): ManifestReading {
     return { ok: false, reason: formatZodIssues(parsed.error) };
   }
   const manifest = parsed.data;
+  if (manifest.page !== undefined && options.allowPage === false) {
+    return {
+      ok: false,
+      unsupported: true,
+      reason: "it declares a page; this dek only carries pages for official plugins",
+    };
+  }
   const problem =
     (manifest.name === name
       ? undefined
@@ -259,7 +270,11 @@ export function lockText(manifest: PluginManifest): string {
 }
 
 /** The manifest a lock pins, read as `manifest`'s output is, so a newer dek's fields are left out. */
-export function readLock(text: string, name: string): ManifestReading {
+export function readLock(
+  text: string,
+  name: string,
+  options: { allowPage?: boolean } = {},
+): ManifestReading {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -273,7 +288,7 @@ export function readLock(text: string, name: string): ManifestReading {
   if (accepted === undefined) {
     return { ok: false, reason: "it has no `accepted` manifest" };
   }
-  return readManifest(accepted, name);
+  return readManifest(accepted, name, options);
 }
 
 /**

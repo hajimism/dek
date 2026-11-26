@@ -78,6 +78,10 @@ export function bundledPageEntries(): Record<string, string> {
   );
 }
 
+function hasBundledPage(name: string): boolean {
+  return BUNDLED[name]?.page !== undefined;
+}
+
 /**
  * A plugin dek ships, from dek's own files; otherwise
  * `dek-<name>` on the user's PATH, as an absolute path to start it by. A PATH entry that is
@@ -204,7 +208,7 @@ export async function installedManifest(
   } catch {
     return broken("printed something other than JSON");
   }
-  const reading = readManifest(value, name);
+  const reading = readManifest(value, name, { allowPage: hasBundledPage(name) });
   if (!reading.ok) {
     return broken(`printed a manifest dek cannot use: ${reading.reason}`, reading.unsupported);
   }
@@ -363,6 +367,10 @@ function readSarif(
   } catch {
     return "printed something other than SARIF";
   }
+  const version = (log as { version?: unknown } | null)?.version;
+  if (version !== "2.1.0") {
+    return "printed SARIF whose version is not 2.1.0";
+  }
   const runs = (log as { runs?: unknown } | null)?.runs;
   if (!Array.isArray(runs)) {
     return "printed SARIF with no runs";
@@ -467,7 +475,9 @@ function readPluginLock(
   name: string,
 ): { text: string; reading: ManifestReading } | undefined {
   const text = readSourceIfExists(lockPath(root, name), root);
-  return text === undefined ? undefined : { text, reading: readLock(text, name) };
+  return text === undefined
+    ? undefined
+    : { text, reading: readLock(text, name, { allowPage: hasBundledPage(name) }) };
 }
 
 /**

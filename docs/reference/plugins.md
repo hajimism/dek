@@ -189,7 +189,7 @@ Prints the manifest as JSON on stdout and exits 0:
 | `name` | The `<name>` of `dek-<name>` |
 | `version` | One token of letters, digits, `.`, `+`, and `-`, at most 64 characters |
 | `check` | Optional. Without it, dek runs no check |
-| `page` | Optional: `{ "api": 1, "keys": ["r"] }`, a page in the player and the build that calls page API 1, and the letters it binds, none of dek's own (`a f l m p s`). For now only an official plugin's page reaches a deck ([ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)) |
+| `page` | Optional: `{ "api": 1, "keys": ["r"] }`, a page in the player and the build that calls page API 1, and the letters it binds, none of dek's own (`a f l m p s`). For now only official plugins shipped with dek may declare `page`; third-party plugins declaring it are reported as `unsupported` by `dekc sync` ([ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md), [ADR 111](https://github.com/hajimism/dek/blob/main/adr/0111-refuse-page-declarations-on-third-party-plugins-until-a-page-protocol-exists.md)) |
 | `check.protocol` | The version of the exchange below: `1` |
 | `check.rules` | Every rule id the check can report. An id is the name in capitals, with `_` for `-`, then three digits: `glossary` → `GLOSSARY001`, `acme-talks` → `ACME_TALKS001` |
 | `…severity` | `error` or `warning`. dek uses this, not a result's SARIF `level`; only an error fails lint |
@@ -223,6 +223,7 @@ Print SARIF 2.1.0 on stdout and exit 0, with or without findings. A non-zero exi
 
 | SARIF | dek's diagnostic |
 | --- | --- |
+| `version` | Required: `"2.1.0"` |
 | `ruleId` | `id`; it must be in `check.rules` |
 | `message.text` | `message`; required |
 | `locations[0].physicalLocation.artifactLocation.uri` | `path`: relative to the deck's folder, or a `file:` URL inside it or inside `pluginDir`. A location elsewhere is dropped. `slides/<slug>.html`, `.css`, or `.ts` also sets `slug` |

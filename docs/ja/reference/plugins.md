@@ -189,7 +189,7 @@ import type { CheckInput, CheckOutput, PluginManifest } from "@hajimism/dek/plug
 | `name` | `dek-<name>` の `<name>` |
 | `version` | 英数字と `.`・`+`・`-` のみで構成される 64 文字以内の文字列 |
 | `check` | 省略可。省略すると検査を実行しない |
-| `page` | 省略可。`{ "api": 1, "keys": ["r"] }` の形式で、プレイヤーとビルドに組み込むページ API 1 の拡張とショートカットキーを宣言する。キーは dek 本体（`a f l m p s`）と被らない英小文字 1 字。現時点では公式プラグインのページのみ有効（[ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)） |
+| `page` | 省略可。`{ "api": 1, "keys": ["r"] }` の形式で、プレイヤーとビルドに組み込むページ API 1 の拡張とショートカットキーを宣言する。キーは dek 本体（`a f l m p s`）と被らない英小文字 1 字。現時点では dek 同梱の公式プラグインのみ宣言でき、サードパーティプラグインが宣言すると `dekc sync` が `unsupported` として拒否する（[ADR 33](https://github.com/hajimism/dek/blob/main/adr/0033-show-a-plugin-s-page-in-the-player-and-builds-behind-page-api-1.md)・[ADR 111](https://github.com/hajimism/dek/blob/main/adr/0111-refuse-page-declarations-on-third-party-plugins-until-a-page-protocol-exists.md)） |
 | `check.protocol` | 検査プロトコルのバージョン（`1`） |
 | `check.rules` | 報告しうる全ルール ID の定義。ID はプラグイン名を大文字化（`-` は `_`）し、3 桁数字を続けた形式（例：`glossary` → `GLOSSARY001`、`acme-talks` → `ACME_TALKS001`） |
 | `…severity` | `error` または `warning`。SARIF の `level` ではなくこの定義が使われ、lint を失敗させるのは `error` のみ |
@@ -223,6 +223,7 @@ dek はデッキごとに 1 回、そのデッキのフォルダを作業ディ�
 
 | SARIF | dek の診断フィールド |
 | --- | --- |
+| `version` | 必須（`"2.1.0"`） |
 | `ruleId` | `id`（`check.rules` に定義済みであること） |
 | `message.text` | `message`（必須） |
 | `locations[0].physicalLocation.artifactLocation.uri` | `path`。デッキからの相対パス、またはデッキ内・`pluginDir` 内を指す `file:` URL（範囲外のパスは無視）。`slides/<slug>.html`・`.css`・`.ts` なら `slug` も自動設定 |
