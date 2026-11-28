@@ -16,8 +16,12 @@ export type PluginRule = {
   summary: string;
 };
 
+type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+
 /** A plugin's rules by id: `<PREFIX>` and three digits, the prefix the name in capitals with `_` for `-`. */
-export type PluginRules<Prefix extends string = string> = Record<`${Prefix}${number}`, PluginRule>;
+export type PluginRules<Prefix extends string = string> = Partial<
+  Record<`${Prefix}${Digit}${Digit}${Digit}`, PluginRule>
+>;
 
 /** What `dek-<name> manifest` prints: the promise the project pins in `plugins/<name>/plugin.json`. */
 export type PluginManifest<Prefix extends string = string> = {
@@ -28,7 +32,11 @@ export type PluginManifest<Prefix extends string = string> = {
   version: string;
   /** Without it, dek runs no check. */
   check?: { protocol: 1; rules: PluginRules<Prefix> };
-  /** A page in the player and the build, which calls `dek.plugin` (page API 1). */
+  /**
+   * A page in the player and the build, which calls `dek.plugin` (page API 1). For now only
+   * official plugins shipped with dek may declare `page`; third-party plugins declaring it are
+   * reported as `unsupported`.
+   */
   page?: {
     api: 1;
     /** Single letters the page binds; none of dek's own (a f l m p s). */
@@ -69,6 +77,7 @@ export type CheckInput = {
 export type CheckResult<RuleId extends string = string> = {
   /** A rule the manifest declares; its severity is the manifest's, whatever `level` says. */
   ruleId: RuleId;
+  /** Non-empty after trimming; dek normalizes it to one line of at most 300 characters. */
   message: { text: string };
   locations?: Array<{
     physicalLocation: {
@@ -80,11 +89,14 @@ export type CheckResult<RuleId extends string = string> = {
       region?: { startLine: number; startColumn?: number };
     };
   }>;
-  /** What to do next. */
+  /** What to do next; dek normalizes it to one line of at most 300 characters. */
   properties?: { hint?: string };
 };
 
-/** What `dek-<name> check` prints on stdout: SARIF 2.1.0, of which dek reads each run's results. */
+/**
+ * What `dek-<name> check` prints on stdout: SARIF 2.1.0 (`version` must be `"2.1.0"`), of which
+ * dek reads each run's results.
+ */
 export type CheckOutput<RuleId extends string = string> = {
   version: "2.1.0";
   $schema?: string;

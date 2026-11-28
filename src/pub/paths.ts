@@ -42,6 +42,19 @@ export const paths = {
   deviceToken: "/api/auth/device/token",
 } as const;
 
+/** A profile's page path on dek.pub, `/@handle`. */
+export function profilePath(handle: string): string {
+  return `/@${handle}`;
+}
+
+/** A talk's page path on dek.pub, `/@handle/slug`. */
+export function talkPath(handle: string, slug: string): string {
+  return `${profilePath(handle)}/${slug}`;
+}
+
+/** Matches a talk's page path, `/@handle/slug`, with an optional trailing slash. */
+export const TALK_PATH = /^\/@([a-z0-9-]+)\/([a-z0-9-]+)\/?$/i;
+
 /** An ID as one path segment: a `/`, `?`, `#`, or `..` in it cannot reach another path. */
 function segment(id: string): string {
   return encodeURIComponent(id);

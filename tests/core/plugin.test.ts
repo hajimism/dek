@@ -326,6 +326,23 @@ describe("a manifest's page", () => {
     });
   });
 
+  test("refuses a page as unsupported when allowPage is false", () => {
+    const withPage = paged({ api: 1, keys: ["r"] });
+    expect(readManifest(withPage, "study", { allowPage: false })).toMatchObject({
+      ok: false,
+      unsupported: true,
+      reason: expect.stringContaining("official plugins"),
+    });
+    expect(
+      readLock(lockText({ ...manifest, page: { api: 1, keys: ["r"] } }), "study", {
+        allowPage: false,
+      }),
+    ).toMatchObject({
+      ok: false,
+      unsupported: true,
+    });
+  });
+
   test("refuses a key dek binds, a key that is no single letter, and a key named twice", () => {
     for (const key of DEK_KEYS) {
       expect(reason(paged({ api: 1, keys: [key] }))).toContain(`\`${key}\``);

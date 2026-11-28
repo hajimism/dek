@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
+import type { z } from "zod";
 import pkg from "../../package.json";
 import { shotCommand } from "../core/annotations.ts";
 import { type Diagnostic, hasErrors, type SkippedCheck } from "../core/diagnostic.ts";
@@ -14,7 +14,6 @@ import { locateQuote } from "../core/pub/quote.ts";
 import { forgetKey, type Key, readKey, readStoredKey, tokenFor } from "../core/pub/store.ts";
 import {
   deckSource,
-  fileName,
   type PreparedVersion,
   prepareVersion,
   refreshPreparedSource,
@@ -35,7 +34,8 @@ import {
   DeckDeleted,
   DeckFound,
   DeckStatus,
-  Grant,
+  fileName,
+  GrantAdded,
   GrantList,
   GrantRemoved,
   KeysRevoked,
@@ -44,8 +44,12 @@ import {
   PublishResult,
   paths,
   Reply,
+  RevokedKey,
+  SLUG_TAKEN,
   SlideMapSlide,
+  STALE_BASE,
   shotField,
+  TALK_PATH,
   VersionManifest,
   Visibility,
 } from "../pub/protocol.ts";
@@ -181,7 +185,7 @@ export async function logoutCommand(flags: FlagValues): Promise<PubResult> {
       const answer = await request(
         origin,
         { method: "DELETE", path: paths.revokeKey, what: "the API key", key },
-        Revoked,
+        RevokedKey,
       );
       revoked = answer.revoked;
       if (!revoked) {
@@ -200,9 +204,6 @@ export async function logoutCommand(flags: FlagValues): Promise<PubResult> {
     ...(reason !== undefined ? { reason } : {}),
   };
 }
-
-/** What revoking a key answers: whether the server knew it and took it back. */
-const Revoked = z.object({ revoked: z.boolean() });
 
 /**
  * `dekc pub logout --all`: revoke every key of the account, with the key there is here, DEK_TOKEN
@@ -532,7 +533,7 @@ export async function publishCommand(
       PublishResult,
     );
   } catch (error) {
-    if (error instanceof PubError && error.status === 409 && error.code === "stale_base") {
+    if (error instanceof PubError && error.status === 409 && error.code === STALE_BASE) {
       throw new DekError("another version of the deck was published since this run looked", {
         hint: `run \`${pubCommand("status", flags)}\` to see the current version, then \`${pubCommand("publish", flags)}\` again`,
         cause: error,
@@ -588,7 +589,7 @@ async function createDeck(
       DeckStatus,
     );
   } catch (error) {
-    if (error instanceof PubError && error.code === "slug_taken") {
+    if (error instanceof PubError && error.code === SLUG_TAKEN) {
       throw new DekError(error.message, {
         hint: `pass --slug <slug> to make this deck under another slug, or put the ID of the deck at ${body.slug} in pub: in script.md to publish onto it; \`${pubCommand("status", flags)}\` reads a deck by its pub:`,
         cause: error,
@@ -790,9 +791,6 @@ export async function takedownCommand(talk: string, flags: FlagValues): Promise<
   };
 }
 
-/** A talk's URL on `origin`, `/@handle/slug`, as the page has it. */
-const TALK_PATH = /^\/@([a-z0-9-]+)\/([a-z0-9-]+)\/?$/i;
-
 /** The deck a takedown names: by its ID as it is, or by its talk's URL on the server asked. */
 function talkNamed(
   word: string,
@@ -863,8 +861,7 @@ export async function grantAddCommand(
   const origin = serverOrigin(flags.server);
   const id = requireDeckId(target, flags);
   const key = await requireKey(origin, flags);
-  const before = await grantList(origin, id, key);
-  const grant = await request(
+  const { invited, ...grant } = await request(
     origin,
     {
       method: "POST",
@@ -877,9 +874,8 @@ export async function grantAddCommand(
         ...(flags.side !== undefined ? { side: flags.side } : {}),
       },
     },
-    Grant,
+    GrantAdded,
   );
-  const invited = !before.grants.some((row) => row.id === grant.id);
   return { action: "grant", server: origin, grant, invited };
 }
 

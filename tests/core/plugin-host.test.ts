@@ -330,6 +330,8 @@ describe("checkDeck", () => {
       const cases: Array<[Record<string, unknown>, string]> = [
         [{ checkExit: 2 }, "exited 2"],
         [{ sarifRaw: "nope" }, "SARIF"],
+        [{ sarifRaw: JSON.stringify({ runs: [] }) }, "2\\.1\\.0"],
+        [{ sarifRaw: JSON.stringify({ version: "1.0.0", runs: [] }) }, "2\\.1\\.0"],
         [{ sarifRaw: JSON.stringify({ version: "2.1.0" }) }, "SARIF"],
         [{ sarif: sarif([{ ruleId: "QUIZ009", message: { text: "x" } }]) }, "QUIZ009"],
         [{ sarif: sarif([{ ruleId: "QUIZ001" }]) }, "message"],
@@ -516,6 +518,55 @@ describe("syncPlugins", () => {
       expect(existsSync(join(root, "plugins"))).toBe(false);
     });
   });
+
+  test.serial(
+    "refuses a third-party plugin that declares a page as unsupported, without writing a lock",
+    async () => {
+      await withPluginProject(QUIZ, async (root, binDir) => {
+        installPlugin(binDir, "quiz", {
+          manifest: quizManifest({ page: { api: 1, keys: ["q"] } }),
+        });
+        const project = resolveProject(root);
+        expect(await syncPlugins(project)).toEqual({
+          plugins: [
+            {
+              name: "quiz",
+              status: "unsupported",
+              reason: expect.stringContaining("official plugins"),
+              hint: "update dek",
+            },
+          ],
+          created: [],
+          updated: [],
+        });
+        expect(existsSync(join(root, "plugins"))).toBe(false);
+        expect(pinnedPlugins(root)).toEqual([{ name: "quiz", manifest: undefined }]);
+      });
+    },
+  );
+
+  test.serial(
+    "ignores a pre-existing third-party lock with a page so AGENTS.md does not advertise dead keys",
+    async () => {
+      await withPluginProject(QUIZ, async (root) => {
+        mkdirSync(join(root, "plugins", "quiz"), { recursive: true });
+        writeFileSync(lockPath(root), lockText({ ...accepted(), page: { api: 1, keys: ["q"] } }));
+        expect(pinnedPlugins(root)).toEqual([{ name: "quiz", manifest: undefined }]);
+        expect(await pluginChecks(resolveProject(root))).toEqual({
+          ready: [],
+          skipped: [
+            {
+              check: "plugin",
+              plugin: "quiz",
+              reason: expect.stringContaining("official plugins"),
+              hint: "update dek",
+            },
+          ],
+          diagnostics: [],
+        });
+      });
+    },
+  );
 
   test.serial(
     "refuses to accept a plugin dek.toml does not name, before writing anything",

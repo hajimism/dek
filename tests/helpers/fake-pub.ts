@@ -15,6 +15,8 @@ import {
   PROTOCOL_HEADER,
   PROTOCOL_VERSION,
   ShareRequest,
+  SLUG_TAKEN,
+  STALE_BASE,
   shotField,
   VERSION_FILES,
   VersionManifest,
@@ -249,7 +251,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if ([...fake.decks.values()].some((deck) => deck.slug === parsed.data.slug)) {
         return error(
           409,
-          "slug_taken",
+          SLUG_TAKEN,
           `you already have a deck at /@${fake.me.handle}/${parsed.data.slug}`,
           "put that deck's ID in pub: in script.md, or rename the deck folder",
         );
@@ -338,7 +340,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
       if (!before) {
         deck.grants.push(grant);
       }
-      return Response.json(grant, { status: 201 });
+      return Response.json({ ...grant, invited: !before }, { status: 201 });
     }
     const grantPath = rest.match(/^\/grants\/([^/]+)$/);
     if (method === "DELETE" && grantPath) {
@@ -382,7 +384,7 @@ export async function withFakePub<T>(fn: (fake: FakePub) => Promise<T>): Promise
     if (manifest.base !== deck.current) {
       return error(
         409,
-        "stale_base",
+        STALE_BASE,
         `version ${deck.current ?? "none"} is the current one, not ${manifest.base ?? "none"}`,
         "someone published since; run `dekc pub status` and publish again",
       );

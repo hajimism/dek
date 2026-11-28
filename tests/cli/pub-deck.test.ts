@@ -229,7 +229,9 @@ describe("dekc pub grants", () => {
         grant: { who: "ann", role: "comment", side: "team" },
         invited: true,
       });
-      expect(fake.requests.at(-1)).toMatchObject({
+      // Single round-trip: POST /grants returns `invited` directly without a prior GET.
+      expect(fake.requests).toHaveLength(1);
+      expect(fake.requests[0]).toMatchObject({
         method: "POST",
         path: `/api/decks/${id}/grants`,
         json: { who: "@Ann", role: "comment", side: "team" },

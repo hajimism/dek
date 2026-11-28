@@ -15,7 +15,7 @@ import {
 } from "@schema";
 import type { Context } from "hono";
 import { and, count, db, desc, eq, isNotNull, sql } from "void/db";
-import type { DeckStatus } from "../../../../../src/pub/protocol.ts";
+import { type DeckStatus, SLUG_TAKEN } from "../../../../../src/pub/protocol.ts";
 import { ApiError, notFound } from "../../common/api-error.ts";
 import { now } from "../../common/db.server.ts";
 import { appUrl } from "../../common/http.server.ts";
@@ -134,7 +134,7 @@ export async function createDeck(owner: Person, slug: string, title: string): Pr
   if (await deckBySlug(owner.id, slug)) {
     throw new ApiError(
       409,
-      "slug_taken",
+      SLUG_TAKEN,
       `you already have a deck at ${talkPath(owner.handle, slug)}`,
       "put that deck's ID in pub: in script.md, or rename the deck folder",
     );

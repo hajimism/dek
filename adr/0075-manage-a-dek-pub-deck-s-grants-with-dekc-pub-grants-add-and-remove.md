@@ -8,6 +8,8 @@ Accepted
 
 Amended by [84. Limit the invitations a dek.pub owner's grants mail to 20 in any 24 hours, counted in D1](0084-limit-the-invitations-a-dek-pub-owner-s-grants-mail-to-20-in-any-24-hours-counted-in-d1.md)
 
+Amended by [112. Tighten dek.pub protocol negotiation and return invited from POST grants](0112-tighten-dek-pub-protocol-negotiation-and-return-invited-from-post-grants.md)
+
 ## Context
 
 A deck is shared with people by grants: each names a handle or an email address, a role (`view` or `comment`, ADR 52) and a side (`team` or `guest`, ADR 51 and 64). Only the manage page makes them. `src/pub/protocol.ts` already has their paths and shapes, and the API takes an API key as it does for `publish`, but `dekc pub` has no command for them. An agent that publishes a deck and sets who may open it with `dekc pub share` must then send a person to a web page to say who it is shared with.

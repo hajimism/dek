@@ -1,6 +1,11 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { MAX_VERSION_BYTES, type SlideMap, type VersionFile } from "../../pub/protocol.ts";
+import {
+  fileName,
+  MAX_VERSION_BYTES,
+  type SlideMap,
+  type VersionFile,
+} from "../../pub/protocol.ts";
 import { loadConfig } from "../config.ts";
 import { renderDeckDocument } from "../document.ts";
 import { DekError } from "../error.ts";
@@ -95,11 +100,6 @@ export function writePreparedFiles({ project, deck }: Target, version: PreparedV
   for (const file of version.files) {
     writeInside(join(scratch, fileName(file.field)), file.bytes, project.root);
   }
-}
-
-/** The file a field is kept as, and sent as: its extension says its type. */
-export function fileName(field: VersionFile): string {
-  return field === "source" ? "source.tar" : field === "cover" ? "cover.png" : `${field}.html`;
 }
 
 function prepared(field: VersionFile, bytes: Uint8Array<ArrayBuffer>, type: string): PreparedFile {

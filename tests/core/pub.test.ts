@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { z } from "zod";
 import { deckSlug } from "../../src/cli/pub.ts";
 import { DEFAULT_SERVER, serverOrigin } from "../../src/core/pub/client.ts";
 import { awaitLogin, hostLabel, startLogin } from "../../src/core/pub/login.ts";
@@ -8,7 +9,8 @@ import { locateQuote } from "../../src/core/pub/quote.ts";
 import { forgetKey, readKey, storeKey } from "../../src/core/pub/store.ts";
 import { deckSource, requireUploadable } from "../../src/core/pub/version.ts";
 import { resolveProject } from "../../src/core/resolve.ts";
-import { answerOf, CommentList, paths } from "../../src/pub/protocol.ts";
+import { profilePath, TALK_PATH, talkPath } from "../../src/pub/paths.ts";
+import { answerOf, CommentList, fileName, paths } from "../../src/pub/protocol.ts";
 import { withFakePub } from "../helpers/fake-pub.ts";
 import { withTempDir } from "../helpers/fs.ts";
 import { withTempProject } from "../helpers/project.ts";
@@ -248,6 +250,36 @@ describe("the protocol", () => {
     });
     expect(read.comments[0]?.author).toEqual({ name: "Ann", handle: "ann" });
     expect(() => answerOf(CommentList).parse({ comments: [{ ...row, status: "lost" }] })).toThrow();
+  });
+
+  test("loosens objects inside z.record and z.partialRecord", () => {
+    const item = z.strictObject({ n: z.number() });
+    const full = z.strictObject({ items: z.record(z.string(), item) });
+    const partial = z.strictObject({
+      byKind: z.partialRecord(z.enum(["a", "b"]), item),
+    });
+
+    expect(full.safeParse({ items: { x: { n: 1, future: true } } }).success).toBe(false);
+    expect(answerOf(full).parse({ items: { x: { n: 1, future: true } }, extra: 1 })).toEqual({
+      items: { x: { n: 1 } },
+    });
+
+    expect(partial.safeParse({ byKind: { a: { n: 2, future: true } } }).success).toBe(false);
+    expect(answerOf(partial).parse({ byKind: { a: { n: 2, future: true } } })).toEqual({
+      byKind: { a: { n: 2 } },
+    });
+    expect(() => answerOf(partial).parse({ byKind: { c: { n: 2 } } })).toThrow();
+  });
+
+  test("shares version file names and talk path helpers", () => {
+    expect(fileName("full")).toBe("full.html");
+    expect(fileName("public")).toBe("public.html");
+    expect(fileName("bare")).toBe("bare.html");
+    expect(fileName("source")).toBe("source.tar");
+    expect(fileName("cover")).toBe("cover.png");
+    expect(profilePath("ann")).toBe("/@ann");
+    expect(talkPath("ann", "why-dek")).toBe("/@ann/why-dek");
+    expect(TALK_PATH.exec(talkPath("ann", "why-dek"))?.slice(1, 3)).toEqual(["ann", "why-dek"]);
   });
 
   test("puts each ID in its path as one segment", () => {

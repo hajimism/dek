@@ -9,6 +9,4 @@ export function handleOf(segment: string | undefined): string | null {
   return isHandle(handle) ? handle : null;
 }
 
-export function profilePath(handle: string): string {
-  return `/@${handle}`;
-}
+export { profilePath } from "../../../../../src/pub/paths.ts";
