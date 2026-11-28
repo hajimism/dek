@@ -2,6 +2,36 @@
 
 Release notes for `@hajimism/dek`. From 0.1.0 on, release-please writes this file from the Conventional Commits on `main`.
 
+## [0.8.1](https://github.com/hajimism/dek/compare/v0.8.0...v0.8.1) (2026-11-28)
+
+
+### Features
+
+* give the deck's page on the dev server as url in dekc goto and dekc current ([47e8300](https://github.com/hajimism/dek/commit/47e8300c26276846e8bba756fca9d790c77b570d))
+* run one dev server for each deck, side by side ([b5db991](https://github.com/hajimism/dek/commit/b5db9910f342d53596fbdb198abaacd6e1bff78e))
+* run one dev server for each deck, side by side ([28d8227](https://github.com/hajimism/dek/commit/28d82270e586ee9770ff858dc090a1f902a3e844))
+
+
+### Bug Fixes
+
+* **cli:** validate pub publish before mutations and scope unsandboxed tracking ([4aa2e32](https://github.com/hajimism/dek/commit/4aa2e32f9a2c114e38e5e9d9faab66b588a96b8f)), closes [#170](https://github.com/hajimism/dek/issues/170) [#176](https://github.com/hajimism/dek/issues/176)
+* draw the files theme.css and a slide's stylesheet load in shots, visual lint, and pptx ([5d5e5b6](https://github.com/hajimism/dek/commit/5d5e5b69807cca2682ff71b6f860c26b99609698))
+* keep a deck to one dev server through a raced lock and an unparsed script ([9778594](https://github.com/hajimism/dek/commit/9778594e9bb1b66a8354aea354b2c4ddd7e15a8e))
+* **plugin:** refuse third-party page declarations and align plugin-api with runtime ([2ae212c](https://github.com/hajimism/dek/commit/2ae212c7fe32d46a72cb0ad0e116d522a6efe810)), closes [#178](https://github.com/hajimism/dek/issues/178)
+* **pub:** tighten protocol negotiation, share wire contracts, and return invited from POST grants ([e0adc11](https://github.com/hajimism/dek/commit/e0adc1154688a2e6e03227fac1133c78864b8116)), closes [#171](https://github.com/hajimism/dek/issues/171)
+* resolve CSS URL rewriting, pub publish pre-flight validation, and unsandboxed contract tracking ([6dacbf0](https://github.com/hajimism/dek/commit/6dacbf016cf04159adf475726b61b00d1bfb62a9))
+* resolve plugin-api page/rule validation and dek.pub protocol gaps ([185c0d7](https://github.com/hajimism/dek/commit/185c0d707af134e9b2cadbf262327348519b2f89))
+* say the dev server is not running when its lock points at nothing ([7eabfa7](https://github.com/hajimism/dek/commit/7eabfa773ebc149f7f9034511a41d2ddeb67e470))
+* say what a running dev server lacks of what a second start asked for ([594b6dc](https://github.com/hajimism/dek/commit/594b6dcc82a98f3116be384d51b77dd5eed80c78))
+* start over a lock whose server is gone though another process has its pid ([f457ca6](https://github.com/hajimism/dek/commit/f457ca6fe00bb070606a2c846b705aed53d1d0c1))
+
+
+### Documentation
+
+* polish Japanese docs, sample decks, and dek-words rules ([5ad4416](https://github.com/hajimism/dek/commit/5ad4416ce02f7d6c459db52bdff401f9d1258c3b))
+* polish Japanese documentation and fix dekc command typos ([f156b3b](https://github.com/hajimism/dek/commit/f156b3b987c54231b36192a52a4569a31d889d15))
+* **sample:** polish sample decks and extend dek-words rules ([5e8f03f](https://github.com/hajimism/dek/commit/5e8f03f30e5e212b0e142eebb5d23228f5fbdd99))
+
 ## [0.8.0](https://github.com/hajimism/dek/compare/v0.7.0...v0.8.0) (2026-11-19)
 
 
